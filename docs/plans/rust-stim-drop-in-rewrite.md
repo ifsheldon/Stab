@@ -185,7 +185,7 @@ Done criteria:
 
 - `just oracle::run --milestone M4` passes for all M4 exact-output and structural cases.
 - `cargo test -p stab-core parser` and `cargo test -p stab-core gates` pass.
-- Parser fuzz smoke runs in CI or is documented as a local long-running target.
+- Parser fuzz smoke runs in CI or is documented as a local long-running target; the current local target is `just rust::parser-fuzz`.
 - `just bench::compare --milestone M4` reports parser/printer throughput against the M3 C++ baseline, even if performance is not yet gated.
 
 ### M5: Portable SIMD Bit Core
