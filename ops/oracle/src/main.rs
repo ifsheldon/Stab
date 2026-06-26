@@ -9,6 +9,7 @@
     )
 )]
 
+mod fixtures;
 mod matrix;
 
 use std::ffi::{OsStr, OsString};
@@ -58,7 +59,29 @@ enum Command {
     Run {
         /// Smoke case to execute.
         #[arg(long = "case")]
-        case: OracleCase,
+        case: Option<OracleCase>,
+
+        /// Run all manifest fixtures that are marked implemented.
+        #[arg(long)]
+        implemented_only: bool,
+
+        /// Run implemented manifest fixtures and report red or ignored cases.
+        #[arg(long)]
+        all: bool,
+
+        /// Reconfigure and rebuild the C++ Stim oracle even if a binary exists.
+        #[arg(long)]
+        rebuild_stim: bool,
+    },
+
+    /// List oracle fixtures grouped by milestone, parity mode, and status.
+    List,
+
+    /// Record or check exact-output fixtures from pinned Stim.
+    Record {
+        /// Fail if generated exact outputs differ from committed fixtures.
+        #[arg(long)]
+        check_clean: bool,
 
         /// Reconfigure and rebuild the C++ Stim oracle even if a binary exists.
         #[arg(long)]
@@ -91,7 +114,13 @@ enum OracleCase {
 #[derive(Debug, Error)]
 enum OracleError {
     #[error(transparent)]
+    Fixture(#[from] fixtures::FixtureError),
+
+    #[error(transparent)]
     Matrix(#[from] matrix::MatrixError),
+
+    #[error("{0}")]
+    InvalidRunSelection(String),
 
     #[error("failed to resolve repository root {path}: {source}")]
     ResolveRoot {
@@ -215,6 +244,13 @@ impl RepoRoot {
         self.path.join("oracle").join("compatibility-matrix.csv")
     }
 
+    fn fixture_manifest(&self) -> PathBuf {
+        self.path
+            .join("oracle")
+            .join("fixtures")
+            .join("manifest.csv")
+    }
+
     fn stab_cli_binary(&self) -> PathBuf {
         self.path
             .join("target")
@@ -311,14 +347,50 @@ fn run(cli: Cli) -> Result<(), OracleError> {
         Command::Version => {
             print_version(&root)?;
         }
-        Command::Run { case, rebuild_stim } => {
-            run_smoke_case(&root, case, rebuild_stim)?;
+        Command::Run {
+            case,
+            implemented_only,
+            all,
+            rebuild_stim,
+        } => {
+            run_selected_cases(&root, case, implemented_only, all, rebuild_stim)?;
+        }
+        Command::List => {
+            fixtures::list_fixtures(&root)?;
+        }
+        Command::Record {
+            check_clean,
+            rebuild_stim,
+        } => {
+            fixtures::record_fixtures(&root, check_clean, rebuild_stim)?;
         }
         Command::Matrix { check, milestone } => {
             run_matrix_command(&root, check, milestone.as_deref())?;
         }
     }
     Ok(())
+}
+
+fn run_selected_cases(
+    root: &RepoRoot,
+    case: Option<OracleCase>,
+    implemented_only: bool,
+    all: bool,
+    rebuild_stim: bool,
+) -> Result<(), OracleError> {
+    let selected = usize::from(case.is_some()) + usize::from(implemented_only) + usize::from(all);
+    if selected != 1 {
+        return Err(OracleError::InvalidRunSelection(
+            "choose exactly one of --case, --implemented-only, or --all".to_string(),
+        ));
+    }
+    if let Some(case) = case {
+        return run_smoke_case(root, case, rebuild_stim);
+    }
+    if implemented_only {
+        return fixtures::run_fixtures(root, fixtures::RunMode::ImplementedOnly, rebuild_stim);
+    }
+    fixtures::run_fixtures(root, fixtures::RunMode::All, rebuild_stim)
 }
 
 fn run_matrix_command(

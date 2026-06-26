@@ -36,6 +36,18 @@ just oracle::run --case smoke/tiny-circuit
 The tiny-circuit smoke case uses a hidden `stab-cli sample` shim that only exists to prove oracle wiring in M0.
 It is not `stim sample` compatibility; the real command contract belongs to the M8 sampling milestone.
 
+Inspect and check the M2 fixture corpus with:
+
+```sh
+just oracle::list
+just oracle::record --check-clean
+just oracle::run --implemented-only
+just oracle::run --all
+```
+
+The fixture manifest lives at `oracle/fixtures/manifest.csv`.
+It records fixture ids, upstream sources, command shapes, parity modes, comparator types, expected statuses, implementation status, statistical plans, and source-license notes.
+
 Validate the M1 compatibility matrix with:
 
 ```sh

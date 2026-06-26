@@ -13,6 +13,16 @@ version *args:
 run *args:
     cargo run -q -p stab-oracle -- run {{args}}
 
+# List oracle fixtures grouped by milestone, parity mode, and status.
+[working-directory: '..']
+list *args:
+    cargo run -q -p stab-oracle -- list {{args}}
+
+# Record or check exact-output oracle fixtures from pinned Stim.
+[working-directory: '..']
+record *args:
+    cargo run -q -p stab-oracle -- record {{args}}
+
 # Inspect or validate the compatibility matrix.
 [working-directory: '..']
 matrix *args:
