@@ -12,7 +12,8 @@ cpp-circuit-model,src/stim/circuit/circuit.test.cc,cxx-test,stim-format,stab-cor
 cpp-circuit-instruction,src/stim/circuit/circuit_instruction.test.cc,cxx-test,stim-format,stab-core,M4,P0,structural,oracle,planned,,,M4 instruction argument and target validation
 cpp-gate-decomposition,src/stim/circuit/gate_decomposition.test.cc,cxx-test,stim-format,stab-core,M4,P0,structural,oracle,planned,,,M4 decomposition fixtures needed by later simulators
 cpp-gate-target,src/stim/circuit/gate_target.test.cc,cxx-test,targets,stab-core,M4,P0,structural,oracle,planned,,,M4 typed target parsing and validation
-cpp-command-convert,src/stim/cmd/command_convert.test.cc,cxx-test,command-convert,stab-cli,M4,P1,exact-output,oracle,planned,,,M4 convert parse and canonical print oracle cases
+cpp-command-convert-canonical,src/stim/cmd/command_convert.test.cc,cxx-test,command-convert,stab-core,M4,P1,exact-output,oracle,planned,,,M4 extracted parser and canonical print oracle case
+cpp-command-convert-cli,src/stim/cmd/command_convert.test.cc,cxx-test,command-convert,stab-cli,M7,P1,exact-output,oracle,planned,,,M7 public convert CLI exact-output cases
 cpp-command-gen,src/stim/cmd/command_gen.test.cc,cxx-test,command-gen,stab-cli,M7,P1,exact-output,oracle,planned,,,M7 generated circuit golden CLI cases
 cpp-command-sample,src/stim/cmd/command_sample.test.cc,cxx-test,command-sample,stab-cli,M8,P1,exact-output-and-statistical,oracle,planned,,,M8 deterministic sample exact cases and noisy statistical cases
 cpp-command-detect,src/stim/cmd/command_detect.test.cc,cxx-test,command-detect,stab-cli,M9,P1,exact-output,oracle,planned,,,M9 detection CLI exact cases

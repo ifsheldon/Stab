@@ -407,6 +407,7 @@ fn unsafe_component(component: Component<'_>) -> bool {
 const REQUIRED_BENCHMARK_IDS: &[&str] = &[
     "m4-circuit-parse",
     "m4-circuit-canonical-print",
+    "m7-convert-stim-canonical",
     "m7-gen-repetition-d3-r3",
     "m7-gen-repetition-d3-r30",
     "m7-gen-repetition-d5-r5",

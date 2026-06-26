@@ -211,11 +211,9 @@ fn read_baseline_report(path: &Path) -> Result<BaselineReport, BenchError> {
 }
 
 fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, BenchError> {
-    if row.runner == Runner::ContractOnly {
-        return Ok(Some(Vec::new()));
-    }
     match row.id.as_str() {
         "m7-cli-dispatch" => Ok(Some(m7::run_cli_dispatch_row(row)?)),
+        "m7-convert-stim-canonical" => Ok(Some(m7::run_convert_stim_row(row)?)),
         "m4-circuit-parse" => {
             let sparse_fixture = m4_stim_parse_sparse_fixture();
             Ok(Some(vec![
@@ -486,6 +484,7 @@ fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, 
                 })?,
             ]))
         }
+        _ if row.runner == Runner::ContractOnly => Ok(Some(Vec::new())),
         _ => m7::run_generator_compare_row(row),
     }
 }
@@ -745,6 +744,9 @@ fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     if row_id == "m7-cli-dispatch" && name == "stab_cli_dispatch_gen_d3_r3" {
         return Some((1.0, "dispatches/s"));
     }
+    if row_id == "m7-convert-stim-canonical" && name == "stab_convert_stim_canonical" {
+        return Some((M4_PARSE_FIXTURE.len() as f64, "bytes/s"));
+    }
     match (row_id, name) {
         ("m5-simd-bit-table", "stab_bit_matrix_row_xor_128x128_contract") => {
             Some(((M5_BIT_TABLE_BITS - 1) as f64, "row-xors/s"))
@@ -796,6 +798,9 @@ fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m7-cli-dispatch" => Some(
             "report-only: Stab measures in-process gen dispatch; upstream baseline is sample-heavy main dispatch",
+        ),
+        "m7-convert-stim-canonical" => Some(
+            "contract-only baseline: Stab measures in-process canonical .stim conversion; pinned Stim has no matching circuit-convert CLI",
         ),
         id if id.starts_with("m7-gen-") => Some(
             "report-only: Stab measures direct Rust generator construction and formatting-independent circuit access",

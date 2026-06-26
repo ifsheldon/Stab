@@ -16,6 +16,7 @@ m6-tableau-iter,M6,report-only,stim-perf,src/stim/stabilizers/tableau_iter.perf.
 m6-stabilizers-to-tableau,M6,report-only,stim-perf,src/stim/util_top/stabilizers_to_tableau.perf.cc,stabilizers_to_tableau_*,,,analysis,stabilizers-to-tableau,stabilizer conversion workloads
 m7-perf-harness,M7,baseline-metadata,contract-only,src/stim/main.perf.cc,,,,startup,perf-harness,Stim perf harness source and baseline metadata anchor
 m7-cli-dispatch,M7,report-only,stim-perf,src/stim/main_namespaced.perf.cc,main_sample*,,,startup,cli-dispatch,namespaced CLI dispatch and sample command workloads
+m7-convert-stim-canonical,M7,report-only,contract-only,src/stim/cmd/command_convert.test.cc,,,,throughput,convert-stim-canonical,Stab canonical .stim convert throughput contract
 m7-gen-repetition-d3-r3,M7,report-only,stim-cli,src/stim/cmd/command_gen.test.cc,,gen|--code|repetition_code|--task|memory|--distance|3|--rounds|3,,generation,gen-repetition,repetition code d3 r3 generation workload
 m7-gen-repetition-d3-r30,M7,report-only,stim-cli,src/stim/cmd/command_gen.test.cc,,gen|--code|repetition_code|--task|memory|--distance|3|--rounds|30,,generation,gen-repetition,repetition code d3 r30 generation workload
 m7-gen-repetition-d5-r5,M7,report-only,stim-cli,src/stim/cmd/command_gen.test.cc,,gen|--code|repetition_code|--task|memory|--distance|5|--rounds|5,,generation,gen-repetition,repetition code d5 r5 generation workload

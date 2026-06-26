@@ -24,6 +24,9 @@ const CLI_DISPATCH_ARGS: &[&str] = &[
     "--rounds",
     "3",
 ];
+const CONVERT_STIM_ARGS: &[&str] = &["stab", "convert", "--in_format=stim", "--out_format=stim"];
+const CONVERT_STIM_FIXTURE: &str =
+    include_str!("../../../../oracle/fixtures/inputs/parser_basic.stim");
 
 pub(super) fn run_cli_dispatch_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     Ok(vec![measure_stab("stab_cli_dispatch_gen_d3_r3", || {
@@ -40,6 +43,30 @@ pub(super) fn run_cli_dispatch_row(row: &BenchmarkRow) -> Result<Vec<Measurement
                 row_id: row.id.clone(),
                 message: format!(
                     "stab-cli dispatch failed with status {status}: {}",
+                    String::from_utf8_lossy(&stderr)
+                ),
+            });
+        }
+        black_box(stdout.len());
+        Ok(())
+    })?])
+}
+
+pub(super) fn run_convert_stim_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    Ok(vec![measure_stab("stab_convert_stim_canonical", || {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = stab_cli::run_from(
+            CONVERT_STIM_ARGS,
+            CONVERT_STIM_FIXTURE.as_bytes(),
+            &mut stdout,
+            &mut stderr,
+        );
+        if status != 0 {
+            return Err(BenchError::StabRunner {
+                row_id: row.id.clone(),
+                message: format!(
+                    "stab-cli convert failed with status {status}: {}",
                     String::from_utf8_lossy(&stderr)
                 ),
             });

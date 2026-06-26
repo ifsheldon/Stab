@@ -263,7 +263,7 @@ impl RepoRoot {
         self.path
             .join("target")
             .join("debug")
-            .join(format!("stab-cli{}", std::env::consts::EXE_SUFFIX))
+            .join(format!("stab{}", std::env::consts::EXE_SUFFIX))
     }
 }
 
@@ -563,7 +563,7 @@ fn build_stamp_content(version: &StimSourceVersion) -> String {
 fn ensure_stab_cli_binary(root: &RepoRoot) -> Result<PathBuf, OracleError> {
     run_checked(
         "cargo",
-        ["build", "-q", "-p", "stab-cli"],
+        ["build", "-q", "-p", "stab-cli", "--bin", "stab"],
         b"",
         Some(&root.path),
     )?;

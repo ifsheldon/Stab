@@ -102,6 +102,15 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now makes comparator imple
 
 ## Open Entries
 
+## 2026-06-27 - M7: Generated Fixture Matrix Scope
+
+Status: Open
+Revealed by: milestone audit of M7 generator oracle rows and structural generator tests.
+Current text: M7 says to store generated circuit fixture matrices by family, task, distance, rounds, and noise settings for later M8 through M12 reuse, and says `stab-cli gen` output must match Stim v1.16.0 for the compatibility matrix of families, tasks, distances, rounds, and noise settings.
+Gap: the milestone does not define the concrete matrix dimensions, required noise settings, fixture artifact format, acceptable storage size, whether every matrix point needs exact CLI golden output or direct Rust structural parity, or how the matrix is reused by later milestones without checking in very large circuit outputs.
+Proposed amendment: define a primary M7 generator matrix with explicit family, task, distance, round, and noise tuples; require exact CLI goldens only for a small public-command subset and direct Rust structural or generated-on-demand oracle checks for the larger matrix; name the fixture artifact location and the later milestones that consume each fixture group.
+Resolution: pending plan update.
+
 ## 2026-06-27 - M7: Convert Command Circuit Versus Result-Format Scope
 
 Status: Open

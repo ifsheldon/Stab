@@ -234,11 +234,12 @@ enum CliError {
 pub fn run_from<I, S, R, W, E>(args: I, mut input: R, mut stdout: W, mut stderr: E) -> i32
 where
     I: IntoIterator<Item = S>,
-    S: Into<OsString> + Clone,
+    S: Into<OsString>,
     R: Read,
     W: Write,
     E: Write,
 {
+    let args = normalize_legacy_gen_args(args);
     let cli = match Cli::try_parse_from(args) {
         Ok(cli) => cli,
         Err(error) => {
@@ -268,6 +269,38 @@ where
             1
         }
     }
+}
+
+fn normalize_legacy_gen_args<I, S>(args: I) -> Vec<OsString>
+where
+    I: IntoIterator<Item = S>,
+    S: Into<OsString>,
+{
+    let mut args = args.into_iter().map(Into::into).collect::<Vec<_>>();
+    if args.len() < 2 {
+        return args;
+    }
+
+    let legacy_arg = args
+        .get(1)
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if let Some(code) = legacy_arg.strip_prefix("--gen=") {
+        args.splice(
+            1..2,
+            [
+                OsString::from("gen"),
+                OsString::from("--code"),
+                OsString::from(code),
+            ],
+        );
+    } else if legacy_arg == "--gen" && args.len() >= 3 {
+        if let Some(arg) = args.get_mut(1) {
+            *arg = OsString::from("gen");
+        }
+        args.insert(2, OsString::from("--code"));
+    }
+    args
 }
 
 fn run_gen<W>(args: GenArgs, stdout: &mut W) -> Result<(), CliError>

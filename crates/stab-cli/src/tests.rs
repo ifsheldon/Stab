@@ -32,6 +32,63 @@ fn gen_repetition_code_matches_m7_oracle_golden() {
 }
 
 #[test]
+fn legacy_gen_repetition_code_matches_m7_oracle_golden() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "--gen=repetition_code",
+            "--task",
+            "memory",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+        ],
+        "".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!("../../../oracle/fixtures/expected/m7_gen_repetition_code.stdout")
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn legacy_gen_space_separated_code_matches_m7_oracle_golden() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "--gen",
+            "repetition_code",
+            "--task",
+            "memory",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+        ],
+        "".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!("../../../oracle/fixtures/expected/m7_gen_repetition_code.stdout")
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
 fn gen_surface_rotated_code_matches_m7_oracle_golden() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
