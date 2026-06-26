@@ -16,7 +16,7 @@ pub use error::{CircuitError, CircuitResult};
 pub use gate::{Gate, GateCategory};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};
 pub use stabilizers::{
-    FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError,
-    StabilizerResult,
+    CliffordString, FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString,
+    SingleQubitClifford, StabilizerError, StabilizerResult,
 };
 pub use target::{Pauli, Target};

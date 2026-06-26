@@ -7,7 +7,9 @@
 use std::str::FromStr;
 
 use proptest::prelude::*;
-use stab_core::{FlexPauliString, PauliBasis, PauliPhase, PauliString};
+use stab_core::{
+    CliffordString, FlexPauliString, Gate, PauliBasis, PauliPhase, PauliString, SingleQubitClifford,
+};
 
 #[test]
 fn stabilizers_pauli_string_dense_text_round_trips_follow_stim() {
@@ -271,6 +273,87 @@ fn stabilizers_flex_pauli_multiplication_matches_stim() {
     );
 }
 
+#[test]
+fn stabilizers_clifford_string_set_gate_at_vs_str_vs_gate_at_matches_stim() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/clifford_string.test.cc.
+    let gates = upstream_clifford_gate_order();
+    let mut cliffords = CliffordString::identity(gates.len());
+    for (index, gate) in gates.iter().copied().enumerate() {
+        cliffords
+            .set_gate_at(index, gate)
+            .expect("set Clifford gate");
+    }
+
+    assert_eq!(
+        cliffords.to_string(),
+        "_I _X _Y _Z HI HX HY HZ SI SX SY SZ VI VX VY VZ uI uX uY uZ dI dX dY dZ"
+    );
+    for (index, gate) in gates.into_iter().enumerate() {
+        assert_eq!(cliffords.gate_at(index), Some(gate));
+    }
+    assert_eq!(cliffords.gate_at(24), None);
+}
+
+#[test]
+fn stabilizers_single_qubit_clifford_gate_conversion_matches_stim() {
+    for gate in SingleQubitClifford::all() {
+        let parsed_gate = Gate::from_name(gate.canonical_name()).expect("single-qubit gate name");
+        assert_eq!(
+            SingleQubitClifford::from_gate(parsed_gate).expect("single-qubit Clifford"),
+            gate
+        );
+    }
+    assert!(SingleQubitClifford::from_gate(Gate::from_name("CX").expect("CX")).is_err());
+}
+
+#[test]
+fn stabilizers_clifford_string_known_identities_match_stim() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/clifford_string.test.cc known_identities.
+    let h = CliffordString::from_gates([SingleQubitClifford::H]);
+    let s = CliffordString::from_gates([SingleQubitClifford::S]);
+    let s_dag = CliffordString::from_gates([SingleQubitClifford::SDag]);
+
+    assert_eq!(h.multiply(&h).expect("H*H"), CliffordString::identity(1));
+    assert_eq!(
+        s.multiply(&s).expect("S*S"),
+        CliffordString::from_gates([SingleQubitClifford::Z])
+    );
+    assert_eq!(
+        h.multiply(&s_dag).expect("H*S_DAG"),
+        CliffordString::from_gates([SingleQubitClifford::Cxyz])
+    );
+}
+
+#[test]
+fn stabilizers_clifford_string_concat_repeat_and_padding_are_stim_like() {
+    let left = CliffordString::from_gates([SingleQubitClifford::H, SingleQubitClifford::S]);
+    let right = CliffordString::from_gates([SingleQubitClifford::X]);
+
+    assert_eq!(left.concat(&right).expect("concat").to_string(), "HI SI _X");
+    assert_eq!(right.repeat(3).expect("repeat").to_string(), "_X _X _X");
+    assert_eq!(left.multiply(&right).expect("padded multiply").len(), 2);
+}
+
+#[test]
+fn stabilizers_single_qubit_clifford_multiplication_is_associative() {
+    let gates = SingleQubitClifford::all().collect::<Vec<_>>();
+    for left in gates.iter().copied() {
+        for middle in gates.iter().copied() {
+            for right in gates.iter().copied() {
+                let lhs = left
+                    .multiply(middle)
+                    .expect("left middle")
+                    .multiply(right)
+                    .expect("(left middle) right");
+                let rhs = left
+                    .multiply(middle.multiply(right).expect("middle right"))
+                    .expect("left (middle right)");
+                assert_eq!(lhs, rhs);
+            }
+        }
+    }
+}
+
 proptest! {
     #[test]
     fn stabilizers_pauli_product_is_associative_for_small_dense_strings(
@@ -305,6 +388,35 @@ fn pauli(text: &str) -> PauliString {
 
 fn flex(text: &str) -> FlexPauliString {
     FlexPauliString::from_str(text).expect("parse FlexPauliString")
+}
+
+fn upstream_clifford_gate_order() -> Vec<SingleQubitClifford> {
+    vec![
+        SingleQubitClifford::I,
+        SingleQubitClifford::X,
+        SingleQubitClifford::Y,
+        SingleQubitClifford::Z,
+        SingleQubitClifford::H,
+        SingleQubitClifford::SqrtYDag,
+        SingleQubitClifford::Hnxz,
+        SingleQubitClifford::SqrtY,
+        SingleQubitClifford::S,
+        SingleQubitClifford::Hxy,
+        SingleQubitClifford::Hnxy,
+        SingleQubitClifford::SDag,
+        SingleQubitClifford::SqrtXDag,
+        SingleQubitClifford::SqrtX,
+        SingleQubitClifford::Hnyz,
+        SingleQubitClifford::Hyz,
+        SingleQubitClifford::Cxyz,
+        SingleQubitClifford::Cxynz,
+        SingleQubitClifford::Cnxyz,
+        SingleQubitClifford::Cxnyz,
+        SingleQubitClifford::Czyx,
+        SingleQubitClifford::Cznyx,
+        SingleQubitClifford::Cnzyx,
+        SingleQubitClifford::Czynx,
+    ]
 }
 
 fn assert_commutes(left: &str, right: &str, expected: bool) {
