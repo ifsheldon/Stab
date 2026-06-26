@@ -1,8 +1,8 @@
 use std::fmt::{Display, Formatter};
 
-use crate::gate::TargetGroupKind;
+use crate::gate::{ArgRule, TargetGroupKind};
 use crate::target::parse_target_token;
-use crate::{CircuitError, CircuitResult, Gate, RepeatCount, Target};
+use crate::{CircuitError, CircuitResult, Gate, ObservableId, Probability, RepeatCount, Target};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Circuit {
@@ -108,6 +108,51 @@ impl CircuitInstruction {
 
     pub fn args(&self) -> &[f64] {
         &self.args
+    }
+
+    /// Returns this instruction's optional probability argument when the gate has one.
+    pub fn probability_argument(&self) -> CircuitResult<Option<Probability>> {
+        if !matches!(
+            self.gate.arg_rule(),
+            ArgRule::ZeroOrOneProbability | ArgRule::ProbabilityList(1)
+        ) {
+            return Ok(None);
+        }
+        self.args
+            .first()
+            .copied()
+            .map(|arg| probability_from_validated_arg(self.gate.canonical_name(), arg))
+            .transpose()
+    }
+
+    /// Returns this instruction's disjoint probability-list arguments when the gate has them.
+    pub fn probability_arguments(&self) -> CircuitResult<Option<Vec<Probability>>> {
+        if !matches!(self.gate.arg_rule(), ArgRule::ProbabilityList(_)) {
+            return Ok(None);
+        }
+        self.args
+            .iter()
+            .copied()
+            .map(|arg| probability_from_validated_arg(self.gate.canonical_name(), arg))
+            .collect::<CircuitResult<Vec<_>>>()
+            .map(Some)
+    }
+
+    /// Returns this instruction's observable id argument when the gate has one.
+    pub fn observable_id_argument(&self) -> CircuitResult<Option<ObservableId>> {
+        if self.gate.arg_rule() != ArgRule::UnsignedInteger {
+            return Ok(None);
+        }
+        self.args
+            .first()
+            .copied()
+            .map(|arg| observable_id_from_validated_arg(self.gate.canonical_name(), arg))
+            .transpose()
+    }
+
+    /// Returns coordinate-like arguments for gates whose argument list is arbitrary floats.
+    pub fn coordinate_arguments(&self) -> Option<&[f64]> {
+        (self.gate.arg_rule() == ArgRule::Any).then_some(&self.args)
     }
 
     pub fn targets(&self) -> &[Target] {
@@ -584,6 +629,29 @@ fn write_escaped_tag(out: &mut String, tag: &str) {
 
 fn normalize_tag(tag: Option<String>) -> Option<String> {
     tag.filter(|tag| !tag.is_empty())
+}
+
+fn probability_from_validated_arg(gate: &'static str, arg: f64) -> CircuitResult<Probability> {
+    Probability::try_new(arg).map_err(|_| CircuitError::InvalidArgument {
+        gate,
+        argument: arg.to_string(),
+    })
+}
+
+fn observable_id_from_validated_arg(gate: &'static str, arg: f64) -> CircuitResult<ObservableId> {
+    if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 || arg > f64::from(u32::MAX) {
+        return Err(CircuitError::InvalidArgument {
+            gate,
+            argument: arg.to_string(),
+        });
+    }
+    let value = format!("{arg:.0}")
+        .parse::<u32>()
+        .map_err(|_| CircuitError::InvalidArgument {
+            gate,
+            argument: arg.to_string(),
+        })?;
+    Ok(ObservableId::new(value))
 }
 
 fn format_float(value: f64) -> String {

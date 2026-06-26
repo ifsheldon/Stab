@@ -19,6 +19,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Resolved Entries
 
+## 2026-06-27 - M4: Canonical Printer Benchmark Baseline
+
+Status: Resolved
+Revealed by: milestone audit of the M4 benchmark evidence.
+Current text: M4 required `just bench::compare --milestone M4` to report parser and printer throughput against the M3 C++ baseline, while `m4-circuit-canonical-print` was a contract-only row.
+Gap: pinned Stim v1.16.0 has parser and gate lookup perf runners but no direct C++ canonical-printer benchmark runner; using public `stim convert` would benchmark result-format conversion, not `.stim` canonical printing.
+Proposed amendment: state that M4 reports parser throughput and gate lookup against the C++ baseline, and reports Stab-only canonical-printer timing against an explicit contract-only printer row without claiming a Stab-vs-Stim printer comparison.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now names the narrower M4 benchmark evidence and the general contract-only benchmark rule.
+
 ## 2026-06-27 - M3: Benchmark Compare Acceptance
 
 Status: Resolved

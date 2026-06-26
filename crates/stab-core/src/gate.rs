@@ -56,6 +56,10 @@ impl Gate {
         self.info.target_rule.validate(self.info.name, targets)
     }
 
+    pub(crate) fn arg_rule(self) -> ArgRule {
+        self.info.arg_rule
+    }
+
     pub(crate) fn target_group_kind(self) -> TargetGroupKind {
         self.info.target_rule.target_group_kind()
     }
@@ -76,7 +80,7 @@ struct GateInfo {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ArgRule {
+pub(crate) enum ArgRule {
     Exact(usize),
     Any,
     ZeroOrOneProbability,

@@ -715,6 +715,50 @@ fn typed_boundaries_reject_invalid_values() {
 }
 
 #[test]
+fn instruction_typed_argument_accessors_preserve_stim_domains() {
+    let circuit = Circuit::from_stim_str(concat!(
+        "X_ERROR(0.125) 0\n",
+        "PAULI_CHANNEL_1(0.1, 0.2, 0.3) 1\n",
+        "OBSERVABLE_INCLUDE(7) rec[-1]\n",
+        "DETECTOR(2, 3.5) rec[-1]\n",
+        "H 2\n",
+    ))
+    .expect("parse typed argument fixture");
+    let mut instructions = circuit
+        .items()
+        .iter()
+        .map(|item| item.as_instruction().expect("instruction"));
+    let x_error = instructions.next().expect("X_ERROR");
+    let pauli_channel = instructions.next().expect("PAULI_CHANNEL_1");
+    let observable = instructions.next().expect("OBSERVABLE_INCLUDE");
+    let detector = instructions.next().expect("DETECTOR");
+    let h = instructions.next().expect("H");
+    assert!(instructions.next().is_none());
+
+    assert_eq!(
+        x_error.probability_argument().unwrap(),
+        Some(Probability::try_new(0.125).unwrap())
+    );
+    assert_eq!(
+        pauli_channel.probability_arguments().unwrap(),
+        Some(vec![
+            Probability::try_new(0.1).unwrap(),
+            Probability::try_new(0.2).unwrap(),
+            Probability::try_new(0.3).unwrap(),
+        ])
+    );
+    assert_eq!(
+        observable.observable_id_argument().unwrap(),
+        Some(ObservableId::new(7))
+    );
+    assert_eq!(detector.coordinate_arguments(), Some(&[2.0, 3.5][..]));
+    assert_eq!(h.probability_argument().unwrap(), None);
+    assert_eq!(h.probability_arguments().unwrap(), None);
+    assert_eq!(h.observable_id_argument().unwrap(), None);
+    assert_eq!(h.coordinate_arguments(), None);
+}
+
+#[test]
 fn probability_typed_boundary_matches_stim_argument_validation() {
     // Adapted from Stim v1.16.0 src/stim/util_bot/probability_util.test.cc validation responsibilities.
     assert_eq!(Probability::try_new(0.0).unwrap().get(), 0.0);

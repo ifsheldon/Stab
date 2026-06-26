@@ -145,7 +145,8 @@ Tasks:
 - Add `just bench::compare` to read a default or explicit C++ Stim baseline report, run Stab-side comparison runners for supported rows, report pending Stab runners explicitly, and make `--strict` fail when selected rows are still pending.
 - Store benchmark results in machine-readable files under a documented generated-artifact directory and summarize them in a concise human-readable report.
 - Define benchmark contracts for parser/printer throughput, `gen`, tableau operations, sampling analysis time, sampling throughput, `detect`, `m2d`, `analyze_errors`, `.dem` parse/print, and `sample_dem`.
-  Contracts without a direct pinned C++ executable benchmark runner are allowed as explicit contract-only rows, but they must name their upstream source and owning milestone and must become runnable before an implementation milestone claims a performance comparison.
+  Contracts without a direct pinned C++ executable benchmark runner are allowed as explicit contract-only rows, but they must name their upstream source and owning milestone and must become runnable before an implementation milestone claims a performance comparison for that workload.
+  An implementation milestone may still report Stab-only timing for a contract-only row when the milestone explicitly accepts that narrower evidence.
 - Separate startup time, compile/analysis time, single-shot latency, and batch throughput where those phases are meaningfully different.
 
 Linked tests and benchmarks:
@@ -180,13 +181,14 @@ Linked tests and benchmarks:
 - CLI oracle tests: `src/stim/cmd/command_convert.test.cc` for parse/canonical-print behavior.
 - Semantic-mining tests: `src/stim/circuit/*_pybind_test.py`, `src/stim/gates/gates_test.py`, and selected parser examples from Cirq tests only when they expose core `.stim` behavior.
 - Benchmarks: `.stim` parse throughput, canonical print throughput, and gate lookup.
+  Canonical print currently has a contract-only pinned-Stim baseline because Stim v1.16.0 does not provide a direct C++ printer benchmark runner; M4 reports Stab-only printer timing and does not claim a Stab-vs-Stim printer comparison.
 
 Done criteria:
 
 - `just oracle::run --milestone M4` passes for all M4 exact-output and structural cases.
 - `cargo test -p stab-core parser` and `cargo test -p stab-core gates` pass.
 - Parser fuzz smoke runs in CI or is documented as a local long-running target; the current local target is `just rust::parser-fuzz`.
-- `just bench::compare --milestone M4` reports parser/printer throughput against the M3 C++ baseline, even if performance is not yet gated.
+- `just bench::compare --milestone M4` reports parser throughput and gate lookup against the M3 C++ baseline, plus Stab-only canonical printer throughput against the explicit contract-only printer row, even if performance is not yet gated.
 
 ### M5: Portable SIMD Bit Core
 

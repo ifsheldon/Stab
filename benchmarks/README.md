@@ -18,4 +18,5 @@ Use `--only` with exact benchmark ids or milestone names, for example `--only m4
 `just bench::compare` reads `target/benchmarks/baseline/latest/baseline.json` by default.
 Pass `--baseline <path>` to compare against a different generated baseline report.
 Compare prints Stab-side timings for rows whose implementation milestone has a runner and prints pending rows explicitly for future milestones.
+When a row is contract-only, compare may report Stab-side timing with `stim=contract-only`; that is not a Stab-vs-Stim performance comparison for the row.
 Pass `--strict` to fail when any selected row is still pending.
