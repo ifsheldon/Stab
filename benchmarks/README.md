@@ -14,3 +14,8 @@ Generated benchmark artifacts belong under `target/benchmarks/` and are not sour
 The default baseline command writes `target/benchmarks/baseline/latest/baseline.json` and `target/benchmarks/baseline/latest/report.md`.
 Any explicit `--out` value must be a repository-relative path under `target/benchmarks/`.
 Use `--only` with exact benchmark ids or milestone names, for example `--only m4-circuit-parse` or `--only M9`.
+
+`just bench::compare` reads `target/benchmarks/baseline/latest/baseline.json` by default.
+Pass `--baseline <path>` to compare against a different generated baseline report.
+Compare prints Stab-side timings for rows whose implementation milestone has a runner and prints pending rows explicitly for future milestones.
+Pass `--strict` to fail when any selected row is still pending.

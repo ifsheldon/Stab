@@ -299,7 +299,7 @@ bench-pauli-string-iter,src/stim/stabilizers/pauli_string_iter.perf.cc,perf,paul
 bench-tableau,src/stim/stabilizers/tableau.perf.cc,perf,tableau,stab-bench,M6,Bench,performance,benchmark,planned,,,M6 tableau benchmark
 bench-tableau-iter,src/stim/stabilizers/tableau_iter.perf.cc,perf,tableau,stab-bench,M6,Bench,performance,benchmark,planned,,,M6 tableau iterator benchmark
 bench-error-decomp,src/stim/util_bot/error_decomp.perf.cc,perf,dem-analysis,stab-bench,M10,Bench,performance,benchmark,planned,,,M10 error decomposition benchmark
-bench-probability-util,src/stim/util_bot/probability_util.perf.cc,perf,probability,stab-bench,M4,Bench,performance,benchmark,planned,,,M4 probability utility benchmark
+bench-probability-util,src/stim/util_bot/probability_util.perf.cc,perf,sampler,stab-bench,M8,Bench,performance,benchmark,planned,,,M8 biased random probability utility benchmark
 bench-reference-sample-tree,src/stim/util_top/reference_sample_tree.perf.cc,perf,sampler,stab-bench,M8,Bench,performance,benchmark,planned,,,M8 reference sample tree benchmark
 bench-stabilizers-to-tableau,src/stim/util_top/stabilizers_to_tableau.perf.cc,perf,tableau,stab-bench,M6,Bench,performance,benchmark,planned,,,M6 stabilizers to tableau benchmark
 m12-oracle-m4,future/oracle-m4,future,stim-format,stab-oracle,M12,P1,structural,oracle,planned,,,M12 reruns M4 oracle matrix rows before performance hardening

@@ -1847,6 +1847,7 @@ dependencies = [
  "csv",
  "serde",
  "serde_json",
+ "stab-core",
  "tempfile",
  "thiserror",
  "wait-timeout",

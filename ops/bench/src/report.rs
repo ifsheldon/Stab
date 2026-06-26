@@ -3,14 +3,14 @@ use std::num::NonZeroUsize;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::BenchError;
 use crate::manifest::{Milestone, Runner};
 use crate::process::{check_success, run_process};
 use crate::root::RepoRoot;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct BaselineReport {
     pub(crate) schema_version: u32,
     pub(crate) generated_unix_epoch_seconds: u64,
@@ -20,7 +20,7 @@ pub(crate) struct BaselineReport {
     pub(crate) rows: Vec<BaselineRowResult>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct MachineMetadata {
     os: String,
     arch: String,
@@ -30,7 +30,7 @@ pub(crate) struct MachineMetadata {
     cmake_version: String,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct StimMetadata {
     pub(crate) source_path: String,
     pub(crate) expected_tag: String,
@@ -39,14 +39,14 @@ pub(crate) struct StimMetadata {
     pub(crate) actual_commit: String,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct BaselineCommandMetadata {
     pub(crate) target_seconds: f64,
     pub(crate) cli_iterations: u32,
     pub(crate) filters: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct BaselineRowResult {
     pub(crate) id: String,
     pub(crate) milestone: Milestone,
@@ -60,14 +60,14 @@ pub(crate) struct BaselineRowResult {
     pub(crate) measurements: Vec<Measurement>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct RowCommandMetadata {
     pub(crate) program: String,
     pub(crate) args: Vec<String>,
     pub(crate) stdin_path: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub(crate) struct Measurement {
     pub(crate) name: String,
     pub(crate) seconds: f64,

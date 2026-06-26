@@ -1,6 +1,9 @@
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::hint::black_box;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
+
+use stab_core::{Circuit, Gate};
 
 use crate::config::{PREFIX, STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
@@ -13,6 +16,9 @@ use crate::report::{
 use crate::root::RepoRoot;
 use crate::stim::{ensure_stim_binaries, validate_stim_source};
 
+const STAB_COMPARE_ITERATIONS: usize = 128;
+const M4_PARSE_FIXTURE: &str = include_str!("../../../oracle/fixtures/inputs/parser_basic.stim");
+
 #[derive(Clone, Debug)]
 pub(crate) struct BaselineOptions {
     pub(crate) stim: PathBuf,
@@ -21,6 +27,13 @@ pub(crate) struct BaselineOptions {
     pub(crate) cli_iterations: u32,
     pub(crate) only: Vec<String>,
     pub(crate) rebuild_stim: bool,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct CompareOptions {
+    pub(crate) baseline: PathBuf,
+    pub(crate) milestone: Option<String>,
+    pub(crate) strict: bool,
 }
 
 pub(crate) fn run_baseline(
@@ -97,33 +110,146 @@ pub(crate) fn run_baseline(
 }
 
 pub(crate) fn run_compare(
+    root: &RepoRoot,
     manifest: &BenchmarkManifest,
-    milestone: Option<&str>,
-    strict: bool,
+    options: &CompareOptions,
 ) -> Result<(), BenchError> {
+    let baseline_path = root.resolve_relative(&options.baseline);
+    let baseline_report = read_baseline_report(&baseline_path)?;
     let rows = manifest
         .rows
         .iter()
-        .filter(|row| milestone.is_none_or(|milestone| milestone == row.milestone.as_str()))
+        .filter(|row| {
+            options
+                .milestone
+                .as_deref()
+                .is_none_or(|milestone| milestone == row.milestone.as_str())
+        })
         .collect::<Vec<_>>();
     println!(
-        "[{PREFIX}] Stab-vs-Stim comparison runners are pending; {} row(s) planned.",
-        rows.len()
+        "[{PREFIX}] comparing {} row(s) against {}",
+        rows.len(),
+        baseline_path.display()
     );
+    let mut pending = Vec::new();
     for row in rows {
-        println!(
-            "- {} {} {} {}",
-            row.milestone.as_str(),
-            row.id,
-            row.threshold_class,
-            row.measurement
-        );
+        let stim_summary = summarize_baseline_row(&baseline_report, &row.id);
+        match run_stab_compare_row(row)? {
+            Some(measurements) => {
+                println!(
+                    "- {} {} status=measured stab={} stim={}",
+                    row.milestone.as_str(),
+                    row.id,
+                    summarize_measurements(&measurements),
+                    stim_summary
+                );
+            }
+            None => {
+                println!(
+                    "- {} {} status=pending stab=no-runner stim={}",
+                    row.milestone.as_str(),
+                    row.id,
+                    stim_summary
+                );
+                pending.push(row.id.clone());
+            }
+        }
     }
-    if strict {
+    if options.strict && !pending.is_empty() {
         Err(BenchError::ComparePending)
     } else {
         Ok(())
     }
+}
+
+fn read_baseline_report(path: &Path) -> Result<BaselineReport, BenchError> {
+    let content = std::fs::read_to_string(path).map_err(|source| BenchError::ReadBaseline {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    Ok(serde_json::from_str(&content)?)
+}
+
+fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, BenchError> {
+    match row.id.as_str() {
+        "m4-circuit-parse" => Ok(Some(vec![measure_stab("stab_parse_parser_basic", || {
+            let circuit = Circuit::from_stim_str(M4_PARSE_FIXTURE).map_err(|error| {
+                BenchError::StabRunner {
+                    row_id: row.id.clone(),
+                    message: error.to_string(),
+                }
+            })?;
+            black_box(circuit.items().len());
+            Ok(())
+        })?])),
+        "m4-circuit-canonical-print" => {
+            let circuit = Circuit::from_stim_str(M4_PARSE_FIXTURE).map_err(|error| {
+                BenchError::StabRunner {
+                    row_id: row.id.clone(),
+                    message: error.to_string(),
+                }
+            })?;
+            Ok(Some(vec![measure_stab("stab_print_parser_basic", || {
+                let text = circuit.to_stim_string();
+                black_box(text.len());
+                Ok(())
+            })?]))
+        }
+        "m4-gate-lookup" => {
+            let names = Gate::all().map(Gate::canonical_name).collect::<Vec<_>>();
+            Ok(Some(vec![measure_stab("stab_gate_lookup_all", || {
+                for name in &names {
+                    let gate = Gate::from_name(name).map_err(|error| BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: error.to_string(),
+                    })?;
+                    black_box(gate);
+                }
+                Ok(())
+            })?]))
+        }
+        _ => Ok(None),
+    }
+}
+
+fn measure_stab(
+    name: &str,
+    mut operation: impl FnMut() -> Result<(), BenchError>,
+) -> Result<Measurement, BenchError> {
+    let mut timings = Vec::with_capacity(STAB_COMPARE_ITERATIONS);
+    for _ in 0..STAB_COMPARE_ITERATIONS {
+        let start = Instant::now();
+        operation()?;
+        timings.push(start.elapsed());
+    }
+    timings.sort();
+    let seconds = timings
+        .get(timings.len() / 2)
+        .map(Duration::as_secs_f64)
+        .unwrap_or_default();
+    Ok(Measurement {
+        name: name.to_string(),
+        seconds,
+        iterations: Some(STAB_COMPARE_ITERATIONS),
+    })
+}
+
+fn summarize_baseline_row(report: &BaselineReport, row_id: &str) -> String {
+    let Some(row) = report.rows.iter().find(|row| row.id == row_id) else {
+        return "missing-baseline".to_string();
+    };
+    if row.measurements.is_empty() {
+        return row.status.clone();
+    }
+    summarize_measurements(&row.measurements)
+}
+
+fn summarize_measurements(measurements: &[Measurement]) -> String {
+    measurements
+        .iter()
+        .map(|measurement| format!("{}={:.9}s", measurement.name, measurement.seconds))
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn run_baseline_row(

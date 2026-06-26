@@ -21,9 +21,9 @@ mod stim;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use baseline::{BaselineOptions, run_baseline, run_compare};
+use baseline::{BaselineOptions, CompareOptions, run_baseline, run_compare};
 use clap::{Parser, Subcommand};
-use config::{DEFAULT_BASELINE_DIR, DEFAULT_STIM_PATH, PREFIX};
+use config::{DEFAULT_BASELINE_DIR, DEFAULT_BASELINE_REPORT, DEFAULT_STIM_PATH, PREFIX};
 use error::BenchError;
 use manifest::BenchmarkManifest;
 use root::RepoRoot;
@@ -87,6 +87,10 @@ enum Command {
         #[arg(long)]
         milestone: Option<String>,
 
+        /// Baseline JSON report produced by `bench::baseline`.
+        #[arg(long, default_value = DEFAULT_BASELINE_REPORT)]
+        baseline: PathBuf,
+
         /// Exit with an error while Stab benchmark comparison runners are pending.
         #[arg(long)]
         strict: bool,
@@ -139,8 +143,20 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                 },
             )?;
         }
-        Command::Compare { milestone, strict } => {
-            run_compare(&manifest, milestone.as_deref(), strict)?;
+        Command::Compare {
+            milestone,
+            baseline,
+            strict,
+        } => {
+            run_compare(
+                &root,
+                &manifest,
+                &CompareOptions {
+                    baseline,
+                    milestone,
+                    strict,
+                },
+            )?;
         }
     }
     Ok(())

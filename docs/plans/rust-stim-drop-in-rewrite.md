@@ -142,7 +142,7 @@ Tasks:
 
 - Create `stab-bench` or an equivalent benchmark package plus `ops` support for benchmark orchestration.
 - Add `just bench::baseline` to compile and benchmark C++ Stim v1.16.0 from `vendor/stim`.
-- Add `just bench::compare` to run Stab and Stim on the same benchmark matrix once Stab supports the feature.
+- Add `just bench::compare` to read a default or explicit C++ Stim baseline report, run Stab-side comparison runners for supported rows, report pending Stab runners explicitly, and make `--strict` fail when selected rows are still pending.
 - Store benchmark results in machine-readable files under a documented generated-artifact directory and summarize them in a concise human-readable report.
 - Define benchmark contracts for parser/printer throughput, `gen`, tableau operations, sampling analysis time, sampling throughput, `detect`, `m2d`, `analyze_errors`, `.dem` parse/print, and `sample_dem`.
   Contracts without a direct pinned C++ executable benchmark runner are allowed as explicit contract-only rows, but they must name their upstream source and owning milestone and must become runnable before an implementation milestone claims a performance comparison.
@@ -179,7 +179,7 @@ Linked tests and benchmarks:
 - Direct or oracle tests: C++ Circuit Model, Parser, Targets, And Decomposition; Gates And Gate Metadata; Input And Output Formats where result-format parsing touches circuit commands.
 - CLI oracle tests: `src/stim/cmd/command_convert.test.cc` for parse/canonical-print behavior.
 - Semantic-mining tests: `src/stim/circuit/*_pybind_test.py`, `src/stim/gates/gates_test.py`, and selected parser examples from Cirq tests only when they expose core `.stim` behavior.
-- Benchmarks: `.stim` parse throughput, canonical print throughput, gate lookup, and `command_convert` startup plus conversion throughput.
+- Benchmarks: `.stim` parse throughput, canonical print throughput, and gate lookup.
 
 Done criteria:
 
@@ -256,14 +256,14 @@ Linked tests and benchmarks:
 
 - Direct tests: C++ Circuit Generation group and CLI Commands group for `command_gen.test.cc` and `command_convert.test.cc`.
 - Related parser tests: M4 `.stim` parse/print fixtures.
-- Benchmarks: `stim gen` workloads for repetition code, rotated surface code, unrotated surface code, and color code circuits from the Benchmark Plan.
+- Benchmarks: `stim gen` workloads for repetition code, rotated surface code, unrotated surface code, and color code circuits from the Benchmark Plan, plus `stim convert` CLI startup and canonical `.stim` conversion throughput.
 
 Done criteria:
 
 - `just oracle::run --milestone M7` passes exact-output `gen` and `convert` golden cases.
 - `stab-cli gen` output matches Stim v1.16.0 for the compatibility matrix of families, tasks, distances, rounds, and noise settings.
 - `stab-cli convert` reads stdin and files and emits canonical `.stim` output for supported circuits.
-- `just bench::compare --milestone M7` reports generator throughput for all primary generated-circuit families.
+- `just bench::compare --milestone M7` reports generator throughput for all primary generated-circuit families and convert throughput for supported `.stim` conversion workflows.
 
 ### M8: Circuit Sampling
 
@@ -283,7 +283,7 @@ Linked tests and benchmarks:
 - Direct tests: C++ Input And Output Formats group for measurement record formats and sparse shots.
 - CLI tests: `src/stim/cmd/command_sample.test.cc`.
 - Semantic-mining tests: Python compiled measurement sampler, frame simulator, tableau simulator, and circuit sampling tests.
-- Benchmarks: `src/stim/simulators/frame_simulator.perf.cc`, `src/stim/simulators/tableau_simulator.perf.cc`, and sampling workloads in the Benchmark Plan.
+- Benchmarks: `src/stim/simulators/frame_simulator.perf.cc`, `src/stim/simulators/tableau_simulator.perf.cc`, `src/stim/util_bot/probability_util.perf.cc`, and sampling workloads in the Benchmark Plan.
 
 Done criteria:
 

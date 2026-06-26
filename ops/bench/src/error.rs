@@ -16,6 +16,12 @@ pub(crate) enum BenchError {
         source: std::io::Error,
     },
 
+    #[error("failed to read benchmark baseline {path}: {source}")]
+    ReadBaseline {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
     #[error("failed to parse benchmark manifest: {0}")]
     ParseManifest(#[from] csv::Error),
 
@@ -55,8 +61,8 @@ pub(crate) enum BenchError {
         source: std::io::Error,
     },
 
-    #[error("failed to serialize benchmark report: {0}")]
-    Serialize(#[from] serde_json::Error),
+    #[error("failed to process benchmark JSON: {0}")]
+    Json(#[from] serde_json::Error),
 
     #[error("failed to start {program}: {source}")]
     Spawn {
@@ -88,6 +94,9 @@ pub(crate) enum BenchError {
 
     #[error("{row_id} produced no parseable stim_perf measurements")]
     MissingPerfMeasurements { row_id: String },
+
+    #[error("{row_id} Stab comparison runner failed: {message}")]
+    StabRunner { row_id: String, message: String },
 
     #[error("benchmark filter matched no rows: {0}")]
     UnmatchedFilter(String),

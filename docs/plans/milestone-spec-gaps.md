@@ -19,6 +19,24 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Resolved Entries
 
+## 2026-06-27 - M3: Benchmark Compare Acceptance
+
+Status: Resolved
+Revealed by: milestone audit of the M3 benchmark harness.
+Current text: M3 asks for `just bench::compare` to run Stab and Stim on the same benchmark matrix once Stab supports the feature, but the done criteria only require `bench::baseline`, `bench::list`, and `bench::smoke`.
+Gap: the milestone does not define what `bench::compare` must accept, read, report, or fail on before implementation milestones start using it as evidence.
+Proposed amendment: require `bench::compare` to read an M3 baseline report or use the documented default, distinguish runnable rows from pending Stab runners, and make `--strict` fail until the owning milestone provides the required Stab runner and comparison output.
+Resolution: `stab-bench compare` now reads the default or explicit baseline report, runs Stab comparison runners for supported rows, reports pending rows explicitly, and makes `--strict` fail when any selected row is pending; `benchmarks/README.md` and `docs/plans/rust-stim-drop-in-rewrite.md` document the behavior.
+
+## 2026-06-27 - M1/M4/M7: CLI Convert Ordering
+
+Status: Resolved
+Revealed by: milestone audit of the M1 compatibility matrix and `just oracle::matrix --milestone M4`.
+Current text: M1 says planned CLI surfaces are covered in implementation order as `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, and `sample_dem`; M4 links `src/stim/cmd/command_convert.test.cc` for parse/canonical-print behavior; M7 tasks say to implement both `stim gen` and `stim convert`.
+Gap: the plan does not clearly say whether M4 implements a public `stim convert` subset, only internal parse-print oracle fixtures, or test metadata that M7 later turns into CLI compatibility.
+Proposed amendment: state that M4 owns the `.stim` parser/printer library contract and may use `command_convert.test.cc` only as oracle evidence for parse/canonical-print semantics, while M7 owns public `stim convert` CLI compatibility unless the plan explicitly promotes a minimal M4 CLI subset.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now limits M4 benchmarks to parser, printer, and gate lookup, and assigns public `stim convert` CLI compatibility and convert throughput to M7.
+
 ## 2026-06-27 - M4/M6/M9: Top-Level Algorithm Fixture Ownership
 
 Status: Resolved
@@ -66,15 +84,6 @@ Gap: the referenced upstream file also tests `sample_hit_indices` and biased ran
 Proposed amendment: state that M4 owns only closed-unit probability validation and disjoint probability-list validation from this file; random hit-index sampling and biased bit generation should move to the first milestone that introduces equivalent RNG and bit/sampler APIs.
 Resolution: pending plan update.
 
-## 2026-06-27 - M3: Benchmark Compare Acceptance
-
-Status: Open
-Revealed by: milestone audit of the M3 benchmark harness.
-Current text: M3 asks for `just bench::compare` to run Stab and Stim on the same benchmark matrix once Stab supports the feature, but the done criteria only require `bench::baseline`, `bench::list`, and `bench::smoke`.
-Gap: the milestone does not define what `bench::compare` must accept, read, report, or fail on before implementation milestones start using it as evidence.
-Proposed amendment: require `bench::compare` to read an M3 baseline report or use the documented default, distinguish runnable rows from pending Stab runners, and make `--strict` fail until the owning milestone provides the required Stab runner and comparison output.
-Resolution: pending plan update.
-
 ## 2026-06-27 - M2: Manifest-Only Subcase Granularity
 
 Status: Open
@@ -82,15 +91,6 @@ Revealed by: milestone audit of the M2 manifest coverage rows.
 Current text: M2 and the test-porting plan allow red or manifest-only oracle cases for all P0 and P1 files needed by M4 through M11.
 Gap: file-level manifest-only rows can satisfy coverage without identifying the upstream subcases, fixture families, malformed-input cases, or extraction criteria that future implementation milestones must port.
 Proposed amendment: require manifest-only rows to name planned subcase groups or extraction criteria for each upstream test file before the owning implementation milestone starts.
-Resolution: pending plan update.
-
-## 2026-06-26 - M1/M4/M7: CLI Convert Ordering
-
-Status: Open
-Revealed by: milestone audit of the M1 compatibility matrix and `just oracle::matrix --milestone M4`.
-Current text: M1 says planned CLI surfaces are covered in implementation order as `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, and `sample_dem`; M4 links `src/stim/cmd/command_convert.test.cc` for parse/canonical-print behavior; M7 tasks say to implement both `stim gen` and `stim convert`.
-Gap: the plan does not clearly say whether M4 implements a public `stim convert` subset, only internal parse-print oracle fixtures, or test metadata that M7 later turns into CLI compatibility.
-Proposed amendment: state that M4 owns the `.stim` parser/printer library contract and may use `command_convert.test.cc` only as oracle evidence for parse/canonical-print semantics, while M7 owns public `stim convert` CLI compatibility unless the plan explicitly promotes a minimal M4 CLI subset.
 Resolution: pending plan update.
 
 ## 2026-06-26 - M0: Upstream Smoke References Overreach
