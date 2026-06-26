@@ -24,6 +24,10 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
     Ok(result)
 }
 
+pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
+    circuit_inverse_unitary(circuit)
+}
+
 fn inverse_instruction(instruction: &CircuitInstruction) -> CircuitResult<CircuitInstruction> {
     let gate = instruction.gate();
     if !is_unitary_category(gate.category()) {

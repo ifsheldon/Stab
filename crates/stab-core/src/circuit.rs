@@ -43,6 +43,10 @@ impl Circuit {
         crate::circuit_inverse_unitary(self)
     }
 
+    pub fn inverse_qec(&self) -> CircuitResult<Self> {
+        crate::circuit_inverse_qec(self)
+    }
+
     pub fn simplified(&self) -> CircuitResult<Self> {
         crate::simplified_circuit(self)
     }
