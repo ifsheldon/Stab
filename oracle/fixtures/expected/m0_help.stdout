@@ -1,0 +1,22 @@
+Available stim commands:
+
+    stim analyze_errors      # Converts a circuit into a detector error model.
+    stim convert             # Convert data between result formats.
+    stim detect              # Sample detection events and observable flips from a circuit.
+    stim diagram             # Produces various kinds of diagrams.
+    stim explain_errors      # Find circuit errors that produce certain detection events.
+    stim gen                 # Generates example circuits.
+    stim help                # Prints helpful information about using stim.
+    stim m2d                 # Convert measurement data into detection event data.
+    stim repl                # Runs stim in interactive read-evaluate-print (REPL) mode.
+    stim sample              # Samples measurements from a circuit.
+    stim sample_dem          # Samples detection events from a detector error model.
+
+Use `stim help [topic]` for help on specific topics. Available topics include:
+
+    stim help commands  # List all tasks performed by stim.
+    stim help gates     # List all circuit instructions supported by stim.
+    stim help formats   # List all result formats supported by stim.
+    stim help [command] # Print information about a command, e.g. "sample".
+    stim help [gate]    # Print information about a gate, e.g. "CNOT".
+    stim help [format]  # Print information about a result format, e.g. "01".

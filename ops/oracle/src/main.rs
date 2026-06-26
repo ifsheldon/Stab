@@ -316,7 +316,7 @@ enum StderrClass {
 struct SmokeCase {
     name: &'static str,
     args: Vec<&'static str>,
-    stdin: &'static str,
+    stdin: &'static [u8],
     comparator: Comparator,
 }
 
@@ -416,7 +416,7 @@ fn fetch_stim(root: &RepoRoot) -> Result<(), OracleError> {
     run_checked(
         "git",
         ["submodule", "update", "--init", "--", VENDOR_STIM_PATH],
-        "",
+        b"",
         Some(&root.path),
     )?;
     validate_stim_source(root)?;
@@ -477,7 +477,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_checked("git", args, "", Some(working_dir))?;
+    let output = run_checked("git", args, b"", Some(working_dir))?;
     Ok(String::from_utf8_lossy(&output.stdout.bytes)
         .trim()
         .to_string())
@@ -505,7 +505,7 @@ fn ensure_stim_binary(root: &RepoRoot, rebuild: bool) -> Result<PathBuf, OracleE
             build_dir.clone().into_os_string(),
             OsString::from("-DCMAKE_BUILD_TYPE=Release"),
         ],
-        "",
+        b"",
         Some(&root.path),
     )?;
     run_checked(
@@ -517,7 +517,7 @@ fn ensure_stim_binary(root: &RepoRoot, rebuild: bool) -> Result<PathBuf, OracleE
             OsString::from("stim"),
             OsString::from("--parallel"),
         ],
-        "",
+        b"",
         Some(&root.path),
     )?;
     if !binary.is_file() {
@@ -548,7 +548,7 @@ fn ensure_stab_cli_binary(root: &RepoRoot) -> Result<PathBuf, OracleError> {
     run_checked(
         "cargo",
         ["build", "-q", "-p", "stab-cli"],
-        "",
+        b"",
         Some(&root.path),
     )?;
     Ok(root.stab_cli_binary())
@@ -590,13 +590,13 @@ fn smoke_case(case: OracleCase) -> SmokeCase {
         OracleCase::SmokeHelp => SmokeCase {
             name: "smoke/help",
             args: vec!["--help"],
-            stdin: "",
+            stdin: b"",
             comparator: Comparator::HelpHealth,
         },
         OracleCase::SmokeTinyCircuit => SmokeCase {
             name: "smoke/tiny-circuit",
             args: vec!["sample", "--shots", "2"],
-            stdin: "M 0\n",
+            stdin: b"M 0\n",
             comparator: Comparator::Exact,
         },
     }
@@ -670,7 +670,7 @@ fn compare_exact(stim: &ProcessOutput, stab: &ProcessOutput) -> Option<String> {
 fn run_checked<I, S>(
     program: &str,
     args: I,
-    stdin: &str,
+    stdin: &[u8],
     working_dir: Option<&Path>,
 ) -> Result<ProcessOutput, OracleError>
 where
@@ -692,7 +692,7 @@ where
 fn run_process<I, S>(
     program: &Path,
     args: I,
-    stdin: &str,
+    stdin: &[u8],
     working_dir: Option<&Path>,
 ) -> Result<ProcessOutput, OracleError>
 where
@@ -733,7 +733,7 @@ where
     let child_stdin = child.stdin.take();
     if let Some(mut child_stdin) = child_stdin {
         child_stdin
-            .write_all(stdin.as_bytes())
+            .write_all(stdin)
             .map_err(|source| OracleError::WriteStdin {
                 program: program.display().to_string(),
                 source,
@@ -851,7 +851,7 @@ mod tests {
 
         assert_eq!(case.name, "smoke/tiny-circuit");
         assert_eq!(case.args, vec!["sample", "--shots", "2"]);
-        assert_eq!(case.stdin, "M 0\n");
+        assert_eq!(case.stdin, b"M 0\n");
         assert_eq!(case.comparator, Comparator::Exact);
     }
 
@@ -861,7 +861,7 @@ mod tests {
 
         assert_eq!(case.name, "smoke/help");
         assert_eq!(case.args, vec!["--help"]);
-        assert_eq!(case.stdin, "");
+        assert_eq!(case.stdin, b"");
         assert_eq!(case.comparator, Comparator::HelpHealth);
     }
 

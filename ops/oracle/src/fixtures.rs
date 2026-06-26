@@ -175,12 +175,25 @@ impl ExpectedStderrClass {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FixturePathRequirement {
+    MustExistFile,
+    ExistingFileIfPresent,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ExpectedStdoutPolicy {
+    RequireExisting,
+    AllowMissing,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 struct CompatibilityRow {
     upstream_path: String,
     source_kind: CompatibilitySourceKind,
     milestone: CompatibilityMilestone,
     priority: CompatibilityPriority,
+    parity_mode: CompatibilityParityMode,
     status: CompatibilityStatus,
 }
 
@@ -225,6 +238,22 @@ enum CompatibilityPriority {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+enum CompatibilityParityMode {
+    #[serde(rename = "exact-output")]
+    ExactOutput,
+    #[serde(rename = "exact-output-and-statistical")]
+    ExactOutputAndStatistical,
+    #[serde(rename = "property")]
+    Property,
+    #[serde(rename = "statistical")]
+    Statistical,
+    #[serde(rename = "structural")]
+    Structural,
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
 enum CompatibilityStatus {
     #[serde(rename = "planned")]
     Planned,
@@ -251,6 +280,33 @@ impl CompatibilityRow {
                 CompatibilityPriority::P0 | CompatibilityPriority::P1
             )
             && self.status == CompatibilityStatus::Planned
+    }
+
+    fn fixture_milestone(&self) -> Option<Milestone> {
+        match self.milestone {
+            CompatibilityMilestone::M4 => Some(Milestone::M4),
+            CompatibilityMilestone::M5 => Some(Milestone::M5),
+            CompatibilityMilestone::M6 => Some(Milestone::M6),
+            CompatibilityMilestone::M7 => Some(Milestone::M7),
+            CompatibilityMilestone::M8 => Some(Milestone::M8),
+            CompatibilityMilestone::M9 => Some(Milestone::M9),
+            CompatibilityMilestone::M10 => Some(Milestone::M10),
+            CompatibilityMilestone::M11 => Some(Milestone::M11),
+            CompatibilityMilestone::Other => None,
+        }
+    }
+
+    fn fixture_parity_mode(&self) -> Option<ParityMode> {
+        match self.parity_mode {
+            CompatibilityParityMode::ExactOutput => Some(ParityMode::ExactOutput),
+            CompatibilityParityMode::ExactOutputAndStatistical => {
+                Some(ParityMode::ExactOutputAndStatistical)
+            }
+            CompatibilityParityMode::Property => Some(ParityMode::Property),
+            CompatibilityParityMode::Statistical => Some(ParityMode::Statistical),
+            CompatibilityParityMode::Structural => Some(ParityMode::Structural),
+            CompatibilityParityMode::Other => None,
+        }
     }
 }
 
@@ -336,6 +392,14 @@ impl FixtureManifest {
     }
 
     fn check(&self, root: &RepoRoot) -> Result<(), FixtureError> {
+        self.check_with_expected_stdout_policy(root, ExpectedStdoutPolicy::RequireExisting)
+    }
+
+    fn check_with_expected_stdout_policy(
+        &self,
+        root: &RepoRoot,
+        expected_stdout_policy: ExpectedStdoutPolicy,
+    ) -> Result<(), FixtureError> {
         let mut violations = Vec::new();
         let mut ids = BTreeSet::new();
         let fixture_root = root.path.join(FIXTURE_ROOT);
@@ -357,6 +421,9 @@ impl FixtureManifest {
             }
             if row.argv_tokens().is_empty() {
                 violations.push(format!("{} has no argv tokens", row.id));
+            }
+            if row.argv.split('|').any(str::is_empty) {
+                violations.push(format!("{} has an empty argv token", row.id));
             }
             if row.comparator == FixtureComparator::ExactOutput
                 && row.status != FixtureStatus::ManifestOnly
@@ -381,12 +448,19 @@ impl FixtureManifest {
                 (
                     "stdin_path",
                     row.stdin_path.as_str(),
-                    !row.stdin_path.is_empty(),
+                    FixturePathRequirement::MustExistFile,
                 ),
                 (
                     "expected_stdout_path",
                     row.expected_stdout_path.as_str(),
-                    false,
+                    match expected_stdout_policy {
+                        ExpectedStdoutPolicy::RequireExisting => {
+                            FixturePathRequirement::MustExistFile
+                        }
+                        ExpectedStdoutPolicy::AllowMissing => {
+                            FixturePathRequirement::ExistingFileIfPresent
+                        }
+                    },
                 ),
             ] {
                 if !relative.is_empty() {
@@ -406,10 +480,10 @@ impl FixtureManifest {
     }
 
     fn check_compatibility_coverage(&self, root: &RepoRoot, violations: &mut Vec<String>) {
-        let fixture_sources = self
+        let fixture_keys = self
             .rows
             .iter()
-            .map(|row| row.upstream_source.as_str())
+            .map(|row| (row.upstream_source.as_str(), row.milestone, row.parity_mode))
             .collect::<BTreeSet<_>>();
         let content = match std::fs::read_to_string(root.compatibility_matrix()) {
             Ok(content) => content,
@@ -424,11 +498,33 @@ impl FixtureManifest {
         for row in reader.deserialize::<CompatibilityRow>() {
             match row {
                 Ok(row) => {
-                    if row.requires_fixture()
-                        && !fixture_sources.contains(row.upstream_path.as_str())
-                    {
-                        violations
-                            .push(format!("missing M2 fixture row for {}", row.upstream_path));
+                    if row.requires_fixture() {
+                        let Some(milestone) = row.fixture_milestone() else {
+                            violations.push(format!(
+                                "missing M2 fixture milestone mapping for {}",
+                                row.upstream_path
+                            ));
+                            continue;
+                        };
+                        let Some(parity_mode) = row.fixture_parity_mode() else {
+                            violations.push(format!(
+                                "missing M2 fixture parity mapping for {}",
+                                row.upstream_path
+                            ));
+                            continue;
+                        };
+                        if !fixture_keys.contains(&(
+                            row.upstream_path.as_str(),
+                            milestone,
+                            parity_mode,
+                        )) {
+                            violations.push(format!(
+                                "missing M2 fixture row for {} ({}/{})",
+                                row.upstream_path,
+                                milestone.as_str(),
+                                parity_mode.as_str()
+                            ));
+                        }
                     }
                 }
                 Err(error) => {
@@ -476,12 +572,12 @@ impl FixtureRow {
             .collect()
     }
 
-    fn stdin(&self, root: &RepoRoot) -> Result<String, FixtureError> {
+    fn stdin(&self, root: &RepoRoot) -> Result<Vec<u8>, FixtureError> {
         if self.stdin_path.is_empty() {
-            return Ok(String::new());
+            return Ok(Vec::new());
         }
         let path = fixture_file(root, &self.stdin_path)?;
-        std::fs::read_to_string(&path).map_err(|source| FixtureError::ReadFile { path, source })
+        std::fs::read(&path).map_err(|source| FixtureError::ReadFile { path, source })
     }
 
     fn expected_stdout_file(&self, root: &RepoRoot) -> Result<PathBuf, FixtureError> {
@@ -500,20 +596,24 @@ pub(crate) fn record_fixtures(
     check_clean: bool,
     rebuild_stim: bool,
 ) -> Result<(), OracleError> {
-    let manifest = load_manifest(root)?;
+    let manifest = load_manifest_with_expected_stdout_policy(
+        root,
+        if check_clean {
+            ExpectedStdoutPolicy::RequireExisting
+        } else {
+            ExpectedStdoutPolicy::AllowMissing
+        },
+    )?;
     let stim_binary = crate::ensure_stim_binary(root, rebuild_stim)?;
     for row in manifest
         .rows
         .iter()
         .filter(|row| row.comparator == FixtureComparator::ExactOutput)
+        .filter(|row| row.status != FixtureStatus::ManifestOnly)
         .filter(|row| !row.expected_stdout_path.is_empty())
     {
-        let output = crate::run_process(
-            &stim_binary,
-            row.argv_tokens(),
-            &row.stdin(root)?,
-            Some(&root.path),
-        )?;
+        let stdin = row.stdin(root)?;
+        let output = crate::run_process(&stim_binary, row.argv_tokens(), &stdin, Some(&root.path))?;
         check_expected_process_shape(row, &output)?;
         let expected_path = row.expected_stdout_file(root)?;
         if check_clean {
@@ -531,14 +631,7 @@ pub(crate) fn record_fixtures(
             }
             println!("[stab-oracle] CLEAN {}", row.id);
         } else {
-            if let Some(parent) = expected_path.parent() {
-                std::fs::create_dir_all(parent).map_err(|source| {
-                    FixtureError::CreateOutputDir {
-                        path: parent.to_path_buf(),
-                        source,
-                    }
-                })?;
-            }
+            prepare_fixture_output_file(root, &row.expected_stdout_path)?;
             std::fs::write(&expected_path, &output.stdout.bytes).map_err(|source| {
                 FixtureError::WriteOutput {
                     path: expected_path.clone(),
@@ -607,6 +700,15 @@ pub(crate) fn run_fixtures(
 fn load_manifest(root: &RepoRoot) -> Result<FixtureManifest, OracleError> {
     let manifest = FixtureManifest::read_from_path(root.fixture_manifest())?;
     manifest.check(root)?;
+    Ok(manifest)
+}
+
+fn load_manifest_with_expected_stdout_policy(
+    root: &RepoRoot,
+    expected_stdout_policy: ExpectedStdoutPolicy,
+) -> Result<FixtureManifest, OracleError> {
+    let manifest = FixtureManifest::read_from_path(root.fixture_manifest())?;
+    manifest.check_with_expected_stdout_policy(root, expected_stdout_policy)?;
     Ok(manifest)
 }
 
@@ -680,23 +782,147 @@ fn validate_fixture_path(
     id: &str,
     field: &str,
     relative: &str,
-    must_exist: bool,
+    requirement: FixturePathRequirement,
 ) -> Result<(), String> {
     let relative_path = Path::new(relative);
-    if relative_path.components().any(unsafe_component) {
-        return Err(format!("{id} has unsafe {field} {relative}"));
+    validate_relative_path_components(id, field, relative_path, relative)?;
+    let canonical_root = fixture_root
+        .canonicalize()
+        .map_err(|source| format!("failed to resolve fixture root {fixture_root:?}: {source}"))?;
+    validate_existing_fixture_components(&canonical_root, id, field, relative_path, requirement)?;
+    let full_path = canonical_root.join(relative_path);
+    if let Ok(canonical_path) = full_path.canonicalize()
+        && !canonical_path.starts_with(&canonical_root)
+    {
+        return Err(format!("{id} {field} escapes fixture root: {relative}"));
     }
-    let full_path = fixture_root.join(relative_path);
-    if must_exist && !full_path.is_file() {
-        return Err(format!("{id} {field} does not exist: {relative}"));
+    if let Some(parent) = full_path.parent()
+        && let Ok(canonical_parent) = parent.canonicalize()
+        && !canonical_parent.starts_with(&canonical_root)
+    {
+        return Err(format!(
+            "{id} {field} parent escapes fixture root: {relative}"
+        ));
     }
     Ok(())
 }
 
+fn validate_relative_path_components(
+    id: &str,
+    field: &str,
+    relative_path: &Path,
+    relative: &str,
+) -> Result<(), String> {
+    let mut has_component = false;
+    for component in relative_path.components() {
+        has_component = true;
+        if unsafe_component(component) {
+            return Err(format!("{id} has unsafe {field} {relative}"));
+        }
+    }
+    if has_component {
+        Ok(())
+    } else {
+        Err(format!("{id} has empty {field}"))
+    }
+}
+
+fn validate_existing_fixture_components(
+    fixture_root: &Path,
+    id: &str,
+    field: &str,
+    relative_path: &Path,
+    requirement: FixturePathRequirement,
+) -> Result<(), String> {
+    let mut current = fixture_root.to_path_buf();
+    let mut components = relative_path.components().peekable();
+    while let Some(component) = components.next() {
+        let Component::Normal(name) = component else {
+            return Err(format!(
+                "{id} has unsafe {field} {}",
+                relative_path.display()
+            ));
+        };
+        current.push(name);
+        let is_final_component = components.peek().is_none();
+        match std::fs::symlink_metadata(&current) {
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink() {
+                    return Err(format!(
+                        "{id} {field} contains symlink: {}",
+                        relative_path.display()
+                    ));
+                }
+                if !is_final_component && !metadata.is_dir() {
+                    return Err(format!(
+                        "{id} {field} has non-directory parent: {}",
+                        relative_path.display()
+                    ));
+                }
+                if is_final_component && !metadata.is_file() {
+                    return Err(format!(
+                        "{id} {field} is not a file: {}",
+                        relative_path.display()
+                    ));
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                if requirement == FixturePathRequirement::MustExistFile {
+                    return Err(format!(
+                        "{id} {field} does not exist: {}",
+                        relative_path.display()
+                    ));
+                }
+                break;
+            }
+            Err(error) => {
+                return Err(format!(
+                    "{id} failed to inspect {field} {}: {error}",
+                    relative_path.display()
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn prepare_fixture_output_file(root: &RepoRoot, relative: &str) -> Result<(), FixtureError> {
+    let fixture_root = root.path.join(FIXTURE_ROOT);
+    validate_fixture_path(
+        &fixture_root,
+        "fixture",
+        "path",
+        relative,
+        FixturePathRequirement::ExistingFileIfPresent,
+    )
+    .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))?;
+    let path = fixture_root.join(relative);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|source| FixtureError::CreateOutputDir {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+    validate_fixture_path(
+        &fixture_root,
+        "fixture",
+        "path",
+        relative,
+        FixturePathRequirement::ExistingFileIfPresent,
+    )
+    .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))
+}
+
 fn fixture_file(root: &RepoRoot, relative: &str) -> Result<PathBuf, FixtureError> {
     let fixture_root = root.path.join(FIXTURE_ROOT);
-    validate_fixture_path(&fixture_root, "fixture", "path", relative, false)
-        .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))?;
+    validate_fixture_path(
+        &fixture_root,
+        "fixture",
+        "path",
+        relative,
+        FixturePathRequirement::ExistingFileIfPresent,
+    )
+    .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))?;
     Ok(fixture_root.join(relative))
 }
 
@@ -709,7 +935,10 @@ fn unsafe_component(component: Component<'_>) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{FixtureComparator, FixtureManifest};
+    use super::{
+        ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement,
+        validate_fixture_path,
+    };
 
     const MANIFEST_CSV: &str = include_str!("../../../oracle/fixtures/manifest.csv");
     const HEADER: &str = "id,milestone,upstream_source,parity_mode,comparator,command_shape,argv,stdin_path,expected_stdout_path,expected_status,expected_stderr_class,status,statistical_plan,source_license_note\n";
@@ -794,5 +1023,97 @@ mod tests {
                 .to_string()
                 .contains("comparator needs structural or statistical plan text")
         );
+    }
+
+    #[test]
+    fn validation_rejects_empty_argv_tokens() {
+        let csv = format!(
+            "{HEADER}bad,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample||--shots|10,inputs/sample_noisy.stim,,0,empty,red,sample_count=10; fixed_seed=1; false_positive_rate<=0.001,hand-authored\n"
+        );
+        let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(std::path::Path::parent)
+            .expect("repo root");
+        let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+        let error = manifest
+            .check(&root)
+            .expect_err("empty argv token should fail");
+
+        assert!(error.to_string().contains("has an empty argv token"));
+    }
+
+    #[test]
+    fn validation_requires_fixture_milestone_and_parity_to_match_matrix() {
+        let csv = format!(
+            "{HEADER}m7-convert-01-to-dets,M7,src/stim/cmd/command_convert.test.cc,exact-output,exact-output,stim convert 01 to dets,convert|--in_format=01|--out_format=dets,inputs/convert_measurements.01,expected/m7_convert_01_to_dets.stdout,0,empty,red,,hand-authored\n"
+        );
+        let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(std::path::Path::parent)
+            .expect("repo root");
+        let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+        let error = manifest
+            .check(&root)
+            .expect_err("M7 convert row must not satisfy M4 coverage");
+
+        assert!(error.to_string().contains(
+            "missing M2 fixture row for src/stim/cmd/command_convert.test.cc (M4/exact-output)"
+        ));
+    }
+
+    #[test]
+    fn validation_requires_declared_expected_stdout_by_default() {
+        let csv = format!(
+            "{HEADER}bad,M4,src/stim/cmd/command_convert.test.cc,exact-output,exact-output,stab-core circuit parse print,core-circuit-parse-print,inputs/parser_basic.stim,expected/missing-golden.stdout,0,any,manifest-only,,hand-authored\n"
+        );
+        let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(std::path::Path::parent)
+            .expect("repo root");
+        let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+
+        let error = manifest
+            .check(&root)
+            .expect_err("declared expected stdout should exist during validation");
+        assert!(
+            error.to_string().contains(
+                "bad expected_stdout_path does not exist: expected/missing-golden.stdout"
+            )
+        );
+
+        let allow_missing_error = manifest
+            .check_with_expected_stdout_policy(&root, ExpectedStdoutPolicy::AllowMissing)
+            .expect_err("synthetic manifest should still fail compatibility coverage");
+        assert!(
+            !allow_missing_error.to_string().contains(
+                "bad expected_stdout_path does not exist: expected/missing-golden.stdout"
+            )
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fixture_path_validation_rejects_symlink_components() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let fixture_root = temp.path().join("fixtures");
+        std::fs::create_dir(&fixture_root).expect("create fixture root");
+        let outside = temp.path().join("outside.stdout");
+        std::fs::write(&outside, b"outside").expect("write outside file");
+        std::os::unix::fs::symlink(&outside, fixture_root.join("link.stdout"))
+            .expect("create symlink");
+
+        let error = validate_fixture_path(
+            &fixture_root,
+            "bad",
+            "expected_stdout_path",
+            "link.stdout",
+            FixturePathRequirement::ExistingFileIfPresent,
+        )
+        .expect_err("symlink fixture path should fail");
+
+        assert!(error.contains("contains symlink"));
     }
 }
