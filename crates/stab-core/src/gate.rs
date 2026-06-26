@@ -24,6 +24,11 @@ pub struct Gate {
 }
 
 impl Gate {
+    /// Iterates over the canonical gates defined by Stim v1.16.0.
+    pub fn all() -> impl ExactSizeIterator<Item = Self> {
+        GATES.iter().map(|info| Self { info })
+    }
+
     pub fn from_name(name: &str) -> CircuitResult<Self> {
         let canonical =
             canonical_gate_name(name).ok_or_else(|| CircuitError::UnknownGate(name.to_string()))?;
@@ -367,6 +372,7 @@ const GATE_ALIASES: &[(&str, &str)] = &[
     ("SQRT_Z", "S"),
     ("SQRT_Z_DAG", "S_DAG"),
     ("CORRELATED_ERROR", "E"),
+    ("SWAPCZ", "CZSWAP"),
 ];
 
 const GATES: &[GateInfo] = &[

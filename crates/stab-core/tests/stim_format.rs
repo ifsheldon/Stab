@@ -461,6 +461,127 @@ fn gates_lookup_is_case_insensitive_and_canonicalizes_aliases() {
 }
 
 #[test]
+fn gates_table_matches_stim_v116_canonical_names_and_aliases() {
+    // Adapted from Stim v1.16.0 src/stim/gates/gates.h and gate_data_* alias declarations.
+    let names: Vec<_> = Gate::all().map(Gate::canonical_name).collect();
+    assert_eq!(
+        names,
+        [
+            "DETECTOR",
+            "OBSERVABLE_INCLUDE",
+            "TICK",
+            "QUBIT_COORDS",
+            "SHIFT_COORDS",
+            "REPEAT",
+            "MPAD",
+            "MX",
+            "MY",
+            "M",
+            "MRX",
+            "MRY",
+            "MR",
+            "RX",
+            "RY",
+            "R",
+            "XCX",
+            "XCY",
+            "XCZ",
+            "YCX",
+            "YCY",
+            "YCZ",
+            "CX",
+            "CY",
+            "CZ",
+            "H",
+            "H_XY",
+            "H_YZ",
+            "H_NXY",
+            "H_NXZ",
+            "H_NYZ",
+            "DEPOLARIZE1",
+            "DEPOLARIZE2",
+            "X_ERROR",
+            "Y_ERROR",
+            "Z_ERROR",
+            "I_ERROR",
+            "II_ERROR",
+            "PAULI_CHANNEL_1",
+            "PAULI_CHANNEL_2",
+            "E",
+            "ELSE_CORRELATED_ERROR",
+            "HERALDED_ERASE",
+            "HERALDED_PAULI_CHANNEL_1",
+            "I",
+            "X",
+            "Y",
+            "Z",
+            "C_XYZ",
+            "C_ZYX",
+            "C_NXYZ",
+            "C_XNYZ",
+            "C_XYNZ",
+            "C_NZYX",
+            "C_ZNYX",
+            "C_ZYNX",
+            "SQRT_X",
+            "SQRT_X_DAG",
+            "SQRT_Y",
+            "SQRT_Y_DAG",
+            "S",
+            "S_DAG",
+            "II",
+            "SQRT_XX",
+            "SQRT_XX_DAG",
+            "SQRT_YY",
+            "SQRT_YY_DAG",
+            "SQRT_ZZ",
+            "SQRT_ZZ_DAG",
+            "MPP",
+            "SPP",
+            "SPP_DAG",
+            "SWAP",
+            "ISWAP",
+            "CXSWAP",
+            "SWAPCX",
+            "CZSWAP",
+            "ISWAP_DAG",
+            "MXX",
+            "MYY",
+            "MZZ",
+        ]
+    );
+    assert_eq!(names.len(), 81);
+
+    for (alias, canonical) in [
+        ("MZ", "M"),
+        ("MRZ", "MR"),
+        ("RZ", "R"),
+        ("CNOT", "CX"),
+        ("ZCX", "CX"),
+        ("ZCY", "CY"),
+        ("ZCZ", "CZ"),
+        ("H_XZ", "H"),
+        ("SQRT_Z", "S"),
+        ("SQRT_Z_DAG", "S_DAG"),
+        ("CORRELATED_ERROR", "E"),
+        ("SWAPCZ", "CZSWAP"),
+    ] {
+        assert_eq!(
+            Gate::from_name(alias).unwrap().canonical_name(),
+            canonical,
+            "{alias}"
+        );
+        assert_eq!(
+            Gate::from_name(&alias.to_ascii_lowercase())
+                .unwrap()
+                .canonical_name(),
+            canonical,
+            "{alias}"
+        );
+    }
+}
+
+#[test]
 fn gate_inverse_metadata_matches_stim_v116() {
     // Adapted from Stim v1.16.0 src/stim/gates/gates.test.cc inverse metadata checks.
     for (gate, inverse) in [
