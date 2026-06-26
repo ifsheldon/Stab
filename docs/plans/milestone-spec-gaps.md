@@ -39,6 +39,15 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now makes comparator imple
 
 ## Open Entries
 
+## 2026-06-27 - M4: Gate Decomposition Utility Scope
+
+Status: Open
+Revealed by: implementation of `coverage-circuit-gate-decomposition` as a direct Rust oracle row.
+Current text: M4 links `src/stim/circuit/gate_decomposition.test.cc` under Circuit Model, Parser, Targets, And Decomposition, but M4's objective is the public `.stim` data model, gate metadata, parser, validator, and canonical printer.
+Gap: the upstream file mixes pure circuit-structure helpers, such as target grouping and disjoint segmentation, with semantic MPP/SPP decomposition behavior that later depends on base-gate decomposition, flows, tableaus, and simulator correctness.
+Proposed amendment: state that M4 owns structural decomposition prerequisites only, including Pauli-product grouping and disjoint target segmentation; full `decomposed` behavior for MPP, SPP, pair measurements, and base-gate lowering should move to the first milestone that implements the required tableau/simulator semantics or receive its own explicit milestone task.
+Resolution: pending plan update.
+
 ## 2026-06-27 - M4: Probability Utility Fixture Scope
 
 Status: Open

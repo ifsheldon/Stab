@@ -313,6 +313,68 @@ fn target_groups_follow_stim_circuit_instruction_semantics() {
 }
 
 #[test]
+fn gate_decomposition_pair_instruction_segments_are_disjoint_like_stim() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/gate_decomposition.test.cc.
+    let circuit = Circuit::from_stim_str("MXX(0.125) 0 1 0 2 3 5 4 5 3 4\n")
+        .expect("parse pair segmentation fixture");
+    let instruction = circuit
+        .items()
+        .first()
+        .and_then(CircuitItemExt::as_instruction)
+        .expect("MXX instruction");
+    let segments = instruction.disjoint_target_segments();
+
+    assert_eq!(
+        segment_targets(&segments),
+        vec![
+            vec![q(0), q(1)],
+            vec![q(0), q(2), q(3), q(5)],
+            vec![q(4), q(5)],
+            vec![q(3), q(4)],
+        ]
+    );
+    for segment in &segments {
+        assert_eq!(segment.gate().canonical_name(), "MXX");
+        assert_eq!(segment.args(), &[0.125]);
+        assert_eq!(segment.target_groups().len() * 2, segment.targets().len());
+    }
+
+    let empty = Circuit::from_stim_str("MZZ\n").expect("parse empty pair measurement");
+    let empty_instruction = empty
+        .items()
+        .first()
+        .and_then(CircuitItemExt::as_instruction)
+        .expect("MZZ instruction");
+    assert!(empty_instruction.disjoint_target_segments().is_empty());
+}
+
+#[test]
+fn gate_decomposition_reversed_segments_match_stim_order() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/gate_decomposition.test.cc.
+    let circuit = Circuit::from_stim_str("M(0.25) 0 1 2 3 2 5 6 7 1 5 6 6\n").expect("parse M");
+    let instruction = circuit
+        .items()
+        .first()
+        .and_then(CircuitItemExt::as_instruction)
+        .expect("M instruction");
+    let segments = instruction.disjoint_target_segments_reversed();
+
+    assert_eq!(
+        segment_targets(&segments),
+        vec![
+            vec![q(6)],
+            vec![q(7), q(1), q(5), q(6)],
+            vec![q(3), q(2), q(5), q(6)],
+            vec![q(0), q(1), q(2)],
+        ]
+    );
+    for segment in &segments {
+        assert_eq!(segment.gate().canonical_name(), "M");
+        assert_eq!(segment.args(), &[0.25]);
+    }
+}
+
+#[test]
 fn parses_mpp_optional_probability_like_stim() {
     // Adapted from Stim v1.16.0 src/stim/circuit/circuit.test.cc parse_mpp.
     let circuit = Circuit::from_stim_str("MPP(0.125) X1*Y2 Z3 * Z4\n").expect("parse MPP");
@@ -882,4 +944,15 @@ fn target_groups(item: &CircuitItem) -> Vec<Vec<Target>> {
         .into_iter()
         .map(<[Target]>::to_vec)
         .collect()
+}
+
+fn segment_targets(segments: &[stab_core::CircuitInstruction]) -> Vec<Vec<Target>> {
+    segments
+        .iter()
+        .map(|segment| segment.targets().to_vec())
+        .collect()
+}
+
+fn q(id: u32) -> Target {
+    Target::qubit(QubitId::new(id).unwrap(), false)
 }

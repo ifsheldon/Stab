@@ -135,6 +135,78 @@ impl CircuitInstruction {
         }
     }
 
+    /// Splits this instruction into maximal segments whose target groups touch disjoint qubits.
+    pub fn disjoint_target_segments(&self) -> Vec<Self> {
+        let mut segments = Vec::new();
+        let mut current_targets = Vec::new();
+        let mut current_qubits = Vec::new();
+
+        for group in self.target_groups() {
+            let group_qubits = group
+                .iter()
+                .filter_map(Target::qubit_id)
+                .collect::<Vec<_>>();
+            if group_qubits
+                .iter()
+                .any(|qubit| current_qubits.contains(qubit))
+                && !current_targets.is_empty()
+            {
+                segments.push(self.with_targets(current_targets));
+                current_targets = Vec::new();
+                current_qubits = Vec::new();
+            }
+            for qubit in group_qubits {
+                if !current_qubits.contains(&qubit) {
+                    current_qubits.push(qubit);
+                }
+            }
+            current_targets.extend_from_slice(group);
+        }
+
+        if !current_targets.is_empty() {
+            segments.push(self.with_targets(current_targets));
+        }
+
+        segments
+    }
+
+    /// Splits this instruction from the end into maximal segments whose target groups touch disjoint qubits.
+    pub fn disjoint_target_segments_reversed(&self) -> Vec<Self> {
+        let mut segments = Vec::new();
+        let mut current_targets = Vec::new();
+        let mut current_qubits = Vec::new();
+
+        for group in self.target_groups().into_iter().rev() {
+            let group_qubits = group
+                .iter()
+                .filter_map(Target::qubit_id)
+                .collect::<Vec<_>>();
+            if group_qubits
+                .iter()
+                .any(|qubit| current_qubits.contains(qubit))
+                && !current_targets.is_empty()
+            {
+                segments.push(self.with_targets(current_targets));
+                current_targets = Vec::new();
+                current_qubits = Vec::new();
+            }
+            for qubit in group_qubits {
+                if !current_qubits.contains(&qubit) {
+                    current_qubits.push(qubit);
+                }
+            }
+            let mut next_targets = group.to_vec();
+            next_targets.extend(current_targets);
+            current_targets = next_targets;
+        }
+
+        if !current_targets.is_empty() {
+            segments.push(self.with_targets(current_targets));
+        }
+
+        segments
+    }
+
     fn without_tag(&self) -> Self {
         Self {
             gate: self.gate,
@@ -157,6 +229,15 @@ impl CircuitInstruction {
             && self.args == other.args
             && self.tag == other.tag
             && self.gate.can_fuse()
+    }
+
+    fn with_targets(&self, targets: Vec<Target>) -> Self {
+        Self {
+            gate: self.gate,
+            args: self.args.clone(),
+            targets,
+            tag: self.tag.clone(),
+        }
     }
 
     fn write_stim(&self, out: &mut String, indent: usize) {
