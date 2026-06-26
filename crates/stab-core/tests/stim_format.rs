@@ -541,6 +541,16 @@ fn parser_reports_invalid_gate_target_and_repeat_errors() {
 }
 
 #[test]
+fn parser_rejects_inverted_targets_except_result_gates_like_stim() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/circuit.test.cc append_op_validation.
+    assert!(Circuit::from_stim_str("M !0\n").is_ok());
+    assert!(Circuit::from_stim_str("MR !0\n").is_ok());
+    assert!(Circuit::from_stim_str("X !0\n").is_err());
+    assert!(Circuit::from_stim_str("R !0\n").is_err());
+    assert!(Circuit::from_stim_str("X_ERROR(0.125) !0\n").is_err());
+}
+
+#[test]
 fn target_from_str_matches_stim_surface_forms() {
     assert_eq!(
         Target::from_str("rec[-3]").unwrap(),

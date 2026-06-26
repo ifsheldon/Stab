@@ -165,6 +165,7 @@ impl ArgRule {
 enum TargetRule {
     None,
     AnySingleQubit,
+    MeasurementQubits,
     MeasurementPads,
     Pairs,
     RecOnly,
@@ -187,7 +188,8 @@ impl TargetRule {
                     })
                 }
             }
-            Self::AnySingleQubit => validate_targets(gate, targets, Target::is_qubit_like),
+            Self::AnySingleQubit => validate_targets(gate, targets, is_plain_qubit_target),
+            Self::MeasurementQubits => validate_targets(gate, targets, Target::is_qubit_like),
             Self::MeasurementPads => validate_targets(gate, targets, is_measurement_pad_target),
             Self::Pairs => {
                 if !targets.len().is_multiple_of(2) {
@@ -217,6 +219,7 @@ impl TargetRule {
         match self {
             Self::None => TargetGroupKind::None,
             Self::AnySingleQubit
+            | Self::MeasurementQubits
             | Self::MeasurementPads
             | Self::RecOnly
             | Self::RecOrPauli
@@ -235,6 +238,16 @@ pub(crate) enum TargetGroupKind {
     Pairs,
     PauliProducts,
     AllTargets,
+}
+
+fn is_plain_qubit_target(target: &Target) -> bool {
+    matches!(
+        target,
+        Target::Qubit {
+            inverted: false,
+            ..
+        }
+    )
 }
 
 fn is_measurement_pad_target(target: &Target) -> bool {
@@ -366,37 +379,37 @@ const GATES: &[GateInfo] = &[
         "MX",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
-        TargetRule::AnySingleQubit,
+        TargetRule::MeasurementQubits,
     ),
     gate(
         "MY",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
-        TargetRule::AnySingleQubit,
+        TargetRule::MeasurementQubits,
     ),
     gate(
         "M",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
-        TargetRule::AnySingleQubit,
+        TargetRule::MeasurementQubits,
     ),
     gate(
         "MRX",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
-        TargetRule::AnySingleQubit,
+        TargetRule::MeasurementQubits,
     ),
     gate(
         "MRY",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
-        TargetRule::AnySingleQubit,
+        TargetRule::MeasurementQubits,
     ),
     gate(
         "MR",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
-        TargetRule::AnySingleQubit,
+        TargetRule::MeasurementQubits,
     ),
     gate_with_inverse(
         "RX",
