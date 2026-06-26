@@ -50,6 +50,10 @@ impl Gate {
     pub(crate) fn target_group_kind(self) -> TargetGroupKind {
         self.info.target_rule.target_group_kind()
     }
+
+    pub(crate) fn can_fuse(self) -> bool {
+        self.info.can_fuse
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -58,6 +62,7 @@ struct GateInfo {
     category: GateCategory,
     arg_rule: ArgRule,
     target_rule: TargetRule,
+    can_fuse: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -296,37 +301,37 @@ const GATE_ALIASES: &[(&str, &str)] = &[
 ];
 
 const GATES: &[GateInfo] = &[
-    gate(
+    not_fusable_gate(
         "DETECTOR",
         GateCategory::Annotation,
         ArgRule::Any,
         TargetRule::RecOnly,
     ),
-    gate(
+    not_fusable_gate(
         "OBSERVABLE_INCLUDE",
         GateCategory::Annotation,
         ArgRule::UnsignedInteger,
         TargetRule::RecOnly,
     ),
-    gate(
+    not_fusable_gate(
         "TICK",
         GateCategory::Annotation,
         ArgRule::Exact(0),
         TargetRule::None,
     ),
-    gate(
+    not_fusable_gate(
         "QUBIT_COORDS",
         GateCategory::Annotation,
         ArgRule::Any,
         TargetRule::QubitCoords,
     ),
-    gate(
+    not_fusable_gate(
         "SHIFT_COORDS",
         GateCategory::Annotation,
         ArgRule::Any,
         TargetRule::None,
     ),
-    gate(
+    not_fusable_gate(
         "REPEAT",
         GateCategory::ControlFlow,
         ArgRule::Exact(0),
@@ -536,13 +541,13 @@ const GATES: &[GateInfo] = &[
         ArgRule::ProbabilityList(15),
         TargetRule::Pairs,
     ),
-    gate(
+    not_fusable_gate(
         "E",
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::PauliList,
     ),
-    gate(
+    not_fusable_gate(
         "ELSE_CORRELATED_ERROR",
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
@@ -795,5 +800,21 @@ const fn gate(
         category,
         arg_rule,
         target_rule,
+        can_fuse: true,
+    }
+}
+
+const fn not_fusable_gate(
+    name: &'static str,
+    category: GateCategory,
+    arg_rule: ArgRule,
+    target_rule: TargetRule,
+) -> GateInfo {
+    GateInfo {
+        name,
+        category,
+        arg_rule,
+        target_rule,
+        can_fuse: false,
     }
 }

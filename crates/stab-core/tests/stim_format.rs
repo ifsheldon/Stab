@@ -99,7 +99,7 @@ fn parses_and_prints_repeat_tags_like_stim() {
     .expect("parse tagged repeat");
     let items = circuit.items();
 
-    assert_eq!(items.len(), 5);
+    assert_eq!(items.len(), 4);
     let first = items
         .first()
         .and_then(CircuitItemExt::as_instruction)
@@ -112,19 +112,21 @@ fn parses_and_prints_repeat_tags_like_stim() {
         .get(2)
         .and_then(CircuitItemExt::as_instruction)
         .expect("third instruction");
-    let fourth = items
-        .get(3)
-        .and_then(CircuitItemExt::as_instruction)
-        .expect("fourth instruction");
     let repeat = items
-        .get(4)
+        .get(3)
         .and_then(CircuitItemExt::as_repeat_block)
         .expect("repeat block");
 
     assert_eq!(first.tag(), Some("test"));
     assert_eq!(second.tag(), Some("no_fuse"));
     assert_eq!(third.tag(), None);
-    assert_eq!(fourth.tag(), Some(""));
+    assert_eq!(
+        third.targets(),
+        &[
+            Target::qubit(QubitId::new(2).unwrap(), false),
+            Target::qubit(QubitId::new(3).unwrap(), false),
+        ]
+    );
     assert_eq!(repeat.tag(), Some("looper"));
     assert_eq!(repeat.repeat_count(), RepeatCount::try_new(5).unwrap());
     assert_eq!(
@@ -132,12 +134,58 @@ fn parses_and_prints_repeat_tags_like_stim() {
         concat!(
             "X_ERROR[test](0.125)\n",
             "X_ERROR[no_fuse](0.125) 1\n",
-            "X_ERROR(0.125) 2\n",
-            "X_ERROR[](0.125) 3\n",
+            "X_ERROR(0.125) 2 3\n",
             "REPEAT[looper] 5 {\n",
             "    CX[within] 0 1\n",
             "}\n",
         )
+    );
+}
+
+#[test]
+fn fuses_compatible_adjacent_instructions_like_stim() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/circuit.test.cc append_op_fuse.
+    assert_eq!(
+        Circuit::from_stim_str("H 1\nH 2 3\n")
+            .expect("parse H fuse fixture")
+            .to_stim_string(),
+        "H 1 2 3\n"
+    );
+    assert_eq!(
+        Circuit::from_stim_str("M 0 1\nM 2 3\n")
+            .expect("parse M fuse fixture")
+            .to_stim_string(),
+        "M 0 1 2 3\n"
+    );
+    assert_eq!(
+        Circuit::from_stim_str("CX 2 3\nCX rec[-5] 3\n")
+            .expect("parse pair-gate fuse fixture")
+            .to_stim_string(),
+        "CX 2 3 rec[-5] 3\n"
+    );
+    assert_eq!(
+        Circuit::from_stim_str("H[test1] 0\nH[test1] 1\nH[test2] 2\nH[test1] 3\n")
+            .expect("parse tagged fuse fixture")
+            .to_stim_string(),
+        concat!("H[test1] 0 1\n", "H[test2] 2\n", "H[test1] 3\n")
+    );
+    assert_eq!(
+        Circuit::from_stim_str("R 0\nR\n")
+            .expect("parse empty-target fuse fixture")
+            .to_stim_string(),
+        "R 0\n"
+    );
+    assert_eq!(
+        Circuit::from_stim_str("TICK\nTICK\n")
+            .expect("parse non-fusable TICK fixture")
+            .to_stim_string(),
+        "TICK\nTICK\n"
+    );
+    assert_eq!(
+        Circuit::from_stim_str("DETECTOR rec[-2] rec[-2]\nDETECTOR rec[-1] rec[-1]\n")
+            .expect("parse non-fusable DETECTOR fixture")
+            .to_stim_string(),
+        "DETECTOR rec[-2] rec[-2]\nDETECTOR rec[-1] rec[-1]\n"
     );
 }
 

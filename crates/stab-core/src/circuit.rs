@@ -39,6 +39,15 @@ impl Circuit {
         self.items.push(item);
     }
 
+    fn push_instruction(&mut self, instruction: CircuitInstruction) {
+        if let Some(CircuitItem::Instruction(previous)) = self.items.last_mut()
+            && previous.try_fuse(&instruction)
+        {
+            return;
+        }
+        self.items.push(CircuitItem::Instruction(instruction));
+    }
+
     fn write_stim(&self, out: &mut String, indent: usize) {
         for item in &self.items {
             item.write_stim(out, indent);
@@ -77,6 +86,7 @@ pub struct CircuitInstruction {
 }
 
 impl CircuitInstruction {
+    /// Creates a Stim circuit instruction, normalizing empty tags to no tag.
     pub fn new(
         gate: Gate,
         args: Vec<f64>,
@@ -88,7 +98,7 @@ impl CircuitInstruction {
             gate,
             args,
             targets,
-            tag,
+            tag: normalize_tag(tag),
         })
     }
 
@@ -104,6 +114,7 @@ impl CircuitInstruction {
         &self.targets
     }
 
+    /// Returns the non-empty Stim tag attached to this instruction.
     pub fn tag(&self) -> Option<&str> {
         self.tag.as_deref()
     }
@@ -131,6 +142,21 @@ impl CircuitInstruction {
             targets: self.targets.clone(),
             tag: None,
         }
+    }
+
+    fn try_fuse(&mut self, other: &Self) -> bool {
+        if !self.can_fuse(other) {
+            return false;
+        }
+        self.targets.extend_from_slice(&other.targets);
+        true
+    }
+
+    fn can_fuse(&self, other: &Self) -> bool {
+        self.gate == other.gate
+            && self.args == other.args
+            && self.tag == other.tag
+            && self.gate.can_fuse()
     }
 
     fn write_stim(&self, out: &mut String, indent: usize) {
@@ -164,12 +190,12 @@ pub struct RepeatBlock {
 }
 
 impl RepeatBlock {
-    /// Creates a `REPEAT` block with an optional Stim tag.
+    /// Creates a `REPEAT` block, normalizing empty tags to no tag.
     pub fn new(repeat_count: RepeatCount, body: Circuit, tag: Option<String>) -> Self {
         Self {
             repeat_count,
             body,
-            tag,
+            tag: normalize_tag(tag),
         }
     }
 
@@ -183,7 +209,7 @@ impl RepeatBlock {
         &self.body
     }
 
-    /// Returns the optional tag attached to this `REPEAT` block.
+    /// Returns the non-empty tag attached to this `REPEAT` block.
     pub fn tag(&self) -> Option<&str> {
         self.tag.as_deref()
     }
@@ -263,10 +289,7 @@ impl<'a> Parser<'a> {
                     self.parse_repeat(line_number, prefix.trim_end())?,
                 ));
             } else {
-                circuit.push(CircuitItem::Instruction(parse_instruction(
-                    line_number,
-                    line,
-                )?));
+                circuit.push_instruction(parse_instruction(line_number, line)?);
             }
         }
         if stop_on_terminator {
@@ -476,6 +499,10 @@ fn write_escaped_tag(out: &mut String, tag: &str) {
             _ => out.push(ch),
         }
     }
+}
+
+fn normalize_tag(tag: Option<String>) -> Option<String> {
+    tag.filter(|tag| !tag.is_empty())
 }
 
 fn format_float(value: f64) -> String {
