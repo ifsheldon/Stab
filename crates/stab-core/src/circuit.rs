@@ -22,6 +22,23 @@ impl Circuit {
         &self.items
     }
 
+    pub fn count_qubits(&self) -> usize {
+        self.items
+            .iter()
+            .map(CircuitItem::count_qubits)
+            .max()
+            .unwrap_or(0)
+    }
+
+    pub fn to_tableau(
+        &self,
+        ignore_noise: bool,
+        ignore_measurement: bool,
+        ignore_reset: bool,
+    ) -> CircuitResult<crate::Tableau> {
+        crate::circuit_to_tableau(self, ignore_noise, ignore_measurement, ignore_reset)
+    }
+
     pub fn to_stim_string(&self) -> String {
         let mut out = String::new();
         self.write_stim(&mut out, 0);
@@ -62,6 +79,13 @@ pub enum CircuitItem {
 }
 
 impl CircuitItem {
+    fn count_qubits(&self) -> usize {
+        match self {
+            Self::Instruction(instruction) => instruction.count_qubits(),
+            Self::RepeatBlock(repeat) => repeat.body().count_qubits(),
+        }
+    }
+
     fn without_tags(&self) -> Self {
         match self {
             Self::Instruction(instruction) => Self::Instruction(instruction.without_tag()),
@@ -157,6 +181,15 @@ impl CircuitInstruction {
 
     pub fn targets(&self) -> &[Target] {
         &self.targets
+    }
+
+    fn count_qubits(&self) -> usize {
+        self.targets
+            .iter()
+            .filter_map(Target::qubit_id)
+            .map(|qubit| qubit.get() as usize + 1)
+            .max()
+            .unwrap_or(0)
     }
 
     /// Returns the non-empty Stim tag attached to this instruction.

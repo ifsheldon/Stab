@@ -4,6 +4,7 @@
 
 pub mod bits;
 mod circuit;
+mod circuit_tableau;
 mod error;
 mod gate;
 mod ids;
@@ -12,6 +13,7 @@ mod target;
 
 pub use bits::{BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVec, SparseXorVec};
 pub use circuit::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
+pub use circuit_tableau::circuit_to_tableau;
 pub use error::{CircuitError, CircuitResult};
 pub use gate::{Gate, GateCategory};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};

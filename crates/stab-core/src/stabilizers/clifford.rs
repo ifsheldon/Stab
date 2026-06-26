@@ -1,6 +1,8 @@
 use std::fmt::{Display, Formatter};
 
-use super::{PauliBasis, PauliPhase, PauliSign, StabilizerError, StabilizerResult};
+use super::{
+    PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError, StabilizerResult, Tableau,
+};
 use crate::Gate;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -191,6 +193,13 @@ impl SingleQubitClifford {
         let z_output = self.apply_signed(rhs.z_output())?;
         Self::from_outputs(x_output, z_output)
             .ok_or(StabilizerError::InvalidSingleQubitCliffordProduct)
+    }
+
+    pub(crate) fn tableau(self) -> Tableau {
+        Tableau::from_output_columns_unchecked(
+            vec![signed_pauli_string(self.x_output())],
+            vec![signed_pauli_string(self.z_output())],
+        )
     }
 
     fn from_outputs(x_output: SignedPauli, z_output: SignedPauli) -> Option<Self> {
@@ -413,4 +422,8 @@ fn sign_from_bit(negative: bool) -> PauliSign {
     } else {
         PauliSign::Plus
     }
+}
+
+fn signed_pauli_string(pauli: SignedPauli) -> PauliString {
+    PauliString::from_bases(pauli.sign, [pauli.basis])
 }

@@ -32,6 +32,9 @@ pub enum CircuitError {
     #[error("gate {gate} received invalid target count {count}")]
     InvalidTargetCount { gate: &'static str, count: usize },
 
+    #[error("cannot convert circuit to tableau: {message}")]
+    InvalidTableauConversion { message: String },
+
     #[error("unterminated repeat block")]
     UnterminatedRepeatBlock,
 
@@ -51,6 +54,12 @@ impl CircuitError {
         Self::InvalidDomainValue {
             kind,
             value: value.to_string(),
+        }
+    }
+
+    pub(crate) fn invalid_tableau_conversion(message: impl Into<String>) -> Self {
+        Self::InvalidTableauConversion {
+            message: message.into(),
         }
     }
 }
