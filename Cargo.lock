@@ -1874,6 +1874,7 @@ dependencies = [
  "clap",
  "csv",
  "serde",
+ "stab-core",
  "tempfile",
  "thiserror",
  "wait-timeout",

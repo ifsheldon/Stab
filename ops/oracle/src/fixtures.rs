@@ -4,16 +4,31 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
 
 use serde::Deserialize;
+use stab_core::Circuit;
 use thiserror::Error;
 
 use crate::{OracleError, RepoRoot, StderrClass, compare_exact, compare_help_health};
 
 const FIXTURE_ROOT: &str = "oracle/fixtures";
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum RunMode {
     ImplementedOnly,
     All,
+    Milestone(String),
+}
+
+impl RunMode {
+    fn milestone_filter(&self) -> Result<Option<Milestone>, FixtureError> {
+        match self {
+            Self::Milestone(milestone) => Milestone::parse(milestone).map(Some),
+            Self::ImplementedOnly | Self::All => Ok(None),
+        }
+    }
+
+    fn reports_pending(&self) -> bool {
+        matches!(self, Self::All | Self::Milestone(_))
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -54,9 +69,29 @@ enum Milestone {
     M10,
     #[serde(rename = "M11")]
     M11,
+    #[serde(rename = "M12")]
+    M12,
 }
 
 impl Milestone {
+    fn parse(value: &str) -> Result<Self, FixtureError> {
+        match value {
+            "M0" => Ok(Self::M0),
+            "M4" => Ok(Self::M4),
+            "M5" => Ok(Self::M5),
+            "M6" => Ok(Self::M6),
+            "M7" => Ok(Self::M7),
+            "M8" => Ok(Self::M8),
+            "M9" => Ok(Self::M9),
+            "M10" => Ok(Self::M10),
+            "M11" => Ok(Self::M11),
+            "M12" => Ok(Self::M12),
+            _ => Err(FixtureError::UnknownMilestone {
+                milestone: value.to_string(),
+            }),
+        }
+    }
+
     fn as_str(self) -> &'static str {
         match self {
             Self::M0 => "M0",
@@ -68,6 +103,7 @@ impl Milestone {
             Self::M9 => "M9",
             Self::M10 => "M10",
             Self::M11 => "M11",
+            Self::M12 => "M12",
         }
     }
 }
@@ -329,6 +365,11 @@ pub(crate) enum FixtureError {
     #[error("fixture manifest validation failed:\n{0}")]
     Validation(Box<str>),
 
+    #[error(
+        "unknown fixture milestone {milestone}; expected one of M0, M4, M5, M6, M7, M8, M9, M10, M11, or M12"
+    )]
+    UnknownMilestone { milestone: String },
+
     #[error("failed to read fixture file {path}: {source}")]
     ReadFile {
         path: PathBuf,
@@ -363,6 +404,9 @@ pub(crate) enum FixtureError {
 
     #[error("{id} expected stdout differs from {path}")]
     ExpectedStdoutMismatch { id: String, path: PathBuf },
+
+    #[error("{id} failed core fixture execution: {reason}")]
+    CoreFixtureFailed { id: String, reason: String },
 
     #[error("{id} failed comparator {comparator}: {reason}")]
     ComparatorMismatch {
@@ -534,14 +578,27 @@ impl FixtureManifest {
         }
     }
 
-    fn list(&self) {
+    fn list(&self, milestone_filter: Option<Milestone>) {
         let mut groups: BTreeMap<(Milestone, ParityMode, FixtureStatus), Vec<&FixtureRow>> =
             BTreeMap::new();
-        for row in &self.rows {
+        for row in self.rows.iter().filter(|row| {
+            milestone_filter
+                .map(|milestone| row.milestone == milestone)
+                .unwrap_or(true)
+        }) {
             groups
                 .entry((row.milestone, row.parity_mode, row.status))
                 .or_default()
                 .push(row);
+        }
+        if groups.is_empty() {
+            if let Some(milestone) = milestone_filter {
+                println!(
+                    "[stab-oracle] no fixtures are declared for {}",
+                    milestone.as_str()
+                );
+            }
+            return;
         }
         for ((milestone, parity_mode, status), rows) in groups {
             println!(
@@ -585,9 +642,10 @@ impl FixtureRow {
     }
 }
 
-pub(crate) fn list_fixtures(root: &RepoRoot) -> Result<(), OracleError> {
+pub(crate) fn list_fixtures(root: &RepoRoot, milestone: Option<&str>) -> Result<(), OracleError> {
     let manifest = load_manifest(root)?;
-    manifest.list();
+    let milestone_filter = milestone.map(Milestone::parse).transpose()?;
+    manifest.list(milestone_filter);
     Ok(())
 }
 
@@ -605,13 +663,7 @@ pub(crate) fn record_fixtures(
         },
     )?;
     let stim_binary = crate::ensure_stim_binary(root, rebuild_stim)?;
-    for row in manifest
-        .rows
-        .iter()
-        .filter(|row| row.comparator == FixtureComparator::ExactOutput)
-        .filter(|row| row.status != FixtureStatus::ManifestOnly)
-        .filter(|row| !row.expected_stdout_path.is_empty())
-    {
+    for row in manifest.rows.iter().filter(|row| is_recordable(row)) {
         let stdin = row.stdin(root)?;
         let output = crate::run_process(&stim_binary, row.argv_tokens(), &stdin, Some(&root.path))?;
         check_expected_process_shape(row, &output)?;
@@ -644,22 +696,44 @@ pub(crate) fn record_fixtures(
     Ok(())
 }
 
+fn is_recordable(row: &FixtureRow) -> bool {
+    row.comparator == FixtureComparator::ExactOutput
+        && row.status != FixtureStatus::ManifestOnly
+        && !is_core_fixture(row)
+        && !row.expected_stdout_path.is_empty()
+}
+
 pub(crate) fn run_fixtures(
     root: &RepoRoot,
     mode: RunMode,
     rebuild_stim: bool,
 ) -> Result<(), OracleError> {
     let manifest = load_manifest(root)?;
-    let stim_binary = crate::ensure_stim_binary(root, rebuild_stim)?;
-    let stab_binary = crate::ensure_stab_cli_binary(root)?;
+    let milestone_filter = mode.milestone_filter()?;
+    let reports_pending = mode.reports_pending();
+    let mut stim_binary = None;
+    let mut stab_binary = None;
     for row in &manifest.rows {
+        if !matches_milestone_filter(row, milestone_filter) {
+            continue;
+        }
         match row.status {
             FixtureStatus::Implemented => {
-                let stdin = row.stdin(root)?;
-                let argv = row.argv_tokens();
-                let stim = crate::run_process(&stim_binary, &argv, &stdin, Some(&root.path))?;
-                let stab = crate::run_process(&stab_binary, &argv, &stdin, Some(&root.path))?;
-                compare_fixture(row, &stim, &stab)?;
+                let stab = if is_core_fixture(row) {
+                    run_core_fixture(root, row)?
+                } else {
+                    let stdin = row.stdin(root)?;
+                    let argv = row.argv_tokens();
+                    let stim_binary_path =
+                        cached_stim_binary(root, rebuild_stim, &mut stim_binary)?;
+                    let stab_binary_path = cached_stab_binary(root, &mut stab_binary)?;
+                    let stim =
+                        crate::run_process(&stim_binary_path, &argv, &stdin, Some(&root.path))?;
+                    let stab =
+                        crate::run_process(&stab_binary_path, &argv, &stdin, Some(&root.path))?;
+                    compare_fixture(row, &stim, &stab)?;
+                    stab
+                };
                 println!(
                     "[stab-oracle] PASS {} status={:?} stderr_class={:?}",
                     row.id,
@@ -667,7 +741,7 @@ pub(crate) fn run_fixtures(
                     stab.stderr_class()
                 );
             }
-            FixtureStatus::Red if mode == RunMode::All => {
+            FixtureStatus::Red if reports_pending => {
                 println!(
                     "[stab-oracle] RED {} [{}] {}",
                     row.id,
@@ -675,7 +749,7 @@ pub(crate) fn run_fixtures(
                     row.command_shape
                 );
             }
-            FixtureStatus::Ignored if mode == RunMode::All => {
+            FixtureStatus::Ignored if reports_pending => {
                 println!(
                     "[stab-oracle] IGNORED {} [{}] {}",
                     row.id,
@@ -683,7 +757,7 @@ pub(crate) fn run_fixtures(
                     row.command_shape
                 );
             }
-            FixtureStatus::ManifestOnly if mode == RunMode::All => {
+            FixtureStatus::ManifestOnly if reports_pending => {
                 println!(
                     "[stab-oracle] MANIFEST-ONLY {} [{}] {}",
                     row.id,
@@ -695,6 +769,149 @@ pub(crate) fn run_fixtures(
         }
     }
     Ok(())
+}
+
+fn matches_milestone_filter(row: &FixtureRow, milestone_filter: Option<Milestone>) -> bool {
+    milestone_filter
+        .map(|milestone| row.milestone == milestone)
+        .unwrap_or(true)
+}
+
+fn cached_stim_binary(
+    root: &RepoRoot,
+    rebuild_stim: bool,
+    cache: &mut Option<PathBuf>,
+) -> Result<PathBuf, OracleError> {
+    if let Some(path) = cache {
+        return Ok(path.clone());
+    }
+    let path = crate::ensure_stim_binary(root, rebuild_stim)?;
+    *cache = Some(path.clone());
+    Ok(path)
+}
+
+fn cached_stab_binary(
+    root: &RepoRoot,
+    cache: &mut Option<PathBuf>,
+) -> Result<PathBuf, OracleError> {
+    if let Some(path) = cache {
+        return Ok(path.clone());
+    }
+    let path = crate::ensure_stab_cli_binary(root)?;
+    *cache = Some(path.clone());
+    Ok(path)
+}
+
+fn is_core_fixture(row: &FixtureRow) -> bool {
+    matches!(
+        row.argv.as_str(),
+        "core-parse-print" | "core-circuit-parse-print"
+    )
+}
+
+fn run_core_fixture(
+    root: &RepoRoot,
+    row: &FixtureRow,
+) -> Result<crate::ProcessOutput, FixtureError> {
+    let stdin = row.stdin(root)?;
+    let output = core_parse_print_output(row, &stdin)?;
+    check_expected_process_shape(row, &output)?;
+    match row.comparator {
+        FixtureComparator::ExactOutput => compare_expected_stdout(row, root, &output)?,
+        FixtureComparator::Structural => {
+            compare_core_parse_print_structure(row, &stdin, &output.stdout.bytes)?;
+        }
+        FixtureComparator::HelpHealth
+        | FixtureComparator::Property
+        | FixtureComparator::Statistical => {
+            return Err(FixtureError::ComparatorMismatch {
+                id: row.id.clone(),
+                comparator: row.comparator.as_str(),
+                reason: "core fixtures only support exact-output and structural comparators"
+                    .to_string(),
+            });
+        }
+    }
+    Ok(output)
+}
+
+fn core_parse_print_output(
+    row: &FixtureRow,
+    stdin: &[u8],
+) -> Result<crate::ProcessOutput, FixtureError> {
+    if !is_core_fixture(row) {
+        return Err(FixtureError::CoreFixtureFailed {
+            id: row.id.clone(),
+            reason: format!("unsupported core fixture argv {}", row.argv),
+        });
+    }
+    let input = fixture_utf8(row, "stdin", stdin)?;
+    let circuit = parse_core_circuit(row, "stdin", input)?;
+    Ok(crate::ProcessOutput {
+        status: Some(0),
+        stdout: crate::CapturedOutput {
+            bytes: circuit.to_stim_string().into_bytes(),
+            truncated: false,
+        },
+        stderr: crate::CapturedOutput {
+            bytes: Vec::new(),
+            truncated: false,
+        },
+    })
+}
+
+fn compare_expected_stdout(
+    row: &FixtureRow,
+    root: &RepoRoot,
+    output: &crate::ProcessOutput,
+) -> Result<(), FixtureError> {
+    let expected_path = row.expected_stdout_file(root)?;
+    let expected = std::fs::read(&expected_path).map_err(|source| FixtureError::ReadFile {
+        path: expected_path.clone(),
+        source,
+    })?;
+    if expected != output.stdout.bytes {
+        return Err(FixtureError::ExpectedStdoutMismatch {
+            id: row.id.clone(),
+            path: expected_path,
+        });
+    }
+    Ok(())
+}
+
+fn compare_core_parse_print_structure(
+    row: &FixtureRow,
+    stdin: &[u8],
+    stdout: &[u8],
+) -> Result<(), FixtureError> {
+    let original = parse_core_circuit(row, "stdin", fixture_utf8(row, "stdin", stdin)?)?;
+    let reparsed = parse_core_circuit(row, "printed stdout", fixture_utf8(row, "stdout", stdout)?)?;
+    if original != reparsed {
+        return Err(FixtureError::ComparatorMismatch {
+            id: row.id.clone(),
+            comparator: row.comparator.as_str(),
+            reason: "parse-print-parse changed circuit semantics".to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn parse_core_circuit(row: &FixtureRow, label: &str, input: &str) -> Result<Circuit, FixtureError> {
+    Circuit::from_stim_str(input).map_err(|source| FixtureError::CoreFixtureFailed {
+        id: row.id.clone(),
+        reason: format!("{label} parse failed: {source}"),
+    })
+}
+
+fn fixture_utf8<'a>(
+    row: &FixtureRow,
+    label: &str,
+    bytes: &'a [u8],
+) -> Result<&'a str, FixtureError> {
+    std::str::from_utf8(bytes).map_err(|source| FixtureError::CoreFixtureFailed {
+        id: row.id.clone(),
+        reason: format!("{label} is not UTF-8: {source}"),
+    })
 }
 
 fn load_manifest(root: &RepoRoot) -> Result<FixtureManifest, OracleError> {
@@ -934,186 +1151,4 @@ fn unsafe_component(component: Component<'_>) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{
-        ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement,
-        validate_fixture_path,
-    };
-
-    const MANIFEST_CSV: &str = include_str!("../../../oracle/fixtures/manifest.csv");
-    const HEADER: &str = "id,milestone,upstream_source,parity_mode,comparator,command_shape,argv,stdin_path,expected_stdout_path,expected_status,expected_stderr_class,status,statistical_plan,source_license_note\n";
-
-    #[test]
-    fn repository_fixture_manifest_passes_validation() {
-        let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(std::path::Path::parent)
-            .expect("repo root");
-        let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-
-        manifest.check(&root).expect("manifest validation");
-    }
-
-    #[test]
-    fn fixture_manifest_has_implemented_smoke_cases() {
-        let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
-        let implemented = manifest
-            .rows
-            .iter()
-            .filter(|row| row.status.as_str() == "implemented")
-            .map(|row| row.id.as_str())
-            .collect::<Vec<_>>();
-
-        assert_eq!(implemented, vec!["smoke-help", "smoke-tiny-circuit"]);
-    }
-
-    #[test]
-    fn exact_output_rows_have_expected_stdout_paths() {
-        let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
-
-        for row in manifest
-            .rows
-            .iter()
-            .filter(|row| row.comparator == FixtureComparator::ExactOutput)
-            .filter(|row| row.status != super::FixtureStatus::ManifestOnly)
-        {
-            assert!(!row.expected_stdout_path.is_empty(), "{}", row.id);
-        }
-    }
-
-    #[test]
-    fn repository_exact_output_files_exist() {
-        let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(std::path::Path::parent)
-            .expect("repo root");
-        let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-
-        for row in manifest
-            .rows
-            .iter()
-            .filter(|row| row.comparator == FixtureComparator::ExactOutput)
-            .filter(|row| !row.expected_stdout_path.is_empty())
-        {
-            assert!(
-                row.expected_stdout_file(&root).unwrap().is_file(),
-                "{}",
-                row.id
-            );
-        }
-    }
-
-    #[test]
-    fn validation_rejects_statistical_row_without_plan() {
-        let csv = format!(
-            "{HEADER}bad,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample|--shots|10,inputs/sample_noisy.stim,,0,empty,red,,hand-authored\n"
-        );
-        let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(std::path::Path::parent)
-            .expect("repo root");
-        let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-        let error = manifest.check(&root).expect_err("missing plan should fail");
-
-        assert!(
-            error
-                .to_string()
-                .contains("comparator needs structural or statistical plan text")
-        );
-    }
-
-    #[test]
-    fn validation_rejects_empty_argv_tokens() {
-        let csv = format!(
-            "{HEADER}bad,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample||--shots|10,inputs/sample_noisy.stim,,0,empty,red,sample_count=10; fixed_seed=1; false_positive_rate<=0.001,hand-authored\n"
-        );
-        let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(std::path::Path::parent)
-            .expect("repo root");
-        let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-        let error = manifest
-            .check(&root)
-            .expect_err("empty argv token should fail");
-
-        assert!(error.to_string().contains("has an empty argv token"));
-    }
-
-    #[test]
-    fn validation_requires_fixture_milestone_and_parity_to_match_matrix() {
-        let csv = format!(
-            "{HEADER}m7-convert-01-to-dets,M7,src/stim/cmd/command_convert.test.cc,exact-output,exact-output,stim convert 01 to dets,convert|--in_format=01|--out_format=dets,inputs/convert_measurements.01,expected/m7_convert_01_to_dets.stdout,0,empty,red,,hand-authored\n"
-        );
-        let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(std::path::Path::parent)
-            .expect("repo root");
-        let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-        let error = manifest
-            .check(&root)
-            .expect_err("M7 convert row must not satisfy M4 coverage");
-
-        assert!(error.to_string().contains(
-            "missing M2 fixture row for src/stim/cmd/command_convert.test.cc (M4/exact-output)"
-        ));
-    }
-
-    #[test]
-    fn validation_requires_declared_expected_stdout_by_default() {
-        let csv = format!(
-            "{HEADER}bad,M4,src/stim/cmd/command_convert.test.cc,exact-output,exact-output,stab-core circuit parse print,core-circuit-parse-print,inputs/parser_basic.stim,expected/missing-golden.stdout,0,any,manifest-only,,hand-authored\n"
-        );
-        let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .and_then(std::path::Path::parent)
-            .expect("repo root");
-        let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
-
-        let error = manifest
-            .check(&root)
-            .expect_err("declared expected stdout should exist during validation");
-        assert!(
-            error.to_string().contains(
-                "bad expected_stdout_path does not exist: expected/missing-golden.stdout"
-            )
-        );
-
-        let allow_missing_error = manifest
-            .check_with_expected_stdout_policy(&root, ExpectedStdoutPolicy::AllowMissing)
-            .expect_err("synthetic manifest should still fail compatibility coverage");
-        assert!(
-            !allow_missing_error.to_string().contains(
-                "bad expected_stdout_path does not exist: expected/missing-golden.stdout"
-            )
-        );
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn fixture_path_validation_rejects_symlink_components() {
-        let temp = tempfile::tempdir().expect("tempdir");
-        let fixture_root = temp.path().join("fixtures");
-        std::fs::create_dir(&fixture_root).expect("create fixture root");
-        let outside = temp.path().join("outside.stdout");
-        std::fs::write(&outside, b"outside").expect("write outside file");
-        std::os::unix::fs::symlink(&outside, fixture_root.join("link.stdout"))
-            .expect("create symlink");
-
-        let error = validate_fixture_path(
-            &fixture_root,
-            "bad",
-            "expected_stdout_path",
-            "link.stdout",
-            FixturePathRequirement::ExistingFileIfPresent,
-        )
-        .expect_err("symlink fixture path should fail");
-
-        assert!(error.contains("contains symlink"));
-    }
-}
+mod tests;

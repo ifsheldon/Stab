@@ -69,13 +69,21 @@ enum Command {
         #[arg(long)]
         all: bool,
 
+        /// Run implemented fixtures and report pending fixtures for a milestone such as M4.
+        #[arg(long)]
+        milestone: Option<String>,
+
         /// Reconfigure and rebuild the C++ Stim oracle even if a binary exists.
         #[arg(long)]
         rebuild_stim: bool,
     },
 
     /// List oracle fixtures grouped by milestone, parity mode, and status.
-    List,
+    List {
+        /// Only list fixtures for a milestone such as M4.
+        #[arg(long)]
+        milestone: Option<String>,
+    },
 
     /// Record or check exact-output fixtures from pinned Stim.
     Record {
@@ -351,12 +359,13 @@ fn run(cli: Cli) -> Result<(), OracleError> {
             case,
             implemented_only,
             all,
+            milestone,
             rebuild_stim,
         } => {
-            run_selected_cases(&root, case, implemented_only, all, rebuild_stim)?;
+            run_selected_cases(&root, case, implemented_only, all, milestone, rebuild_stim)?;
         }
-        Command::List => {
-            fixtures::list_fixtures(&root)?;
+        Command::List { milestone } => {
+            fixtures::list_fixtures(&root, milestone.as_deref())?;
         }
         Command::Record {
             check_clean,
@@ -376,12 +385,16 @@ fn run_selected_cases(
     case: Option<OracleCase>,
     implemented_only: bool,
     all: bool,
+    milestone: Option<String>,
     rebuild_stim: bool,
 ) -> Result<(), OracleError> {
-    let selected = usize::from(case.is_some()) + usize::from(implemented_only) + usize::from(all);
+    let selected = usize::from(case.is_some())
+        + usize::from(implemented_only)
+        + usize::from(all)
+        + usize::from(milestone.is_some());
     if selected != 1 {
         return Err(OracleError::InvalidRunSelection(
-            "choose exactly one of --case, --implemented-only, or --all".to_string(),
+            "choose exactly one of --case, --implemented-only, --all, or --milestone".to_string(),
         ));
     }
     if let Some(case) = case {
@@ -389,6 +402,9 @@ fn run_selected_cases(
     }
     if implemented_only {
         return fixtures::run_fixtures(root, fixtures::RunMode::ImplementedOnly, rebuild_stim);
+    }
+    if let Some(milestone) = milestone {
+        return fixtures::run_fixtures(root, fixtures::RunMode::Milestone(milestone), rebuild_stim);
     }
     fixtures::run_fixtures(root, fixtures::RunMode::All, rebuild_stim)
 }

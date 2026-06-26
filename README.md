@@ -40,15 +40,18 @@ Inspect and check the M2 fixture corpus with:
 
 ```sh
 just oracle::list
+just oracle::list --milestone M4
 just oracle::record --check-clean
 just oracle::run --implemented-only
+just oracle::run --milestone M4
 just oracle::run --all
 ```
 
 The fixture manifest lives at `oracle/fixtures/manifest.csv`.
 It records fixture ids, upstream sources, command shapes, parity modes, comparator types, expected statuses, implementation status, statistical plans, and source-license notes.
 Manifest validation also requires every planned M4 through M11 P0/P1 C++ source from the compatibility matrix to have an explicit fixture row with the matching milestone and parity mode.
-`just oracle::record --check-clean` checks runnable exact-output rows against pinned Stim; manifest-only parser/printer golden files are checked for presence but skipped because they target library-only behavior without a Stim CLI command.
+`just oracle::run --milestone Mx` scopes execution to implemented fixture rows for that milestone and reports pending red, ignored, or manifest-only rows in the same milestone.
+`just oracle::record --check-clean` checks runnable exact-output rows against pinned Stim; library-only parser/printer rows are run in-process by `stab-oracle` and are skipped by recording because they do not have a Stim CLI command.
 
 Validate the M1 compatibility matrix with:
 

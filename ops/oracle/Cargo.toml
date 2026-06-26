@@ -15,6 +15,7 @@ workspace = true
 clap = { workspace = true }
 csv = { workspace = true }
 serde = { workspace = true }
+stab-core = { path = "../../crates/stab-core" }
 thiserror = { workspace = true }
 wait-timeout = { workspace = true }
 
