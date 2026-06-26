@@ -17,7 +17,27 @@ Proposed amendment: concrete replacement text or additional done criterion
 Resolution: link or note for the plan update that resolved the gap
 ```
 
+## Resolved Entries
+
+## 2026-06-27 - M2: Comparator Implementation Ownership
+
+Status: Resolved
+Revealed by: milestone audit of the M2 oracle corpus.
+Current text: M2 said to define structural and statistical comparators, while later milestones own the first runnable uses of many semantic and statistical comparator families.
+Gap: the plan did not say whether M2 must implement every comparator executable or only define comparator contracts and fixture metadata before implementation milestones begin.
+Proposed amendment: state that M2 defines comparator contracts and manifest metadata, while the owning M4 through M11 milestones must implement runnable structural or statistical comparator code before marking matching rows `implemented`.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now makes comparator implementation ownership explicit in the M2 task list.
+
 ## Open Entries
+
+## 2026-06-27 - M2: Manifest-Only Subcase Granularity
+
+Status: Open
+Revealed by: milestone audit of the M2 manifest coverage rows.
+Current text: M2 and the test-porting plan allow red or manifest-only oracle cases for all P0 and P1 files needed by M4 through M11.
+Gap: file-level manifest-only rows can satisfy coverage without identifying the upstream subcases, fixture families, malformed-input cases, or extraction criteria that future implementation milestones must port.
+Proposed amendment: require manifest-only rows to name planned subcase groups or extraction criteria for each upstream test file before the owning implementation milestone starts.
+Resolution: pending plan update.
 
 ## 2026-06-26 - M1/M4/M7: CLI Convert Ordering
 

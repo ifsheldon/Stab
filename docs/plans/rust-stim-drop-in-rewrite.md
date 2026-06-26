@@ -113,8 +113,10 @@ Tasks:
 
 - Create an oracle fixture manifest that names every planned fixture, upstream source, comparator, command shape, expected status, and milestone.
 - Import or generate exact-output fixtures for deterministic parser/printer, `gen`, `convert`, deterministic sampling, `detect`, `m2d`, `.dem` parsing/printing, and CLI help cases.
-- Define structural comparators for cases where byte-for-byte output is too strict but semantic equality is required.
-- Define statistical comparators for noisy circuit sampling and DEM sampling, including sample counts, confidence bounds, fixed Rust seeds, and acceptable false-positive rate.
+- Define structural comparator contracts for cases where byte-for-byte output is too strict but semantic equality is required.
+  Runnable structural comparator implementations are completed in the owning implementation milestone before any matching row is marked `implemented`.
+- Define statistical comparator contracts for noisy circuit sampling and DEM sampling, including sample counts, confidence bounds, fixed Rust seeds, and acceptable false-positive rate.
+  Runnable statistical comparator implementations are completed in the owning sampling milestone before any matching row is marked `implemented`.
 - Mark not-yet-implemented Stab cases as red, ignored, or manifest-only without hiding them from `just oracle::list`.
 - Add source-license notes for any copied upstream tests or fixtures.
 
@@ -127,9 +129,10 @@ Linked tests and benchmarks:
 Done criteria:
 
 - `just oracle::list` prints every fixture grouped by milestone, parity mode, and status.
-- `just oracle::record --check-clean` can record exact-output fixtures from `vendor/stim` without modifying existing committed fixtures.
+- `just oracle::record --check-clean` can record runnable exact-output fixtures from `vendor/stim` without modifying existing committed fixtures.
+  Exact-output parser/printer fixtures that exercise library-only behavior without a Stim CLI equivalent are committed as manifest-only golden files and skipped by recording.
 - `just oracle::run --implemented-only` passes for implemented smoke cases.
-- `just oracle::run --all` reports unimplemented cases as explicit red or ignored cases, not as missing metadata.
+- `just oracle::run --all` reports unimplemented cases as explicit red, ignored, or manifest-only cases, not as missing metadata.
 
 ### M3: Benchmark Baseline And Performance Contracts
 
