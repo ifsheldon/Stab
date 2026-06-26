@@ -40,6 +40,10 @@ enum Milestone {
     M0,
     #[serde(rename = "M4")]
     M4,
+    #[serde(rename = "M5")]
+    M5,
+    #[serde(rename = "M6")]
+    M6,
     #[serde(rename = "M7")]
     M7,
     #[serde(rename = "M8")]
@@ -57,6 +61,8 @@ impl Milestone {
         match self {
             Self::M0 => "M0",
             Self::M4 => "M4",
+            Self::M5 => "M5",
+            Self::M6 => "M6",
             Self::M7 => "M7",
             Self::M8 => "M8",
             Self::M9 => "M9",
@@ -72,6 +78,8 @@ enum ParityMode {
     ExactOutput,
     #[serde(rename = "exact-output-and-statistical")]
     ExactOutputAndStatistical,
+    #[serde(rename = "property")]
+    Property,
     #[serde(rename = "statistical")]
     Statistical,
     #[serde(rename = "structural")]
@@ -83,6 +91,7 @@ impl ParityMode {
         match self {
             Self::ExactOutput => "exact-output",
             Self::ExactOutputAndStatistical => "exact-output-and-statistical",
+            Self::Property => "property",
             Self::Statistical => "statistical",
             Self::Structural => "structural",
         }
@@ -95,6 +104,8 @@ enum FixtureComparator {
     ExactOutput,
     #[serde(rename = "help-health")]
     HelpHealth,
+    #[serde(rename = "property")]
+    Property,
     #[serde(rename = "statistical")]
     Statistical,
     #[serde(rename = "structural")]
@@ -106,6 +117,7 @@ impl FixtureComparator {
         match self {
             Self::ExactOutput => "exact-output",
             Self::HelpHealth => "help-health",
+            Self::Property => "property",
             Self::Statistical => "statistical",
             Self::Structural => "structural",
         }
@@ -160,6 +172,85 @@ impl ExpectedStderrClass {
             Self::Empty => actual == StderrClass::Empty,
             Self::NonEmpty => actual == StderrClass::NonEmpty,
         }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+struct CompatibilityRow {
+    upstream_path: String,
+    source_kind: CompatibilitySourceKind,
+    milestone: CompatibilityMilestone,
+    priority: CompatibilityPriority,
+    status: CompatibilityStatus,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+enum CompatibilitySourceKind {
+    #[serde(rename = "cxx-test")]
+    CxxTest,
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+enum CompatibilityMilestone {
+    #[serde(rename = "M4")]
+    M4,
+    #[serde(rename = "M5")]
+    M5,
+    #[serde(rename = "M6")]
+    M6,
+    #[serde(rename = "M7")]
+    M7,
+    #[serde(rename = "M8")]
+    M8,
+    #[serde(rename = "M9")]
+    M9,
+    #[serde(rename = "M10")]
+    M10,
+    #[serde(rename = "M11")]
+    M11,
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+enum CompatibilityPriority {
+    #[serde(rename = "P0")]
+    P0,
+    #[serde(rename = "P1")]
+    P1,
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+enum CompatibilityStatus {
+    #[serde(rename = "planned")]
+    Planned,
+    #[serde(other)]
+    Other,
+}
+
+impl CompatibilityRow {
+    fn requires_fixture(&self) -> bool {
+        self.source_kind == CompatibilitySourceKind::CxxTest
+            && matches!(
+                self.milestone,
+                CompatibilityMilestone::M4
+                    | CompatibilityMilestone::M5
+                    | CompatibilityMilestone::M6
+                    | CompatibilityMilestone::M7
+                    | CompatibilityMilestone::M8
+                    | CompatibilityMilestone::M9
+                    | CompatibilityMilestone::M10
+                    | CompatibilityMilestone::M11
+            )
+            && matches!(
+                self.priority,
+                CompatibilityPriority::P0 | CompatibilityPriority::P1
+            )
+            && self.status == CompatibilityStatus::Planned
     }
 }
 
@@ -268,13 +359,16 @@ impl FixtureManifest {
                 violations.push(format!("{} has no argv tokens", row.id));
             }
             if row.comparator == FixtureComparator::ExactOutput
+                && row.status != FixtureStatus::ManifestOnly
                 && row.expected_stdout_path.is_empty()
             {
                 violations.push(format!("{} exact fixture has no expected stdout", row.id));
             }
             if matches!(
                 row.comparator,
-                FixtureComparator::Statistical | FixtureComparator::Structural
+                FixtureComparator::Property
+                    | FixtureComparator::Statistical
+                    | FixtureComparator::Structural
             ) && row.statistical_plan.is_empty()
             {
                 violations.push(format!(
@@ -301,12 +395,46 @@ impl FixtureManifest {
                 }
             }
         }
+        self.check_compatibility_coverage(root, &mut violations);
         if violations.is_empty() {
             Ok(())
         } else {
             Err(FixtureError::Validation(
                 violations.join("\n").into_boxed_str(),
             ))
+        }
+    }
+
+    fn check_compatibility_coverage(&self, root: &RepoRoot, violations: &mut Vec<String>) {
+        let fixture_sources = self
+            .rows
+            .iter()
+            .map(|row| row.upstream_source.as_str())
+            .collect::<BTreeSet<_>>();
+        let content = match std::fs::read_to_string(root.compatibility_matrix()) {
+            Ok(content) => content,
+            Err(error) => {
+                violations.push(format!("failed to read compatibility matrix: {error}"));
+                return;
+            }
+        };
+        let mut reader = csv::ReaderBuilder::new()
+            .trim(csv::Trim::All)
+            .from_reader(content.as_bytes());
+        for row in reader.deserialize::<CompatibilityRow>() {
+            match row {
+                Ok(row) => {
+                    if row.requires_fixture()
+                        && !fixture_sources.contains(row.upstream_path.as_str())
+                    {
+                        violations
+                            .push(format!("missing M2 fixture row for {}", row.upstream_path));
+                    }
+                }
+                Err(error) => {
+                    violations.push(format!("failed to parse compatibility matrix row: {error}"));
+                }
+            }
         }
     }
 
@@ -378,6 +506,7 @@ pub(crate) fn record_fixtures(
         .rows
         .iter()
         .filter(|row| row.comparator == FixtureComparator::ExactOutput)
+        .filter(|row| !row.expected_stdout_path.is_empty())
     {
         let output = crate::run_process(
             &stim_binary,
@@ -511,7 +640,9 @@ fn compare_fixture(
     let reason = match row.comparator {
         FixtureComparator::ExactOutput => compare_exact(stim, stab),
         FixtureComparator::HelpHealth => compare_help_health(stim, stab),
-        FixtureComparator::Statistical | FixtureComparator::Structural => Some(format!(
+        FixtureComparator::Property
+        | FixtureComparator::Statistical
+        | FixtureComparator::Structural => Some(format!(
             "{} comparator is not runnable until the milestone implementation defines it",
             row.comparator.as_str()
         )),
@@ -616,6 +747,7 @@ mod tests {
             .rows
             .iter()
             .filter(|row| row.comparator == FixtureComparator::ExactOutput)
+            .filter(|row| row.status != super::FixtureStatus::ManifestOnly)
         {
             assert!(!row.expected_stdout_path.is_empty(), "{}", row.id);
         }
@@ -634,6 +766,7 @@ mod tests {
             .rows
             .iter()
             .filter(|row| row.comparator == FixtureComparator::ExactOutput)
+            .filter(|row| !row.expected_stdout_path.is_empty())
         {
             assert!(
                 row.expected_stdout_file(&root).unwrap().is_file(),
