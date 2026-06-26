@@ -54,4 +54,33 @@ pub enum StabilizerError {
 
     #[error("failed to derive inverse Tableau row")]
     InvalidTableauInverse,
+
+    #[error("stabilizer {stabilizer} anticommutes with earlier stabilizer {conflict}")]
+    AntiCommutingStabilizer {
+        stabilizer: String,
+        conflict: String,
+    },
+
+    #[error("redundant stabilizer {stabilizer} is not allowed")]
+    RedundantStabilizer { stabilizer: String },
+
+    #[error("stabilizer {stabilizer} has an inconsistent sign")]
+    InconsistentStabilizer { stabilizer: String },
+
+    #[error("stabilizer set has {independent} independent generators but {num_qubits} qubits")]
+    OverconstrainedStabilizers {
+        independent: usize,
+        num_qubits: usize,
+    },
+
+    #[error(
+        "stabilizer set has {independent} independent generators but {num_qubits} qubits and underconstrained conversion is disabled"
+    )]
+    UnderconstrainedStabilizers {
+        independent: usize,
+        num_qubits: usize,
+    },
+
+    #[error("failed to synthesize a stabilizer Tableau")]
+    InvalidStabilizerTableauSynthesis,
 }

@@ -24,6 +24,6 @@ pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCou
 pub use stabilizers::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, PauliBasis, PauliPhase,
     PauliSign, PauliString, PauliStringIterator, SingleQubitClifford, StabilizerError,
-    StabilizerResult, Tableau, TableauIterator,
+    StabilizerResult, Tableau, TableauIterator, stabilizers_to_tableau,
 };
 pub use target::{Pauli, Target};
