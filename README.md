@@ -59,8 +59,17 @@ just oracle::matrix --milestone M4
 
 The matrix lives at `oracle/compatibility-matrix.csv` and records upstream source paths, owners, milestones, priorities, parity modes, comparators, status, acceptance checks, and deferred future buckets.
 
-Compile benchmark targets as a smoke check with:
+Benchmark contracts live at `benchmarks/manifest.csv`.
+The M3 benchmark workflow validates those contracts, records pinned C++ Stim baseline results, and writes generated reports under `target/benchmarks/`.
+Any explicit `--out` path must be repository-relative and under `target/benchmarks/`.
+`--only` filters use exact benchmark row ids or milestone names such as `M7`.
 
 ```sh
+just bench::list
 just bench::smoke
+just bench::baseline --stim vendor/stim
+just bench::compare --milestone M4
 ```
+
+`just bench::baseline` writes `baseline.json` and `report.md` to `target/benchmarks/baseline/latest` by default.
+Use a small `--target-seconds` value for quick local smoke runs, and increase it when recording durable baseline artifacts.

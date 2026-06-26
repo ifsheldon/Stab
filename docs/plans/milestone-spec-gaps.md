@@ -19,6 +19,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Resolved Entries
 
+## 2026-06-27 - M3: Contract-Only Benchmark Rows
+
+Status: Resolved
+Revealed by: implementation of the M3 benchmark manifest.
+Current text: M3 requires benchmark contracts for surfaces such as bit-packed `m2d` and `.dem` parse/print while also requiring pinned C++ baseline results.
+Gap: some required benchmark contracts do not have a direct `stim_perf` filter or Stim CLI command that exercises the exact future Stab performance surface.
+Proposed amendment: allow explicit contract-only benchmark rows when no direct pinned C++ executable baseline exists, require those rows to name their upstream source and owning milestone, and require a runnable benchmark before an implementation milestone claims a Stab-vs-Stim performance comparison.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now makes contract-only benchmark rows explicit in M3.
+
 ## 2026-06-27 - M2: Comparator Implementation Ownership
 
 Status: Resolved
@@ -29,6 +38,15 @@ Proposed amendment: state that M2 defines comparator contracts and manifest meta
 Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now makes comparator implementation ownership explicit in the M2 task list.
 
 ## Open Entries
+
+## 2026-06-27 - M3: Benchmark Compare Acceptance
+
+Status: Open
+Revealed by: milestone audit of the M3 benchmark harness.
+Current text: M3 asks for `just bench::compare` to run Stab and Stim on the same benchmark matrix once Stab supports the feature, but the done criteria only require `bench::baseline`, `bench::list`, and `bench::smoke`.
+Gap: the milestone does not define what `bench::compare` must accept, read, report, or fail on before implementation milestones start using it as evidence.
+Proposed amendment: require `bench::compare` to read an M3 baseline report or use the documented default, distinguish runnable rows from pending Stab runners, and make `--strict` fail until the owning milestone provides the required Stab runner and comparison output.
+Resolution: pending plan update.
 
 ## 2026-06-27 - M2: Manifest-Only Subcase Granularity
 

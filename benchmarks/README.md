@@ -1,0 +1,16 @@
+# Benchmark Contracts
+
+`manifest.csv` is the source-owned benchmark contract manifest for M3 and later performance work.
+Each row names the owning implementation milestone, threshold class, runner, upstream Stim source, workload phase, and measurement family.
+`just bench::smoke` validates that required M3 contracts remain present, including the primary benchmark matrix, canonical print and convert contracts, bit-packed detector conversion contracts, and the M12 performance-hardening target.
+
+Runner meanings:
+
+- `stim-perf`: run pinned C++ Stim's `stim_perf` binary with the row's `stim_perf_filter`.
+- `stim-cli`: run pinned C++ Stim's `stim` binary with the row's pipe-delimited `argv` and optional `stdin_path`.
+- `contract-only`: reserve a benchmark contract that has no direct pinned C++ executable baseline yet.
+
+Generated benchmark artifacts belong under `target/benchmarks/` and are not source files.
+The default baseline command writes `target/benchmarks/baseline/latest/baseline.json` and `target/benchmarks/baseline/latest/report.md`.
+Any explicit `--out` value must be a repository-relative path under `target/benchmarks/`.
+Use `--only` with exact benchmark ids or milestone names, for example `--only m4-circuit-parse` or `--only M9`.

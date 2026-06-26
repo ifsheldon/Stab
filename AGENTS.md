@@ -62,7 +62,8 @@
 - Use `just oracle::list` to inspect and validate the M2 fixture corpus, including coverage of planned M4 through M11 P0/P1 C++ compatibility-matrix rows by upstream source, milestone, and parity mode; use `just oracle::record --check-clean` to verify committed runnable exact-output fixtures against pinned Stim, `just oracle::run --implemented-only` for implemented fixture parity, and `just oracle::run --all` to report red or manifest-only future fixtures.
 - Use `just oracle::matrix --check` to validate the M1 compatibility matrix, and use `just oracle::matrix --milestone Mx` to inspect acceptance rows for implementation milestones.
 - Treat the M0 `stab-cli sample` path as a hidden oracle smoke shim only; it is not real `stim sample` compatibility, which belongs to M8.
-- Use `just bench::smoke` for the M0 benchmark smoke check until M3 introduces the full benchmark harness.
+- Use `just bench::list` to inspect M3 benchmark contracts, `just bench::smoke` to validate them without long runs, `just bench::baseline --stim vendor/stim` to record pinned C++ Stim baselines under `target/benchmarks/baseline/latest`, and `just bench::compare --milestone Mx` to inspect planned Stab-vs-Stim comparison rows.
+- Benchmark baseline `--out` paths must be repository-relative paths under `target/benchmarks/`, and `--only` filters must exactly match benchmark row ids or milestone names such as `M7`.
 - The pre-commit hook must stay shell-script-free in this repository: build and install the Rust binary instead of adding a tracked shell launcher.
 - The hook should treat submodules as pointer updates, run Rust checks only for staged Rust-affecting paths, scan staged source blobs for oversized files, and check Stab's instruction-document policy only when instruction docs or `.gitmodules` change.
 - Every scanned `README.md` must have a colocated `AGENTS.md`, and every effective `AGENTS.md` source must have at least one `CLAUDE.md` symlink pointing to it.

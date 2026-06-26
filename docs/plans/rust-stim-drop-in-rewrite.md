@@ -145,6 +145,7 @@ Tasks:
 - Add `just bench::compare` to run Stab and Stim on the same benchmark matrix once Stab supports the feature.
 - Store benchmark results in machine-readable files under a documented generated-artifact directory and summarize them in a concise human-readable report.
 - Define benchmark contracts for parser/printer throughput, `gen`, tableau operations, sampling analysis time, sampling throughput, `detect`, `m2d`, `analyze_errors`, `.dem` parse/print, and `sample_dem`.
+  Contracts without a direct pinned C++ executable benchmark runner are allowed as explicit contract-only rows, but they must name their upstream source and owning milestone and must become runnable before an implementation milestone claims a performance comparison.
 - Separate startup time, compile/analysis time, single-shot latency, and batch throughput where those phases are meaningfully different.
 
 Linked tests and benchmarks:
@@ -155,7 +156,7 @@ Linked tests and benchmarks:
 
 Done criteria:
 
-- `just bench::baseline --stim vendor/stim` records pinned C++ baseline results with machine metadata, command metadata, and Stim commit metadata.
+- `just bench::baseline --stim vendor/stim` records pinned C++ baseline results for runnable rows with machine metadata, command metadata, and Stim commit metadata, and reports contract-only rows explicitly.
 - `just bench::list` prints every planned benchmark with owning milestone and threshold class.
 - `just bench::smoke` runs in CI without requiring long benchmark durations.
 - Every implementation milestone M4 through M12 has named benchmark targets or explicitly says no benchmark is required.
