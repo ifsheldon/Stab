@@ -5,6 +5,7 @@
 pub mod bits;
 mod circuit;
 mod circuit_flow;
+mod circuit_generation;
 mod circuit_inverse;
 mod circuit_simplify;
 mod circuit_tableau;
@@ -18,6 +19,10 @@ mod target;
 pub use bits::{BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVec, SparseXorVec};
 pub use circuit::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 pub use circuit_flow::{check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators};
+pub use circuit_generation::{
+    CodeDistance, GeneratedCircuit, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
+    generate_repetition_code_circuit,
+};
 pub use circuit_inverse::{circuit_inverse_qec, circuit_inverse_unitary};
 pub use circuit_simplify::simplified_circuit;
 pub use circuit_tableau::circuit_to_tableau;

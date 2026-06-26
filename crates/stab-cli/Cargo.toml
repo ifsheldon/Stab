@@ -12,4 +12,5 @@ workspace = true
 
 [dependencies]
 clap = { workspace = true }
+stab-core = { path = "../stab-core" }
 thiserror = { workspace = true }
