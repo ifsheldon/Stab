@@ -551,6 +551,20 @@ fn parser_rejects_inverted_targets_except_result_gates_like_stim() {
 }
 
 #[test]
+fn parser_validates_pair_targets_like_stim() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/circuit.test.cc and gate_data_* examples.
+    assert!(Circuit::from_stim_str("CX rec[-1] 0\nCY sweep[0] 1\nCZ 2 rec[-1]\n").is_ok());
+    assert!(Circuit::from_stim_str("MXX !0 1\nMYY !2 !3\n").is_ok());
+
+    assert!(Circuit::from_stim_str("CX 0\n").is_err());
+    assert!(Circuit::from_stim_str("CX 0 0\n").is_err());
+    assert!(Circuit::from_stim_str("CX !0 1\n").is_err());
+    assert!(Circuit::from_stim_str("DEPOLARIZE2(0.1) 1 1\n").is_err());
+    assert!(Circuit::from_stim_str("DEPOLARIZE2(0.1) rec[-1] 1\n").is_err());
+    assert!(Circuit::from_stim_str("MXX rec[-1] 1\n").is_err());
+}
+
+#[test]
 fn target_from_str_matches_stim_surface_forms() {
     assert_eq!(
         Target::from_str("rec[-3]").unwrap(),

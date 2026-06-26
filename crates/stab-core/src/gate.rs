@@ -167,7 +167,9 @@ enum TargetRule {
     AnySingleQubit,
     MeasurementQubits,
     MeasurementPads,
-    Pairs,
+    PlainPairs,
+    ClassicalControlPairs,
+    MeasurementPairs,
     RecOnly,
     RecOrPauli,
     QubitCoords,
@@ -191,15 +193,11 @@ impl TargetRule {
             Self::AnySingleQubit => validate_targets(gate, targets, is_plain_qubit_target),
             Self::MeasurementQubits => validate_targets(gate, targets, Target::is_qubit_like),
             Self::MeasurementPads => validate_targets(gate, targets, is_measurement_pad_target),
-            Self::Pairs => {
-                if !targets.len().is_multiple_of(2) {
-                    return Err(CircuitError::InvalidTargetCount {
-                        gate,
-                        count: targets.len(),
-                    });
-                }
-                validate_targets(gate, targets, Target::is_classical_or_qubit)
+            Self::PlainPairs => validate_pair_targets(gate, targets, is_plain_qubit_target),
+            Self::ClassicalControlPairs => {
+                validate_pair_targets(gate, targets, is_plain_qubit_or_classical_target)
             }
+            Self::MeasurementPairs => validate_pair_targets(gate, targets, Target::is_qubit_target),
             Self::RecOnly => validate_targets(gate, targets, Target::is_measurement_record),
             Self::RecOrPauli => validate_targets(gate, targets, |target| {
                 target.is_measurement_record_target() || target.is_pauli_target()
@@ -224,7 +222,9 @@ impl TargetRule {
             | Self::RecOnly
             | Self::RecOrPauli
             | Self::QubitCoords => TargetGroupKind::Singles,
-            Self::Pairs => TargetGroupKind::Pairs,
+            Self::PlainPairs | Self::ClassicalControlPairs | Self::MeasurementPairs => {
+                TargetGroupKind::Pairs
+            }
             Self::PauliProducts => TargetGroupKind::PauliProducts,
             Self::PauliList => TargetGroupKind::AllTargets,
         }
@@ -250,8 +250,37 @@ fn is_plain_qubit_target(target: &Target) -> bool {
     )
 }
 
+fn is_plain_qubit_or_classical_target(target: &Target) -> bool {
+    is_plain_qubit_target(target) || target.is_classical_bit_target()
+}
+
 fn is_measurement_pad_target(target: &Target) -> bool {
     matches!(target, Target::Qubit { id, inverted: false } if id.get() <= 1)
+}
+
+fn validate_pair_targets(
+    gate: &'static str,
+    targets: &[Target],
+    predicate: impl Fn(&Target) -> bool,
+) -> CircuitResult<()> {
+    if !targets.len().is_multiple_of(2) {
+        return Err(CircuitError::InvalidTargetCount {
+            gate,
+            count: targets.len(),
+        });
+    }
+    validate_targets(gate, targets, predicate)?;
+    for pair in targets.chunks_exact(2) {
+        if let [left, right] = pair
+            && left == right
+        {
+            return Err(CircuitError::InvalidTarget {
+                gate,
+                target: left.to_string(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn validate_targets(
@@ -436,55 +465,55 @@ const GATES: &[GateInfo] = &[
         "XCX",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::ClassicalControlPairs,
     ),
     gate(
         "XCY",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::ClassicalControlPairs,
     ),
     gate(
         "XCZ",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::ClassicalControlPairs,
     ),
     gate(
         "YCX",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::ClassicalControlPairs,
     ),
     gate(
         "YCY",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::ClassicalControlPairs,
     ),
     gate(
         "YCZ",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::ClassicalControlPairs,
     ),
     gate(
         "CX",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::ClassicalControlPairs,
     ),
     gate(
         "CY",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::ClassicalControlPairs,
     ),
     gate(
         "CZ",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::ClassicalControlPairs,
     ),
     gate(
         "H",
@@ -532,7 +561,7 @@ const GATES: &[GateInfo] = &[
         "DEPOLARIZE2",
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate(
         "X_ERROR",
@@ -562,7 +591,7 @@ const GATES: &[GateInfo] = &[
         "II_ERROR",
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate(
         "PAULI_CHANNEL_1",
@@ -574,7 +603,7 @@ const GATES: &[GateInfo] = &[
         "PAULI_CHANNEL_2",
         GateCategory::Noise,
         ArgRule::ProbabilityList(15),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     not_fusable_gate(
         "E",
@@ -726,49 +755,49 @@ const GATES: &[GateInfo] = &[
         "II",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate_with_inverse(
         "SQRT_XX",
         "SQRT_XX_DAG",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate_with_inverse(
         "SQRT_XX_DAG",
         "SQRT_XX",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate_with_inverse(
         "SQRT_YY",
         "SQRT_YY_DAG",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate_with_inverse(
         "SQRT_YY_DAG",
         "SQRT_YY",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate_with_inverse(
         "SQRT_ZZ",
         "SQRT_ZZ_DAG",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate_with_inverse(
         "SQRT_ZZ_DAG",
         "SQRT_ZZ",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate(
         "MPP",
@@ -794,59 +823,59 @@ const GATES: &[GateInfo] = &[
         "SWAP",
         GateCategory::Swap,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate_with_inverse(
         "ISWAP",
         "ISWAP_DAG",
         GateCategory::Swap,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate_with_inverse(
         "CXSWAP",
         "SWAPCX",
         GateCategory::Swap,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate_with_inverse(
         "SWAPCX",
         "CXSWAP",
         GateCategory::Swap,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate(
         "CZSWAP",
         GateCategory::Swap,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate_with_inverse(
         "ISWAP_DAG",
         "ISWAP",
         GateCategory::Swap,
         ArgRule::Exact(0),
-        TargetRule::Pairs,
+        TargetRule::PlainPairs,
     ),
     gate(
         "MXX",
         GateCategory::PairMeasurement,
         ArgRule::ZeroOrOneProbability,
-        TargetRule::Pairs,
+        TargetRule::MeasurementPairs,
     ),
     gate(
         "MYY",
         GateCategory::PairMeasurement,
         ArgRule::ZeroOrOneProbability,
-        TargetRule::Pairs,
+        TargetRule::MeasurementPairs,
     ),
     gate(
         "MZZ",
         GateCategory::PairMeasurement,
         ArgRule::ZeroOrOneProbability,
-        TargetRule::Pairs,
+        TargetRule::MeasurementPairs,
     ),
 ];
 

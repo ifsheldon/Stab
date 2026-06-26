@@ -212,10 +212,6 @@ impl Target {
         self.is_qubit_target()
     }
 
-    pub(crate) fn is_classical_or_qubit(&self) -> bool {
-        self.is_qubit_target() || self.is_classical_bit_target()
-    }
-
     pub(crate) fn is_measurement_record(&self) -> bool {
         self.is_measurement_record_target()
     }
