@@ -1,0 +1,14 @@
+[package]
+name = "stab-core"
+version.workspace = true
+edition.workspace = true
+description = "Core circuit, detector error model, and simulator primitives for Stab."
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+

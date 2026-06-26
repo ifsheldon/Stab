@@ -1,0 +1,22 @@
+[package]
+name = "stab-pre-commit"
+version.workspace = true
+edition.workspace = true
+description = "Staged-aware Stab repository pre-commit checks."
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+clap = { workspace = true }
+gix = { workspace = true }
+ignore = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
