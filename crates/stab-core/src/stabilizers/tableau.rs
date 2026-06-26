@@ -158,6 +158,14 @@ impl Tableau {
         Ok(Self { xs, zs })
     }
 
+    pub fn inverse(&self) -> StabilizerResult<Self> {
+        self.inverse_with_signs(true)
+    }
+
+    pub fn inverse_skipping_signs(&self) -> StabilizerResult<Self> {
+        self.inverse_with_signs(false)
+    }
+
     pub fn to_pauli_string(&self) -> StabilizerResult<PauliString> {
         if !self.is_pauli_product() {
             return Err(StabilizerError::NotPauliProduct);
@@ -217,6 +225,38 @@ impl Tableau {
             }
         }
         Ok(true)
+    }
+
+    fn inverse_with_signs(&self, include_signs: bool) -> StabilizerResult<Self> {
+        let mut xs = Vec::with_capacity(self.len());
+        let mut zs = Vec::with_capacity(self.len());
+        for index in 0..self.len() {
+            let target_x = single_pauli(self.len(), index, PauliBasis::X, PauliSign::Plus);
+            let target_z = single_pauli(self.len(), index, PauliBasis::Z, PauliSign::Plus);
+            xs.push(self.preimage(&target_x, include_signs)?);
+            zs.push(self.preimage(&target_z, include_signs)?);
+        }
+        Ok(Self { xs, zs })
+    }
+
+    fn preimage(&self, target: &PauliString, include_sign: bool) -> StabilizerResult<PauliString> {
+        ensure_pauli_len(target, self.len())?;
+        let mut bases = Vec::with_capacity(self.len());
+        for index in 0..self.len() {
+            let has_x = !target.commutes(self.z_output(index)?)?;
+            let has_z = !target.commutes(self.x_output(index)?)?;
+            bases.push(PauliBasis::from_xz(has_x, has_z));
+        }
+        let unsigned = PauliString::from_bases(PauliSign::Plus, bases.clone());
+        if !include_sign || self.apply(&unsigned)? == *target {
+            return Ok(unsigned);
+        }
+        let signed = PauliString::from_bases(PauliSign::Minus, bases);
+        if self.apply(&signed)? == *target {
+            Ok(signed)
+        } else {
+            Err(StabilizerError::InvalidTableauInverse)
+        }
     }
 
     fn set_outputs(

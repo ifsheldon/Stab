@@ -442,6 +442,75 @@ fn stabilizers_tableau_then_and_pauli_product_round_trip_match_stim() {
     );
 }
 
+#[test]
+fn stabilizers_tableau_inverse_matches_stim_identities() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc inverse and then cases.
+    let h = Tableau::gate1("+Z", "+X").expect("H");
+    assert_eq!(h.inverse().expect("H inverse"), h);
+
+    let s = Tableau::gate1("+Y", "+Z").expect("S");
+    let s_dag = Tableau::gate1("-Y", "+Z").expect("S_DAG");
+    assert_eq!(s.inverse().expect("S inverse"), s_dag);
+    assert_eq!(s_dag.inverse().expect("S_DAG inverse"), s);
+    assert_eq!(
+        s.then(&s.inverse().expect("inverse"))
+            .expect("S then inverse"),
+        Tableau::identity(1)
+    );
+
+    let cnot = cnot_tableau();
+    assert_eq!(cnot.inverse().expect("CNOT inverse"), cnot);
+    assert_eq!(
+        cnot.then(&cnot.inverse().expect("inverse"))
+            .expect("CNOT then inverse"),
+        Tableau::identity(2)
+    );
+}
+
+#[test]
+fn stabilizers_tableau_inverse_round_trips_composed_tableau() {
+    let h0 = Tableau::gate2("+Z_", "+X_", "+_X", "+_Z").expect("H on q0");
+    let s1 = Tableau::gate2("+X_", "+Z_", "+_Y", "+_Z").expect("S on q1");
+    let cnot = cnot_tableau();
+    let tableau = h0
+        .then(&cnot)
+        .expect("H then CNOT")
+        .then(&s1)
+        .expect("then S");
+    let inverse = tableau.inverse().expect("inverse");
+
+    assert!(tableau.satisfies_invariants().expect("invariants"));
+    assert!(inverse.satisfies_invariants().expect("inverse invariants"));
+    assert_eq!(
+        tableau.then(&inverse).expect("then inverse"),
+        Tableau::identity(2)
+    );
+    assert_eq!(
+        inverse.then(&tableau).expect("inverse then"),
+        Tableau::identity(2)
+    );
+
+    let unsigned_inverse = tableau
+        .inverse_skipping_signs()
+        .expect("inverse without signs");
+    for index in 0..unsigned_inverse.len() {
+        assert!(
+            !unsigned_inverse
+                .x_output(index)
+                .expect("x output")
+                .sign()
+                .is_negative()
+        );
+        assert!(
+            !unsigned_inverse
+                .z_output(index)
+                .expect("z output")
+                .sign()
+                .is_negative()
+        );
+    }
+}
+
 proptest! {
     #[test]
     fn stabilizers_tableau_identity_preserves_dense_pauli_strings(body in bare_pauli_body_strategy(10)) {

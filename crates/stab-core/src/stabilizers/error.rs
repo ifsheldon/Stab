@@ -36,4 +36,7 @@ pub enum StabilizerError {
 
     #[error("Tableau is not a Pauli product")]
     NotPauliProduct,
+
+    #[error("failed to derive inverse Tableau row")]
+    InvalidTableauInverse,
 }
