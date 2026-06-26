@@ -469,6 +469,9 @@ impl FixtureManifest {
             if row.argv.split('|').any(str::is_empty) {
                 violations.push(format!("{} has an empty argv token", row.id));
             }
+            if is_direct_rust_fixture(row) && row.argv_tokens().len() < 2 {
+                violations.push(format!("{} cargo-test row has no cargo arguments", row.id));
+            }
             if row.comparator == FixtureComparator::ExactOutput
                 && row.status != FixtureStatus::ManifestOnly
                 && row.expected_stdout_path.is_empty()
@@ -721,6 +724,8 @@ pub(crate) fn run_fixtures(
             FixtureStatus::Implemented => {
                 let stab = if is_core_fixture(row) {
                     run_core_fixture(root, row)?
+                } else if is_direct_rust_fixture(row) {
+                    run_direct_rust_fixture(root, row)?
                 } else {
                     let stdin = row.stdin(root)?;
                     let argv = row.argv_tokens();
@@ -807,6 +812,40 @@ fn is_core_fixture(row: &FixtureRow) -> bool {
         row.argv.as_str(),
         "core-parse-print" | "core-circuit-parse-print"
     )
+}
+
+fn is_direct_rust_fixture(row: &FixtureRow) -> bool {
+    row.argv_tokens()
+        .first()
+        .is_some_and(|token| token == "cargo-test")
+}
+
+fn run_direct_rust_fixture(
+    root: &RepoRoot,
+    row: &FixtureRow,
+) -> Result<crate::ProcessOutput, FixtureError> {
+    let tokens = row.argv_tokens();
+    let args = std::iter::once("test").chain(tokens.iter().skip(1).map(String::as_str));
+    let output =
+        crate::run_process(Path::new("cargo"), args, &[], Some(&root.path)).map_err(|source| {
+            FixtureError::CoreFixtureFailed {
+                id: row.id.clone(),
+                reason: source.to_string(),
+            }
+        })?;
+    check_expected_process_shape(row, &output)?;
+    match row.comparator {
+        FixtureComparator::Property
+        | FixtureComparator::Statistical
+        | FixtureComparator::Structural => Ok(output),
+        FixtureComparator::ExactOutput | FixtureComparator::HelpHealth => {
+            Err(FixtureError::ComparatorMismatch {
+                id: row.id.clone(),
+                comparator: row.comparator.as_str(),
+                reason: "direct Rust fixtures only support test-like comparators".to_string(),
+            })
+        }
+    }
 }
 
 fn run_core_fixture(

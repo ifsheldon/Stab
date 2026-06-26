@@ -1,6 +1,6 @@
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement, Milestone,
-    RunMode, is_recordable, run_core_fixture, validate_fixture_path,
+    RunMode, is_recordable, run_core_fixture, run_direct_rust_fixture, validate_fixture_path,
 };
 
 const MANIFEST_CSV: &str = include_str!("../../../../oracle/fixtures/manifest.csv");
@@ -33,6 +33,8 @@ fn fixture_manifest_has_implemented_smoke_cases() {
         "smoke-tiny-circuit",
         "m4-parser-basic",
         "m4-convert-canonical-print",
+        "coverage-circuit-circuit-instruction",
+        "coverage-circuit-gate-target",
     ] {
         assert!(implemented.contains(&id), "{id}");
     }
@@ -61,6 +63,30 @@ fn m4_core_parse_print_rows_run_in_process() {
             .find(|row| row.id == id)
             .expect("M4 core row");
         let output = run_core_fixture(&root, row).expect("core fixture");
+
+        assert_eq!(output.status, Some(0), "{id}");
+    }
+}
+
+#[test]
+fn m4_direct_rust_rows_run_cargo_tests() {
+    let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+
+    for id in [
+        "coverage-circuit-circuit-instruction",
+        "coverage-circuit-gate-target",
+    ] {
+        let row = manifest
+            .rows
+            .iter()
+            .find(|row| row.id == id)
+            .expect("M4 direct Rust row");
+        let output = run_direct_rust_fixture(&root, row).expect("direct Rust fixture");
 
         assert_eq!(output.status, Some(0), "{id}");
     }
@@ -119,6 +145,26 @@ fn repository_exact_output_files_exist() {
             row.id
         );
     }
+}
+
+#[test]
+fn validation_rejects_cargo_test_row_without_cargo_arguments() {
+    let csv = format!(
+        "{HEADER}bad,M4,src/stim/circuit/gate_target.test.cc,structural,structural,cargo test,cargo-test,,,0,any,implemented,Run direct Rust gate target parity tests,hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+    let error = manifest.check(&root).expect_err("missing cargo args");
+
+    assert!(
+        error
+            .to_string()
+            .contains("bad cargo-test row has no cargo arguments")
+    );
 }
 
 #[test]

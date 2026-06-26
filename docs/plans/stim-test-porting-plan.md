@@ -23,6 +23,13 @@ Use the following priorities when converting Stim tests into Stab tests.
 | Bench | Benchmark source | Convert into Criterion, CLI benchmark, or `ops` benchmark workloads. |
 | Skip | Not useful as a Rust test | Replace with Cargo, Rust API, documentation, or CI guarantees instead of porting literally. |
 
+## Oracle Fixture Execution
+
+Manifest rows that are proven by direct Rust tests can use an `argv` value starting with `cargo-test`.
+The remaining `argv` tokens are passed to `cargo test` from the repository root, for example `cargo-test|-p|stab-core|--test|stim_format|target`.
+Use this mode only when the row's upstream behavior has been ported into explicit Rust tests and the row's comparator is structural, property, or statistical.
+Keep exact CLI or file-output compatibility rows on oracle fixtures that compare pinned Stim output against Stab output.
+
 ## Summary
 
 | Upstream bucket | Count | Primary action |
