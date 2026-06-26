@@ -7,6 +7,7 @@ mod circuit;
 mod error;
 mod gate;
 mod ids;
+pub mod stabilizers;
 mod target;
 
 pub use bits::{BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVec, SparseXorVec};
@@ -14,4 +15,8 @@ pub use circuit::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 pub use error::{CircuitError, CircuitResult};
 pub use gate::{Gate, GateCategory};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};
+pub use stabilizers::{
+    FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError,
+    StabilizerResult,
+};
 pub use target::{Pauli, Target};

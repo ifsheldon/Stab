@@ -102,6 +102,15 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now makes comparator imple
 
 ## Open Entries
 
+## 2026-06-27 - M6: Stabilizer Algebra Public View And Text Scope
+
+Status: Open
+Revealed by: implementation of the first owned Pauli-string algebra slice and upstream stabilizer scan.
+Current text: M6 requires `PauliString`, `CliffordString`, `Tableau`, related iterators or views, sign handling, and text round trips.
+Gap: the milestone does not say whether Rust must expose a public borrowed `PauliStringRef` equivalent, does not distinguish real-phase C++ `PauliString` text from phase-general `FlexPauliString` sparse and lowercase text, and does not define which Python-facing phase semantics are required before the Python API milestone.
+Proposed amendment: state that M6 starts with owned Pauli, FlexPauli, Clifford, and Tableau APIs; borrowed views may stay internal unless a later M6 task proves a public view is necessary; text parity must separately cover real dense `PauliString` syntax and phase-general `FlexPauliString` dense or sparse syntax; Python-only binding behavior is semantic-mining input but not a public API requirement until the Python milestone.
+Resolution: pending plan update.
+
 ## 2026-06-27 - M4: Gate Decomposition Utility Scope
 
 Status: Open
