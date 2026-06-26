@@ -470,6 +470,44 @@ fn sample_basic_matches_m8_oracle_golden() {
 }
 
 #[test]
+fn legacy_sample_flag_matches_m8_oracle_golden() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "--sample=2"],
+        include_bytes!("../../../oracle/fixtures/inputs/sample_basic.stim").as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!("../../../oracle/fixtures/expected/m8_sample_basic.stdout")
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn legacy_sample_space_separated_flag_matches_m8_oracle_golden() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "--sample", "2"],
+        include_bytes!("../../../oracle/fixtures/inputs/sample_basic.stim").as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!("../../../oracle/fixtures/expected/m8_sample_basic.stdout")
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
 fn sample_supports_deterministic_pauli_frame_measurements() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -483,6 +521,64 @@ fn sample_supports_deterministic_pauli_frame_measurements() {
     assert_eq!(status, 0);
     assert_eq!(String::from_utf8(stdout).unwrap(), "11\n");
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_writes_sparse_text_formats_like_stim() {
+    let input = include_bytes!("../../../oracle/fixtures/inputs/sample_sparse_text_formats.stim")
+        .as_slice();
+
+    let mut dets_stdout = Vec::new();
+    let mut dets_stderr = Vec::new();
+    let dets_status = run_from(
+        ["stab", "sample", "--shots=1", "--out_format=dets"],
+        input,
+        &mut dets_stdout,
+        &mut dets_stderr,
+    );
+
+    assert_eq!(dets_status, 0);
+    assert_eq!(
+        String::from_utf8(dets_stdout).unwrap(),
+        include_str!("../../../oracle/fixtures/expected/m8_sample_dets.stdout")
+    );
+    assert_eq!(String::from_utf8(dets_stderr).unwrap(), "");
+
+    let mut hits_stdout = Vec::new();
+    let mut hits_stderr = Vec::new();
+    let hits_status = run_from(
+        ["stab", "sample", "--shots=1", "--out_format=hits"],
+        input,
+        &mut hits_stdout,
+        &mut hits_stderr,
+    );
+
+    assert_eq!(hits_status, 0);
+    assert_eq!(
+        String::from_utf8(hits_stdout).unwrap(),
+        include_str!("../../../oracle/fixtures/expected/m8_sample_hits.stdout")
+    );
+    assert_eq!(String::from_utf8(hits_stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_rejects_binary_formats_until_m8_result_writers_land() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample", "--out_format=b8"],
+        "M 0\n".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("unsupported sample output format")
+    );
 }
 
 #[test]

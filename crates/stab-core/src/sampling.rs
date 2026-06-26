@@ -6,6 +6,13 @@ pub struct CompiledSampler {
     operations: Vec<SampleOperation>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SampleFormat {
+    ZeroOne,
+    Hits,
+    Dets,
+}
+
 impl CompiledSampler {
     pub fn compile(circuit: &Circuit) -> CircuitResult<Self> {
         let mut operations = Vec::new();
@@ -21,12 +28,13 @@ impl CompiledSampler {
     }
 
     pub fn sample_zero_one_bytes(&self, shots: usize) -> Vec<u8> {
+        self.sample_bytes(shots, SampleFormat::ZeroOne)
+    }
+
+    pub fn sample_bytes(&self, shots: usize, format: SampleFormat) -> Vec<u8> {
         let mut output = Vec::new();
-        for sample in self.sample_zero_one(shots) {
-            for bit in sample {
-                output.push(if bit { b'1' } else { b'0' });
-            }
-            output.push(b'\n');
+        for _ in 0..shots {
+            append_sample(&self.sample_shot(), format, &mut output);
         }
         output
     }
@@ -87,6 +95,43 @@ impl DeterministicFrame {
 
     fn measure(&self, qubit: usize, inverted: bool) -> bool {
         self.z_values.get(qubit).copied().unwrap_or(false) ^ inverted
+    }
+}
+
+fn append_sample(sample: &[bool], format: SampleFormat, output: &mut Vec<u8>) {
+    match format {
+        SampleFormat::ZeroOne => {
+            for bit in sample {
+                output.push(if *bit { b'1' } else { b'0' });
+            }
+        }
+        SampleFormat::Hits => append_hits_sample(sample, output),
+        SampleFormat::Dets => append_dets_sample(sample, output),
+    }
+    output.push(b'\n');
+}
+
+fn append_hits_sample(sample: &[bool], output: &mut Vec<u8>) {
+    let mut first = true;
+    for (index, bit) in sample.iter().enumerate() {
+        if !bit {
+            continue;
+        }
+        if !first {
+            output.push(b',');
+        }
+        first = false;
+        output.extend_from_slice(index.to_string().as_bytes());
+    }
+}
+
+fn append_dets_sample(sample: &[bool], output: &mut Vec<u8>) {
+    output.extend_from_slice(b"shot");
+    for (index, bit) in sample.iter().enumerate() {
+        if *bit {
+            output.extend_from_slice(b" M");
+            output.extend_from_slice(index.to_string().as_bytes());
+        }
     }
 }
 
@@ -286,6 +331,23 @@ mod tests {
         assert_eq!(
             samples("REPEAT 2 {\n    X 0\n    M 0\n}\n", 1),
             vec![vec![true, false]]
+        );
+    }
+
+    #[test]
+    fn writes_stim_text_sample_formats() {
+        let circuit = Circuit::from_stim_str("X 2 3 5\nM 0 1 2 3 4 5\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+        assert_eq!(sampler.sample_bytes(1, SampleFormat::ZeroOne), b"001101\n");
+        assert_eq!(sampler.sample_bytes(1, SampleFormat::Hits), b"2,3,5\n");
+        assert_eq!(
+            sampler.sample_bytes(1, SampleFormat::Dets),
+            b"shot M2 M3 M5\n"
+        );
+        assert_eq!(
+            sampler.sample_bytes(2, SampleFormat::Hits),
+            b"2,3,5\n2,3,5\n"
         );
     }
 

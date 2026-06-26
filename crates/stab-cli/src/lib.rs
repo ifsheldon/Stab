@@ -18,7 +18,7 @@ use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use stab_core::{
     Circuit, CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask, CompiledSampler,
     GeneratedCircuit, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    SurfaceCodeParams, SurfaceCodeTask, generate_color_code_circuit,
+    SampleFormat, SurfaceCodeParams, SurfaceCodeTask, generate_color_code_circuit,
     generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 use thiserror::Error;
@@ -130,6 +130,17 @@ enum SampleOutFormatArg {
     Hits,
     #[value(name = "dets")]
     Dets,
+}
+
+impl SampleOutFormatArg {
+    fn sample_format(self) -> Result<SampleFormat, CliError> {
+        match self {
+            Self::ZeroOne => Ok(SampleFormat::ZeroOne),
+            Self::Hits => Ok(SampleFormat::Hits),
+            Self::Dets => Ok(SampleFormat::Dets),
+            Self::B8 | Self::R8 | Self::Ptb64 => Err(CliError::UnsupportedSampleOutputFormat),
+        }
+    }
 }
 
 #[derive(Debug, Args)]
@@ -278,7 +289,7 @@ where
     W: Write,
     E: Write,
 {
-    let args = normalize_legacy_gen_args(args);
+    let args = normalize_legacy_args(args);
     let cli = match Cli::try_parse_from(args) {
         Ok(cli) => cli,
         Err(error) => {
@@ -310,7 +321,7 @@ where
     }
 }
 
-fn normalize_legacy_gen_args<I, S>(args: I) -> Vec<OsString>
+fn normalize_legacy_args<I, S>(args: I) -> Vec<OsString>
 where
     I: IntoIterator<Item = S>,
     S: Into<OsString>,
@@ -338,6 +349,27 @@ where
             *arg = OsString::from("gen");
         }
         args.insert(2, OsString::from("--code"));
+    } else if let Some(shots) = legacy_arg.strip_prefix("--sample=") {
+        args.splice(
+            1..2,
+            [
+                OsString::from("sample"),
+                OsString::from("--shots"),
+                OsString::from(shots),
+            ],
+        );
+    } else if legacy_arg == "--sample" {
+        if let Some(arg) = args.get_mut(1) {
+            *arg = OsString::from("sample");
+        }
+        args.insert(2, OsString::from("--shots"));
+        if args
+            .get(3)
+            .map(|arg| arg.to_string_lossy().starts_with('-'))
+            .unwrap_or(true)
+        {
+            args.insert(3, OsString::from("1"));
+        }
     }
     args
 }
@@ -718,9 +750,7 @@ where
     R: Read,
     W: Write,
 {
-    if args.out_format != SampleOutFormatArg::ZeroOne {
-        return Err(CliError::UnsupportedSampleOutputFormat);
-    }
+    let out_format = args.out_format.sample_format()?;
     if args.seed.is_some() {
         return Err(CliError::UnsupportedSampleFlag { flag: "--seed" });
     }
@@ -739,7 +769,7 @@ where
     let circuit_text = std::str::from_utf8(&input_bytes).map_err(|_| CliError::InvalidUtf8Input)?;
     let circuit = Circuit::from_stim_str(circuit_text)?;
     let sampler = CompiledSampler::compile(&circuit)?;
-    let output = sampler.sample_zero_one_bytes(args.shots);
+    let output = sampler.sample_bytes(args.shots, out_format);
     write_output(args.output.as_ref(), stdout, &output)
 }
 
