@@ -125,11 +125,19 @@ impl ArgRule {
                         actual: args.len(),
                     });
                 }
+                let mut total = 0.0;
                 for arg in args {
                     Probability::try_new(*arg).map_err(|_| CircuitError::InvalidArgument {
                         gate,
                         argument: arg.to_string(),
                     })?;
+                    total += *arg;
+                }
+                if total > 1.0000001 {
+                    return Err(CircuitError::InvalidArgument {
+                        gate,
+                        argument: format!("sum {total}"),
+                    });
                 }
                 Ok(())
             }

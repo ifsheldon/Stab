@@ -565,6 +565,22 @@ fn parser_validates_pair_targets_like_stim() {
 }
 
 #[test]
+fn parser_rejects_probability_lists_that_are_not_disjoint_like_stim() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/circuit.test.cc PAULI_CHANNEL_2 validation.
+    assert!(Circuit::from_stim_str("PAULI_CHANNEL_1(0.5, 0.25, 0.25) 0\n").is_ok());
+    assert!(
+        Circuit::from_stim_str("PAULI_CHANNEL_2(0.1,0,0,0,0,0,0,0,0,0,0.1,0,0,0,0.1) 1 2\n")
+            .is_ok()
+    );
+
+    assert!(Circuit::from_stim_str("PAULI_CHANNEL_1(0.5, 0.5, 0.1) 0\n").is_err());
+    assert!(
+        Circuit::from_stim_str("PAULI_CHANNEL_2(0.4,0,0,0,0,0.4,0,0,0,0,0,0,0,0,0.4) 1 2\n")
+            .is_err()
+    );
+}
+
+#[test]
 fn target_from_str_matches_stim_surface_forms() {
     assert_eq!(
         Target::from_str("rec[-3]").unwrap(),
