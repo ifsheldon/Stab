@@ -34,7 +34,7 @@ just oracle::run --case smoke/tiny-circuit
 ```
 
 The tiny-circuit smoke case now runs through the public `stab sample` command.
-M8 sampling compatibility has started with deterministic `01`, `b8`, `hits`, and `dets` output for the parser-backed Z-basis subset plus seeded `X_ERROR` sampling for the first statistical oracle case; `r8`, `ptb64`, broader noise channels, and reference-sample behavior still belong to later M8 work.
+M8 sampling compatibility has started with deterministic `01`, `b8`, `hits`, and `dets` output for the parser-backed Z-basis subset plus seeded single-qubit noise sampling for `X_ERROR`, `Y_ERROR`, `Z_ERROR`, `I_ERROR`, `DEPOLARIZE1`, and `PAULI_CHANNEL_1`; `r8`, `ptb64`, broader simulator semantics, and reference-sample behavior still belong to later M8 work.
 
 Inspect and check the M2 fixture corpus with:
 

@@ -638,6 +638,53 @@ fn sample_seed_makes_noisy_x_error_reproducible() {
 }
 
 #[test]
+fn sample_supports_z_basis_single_qubit_noise_channels() {
+    let cases = [
+        (
+            "DEPOLARIZE1(0.3) 0\nM 0\n",
+            "expected roughly 200 depolarize1 hits",
+            125..=275,
+        ),
+        (
+            "PAULI_CHANNEL_1(0.1, 0.2, 0.3) 0\nM 0\n",
+            "expected roughly 300 pauli-channel1 hits",
+            215..=385,
+        ),
+    ];
+
+    for (input, message, expected_hits) in cases {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            ["stab", "sample", "--shots=1000", "--seed=5"],
+            input.as_bytes(),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, 0, "{message}");
+        assert_eq!(String::from_utf8(stderr).unwrap(), "", "{message}");
+
+        let stdout = String::from_utf8(stdout).unwrap();
+        let hits = stdout.lines().filter(|line| *line == "1").count();
+        assert!(expected_hits.contains(&hits), "{message}, got {hits}");
+    }
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample", "--shots=4", "--seed=5"],
+        "Z_ERROR(0.9) 0\nI_ERROR(0.8) 0\nM 0\n".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "0\n0\n0\n0\n");
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
 fn sample_reads_and_writes_paths() {
     let temp_dir = tempdir().expect("temp dir");
     let input_path = temp_dir.path().join("input.stim");

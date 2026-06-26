@@ -224,7 +224,30 @@ fn compile_instruction(
         }
         "M" | "MR" => compile_z_measurement(instruction, operations),
         "MPAD" => compile_measurement_pads(instruction, operations),
-        "X_ERROR" | "Y_ERROR" => compile_single_qubit_x_basis_noise(instruction, operations),
+        "X_ERROR" | "Y_ERROR" => compile_single_qubit_probabilistic_toggle(
+            instruction,
+            operations,
+            single_probability_argument(instruction)?.get(),
+        ),
+        "Z_ERROR" | "I_ERROR" => Ok(()),
+        "DEPOLARIZE1" => compile_single_qubit_probabilistic_toggle(
+            instruction,
+            operations,
+            single_probability_argument(instruction)?.get() * (2.0 / 3.0),
+        ),
+        "PAULI_CHANNEL_1" => {
+            let Some(probabilities) = instruction.probability_arguments()? else {
+                return Err(unsupported_sampler_instruction(instruction));
+            };
+            let [x_probability, y_probability, _z_probability] = probabilities.as_slice() else {
+                return Err(unsupported_sampler_instruction(instruction));
+            };
+            compile_single_qubit_probabilistic_toggle(
+                instruction,
+                operations,
+                x_probability.get() + y_probability.get(),
+            )
+        }
         _ if zero_probability_noise(instruction)? => Ok(()),
         _ => Err(unsupported_sampler_instruction(instruction)),
     }
@@ -262,15 +285,15 @@ fn compile_measurement_pads(
     Ok(())
 }
 
-fn compile_single_qubit_x_basis_noise(
+fn compile_single_qubit_probabilistic_toggle(
     instruction: &CircuitInstruction,
     operations: &mut Vec<SampleOperation>,
+    probability: f64,
 ) -> CircuitResult<()> {
-    let probability = single_probability_argument(instruction)?;
     for target in instruction.targets() {
         operations.push(SampleOperation::ProbabilisticToggle {
             qubit: qubit_index(instruction, target)?,
-            probability: probability.get(),
+            probability,
         });
     }
     Ok(())
@@ -455,6 +478,41 @@ mod tests {
         assert!(
             (175..=325).contains(&hits),
             "expected roughly 250 noisy hits, got {hits}"
+        );
+    }
+
+    #[test]
+    fn z_and_identity_errors_do_not_flip_z_basis_measurements() {
+        assert_eq!(
+            samples("Z_ERROR(0.9) 0\nI_ERROR(0.8) 0\nM 0\n", 20),
+            vec![vec![false]; 20]
+        );
+    }
+
+    #[test]
+    fn depolarize1_flips_z_basis_measurements_with_x_or_y_probability() {
+        let circuit = Circuit::from_stim_str("DEPOLARIZE1(0.3) 0\nM 0\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+        let samples = sampler.sample_zero_one_with_seed(1000, Some(5));
+        let hits = samples.iter().filter(|shot| shot == &&vec![true]).count();
+        assert!(
+            (125..=275).contains(&hits),
+            "expected roughly 200 depolarize1 Z-basis hits, got {hits}"
+        );
+    }
+
+    #[test]
+    fn pauli_channel1_flips_z_basis_measurements_for_x_or_y_cases() {
+        let circuit = Circuit::from_stim_str("PAULI_CHANNEL_1(0.1, 0.2, 0.3) 0\nM 0\n")
+            .expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+        let samples = sampler.sample_zero_one_with_seed(1000, Some(5));
+        let hits = samples.iter().filter(|shot| shot == &&vec![true]).count();
+        assert!(
+            (215..=385).contains(&hits),
+            "expected roughly 300 pauli-channel1 Z-basis hits, got {hits}"
         );
     }
 
