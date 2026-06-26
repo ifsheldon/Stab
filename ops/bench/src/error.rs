@@ -116,6 +116,6 @@ pub(crate) enum BenchError {
     #[error("benchmark output path {path} escaped {root}")]
     BenchmarkOutputEscaped { path: PathBuf, root: PathBuf },
 
-    #[error("Stab benchmark comparison runners are not implemented yet")]
-    ComparePending,
+    #[error("benchmark comparison is incomplete:\n{details}")]
+    CompareIncomplete { details: Box<str> },
 }

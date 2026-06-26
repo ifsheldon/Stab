@@ -18,6 +18,11 @@ use crate::stim::{ensure_stim_binaries, validate_stim_source};
 
 const STAB_COMPARE_ITERATIONS: usize = 128;
 const M4_PARSE_FIXTURE: &str = include_str!("../../../oracle/fixtures/inputs/parser_basic.stim");
+const M4_STIM_PARSE_DENSE_FIXTURE: &str = r#"
+H 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+CNOT 4 5 6 7
+M 1 2 3 4 5 6 7 8 9 10 11
+"#;
 
 #[derive(Clone, Debug)]
 pub(crate) struct BaselineOptions {
@@ -132,8 +137,15 @@ pub(crate) fn run_compare(
         baseline_path.display()
     );
     let mut pending = Vec::new();
+    let mut missing_baselines = Vec::new();
     for row in rows {
-        let stim_summary = summarize_baseline_row(&baseline_report, &row.id);
+        let stim_summary = match summarize_baseline_row(&baseline_report, &row.id) {
+            BaselineSummary::Present(summary) => summary,
+            BaselineSummary::Missing => {
+                missing_baselines.push(row.id.clone());
+                "missing-baseline".to_string()
+            }
+        };
         match run_stab_compare_row(row)? {
             Some(measurements) => {
                 println!(
@@ -155,8 +167,10 @@ pub(crate) fn run_compare(
             }
         }
     }
-    if options.strict && !pending.is_empty() {
-        Err(BenchError::ComparePending)
+    if options.strict && (!pending.is_empty() || !missing_baselines.is_empty()) {
+        Err(BenchError::CompareIncomplete {
+            details: compare_incomplete_details(&pending, &missing_baselines).into_boxed_str(),
+        })
     } else {
         Ok(())
     }
@@ -172,16 +186,32 @@ fn read_baseline_report(path: &Path) -> Result<BaselineReport, BenchError> {
 
 fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
-        "m4-circuit-parse" => Ok(Some(vec![measure_stab("stab_parse_parser_basic", || {
-            let circuit = Circuit::from_stim_str(M4_PARSE_FIXTURE).map_err(|error| {
-                BenchError::StabRunner {
-                    row_id: row.id.clone(),
-                    message: error.to_string(),
-                }
-            })?;
-            black_box(circuit.items().len());
-            Ok(())
-        })?])),
+        "m4-circuit-parse" => {
+            let sparse_fixture = m4_stim_parse_sparse_fixture();
+            Ok(Some(vec![
+                measure_stab("stab_circuit_parse", || {
+                    let circuit =
+                        Circuit::from_stim_str(M4_STIM_PARSE_DENSE_FIXTURE).map_err(|error| {
+                            BenchError::StabRunner {
+                                row_id: row.id.clone(),
+                                message: error.to_string(),
+                            }
+                        })?;
+                    black_box(circuit.items().len());
+                    Ok(())
+                })?,
+                measure_stab("stab_circuit_parse_sparse", || {
+                    let circuit = Circuit::from_stim_str(&sparse_fixture).map_err(|error| {
+                        BenchError::StabRunner {
+                            row_id: row.id.clone(),
+                            message: error.to_string(),
+                        }
+                    })?;
+                    black_box(circuit.items().len());
+                    Ok(())
+                })?,
+            ]))
+        }
         "m4-circuit-canonical-print" => {
             let circuit = Circuit::from_stim_str(M4_PARSE_FIXTURE).map_err(|error| {
                 BenchError::StabRunner {
@@ -212,6 +242,14 @@ fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, 
     }
 }
 
+fn m4_stim_parse_sparse_fixture() -> String {
+    let mut text = String::new();
+    for _ in 0..1000 {
+        text.push_str("H 0\nCNOT 1 2\nM 0\n");
+    }
+    text
+}
+
 fn measure_stab(
     name: &str,
     mut operation: impl FnMut() -> Result<(), BenchError>,
@@ -234,14 +272,37 @@ fn measure_stab(
     })
 }
 
-fn summarize_baseline_row(report: &BaselineReport, row_id: &str) -> String {
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum BaselineSummary {
+    Present(String),
+    Missing,
+}
+
+fn summarize_baseline_row(report: &BaselineReport, row_id: &str) -> BaselineSummary {
     let Some(row) = report.rows.iter().find(|row| row.id == row_id) else {
-        return "missing-baseline".to_string();
+        return BaselineSummary::Missing;
     };
     if row.measurements.is_empty() {
-        return row.status.clone();
+        return BaselineSummary::Present(row.status.clone());
     }
-    summarize_measurements(&row.measurements)
+    BaselineSummary::Present(summarize_measurements(&row.measurements))
+}
+
+fn compare_incomplete_details(pending: &[String], missing_baselines: &[String]) -> String {
+    let mut details = Vec::new();
+    if !pending.is_empty() {
+        details.push(format!(
+            "pending Stab comparison runner(s): {}",
+            pending.join(", ")
+        ));
+    }
+    if !missing_baselines.is_empty() {
+        details.push(format!(
+            "missing baseline row(s): {}",
+            missing_baselines.join(", ")
+        ));
+    }
+    details.join("\n")
 }
 
 fn summarize_measurements(measurements: &[Measurement]) -> String {
@@ -405,8 +466,8 @@ fn duration_seconds(value: f64, unit: &str) -> Option<f64> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_stim_perf_line;
-    use crate::report::Measurement;
+    use super::{BaselineSummary, parse_stim_perf_line, summarize_baseline_row};
+    use crate::report::{BaselineReport, Measurement};
 
     #[test]
     fn parses_stim_perf_measurement_line() {
@@ -422,6 +483,90 @@ mod tests {
                 seconds: 0.0000013,
                 iterations: None,
             }
+        );
+    }
+
+    #[test]
+    fn summarizes_present_contract_and_missing_baseline_rows() {
+        let report = serde_json::from_str::<BaselineReport>(
+            r#"{
+                "schema_version": 1,
+                "generated_unix_epoch_seconds": 0,
+                "machine": {
+                    "os": "linux",
+                    "arch": "x86_64",
+                    "family": "unix",
+                    "available_parallelism": 1,
+                    "rustc_version": "rustc test",
+                    "cmake_version": "cmake test"
+                },
+                "stim": {
+                    "source_path": "vendor/stim",
+                    "expected_tag": "v1.16.0",
+                    "expected_commit": "expected",
+                    "actual_tag": "v1.16.0",
+                    "actual_commit": "actual"
+                },
+                "command": {
+                    "target_seconds": 0.001,
+                    "cli_iterations": 1,
+                    "filters": []
+                },
+                "rows": [
+                    {
+                        "id": "measured-row",
+                        "milestone": "M4",
+                        "threshold_class": "report-only",
+                        "runner": "stim-perf",
+                        "upstream_source": "src/stim/circuit/circuit.perf.cc",
+                        "phase": "analysis",
+                        "measurement": "parser-throughput",
+                        "status": "measured",
+                        "command": {
+                            "program": "stim_perf",
+                            "args": [],
+                            "stdin_path": ""
+                        },
+                        "measurements": [
+                            {
+                                "name": "circuit_parse",
+                                "seconds": 0.0000013,
+                                "iterations": null
+                            }
+                        ]
+                    },
+                    {
+                        "id": "contract-row",
+                        "milestone": "M4",
+                        "threshold_class": "report-only",
+                        "runner": "contract-only",
+                        "upstream_source": "src/stim/circuit/circuit.test.cc",
+                        "phase": "analysis",
+                        "measurement": "canonical-print",
+                        "status": "contract-only",
+                        "command": {
+                            "program": "",
+                            "args": [],
+                            "stdin_path": ""
+                        },
+                        "measurements": []
+                    }
+                ]
+            }"#,
+        )
+        .expect("baseline report");
+
+        assert_eq!(
+            summarize_baseline_row(&report, "measured-row"),
+            BaselineSummary::Present("circuit_parse=0.000001300s".to_string())
+        );
+        assert_eq!(
+            summarize_baseline_row(&report, "contract-row"),
+            BaselineSummary::Present("contract-only".to_string())
+        );
+        assert_eq!(
+            summarize_baseline_row(&report, "missing-row"),
+            BaselineSummary::Missing
         );
     }
 }

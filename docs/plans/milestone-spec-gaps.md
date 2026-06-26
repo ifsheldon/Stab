@@ -34,8 +34,8 @@ Status: Resolved
 Revealed by: milestone audit of the M3 benchmark harness.
 Current text: M3 asks for `just bench::compare` to run Stab and Stim on the same benchmark matrix once Stab supports the feature, but the done criteria only require `bench::baseline`, `bench::list`, and `bench::smoke`.
 Gap: the milestone does not define what `bench::compare` must accept, read, report, or fail on before implementation milestones start using it as evidence.
-Proposed amendment: require `bench::compare` to read an M3 baseline report or use the documented default, distinguish runnable rows from pending Stab runners, and make `--strict` fail until the owning milestone provides the required Stab runner and comparison output.
-Resolution: `stab-bench compare` now reads the default or explicit baseline report, runs Stab comparison runners for supported rows, reports pending rows explicitly, and makes `--strict` fail when any selected row is pending; `benchmarks/README.md` and `docs/plans/rust-stim-drop-in-rewrite.md` document the behavior.
+Proposed amendment: require `bench::compare` to read an M3 baseline report or use the documented default, distinguish runnable rows from pending Stab runners, and make `--strict` fail until the owning milestone provides the required Stab runner and complete selected baseline evidence.
+Resolution: `stab-bench compare` now reads the default or explicit baseline report, runs Stab comparison runners for supported rows, reports pending rows explicitly, and makes `--strict` fail when any selected row is pending or missing from the selected baseline; `benchmarks/README.md` and `docs/plans/rust-stim-drop-in-rewrite.md` document the behavior.
 
 ## 2026-06-27 - M1/M4/M7: CLI Convert Ordering
 

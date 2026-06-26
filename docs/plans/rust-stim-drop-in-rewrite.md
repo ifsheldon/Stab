@@ -142,7 +142,7 @@ Tasks:
 
 - Create `stab-bench` or an equivalent benchmark package plus `ops` support for benchmark orchestration.
 - Add `just bench::baseline` to compile and benchmark C++ Stim v1.16.0 from `vendor/stim`.
-- Add `just bench::compare` to read a default or explicit C++ Stim baseline report, run Stab-side comparison runners for supported rows, report pending Stab runners explicitly, and make `--strict` fail when selected rows are still pending.
+- Add `just bench::compare` to read a default or explicit C++ Stim baseline report, run Stab-side comparison runners for supported rows, report pending Stab runners explicitly, and make `--strict` fail when selected rows are still pending or missing from the selected baseline.
 - Store benchmark results in machine-readable files under a documented generated-artifact directory and summarize them in a concise human-readable report.
 - Define benchmark contracts for parser/printer throughput, `gen`, tableau operations, sampling analysis time, sampling throughput, `detect`, `m2d`, `analyze_errors`, `.dem` parse/print, and `sample_dem`.
   Contracts without a direct pinned C++ executable benchmark runner are allowed as explicit contract-only rows, but they must name their upstream source and owning milestone and must become runnable before an implementation milestone claims a performance comparison for that workload.
