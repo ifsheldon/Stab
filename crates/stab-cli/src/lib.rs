@@ -16,9 +16,10 @@ use std::path::PathBuf;
 use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use stab_core::{
-    CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, Probability,
-    RepetitionCodeParams, RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
-    generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
+    Circuit, CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit,
+    Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount, SurfaceCodeParams,
+    SurfaceCodeTask, generate_color_code_circuit, generate_repetition_code_circuit,
+    generate_surface_code_circuit,
 };
 use thiserror::Error;
 
@@ -111,6 +112,8 @@ enum RecordFormatArg {
     ZeroOne,
     #[value(name = "dets")]
     Dets,
+    #[value(name = "stim")]
+    Stim,
 }
 
 #[derive(Debug, Args)]
@@ -189,13 +192,15 @@ enum CliError {
     #[error("unsupported color_code task {task:?}; expected memory_xyz")]
     UnsupportedColorTask { task: String },
 
-    #[error("unsupported conversion; this M7 slice supports 01 input with 01 or dets output")]
+    #[error(
+        "unsupported conversion; this M7 slice supports 01 input to 01 or dets output, and stim input to stim output"
+    )]
     UnsupportedConversion,
 
     #[error("not enough information given to parse input file")]
     MissingRecordWidth,
 
-    #[error("input is not valid UTF-8 01 text")]
+    #[error("input is not valid UTF-8 text")]
     InvalidUtf8Input,
 
     #[error("01 record on line {line} has {actual} bits but expected {expected}")]
@@ -453,16 +458,44 @@ where
     R: Read,
     W: Write,
 {
-    if args.in_format != RecordFormatArg::ZeroOne {
-        return Err(CliError::UnsupportedConversion);
+    match (args.in_format, args.out_format) {
+        (RecordFormatArg::ZeroOne, RecordFormatArg::ZeroOne | RecordFormatArg::Dets) => {
+            run_convert_zero_one(args, stdin, stdout)
+        }
+        (RecordFormatArg::Stim, RecordFormatArg::Stim) => run_convert_stim(args, stdin, stdout),
+        _ => Err(CliError::UnsupportedConversion),
     }
+}
+
+fn run_convert_zero_one<R, W>(
+    args: ConvertArgs,
+    stdin: &mut R,
+    stdout: &mut W,
+) -> Result<(), CliError>
+where
+    R: Read,
+    W: Write,
+{
     let width = convert_record_width(&args)?;
     let input = read_input(args.input.as_ref(), stdin)?;
     let records = parse_zero_one_records(&input, width)?;
     let output = match args.out_format {
         RecordFormatArg::ZeroOne => write_zero_one_records(&records),
         RecordFormatArg::Dets => write_dets_records(&records, &args),
+        RecordFormatArg::Stim => return Err(CliError::UnsupportedConversion),
     };
+    write_output(args.output.as_ref(), stdout, output.as_bytes())
+}
+
+fn run_convert_stim<R, W>(args: ConvertArgs, stdin: &mut R, stdout: &mut W) -> Result<(), CliError>
+where
+    R: Read,
+    W: Write,
+{
+    let input = read_input(args.input.as_ref(), stdin)?;
+    let text = std::str::from_utf8(&input).map_err(|_| CliError::InvalidUtf8Input)?;
+    let circuit = Circuit::from_stim_str(text)?;
+    let output = circuit.to_stim_string();
     write_output(args.output.as_ref(), stdout, output.as_bytes())
 }
 
@@ -674,214 +707,4 @@ fn count_smoke_measurements(circuit: &str) -> Result<usize, CliError> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::run_from;
-
-    #[test]
-    fn gen_repetition_code_matches_m7_oracle_golden() {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            [
-                "stab",
-                "gen",
-                "--code",
-                "repetition_code",
-                "--task",
-                "memory",
-                "--distance",
-                "3",
-                "--rounds",
-                "2",
-            ],
-            "".as_bytes(),
-            &mut stdout,
-            &mut stderr,
-        );
-
-        assert_eq!(status, 0);
-        assert_eq!(
-            String::from_utf8(stdout).unwrap(),
-            include_str!("../../../oracle/fixtures/expected/m7_gen_repetition_code.stdout")
-        );
-        assert_eq!(String::from_utf8(stderr).unwrap(), "");
-    }
-
-    #[test]
-    fn gen_surface_rotated_code_matches_m7_oracle_golden() {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            [
-                "stab",
-                "gen",
-                "--code",
-                "surface_code",
-                "--task",
-                "rotated_memory_z",
-                "--distance",
-                "2",
-                "--rounds",
-                "1",
-            ],
-            "".as_bytes(),
-            &mut stdout,
-            &mut stderr,
-        );
-
-        assert_eq!(status, 0);
-        assert_eq!(
-            String::from_utf8(stdout).unwrap(),
-            include_str!("../../../oracle/fixtures/expected/m7_gen_surface_rotated_z.stdout")
-        );
-        assert_eq!(String::from_utf8(stderr).unwrap(), "");
-    }
-
-    #[test]
-    fn gen_surface_unrotated_code_matches_m7_oracle_golden() {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            [
-                "stab",
-                "gen",
-                "--code",
-                "surface_code",
-                "--task",
-                "unrotated_memory_z",
-                "--distance",
-                "2",
-                "--rounds",
-                "1",
-            ],
-            "".as_bytes(),
-            &mut stdout,
-            &mut stderr,
-        );
-
-        assert_eq!(status, 0);
-        assert_eq!(
-            String::from_utf8(stdout).unwrap(),
-            include_str!("../../../oracle/fixtures/expected/m7_gen_surface_unrotated_z.stdout")
-        );
-        assert_eq!(String::from_utf8(stderr).unwrap(), "");
-    }
-
-    #[test]
-    fn gen_color_code_matches_m7_oracle_golden() {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            [
-                "stab",
-                "gen",
-                "--code",
-                "color_code",
-                "--task",
-                "memory_xyz",
-                "--distance",
-                "3",
-                "--rounds",
-                "2",
-            ],
-            "".as_bytes(),
-            &mut stdout,
-            &mut stderr,
-        );
-
-        assert_eq!(status, 0);
-        assert_eq!(
-            String::from_utf8(stdout).unwrap(),
-            include_str!("../../../oracle/fixtures/expected/m7_gen_color_code.stdout")
-        );
-        assert_eq!(String::from_utf8(stderr).unwrap(), "");
-    }
-
-    #[test]
-    fn convert_01_to_dets_matches_m7_oracle_golden() {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            [
-                "stab",
-                "convert",
-                "--in_format=01",
-                "--out_format=dets",
-                "--num_detectors=2",
-            ],
-            include_bytes!("../../../oracle/fixtures/inputs/convert_measurements.01").as_slice(),
-            &mut stdout,
-            &mut stderr,
-        );
-
-        assert_eq!(status, 0);
-        assert_eq!(
-            String::from_utf8(stdout).unwrap(),
-            include_str!("../../../oracle/fixtures/expected/m7_convert_01_to_dets.stdout")
-        );
-        assert_eq!(String::from_utf8(stderr).unwrap(), "");
-    }
-
-    #[test]
-    fn smoke_sampler_outputs_zero_measurements_for_each_shot() {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            ["stab", "sample", "--shots", "2"],
-            "M 0 1\n".as_bytes(),
-            &mut stdout,
-            &mut stderr,
-        );
-
-        assert_eq!(status, 0);
-        assert_eq!(String::from_utf8(stdout).unwrap(), "00\n00\n");
-        assert_eq!(String::from_utf8(stderr).unwrap(), "");
-    }
-
-    #[test]
-    fn smoke_sampler_ignores_comments_and_ticks() {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            ["stab", "sample", "--shots=1"],
-            "# comment\nTICK\nMZ 2 # after\n".as_bytes(),
-            &mut stdout,
-            &mut stderr,
-        );
-
-        assert_eq!(status, 0);
-        assert_eq!(String::from_utf8(stdout).unwrap(), "0\n");
-        assert_eq!(String::from_utf8(stderr).unwrap(), "");
-    }
-
-    #[test]
-    fn smoke_sampler_rejects_non_smoke_instructions() {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            ["stab", "sample"],
-            "H 0\nM 0\n".as_bytes(),
-            &mut stdout,
-            &mut stderr,
-        );
-
-        assert_eq!(status, 1);
-        assert_eq!(String::from_utf8(stdout).unwrap(), "");
-        assert!(
-            String::from_utf8(stderr)
-                .unwrap()
-                .contains("only supports M and MZ")
-        );
-    }
-
-    #[test]
-    fn smoke_sampler_is_hidden_from_public_help() {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(["stab", "--help"], "".as_bytes(), &mut stdout, &mut stderr);
-
-        assert_eq!(status, 0);
-        assert!(!String::from_utf8(stdout).unwrap().contains("sample"));
-        assert_eq!(String::from_utf8(stderr).unwrap(), "");
-    }
-}
+mod tests;
