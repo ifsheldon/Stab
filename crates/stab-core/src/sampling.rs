@@ -12,6 +12,7 @@ pub struct CompiledSampler {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SampleFormat {
     ZeroOne,
+    B8,
     Hits,
     Dets,
 }
@@ -134,10 +135,25 @@ fn append_sample(sample: &[bool], format: SampleFormat, output: &mut Vec<u8>) {
                 output.push(if *bit { b'1' } else { b'0' });
             }
         }
+        SampleFormat::B8 => append_b8_sample(sample, output),
         SampleFormat::Hits => append_hits_sample(sample, output),
         SampleFormat::Dets => append_dets_sample(sample, output),
     }
-    output.push(b'\n');
+    if format != SampleFormat::B8 {
+        output.push(b'\n');
+    }
+}
+
+fn append_b8_sample(sample: &[bool], output: &mut Vec<u8>) {
+    for byte_bits in sample.chunks(8) {
+        let mut byte = 0u8;
+        for (bit_index, bit) in byte_bits.iter().enumerate() {
+            if *bit {
+                byte |= 1u8 << bit_index;
+            }
+        }
+        output.push(byte);
+    }
 }
 
 fn append_hits_sample(sample: &[bool], output: &mut Vec<u8>) {
@@ -402,6 +418,7 @@ mod tests {
         let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
 
         assert_eq!(sampler.sample_bytes(1, SampleFormat::ZeroOne), b"001101\n");
+        assert_eq!(sampler.sample_bytes(1, SampleFormat::B8), &[0x2c]);
         assert_eq!(sampler.sample_bytes(1, SampleFormat::Hits), b"2,3,5\n");
         assert_eq!(
             sampler.sample_bytes(1, SampleFormat::Dets),
@@ -410,6 +427,18 @@ mod tests {
         assert_eq!(
             sampler.sample_bytes(2, SampleFormat::Hits),
             b"2,3,5\n2,3,5\n"
+        );
+    }
+
+    #[test]
+    fn writes_b8_samples_with_per_shot_padding() {
+        let circuit =
+            Circuit::from_stim_str("X 0 8\nM 0 1 2 3 4 5 6 7 8\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+        assert_eq!(
+            sampler.sample_bytes(2, SampleFormat::B8),
+            &[0x01, 0x01, 0x01, 0x01]
         );
     }
 
