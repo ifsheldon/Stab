@@ -4,6 +4,7 @@
 
 pub mod bits;
 mod circuit;
+mod circuit_inverse;
 mod circuit_tableau;
 mod error;
 mod gate;
@@ -13,6 +14,7 @@ mod target;
 
 pub use bits::{BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVec, SparseXorVec};
 pub use circuit::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
+pub use circuit_inverse::circuit_inverse_unitary;
 pub use circuit_tableau::circuit_to_tableau;
 pub use error::{CircuitError, CircuitResult};
 pub use gate::{Gate, GateCategory};

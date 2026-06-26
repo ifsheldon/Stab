@@ -39,6 +39,20 @@ impl Circuit {
         crate::circuit_to_tableau(self, ignore_noise, ignore_measurement, ignore_reset)
     }
 
+    pub fn inverse_unitary(&self) -> CircuitResult<Self> {
+        crate::circuit_inverse_unitary(self)
+    }
+
+    /// Appends an instruction, fusing it into the previous instruction when Stim formatting allows it.
+    pub fn append_instruction(&mut self, instruction: CircuitInstruction) {
+        self.push_instruction(instruction);
+    }
+
+    /// Appends a repeat block without modifying its body.
+    pub fn append_repeat_block(&mut self, repeat: RepeatBlock) {
+        self.push(CircuitItem::RepeatBlock(repeat));
+    }
+
     pub fn to_stim_string(&self) -> String {
         let mut out = String::new();
         self.write_stim(&mut out, 0);
