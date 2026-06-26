@@ -523,6 +523,46 @@ fn gates_lookup_is_case_insensitive_and_canonicalizes_aliases() {
 }
 
 #[test]
+fn canonical_float_printing_matches_stim_v116_stream_format() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/circuit_instruction.cc stream printing.
+    let circuit = Circuit::from_stim_str(concat!(
+        "QUBIT_COORDS(",
+        "1e20, ",
+        "0.33333333334, ",
+        "0.000123456789, ",
+        "0.0000123456789, ",
+        "123456.789, ",
+        "1234567.89, ",
+        "-0, ",
+        "1.5, ",
+        "100000.1, ",
+        "999999.9",
+        ") 0\n",
+        "X_ERROR(0.33333333334) 1\n",
+    ))
+    .expect("parse float formatting fixture");
+
+    assert_eq!(
+        circuit.to_stim_string(),
+        concat!(
+            "QUBIT_COORDS(",
+            "1e+20, ",
+            "0.333333, ",
+            "0.000123457, ",
+            "1.23457e-05, ",
+            "123457, ",
+            "1.23457e+06, ",
+            "0, ",
+            "1.5, ",
+            "100000, ",
+            "1e+06",
+            ") 0\n",
+            "X_ERROR(0.333333) 1\n",
+        )
+    );
+}
+
+#[test]
 fn gates_table_matches_stim_v116_canonical_names_and_aliases() {
     // Adapted from Stim v1.16.0 src/stim/gates/gates.h and gate_data_* alias declarations.
     let names: Vec<_> = Gate::all().map(Gate::canonical_name).collect();
@@ -705,13 +745,19 @@ fn gate_inverse_metadata_matches_stim_v116() {
 #[test]
 fn typed_boundaries_reject_invalid_values() {
     assert_eq!(QubitId::new(4).unwrap().get(), 4);
+    assert!(QubitId::new(1 << 24).is_err());
     assert!(MeasureRecordOffset::try_new(0).is_err());
     assert!(MeasureRecordOffset::try_new(1).is_err());
+    assert!(MeasureRecordOffset::try_new(-(1 << 24)).is_err());
     assert!(RepeatCount::try_new(0).is_err());
     assert!(Probability::try_new(-0.1).is_err());
     assert!(Probability::try_new(1.1).is_err());
     assert!(Probability::try_new(f64::NAN).is_err());
     assert_eq!(ObservableId::new(2).get(), 2);
+    assert_eq!(
+        ObservableId::new(u64::from(u32::MAX) + 1).get(),
+        4_294_967_296
+    );
 }
 
 #[test]
@@ -720,6 +766,7 @@ fn instruction_typed_argument_accessors_preserve_stim_domains() {
         "X_ERROR(0.125) 0\n",
         "PAULI_CHANNEL_1(0.1, 0.2, 0.3) 1\n",
         "OBSERVABLE_INCLUDE(7) rec[-1]\n",
+        "OBSERVABLE_INCLUDE(4294967296) rec[-2]\n",
         "DETECTOR(2, 3.5) rec[-1]\n",
         "H 2\n",
     ))
@@ -731,6 +778,7 @@ fn instruction_typed_argument_accessors_preserve_stim_domains() {
     let x_error = instructions.next().expect("X_ERROR");
     let pauli_channel = instructions.next().expect("PAULI_CHANNEL_1");
     let observable = instructions.next().expect("OBSERVABLE_INCLUDE");
+    let large_observable = instructions.next().expect("large OBSERVABLE_INCLUDE");
     let detector = instructions.next().expect("DETECTOR");
     let h = instructions.next().expect("H");
     assert!(instructions.next().is_none());
@@ -750,6 +798,10 @@ fn instruction_typed_argument_accessors_preserve_stim_domains() {
     assert_eq!(
         observable.observable_id_argument().unwrap(),
         Some(ObservableId::new(7))
+    );
+    assert_eq!(
+        large_observable.observable_id_argument().unwrap(),
+        Some(ObservableId::new(4_294_967_296))
     );
     assert_eq!(detector.coordinate_arguments(), Some(&[2.0, 3.5][..]));
     assert_eq!(h.probability_argument().unwrap(), None);
@@ -786,6 +838,28 @@ fn parser_rejects_inverted_targets_except_result_gates_like_stim() {
     assert!(Circuit::from_stim_str("X !0\n").is_err());
     assert!(Circuit::from_stim_str("R !0\n").is_err());
     assert!(Circuit::from_stim_str("X_ERROR(0.125) !0\n").is_err());
+}
+
+#[test]
+fn parser_matches_stim_target_text_boundaries() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/gate_target.h target text parsing.
+    assert_eq!(
+        Circuit::from_stim_str("MPP x0*y1 z2\n")
+            .expect("lowercase Pauli targets")
+            .to_stim_string(),
+        "MPP X0*Y1 Z2\n"
+    );
+
+    for invalid in [
+        "H +1\n",
+        "CX sweep[+1] 1\n",
+        "H 16777216\n",
+        "MPP x16777216\n",
+        "CX sweep[16777216] 1\n",
+        "DETECTOR rec[-16777216]\n",
+    ] {
+        assert!(Circuit::from_stim_str(invalid).is_err(), "{invalid}");
+    }
 }
 
 #[test]
@@ -833,10 +907,17 @@ fn target_from_str_matches_stim_surface_forms() {
         Target::from_str("Z11").unwrap(),
         Target::pauli(Pauli::Z, QubitId::new(11).unwrap(), false)
     );
-    assert!(Target::from_str("4294967295").is_err());
-    assert!(Target::from_str("X4294967295").is_err());
+    assert_eq!(
+        Target::from_str("z11").unwrap(),
+        Target::pauli(Pauli::Z, QubitId::new(11).unwrap(), false)
+    );
+    assert!(Target::from_str("+1").is_err());
+    assert!(Target::from_str("16777216").is_err());
+    assert!(Target::from_str("X16777216").is_err());
     assert!(Target::from_str("rec[0]").is_err());
-    assert!(Target::from_str("rec[-1073741824]").is_err());
+    assert!(Target::from_str("rec[-16777216]").is_err());
+    assert!(Target::from_str("sweep[+1]").is_err());
+    assert!(Target::from_str("sweep[16777216]").is_err());
 }
 
 #[test]

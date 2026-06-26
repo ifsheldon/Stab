@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
+use crate::ids::STIM_TARGET_VALUE_LIMIT;
 use crate::{CircuitError, CircuitResult, MeasureRecordOffset, QubitId};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -12,13 +13,14 @@ pub enum Pauli {
 
 impl Pauli {
     fn parse_prefixed_target(text: &str) -> Option<(Self, &str)> {
-        if let Some(rest) = text.strip_prefix('X') {
-            Some((Self::X, rest))
-        } else if let Some(rest) = text.strip_prefix('Y') {
-            Some((Self::Y, rest))
-        } else {
-            text.strip_prefix('Z').map(|rest| (Self::Z, rest))
-        }
+        let mut chars = text.chars();
+        let pauli = match chars.next()? {
+            'X' | 'x' => Self::X,
+            'Y' | 'y' => Self::Y,
+            'Z' | 'z' => Self::Z,
+            _ => return None,
+        };
+        Some((pauli, chars.as_str()))
     }
 }
 
@@ -232,7 +234,8 @@ impl FromStr for Target {
             return Ok(Self::Combiner);
         }
         if let Some(offset) = raw.strip_prefix("rec[-").and_then(|v| v.strip_suffix(']')) {
-            let offset = offset.parse::<i32>().map_err(|_| {
+            let offset = parse_u24(offset, "measurement record target")?;
+            let offset = i32::try_from(offset).map_err(|_| {
                 CircuitError::invalid_domain_value("measurement record target", raw)
             })?;
             return Ok(Self::measurement_record(MeasureRecordOffset::try_new(
@@ -240,7 +243,7 @@ impl FromStr for Target {
             )?));
         }
         if let Some(index) = raw.strip_prefix("sweep[").and_then(|v| v.strip_suffix(']')) {
-            let id = parse_u32(index, "sweep target")?;
+            let id = parse_u24(index, "sweep target")?;
             return Ok(Self::sweep_bit(id));
         }
 
@@ -248,10 +251,10 @@ impl FromStr for Target {
             .strip_prefix('!')
             .map_or((false, raw), |body| (true, body));
         if let Some((pauli, id_text)) = Pauli::parse_prefixed_target(body) {
-            let id = parse_u32(id_text, "pauli target")?;
+            let id = parse_u24(id_text, "pauli target")?;
             return Ok(Self::pauli(pauli, QubitId::new(id)?, inverted));
         }
-        let id = parse_u32(body, "qubit target")?;
+        let id = parse_u24(body, "qubit target")?;
         Ok(Self::qubit(QubitId::new(id)?, inverted))
     }
 }
@@ -304,7 +307,15 @@ pub(crate) fn parse_target_token(token: &str) -> CircuitResult<Vec<Target>> {
     Ok(targets)
 }
 
-fn parse_u32(text: &str, kind: &'static str) -> CircuitResult<u32> {
-    text.parse::<u32>()
-        .map_err(|_| CircuitError::invalid_domain_value(kind, text))
+fn parse_u24(text: &str, kind: &'static str) -> CircuitResult<u32> {
+    if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err(CircuitError::invalid_domain_value(kind, text));
+    }
+    let value = text
+        .parse::<u32>()
+        .map_err(|_| CircuitError::invalid_domain_value(kind, text))?;
+    if value >= STIM_TARGET_VALUE_LIMIT {
+        return Err(CircuitError::invalid_domain_value(kind, text));
+    }
+    Ok(value)
 }

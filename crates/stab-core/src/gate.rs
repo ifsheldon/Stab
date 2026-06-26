@@ -165,8 +165,7 @@ impl ArgRule {
                         actual: args.len(),
                     });
                 };
-                if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 || arg > f64::from(u32::MAX)
-                {
+                if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 {
                     return Err(CircuitError::InvalidArgument {
                         gate,
                         argument: arg.to_string(),

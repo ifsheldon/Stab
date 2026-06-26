@@ -1,14 +1,14 @@
 use crate::{CircuitError, CircuitResult};
 
-const STIM_INDEX_SENTINEL: u32 = u32::MAX;
-const MIN_MEASUREMENT_RECORD_OFFSET: i32 = -(1 << 30) + 1;
+pub(crate) const STIM_TARGET_VALUE_LIMIT: u32 = 1 << 24;
+const MIN_MEASUREMENT_RECORD_OFFSET: i32 = -(1 << 24) + 1;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct QubitId(u32);
 
 impl QubitId {
     pub fn new(value: u32) -> CircuitResult<Self> {
-        if value == STIM_INDEX_SENTINEL {
+        if value >= STIM_TARGET_VALUE_LIMIT {
             return Err(CircuitError::invalid_domain_value("qubit id", value));
         }
         Ok(Self(value))
@@ -20,14 +20,14 @@ impl QubitId {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct ObservableId(u32);
+pub struct ObservableId(u64);
 
 impl ObservableId {
-    pub fn new(value: u32) -> Self {
+    pub fn new(value: u64) -> Self {
         Self(value)
     }
 
-    pub fn get(self) -> u32 {
+    pub fn get(self) -> u64 {
         self.0
     }
 }

@@ -639,14 +639,14 @@ fn probability_from_validated_arg(gate: &'static str, arg: f64) -> CircuitResult
 }
 
 fn observable_id_from_validated_arg(gate: &'static str, arg: f64) -> CircuitResult<ObservableId> {
-    if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 || arg > f64::from(u32::MAX) {
+    if !arg.is_finite() || arg < 0.0 || arg.fract() != 0.0 {
         return Err(CircuitError::InvalidArgument {
             gate,
             argument: arg.to_string(),
         });
     }
     let value = format!("{arg:.0}")
-        .parse::<u32>()
+        .parse::<u64>()
         .map_err(|_| CircuitError::InvalidArgument {
             gate,
             argument: arg.to_string(),
@@ -655,7 +655,57 @@ fn observable_id_from_validated_arg(gate: &'static str, arg: f64) -> CircuitResu
 }
 
 fn format_float(value: f64) -> String {
-    value.to_string()
+    if let Some(integer) = stim_integer_like_i64(value) {
+        return integer.to_string();
+    }
+
+    let scientific = format!("{value:.5e}");
+    let Some((mantissa, exponent)) = scientific.split_once('e') else {
+        return value.to_string();
+    };
+    let Ok(exponent) = exponent.parse::<i32>() else {
+        return value.to_string();
+    };
+
+    if (-4..6).contains(&exponent) {
+        let decimal_places = usize::try_from(5 - exponent).unwrap_or(0);
+        trim_decimal_float(format!("{value:.decimal_places$}"))
+    } else {
+        format!(
+            "{}e{}",
+            trim_decimal_float(mantissa.to_string()),
+            format_scientific_exponent(exponent)
+        )
+    }
+}
+
+#[allow(
+    clippy::cast_possible_truncation,
+    reason = "Stim's C++ printer casts integral doubles to int64_t before printing"
+)]
+fn stim_integer_like_i64(value: f64) -> Option<i64> {
+    if value > i64::MIN as f64 && value < i64::MAX as f64 {
+        let integer = value as i64;
+        if integer as f64 == value {
+            return Some(integer);
+        }
+    }
+    None
+}
+
+fn trim_decimal_float(mut text: String) -> String {
+    if text.contains('.') {
+        text = text.trim_end_matches('0').trim_end_matches('.').to_string();
+    }
+    text
+}
+
+fn format_scientific_exponent(exponent: i32) -> String {
+    if exponent < 0 {
+        format!("-{:02}", exponent.abs())
+    } else {
+        format!("+{exponent:02}")
+    }
 }
 
 fn wrap_line(line: usize, error: CircuitError) -> CircuitError {
