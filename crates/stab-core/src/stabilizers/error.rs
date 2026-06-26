@@ -40,6 +40,15 @@ pub enum StabilizerError {
     #[error("Tableau iteration requires fewer than 64 qubits but got {num_qubits}")]
     InvalidTableauIteratorQubitCount { num_qubits: usize },
 
+    #[error("invalid stabilizer flow text {text:?}")]
+    InvalidFlowText { text: String },
+
+    #[error("anti-Hermitian stabilizer flows are not allowed")]
+    AntiHermitianFlow,
+
+    #[error("stabilizer flow product anticommutes: {left} with {right}")]
+    InvalidFlowProduct { left: String, right: String },
+
     #[error("Tableau is not a Pauli product")]
     NotPauliProduct,
 

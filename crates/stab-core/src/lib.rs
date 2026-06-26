@@ -16,7 +16,7 @@ pub use error::{CircuitError, CircuitResult};
 pub use gate::{Gate, GateCategory};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};
 pub use stabilizers::{
-    CliffordString, CommutingPauliStringIterator, FlexPauliString, PauliBasis, PauliPhase,
+    CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, PauliBasis, PauliPhase,
     PauliSign, PauliString, PauliStringIterator, SingleQubitClifford, StabilizerError,
     StabilizerResult, Tableau, TableauIterator,
 };

@@ -8,8 +8,8 @@ use std::str::FromStr;
 
 use proptest::prelude::*;
 use stab_core::{
-    CliffordString, CommutingPauliStringIterator, FlexPauliString, Gate, PauliBasis, PauliPhase,
-    PauliString, PauliStringIterator, SingleQubitClifford, Tableau, TableauIterator,
+    CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, Gate, PauliBasis,
+    PauliPhase, PauliString, PauliStringIterator, SingleQubitClifford, Tableau, TableauIterator,
 };
 
 #[test]
@@ -707,6 +707,210 @@ fn stabilizers_tableau_iter_clone_continues_from_same_state() {
     }
 }
 
+#[test]
+fn stabilizers_flow_from_str_canonicalizes_duplicate_terms() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/flow.test.cc.
+    assert_eq!(
+        flow(
+            "X -> Y xor rec[-1] xor rec[-1] xor rec[-1] xor rec[-2] xor rec[-2] xor rec[-3] xor obs[1] xor obs[1] xor obs[3] xor obs[3] xor obs[3]"
+        ),
+        Flow::new(pauli("X"), pauli("Y"), [-3, -1], [3])
+    );
+}
+
+#[test]
+fn stabilizers_flow_from_str_rejects_invalid_text_like_stim() {
+    for text in [
+        "",
+        "X",
+        "X>X",
+        "X-X",
+        "X > X",
+        "X - X",
+        "->X",
+        "X->",
+        "rec[0] -> X",
+        "X -> rec[ -1]",
+        "X -> X rec[-1]",
+        "X -> X xor",
+        "X -> rec[-1] xor X",
+        "X -> obs[-1]",
+        "X -> obs[A]",
+        "X -> obs[]",
+        "X -> obs[ 5]",
+        "X -> rec[]",
+    ] {
+        assert!(Flow::from_str(text).is_err(), "{text:?}");
+    }
+}
+
+#[test]
+fn stabilizers_flow_from_str_accepts_stim_examples() {
+    assert_eq!(flow("1 -> 1"), Flow::new(pauli(""), pauli(""), [], []));
+    assert_eq!(
+        flow("1 -> -rec[0]"),
+        Flow::new(pauli(""), pauli("-"), [0], [])
+    );
+    assert_eq!(flow("i -> -i"), Flow::new(pauli(""), pauli("-"), [], []));
+    assert_eq!(
+        flow("iX -> -iY"),
+        Flow::new(pauli("X"), pauli("-Y"), [], [])
+    );
+    assert_eq!(flow("X->-Y"), Flow::new(pauli("X"), pauli("-Y"), [], []));
+    assert_eq!(flow("X -> -Y"), Flow::new(pauli("X"), pauli("-Y"), [], []));
+    assert_eq!(flow("-X -> Y"), Flow::new(pauli("-X"), pauli("Y"), [], []));
+    assert_eq!(
+        flow("XYZ -> -Z_Z"),
+        Flow::new(pauli("XYZ"), pauli("-Z_Z"), [], [])
+    );
+    assert_eq!(
+        flow("XYZ -> Z_Y xor rec[-1]"),
+        Flow::new(pauli("XYZ"), pauli("Z_Y"), [-1], [])
+    );
+    assert_eq!(
+        flow("XYZ -> Z_Y xor rec[5]"),
+        Flow::new(pauli("XYZ"), pauli("Z_Y"), [5], [])
+    );
+    assert_eq!(
+        flow("XYZ -> rec[-1]"),
+        Flow::new(pauli("XYZ"), pauli(""), [-1], [])
+    );
+    assert_eq!(
+        flow("XYZ -> Z_Y xor rec[-1] xor rec[-3]"),
+        Flow::new(pauli("XYZ"), pauli("Z_Y"), [-3, -1], [])
+    );
+    assert_eq!(
+        flow("XYZ -> ZIY xor rec[55] xor rec[-3]"),
+        Flow::new(pauli("XYZ"), pauli("Z_Y"), [-3, 55], [])
+    );
+    assert_eq!(
+        flow("XYZ -> ZIY xor rec[-3] xor rec[55]"),
+        Flow::new(pauli("XYZ"), pauli("Z_Y"), [-3, 55], [])
+    );
+    assert_eq!(
+        flow("X9 -> -Z5*Y3 xor rec[55] xor rec[-3]"),
+        Flow::new(pauli("_________X"), pauli("-___Y_Z"), [-3, 55], [])
+    );
+}
+
+#[test]
+fn stabilizers_flow_observable_terms_match_stim() {
+    assert_eq!(
+        flow("X9 -> obs[5]"),
+        Flow::new(pauli("_________X"), pauli(""), [], [5])
+    );
+    assert_eq!(
+        flow("X9 -> X xor obs[5] xor obs[3] xor rec[-1]"),
+        Flow::new(pauli("_________X"), pauli("X"), [-1], [3, 5])
+    );
+    assert_eq!(
+        flow("X9 -> X xor obs[5] xor rec[-1] xor obs[3]"),
+        Flow::new(pauli("_________X"), pauli("X"), [-1], [3, 5])
+    );
+}
+
+#[test]
+fn stabilizers_flow_display_and_sparse_round_trip_match_stim() {
+    let value = Flow::new(pauli("XY"), pauli("_Z"), [-3], []);
+    assert_eq!(value.to_string(), "XY -> _Z xor rec[-3]");
+    assert_eq!(flow("X0*Y1 -> Z1 xor rec[-3]"), value);
+    assert_eq!(flow("XY -> _Z xor rec[-3]"), value);
+
+    assert_eq!(
+        flow("1 -> rec[-1]"),
+        Flow::new(pauli(""), pauli(""), [-1], [])
+    );
+    assert_eq!(
+        flow("1 -> 1 xor rec[-1]"),
+        Flow::new(pauli(""), pauli(""), [-1], [])
+    );
+    assert_eq!(
+        flow("1 -> Z9 xor rec[55]"),
+        Flow::new(pauli(""), pauli("_________Z"), [55], [])
+    );
+    assert_eq!(
+        flow("-1 -> -X xor rec[-1] xor rec[-3]"),
+        Flow::new(pauli("-"), pauli("-X"), [-3, -1], [])
+    );
+    assert_eq!(
+        flow("X20 -> Y xor rec[-1]").to_string(),
+        "X20 -> Y0 xor rec[-1]"
+    );
+    assert_eq!(
+        flow("X20*I21 -> Y xor rec[-1]").to_string(),
+        "____________________X_ -> Y xor rec[-1]"
+    );
+}
+
+#[test]
+fn stabilizers_flow_ordering_matches_stim_examples() {
+    assert!(!(flow("1 -> 1") < flow("1 -> 1")));
+    assert!(!(flow("X -> 1") < flow("1 -> 1")));
+    assert!(!(flow("1 -> X") < flow("1 -> 1")));
+    assert!(!(flow("1 -> rec[-1]") < flow("1 -> 1")));
+    assert!(flow("1 -> 1") < flow("X -> 1"));
+    assert!(flow("1 -> 1") < flow("1 -> X"));
+    assert!(flow("1 -> 1") < flow("1 -> rec[-1]"));
+}
+
+#[test]
+fn stabilizers_flow_multiplication_matches_stim_examples() {
+    assert_eq!(
+        flow("XYZ -> 1")
+            .multiply(&flow("1 -> XYZ"))
+            .expect("multiply"),
+        flow("XYZ -> XYZ")
+    );
+    assert_eq!(
+        flow("XX_ -> 1")
+            .multiply(&flow("_XX -> 1"))
+            .expect("multiply"),
+        flow("X_X -> 1")
+    );
+    assert_eq!(
+        flow("1 -> XX_")
+            .multiply(&flow("1 -> _XX"))
+            .expect("multiply"),
+        flow("1 -> X_X")
+    );
+    assert_eq!(
+        flow("1 -> rec[-1] xor rec[-3]")
+            .multiply(&flow("1 -> rec[-1] xor rec[-2]"))
+            .expect("multiply"),
+        flow("1 -> rec[-2] xor rec[-3]")
+    );
+    assert_eq!(
+        flow("1 -> obs[1] xor obs[3]")
+            .multiply(&flow("1 -> obs[1] xor obs[2]"))
+            .expect("multiply"),
+        flow("1 -> obs[2] xor obs[3]")
+    );
+    assert_eq!(
+        flow("X -> X").multiply(&flow("Z -> Z")).expect("multiply"),
+        flow("Y -> Y")
+    );
+    assert_eq!(
+        flow("1 -> XX")
+            .multiply(&flow("1 -> ZZ"))
+            .expect("multiply"),
+        flow("1 -> -YY")
+    );
+    assert_eq!(
+        flow("1 -> obs[1]")
+            .multiply(&flow("1 -> obs[1]"))
+            .expect("multiply"),
+        flow("1 -> 1")
+    );
+    assert_eq!(
+        flow("1 -> rec[1]")
+            .multiply(&flow("1 -> rec[1]"))
+            .expect("multiply"),
+        flow("1 -> 1")
+    );
+    assert!(flow("1 -> X").multiply(&flow("1 -> Y")).is_err());
+    assert!(flow("1 -> Y").multiply(&flow("1 -> X")).is_err());
+}
+
 proptest! {
     #[test]
     fn stabilizers_tableau_identity_preserves_dense_pauli_strings(body in bare_pauli_body_strategy(10)) {
@@ -750,6 +954,10 @@ fn pauli(text: &str) -> PauliString {
 
 fn flex(text: &str) -> FlexPauliString {
     FlexPauliString::from_str(text).expect("parse FlexPauliString")
+}
+
+fn flow(text: &str) -> Flow {
+    Flow::from_str(text).expect("parse Flow")
 }
 
 fn cnot_tableau() -> Tableau {
