@@ -59,6 +59,7 @@
 - Use `just maintenance::setup-hooks` to install the staged-aware Rust pre-commit hook into `.git/hooks/pre-commit`.
 - Use `just maintenance::pre-commit` to run the hook manually against the staged index.
 - Use `just oracle::version` to validate that `vendor/stim` is pinned to Stim v1.16.0, and use `just oracle::run --case smoke/help` plus `just oracle::run --case smoke/tiny-circuit` for M0 oracle smoke checks.
+- Use `just oracle::matrix --check` to validate the M1 compatibility matrix, and use `just oracle::matrix --milestone Mx` to inspect acceptance rows for implementation milestones.
 - Treat the M0 `stab-cli sample` path as a hidden oracle smoke shim only; it is not real `stim sample` compatibility, which belongs to M8.
 - Use `just bench::smoke` for the M0 benchmark smoke check until M3 introduces the full benchmark harness.
 - The pre-commit hook must stay shell-script-free in this repository: build and install the Rust binary instead of adding a tracked shell launcher.

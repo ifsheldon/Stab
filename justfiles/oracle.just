@@ -12,3 +12,8 @@ version *args:
 [working-directory: '..']
 run *args:
     cargo run -q -p stab-oracle -- run {{args}}
+
+# Inspect or validate the compatibility matrix.
+[working-directory: '..']
+matrix *args:
+    cargo run -q -p stab-oracle -- matrix {{args}}

@@ -9,6 +9,8 @@
     )
 )]
 
+mod matrix;
+
 use std::ffi::{OsStr, OsString};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -62,6 +64,17 @@ enum Command {
         #[arg(long)]
         rebuild_stim: bool,
     },
+
+    /// Inspect or validate the compatibility matrix.
+    Matrix {
+        /// Validate matrix coverage and acceptance metadata.
+        #[arg(long)]
+        check: bool,
+
+        /// Print rows owned by a milestone such as M4.
+        #[arg(long)]
+        milestone: Option<String>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -77,6 +90,9 @@ enum OracleCase {
 
 #[derive(Debug, Error)]
 enum OracleError {
+    #[error(transparent)]
+    Matrix(#[from] matrix::MatrixError),
+
     #[error("failed to resolve repository root {path}: {source}")]
     ResolveRoot {
         path: PathBuf,
@@ -195,6 +211,10 @@ impl RepoRoot {
         self.build_dir().join(BUILD_STAMP_FILE)
     }
 
+    fn compatibility_matrix(&self) -> PathBuf {
+        self.path.join("oracle").join("compatibility-matrix.csv")
+    }
+
     fn stab_cli_binary(&self) -> PathBuf {
         self.path
             .join("target")
@@ -294,6 +314,28 @@ fn run(cli: Cli) -> Result<(), OracleError> {
         Command::Run { case, rebuild_stim } => {
             run_smoke_case(&root, case, rebuild_stim)?;
         }
+        Command::Matrix { check, milestone } => {
+            run_matrix_command(&root, check, milestone.as_deref())?;
+        }
+    }
+    Ok(())
+}
+
+fn run_matrix_command(
+    root: &RepoRoot,
+    check: bool,
+    milestone: Option<&str>,
+) -> Result<(), OracleError> {
+    let matrix = matrix::CompatibilityMatrix::read_from_path(root.compatibility_matrix())?;
+    if check {
+        let report = matrix.check(&root.path)?;
+        report.print();
+    }
+    if let Some(milestone) = milestone {
+        matrix.print_milestone(milestone)?;
+    }
+    if !check && milestone.is_none() {
+        matrix.print_summary();
     }
     Ok(())
 }

@@ -36,6 +36,15 @@ just oracle::run --case smoke/tiny-circuit
 The tiny-circuit smoke case uses a hidden `stab-cli sample` shim that only exists to prove oracle wiring in M0.
 It is not `stim sample` compatibility; the real command contract belongs to the M8 sampling milestone.
 
+Validate the M1 compatibility matrix with:
+
+```sh
+just oracle::matrix --check
+just oracle::matrix --milestone M4
+```
+
+The matrix lives at `oracle/compatibility-matrix.csv` and records upstream source paths, owners, milestones, priorities, parity modes, comparators, status, acceptance checks, and deferred future buckets.
+
 Compile benchmark targets as a smoke check with:
 
 ```sh
