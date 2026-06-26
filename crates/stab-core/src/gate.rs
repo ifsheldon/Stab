@@ -42,6 +42,10 @@ impl Gate {
         self.info.category
     }
 
+    pub fn best_candidate_inverse(self) -> CircuitResult<Self> {
+        Self::from_name(self.info.inverse_name)
+    }
+
     pub(crate) fn validate(self, args: &[f64], targets: &[Target]) -> CircuitResult<()> {
         self.info.arg_rule.validate(self.info.name, args)?;
         self.info.target_rule.validate(self.info.name, targets)
@@ -59,6 +63,7 @@ impl Gate {
 #[derive(Debug, Eq, PartialEq)]
 struct GateInfo {
     name: &'static str,
+    inverse_name: &'static str,
     category: GateCategory,
     arg_rule: ArgRule,
     target_rule: TargetRule,
@@ -379,20 +384,23 @@ const GATES: &[GateInfo] = &[
         ArgRule::ZeroOrOneProbability,
         TargetRule::AnySingleQubit,
     ),
-    gate(
+    gate_with_inverse(
         "RX",
+        "MX",
         GateCategory::Collapsing,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
-    gate(
+    gate_with_inverse(
         "RY",
+        "MY",
         GateCategory::Collapsing,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
-    gate(
+    gate_with_inverse(
         "R",
+        "M",
         GateCategory::Collapsing,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
@@ -589,86 +597,100 @@ const GATES: &[GateInfo] = &[
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
-    gate(
+    gate_with_inverse(
         "C_XYZ",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
         "C_ZYX",
         GateCategory::Period3,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
-    gate(
+    gate_with_inverse(
+        "C_ZYX",
+        "C_XYZ",
+        GateCategory::Period3,
+        ArgRule::Exact(0),
+        TargetRule::AnySingleQubit,
+    ),
+    gate_with_inverse(
         "C_NXYZ",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "C_XNYZ",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "C_XYNZ",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "C_NZYX",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
-        "C_ZNYX",
-        GateCategory::Period3,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
-    ),
-    gate(
         "C_ZYNX",
         GateCategory::Period3,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
-    gate(
-        "SQRT_X",
-        GateCategory::Period4,
+    gate_with_inverse(
+        "C_XNYZ",
+        "C_ZNYX",
+        GateCategory::Period3,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
-    gate(
+    gate_with_inverse(
+        "C_XYNZ",
+        "C_NZYX",
+        GateCategory::Period3,
+        ArgRule::Exact(0),
+        TargetRule::AnySingleQubit,
+    ),
+    gate_with_inverse(
+        "C_NZYX",
+        "C_XYNZ",
+        GateCategory::Period3,
+        ArgRule::Exact(0),
+        TargetRule::AnySingleQubit,
+    ),
+    gate_with_inverse(
+        "C_ZNYX",
+        "C_XNYZ",
+        GateCategory::Period3,
+        ArgRule::Exact(0),
+        TargetRule::AnySingleQubit,
+    ),
+    gate_with_inverse(
+        "C_ZYNX",
+        "C_NXYZ",
+        GateCategory::Period3,
+        ArgRule::Exact(0),
+        TargetRule::AnySingleQubit,
+    ),
+    gate_with_inverse(
+        "SQRT_X",
         "SQRT_X_DAG",
         GateCategory::Period4,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
-    gate(
-        "SQRT_Y",
+    gate_with_inverse(
+        "SQRT_X_DAG",
+        "SQRT_X",
         GateCategory::Period4,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
-    gate(
+    gate_with_inverse(
+        "SQRT_Y",
         "SQRT_Y_DAG",
         GateCategory::Period4,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
-    gate(
-        "S",
+    gate_with_inverse(
+        "SQRT_Y_DAG",
+        "SQRT_Y",
         GateCategory::Period4,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
-    gate(
+    gate_with_inverse(
+        "S",
         "S_DAG",
+        GateCategory::Period4,
+        ArgRule::Exact(0),
+        TargetRule::AnySingleQubit,
+    ),
+    gate_with_inverse(
+        "S_DAG",
+        "S",
         GateCategory::Period4,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
@@ -679,38 +701,44 @@ const GATES: &[GateInfo] = &[
         ArgRule::Exact(0),
         TargetRule::Pairs,
     ),
-    gate(
+    gate_with_inverse(
         "SQRT_XX",
-        GateCategory::ParityPhasing,
-        ArgRule::Exact(0),
-        TargetRule::Pairs,
-    ),
-    gate(
         "SQRT_XX_DAG",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::Pairs,
     ),
-    gate(
-        "SQRT_YY",
+    gate_with_inverse(
+        "SQRT_XX_DAG",
+        "SQRT_XX",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::Pairs,
     ),
-    gate(
+    gate_with_inverse(
+        "SQRT_YY",
         "SQRT_YY_DAG",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::Pairs,
     ),
-    gate(
-        "SQRT_ZZ",
+    gate_with_inverse(
+        "SQRT_YY_DAG",
+        "SQRT_YY",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::Pairs,
     ),
-    gate(
+    gate_with_inverse(
+        "SQRT_ZZ",
         "SQRT_ZZ_DAG",
+        GateCategory::ParityPhasing,
+        ArgRule::Exact(0),
+        TargetRule::Pairs,
+    ),
+    gate_with_inverse(
+        "SQRT_ZZ_DAG",
+        "SQRT_ZZ",
         GateCategory::ParityPhasing,
         ArgRule::Exact(0),
         TargetRule::Pairs,
@@ -721,14 +749,16 @@ const GATES: &[GateInfo] = &[
         ArgRule::ZeroOrOneProbability,
         TargetRule::PauliProducts,
     ),
-    gate(
+    gate_with_inverse(
         "SPP",
+        "SPP_DAG",
         GateCategory::PauliProduct,
         ArgRule::Exact(0),
         TargetRule::PauliProducts,
     ),
-    gate(
+    gate_with_inverse(
         "SPP_DAG",
+        "SPP",
         GateCategory::PauliProduct,
         ArgRule::Exact(0),
         TargetRule::PauliProducts,
@@ -739,20 +769,23 @@ const GATES: &[GateInfo] = &[
         ArgRule::Exact(0),
         TargetRule::Pairs,
     ),
-    gate(
+    gate_with_inverse(
         "ISWAP",
+        "ISWAP_DAG",
         GateCategory::Swap,
         ArgRule::Exact(0),
         TargetRule::Pairs,
     ),
-    gate(
+    gate_with_inverse(
         "CXSWAP",
+        "SWAPCX",
         GateCategory::Swap,
         ArgRule::Exact(0),
         TargetRule::Pairs,
     ),
-    gate(
+    gate_with_inverse(
         "SWAPCX",
+        "CXSWAP",
         GateCategory::Swap,
         ArgRule::Exact(0),
         TargetRule::Pairs,
@@ -763,8 +796,9 @@ const GATES: &[GateInfo] = &[
         ArgRule::Exact(0),
         TargetRule::Pairs,
     ),
-    gate(
+    gate_with_inverse(
         "ISWAP_DAG",
+        "ISWAP",
         GateCategory::Swap,
         ArgRule::Exact(0),
         TargetRule::Pairs,
@@ -795,8 +829,19 @@ const fn gate(
     arg_rule: ArgRule,
     target_rule: TargetRule,
 ) -> GateInfo {
+    gate_with_inverse(name, name, category, arg_rule, target_rule)
+}
+
+const fn gate_with_inverse(
+    name: &'static str,
+    inverse_name: &'static str,
+    category: GateCategory,
+    arg_rule: ArgRule,
+    target_rule: TargetRule,
+) -> GateInfo {
     GateInfo {
         name,
+        inverse_name,
         category,
         arg_rule,
         target_rule,
@@ -812,6 +857,7 @@ const fn not_fusable_gate(
 ) -> GateInfo {
     GateInfo {
         name,
+        inverse_name: name,
         category,
         arg_rule,
         target_rule,

@@ -421,6 +421,65 @@ fn gates_lookup_is_case_insensitive_and_canonicalizes_aliases() {
 }
 
 #[test]
+fn gate_inverse_metadata_matches_stim_v116() {
+    // Adapted from Stim v1.16.0 src/stim/gates/gates.test.cc inverse metadata checks.
+    for (gate, inverse) in [
+        ("H", "H"),
+        ("CX", "CX"),
+        ("RX", "MX"),
+        ("RY", "MY"),
+        ("R", "M"),
+        ("SQRT_X", "SQRT_X_DAG"),
+        ("SQRT_X_DAG", "SQRT_X"),
+        ("SQRT_Y", "SQRT_Y_DAG"),
+        ("SQRT_Y_DAG", "SQRT_Y"),
+        ("S", "S_DAG"),
+        ("S_DAG", "S"),
+        ("C_XYZ", "C_ZYX"),
+        ("C_ZYX", "C_XYZ"),
+        ("C_NXYZ", "C_ZYNX"),
+        ("C_ZYNX", "C_NXYZ"),
+        ("C_XNYZ", "C_ZNYX"),
+        ("C_ZNYX", "C_XNYZ"),
+        ("C_XYNZ", "C_NZYX"),
+        ("C_NZYX", "C_XYNZ"),
+        ("SQRT_XX", "SQRT_XX_DAG"),
+        ("SQRT_XX_DAG", "SQRT_XX"),
+        ("SQRT_YY", "SQRT_YY_DAG"),
+        ("SQRT_YY_DAG", "SQRT_YY"),
+        ("SQRT_ZZ", "SQRT_ZZ_DAG"),
+        ("SQRT_ZZ_DAG", "SQRT_ZZ"),
+        ("SPP", "SPP_DAG"),
+        ("SPP_DAG", "SPP"),
+        ("ISWAP", "ISWAP_DAG"),
+        ("ISWAP_DAG", "ISWAP"),
+        ("CXSWAP", "SWAPCX"),
+        ("SWAPCX", "CXSWAP"),
+        ("CZSWAP", "CZSWAP"),
+        ("X_ERROR", "X_ERROR"),
+    ] {
+        assert_eq!(
+            Gate::from_name(gate)
+                .unwrap()
+                .best_candidate_inverse()
+                .unwrap()
+                .canonical_name(),
+            inverse,
+            "{gate}"
+        );
+    }
+
+    assert_eq!(
+        Gate::from_name("H_XZ")
+            .unwrap()
+            .best_candidate_inverse()
+            .unwrap()
+            .canonical_name(),
+        "H"
+    );
+}
+
+#[test]
 fn typed_boundaries_reject_invalid_values() {
     assert_eq!(QubitId::new(4).unwrap().get(), 4);
     assert!(MeasureRecordOffset::try_new(0).is_err());
