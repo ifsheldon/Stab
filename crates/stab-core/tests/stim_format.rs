@@ -653,6 +653,17 @@ fn typed_boundaries_reject_invalid_values() {
 }
 
 #[test]
+fn probability_typed_boundary_matches_stim_argument_validation() {
+    // Adapted from Stim v1.16.0 src/stim/util_bot/probability_util.test.cc validation responsibilities.
+    assert_eq!(Probability::try_new(0.0).unwrap().get(), 0.0);
+    assert_eq!(Probability::try_new(1.0).unwrap().get(), 1.0);
+
+    for value in [-0.1, 1.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(Probability::try_new(value).is_err(), "{value}");
+    }
+}
+
+#[test]
 fn parser_reports_invalid_gate_target_and_repeat_errors() {
     assert!(Circuit::from_stim_str("UNKNOWN 0\n").is_err());
     assert!(Circuit::from_stim_str("M rec[-1]\n").is_err());

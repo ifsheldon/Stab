@@ -36,6 +36,7 @@ fn fixture_manifest_has_implemented_smoke_cases() {
         "coverage-circuit-circuit-instruction",
         "coverage-circuit-gate-target",
         "coverage-gates-gates",
+        "coverage-util-bot-probability-util",
     ] {
         assert!(implemented.contains(&id), "{id}");
     }
@@ -82,6 +83,7 @@ fn m4_direct_rust_rows_run_cargo_tests() {
         "coverage-circuit-circuit-instruction",
         "coverage-circuit-gate-target",
         "coverage-gates-gates",
+        "coverage-util-bot-probability-util",
     ] {
         let row = manifest
             .rows

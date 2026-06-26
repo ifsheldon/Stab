@@ -39,6 +39,15 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now makes comparator imple
 
 ## Open Entries
 
+## 2026-06-27 - M4: Probability Utility Fixture Scope
+
+Status: Open
+Revealed by: implementation of `coverage-util-bot-probability-util` as a direct Rust oracle row.
+Current text: M4 requires gate argument rules and probability validation, while the test-porting plan points at `src/stim/util_bot/probability_util.test.cc` for probability validation.
+Gap: the referenced upstream file also tests `sample_hit_indices` and biased random bit generation, which require RNG and bit-storage behavior that M4 does not otherwise define.
+Proposed amendment: state that M4 owns only closed-unit probability validation and disjoint probability-list validation from this file; random hit-index sampling and biased bit generation should move to the first milestone that introduces equivalent RNG and bit/sampler APIs.
+Resolution: pending plan update.
+
 ## 2026-06-27 - M3: Benchmark Compare Acceptance
 
 Status: Open
