@@ -650,6 +650,11 @@ fn sample_supports_z_basis_single_qubit_noise_channels() {
             "expected roughly 300 pauli-channel1 hits",
             215..=385,
         ),
+        (
+            "DEPOLARIZE2(0.3) 0 1\nM 0\n",
+            "expected roughly 160 depolarize2 hits",
+            95..=225,
+        ),
     ];
 
     for (input, message, expected_hits) in cases {

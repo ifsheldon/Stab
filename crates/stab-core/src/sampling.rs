@@ -89,11 +89,34 @@ enum SampleOperation {
         qubit: usize,
         probability: f64,
     },
+    TwoQubitPauliChannel {
+        left: usize,
+        right: usize,
+        probabilities: [f64; 15],
+    },
     Repeat {
         count: u64,
         body: Vec<SampleOperation>,
     },
 }
+
+const TWO_QUBIT_PAULI_Z_BASIS_TOGGLES: [(bool, bool); 15] = [
+    (false, true),
+    (false, true),
+    (false, false),
+    (true, false),
+    (true, true),
+    (true, true),
+    (true, false),
+    (true, false),
+    (true, true),
+    (true, true),
+    (true, false),
+    (false, false),
+    (false, true),
+    (false, true),
+    (false, false),
+];
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct DeterministicFrame {
@@ -235,6 +258,11 @@ fn compile_instruction(
             operations,
             single_probability_argument(instruction)?.get() * (2.0 / 3.0),
         ),
+        "DEPOLARIZE2" => {
+            let probability = single_probability_argument(instruction)?.get();
+            compile_two_qubit_pauli_channel(instruction, operations, [probability / 15.0; 15])
+        }
+        "II_ERROR" => Ok(()),
         "PAULI_CHANNEL_1" => {
             let Some(probabilities) = instruction.probability_arguments()? else {
                 return Err(unsupported_sampler_instruction(instruction));
@@ -247,6 +275,21 @@ fn compile_instruction(
                 operations,
                 x_probability.get() + y_probability.get(),
             )
+        }
+        "PAULI_CHANNEL_2" => {
+            let Some(probabilities) = instruction.probability_arguments()? else {
+                return Err(unsupported_sampler_instruction(instruction));
+            };
+            if probabilities.len() != 15 {
+                return Err(unsupported_sampler_instruction(instruction));
+            }
+            let mut channel_probabilities = [0.0; 15];
+            for (channel_probability, probability) in
+                channel_probabilities.iter_mut().zip(probabilities.iter())
+            {
+                *channel_probability = probability.get();
+            }
+            compile_two_qubit_pauli_channel(instruction, operations, channel_probabilities)
         }
         _ if zero_probability_noise(instruction)? => Ok(()),
         _ => Err(unsupported_sampler_instruction(instruction)),
@@ -294,6 +337,24 @@ fn compile_single_qubit_probabilistic_toggle(
         operations.push(SampleOperation::ProbabilisticToggle {
             qubit: qubit_index(instruction, target)?,
             probability,
+        });
+    }
+    Ok(())
+}
+
+fn compile_two_qubit_pauli_channel(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    probabilities: [f64; 15],
+) -> CircuitResult<()> {
+    for target_pair in instruction.target_groups() {
+        let [left, right] = target_pair else {
+            return Err(unsupported_sampler_instruction(instruction));
+        };
+        operations.push(SampleOperation::TwoQubitPauliChannel {
+            left: qubit_index(instruction, left)?,
+            right: qubit_index(instruction, right)?,
+            probabilities,
         });
     }
     Ok(())
@@ -373,12 +434,44 @@ fn execute_operations(
                     frame.toggle(*qubit);
                 }
             }
+            SampleOperation::TwoQubitPauliChannel {
+                left,
+                right,
+                probabilities,
+            } => {
+                apply_two_qubit_pauli_channel(frame, *left, *right, probabilities, rng);
+            }
             SampleOperation::Repeat { count, body } => {
                 for _ in 0..*count {
                     execute_operations(body, frame, measurements, rng);
                 }
             }
         }
+    }
+}
+
+fn apply_two_qubit_pauli_channel(
+    frame: &mut DeterministicFrame,
+    left: usize,
+    right: usize,
+    probabilities: &[f64; 15],
+    rng: &mut impl Rng,
+) {
+    let mut sampled_probability = rng.random::<f64>();
+    for ((toggle_left, toggle_right), probability) in TWO_QUBIT_PAULI_Z_BASIS_TOGGLES
+        .into_iter()
+        .zip(probabilities.iter().copied())
+    {
+        if sampled_probability < probability {
+            if toggle_left {
+                frame.toggle(left);
+            }
+            if toggle_right {
+                frame.toggle(right);
+            }
+            return;
+        }
+        sampled_probability -= probability;
     }
 }
 
@@ -513,6 +606,34 @@ mod tests {
         assert!(
             (215..=385).contains(&hits),
             "expected roughly 300 pauli-channel1 Z-basis hits, got {hits}"
+        );
+    }
+
+    #[test]
+    fn depolarize2_flips_z_basis_measurements_for_two_qubit_x_or_y_cases() {
+        let circuit = Circuit::from_stim_str("DEPOLARIZE2(0.3) 0 1\nM 0\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+        let samples = sampler.sample_zero_one_with_seed(1000, Some(5));
+        let hits = samples.iter().filter(|shot| shot == &&vec![true]).count();
+        assert!(
+            (95..=225).contains(&hits),
+            "expected roughly 160 depolarize2 Z-basis hits, got {hits}"
+        );
+    }
+
+    #[test]
+    fn pauli_channel2_uses_stim_probability_order_for_z_basis_toggles() {
+        let circuit = Circuit::from_stim_str(
+            "PAULI_CHANNEL_2(0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 0 1\nM 0 1\n",
+        )
+        .expect("parse circuit");
+
+        assert_eq!(
+            CompiledSampler::compile(&circuit)
+                .expect("compile sampler")
+                .sample_zero_one_with_seed(5, Some(5)),
+            vec![vec![true, false]; 5]
         );
     }
 
