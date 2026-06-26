@@ -1,0 +1,47 @@
+# Generated surface_code circuit.
+# task: unrotated_memory_z
+# rounds: 1
+# distance: 2
+# before_round_data_depolarization: 0
+# before_measure_flip_probability: 0
+# after_reset_flip_probability: 0
+# after_clifford_depolarization: 0
+# layout:
+# d6 X7 d8
+# Z3 d4 Z5
+# L0 X1 L2
+# Legend:
+#     d# = data qubit
+#     L# = data qubit with logical observable crossing
+#     X# = measurement qubit (X stabilizer)
+#     Z# = measurement qubit (Z stabilizer)
+QUBIT_COORDS(0, 0) 0
+QUBIT_COORDS(1, 0) 1
+QUBIT_COORDS(2, 0) 2
+QUBIT_COORDS(0, 1) 3
+QUBIT_COORDS(1, 1) 4
+QUBIT_COORDS(2, 1) 5
+QUBIT_COORDS(0, 2) 6
+QUBIT_COORDS(1, 2) 7
+QUBIT_COORDS(2, 2) 8
+R 0 2 4 6 8 1 3 5 7
+TICK
+H 1 7
+TICK
+CX 1 2 7 8 4 3
+TICK
+CX 1 4 6 3 8 5
+TICK
+CX 7 4 0 3 2 5
+TICK
+CX 1 0 7 6 4 5
+TICK
+H 1 7
+TICK
+MR 1 3 5 7
+DETECTOR(0, 1, 0) rec[-3]
+DETECTOR(2, 1, 0) rec[-2]
+M 0 2 4 6 8
+DETECTOR(0, 1, 1) rec[-2] rec[-3] rec[-5] rec[-8]
+DETECTOR(2, 1, 1) rec[-1] rec[-3] rec[-4] rec[-7]
+OBSERVABLE_INCLUDE(0) rec[-4] rec[-5]

@@ -20,8 +20,9 @@ pub use bits::{BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVe
 pub use circuit::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 pub use circuit_flow::{check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators};
 pub use circuit_generation::{
-    CodeDistance, GeneratedCircuit, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    generate_repetition_code_circuit,
+    CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
+    RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
+    generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 pub use circuit_inverse::{circuit_inverse_qec, circuit_inverse_unitary};
 pub use circuit_simplify::simplified_circuit;

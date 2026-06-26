@@ -1979,6 +1979,7 @@ dependencies = [
  "csv",
  "serde",
  "serde_json",
+ "stab-cli",
  "stab-core",
  "tempfile",
  "thiserror",

@@ -429,6 +429,7 @@ const REQUIRED_BENCHMARK_IDS: &[&str] = &[
     "m7-gen-unrotated-surface-d5-r50",
     "m7-gen-unrotated-surface-d9-r9",
     "m7-gen-unrotated-surface-d9-r90",
+    "m7-gen-color-d5-r5",
     "m8-sample-analysis-1shot",
     "m8-sample-throughput-1024",
     "m8-sample-throughput-1000000",

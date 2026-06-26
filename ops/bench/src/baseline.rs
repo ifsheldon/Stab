@@ -20,6 +20,8 @@ use crate::report::{
 use crate::root::RepoRoot;
 use crate::stim::{ensure_stim_binaries, validate_stim_source};
 
+mod m7;
+
 #[cfg(not(test))]
 const STAB_COMPARE_ITERATIONS: usize = 128;
 #[cfg(test)]
@@ -209,7 +211,11 @@ fn read_baseline_report(path: &Path) -> Result<BaselineReport, BenchError> {
 }
 
 fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, BenchError> {
+    if row.runner == Runner::ContractOnly {
+        return Ok(Some(Vec::new()));
+    }
     match row.id.as_str() {
+        "m7-cli-dispatch" => Ok(Some(m7::run_cli_dispatch_row(row)?)),
         "m4-circuit-parse" => {
             let sparse_fixture = m4_stim_parse_sparse_fixture();
             Ok(Some(vec![
@@ -480,7 +486,7 @@ fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, 
                 })?,
             ]))
         }
-        _ => Ok(None),
+        _ => m7::run_generator_compare_row(row),
     }
 }
 
@@ -733,6 +739,12 @@ fn summarize_measurement_rates(row_id: &str, measurements: &[Measurement]) -> St
 }
 
 fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
+    if row_id.starts_with("m7-gen-") && name.starts_with("stab_gen_") {
+        return Some((1.0, "circuits/s"));
+    }
+    if row_id == "m7-cli-dispatch" && name == "stab_cli_dispatch_gen_d3_r3" {
+        return Some((1.0, "dispatches/s"));
+    }
     match (row_id, name) {
         ("m5-simd-bit-table", "stab_bit_matrix_row_xor_128x128_contract") => {
             Some(((M5_BIT_TABLE_BITS - 1) as f64, "row-xors/s"))
@@ -779,6 +791,15 @@ fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
 
 fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
+        "m7-perf-harness" => Some(
+            "contract-only: verifies baseline metadata coverage; no Stab runtime workload is expected",
+        ),
+        "m7-cli-dispatch" => Some(
+            "report-only: Stab measures in-process gen dispatch; upstream baseline is sample-heavy main dispatch",
+        ),
+        id if id.starts_with("m7-gen-") => Some(
+            "report-only: Stab measures direct Rust generator construction and formatting-independent circuit access",
+        ),
         "m5-simd-bit-table" => Some(
             "contract-smoke: Stab transpose/row-xor uses 128x128 until optimized 10k transpose parity is introduced",
         ),

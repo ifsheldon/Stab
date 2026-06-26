@@ -120,6 +120,15 @@ Gap: the milestone does not split deterministic unitary/tableau subset parity fr
 Proposed amendment: split each related util-top row into explicit subcases owned by M6 and deferred subcases owned by the simulator, detector, or performance-hardening milestones; require public APIs for subset helpers to document unsupported semantics until the deferred rows are implemented.
 Resolution: pending plan update.
 
+## 2026-06-27 - M7: Generator Benchmark Comparability
+
+Status: Open
+Revealed by: implementation of Stab-side M7 benchmark runners for `just bench::compare --milestone M7 --strict`.
+Current text: M7 requires generator throughput for repetition, rotated surface, unrotated surface, and color code circuits, and the benchmark manifest uses pinned Stim CLI rows for `stim gen` plus a `main_sample*` CLI dispatch perf row.
+Gap: the plan does not specify whether Stab-side generator benchmark evidence must measure direct Rust generator construction, `stab-cli gen` end-to-end execution, canonical `.stim` printing cost, process startup cost, or all of these separately.
+Proposed amendment: split M7 benchmark acceptance into explicit rows for direct Rust generator construction, `stab-cli gen` in-process dispatch, and external process startup or canonical text emission if those are required; keep the current Stab direct generator rows report-only until an exact CLI-vs-CLI threshold is specified.
+Resolution: pending plan update.
+
 ## 2026-06-27 - M6: Stabilizers Versus Amplitudes Dependency
 
 Status: Open

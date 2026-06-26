@@ -16,8 +16,9 @@ use std::path::PathBuf;
 use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use stab_core::{
-    CircuitResult, CodeDistance, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    generate_repetition_code_circuit,
+    CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, Probability,
+    RepetitionCodeParams, RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
+    generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 use thiserror::Error;
 
@@ -177,13 +178,16 @@ enum CliError {
     #[error("{0}")]
     Circuit(#[from] stab_core::CircuitError),
 
-    #[error(
-        "unsupported generated code {code:?}; only repetition_code is implemented in this M7 slice"
-    )]
-    UnsupportedGeneratedCode { code: GeneratedCodeArg },
-
     #[error("unsupported repetition_code task {task:?}; expected memory")]
     UnsupportedRepetitionTask { task: String },
+
+    #[error(
+        "unsupported surface_code task {task:?}; expected rotated_memory_x, rotated_memory_z, unrotated_memory_x, or unrotated_memory_z"
+    )]
+    UnsupportedSurfaceTask { task: String },
+
+    #[error("unsupported color_code task {task:?}; expected memory_xyz")]
+    UnsupportedColorTask { task: String },
 
     #[error("unsupported conversion; this M7 slice supports 01 input with 01 or dets output")]
     UnsupportedConversion,
@@ -270,64 +274,163 @@ where
 }
 
 fn generated_circuit_text(args: &GenArgs) -> Result<String, CliError> {
-    if args.code != GeneratedCodeArg::Repetition {
-        return Err(CliError::UnsupportedGeneratedCode { code: args.code });
+    let rounds = RoundCount::try_new(args.rounds)?;
+    let distance = CodeDistance::try_new(args.distance)?;
+    let probabilities = GeneratorProbabilities::from_args(args)?;
+    let generated = match args.code {
+        GeneratedCodeArg::Repetition => {
+            let params = probabilities.apply_repetition(RepetitionCodeParams::new(
+                rounds,
+                distance,
+                parse_repetition_task(&args.task)?,
+            )?);
+            generate_repetition_code_circuit(&params)?
+        }
+        GeneratedCodeArg::Surface => {
+            let params = probabilities.apply_surface(SurfaceCodeParams::new(
+                rounds,
+                distance,
+                parse_surface_task(&args.task)?,
+            )?);
+            generate_surface_code_circuit(&params)?
+        }
+        GeneratedCodeArg::Color => {
+            let params = probabilities.apply_color(ColorCodeParams::new(
+                rounds,
+                distance,
+                parse_color_task(&args.task)?,
+            )?);
+            generate_color_code_circuit(&params)?
+        }
+    };
+    Ok(format_generated_circuit(
+        args.code.as_stim_name(),
+        &args.task,
+        rounds,
+        distance,
+        probabilities,
+        &generated,
+    ))
+}
+
+#[derive(Clone, Copy, Debug)]
+struct GeneratorProbabilities {
+    before_round_data_depolarization: Probability,
+    before_measure_flip_probability: Probability,
+    after_reset_flip_probability: Probability,
+    after_clifford_depolarization: Probability,
+}
+
+impl GeneratorProbabilities {
+    fn from_args(args: &GenArgs) -> Result<Self, CliError> {
+        Ok(Self {
+            before_round_data_depolarization: probability_arg(
+                args.before_round_data_depolarization,
+            )?,
+            before_measure_flip_probability: probability_arg(args.before_measure_flip_probability)?,
+            after_reset_flip_probability: probability_arg(args.after_reset_flip_probability)?,
+            after_clifford_depolarization: probability_arg(args.after_clifford_depolarization)?,
+        })
     }
-    let task = parse_repetition_task(&args.task)?;
-    let params = RepetitionCodeParams::new(
-        RoundCount::try_new(args.rounds)?,
-        CodeDistance::try_new(args.distance)?,
-        task,
-    )?
-    .with_before_round_data_depolarization(probability_arg(args.before_round_data_depolarization)?)
-    .with_before_measure_flip_probability(probability_arg(args.before_measure_flip_probability)?)
-    .with_after_reset_flip_probability(probability_arg(args.after_reset_flip_probability)?)
-    .with_after_clifford_depolarization(probability_arg(args.after_clifford_depolarization)?);
-    let generated = generate_repetition_code_circuit(&params)?;
+
+    fn apply_repetition(self, params: RepetitionCodeParams) -> RepetitionCodeParams {
+        params
+            .with_before_round_data_depolarization(self.before_round_data_depolarization)
+            .with_before_measure_flip_probability(self.before_measure_flip_probability)
+            .with_after_reset_flip_probability(self.after_reset_flip_probability)
+            .with_after_clifford_depolarization(self.after_clifford_depolarization)
+    }
+
+    fn apply_surface(self, params: SurfaceCodeParams) -> SurfaceCodeParams {
+        params
+            .with_before_round_data_depolarization(self.before_round_data_depolarization)
+            .with_before_measure_flip_probability(self.before_measure_flip_probability)
+            .with_after_reset_flip_probability(self.after_reset_flip_probability)
+            .with_after_clifford_depolarization(self.after_clifford_depolarization)
+    }
+
+    fn apply_color(self, params: ColorCodeParams) -> ColorCodeParams {
+        params
+            .with_before_round_data_depolarization(self.before_round_data_depolarization)
+            .with_before_measure_flip_probability(self.before_measure_flip_probability)
+            .with_after_reset_flip_probability(self.after_reset_flip_probability)
+            .with_after_clifford_depolarization(self.after_clifford_depolarization)
+    }
+}
+
+fn format_generated_circuit(
+    code_name: &str,
+    task: &str,
+    rounds: RoundCount,
+    distance: CodeDistance,
+    probabilities: GeneratorProbabilities,
+    generated: &GeneratedCircuit,
+) -> String {
     let mut out = String::new();
     out.push_str("# Generated ");
-    out.push_str(args.code.as_stim_name());
+    out.push_str(code_name);
     out.push_str(" circuit.\n");
     out.push_str("# task: ");
-    out.push_str(&args.task);
+    out.push_str(task);
     out.push('\n');
     out.push_str("# rounds: ");
-    out.push_str(&params.rounds().get().to_string());
+    out.push_str(&rounds.get().to_string());
     out.push('\n');
     out.push_str("# distance: ");
-    out.push_str(&params.distance().get().to_string());
+    out.push_str(&distance.get().to_string());
     out.push('\n');
     write_probability_header(
         &mut out,
         "before_round_data_depolarization",
-        params.before_round_data_depolarization(),
+        probabilities.before_round_data_depolarization,
     );
     write_probability_header(
         &mut out,
         "before_measure_flip_probability",
-        params.before_measure_flip_probability(),
+        probabilities.before_measure_flip_probability,
     );
     write_probability_header(
         &mut out,
         "after_reset_flip_probability",
-        params.after_reset_flip_probability(),
+        probabilities.after_reset_flip_probability,
     );
     write_probability_header(
         &mut out,
         "after_clifford_depolarization",
-        params.after_clifford_depolarization(),
+        probabilities.after_clifford_depolarization,
     );
     out.push_str("# layout:\n");
     out.push_str(generated.layout_text());
     out.push_str(generated.hint_text());
     out.push_str(&generated.circuit().to_stim_string());
-    Ok(out)
+    out
 }
 
 fn parse_repetition_task(task: &str) -> Result<RepetitionCodeTask, CliError> {
     match task {
         "memory" => Ok(RepetitionCodeTask::Memory),
         _ => Err(CliError::UnsupportedRepetitionTask {
+            task: task.to_string(),
+        }),
+    }
+}
+
+fn parse_surface_task(task: &str) -> Result<SurfaceCodeTask, CliError> {
+    match task {
+        "rotated_memory_x" => Ok(SurfaceCodeTask::RotatedMemoryX),
+        "rotated_memory_z" => Ok(SurfaceCodeTask::RotatedMemoryZ),
+        "unrotated_memory_x" => Ok(SurfaceCodeTask::UnrotatedMemoryX),
+        "unrotated_memory_z" => Ok(SurfaceCodeTask::UnrotatedMemoryZ),
+        _ => Err(CliError::UnsupportedSurfaceTask {
+            task: task.to_string(),
+        }),
+    }
+}
+
+fn parse_color_task(task: &str) -> Result<ColorCodeTask, CliError> {
+    match task {
+        "memory_xyz" => Ok(ColorCodeTask::MemoryXyz),
+        _ => Err(CliError::UnsupportedColorTask {
             task: task.to_string(),
         }),
     }
@@ -600,6 +703,96 @@ mod tests {
         assert_eq!(
             String::from_utf8(stdout).unwrap(),
             include_str!("../../../oracle/fixtures/expected/m7_gen_repetition_code.stdout")
+        );
+        assert_eq!(String::from_utf8(stderr).unwrap(), "");
+    }
+
+    #[test]
+    fn gen_surface_rotated_code_matches_m7_oracle_golden() {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            [
+                "stab",
+                "gen",
+                "--code",
+                "surface_code",
+                "--task",
+                "rotated_memory_z",
+                "--distance",
+                "2",
+                "--rounds",
+                "1",
+            ],
+            "".as_bytes(),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, 0);
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            include_str!("../../../oracle/fixtures/expected/m7_gen_surface_rotated_z.stdout")
+        );
+        assert_eq!(String::from_utf8(stderr).unwrap(), "");
+    }
+
+    #[test]
+    fn gen_surface_unrotated_code_matches_m7_oracle_golden() {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            [
+                "stab",
+                "gen",
+                "--code",
+                "surface_code",
+                "--task",
+                "unrotated_memory_z",
+                "--distance",
+                "2",
+                "--rounds",
+                "1",
+            ],
+            "".as_bytes(),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, 0);
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            include_str!("../../../oracle/fixtures/expected/m7_gen_surface_unrotated_z.stdout")
+        );
+        assert_eq!(String::from_utf8(stderr).unwrap(), "");
+    }
+
+    #[test]
+    fn gen_color_code_matches_m7_oracle_golden() {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            [
+                "stab",
+                "gen",
+                "--code",
+                "color_code",
+                "--task",
+                "memory_xyz",
+                "--distance",
+                "3",
+                "--rounds",
+                "2",
+            ],
+            "".as_bytes(),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, 0);
+        assert_eq!(
+            String::from_utf8(stdout).unwrap(),
+            include_str!("../../../oracle/fixtures/expected/m7_gen_color_code.stdout")
         );
         assert_eq!(String::from_utf8(stderr).unwrap(), "");
     }
