@@ -11,6 +11,7 @@
 
 - `docs/plans/rust-stim-drop-in-rewrite.md` is the current implementation roadmap for the Rust Stim drop-in rewrite.
 - When changing planned scope, milestone order, compatibility targets, public CLI behavior, or benchmark acceptance gates, update the matching plan document in the same change set.
+- Use `.agents/skills/milestone-audit` when auditing whether a milestone implementation satisfies its objective, tasks, linked tests, benchmarks, and done criteria, or when implementation reveals milestone loopholes or under-specified scope.
 - When changing implemented behavior, public APIs, CLI flags, supported file formats, operational workflows, or developer workflows, update the matching documentation in the same change set.
 - If generated documentation, schemas, API references, or compatibility matrices are introduced, regenerate them when changing the source of truth.
 - When editing Markdown prose, do not insert hard line breaks in the middle of a sentence; keep each sentence on one physical line unless a table, list, code block, quoted source, or other format requires line breaks.
