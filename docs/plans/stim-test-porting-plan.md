@@ -40,7 +40,7 @@ Use the following priorities when converting Stim tests into Stab tests.
 2. M2 should create red or manifest-only oracle cases for all P0 and P1 files needed by M4 through M11.
 3. M3 should convert the `Bench` files into a pinned C++ Stim baseline before Rust implementations exist.
 4. M4 through M11 should flip the relevant red parity tests green as each feature lands.
-5. M13 should revisit P3 Python, JS, Crumble, and diagram snapshot tests after the core CLI and Rust library are stable.
+5. The Future Plan in `docs/plans/rust-stim-drop-in-rewrite.md` should revisit P3 Python, JS, Crumble, and diagram snapshot tests after the core CLI and Rust library are stable.
 
 ## C++ GTest Hierarchy
 

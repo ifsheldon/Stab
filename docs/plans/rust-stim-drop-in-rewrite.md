@@ -50,249 +50,366 @@ Define the first SIMD backend around a portable bit block such as `Simd<u64, 4>`
 ## Milestones
 
 Milestones M1 through M3 are intentionally implementation-light. They establish the compatibility matrix, red or manifest-only parity tests, and benchmark baselines before feature implementation begins in M4.
+Every milestone should leave behind runnable commands, source-owned manifests, and documentation that another agent can use without rediscovering the same facts.
 
 ### M0: Project Foundation And Oracle Lab
 
-Theme: infrastructure, compatibility, and repeatability.
+Objective: make the repository reproducible, staged-checkable, and able to call the pinned Stim v1.16.0 oracle before any large feature work starts.
 
-Deliverables:
+Tasks:
 
-- Convert the repo into the workspace layout described above.
-- Add `rust-toolchain.toml` pinned to Nightly and document why Nightly is required.
-- Add a root `justfile` and modular files under `justfiles/` for workflow dispatch.
-- Add an `ops` crate for complex operational logic.
-- Add a staged-aware Rust pre-commit ops binary with `just maintenance::setup-hooks` and `just maintenance::pre-commit`.
-- Add `just oracle::fetch` to initialize and validate the `vendor/stim` submodule at Stim v1.16.0 through an `ops` binary.
-- Add `just oracle::run` to execute Rust and C++ Stim on the same input and compare results through an `ops` binary.
-- Add CI jobs for formatting, linting, tests, oracle smoke tests, and benchmark smoke tests.
+- Convert the repo into the workspace layout described above, with `stab-core` as the first default member.
+- Add `rust-toolchain.toml` pinned to Nightly and document why Nightly is required for `portable_simd`.
+- Keep the root `justfile` thin and dispatch operational workflows through modular `justfiles/`.
+- Keep complex operational logic in Rust binaries, including staged pre-commit checks and oracle orchestration.
+- Add `just oracle::fetch` to initialize, update, and validate the `vendor/stim` submodule at tag `v1.16.0`.
+- Add `just oracle::version` to print and assert the pinned Stim tag and commit.
+- Add `just oracle::run` to invoke pinned C++ Stim and Stab on the same input and compare exact stdout, stderr class, and exit status when the selected comparator requires it.
+- Add CI jobs for formatting, linting, unit tests, oracle smoke tests, and benchmark smoke tests.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- `cargo test --workspace` passes.
-- `just oracle::version` reports Stim v1.16.0.
-- A smoke oracle test compares `stim --help` and a tiny circuit parse or sample flow.
+- C++ smoke references: `src/stim.test.cc`, `src/stim/main_namespaced.test.cc`, and `src/stim_included_twice.test.cc` from `docs/plans/stim-test-porting-plan.md`.
+- Hook checks: `just maintenance::pre-commit`, `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace`.
+- Oracle smoke: `stim --help` and one tiny `.stim` parse-print or sample command against the pinned submodule.
+
+Done criteria:
+
+- `just maintenance::setup-hooks` installs a working local pre-commit hook without a tracked shell script.
+- `just oracle::version` fails unless `vendor/stim` resolves to `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
+- `just oracle::run --case smoke/help` and `just oracle::run --case smoke/tiny-circuit` pass.
+- `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo fmt --all --check` pass in CI and locally.
 
 ### M1: Feature Parity Inventory And Acceptance Contracts
 
-Theme: define the compatibility target before implementing features.
+Objective: create the compatibility contract that later agents implement against instead of guessing from upstream source files.
 
-Deliverables:
+Tasks:
 
-- Build a compatibility matrix from Stim v1.16.0 docs, tests, file formats, and CLI command references.
-- Use `docs/plans/stim-test-porting-plan.md` as the starting hierarchy for test-file inventory, priority, and milestone ownership.
+- Build a machine-readable compatibility matrix from Stim v1.16.0 docs, tests, file formats, CLI command references, and `docs/plans/stim-test-porting-plan.md`.
+- Give every row an upstream source path, Stab owner crate, planned milestone, parity mode, comparator type, priority, and status.
 - Cover planned core surfaces: `.stim`, `.dem`, result formats, gate table, targets, Pauli strings, tableaus, samplers, generated circuits, detector conversion, and detector error model analysis.
 - Cover planned CLI surfaces in implementation order: `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, and `sample_dem`.
-- Classify each behavior as exact-output parity, structural parity, statistical parity, performance parity, explicitly deferred, or intentionally out of scope.
-- Define acceptance checks for each future implementation milestone before that milestone starts.
+- Mark deferred surfaces as explicit future work: diagrams, `explain_errors`, `repl`, Python bindings, JS/WASM, Crumble, Cirq, Sinter, StimFlow, ZX, lattice-surgery helpers, QASM, Quirk, and GPU acceleration.
+- Define the acceptance check each implementation milestone must satisfy before the milestone begins.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- The compatibility matrix identifies every planned feature area and its parity class.
-- Deferred surfaces such as `diagram`, `explain_errors`, `repl`, Python bindings, JS/WASM, Crumble, and GPU work are explicitly marked.
-- Every implementation milestone below has named parity tests or benchmark checks waiting for it.
+- Test hierarchy: all P0, P1, P2, P3, Bench, and Skip groups in `docs/plans/stim-test-porting-plan.md`.
+- Benchmark hierarchy: `vendor/stim/file_lists/perf_files` as summarized in the Benchmark Source Hierarchy section of `docs/plans/stim-test-porting-plan.md`.
+
+Done criteria:
+
+- `just oracle::matrix --check` verifies that every P0, P1, and Bench upstream file has a matrix row.
+- `just oracle::matrix --milestone M4` through `M12` prints non-empty task lists with parity mode and comparator type.
+- No implementation milestone below has an unnamed test or benchmark dependency.
+- Deferred rows include a reason and a future-plan bucket.
 
 ### M2: Oracle Corpus And Red Parity Tests
 
-Theme: write feature-equivalence tests before implementation.
+Objective: create feature-equivalence tests before the implementation exists, so implementation milestones can turn red cases green.
 
-Deliverables:
+Tasks:
 
-- Create an oracle fixture corpus from `vendor/stim` tests, docs, examples, and generated v1.16.0 outputs.
-- Prioritize the P0 and P1 groups from `docs/plans/stim-test-porting-plan.md` before mining deferred ecosystem tests.
-- Add oracle test scaffolding that can run C++ Stim v1.16.0 and Rust Stab against the same input once each Rust feature exists.
-- Add golden expected outputs for exact-output surfaces such as parser/printer round trips, deterministic `gen`, deterministic sampling, deterministic `detect` and `m2d`, `.dem` printing, and CLI help where compatibility is required.
-- Add structural comparators for cases where byte-for-byte output is too strict but semantic equality is required.
-- Add statistical test definitions for noisy sampling and DEM sampling.
-- Mark not-yet-implemented Stab cases as expected-failing, ignored, or manifest-only so the test suite documents future work without blocking M0.
+- Create an oracle fixture manifest that names every planned fixture, upstream source, comparator, command shape, expected status, and milestone.
+- Import or generate exact-output fixtures for deterministic parser/printer, `gen`, `convert`, deterministic sampling, `detect`, `m2d`, `.dem` parsing/printing, and CLI help cases.
+- Define structural comparators for cases where byte-for-byte output is too strict but semantic equality is required.
+- Define statistical comparators for noisy circuit sampling and DEM sampling, including sample counts, confidence bounds, fixed Rust seeds, and acceptable false-positive rate.
+- Mark not-yet-implemented Stab cases as red, ignored, or manifest-only without hiding them from `just oracle::list`.
+- Add source-license notes for any copied upstream tests or fixtures.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- `just oracle::list` or the equivalent ops command lists the planned corpus by feature area and parity class.
-- Exact-output oracle cases can be recorded from the pinned `vendor/stim` submodule.
-- Statistical and structural comparators are specified before the sampler and analyzer implementations begin.
+- P0 and P1 C++ groups from `docs/plans/stim-test-porting-plan.md`, especially circuit, command, DEM, generator, IO, simulator, stabilizer, and util-top groups.
+- P2 Python binding tests only as semantic-mining sources before Python bindings exist.
+- No performance benchmarks are required in M2, but oracle fixture manifests should reference benchmark fixtures when a fixture will later be reused by M3 or M12.
+
+Done criteria:
+
+- `just oracle::list` prints every fixture grouped by milestone, parity mode, and status.
+- `just oracle::record --check-clean` can record exact-output fixtures from `vendor/stim` without modifying existing committed fixtures.
+- `just oracle::run --implemented-only` passes for implemented smoke cases.
+- `just oracle::run --all` reports unimplemented cases as explicit red or ignored cases, not as missing metadata.
 
 ### M3: Benchmark Baseline And Performance Contracts
 
-Theme: measure the C++ baseline before optimizing Rust code.
+Objective: measure the pinned C++ baseline and freeze benchmark contracts before Rust implementations start optimizing against vague targets.
 
-Deliverables:
+Tasks:
 
-- Create `stab-bench` and `ops` support for benchmark orchestration before feature implementation.
-- Add `just bench::baseline` to run the benchmark matrix against C++ Stim v1.16.0 from `vendor/stim`.
-- Record baseline results in a reproducible machine-readable format and a concise human-readable report.
-- Define per-feature benchmark contracts for parser/printer throughput, `gen`, tableau operations, sampling analysis time, sampling throughput, `detect`, `m2d`, `analyze_errors`, `.dem` parse/print, and `sample_dem`.
-- Separate compile/analysis time from per-shot throughput for sampling benchmarks.
+- Create `stab-bench` or an equivalent benchmark package plus `ops` support for benchmark orchestration.
+- Add `just bench::baseline` to compile and benchmark C++ Stim v1.16.0 from `vendor/stim`.
+- Add `just bench::compare` to run Stab and Stim on the same benchmark matrix once Stab supports the feature.
+- Store benchmark results in machine-readable files under a documented generated-artifact directory and summarize them in a concise human-readable report.
+- Define benchmark contracts for parser/printer throughput, `gen`, tableau operations, sampling analysis time, sampling throughput, `detect`, `m2d`, `analyze_errors`, `.dem` parse/print, and `sample_dem`.
+- Separate startup time, compile/analysis time, single-shot latency, and batch throughput where those phases are meaningfully different.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- The benchmark harness can run against C++ Stim v1.16.0 before equivalent Rust features exist.
-- The primary benchmark circuit matrix is recorded with baseline numbers or documented as pending due to missing local tooling.
-- Each later implementation milestone has an associated benchmark target when performance matters.
+- Benchmark source hierarchy from `docs/plans/stim-test-porting-plan.md`.
+- Primary benchmark circuit matrix from the Benchmark Plan section below.
+- Perf sources: `src/stim/circuit/circuit.perf.cc`, `src/stim/gates/gates.perf.cc`, `src/stim/io/measure_record_reader.perf.cc`, `src/stim/mem/*.perf.cc`, `src/stim/simulators/*.perf.cc`, `src/stim/stabilizers/*.perf.cc`, `src/stim/util_bot/*.perf.cc`, and `src/stim/util_top/*.perf.cc`.
+
+Done criteria:
+
+- `just bench::baseline --stim vendor/stim` records pinned C++ baseline results with machine metadata, command metadata, and Stim commit metadata.
+- `just bench::list` prints every planned benchmark with owning milestone and threshold class.
+- `just bench::smoke` runs in CI without requiring long benchmark durations.
+- Every implementation milestone M4 through M12 has named benchmark targets or explicitly says no benchmark is required.
 
 ### M4: Formats, Gate Model, And Canonical Printing
 
-Theme: public data formats before simulation.
+Objective: implement the public `.stim` data model, gate metadata, parser, validator, and canonical printer before any simulator depends on them.
 
-Deliverables:
+Tasks:
 
-- Implement `.stim` parsing for gates, targets, arguments, tags, comments, whitespace, and `REPEAT` blocks.
+- Implement `Circuit`, `CircuitInstruction`, `RepeatBlock`, `Gate`, `Target`, and typed argument/newtype APIs in `stab-core`.
+- Implement `.stim` parsing for gates, targets, arguments, tags, comments, whitespace, `TICK`, annotations, target combiners, measurement-record targets, sweep targets, detector targets, observable targets, and `REPEAT` blocks.
 - Implement canonical `.stim` printing compatible with Stim v1.16.0 for supported constructs.
-- Implement the v1.16.0 gate table, aliases, gate categories, arity rules, argument rules, and target validation.
-- Implement the initial `Circuit`, `CircuitInstruction`, `RepeatBlock`, `Gate`, and `Target` APIs.
+- Implement the v1.16.0 gate table, aliases, categories, inverse metadata, arity rules, argument rules, and target validation.
+- Implement clear domain errors for invalid gates, invalid arguments, invalid target separators, invalid repeat counts, and invalid measurement references.
+- Add a minimal parse-print-parse invariant suite and fuzz target for `.stim` input.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- Upstream circuit parser and printer tests are ported or covered by equivalent oracle cases.
-- All golden `.stim` examples round-trip through parse and print.
-- Invalid input produces clear domain errors, even if exact C++ error text is not yet required.
+- Direct or oracle tests: C++ Circuit Model, Parser, Targets, And Decomposition; Gates And Gate Metadata; Input And Output Formats where result-format parsing touches circuit commands.
+- CLI oracle tests: `src/stim/cmd/command_convert.test.cc` for parse/canonical-print behavior.
+- Semantic-mining tests: `src/stim/circuit/*_pybind_test.py`, `src/stim/gates/gates_test.py`, and selected parser examples from Cirq tests only when they expose core `.stim` behavior.
+- Benchmarks: `.stim` parse throughput, canonical print throughput, gate lookup, and `command_convert` startup plus conversion throughput.
+
+Done criteria:
+
+- `just oracle::run --milestone M4` passes for all M4 exact-output and structural cases.
+- `cargo test -p stab-core parser` and `cargo test -p stab-core gates` pass.
+- Parser fuzz smoke runs in CI or is documented as a local long-running target.
+- `just bench::compare --milestone M4` reports parser/printer throughput against the M3 C++ baseline, even if performance is not yet gated.
 
 ### M5: Portable SIMD Bit Core
 
-Theme: maintainable high-throughput primitives.
+Objective: provide maintainable, portable high-throughput bit primitives that simulators can use without touching raw SIMD lanes.
 
-Deliverables:
+Tasks:
 
-- Implement `BitBlock`, `BitSlice`, `BitVec`, and `BitMatrix` around portable SIMD.
-- Implement XOR, AND, OR, popcount helpers, row swap, masked row operations, range XOR, transposition helpers, and bit-packed load/store.
-- Provide a scalar reference implementation used only by tests.
-- Add property tests comparing portable SIMD kernels to scalar kernels.
+- Pin Nightly in `rust-toolchain.toml` and isolate `#![feature(portable_simd)]` in bit-kernel modules.
+- Implement `BitBlock`, `BitSlice`, `BitVec`, and `BitMatrix` around portable SIMD with typed dimensions and explicit ownership.
+- Implement XOR, AND, OR, row swap, masked row operations, range XOR, transposition helpers, bit-packed load/store, and popcount-like helpers.
+- Provide scalar reference kernels used by tests and comparator code.
+- Add randomized property tests over boundary sizes, empty sizes, unaligned tails, repeated row operations, and scalar-vs-SIMD equivalence.
+- Prevent simulator modules from depending directly on `std::simd` or architecture-specific intrinsics.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- SIMD and scalar implementations agree across randomized inputs and boundary sizes.
-- Criterion benchmarks exist for row XOR, matrix transpose, bit-packed copy, and popcount-like workloads.
-- No simulator code directly manipulates raw SIMD lanes outside `stab-core` bit modules.
+- Direct tests: C++ Memory And Portable SIMD group from `docs/plans/stim-test-porting-plan.md`.
+- Adapted tests: skip C++ container-only tests such as `fixed_cap_vector` and `monotonic_buffer` unless Stab introduces equivalent containers.
+- Benchmarks: `src/stim/mem/simd_bit_table.perf.cc`, `src/stim/mem/simd_bits.perf.cc`, `src/stim/mem/simd_word.perf.cc`, and `src/stim/mem/sparse_xor_vec.perf.cc`.
+
+Done criteria:
+
+- `cargo test -p stab-core bits` passes scalar-vs-SIMD property tests.
+- `rg "std::simd|portable_simd" crates/stab-core/src` shows direct SIMD usage only inside approved bit-kernel modules.
+- `just bench::compare --milestone M5` reports row XOR, matrix transpose, bit-packed copy, sparse XOR, and popcount-like workloads against the M3 baseline.
+- Any required architecture-specific fallback is documented as deferred and not implemented in this milestone.
 
 ### M6: Stabilizer Algebra
 
-Theme: correctness of the algebraic core.
+Objective: implement the algebraic core needed by generation, sampling, tableau simulation, circuit inversion, and detector analysis.
 
-Deliverables:
+Tasks:
 
-- Implement `PauliString`, `CliffordString`, and `Tableau`.
-- Implement tableau composition, inversion, gate conjugation, commutation checks, sign handling, and measurement-related primitives.
-- Implement single-qubit Clifford gates, two-qubit Clifford gates, swaps, Pauli products, and common derived operations.
+- Implement `PauliString`, `CliffordString`, `Tableau`, and related iterators or views with typed lengths and sign handling.
+- Implement tableau composition, inversion, gate conjugation, commutation checks, Pauli products, sign multiplication, random generation hooks, and text round trips.
+- Implement single-qubit Clifford gates, two-qubit Clifford gates, swaps, Pauli-product operations, and common derived operations used by Stim tests.
+- Implement conversion helpers needed by later `Circuit::to_tableau`, inverse-circuit, flow, and stabilizer-to-tableau operations.
+- Add property tests for inverse, identity, associativity where applicable, commutation, conjugation, text round trips, and scalar/reference equivalence.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- Port upstream algebra tests for Pauli strings, Clifford strings, and tableaus.
-- Add randomized property tests for inverse, associativity where applicable, commutation, conjugation, and round-tripping through text.
-- Compare selected operations against C++ Stim through the oracle.
+- Direct tests: C++ Stabilizers And Algebra group.
+- Related util-top tests: `circuit_vs_tableau`, `stabilizers_to_tableau`, `stabilizers_vs_amplitudes`, and `circuit_inverse_unitary` when their dependencies are in scope.
+- Semantic-mining tests: Python `pauli_string_pybind`, `clifford_string_pybind`, `tableau_pybind`, `flow_pybind`, and `tableau_simulator_pybind` cases that express core algebra semantics.
+- Benchmarks: `src/stim/stabilizers/*.perf.cc` and `src/stim/util_top/stabilizers_to_tableau.perf.cc`.
+
+Done criteria:
+
+- `cargo test -p stab-core stabilizers` passes direct and property tests.
+- `just oracle::run --milestone M6` passes selected C++ Stim algebra comparisons.
+- `just bench::compare --milestone M6` reports Pauli, Clifford, tableau, tableau-iterator, and stabilizers-to-tableau workloads.
+- Public algebra APIs avoid Python-hostile lifetime or generic shapes unless documented.
 
 ### M7: Circuit Generation And Early CLI
 
-Theme: deterministic circuit production and useful developer workflows.
+Objective: ship the first useful `stim`-compatible CLI surface and deterministic generated-circuit fixtures for later simulator, detector, and benchmark work.
 
-Deliverables:
+Tasks:
 
+- Add `stab-cli` with a binary name or compatibility wrapper that can be invoked as `stab` during development and compared against `stim`.
 - Implement `stim gen` compatibility for repetition code, rotated surface code, unrotated surface code, and color code tasks supported by v1.16.0.
-- Implement CLI argument parsing for the supported `gen` flags.
-- Add a minimal `stim convert` path for parse and canonical print workflows.
+- Implement all supported `gen` flags with typed parsing, probability validation, distance/round validation, and helpful errors.
+- Implement `stim convert` for `.stim` parse and canonical print workflows.
+- Store generated circuit fixture matrices by family, task, distance, rounds, and noise settings for later M8 through M12 reuse.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- `stab-cli gen` output matches v1.16.0 for a golden matrix of distances, rounds, tasks, and noise settings.
-- `stab-cli convert` can read `.stim` input and emit canonical `.stim` output for supported circuits.
-- Generated circuits become shared fixtures for later simulator, detector, and benchmark milestones.
+- Direct tests: C++ Circuit Generation group and CLI Commands group for `command_gen.test.cc` and `command_convert.test.cc`.
+- Related parser tests: M4 `.stim` parse/print fixtures.
+- Benchmarks: `stim gen` workloads for repetition code, rotated surface code, unrotated surface code, and color code circuits from the Benchmark Plan.
+
+Done criteria:
+
+- `just oracle::run --milestone M7` passes exact-output `gen` and `convert` golden cases.
+- `stab-cli gen` output matches Stim v1.16.0 for the compatibility matrix of families, tasks, distances, rounds, and noise settings.
+- `stab-cli convert` reads stdin and files and emits canonical `.stim` output for supported circuits.
+- `just bench::compare --milestone M7` reports generator throughput for all primary generated-circuit families.
 
 ### M8: Circuit Sampling
 
-Theme: Stim's main performance promise.
+Objective: implement Stim's core circuit-sampling behavior with clear analysis-vs-shot separation and early bit-packed output support.
 
-Deliverables:
+Tasks:
 
-- Implement `CompiledSampler` with analysis separated from per-shot sampling.
-- Implement noiseless sampling, Pauli noise, depolarizing noise, heralded errors, measurement/reset behavior, feedback where supported by v1.16.0, and repeat handling.
-- Implement `stim sample` with core flags and output formats needed by downstream workflows.
-- Implement bit-packed measurement output paths from the beginning.
+- Implement `CompiledSampler` with explicit analysis state separated from per-shot sampling.
+- Implement noiseless sampling, Pauli noise, depolarizing noise, heralded errors, measurement/reset behavior, feedback supported by v1.16.0, repeat handling, and reference sample behavior.
+- Implement `stim sample` with core flags, input/output paths, measurement output formats, bit-packed output, seed handling, and deterministic no-noise behavior.
+- Add statistical tests for noisy sampling that do not require C++ random-stream compatibility.
+- Add regression tests for result-format padding, endian conventions, text output, and bit-packed output.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- Deterministic circuits match C++ Stim exactly.
-- Noisy circuits pass statistical equivalence checks without requiring identical random streams.
-- Benchmarks separately report compile time, single-shot latency, and batch throughput for `1`, `1024`, and `1_000_000` shots.
+- Direct tests: C++ Simulators group for frame, tableau, vector, and graph simulation cases that apply to sampling.
+- Direct tests: C++ Input And Output Formats group for measurement record formats and sparse shots.
+- CLI tests: `src/stim/cmd/command_sample.test.cc`.
+- Semantic-mining tests: Python compiled measurement sampler, frame simulator, tableau simulator, and circuit sampling tests.
+- Benchmarks: `src/stim/simulators/frame_simulator.perf.cc`, `src/stim/simulators/tableau_simulator.perf.cc`, and sampling workloads in the Benchmark Plan.
+
+Done criteria:
+
+- `just oracle::run --milestone M8 --exact` passes deterministic sampling cases.
+- `just oracle::run --milestone M8 --statistical` passes noisy sampling statistical cases with documented sample counts and confidence bounds.
+- `cargo test -p stab-core sample` covers repeat blocks, feedback, reset/measurement edge cases, and output-format padding.
+- `just bench::compare --milestone M8` reports compile/analysis time, single-shot latency, and batch throughput for `1`, `1024`, and `1_000_000` shots.
 
 ### M9: Detection Event Workflows
 
-Theme: QEC result processing.
+Objective: implement measurement-to-detection conversion and the CLI workflows that decoder pipelines depend on.
 
-Deliverables:
+Tasks:
 
-- Implement measurement-to-detection conversion.
-- Implement `stim detect` and `stim m2d`.
-- Support the result formats needed for CLI parity, including text and bit-packed formats.
-- Handle gauge detector semantics consistently with Stim's documented behavior, without requiring identical arbitrary choices.
+- Implement measurement-to-detection conversion from measurement records and circuits with detectors, observables, coordinate shifts, and repeats.
+- Implement `stim detect` with supported input/output formats, bit-packed modes, observables, and detector output handling.
+- Implement `stim m2d` with measurement input parsing, detector conversion, observable output, and error handling for inconsistent inputs.
+- Handle gauge detector semantics structurally, without requiring identical arbitrary choices when Stim documents nondeterminism.
+- Add round-trip tests for bit-packed input/output and text input/output across circuit fixtures generated in M7.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- Deterministic examples match C++ Stim exactly.
-- Gauge-detector examples satisfy structural equivalence checks.
-- Bit-packed input and output are covered by round-trip tests and oracle tests.
+- Direct tests: `src/stim/simulators/measurements_to_detection_events.test.cc` and related Python `measurements_to_detection_events_test.py`.
+- CLI tests: `src/stim/cmd/command_detect.test.cc` and `src/stim/cmd/command_m2d.test.cc`.
+- IO tests: C++ Input And Output Formats group for bit-packed and text result formats.
+- Benchmarks: `stim detect` and `stim m2d` on text and bit-packed input from the Benchmark Plan.
+
+Done criteria:
+
+- `just oracle::run --milestone M9 --exact` passes deterministic detection examples.
+- `just oracle::run --milestone M9 --structural` passes gauge-detector structural equivalence cases.
+- `cargo test -p stab-core detection` covers coordinate shifts, repeats, observables, empty-detector circuits, and invalid measurement references.
+- `just bench::compare --milestone M9` reports `detect` and `m2d` throughput separately for text and bit-packed formats.
 
 ### M10: Detector Error Model Core
 
-Theme: decoder ecosystem compatibility.
+Objective: implement `.dem` compatibility and circuit-to-DEM analysis well enough for decoder ecosystem workflows.
 
-Deliverables:
+Tasks:
 
-- Implement `.dem` parser and printer.
-- Implement `DetectorErrorModel`, `DemInstruction`, DEM targets, repeat blocks, coordinate handling, detector shifts, observables, and probability validation.
-- Implement `stim analyze_errors` initially without advanced flags, then add `--decompose_errors`, `--fold_loops`, `--allow_gauge_detectors`, and approximation behavior.
+- Implement `.dem` parser and canonical printer.
+- Implement `DetectorErrorModel`, `DemInstruction`, DEM targets, repeat blocks, coordinate handling, detector shifts, observables, separators, and probability validation.
+- Implement `stim analyze_errors` with a staged flag plan: first default behavior, then `--decompose_errors`, `--fold_loops`, `--allow_gauge_detectors`, and approximation behavior.
+- Implement loop folding without accidentally flattening high-repeat circuits when Stim would preserve structure.
+- Add structural DEM comparators that account for equivalent detector shifts, repeats, and graphlike decomposition where byte-for-byte output is too strict.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- DEM parse and print tests pass against upstream fixtures.
-- Standard generated circuits produce DEMs equivalent to v1.16.0.
-- `analyze_errors --fold_loops` avoids expanding high-repeat circuits when Stim v1.16.0 would fold them.
+- Direct tests: C++ Detector Error Model group.
+- Analyzer tests: `src/stim/simulators/error_analyzer.test.cc`, `src/stim/simulators/error_matcher.test.cc`, and `src/stim/util_top/circuit_to_dem.test.cc`.
+- CLI tests: `src/stim/cmd/command_analyze_errors.test.cc`.
+- Semantic-mining tests: Python detector error model, DEM instruction, DEM target, matched error, and circuit detector-error-model tests.
+- Benchmarks: `src/stim/simulators/error_analyzer.perf.cc`, `.dem` parse/print workloads, and `analyze_errors --decompose_errors` and `--fold_loops` workloads.
+
+Done criteria:
+
+- `just oracle::run --milestone M10 --exact` passes DEM parse/print and simple analyzer cases.
+- `just oracle::run --milestone M10 --structural` passes generated QEC circuit DEM equivalence cases.
+- `cargo test -p stab-core dem` covers repeat blocks, detector shifts, coordinates, observables, probabilities, separators, and invalid input.
+- `just bench::compare --milestone M10` reports `.dem` parse/print and `analyze_errors` workloads with loop-folding cases included.
 
 ### M11: Detector Error Model Sampling
 
-Theme: fast DEM-based sampling.
+Objective: implement fast DEM-based sampling and complete the initial CLI compatibility surface.
 
-Deliverables:
+Tasks:
 
-- Implement `CompiledDemSampler`.
-- Implement `stim sample_dem`.
-- Reuse bit-packed result writers and portable SIMD bit operations from earlier milestones.
+- Implement `CompiledDemSampler` with reusable analysis state and per-shot sampling.
+- Implement `stim sample_dem` with supported flags, detector output, observable output, bit-packed formats, seed handling, and deterministic behavior where applicable.
+- Reuse M5 bit kernels and M8/M9 result writers instead of creating a separate output stack.
+- Add exact tests for deterministic DEMs and statistical tests for noisy DEMs.
+- Add sparse, dense, repeated, and high-detector-count DEM fixture groups.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- Deterministic DEMs match C++ Stim exactly.
-- Noisy DEMs pass statistical equivalence checks.
-- Benchmarks cover sparse, dense, repeated, and high-detector-count DEMs.
+- Direct tests: `src/stim/simulators/dem_sampler.test.cc` and `src/stim/simulators/matched_error.test.cc` where applicable.
+- CLI tests: `src/stim/cmd/command_sample_dem.test.cc`.
+- Semantic-mining tests: Python DEM sampler and compiled detector sampler tests.
+- Benchmarks: `src/stim/simulators/dem_sampler.perf.cc` plus sparse, dense, repeated, and high-detector-count DEM workloads.
+
+Done criteria:
+
+- `just oracle::run --milestone M11 --exact` passes deterministic DEM sampling cases.
+- `just oracle::run --milestone M11 --statistical` passes noisy DEM sampling cases with documented confidence bounds.
+- `cargo test -p stab-core dem_sampler` covers empty DEMs, observables-only DEMs, repeated DEMs, dense detector cases, and bit-packed output.
+- `just bench::compare --milestone M11` reports sparse, dense, repeated, and high-detector-count DEM sampling throughput.
 
 ### M12: Performance Hardening
 
-Theme: measured optimization while preserving maintainability.
+Objective: close the first public beta performance gate with measured, reviewable optimizations instead of speculative rewrites.
 
-Deliverables:
+Tasks:
 
-- Add a benchmark dashboard comparing Stab against Stim v1.16.0.
-- Profile the slowest workloads before optimizing.
-- Tune portable SIMD lane widths and memory layout behind the bit-kernel abstraction.
-- Add allocation tracking for hot paths.
+- Freeze the primary benchmark matrix from M3, M7, M8, M9, M10, and M11 so benchmark names and inputs are stable.
+- Add `just bench::compare --profile release --report target/benchmarks/latest` to compare Stab against pinned Stim v1.16.0 for the full primary matrix.
+- Add a benchmark dashboard or report artifact that records machine metadata, compiler/toolchain metadata, Stim commit, Stab commit, benchmark parameters, median timing, variance, relative ratio, and pass/fail status.
+- Profile every benchmark that is slower than the beta gate before optimizing it, and store a short profiler note beside the benchmark report.
+- Optimize only behind existing abstractions unless profiler evidence justifies a new abstraction.
+- Tune portable SIMD lane widths, memory layouts, allocation patterns, and hot-loop structure behind `stab-core` bit, sampler, detector, and DEM modules.
+- Add allocation tracking for parser, sampler compilation, detector conversion, analyzer, and DEM sampler hot paths.
+- Add regression thresholds for all workloads that pass the beta gate so future work cannot accidentally erase performance wins.
 
-Exit criteria:
+Linked tests and benchmarks:
 
-- Beta gate: Stab is within 2x C++ Stim on parser throughput, sampling throughput, `m2d`, `detect`, `sample_dem`, and `analyze_errors`.
-- 1.0 gate: Stab is within 1.25x C++ Stim or faster on the primary sampling, detection, DEM sampling, and analyzer benchmarks.
-- Any remaining performance gaps are documented with profiler evidence and an owner milestone.
+- Full Benchmark Plan below, including `.stim` parse/print, `gen`, tableau/Pauli primitives, `sample`, `detect`, `m2d`, `analyze_errors`, `.dem` parse/print, and `sample_dem`.
+- Benchmark source hierarchy from `docs/plans/stim-test-porting-plan.md`.
+- All oracle suites for M4 through M11, because performance changes must preserve functional parity.
 
-### M13: Python, Browser, And GPU Follow-Ups
+Done criteria:
 
-Theme: ecosystem expansion after CLI and core parity.
+- `just oracle::run --implemented-only` passes before and after performance changes.
+- `just bench::compare --profile release --primary` produces a committed or archived report with no missing primary workloads.
+- Beta performance gate passes: every primary parser, generator, sampling, detection, DEM parsing, DEM sampling, and analyzer workload is no slower than 2.0x the pinned C++ Stim v1.16.0 median on the same machine.
+- Beta memory gate passes: no primary workload regresses peak allocations or resident memory by more than 25 percent relative to the first complete Stab benchmark report unless the report documents an accepted tradeoff.
+- Hot-path gate passes: every workload slower than 1.5x Stim has a profiler note naming the dominant cost and the next owner action.
+- Regression gate passes: workloads already at or below 1.25x Stim have benchmark thresholds checked by CI smoke or scheduled benchmark automation.
+- Any workload that misses the beta gate has a dedicated follow-up issue or milestone entry with profiler evidence, suspected cause, and a proposed implementation path.
 
-Deliverables:
+## Future Plan
 
-- Add Python bindings with `pyo3` and `maturin` after CLI parity is stable.
-- Add JS/WASM only after the Rust API has settled.
-- Revisit Crumble compatibility after JS/WASM support exists.
-- Run a GPU spike only for `CompiledSampler` and `CompiledDemSampler`, and only if CPU profiles show a large batch-parallel bottleneck.
+Future work is intentionally outside the M0 through M12 core rewrite sequence. Start any of these only after the Rust library and CLI compatibility surface has passed the first public beta gate or after the roadmap is deliberately revised.
 
-Exit criteria:
-
-- Python binding plan is written against the stable Rust API, not the other way around.
-- GPU spike has a benchmark proving transfer overhead is amortized before any production implementation is accepted.
+- Python bindings: add `pyo3` and `maturin` bindings after the Rust API is stable enough to avoid binding-driven churn.
+- JS/WASM: add browser bindings only after the Rust API has settled and the memory model is compatible with WASM constraints.
+- Crumble compatibility: revisit after JS/WASM exists and after Crumble-specific tests are reclassified from P3 to implementation work.
+- Cirq, Sinter, StimFlow, ZX, and lattice-surgery integrations: treat as ecosystem projects, not core drop-in CLI requirements.
+- Diagrams, `stim explain_errors`, and `stim repl`: plan separately because they need different UX, rendering, and interactivity acceptance checks.
+- QASM and Quirk exports: revisit only if drop-in compatibility scope expands beyond the initial CLI order.
+- GPU acceleration: run a GPU spike only for `CompiledSampler` and `CompiledDemSampler`, and only if CPU profiles show a large batch-parallel bottleneck.
+- GPU acceptance condition: a future GPU implementation must include a benchmark proving that transfer and launch overhead are amortized for the target batch sizes before production code is accepted.
 
 ## CLI Compatibility Order
 
