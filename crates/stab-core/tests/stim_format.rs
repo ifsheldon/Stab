@@ -179,6 +179,7 @@ fn target_groups_follow_stim_circuit_instruction_semantics() {
 
 #[test]
 fn parses_mpp_optional_probability_like_stim() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/circuit.test.cc parse_mpp.
     let circuit = Circuit::from_stim_str("MPP(0.125) X1*Y2 Z3 * Z4\n").expect("parse MPP");
     let instruction = circuit
         .items()
@@ -190,6 +191,78 @@ fn parses_mpp_optional_probability_like_stim() {
     assert_eq!(circuit.to_stim_string(), "MPP(0.125) X1*Y2 Z3*Z4\n");
     assert!(Circuit::from_stim_str("MPP(1.1) X1\n").is_err());
     assert!(Circuit::from_stim_str("MPP(-0.5) X1\n").is_err());
+    for invalid in [
+        "H *\n",
+        "MPP 0\n",
+        "MPP *\n",
+        "MPP * X1\n",
+        "MPP * X1 *\n",
+        "MPP X1 *\n",
+        "MPP X1 * * Y2\n",
+        "MPP X1**Y2\n",
+        "MPP(1.1) X1**Y2\n",
+        "MPP(-0.5) X1**Y2\n",
+        "MPP X1*rec[-1]\n",
+        "MPP rec[-1]\n",
+        "MPP sweep[0]\n",
+    ] {
+        assert!(Circuit::from_stim_str(invalid).is_err(), "{invalid}");
+    }
+    let repeated_qubit = Circuit::from_stim_str("MPP X1*X1\n").expect("repeated qubit");
+    let repeated_qubit_instruction = repeated_qubit
+        .items()
+        .first()
+        .and_then(CircuitItemExt::as_instruction)
+        .expect("MPP instruction");
+    assert_eq!(repeated_qubit_instruction.targets().len(), 3);
+}
+
+#[test]
+fn parses_spp_and_spp_dag_pauli_products_like_stim() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/circuit.test.cc parse_spp and parse_spp_dag.
+    for gate in ["SPP", "SPP_DAG"] {
+        for invalid in [
+            format!("{gate} 1\n"),
+            format!("{gate} rec[-1]\n"),
+            format!("{gate} sweep[0]\n"),
+            format!("{gate} rec[-1]*X0\n"),
+        ] {
+            assert!(Circuit::from_stim_str(&invalid).is_err(), "{invalid}");
+        }
+
+        assert_eq!(
+            Circuit::from_stim_str(&format!("{gate}\n"))
+                .expect("empty SPP")
+                .items()
+                .len(),
+            1
+        );
+        let circuit = Circuit::from_stim_str(&format!("{gate} X0 X1*Y2*Z3\n")).expect("parse SPP");
+        let instruction = circuit
+            .items()
+            .first()
+            .and_then(CircuitItemExt::as_instruction)
+            .expect("SPP instruction");
+        assert_eq!(
+            instruction.target_groups(),
+            &[
+                &[Target::pauli(Pauli::X, QubitId::new(0).unwrap(), false)][..],
+                &[
+                    Target::pauli(Pauli::X, QubitId::new(1).unwrap(), false),
+                    Target::combiner(),
+                    Target::pauli(Pauli::Y, QubitId::new(2).unwrap(), false),
+                    Target::combiner(),
+                    Target::pauli(Pauli::Z, QubitId::new(3).unwrap(), false),
+                ][..],
+            ]
+        );
+        assert_eq!(
+            Circuit::from_stim_str(&format!("{gate} X1 Z2\n"))
+                .expect("parse two products")
+                .to_stim_string(),
+            format!("{gate} X1 Z2\n")
+        );
+    }
 }
 
 #[test]
