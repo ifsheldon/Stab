@@ -38,6 +38,9 @@ pub enum CircuitError {
     #[error("cannot simplify circuit: {message}")]
     InvalidCircuitSimplification { message: String },
 
+    #[error("cannot compile circuit sampler: {message}")]
+    InvalidSamplerCompilation { message: String },
+
     #[error("unterminated repeat block")]
     UnterminatedRepeatBlock,
 
@@ -68,6 +71,12 @@ impl CircuitError {
 
     pub(crate) fn invalid_circuit_simplification(message: impl Into<String>) -> Self {
         Self::InvalidCircuitSimplification {
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn invalid_sampler_compilation(message: impl Into<String>) -> Self {
+        Self::InvalidSamplerCompilation {
             message: message.into(),
         }
     }

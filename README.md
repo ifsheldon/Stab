@@ -33,8 +33,8 @@ just oracle::run --case smoke/help
 just oracle::run --case smoke/tiny-circuit
 ```
 
-The tiny-circuit smoke case uses a hidden `stab-cli sample` shim that only exists to prove oracle wiring in M0.
-It is not `stim sample` compatibility; the real command contract belongs to the M8 sampling milestone.
+The tiny-circuit smoke case now runs through the public `stab sample` command.
+M8 sampling compatibility has started with deterministic `01` output for the parser-backed Z-basis subset; noisy sampling, non-`01` result formats, and reference-sample behavior still belong to later M8 work.
 
 Inspect and check the M2 fixture corpus with:
 

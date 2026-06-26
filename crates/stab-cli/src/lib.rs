@@ -16,10 +16,10 @@ use std::path::PathBuf;
 use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use stab_core::{
-    Circuit, CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit,
-    Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount, SurfaceCodeParams,
-    SurfaceCodeTask, generate_color_code_circuit, generate_repetition_code_circuit,
-    generate_surface_code_circuit,
+    Circuit, CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask, CompiledSampler,
+    GeneratedCircuit, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
+    SurfaceCodeParams, SurfaceCodeTask, generate_color_code_circuit,
+    generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 use thiserror::Error;
 
@@ -42,8 +42,8 @@ enum Command {
     /// Converts supported result data between text formats.
     Convert(ConvertArgs),
 
-    /// M0 oracle-only measurement smoke shim; full sample support arrives in M8.
-    #[command(name = "sample", hide = true)]
+    /// Samples measurements from a circuit.
+    #[command(name = "sample")]
     Sample(SampleArgs),
 }
 
@@ -116,6 +116,22 @@ enum RecordFormatArg {
     Stim,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum SampleOutFormatArg {
+    #[value(name = "01")]
+    ZeroOne,
+    #[value(name = "b8")]
+    B8,
+    #[value(name = "r8")]
+    R8,
+    #[value(name = "ptb64")]
+    Ptb64,
+    #[value(name = "hits")]
+    Hits,
+    #[value(name = "dets")]
+    Dets,
+}
+
 #[derive(Debug, Args)]
 struct ConvertArgs {
     /// Input record format.
@@ -156,6 +172,34 @@ struct SampleArgs {
     /// Number of shots to sample.
     #[arg(long, default_value_t = 1)]
     shots: usize,
+
+    /// Input circuit path. Defaults to stdin.
+    #[arg(long = "in")]
+    input: Option<PathBuf>,
+
+    /// Output sample path. Defaults to stdout.
+    #[arg(long = "out")]
+    output: Option<PathBuf>,
+
+    /// Output sample format.
+    #[arg(long = "out_format", value_enum, default_value = "01")]
+    out_format: SampleOutFormatArg,
+
+    /// Partially deterministic random seed for noisy sampling.
+    #[arg(long)]
+    seed: Option<u64>,
+
+    /// Assert the noiseless reference sample is all zeroes.
+    #[arg(long = "skip_reference_sample")]
+    skip_reference_sample: bool,
+
+    /// Disable reference-sample loop folding.
+    #[arg(long = "skip_loop_folding")]
+    skip_loop_folding: bool,
+
+    /// Deprecated Stim alias for --skip_reference_sample.
+    #[arg(long = "frame0", hide = true)]
+    frame0: bool,
 }
 
 #[derive(Debug, Error)]
@@ -197,6 +241,14 @@ enum CliError {
     )]
     UnsupportedConversion,
 
+    #[error("unsupported sample output format; this M8 slice supports --out_format=01")]
+    UnsupportedSampleOutputFormat,
+
+    #[error(
+        "sample flag {flag} requires noisy or reference-sample support that is not in this M8 slice"
+    )]
+    UnsupportedSampleFlag { flag: &'static str },
+
     #[error("not enough information given to parse input file")]
     MissingRecordWidth,
 
@@ -212,19 +264,6 @@ enum CliError {
 
     #[error("01 record on line {line} contains invalid character {character:?}")]
     InvalidZeroOneCharacter { line: usize, character: char },
-
-    #[error(
-        "M0 smoke sampler only supports M and MZ instructions, found {instruction:?} on line {line}"
-    )]
-    UnsupportedInstruction { line: usize, instruction: String },
-
-    #[error("measurement instruction on line {line} must include at least one qubit target")]
-    MissingMeasurementTarget { line: usize },
-
-    #[error(
-        "M0 smoke sampler only supports unsigned integer qubit targets, found {target:?} on line {line}"
-    )]
-    InvalidMeasurementTarget { line: usize, target: String },
 
     #[error("measurement count overflowed")]
     MeasurementCountOverflow,
@@ -679,64 +718,29 @@ where
     R: Read,
     W: Write,
 {
-    let mut circuit = String::new();
-    input
-        .read_to_string(&mut circuit)
-        .map_err(CliError::ReadInput)?;
-    let measurement_count = count_smoke_measurements(&circuit)?;
-    for _ in 0..args.shots {
-        for _ in 0..measurement_count {
-            stdout.write_all(b"0").map_err(CliError::WriteOutput)?;
-        }
-        stdout.write_all(b"\n").map_err(CliError::WriteOutput)?;
+    if args.out_format != SampleOutFormatArg::ZeroOne {
+        return Err(CliError::UnsupportedSampleOutputFormat);
     }
-    Ok(())
-}
-
-fn count_smoke_measurements(circuit: &str) -> Result<usize, CliError> {
-    let mut count = 0usize;
-    for (line_index, raw_line) in circuit.lines().enumerate() {
-        let line_number = line_index
-            .checked_add(1)
-            .ok_or(CliError::MeasurementCountOverflow)?;
-        let line = raw_line
-            .split_once('#')
-            .map_or(raw_line, |(before_comment, _comment)| before_comment)
-            .trim();
-        if line.is_empty() || line == "TICK" {
-            continue;
-        }
-        let mut parts = line.split_whitespace();
-        let Some(instruction) = parts.next() else {
-            continue;
-        };
-        if instruction != "M" && instruction != "MZ" {
-            return Err(CliError::UnsupportedInstruction {
-                line: line_number,
-                instruction: instruction.to_string(),
-            });
-        }
-
-        let mut targets_on_line = 0usize;
-        for target in parts {
-            if target.parse::<u64>().is_err() {
-                return Err(CliError::InvalidMeasurementTarget {
-                    line: line_number,
-                    target: target.to_string(),
-                });
-            }
-            targets_on_line = targets_on_line
-                .checked_add(1)
-                .ok_or(CliError::MeasurementCountOverflow)?;
-        }
-        if targets_on_line == 0 {
-            return Err(CliError::MissingMeasurementTarget { line: line_number });
-        }
-        count = count
-            .checked_add(targets_on_line)
-            .ok_or(CliError::MeasurementCountOverflow)?;
+    if args.seed.is_some() {
+        return Err(CliError::UnsupportedSampleFlag { flag: "--seed" });
     }
-    Ok(count)
+    if args.skip_reference_sample || args.frame0 {
+        return Err(CliError::UnsupportedSampleFlag {
+            flag: "--skip_reference_sample",
+        });
+    }
+    if args.skip_loop_folding {
+        return Err(CliError::UnsupportedSampleFlag {
+            flag: "--skip_loop_folding",
+        });
+    }
+
+    let input_bytes = read_input(args.input.as_ref(), input)?;
+    let circuit_text = std::str::from_utf8(&input_bytes).map_err(|_| CliError::InvalidUtf8Input)?;
+    let circuit = Circuit::from_stim_str(circuit_text)?;
+    let sampler = CompiledSampler::compile(&circuit)?;
+    let output = sampler.sample_zero_one_bytes(args.shots);
+    write_output(args.output.as_ref(), stdout, &output)
 }
 
 #[cfg(test)]

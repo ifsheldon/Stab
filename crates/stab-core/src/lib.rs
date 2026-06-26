@@ -13,6 +13,7 @@ mod error;
 mod gate;
 mod ids;
 mod mbqc_decomposition;
+mod sampling;
 pub mod stabilizers;
 mod target;
 
@@ -31,6 +32,7 @@ pub use error::{CircuitError, CircuitResult};
 pub use gate::{Gate, GateCategory};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};
 pub use mbqc_decomposition::mbqc_decomposition;
+pub use sampling::CompiledSampler;
 pub use stabilizers::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, PauliBasis, PauliPhase,
     PauliSign, PauliString, PauliStringIterator, SingleQubitClifford, StabilizerError,

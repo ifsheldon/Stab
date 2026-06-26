@@ -451,39 +451,75 @@ fn cli_rejects_out_of_range_probability_arguments_like_arg_parse_test() {
 }
 
 #[test]
-fn smoke_sampler_outputs_zero_measurements_for_each_shot() {
+fn sample_basic_matches_m8_oracle_golden() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(
         ["stab", "sample", "--shots", "2"],
-        "M 0 1\n".as_bytes(),
+        include_bytes!("../../../oracle/fixtures/inputs/sample_basic.stim").as_slice(),
         &mut stdout,
         &mut stderr,
     );
 
     assert_eq!(status, 0);
-    assert_eq!(String::from_utf8(stdout).unwrap(), "00\n00\n");
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!("../../../oracle/fixtures/expected/m8_sample_basic.stdout")
+    );
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
 }
 
 #[test]
-fn smoke_sampler_ignores_comments_and_ticks() {
+fn sample_supports_deterministic_pauli_frame_measurements() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(
         ["stab", "sample", "--shots=1"],
-        "# comment\nTICK\nMZ 2 # after\n".as_bytes(),
+        "X 0\nM 0\nM !1\n".as_bytes(),
         &mut stdout,
         &mut stderr,
     );
 
     assert_eq!(status, 0);
-    assert_eq!(String::from_utf8(stdout).unwrap(), "0\n");
+    assert_eq!(String::from_utf8(stdout).unwrap(), "11\n");
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
 }
 
 #[test]
-fn smoke_sampler_rejects_non_smoke_instructions() {
+fn sample_reads_and_writes_paths() {
+    let temp_dir = tempdir().expect("temp dir");
+    let input_path = temp_dir.path().join("input.stim");
+    let output_path = temp_dir.path().join("output.01");
+    std::fs::write(&input_path, "X 0\nMR 0\nMR 0\n").expect("write input");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "sample",
+            "--shots=1",
+            "--in",
+            input_path.to_str().expect("utf-8 path"),
+            "--out",
+            output_path.to_str().expect("utf-8 path"),
+        ],
+        "".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+    assert_eq!(
+        std::fs::read_to_string(output_path).expect("read output"),
+        "10\n"
+    );
+}
+
+#[test]
+fn sample_rejects_unsupported_tableau_semantics() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(
@@ -498,17 +534,17 @@ fn smoke_sampler_rejects_non_smoke_instructions() {
     assert!(
         String::from_utf8(stderr)
             .unwrap()
-            .contains("only supports M and MZ")
+            .contains("deterministic M8 sampler subset does not support H")
     );
 }
 
 #[test]
-fn smoke_sampler_is_hidden_from_public_help() {
+fn sample_is_visible_in_public_help() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(["stab", "--help"], "".as_bytes(), &mut stdout, &mut stderr);
 
     assert_eq!(status, 0);
-    assert!(!String::from_utf8(stdout).unwrap().contains("sample"));
+    assert!(String::from_utf8(stdout).unwrap().contains("sample"));
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
 }

@@ -1,0 +1,302 @@
+use crate::{Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory};
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompiledSampler {
+    qubit_count: usize,
+    operations: Vec<SampleOperation>,
+}
+
+impl CompiledSampler {
+    pub fn compile(circuit: &Circuit) -> CircuitResult<Self> {
+        let mut operations = Vec::new();
+        compile_circuit(circuit, &mut operations)?;
+        Ok(Self {
+            qubit_count: circuit.count_qubits(),
+            operations,
+        })
+    }
+
+    pub fn sample_zero_one(&self, shots: usize) -> Vec<Vec<bool>> {
+        (0..shots).map(|_| self.sample_shot()).collect()
+    }
+
+    pub fn sample_zero_one_bytes(&self, shots: usize) -> Vec<u8> {
+        let mut output = Vec::new();
+        for sample in self.sample_zero_one(shots) {
+            for bit in sample {
+                output.push(if bit { b'1' } else { b'0' });
+            }
+            output.push(b'\n');
+        }
+        output
+    }
+
+    fn sample_shot(&self) -> Vec<bool> {
+        let mut frame = DeterministicFrame::new(self.qubit_count);
+        let mut measurements = Vec::new();
+        execute_operations(&self.operations, &mut frame, &mut measurements);
+        measurements
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum SampleOperation {
+    Toggle {
+        qubit: usize,
+    },
+    Reset {
+        qubit: usize,
+    },
+    Measure {
+        qubit: usize,
+        inverted: bool,
+        reset: bool,
+    },
+    Pad {
+        value: bool,
+    },
+    Repeat {
+        count: u64,
+        body: Vec<SampleOperation>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct DeterministicFrame {
+    z_values: Vec<bool>,
+}
+
+impl DeterministicFrame {
+    fn new(qubit_count: usize) -> Self {
+        Self {
+            z_values: vec![false; qubit_count],
+        }
+    }
+
+    fn toggle(&mut self, qubit: usize) {
+        if let Some(value) = self.z_values.get_mut(qubit) {
+            *value = !*value;
+        }
+    }
+
+    fn reset(&mut self, qubit: usize) {
+        if let Some(value) = self.z_values.get_mut(qubit) {
+            *value = false;
+        }
+    }
+
+    fn measure(&self, qubit: usize, inverted: bool) -> bool {
+        self.z_values.get(qubit).copied().unwrap_or(false) ^ inverted
+    }
+}
+
+fn compile_circuit(circuit: &Circuit, operations: &mut Vec<SampleOperation>) -> CircuitResult<()> {
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(instruction) => {
+                compile_instruction(instruction, operations)?;
+            }
+            CircuitItem::RepeatBlock(repeat) => {
+                let mut body = Vec::new();
+                compile_circuit(repeat.body(), &mut body)?;
+                operations.push(SampleOperation::Repeat {
+                    count: repeat.repeat_count().get(),
+                    body,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn compile_instruction(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+) -> CircuitResult<()> {
+    match instruction.gate().canonical_name() {
+        "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" | "DETECTOR" | "OBSERVABLE_INCLUDE" => Ok(()),
+        "I" | "Z" => Ok(()),
+        "X" | "Y" => {
+            for target in instruction.targets() {
+                operations.push(SampleOperation::Toggle {
+                    qubit: qubit_index(instruction, target)?,
+                });
+            }
+            Ok(())
+        }
+        "R" => {
+            for target in instruction.targets() {
+                operations.push(SampleOperation::Reset {
+                    qubit: qubit_index(instruction, target)?,
+                });
+            }
+            Ok(())
+        }
+        "M" | "MR" => compile_z_measurement(instruction, operations),
+        "MPAD" => compile_measurement_pads(instruction, operations),
+        _ if zero_probability_noise(instruction)? => Ok(()),
+        _ => Err(unsupported_sampler_instruction(instruction)),
+    }
+}
+
+fn compile_z_measurement(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+) -> CircuitResult<()> {
+    let flip = deterministic_measurement_flip(instruction)?;
+    let reset = instruction.gate().canonical_name() == "MR";
+    for target in instruction.targets() {
+        operations.push(SampleOperation::Measure {
+            qubit: qubit_index(instruction, target)?,
+            inverted: target.is_inverted_result_target() ^ flip,
+            reset,
+        });
+    }
+    Ok(())
+}
+
+fn compile_measurement_pads(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+) -> CircuitResult<()> {
+    let flip = deterministic_measurement_flip(instruction)?;
+    for target in instruction.targets() {
+        let Some(qubit) = target.qubit_id() else {
+            return Err(unsupported_sampler_instruction(instruction));
+        };
+        operations.push(SampleOperation::Pad {
+            value: (qubit.get() == 1) ^ flip,
+        });
+    }
+    Ok(())
+}
+
+fn deterministic_measurement_flip(instruction: &CircuitInstruction) -> CircuitResult<bool> {
+    match instruction.probability_argument()? {
+        None => Ok(false),
+        Some(probability) if probability.get() == 0.0 => Ok(false),
+        Some(probability) if probability.get() == 1.0 => Ok(true),
+        Some(_) => Err(unsupported_sampler_instruction(instruction)),
+    }
+}
+
+fn zero_probability_noise(instruction: &CircuitInstruction) -> CircuitResult<bool> {
+    if !matches!(
+        instruction.gate().category(),
+        GateCategory::Noise | GateCategory::HeraldedNoise
+    ) {
+        return Ok(false);
+    }
+    let Some(probabilities) = instruction.probability_arguments()? else {
+        return Ok(false);
+    };
+    Ok(probabilities
+        .iter()
+        .all(|probability| probability.get() == 0.0))
+}
+
+fn qubit_index(instruction: &CircuitInstruction, target: &crate::Target) -> CircuitResult<usize> {
+    let Some(qubit) = target.qubit_id() else {
+        return Err(unsupported_sampler_instruction(instruction));
+    };
+    usize::try_from(qubit.get()).map_err(|_| {
+        CircuitError::invalid_sampler_compilation(format!(
+            "qubit target {} cannot fit in this platform's usize",
+            qubit.get()
+        ))
+    })
+}
+
+fn execute_operations(
+    operations: &[SampleOperation],
+    frame: &mut DeterministicFrame,
+    measurements: &mut Vec<bool>,
+) {
+    for operation in operations {
+        match operation {
+            SampleOperation::Toggle { qubit } => frame.toggle(*qubit),
+            SampleOperation::Reset { qubit } => frame.reset(*qubit),
+            SampleOperation::Measure {
+                qubit,
+                inverted,
+                reset,
+            } => {
+                measurements.push(frame.measure(*qubit, *inverted));
+                if *reset {
+                    frame.reset(*qubit);
+                }
+            }
+            SampleOperation::Pad { value } => measurements.push(*value),
+            SampleOperation::Repeat { count, body } => {
+                for _ in 0..*count {
+                    execute_operations(body, frame, measurements);
+                }
+            }
+        }
+    }
+}
+
+fn unsupported_sampler_instruction(instruction: &CircuitInstruction) -> CircuitError {
+    CircuitError::invalid_sampler_compilation(format!(
+        "deterministic M8 sampler subset does not support {}",
+        instruction.gate().canonical_name()
+    ))
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    reason = "sampling unit tests use direct fixture parsing assertions for compact diagnostics"
+)]
+mod tests {
+    use super::*;
+
+    fn samples(input: &str, shots: usize) -> Vec<Vec<bool>> {
+        let circuit = Circuit::from_stim_str(input).expect("parse circuit");
+        CompiledSampler::compile(&circuit)
+            .expect("compile sampler")
+            .sample_zero_one(shots)
+    }
+
+    #[test]
+    fn samples_m8_basic_measurements_as_zeroes() {
+        assert_eq!(
+            samples(
+                include_str!("../../../oracle/fixtures/inputs/sample_basic.stim"),
+                2
+            ),
+            vec![vec![false, false], vec![false, false]]
+        );
+    }
+
+    #[test]
+    fn samples_x_and_inverted_measurements_like_command_sample() {
+        assert_eq!(samples("X 0\nM 0\n", 1), vec![vec![true]]);
+        assert_eq!(samples("M !0\n", 1), vec![vec![true]]);
+    }
+
+    #[test]
+    fn samples_reset_and_measure_reset_deterministically() {
+        assert_eq!(samples("X 0\nR 0\nM 0\n", 1), vec![vec![false]]);
+        assert_eq!(samples("X 0\nMR 0\nMR 0\n", 1), vec![vec![true, false]]);
+    }
+
+    #[test]
+    fn samples_repeat_blocks_without_flattening_during_compilation() {
+        assert_eq!(
+            samples("REPEAT 2 {\n    X 0\n    M 0\n}\n", 1),
+            vec![vec![true, false]]
+        );
+    }
+
+    #[test]
+    fn rejects_hadamard_until_tableau_sampling_lands() {
+        let circuit = Circuit::from_stim_str("H 0\nM 0\n").expect("parse circuit");
+        assert_eq!(
+            CompiledSampler::compile(&circuit),
+            Err(CircuitError::invalid_sampler_compilation(
+                "deterministic M8 sampler subset does not support H"
+            ))
+        );
+    }
+}
