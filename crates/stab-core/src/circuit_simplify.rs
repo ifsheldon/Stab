@@ -5,6 +5,10 @@ use crate::{
     RepeatBlock, SingleQubitClifford, StabilizerError, Tableau, Target,
 };
 
+/// Rewrites supported Clifford operations into the current base-gate subset.
+///
+/// M6 covers single-qubit Clifford gates and selected two-qubit Clifford gates used
+/// by the tableau milestone. Gates outside that subset are preserved verbatim.
 pub fn simplified_circuit(circuit: &Circuit) -> CircuitResult<Circuit> {
     let mut result = Circuit::new();
     append_simplified_circuit(circuit, &mut result)?;

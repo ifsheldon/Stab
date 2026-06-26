@@ -102,6 +102,42 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now makes comparator imple
 
 ## Open Entries
 
+## 2026-06-27 - M6: Random Generation Hook Ownership
+
+Status: Open
+Revealed by: milestone audit of the M6 stabilizer algebra implementation and benchmark rows.
+Current text: M6 requires random generation hooks and links upstream `tableau_random*`, Clifford random distribution, and stabilizers-to-tableau fuzz and perf coverage.
+Gap: the milestone does not define which Rust RNG type, seeding contract, distribution parity, or public random-constructor API must exist before Stab has simulator and sampling consumers.
+Proposed amendment: state that M6 must either introduce explicit deterministic random hooks for `CliffordString`, `PauliString`, and `Tableau` with documented seed and distribution contracts, or defer random generation to the first simulator/sampler milestone that consumes those hooks while keeping M6 deterministic algebra and iterator coverage.
+Resolution: pending plan update.
+
+## 2026-06-27 - M6: Util-Top Algorithm Subset Boundaries
+
+Status: Open
+Revealed by: milestone audit of M6 `circuit_flow_generators`, `has_flow`, `circuit_inverse_qec`, `simplified_circuit`, `mbqc_decomposition`, `circuit_vs_tableau`, and `stabilizers_to_tableau` rows.
+Current text: M6 links related util-top tests when their dependencies are in scope, but the oracle manifest records several rows as implemented with notes that defer measurement-rich, detector, noise, sampled-flow, full-gate, tableau-to-circuit, and fuzz variants.
+Gap: the milestone does not split deterministic unitary/tableau subset parity from full upstream util-top parity, so an implemented row can be misread as full Stim parity for the entire upstream file.
+Proposed amendment: split each related util-top row into explicit subcases owned by M6 and deferred subcases owned by the simulator, detector, or performance-hardening milestones; require public APIs for subset helpers to document unsupported semantics until the deferred rows are implemented.
+Resolution: pending plan update.
+
+## 2026-06-27 - M6: Stabilizers Versus Amplitudes Dependency
+
+Status: Open
+Revealed by: milestone audit of the M6 linked-test list and compatibility matrix.
+Current text: M6 lists `stabilizers_vs_amplitudes` as a related util-top test when dependencies are in scope.
+Gap: the plan does not say which amplitude-state or simulator dependency brings this row into scope, and no M6 fixture manifest row currently names the semantic subset that should be proven by the algebra milestone alone.
+Proposed amendment: either add a deterministic algebra-only fixture for the subcases that can be checked without an amplitude simulator, or move `stabilizers_vs_amplitudes` to the tableau simulator milestone with a clear dependency note.
+Resolution: pending plan update.
+
+## 2026-06-27 - M6: Stabilizer Benchmark Exact Workload Parity
+
+Status: Open
+Revealed by: milestone audit of `just bench::compare --milestone M6`.
+Current text: M6 requires `just bench::compare --milestone M6` to report Pauli, Clifford, tableau, tableau-iterator, and stabilizers-to-tableau workloads, while benchmark manifest rows point at upstream random, fuzz-like, and large-tableau perf filters.
+Gap: the milestone does not distinguish report-only deterministic Stab benchmark runners from exact parity with upstream random and 10K-qubit perf workloads.
+Proposed amendment: require M6 compare output to provide deterministic Stab-side timings and normalized rates for each M6 benchmark row, label non-exact benchmark workloads in compare notes, and defer exact random and large-tableau threshold parity to M12 performance hardening after random hooks and optimized tableau internals are specified.
+Resolution: pending plan update.
+
 ## 2026-06-27 - M6: Stabilizer Algebra Public View And Text Scope
 
 Status: Open

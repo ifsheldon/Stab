@@ -3,6 +3,10 @@ use crate::{
     RepeatBlock, Target,
 };
 
+/// Returns the inverse of a circuit made only from supported unitary Clifford gates.
+///
+/// Repeat blocks are inverted recursively. Non-unitary instructions return a circuit
+/// error instead of being skipped or approximated.
 pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
     let mut result = Circuit::new();
     for item in circuit.items().iter().rev() {
@@ -24,6 +28,10 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
     Ok(result)
 }
 
+/// Returns the currently implemented QEC inverse subset.
+///
+/// In M6 this delegates to `circuit_inverse_unitary`. Stim's QEC-specific inverse
+/// rewrites for measurements, resets, detectors, noise, and feedback are deferred.
 pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
     circuit_inverse_unitary(circuit)
 }

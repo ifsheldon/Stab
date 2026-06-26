@@ -30,6 +30,11 @@ impl Circuit {
             .unwrap_or(0)
     }
 
+    /// Converts the currently supported Clifford circuit subset into a tableau.
+    ///
+    /// M6 supports unitary Clifford operations, plus explicit ignore flags for noise,
+    /// measurements, and resets. Measurement feedback, detector semantics, and
+    /// simulator-backed tableau extraction are outside this helper's current contract.
     pub fn to_tableau(
         &self,
         ignore_noise: bool,
@@ -39,14 +44,27 @@ impl Circuit {
         crate::circuit_to_tableau(self, ignore_noise, ignore_measurement, ignore_reset)
     }
 
+    /// Returns the inverse of a unitary Clifford circuit.
+    ///
+    /// Non-unitary operations such as measurements, resets, detectors, and noise
+    /// return an error instead of being rewritten.
     pub fn inverse_unitary(&self) -> CircuitResult<Self> {
         crate::circuit_inverse_unitary(self)
     }
 
+    /// Returns the currently supported QEC inverse subset.
+    ///
+    /// This is intentionally equivalent to `inverse_unitary` in M6. Stim's richer
+    /// measurement, detector, feedback, and noise rewrites are deferred until those
+    /// semantic dependencies exist in Stab.
     pub fn inverse_qec(&self) -> CircuitResult<Self> {
         crate::circuit_inverse_qec(self)
     }
 
+    /// Returns a circuit rewritten into the current base-gate simplification subset.
+    ///
+    /// M6 decomposes supported single-qubit Clifford gates and selected two-qubit
+    /// Clifford gates. Unsupported gates are preserved verbatim.
     pub fn simplified(&self) -> CircuitResult<Self> {
         crate::simplified_circuit(self)
     }

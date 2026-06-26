@@ -3,7 +3,11 @@ use std::hint::black_box;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use stab_core::{BitMatrix, BitVec, Circuit, Gate, SparseXorVec};
+use stab_core::{
+    BitMatrix, BitVec, Circuit, CliffordString, Gate, PauliBasis, PauliSign, PauliString,
+    PauliStringIterator, SingleQubitClifford, SparseXorVec, TableauIterator,
+    stabilizers_to_tableau,
+};
 
 use crate::config::{PREFIX, STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
@@ -16,13 +20,23 @@ use crate::report::{
 use crate::root::RepoRoot;
 use crate::stim::{ensure_stim_binaries, validate_stim_source};
 
+#[cfg(not(test))]
 const STAB_COMPARE_ITERATIONS: usize = 128;
+#[cfg(test)]
+const STAB_COMPARE_ITERATIONS: usize = 1;
 const WORD_BITS: usize = u64::BITS as usize;
 const M5_BIT_TABLE_BITS: usize = 128;
 const M5_BITVEC_BITS: usize = 10_000;
 const M5_POPCOUNT_BITS: usize = 1024 * 256;
 const M5_SPARSE_ROWS_USIZE: usize = 1000;
 const M5_SPARSE_ROWS_U32: u32 = 1000;
+const M6_CLIFFORD_QUBITS: usize = 4096;
+const M6_PAULI_QUBITS: usize = 10_000;
+const M6_PAULI_ITER_QUBITS: usize = 16;
+const M6_PAULI_ITER_MAX_WEIGHT: usize = 3;
+const M6_TABLEAU_QUBITS: usize = 32;
+const M6_TABLEAU_ITER_QUBITS: usize = 2;
+const M6_STABILIZER_QUBITS: usize = 16;
 const M4_PARSE_FIXTURE: &str = include_str!("../../../oracle/fixtures/inputs/parser_basic.stim");
 const M4_STIM_PARSE_DENSE_FIXTURE: &str = r#"
 H 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
@@ -351,6 +365,121 @@ fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, 
                 })?,
             ]))
         }
+        "m6-clifford-string" => {
+            let left = m6_clifford_string(M6_CLIFFORD_QUBITS, 0);
+            let right = m6_clifford_string(M6_CLIFFORD_QUBITS, 7);
+            Ok(Some(vec![measure_stab(
+                "stab_clifford_string_multiply_4096",
+                || {
+                    let product = left
+                        .multiply(&right)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    black_box(product);
+                    Ok(())
+                },
+            )?]))
+        }
+        "m6-pauli-string" => {
+            let left = m6_pauli_string(M6_PAULI_QUBITS, 0x6eed_5eed);
+            let right = m6_pauli_string(M6_PAULI_QUBITS, 0x51ab_51ab);
+            Ok(Some(vec![
+                measure_stab("stab_pauli_string_multiply_10k", || {
+                    let product = left
+                        .multiply(&right)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    black_box(product);
+                    Ok(())
+                })?,
+                measure_stab("stab_pauli_string_commutes_10k", || {
+                    let commutes = left
+                        .commutes(&right)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    black_box(commutes);
+                    Ok(())
+                })?,
+            ]))
+        }
+        "m6-pauli-iter" => Ok(Some(vec![measure_stab(
+            "stab_pauli_iter_16q_weight_1_to_3",
+            || {
+                let mut count = 0_usize;
+                let mut total_weight = 0_usize;
+                for pauli in PauliStringIterator::new(
+                    M6_PAULI_ITER_QUBITS,
+                    1,
+                    M6_PAULI_ITER_MAX_WEIGHT,
+                    true,
+                    true,
+                    true,
+                ) {
+                    count += 1;
+                    total_weight += pauli.weight();
+                }
+                black_box((count, total_weight));
+                Ok(())
+            },
+        )?])),
+        "m6-tableau" => {
+            let circuit = m6_tableau_circuit(&row.id)?;
+            let tableau = circuit
+                .to_tableau(false, false, false)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let pauli = m6_pauli_string(M6_TABLEAU_QUBITS, 0x07ab_1ea7);
+            Ok(Some(vec![
+                measure_stab("stab_tableau_from_circuit_32q", || {
+                    let result = circuit
+                        .to_tableau(false, false, false)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    black_box(result);
+                    Ok(())
+                })?,
+                measure_stab("stab_tableau_inverse_32q", || {
+                    let inverse = tableau
+                        .inverse()
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    black_box(inverse);
+                    Ok(())
+                })?,
+                measure_stab("stab_tableau_apply_32q", || {
+                    let output = tableau
+                        .apply(&pauli)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    black_box(output);
+                    Ok(())
+                })?,
+            ]))
+        }
+        "m6-tableau-iter" => Ok(Some(vec![measure_stab(
+            "stab_tableau_iter_unsigned_2q",
+            || {
+                let mut count = 0_usize;
+                for tableau in TableauIterator::new(M6_TABLEAU_ITER_QUBITS, false)
+                    .map_err(|error| stab_runner_error(&row.id, error))?
+                {
+                    count += 1;
+                    black_box(tableau);
+                }
+                black_box(count);
+                Ok(())
+            },
+        )?])),
+        "m6-stabilizers-to-tableau" => {
+            let stabilizers = m6_z_stabilizers(M6_STABILIZER_QUBITS);
+            Ok(Some(vec![
+                measure_stab("stab_stabilizers_to_tableau_16q", || {
+                    let tableau = stabilizers_to_tableau(&stabilizers, false, false, false)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    black_box(tableau);
+                    Ok(())
+                })?,
+                measure_stab("stab_stabilizers_to_inverse_tableau_16q", || {
+                    let tableau = stabilizers_to_tableau(&stabilizers, false, false, true)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    black_box(tableau);
+                    Ok(())
+                })?,
+            ]))
+        }
         _ => Ok(None),
     }
 }
@@ -407,6 +536,82 @@ fn sparse_table_row_xor(table: &mut [SparseXorVec]) {
             target.xor_assign(source);
         }
     }
+}
+
+fn m6_clifford_string(num_qubits: usize, offset: usize) -> CliffordString {
+    CliffordString::from_gates((0..num_qubits).map(|index| m6_clifford_gate(index + offset)))
+}
+
+fn m6_clifford_gate(index: usize) -> SingleQubitClifford {
+    match index % 24 {
+        0 => SingleQubitClifford::I,
+        1 => SingleQubitClifford::X,
+        2 => SingleQubitClifford::Y,
+        3 => SingleQubitClifford::Z,
+        4 => SingleQubitClifford::H,
+        5 => SingleQubitClifford::SqrtYDag,
+        6 => SingleQubitClifford::Hnxz,
+        7 => SingleQubitClifford::SqrtY,
+        8 => SingleQubitClifford::S,
+        9 => SingleQubitClifford::Hxy,
+        10 => SingleQubitClifford::Hnxy,
+        11 => SingleQubitClifford::SDag,
+        12 => SingleQubitClifford::SqrtXDag,
+        13 => SingleQubitClifford::SqrtX,
+        14 => SingleQubitClifford::Hnyz,
+        15 => SingleQubitClifford::Hyz,
+        16 => SingleQubitClifford::Cxyz,
+        17 => SingleQubitClifford::Cxynz,
+        18 => SingleQubitClifford::Cnxyz,
+        19 => SingleQubitClifford::Cxnyz,
+        20 => SingleQubitClifford::Czyx,
+        21 => SingleQubitClifford::Cznyx,
+        22 => SingleQubitClifford::Cnzyx,
+        _ => SingleQubitClifford::Czynx,
+    }
+}
+
+fn m6_pauli_string(num_qubits: usize, seed: u64) -> PauliString {
+    let mut state = seed;
+    let bases = (0..num_qubits).map(|_| {
+        state = splitmix64(state);
+        PauliBasis::from_xz((state & 1) != 0, (state & 2) != 0)
+    });
+    PauliString::from_bases(PauliSign::Plus, bases)
+}
+
+fn m6_tableau_circuit(row_id: &str) -> Result<Circuit, BenchError> {
+    let mut text = String::new();
+    for index in 0..M6_TABLEAU_QUBITS {
+        text.push_str("H ");
+        text.push_str(&index.to_string());
+        text.push('\n');
+    }
+    for index in 0..M6_TABLEAU_QUBITS.saturating_sub(1) {
+        text.push_str("CX ");
+        text.push_str(&index.to_string());
+        text.push(' ');
+        text.push_str(&(index + 1).to_string());
+        text.push('\n');
+    }
+    Circuit::from_stim_str(&text).map_err(|error| stab_runner_error(row_id, error))
+}
+
+fn m6_z_stabilizers(num_qubits: usize) -> Vec<PauliString> {
+    (0..num_qubits)
+        .map(|target| {
+            PauliString::from_bases(
+                PauliSign::Plus,
+                (0..num_qubits).map(|index| {
+                    if index == target {
+                        PauliBasis::Z
+                    } else {
+                        PauliBasis::I
+                    }
+                }),
+            )
+        })
+        .collect()
 }
 
 fn words_for_bits(bit_len: usize) -> usize {
@@ -549,6 +754,25 @@ fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
             Some(((M5_SPARSE_ROWS_USIZE * 2) as f64, "row-xors/s"))
         }
         ("m5-sparse-xor", "stab_sparse_xor_item_7") => Some((7.0, "items/s")),
+        ("m6-clifford-string", "stab_clifford_string_multiply_4096") => {
+            Some((M6_CLIFFORD_QUBITS as f64, "single-qubit-products/s"))
+        }
+        ("m6-pauli-string", "stab_pauli_string_multiply_10k")
+        | ("m6-pauli-string", "stab_pauli_string_commutes_10k") => {
+            Some((M6_PAULI_QUBITS as f64, "qubits/s"))
+        }
+        ("m6-pauli-iter", "stab_pauli_iter_16q_weight_1_to_3") => Some((16_248.0, "paulis/s")),
+        ("m6-tableau", "stab_tableau_from_circuit_32q") => {
+            Some(((M6_TABLEAU_QUBITS * 2) as f64, "gates/s"))
+        }
+        ("m6-tableau", "stab_tableau_inverse_32q") | ("m6-tableau", "stab_tableau_apply_32q") => {
+            Some((M6_TABLEAU_QUBITS as f64, "qubits/s"))
+        }
+        ("m6-tableau-iter", "stab_tableau_iter_unsigned_2q") => Some((720.0, "tableaus/s")),
+        ("m6-stabilizers-to-tableau", "stab_stabilizers_to_tableau_16q")
+        | ("m6-stabilizers-to-tableau", "stab_stabilizers_to_inverse_tableau_16q") => {
+            Some((M6_STABILIZER_QUBITS as f64, "stabilizers/s"))
+        }
         _ => None,
     }
 }
@@ -560,6 +784,24 @@ fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m5-simd-bits" => Some(
             "partial-match: xor/not_zero use upstream 10k size; masked/range/copy are Stab M5 contract extras; randomize is not implemented in M5",
+        ),
+        "m6-clifford-string" => Some(
+            "report-only: deterministic 4096-qubit multiplication workload; upstream baseline uses a 10K CliffordString multiplication filter",
+        ),
+        "m6-pauli-string" => Some(
+            "partial-match: Stab reports 10K multiplication plus commutation; upstream baseline includes 10K, 100K, and 1M multiplication filters",
+        ),
+        "m6-pauli-iter" => Some(
+            "report-only: deterministic 16q weight-1-to-3 iterator workload; upstream filters cover different iterator ranges",
+        ),
+        "m6-tableau" => Some(
+            "report-only: Stab uses deterministic 32q circuit/tableau operations until M12 defines optimized random 10k-qubit parity thresholds",
+        ),
+        "m6-tableau-iter" => Some(
+            "report-only: deterministic unsigned 2q iterator workload; upstream baseline uses unsigned and signed 3q iterator filters",
+        ),
+        "m6-stabilizers-to-tableau" => Some(
+            "report-only: deterministic 16q conversion workload; upstream random/fuzz distribution remains M6 spec-follow-up input",
         ),
         _ => None,
     }
@@ -718,7 +960,11 @@ fn duration_seconds(value: f64, unit: &str) -> Option<f64> {
 
 #[cfg(test)]
 mod tests {
-    use super::{BaselineSummary, parse_stim_perf_line, summarize_baseline_row};
+    use super::{
+        BaselineSummary, compare_note, measurement_work, parse_stim_perf_line,
+        run_stab_compare_row, summarize_baseline_row,
+    };
+    use crate::manifest::{BenchmarkRow, Milestone, Runner};
     use crate::report::{BaselineReport, Measurement};
 
     #[test]
@@ -820,5 +1066,73 @@ mod tests {
             summarize_baseline_row(&report, "missing-row"),
             BaselineSummary::Missing
         );
+    }
+
+    #[test]
+    fn m6_benchmark_rows_have_stab_compare_runners() {
+        for (id, expected_measurements) in [
+            (
+                "m6-clifford-string",
+                &["stab_clifford_string_multiply_4096"][..],
+            ),
+            (
+                "m6-pauli-string",
+                &[
+                    "stab_pauli_string_multiply_10k",
+                    "stab_pauli_string_commutes_10k",
+                ][..],
+            ),
+            ("m6-pauli-iter", &["stab_pauli_iter_16q_weight_1_to_3"][..]),
+            (
+                "m6-tableau",
+                &[
+                    "stab_tableau_from_circuit_32q",
+                    "stab_tableau_inverse_32q",
+                    "stab_tableau_apply_32q",
+                ][..],
+            ),
+            ("m6-tableau-iter", &["stab_tableau_iter_unsigned_2q"][..]),
+            (
+                "m6-stabilizers-to-tableau",
+                &[
+                    "stab_stabilizers_to_tableau_16q",
+                    "stab_stabilizers_to_inverse_tableau_16q",
+                ][..],
+            ),
+        ] {
+            let row = BenchmarkRow {
+                id: id.to_string(),
+                milestone: Milestone::M6,
+                threshold_class: "report-only".to_string(),
+                runner: Runner::StimPerf,
+                upstream_source: "src/stim/stabilizers/test.perf.cc".to_string(),
+                stim_perf_filter: "test".to_string(),
+                argv: String::new(),
+                stdin_path: String::new(),
+                phase: "throughput".to_string(),
+                measurement: "stabilizers".to_string(),
+                description: "test row".to_string(),
+            };
+
+            let measurements = run_stab_compare_row(&row)
+                .expect("run compare row")
+                .expect("Stab runner");
+            let names = measurements
+                .iter()
+                .map(|measurement| measurement.name.as_str())
+                .collect::<Vec<_>>();
+
+            assert_eq!(names.as_slice(), expected_measurements);
+            assert!(
+                compare_note(id).is_some(),
+                "{id} should explain benchmark comparability"
+            );
+            for name in names {
+                assert!(
+                    measurement_work(id, name).is_some(),
+                    "{id}/{name} should report normalized work"
+                );
+            }
+        }
     }
 }

@@ -1,5 +1,9 @@
 use crate::{Circuit, CircuitError, CircuitResult, Flow, PauliBasis, PauliSign, PauliString};
 
+/// Returns unsigned stabilizer-flow generators for the supported unitary tableau subset.
+///
+/// The current M6 implementation derives generators from `Circuit::to_tableau`, so
+/// measurement, observable, detector, and noisy-flow semantics are not included.
 pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
     let tableau = circuit.to_tableau(false, false, false)?;
     let mut flows = Vec::with_capacity(tableau.len() * 2);
@@ -26,6 +30,10 @@ pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
     Ok(flows)
 }
 
+/// Checks unsigned stabilizer flows against the supported unitary tableau subset.
+///
+/// Flows with measurement or observable dependencies return `false` in M6 because
+/// those Stim flow semantics require later simulator and detector milestones.
 pub fn check_if_circuit_has_unsigned_stabilizer_flows(
     circuit: &Circuit,
     flows: &[Flow],

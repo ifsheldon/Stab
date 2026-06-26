@@ -1,5 +1,10 @@
 use super::{PauliBasis, PauliSign, PauliString, StabilizerError, StabilizerResult, Tableau};
 
+/// Synthesizes a tableau from a deterministic set of commuting stabilizer generators.
+///
+/// This M6 helper validates redundancy, underconstraint, and anticommutation according
+/// to the flags. Random generator distributions and the full upstream fuzz matrix are
+/// tracked as milestone follow-up scope rather than part of this function contract.
 pub fn stabilizers_to_tableau(
     stabilizers: &[PauliString],
     allow_redundant: bool,
