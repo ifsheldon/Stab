@@ -4,10 +4,10 @@ m4-circuit-canonical-print,M4,report-only,contract-only,src/stim/circuit/circuit
 m9-convert-measurements-dets,M9,report-only,stim-cli,src/stim/cmd/command_convert.test.cc,,convert|--in_format=01|--out_format=dets|--circuit=oracle/fixtures/inputs/m2d_basic.stim|--types=M,oracle/fixtures/inputs/m2d_basic_measurements.01,throughput,convert-cli,measurement conversion CLI throughput
 m4-gate-lookup,M4,report-only,stim-perf,src/stim/gates/gates.perf.cc,gate_data_hash_all_gate_names,,,analysis,gate-lookup,gate table lookup throughput
 m8-probability-util,M8,report-only,stim-perf,src/stim/util_bot/probability_util.perf.cc,biased_random_1024_*,,,throughput,random-probability,biased random probability utility throughput
-m5-simd-bit-table,M5,report-only,stim-perf,src/stim/mem/simd_bit_table.perf.cc,simd_bit_table_*,,,throughput,bit-table,bit table transpose workloads
-m5-simd-bits,M5,report-only,stim-perf,src/stim/mem/simd_bits.perf.cc,simd_bits_*,,,throughput,bit-vector,bit vector randomize xor and nonzero workloads
-m5-simd-word,M5,report-only,stim-perf,src/stim/mem/simd_word.perf.cc,simd_compat_popcnt,,,throughput,bit-word,popcount-like SIMD word workload
-m5-sparse-xor,M5,report-only,stim-perf,src/stim/mem/sparse_xor_vec.perf.cc,SparseXor*,,,throughput,sparse-xor,sparse XOR vector workloads
+m5-simd-bit-table,M5,report-only,stim-perf,src/stim/mem/simd_bit_table.perf.cc,simd_bit_table_*,,,throughput,bit-table,bit table transpose baseline plus Stab row-XOR and transpose contract-smoke rates
+m5-simd-bits,M5,report-only,stim-perf,src/stim/mem/simd_bits.perf.cc,simd_bits_*,,,throughput,bit-vector,bit vector xor and nonzero baseline plus Stab masked range and copy contract rates
+m5-simd-word,M5,report-only,stim-perf,src/stim/mem/simd_word.perf.cc,simd_compat_popcnt,,,throughput,bit-word,popcount-like bit-vector workload over the upstream bit count
+m5-sparse-xor,M5,report-only,stim-perf,src/stim/mem/sparse_xor_vec.perf.cc,SparseXor*,,,throughput,sparse-xor,sparse table row XOR and item XOR workloads
 m6-clifford-string,M6,report-only,stim-perf,src/stim/stabilizers/clifford_string.perf.cc,CliffordString_*,,,throughput,clifford-string,Clifford string multiplication workload
 m6-pauli-string,M6,report-only,stim-perf,src/stim/stabilizers/pauli_string.perf.cc,PauliString_*,,,throughput,pauli-string,Pauli string multiplication workloads
 m6-pauli-iter,M6,report-only,stim-perf,src/stim/stabilizers/pauli_string_iter.perf.cc,pauli_iter_*,,,throughput,pauli-iterator,Pauli string iterator workloads

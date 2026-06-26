@@ -34,7 +34,7 @@ Recommended workspace layout:
 | `stab-bench` | Criterion and CLI benchmark workloads. |
 | `ops` | Rust operational binaries for complex repository automation, compatibility workflows, reports, and release checks. |
 
-Pin `rust-toolchain.toml` to a specific Nightly and enable `#![feature(portable_simd)]` only inside the SIMD kernel modules. Keep non-kernel modules free of nightly-only APIs where possible.
+Pin `rust-toolchain.toml` to a specific Nightly, enable the required crate-level `#![feature(portable_simd)]` gate, and keep direct `std::simd` imports and operations inside the SIMD kernel modules. Keep non-kernel modules free of nightly-only APIs where possible.
 
 Operational commands should use a root `justfile` with modular files under `justfiles/`.
 Recipes should be thin dispatchers for common workflows such as Rust checks, oracle runs, benchmarks, compatibility reports, release checks, and maintenance tasks.
@@ -196,7 +196,7 @@ Objective: provide maintainable, portable high-throughput bit primitives that si
 
 Tasks:
 
-- Pin Nightly in `rust-toolchain.toml` and isolate `#![feature(portable_simd)]` in bit-kernel modules.
+- Pin Nightly in `rust-toolchain.toml`, enable the crate-level `#![feature(portable_simd)]` gate required by Rust, and isolate direct `std::simd` imports and operations in bit-kernel modules.
 - Implement `BitBlock`, `BitSlice`, `BitVec`, and `BitMatrix` around portable SIMD with typed dimensions and explicit ownership.
 - Implement XOR, AND, OR, row swap, masked row operations, range XOR, transposition helpers, bit-packed load/store, and popcount-like helpers.
 - Provide scalar reference kernels used by tests and comparator code.
@@ -212,8 +212,9 @@ Linked tests and benchmarks:
 Done criteria:
 
 - `cargo test -p stab-core bits` passes scalar-vs-SIMD property tests.
-- `rg "std::simd|portable_simd" crates/stab-core/src` shows direct SIMD usage only inside approved bit-kernel modules.
-- `just bench::compare --milestone M5` reports row XOR, matrix transpose, bit-packed copy, sparse XOR, and popcount-like workloads against the M3 baseline.
+- `rg "std::simd|portable_simd" crates/stab-core/src` shows the crate-level `portable_simd` feature gate and direct `std::simd` usage only inside approved bit-kernel modules.
+- `just bench::compare --milestone M5` reports normalized Stab rates and pinned Stim timings for row XOR, matrix transpose, bit-vector XOR and nonzero checks, sparse table row XOR, sparse item XOR, popcount-like workloads, and Stab-only M5 contract extras such as masked XOR, range XOR, and bit-packed copy.
+- M5 benchmark output must label non-comparable contract-smoke workloads; exact optimized 10k bit-table transpose parity is deferred to M12 performance hardening.
 - Any required architecture-specific fallback is documented as deferred and not implemented in this milestone.
 
 ### M6: Stabilizer Algebra

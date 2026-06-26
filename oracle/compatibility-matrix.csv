@@ -44,15 +44,15 @@ cpp-measure-record-batch-writer,src/stim/io/measure_record_batch_writer.test.cc,
 cpp-measure-record-reader,src/stim/io/measure_record_reader.test.cc,cxx-test,result-format,stab-core,M8,P0,exact-output,direct-rust,planned,,,M8 measurement reader text and bit packed behavior
 cpp-measure-record-writer,src/stim/io/measure_record_writer.test.cc,cxx-test,result-format,stab-core,M8,P0,exact-output,direct-rust,planned,,,M8 measurement writer text and bit packed behavior
 cpp-sparse-shot,src/stim/io/sparse_shot.test.cc,cxx-test,result-format,stab-core,M8,P0,exact-output,direct-rust,planned,,,M8 sparse shot result format tests
-cpp-bit-ref,src/stim/mem/bit_ref.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5 bit reference and boundary tests
+cpp-bit-ref,src/stim/mem/bit_ref.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5-owned bit reference and boundary subset; unsupported memory utility subcases are deferred by the M5 scope gap
 cpp-fixed-cap-vector,src/stim/mem/fixed_cap_vector.test.cc,cxx-test,container-utility,none,Future,Skip,skipped,skipped,skipped,,,Only port if Stab introduces an equivalent container
 cpp-monotonic-buffer,src/stim/mem/monotonic_buffer.test.cc,cxx-test,container-utility,none,Future,Skip,skipped,skipped,skipped,,,Only port if Stab introduces an equivalent allocator
-cpp-simd-bit-table,src/stim/mem/simd_bit_table.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5 portable SIMD bit table property tests
-cpp-simd-bits,src/stim/mem/simd_bits.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5 portable SIMD bit vector property tests
-cpp-simd-bits-range,src/stim/mem/simd_bits_range_ref.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5 range reference property tests
-cpp-simd-util,src/stim/mem/simd_util.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5 SIMD utility scalar equivalence tests
-cpp-simd-word,src/stim/mem/simd_word.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5 bit word scalar equivalence tests
-cpp-sparse-xor-vec,src/stim/mem/sparse_xor_vec.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5 sparse XOR vector property tests
+cpp-simd-bit-table,src/stim/mem/simd_bit_table.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5-owned bit table row operation and transposition subset; unsupported table utilities are deferred by the M5 scope gap
+cpp-simd-bits,src/stim/mem/simd_bits.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5-owned packed bit vector XOR AND OR masked XOR copy and tail subset; unsupported randomization shifts and predicates are deferred by the M5 scope gap
+cpp-simd-bits-range,src/stim/mem/simd_bits_range_ref.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5-owned range XOR and unaligned-tail subset; unsupported range randomization shifts addition and predicates are deferred by the M5 scope gap
+cpp-simd-util,src/stim/mem/simd_util.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5-owned masked XOR and popcount utility subset; unsupported storage helpers are deferred by the M5 scope gap
+cpp-simd-word,src/stim/mem/simd_word.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5-owned bit word scalar equivalence subset
+cpp-sparse-xor-vec,src/stim/mem/sparse_xor_vec.test.cc,cxx-test,bit-kernel,stab-core,M5,P0,property,direct-rust,planned,,,M5-owned sparse XOR vector symmetric-difference subset; broader helpers are deferred by the M5 scope gap
 cpp-graphlike-algo,src/stim/search/graphlike/algo.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,direct-rust,planned,,,M10 graphlike search algorithm tests
 cpp-graphlike-edge,src/stim/search/graphlike/edge.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,direct-rust,planned,,,M10 graphlike edge model tests
 cpp-graphlike-graph,src/stim/search/graphlike/graph.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,direct-rust,planned,,,M10 graphlike graph construction tests

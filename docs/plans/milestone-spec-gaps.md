@@ -19,6 +19,33 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Resolved Entries
 
+## 2026-06-27 - M5: Memory Test Subcase Granularity
+
+Status: Resolved
+Revealed by: full code review of the M5 oracle rows.
+Current text: the test-porting plan marked the Memory And Portable SIMD files as P0 for M5 without separating subcases that require APIs not introduced by the M5 portable bit core.
+Gap: file-level oracle rows could imply full parity for upstream memory tests that include randomization, shifts, addition, table text parsing, table slicing and resizing, lower-triangular inversion, subset/intersection predicates, and custom allocation/storage utilities.
+Proposed amendment: state that M5 owns only the subcases corresponding to the initial Stab bit-core API, and require unsupported upstream subcases to remain deferred until Stab introduces equivalent public or simulator-facing APIs.
+Resolution: `docs/plans/stim-test-porting-plan.md` now defines the M5-owned memory subcases, and `oracle/fixtures/manifest.csv` labels implemented M5 memory rows as M5-owned subsets rather than full-file parity.
+
+## 2026-06-27 - M5: Benchmark Compare Semantics
+
+Status: Resolved
+Revealed by: milestone audit of the M5 benchmark compare output.
+Current text: M5 required `just bench::compare --milestone M5` to report row XOR, matrix transpose, bit-packed copy, sparse XOR, and popcount-like workloads against the M3 baseline.
+Gap: the milestone did not distinguish exact upstream workload matches from Stab-only M5 contract-smoke workloads, did not require normalized Stab rates, and did not say whether the current simple matrix transpose helper had to match the upstream 10k optimized transpose benchmark.
+Proposed amendment: require M5 compare output to report normalized Stab rates and pinned Stim timings, label non-comparable contract-smoke workloads explicitly, and defer exact optimized 10k bit-table transpose parity to M12 performance hardening.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now names the normalized M5 benchmark evidence and the M12 deferral; `stab-bench compare` prints normalized rates and M5 comparability notes.
+
+## 2026-06-27 - M5: Portable SIMD Feature Gate Location
+
+Status: Resolved
+Revealed by: implementation of the M5 portable-SIMD bit kernel.
+Current text: M5 said to pin Nightly and isolate `#![feature(portable_simd)]` in bit-kernel modules.
+Gap: Rust feature gates are crate-level attributes, so `#![feature(portable_simd)]` cannot be placed only inside a module even when direct `std::simd` imports and operations are module-local.
+Proposed amendment: state that the crate-level feature gate is allowed at `stab-core` crate root, while direct `std::simd` imports and operations must stay in approved bit-kernel modules.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now distinguishes the crate-level feature gate from direct SIMD usage.
+
 ## 2026-06-27 - M4: Canonical Printer Benchmark Baseline
 
 Status: Resolved

@@ -193,6 +193,8 @@ Small features:
 ### Memory And Portable SIMD
 
 Action: P0 for M5, translated into Rust scalar-vs-portable-SIMD property tests plus focused unit tests.
+M5 owns the subcases that correspond to Stab's initial bit-core API: bit references, packed bit vectors, row operations, masked XOR, range XOR, transposition, copy/load-store boundaries, popcount-like helpers, twiddle helpers, and sparse XOR vectors.
+Upstream subcases for APIs not introduced in M5, such as randomization, shifts, addition, table text parsing, table slicing/concatenation/resizing, lower-triangular inversion, subset/intersection predicates, and custom allocation/storage utilities, must stay explicitly deferred until Stab introduces equivalent public or simulator-facing APIs.
 
 ```text
 src/stim/mem/bit_ref.test.cc
