@@ -1,4 +1,13 @@
 //! Core circuit, detector error model, and simulator primitives for Stab.
-//!
-//! Feature implementation starts after the M0 oracle lab can compare this
-//! workspace against the pinned Stim v1.16.0 source tree.
+
+mod circuit;
+mod error;
+mod gate;
+mod ids;
+mod target;
+
+pub use circuit::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
+pub use error::{CircuitError, CircuitResult};
+pub use gate::{Gate, GateCategory};
+pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};
+pub use target::{Pauli, Target};
