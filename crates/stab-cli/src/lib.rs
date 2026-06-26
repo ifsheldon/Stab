@@ -751,9 +751,6 @@ where
     W: Write,
 {
     let out_format = args.out_format.sample_format()?;
-    if args.seed.is_some() {
-        return Err(CliError::UnsupportedSampleFlag { flag: "--seed" });
-    }
     if args.skip_reference_sample || args.frame0 {
         return Err(CliError::UnsupportedSampleFlag {
             flag: "--skip_reference_sample",
@@ -769,7 +766,7 @@ where
     let circuit_text = std::str::from_utf8(&input_bytes).map_err(|_| CliError::InvalidUtf8Input)?;
     let circuit = Circuit::from_stim_str(circuit_text)?;
     let sampler = CompiledSampler::compile(&circuit)?;
-    let output = sampler.sample_bytes(args.shots, out_format);
+    let output = sampler.sample_bytes_with_seed(args.shots, out_format, args.seed);
     write_output(args.output.as_ref(), stdout, &output)
 }
 

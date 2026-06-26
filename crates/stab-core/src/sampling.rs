@@ -1,3 +1,6 @@
+use rand::rngs::SmallRng;
+use rand::{Rng, RngExt as _, SeedableRng as _};
+
 use crate::{Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -24,7 +27,12 @@ impl CompiledSampler {
     }
 
     pub fn sample_zero_one(&self, shots: usize) -> Vec<Vec<bool>> {
-        (0..shots).map(|_| self.sample_shot()).collect()
+        self.sample_zero_one_with_seed(shots, None)
+    }
+
+    pub fn sample_zero_one_with_seed(&self, shots: usize, seed: Option<u64>) -> Vec<Vec<bool>> {
+        let mut rng = sampler_rng(seed);
+        (0..shots).map(|_| self.sample_shot(&mut rng)).collect()
     }
 
     pub fn sample_zero_one_bytes(&self, shots: usize) -> Vec<u8> {
@@ -32,17 +40,30 @@ impl CompiledSampler {
     }
 
     pub fn sample_bytes(&self, shots: usize, format: SampleFormat) -> Vec<u8> {
+        self.sample_bytes_with_seed(shots, format, None)
+    }
+
+    pub fn sample_bytes_with_seed(
+        &self,
+        shots: usize,
+        format: SampleFormat,
+        seed: Option<u64>,
+    ) -> Vec<u8> {
+        let mut rng = sampler_rng(seed);
         let mut output = Vec::new();
         for _ in 0..shots {
-            append_sample(&self.sample_shot(), format, &mut output);
+            append_sample(&self.sample_shot(&mut rng), format, &mut output);
         }
         output
     }
 
-    fn sample_shot(&self) -> Vec<bool> {
+    fn sample_shot<R>(&self, rng: &mut R) -> Vec<bool>
+    where
+        R: Rng,
+    {
         let mut frame = DeterministicFrame::new(self.qubit_count);
         let mut measurements = Vec::new();
-        execute_operations(&self.operations, &mut frame, &mut measurements);
+        execute_operations(&self.operations, &mut frame, &mut measurements, rng);
         measurements
     }
 }
@@ -62,6 +83,10 @@ enum SampleOperation {
     },
     Pad {
         value: bool,
+    },
+    ProbabilisticToggle {
+        qubit: usize,
+        probability: f64,
     },
     Repeat {
         count: u64,
@@ -96,6 +121,10 @@ impl DeterministicFrame {
     fn measure(&self, qubit: usize, inverted: bool) -> bool {
         self.z_values.get(qubit).copied().unwrap_or(false) ^ inverted
     }
+}
+
+fn sampler_rng(seed: Option<u64>) -> SmallRng {
+    SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random))
 }
 
 fn append_sample(sample: &[bool], format: SampleFormat, output: &mut Vec<u8>) {
@@ -179,6 +208,7 @@ fn compile_instruction(
         }
         "M" | "MR" => compile_z_measurement(instruction, operations),
         "MPAD" => compile_measurement_pads(instruction, operations),
+        "X_ERROR" | "Y_ERROR" => compile_single_qubit_x_basis_noise(instruction, operations),
         _ if zero_probability_noise(instruction)? => Ok(()),
         _ => Err(unsupported_sampler_instruction(instruction)),
     }
@@ -214,6 +244,32 @@ fn compile_measurement_pads(
         });
     }
     Ok(())
+}
+
+fn compile_single_qubit_x_basis_noise(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+) -> CircuitResult<()> {
+    let probability = single_probability_argument(instruction)?;
+    for target in instruction.targets() {
+        operations.push(SampleOperation::ProbabilisticToggle {
+            qubit: qubit_index(instruction, target)?,
+            probability: probability.get(),
+        });
+    }
+    Ok(())
+}
+
+fn single_probability_argument(
+    instruction: &CircuitInstruction,
+) -> CircuitResult<crate::Probability> {
+    let Some(probabilities) = instruction.probability_arguments()? else {
+        return Err(unsupported_sampler_instruction(instruction));
+    };
+    match probabilities.as_slice() {
+        [probability] => Ok(*probability),
+        _ => Err(unsupported_sampler_instruction(instruction)),
+    }
 }
 
 fn deterministic_measurement_flip(instruction: &CircuitInstruction) -> CircuitResult<bool> {
@@ -256,6 +312,7 @@ fn execute_operations(
     operations: &[SampleOperation],
     frame: &mut DeterministicFrame,
     measurements: &mut Vec<bool>,
+    rng: &mut impl Rng,
 ) {
     for operation in operations {
         match operation {
@@ -272,9 +329,14 @@ fn execute_operations(
                 }
             }
             SampleOperation::Pad { value } => measurements.push(*value),
+            SampleOperation::ProbabilisticToggle { qubit, probability } => {
+                if rng.random_bool(*probability) {
+                    frame.toggle(*qubit);
+                }
+            }
             SampleOperation::Repeat { count, body } => {
                 for _ in 0..*count {
-                    execute_operations(body, frame, measurements);
+                    execute_operations(body, frame, measurements, rng);
                 }
             }
         }
@@ -348,6 +410,22 @@ mod tests {
         assert_eq!(
             sampler.sample_bytes(2, SampleFormat::Hits),
             b"2,3,5\n2,3,5\n"
+        );
+    }
+
+    #[test]
+    fn seeded_x_error_sampling_is_reproducible_and_statistical() {
+        let circuit = Circuit::from_stim_str("X_ERROR(0.25) 0\nM 0\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+        let first = sampler.sample_zero_one_with_seed(1000, Some(5));
+        let second = sampler.sample_zero_one_with_seed(1000, Some(5));
+        assert_eq!(first, second);
+
+        let hits = first.iter().filter(|shot| shot == &&vec![true]).count();
+        assert!(
+            (175..=325).contains(&hits),
+            "expected roughly 250 noisy hits, got {hits}"
         );
     }
 

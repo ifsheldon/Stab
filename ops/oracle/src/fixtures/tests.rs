@@ -1,6 +1,7 @@
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement, Milestone,
-    RunMode, is_recordable, run_core_fixture, run_direct_rust_fixture, validate_fixture_path,
+    RunMode, is_recordable, run_core_fixture, run_direct_rust_fixture, statistical,
+    validate_fixture_path,
 };
 
 const MANIFEST_CSV: &str = include_str!("../../../../oracle/fixtures/manifest.csv");
@@ -190,6 +191,44 @@ fn validation_rejects_statistical_row_without_plan() {
         error
             .to_string()
             .contains("comparator needs structural or statistical plan text")
+    );
+}
+
+#[test]
+fn binomial_statistical_comparator_accepts_samples_within_tolerance() {
+    let plan = "sample_count=1000; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
+    let mut stdout = Vec::new();
+    stdout.extend(std::iter::repeat_n(b"1\n", 250).flatten());
+    stdout.extend(std::iter::repeat_n(b"0\n", 750).flatten());
+
+    assert_eq!(
+        statistical::compare_binomial_statistical_plan(plan, &stdout),
+        None
+    );
+}
+
+#[test]
+fn binomial_statistical_comparator_rejects_samples_outside_tolerance() {
+    let plan = "sample_count=1000; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
+    let mut stdout = Vec::new();
+    stdout.extend(std::iter::repeat_n(b"1\n", 500).flatten());
+    stdout.extend(std::iter::repeat_n(b"0\n", 500).flatten());
+
+    assert!(
+        statistical::compare_binomial_statistical_plan(plan, &stdout)
+            .expect("statistical rejection")
+            .contains("outside 5 sigma")
+    );
+}
+
+#[test]
+fn binomial_statistical_comparator_rejects_non_bit_output() {
+    let plan = "tolerate binomial p=0.25 within 5 sigma";
+
+    assert!(
+        statistical::compare_binomial_statistical_plan(plan, b"shot M0\n")
+            .expect("statistical rejection")
+            .contains("expected one 0/1 bit per shot")
     );
 }
 

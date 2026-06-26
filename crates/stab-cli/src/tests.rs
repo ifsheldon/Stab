@@ -582,6 +582,42 @@ fn sample_rejects_binary_formats_until_m8_result_writers_land() {
 }
 
 #[test]
+fn sample_seed_makes_noisy_x_error_reproducible() {
+    let input = include_bytes!("../../../oracle/fixtures/inputs/sample_noisy.stim").as_slice();
+
+    let mut first_stdout = Vec::new();
+    let mut first_stderr = Vec::new();
+    let first_status = run_from(
+        ["stab", "sample", "--shots=1000", "--seed=5"],
+        input,
+        &mut first_stdout,
+        &mut first_stderr,
+    );
+
+    let mut second_stdout = Vec::new();
+    let mut second_stderr = Vec::new();
+    let second_status = run_from(
+        ["stab", "sample", "--shots=1000", "--seed=5"],
+        input,
+        &mut second_stdout,
+        &mut second_stderr,
+    );
+
+    assert_eq!(first_status, 0);
+    assert_eq!(second_status, 0);
+    assert_eq!(first_stdout, second_stdout);
+    assert_eq!(String::from_utf8(first_stderr).unwrap(), "");
+    assert_eq!(String::from_utf8(second_stderr).unwrap(), "");
+
+    let stdout = String::from_utf8(first_stdout).unwrap();
+    let hits = stdout.lines().filter(|line| *line == "1").count();
+    assert!(
+        (175..=325).contains(&hits),
+        "expected roughly 250 noisy hits, got {hits}"
+    );
+}
+
+#[test]
 fn sample_reads_and_writes_paths() {
     let temp_dir = tempdir().expect("temp dir");
     let input_path = temp_dir.path().join("input.stim");
