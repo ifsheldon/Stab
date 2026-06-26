@@ -137,24 +137,43 @@ impl CircuitInstruction {
 pub struct RepeatBlock {
     repeat_count: RepeatCount,
     body: Circuit,
+    tag: Option<String>,
 }
 
 impl RepeatBlock {
-    pub fn new(repeat_count: RepeatCount, body: Circuit) -> Self {
-        Self { repeat_count, body }
+    /// Creates a `REPEAT` block with an optional Stim tag.
+    pub fn new(repeat_count: RepeatCount, body: Circuit, tag: Option<String>) -> Self {
+        Self {
+            repeat_count,
+            body,
+            tag,
+        }
     }
 
+    /// Returns how many times the block body repeats.
     pub fn repeat_count(&self) -> RepeatCount {
         self.repeat_count
     }
 
+    /// Returns the repeated body circuit.
     pub fn body(&self) -> &Circuit {
         &self.body
     }
 
+    /// Returns the optional tag attached to this `REPEAT` block.
+    pub fn tag(&self) -> Option<&str> {
+        self.tag.as_deref()
+    }
+
     fn write_stim(&self, out: &mut String, indent: usize) {
         write_indent(out, indent);
-        out.push_str("REPEAT ");
+        out.push_str("REPEAT");
+        if let Some(tag) = &self.tag {
+            out.push('[');
+            write_escaped_tag(out, tag);
+            out.push(']');
+        }
+        out.push(' ');
         out.push_str(&self.repeat_count.get().to_string());
         out.push_str(" {\n");
         self.body.write_stim(out, indent + 4);
@@ -227,14 +246,19 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_repeat(&mut self, line_number: usize, line: &str) -> CircuitResult<RepeatBlock> {
-        let mut parts = line.split_whitespace();
-        let name = parts
-            .next()
-            .ok_or_else(|| CircuitError::parse_line(line_number, "missing repeat instruction"))?;
+        let (name, rest) = parse_name(line_number, line)?;
+        if !name.eq_ignore_ascii_case("REPEAT") {
+            return Err(CircuitError::parse_line(
+                line_number,
+                "repeat blocks must be written as REPEAT <count> {",
+            ));
+        }
+        let (tag, rest) = parse_optional_tag(line_number, rest)?;
+        let mut parts = rest.split_whitespace();
         let count = parts
             .next()
             .ok_or_else(|| CircuitError::parse_line(line_number, "missing repeat count"))?;
-        if parts.next().is_some() || !name.eq_ignore_ascii_case("REPEAT") {
+        if parts.next().is_some() {
             return Err(CircuitError::parse_line(
                 line_number,
                 "repeat blocks must be written as REPEAT <count> {",
@@ -244,7 +268,7 @@ impl<'a> Parser<'a> {
             .parse::<u64>()
             .map_err(|_| CircuitError::parse_line(line_number, "invalid repeat count"))?;
         let body = self.parse_block(true)?;
-        Ok(RepeatBlock::new(RepeatCount::try_new(count)?, body))
+        Ok(RepeatBlock::new(RepeatCount::try_new(count)?, body, tag))
     }
 }
 

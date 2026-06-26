@@ -83,6 +83,65 @@ fn parses_targets_tags_arguments_comments_and_repeat_blocks() {
 }
 
 #[test]
+fn parses_and_prints_repeat_tags_like_stim() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/circuit.test.cc parse_tag.
+    let circuit = Circuit::from_stim_str(
+        r#"
+            X_ERROR[test](0.125)
+            X_ERROR[no_fuse](0.125) 1
+            X_ERROR(0.125) 2
+            X_ERROR[](0.125) 3
+            REPEAT[looper] 5 {
+                CX[within] 0 1
+            }
+        "#,
+    )
+    .expect("parse tagged repeat");
+    let items = circuit.items();
+
+    assert_eq!(items.len(), 5);
+    let first = items
+        .first()
+        .and_then(CircuitItemExt::as_instruction)
+        .expect("first instruction");
+    let second = items
+        .get(1)
+        .and_then(CircuitItemExt::as_instruction)
+        .expect("second instruction");
+    let third = items
+        .get(2)
+        .and_then(CircuitItemExt::as_instruction)
+        .expect("third instruction");
+    let fourth = items
+        .get(3)
+        .and_then(CircuitItemExt::as_instruction)
+        .expect("fourth instruction");
+    let repeat = items
+        .get(4)
+        .and_then(CircuitItemExt::as_repeat_block)
+        .expect("repeat block");
+
+    assert_eq!(first.tag(), Some("test"));
+    assert_eq!(second.tag(), Some("no_fuse"));
+    assert_eq!(third.tag(), None);
+    assert_eq!(fourth.tag(), Some(""));
+    assert_eq!(repeat.tag(), Some("looper"));
+    assert_eq!(repeat.repeat_count(), RepeatCount::try_new(5).unwrap());
+    assert_eq!(
+        circuit.to_stim_string(),
+        concat!(
+            "X_ERROR[test](0.125)\n",
+            "X_ERROR[no_fuse](0.125) 1\n",
+            "X_ERROR(0.125) 2\n",
+            "X_ERROR[](0.125) 3\n",
+            "REPEAT[looper] 5 {\n",
+            "    CX[within] 0 1\n",
+            "}\n",
+        )
+    );
+}
+
+#[test]
 fn target_groups_follow_stim_circuit_instruction_semantics() {
     // Adapted from Stim v1.16.0 src/stim/circuit/circuit_instruction.test.cc.
     let circuit = Circuit::from_stim_str(
