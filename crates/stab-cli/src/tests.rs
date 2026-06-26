@@ -62,6 +62,36 @@ fn gen_surface_rotated_code_matches_m7_oracle_golden() {
 }
 
 #[test]
+fn gen_surface_rotated_x_code_matches_m7_oracle_golden() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "rotated_memory_x",
+            "--distance",
+            "2",
+            "--rounds",
+            "1",
+        ],
+        "".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!("../../../oracle/fixtures/expected/m7_gen_surface_rotated_x.stdout")
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
 fn gen_surface_unrotated_code_matches_m7_oracle_golden() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -87,6 +117,36 @@ fn gen_surface_unrotated_code_matches_m7_oracle_golden() {
     assert_eq!(
         String::from_utf8(stdout).unwrap(),
         include_str!("../../../oracle/fixtures/expected/m7_gen_surface_unrotated_z.stdout")
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn gen_surface_unrotated_x_code_matches_m7_oracle_golden() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "gen",
+            "--code",
+            "surface_code",
+            "--task",
+            "unrotated_memory_x",
+            "--distance",
+            "2",
+            "--rounds",
+            "1",
+        ],
+        "".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!("../../../oracle/fixtures/expected/m7_gen_surface_unrotated_x.stdout")
     );
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
 }
