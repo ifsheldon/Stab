@@ -32,6 +32,32 @@ impl Tableau {
         Self { xs, zs }
     }
 
+    pub(crate) fn from_output_columns_unchecked(
+        xs: Vec<PauliString>,
+        zs: Vec<PauliString>,
+    ) -> Self {
+        Self { xs, zs }
+    }
+
+    pub(crate) fn with_output_sign_mask(&self, mask: u128) -> Self {
+        let len = self.len();
+        let xs = self
+            .xs
+            .iter()
+            .enumerate()
+            .map(|(index, output)| output.with_sign(sign_from_bit(((mask >> index) & 1) != 0)))
+            .collect();
+        let zs = self
+            .zs
+            .iter()
+            .enumerate()
+            .map(|(index, output)| {
+                output.with_sign(sign_from_bit(((mask >> (len + index)) & 1) != 0))
+            })
+            .collect();
+        Self { xs, zs }
+    }
+
     pub fn gate1(x_output: &str, z_output: &str) -> StabilizerResult<Self> {
         let x = x_output.parse::<PauliString>()?;
         let z = z_output.parse::<PauliString>()?;

@@ -8,8 +8,8 @@ use std::str::FromStr;
 
 use proptest::prelude::*;
 use stab_core::{
-    CliffordString, FlexPauliString, Gate, PauliBasis, PauliPhase, PauliString,
-    PauliStringIterator, SingleQubitClifford, Tableau,
+    CliffordString, CommutingPauliStringIterator, FlexPauliString, Gate, PauliBasis, PauliPhase,
+    PauliString, PauliStringIterator, SingleQubitClifford, Tableau, TableauIterator,
 };
 
 #[test]
@@ -604,6 +604,106 @@ fn stabilizers_tableau_inverse_round_trips_composed_tableau() {
                 .sign()
                 .is_negative()
         );
+    }
+}
+
+#[test]
+fn stabilizers_tableau_iter_commuting_pauli_iterator_1q_matches_stim() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau_iter.test.cc.
+    let mut iter = CommutingPauliStringIterator::new(1).expect("commuting iterator");
+    assert_eq!(iter.next().expect("first").to_string(), "+X");
+    assert_eq!(iter.next().expect("second").to_string(), "+Z");
+    assert_eq!(iter.next().expect("third").to_string(), "+Y");
+    assert_eq!(iter.next(), None);
+
+    iter.restart_iter(&[], &[]).expect("restart unconstrained");
+    assert_eq!(iter.next().expect("first").to_string(), "+X");
+    assert_eq!(iter.next().expect("second").to_string(), "+Z");
+    assert_eq!(iter.next().expect("third").to_string(), "+Y");
+    assert_eq!(iter.next(), None);
+
+    let x = pauli("+X");
+    iter.restart_iter(std::slice::from_ref(&x), &[])
+        .expect("restart commute with X");
+    assert_eq!(iter.next().expect("commuting X").to_string(), "+X");
+    assert_eq!(iter.next(), None);
+
+    iter.restart_iter(&[], std::slice::from_ref(&x))
+        .expect("restart anticommute with X");
+    assert_eq!(iter.next().expect("anticommuting Z").to_string(), "+Z");
+    assert_eq!(iter.next().expect("anticommuting Y").to_string(), "+Y");
+    assert_eq!(iter.next(), None);
+}
+
+#[test]
+fn stabilizers_tableau_iter_commuting_pauli_iterator_constraints_match_stim() {
+    let commutators = vec![pauli("+Z_")];
+    let anticommutators = vec![pauli("+XX")];
+    let mut iter = CommutingPauliStringIterator::new(2).expect("commuting iterator");
+    iter.restart_iter(&commutators, &anticommutators)
+        .expect("restart constrained");
+    assert_eq!(
+        iter.map(|pauli| pauli.to_string()).collect::<Vec<_>>(),
+        vec!["+Z_", "+ZX", "+_Z", "+_Y"]
+    );
+
+    let mut iter = CommutingPauliStringIterator::new(4).expect("commuting iterator");
+    assert_eq!(
+        iter.by_ref()
+            .take(11)
+            .map(|pauli| pauli.to_string())
+            .collect::<Vec<_>>(),
+        vec![
+            "+X___", "+_X__", "+XX__", "+__X_", "+X_X_", "+_XX_", "+XXX_", "+Z___", "+Y___",
+            "+ZX__", "+YX__"
+        ]
+    );
+
+    let commutators = vec![pauli("+Z___"), pauli("+_Z__"), pauli("+___Z")];
+    let anticommutators = vec![pauli("+X___"), pauli("+_X__"), pauli("+___X")];
+    iter.restart_iter(&commutators, &anticommutators)
+        .expect("restart constrained");
+    assert_eq!(
+        iter.map(|pauli| pauli.to_string()).collect::<Vec<_>>(),
+        vec!["+ZZ_Z", "+ZZXZ", "+ZZZZ", "+ZZYZ"]
+    );
+}
+
+#[test]
+fn stabilizers_tableau_iter_counts_match_stim() {
+    let iter1 = TableauIterator::new(1, false).expect("1q unsigned tableau iterator");
+    assert_eq!(iter1.count(), 6);
+
+    let iter1_signs = TableauIterator::new(1, true).expect("1q signed tableau iterator");
+    assert_eq!(iter1_signs.count(), 24);
+
+    let iter2 = TableauIterator::new(2, false).expect("2q unsigned tableau iterator");
+    assert_eq!(iter2.count(), 720);
+}
+
+#[test]
+fn stabilizers_tableau_iter_signed_2q_tableaus_are_distinct() {
+    let iter = TableauIterator::new(2, true).expect("2q signed tableau iterator");
+    let seen = iter
+        .map(|tableau| tableau.to_string())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(seen.len(), 11520);
+}
+
+#[test]
+fn stabilizers_tableau_iter_clone_continues_from_same_state() {
+    let mut iter1 = TableauIterator::new(3, false).expect("3q tableau iterator");
+    let mut iter2 = TableauIterator::new(2, true).expect("2q tableau iterator");
+    assert!(iter2.next().is_some());
+    iter2 = iter1.clone();
+    assert!(iter2.next().is_some());
+
+    for _ in 0..100 {
+        iter2 = iter1.clone();
+        assert_eq!(iter1.next(), iter2.next());
+    }
+    for _ in 0..1000 {
+        assert_eq!(iter1.next(), iter2.next());
     }
 }
 

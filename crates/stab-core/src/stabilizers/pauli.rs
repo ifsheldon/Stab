@@ -238,6 +238,12 @@ impl PauliString {
         self.sign
     }
 
+    pub(crate) fn with_sign(&self, sign: PauliSign) -> Self {
+        let mut result = self.clone();
+        result.sign = sign;
+        result
+    }
+
     pub fn phase(&self) -> PauliPhase {
         self.sign.to_phase()
     }
