@@ -40,6 +40,7 @@
 - When adding a new dependency, search for its latest stable version on crates.io before adding it. Do not recall a version from your memory.
 - Use the workspace structure described in `docs/plans/rust-stim-drop-in-rewrite.md` unless the plan is deliberately revised.
 - Pin Nightly Rust in `rust-toolchain.toml` before using `portable_simd`.
+- This workspace currently pins `nightly-2026-06-20` so local and CI checks use the same toolchain.
 - Keep direct `std::simd` usage isolated in bit-kernel modules, with scalar reference implementations available for tests.
 - Prefer small crates and clear module boundaries over large cross-cutting modules.
 - Avoid public APIs that expose awkward lifetimes, unnecessary generic parameters, or borrowed internals that will be painful to wrap with Python bindings later.
@@ -57,6 +58,9 @@
 - Complex logic includes branching workflows, path validation, downloads, report generation, compatibility orchestration, benchmark orchestration, release checks, and any workflow that would otherwise become a multiline shell script.
 - Use `just maintenance::setup-hooks` to install the staged-aware Rust pre-commit hook into `.git/hooks/pre-commit`.
 - Use `just maintenance::pre-commit` to run the hook manually against the staged index.
+- Use `just oracle::version` to validate that `vendor/stim` is pinned to Stim v1.16.0, and use `just oracle::run --case smoke/help` plus `just oracle::run --case smoke/tiny-circuit` for M0 oracle smoke checks.
+- Treat the M0 `stab-cli sample` path as a hidden oracle smoke shim only; it is not real `stim sample` compatibility, which belongs to M8.
+- Use `just bench::smoke` for the M0 benchmark smoke check until M3 introduces the full benchmark harness.
 - The pre-commit hook must stay shell-script-free in this repository: build and install the Rust binary instead of adding a tracked shell launcher.
 - The hook should treat submodules as pointer updates, run Rust checks only for staged Rust-affecting paths, scan staged source blobs for oversized files, and check Stab's instruction-document policy only when instruction docs or `.gitmodules` change.
 - Every scanned `README.md` must have a colocated `AGENTS.md`, and every effective `AGENTS.md` source must have at least one `CLAUDE.md` symlink pointing to it.

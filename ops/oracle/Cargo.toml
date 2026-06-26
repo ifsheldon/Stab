@@ -1,0 +1,17 @@
+[package]
+name = "stab-oracle"
+version.workspace = true
+edition.workspace = true
+description = "Oracle orchestration for comparing Stab against pinned Stim."
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+clap = { workspace = true }
+thiserror = { workspace = true }
+wait-timeout = { workspace = true }

@@ -1,7 +1,9 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/stab-cli",
     "crates/stab-core",
+    "ops/oracle",
     "ops/pre-commit",
 ]
 default-members = [
@@ -22,9 +24,11 @@ ignore = "0.4.26"
 tempfile = "3.27.0"
 thiserror = "2.0.18"
 tokio = { version = "1.52.3", features = ["io-util", "macros", "process", "rt-multi-thread", "signal"] }
+wait-timeout = "0.2.1"
 
 [workspace.lints.rust]
 let_underscore_drop = "warn"
+linker_messages = "allow"
 missing_debug_implementations = "warn"
 redundant_imports = "warn"
 unsafe_code = "deny"

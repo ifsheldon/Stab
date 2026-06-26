@@ -1,14 +1,4 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+//! Core circuit, detector error model, and simulator primitives for Stab.
+//!
+//! Feature implementation starts after the M0 oracle lab can compare this
+//! workspace against the pinned Stim v1.16.0 source tree.
