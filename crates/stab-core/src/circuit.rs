@@ -28,6 +28,13 @@ impl Circuit {
         out
     }
 
+    /// Returns a copy of this circuit with all instruction and repeat-block tags removed.
+    pub fn without_tags(&self) -> Self {
+        Self {
+            items: self.items.iter().map(CircuitItem::without_tags).collect(),
+        }
+    }
+
     fn push(&mut self, item: CircuitItem) {
         self.items.push(item);
     }
@@ -46,6 +53,13 @@ pub enum CircuitItem {
 }
 
 impl CircuitItem {
+    fn without_tags(&self) -> Self {
+        match self {
+            Self::Instruction(instruction) => Self::Instruction(instruction.without_tag()),
+            Self::RepeatBlock(repeat) => Self::RepeatBlock(repeat.without_tags()),
+        }
+    }
+
     fn write_stim(&self, out: &mut String, indent: usize) {
         match self {
             Self::Instruction(instruction) => instruction.write_stim(out, indent),
@@ -110,6 +124,15 @@ impl CircuitInstruction {
         }
     }
 
+    fn without_tag(&self) -> Self {
+        Self {
+            gate: self.gate,
+            args: self.args.clone(),
+            targets: self.targets.clone(),
+            tag: None,
+        }
+    }
+
     fn write_stim(&self, out: &mut String, indent: usize) {
         write_indent(out, indent);
         out.push_str(self.gate.canonical_name());
@@ -163,6 +186,14 @@ impl RepeatBlock {
     /// Returns the optional tag attached to this `REPEAT` block.
     pub fn tag(&self) -> Option<&str> {
         self.tag.as_deref()
+    }
+
+    fn without_tags(&self) -> Self {
+        Self {
+            repeat_count: self.repeat_count,
+            body: self.body.without_tags(),
+            tag: None,
+        }
     }
 
     fn write_stim(&self, out: &mut String, indent: usize) {

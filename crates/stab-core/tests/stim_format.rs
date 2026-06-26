@@ -142,6 +142,34 @@ fn parses_and_prints_repeat_tags_like_stim() {
 }
 
 #[test]
+fn strips_tags_recursively_like_stim() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/circuit.test.cc without_tags.
+    let initial = Circuit::from_stim_str(
+        r#"
+            H[test-1] 0
+            REPEAT[test-2] 100 {
+                REPEAT[test-3] 100 {
+                    M[test-4](0.125) 0
+                }
+            }
+        "#,
+    )
+    .expect("parse tagged circuit");
+
+    assert_eq!(
+        initial.without_tags().to_stim_string(),
+        concat!(
+            "H 0\n",
+            "REPEAT 100 {\n",
+            "    REPEAT 100 {\n",
+            "        M(0.125) 0\n",
+            "    }\n",
+            "}\n",
+        )
+    );
+}
+
+#[test]
 fn target_groups_follow_stim_circuit_instruction_semantics() {
     // Adapted from Stim v1.16.0 src/stim/circuit/circuit_instruction.test.cc.
     let circuit = Circuit::from_stim_str(
