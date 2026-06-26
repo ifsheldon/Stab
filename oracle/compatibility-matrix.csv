@@ -34,10 +34,10 @@ cpp-diagram-timeline-3d,src/stim/diagram/timeline/timeline_3d_drawer.test.cc,cxx
 cpp-diagram-timeline-ascii,src/stim/diagram/timeline/timeline_ascii_drawer.test.cc,cxx-test,diagrams,none,Future,P3,deferred,deferred,deferred,diagrams,timeline rendering deferred beyond beta,Future diagram snapshot plan
 cpp-diagram-timeline-svg,src/stim/diagram/timeline/timeline_svg_drawer.test.cc,cxx-test,diagrams,none,Future,P3,deferred,deferred,deferred,diagrams,timeline rendering deferred beyond beta,Future diagram snapshot plan
 cpp-gates,src/stim/gates/gates.test.cc,cxx-test,gate-table,stab-core,M4,P0,structural,direct-rust,planned,,,M4 gate table alias arity inverse and validation tests
-cpp-gen-params,src/stim/gen/circuit_gen_params.test.cc,cxx-test,circuit-generation,stab-core,M7,P1,exact-output,oracle,planned,,,M7 generator parameter validation
-cpp-gen-color-code,src/stim/gen/gen_color_code.test.cc,cxx-test,circuit-generation,stab-core,M7,P1,exact-output,oracle,planned,,,M7 color code generator golden cases
-cpp-gen-rep-code,src/stim/gen/gen_rep_code.test.cc,cxx-test,circuit-generation,stab-core,M7,P1,exact-output,oracle,planned,,,M7 repetition code generator golden cases
-cpp-gen-surface-code,src/stim/gen/gen_surface_code.test.cc,cxx-test,circuit-generation,stab-core,M7,P1,exact-output,oracle,planned,,,M7 surface code generator golden cases
+cpp-gen-params,src/stim/gen/circuit_gen_params.test.cc,cxx-test,circuit-generation,stab-core,M7,P1,structural,direct-rust,planned,,,M7 generator parameter helper validation
+cpp-gen-color-code,src/stim/gen/gen_color_code.test.cc,cxx-test,circuit-generation,stab-core,M7,P1,structural,direct-rust,planned,,,M7 color code generator golden structural cases
+cpp-gen-rep-code,src/stim/gen/gen_rep_code.test.cc,cxx-test,circuit-generation,stab-core,M7,P1,structural,direct-rust,planned,,,M7 repetition code generator golden structural cases
+cpp-gen-surface-code,src/stim/gen/gen_surface_code.test.cc,cxx-test,circuit-generation,stab-core,M7,P1,structural,direct-rust,planned,,,M7 surface code generator golden structural cases
 cpp-measure-record,src/stim/io/measure_record.test.cc,cxx-test,result-format,stab-core,M8,P0,exact-output,direct-rust,planned,,,M8 measurement record format parsing and writing
 cpp-measure-record-batch,src/stim/io/measure_record_batch.test.cc,cxx-test,result-format,stab-core,M8,P0,exact-output,direct-rust,planned,,,M8 batched result format behavior
 cpp-measure-record-batch-writer,src/stim/io/measure_record_batch_writer.test.cc,cxx-test,result-format,stab-core,M8,P0,exact-output,direct-rust,planned,,,M8 batched writer byte layout

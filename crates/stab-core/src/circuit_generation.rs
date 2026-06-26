@@ -7,6 +7,8 @@ use crate::{
 
 mod color;
 mod surface;
+#[cfg(test)]
+mod tests;
 
 pub use color::generate_color_code_circuit;
 pub use surface::generate_surface_code_circuit;
