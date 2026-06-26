@@ -165,6 +165,7 @@ impl ArgRule {
 enum TargetRule {
     None,
     AnySingleQubit,
+    MeasurementPads,
     Pairs,
     RecOnly,
     QubitCoords,
@@ -186,6 +187,7 @@ impl TargetRule {
                 }
             }
             Self::AnySingleQubit => validate_targets(gate, targets, Target::is_qubit_like),
+            Self::MeasurementPads => validate_targets(gate, targets, is_measurement_pad_target),
             Self::Pairs => {
                 if !targets.len().is_multiple_of(2) {
                     return Err(CircuitError::InvalidTargetCount {
@@ -210,7 +212,9 @@ impl TargetRule {
     fn target_group_kind(self) -> TargetGroupKind {
         match self {
             Self::None => TargetGroupKind::None,
-            Self::AnySingleQubit | Self::RecOnly | Self::QubitCoords => TargetGroupKind::Singles,
+            Self::AnySingleQubit | Self::MeasurementPads | Self::RecOnly | Self::QubitCoords => {
+                TargetGroupKind::Singles
+            }
             Self::Pairs => TargetGroupKind::Pairs,
             Self::PauliProducts => TargetGroupKind::PauliProducts,
             Self::PauliList => TargetGroupKind::AllTargets,
@@ -225,6 +229,10 @@ pub(crate) enum TargetGroupKind {
     Pairs,
     PauliProducts,
     AllTargets,
+}
+
+fn is_measurement_pad_target(target: &Target) -> bool {
+    matches!(target, Target::Qubit { id, inverted: false } if id.get() <= 1)
 }
 
 fn validate_targets(
@@ -344,9 +352,9 @@ const GATES: &[GateInfo] = &[
     ),
     gate(
         "MPAD",
-        GateCategory::Collapsing,
-        ArgRule::Exact(0),
-        TargetRule::AnySingleQubit,
+        GateCategory::Annotation,
+        ArgRule::ZeroOrOneProbability,
+        TargetRule::MeasurementPads,
     ),
     gate(
         "MX",

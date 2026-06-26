@@ -401,6 +401,27 @@ fn parses_spp_and_spp_dag_pauli_products_like_stim() {
 }
 
 #[test]
+fn parses_mpad_optional_probability_like_stim() {
+    // Adapted from Stim v1.16.0 src/stim/gates/gate_data_annotations.cc MPAD examples.
+    let circuit = Circuit::from_stim_str("MPAD(0.125) 0\nMPAD 1\n").expect("parse MPAD");
+    assert_eq!(circuit.to_stim_string(), "MPAD(0.125) 0\nMPAD 1\n");
+
+    let gate = Gate::from_name("MPAD").expect("MPAD");
+    assert_eq!(gate.category(), GateCategory::Annotation);
+
+    for invalid in [
+        "MPAD(1.1) 0\n",
+        "MPAD(0.1, 0.2) 0\n",
+        "MPAD 2\n",
+        "MPAD !0\n",
+        "MPAD rec[-1]\n",
+        "MPAD sweep[0]\n",
+    ] {
+        assert!(Circuit::from_stim_str(invalid).is_err(), "{invalid}");
+    }
+}
+
+#[test]
 fn gates_lookup_is_case_insensitive_and_canonicalizes_aliases() {
     let h = Gate::from_name("h").expect("H");
     let h_xz = Gate::from_name("H_XZ").expect("H_XZ");
