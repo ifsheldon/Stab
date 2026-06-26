@@ -9,7 +9,7 @@ use std::str::FromStr;
 use proptest::prelude::*;
 use stab_core::{
     CliffordString, FlexPauliString, Gate, PauliBasis, PauliPhase, PauliString,
-    SingleQubitClifford, Tableau,
+    PauliStringIterator, SingleQubitClifford, Tableau,
 };
 
 #[test]
@@ -218,6 +218,102 @@ fn stabilizers_pauli_sparse_string_matches_stim() {
     assert_eq!(pauli("IIIXI").sparse_string(), "+X3");
     assert_eq!(pauli("IYIXZ").sparse_string(), "+Y1*X3*Z4");
     assert_eq!(pauli("-IYIXZ").sparse_string(), "-Y1*X3*Z4");
+}
+
+#[test]
+fn stabilizers_pauli_string_iter_small_cases_match_stim_order() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/pauli_string_iter.test.cc.
+    assert_eq!(collect_pauli_iter(3, 0, 0, true, true, true), vec!["+___"]);
+    assert_eq!(
+        collect_pauli_iter(2, 0, 1, true, true, true),
+        vec!["+__", "+X_", "+Y_", "+Z_", "+_X", "+_Y", "+_Z"]
+    );
+    assert_eq!(
+        collect_pauli_iter(3, 1, 1, true, true, true),
+        vec![
+            "+X__", "+Y__", "+Z__", "+_X_", "+_Y_", "+_Z_", "+__X", "+__Y", "+__Z"
+        ]
+    );
+    assert_eq!(
+        collect_pauli_iter(2, 2, 2, true, true, true),
+        vec![
+            "+XX", "+XY", "+XZ", "+YX", "+YY", "+YZ", "+ZX", "+ZY", "+ZZ"
+        ]
+    );
+    assert_eq!(
+        collect_pauli_iter(2, 0, 2, true, true, true),
+        vec![
+            "+__", "+X_", "+Y_", "+Z_", "+_X", "+_Y", "+_Z", "+XX", "+XY", "+XZ", "+YX", "+YY",
+            "+YZ", "+ZX", "+ZY", "+ZZ"
+        ]
+    );
+}
+
+#[test]
+fn stabilizers_pauli_string_iter_axis_filters_match_stim_order() {
+    assert_eq!(
+        collect_pauli_iter(2, 0, 2, false, true, true),
+        vec![
+            "+__", "+Y_", "+Z_", "+_Y", "+_Z", "+YY", "+YZ", "+ZY", "+ZZ"
+        ]
+    );
+    assert_eq!(
+        collect_pauli_iter(2, 0, 2, true, false, true),
+        vec![
+            "+__", "+X_", "+Z_", "+_X", "+_Z", "+XX", "+XZ", "+ZX", "+ZZ"
+        ]
+    );
+    assert_eq!(
+        collect_pauli_iter(2, 0, 2, true, true, false),
+        vec![
+            "+__", "+X_", "+Y_", "+_X", "+_Y", "+XX", "+XY", "+YX", "+YY"
+        ]
+    );
+    assert_eq!(
+        collect_pauli_iter(2, 0, 2, true, false, false),
+        vec!["+__", "+X_", "+_X", "+XX"]
+    );
+    assert_eq!(
+        collect_pauli_iter(2, 0, 2, false, true, false),
+        vec!["+__", "+Y_", "+_Y", "+YY"]
+    );
+    assert_eq!(
+        collect_pauli_iter(2, 0, 2, false, false, true),
+        vec!["+__", "+Z_", "+_Z", "+ZZ"]
+    );
+}
+
+#[test]
+fn stabilizers_pauli_string_iter_empty_and_restart_cases_match_stim() {
+    assert_eq!(
+        collect_pauli_iter(2, 0, 2, false, false, false),
+        vec!["+__"]
+    );
+    assert_eq!(
+        collect_pauli_iter(2, 1, 2, false, false, false),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        collect_pauli_iter(2, 3, 6, false, false, false),
+        Vec::<String>::new()
+    );
+    assert_eq!(
+        collect_pauli_iter(2, 2, 1, false, false, false),
+        Vec::<String>::new()
+    );
+
+    let mut iter = PauliStringIterator::new(2, 1, 1, true, false, false);
+    assert_eq!(
+        iter.by_ref()
+            .map(|pauli| pauli.to_string())
+            .collect::<Vec<_>>(),
+        vec!["+X_", "+_X"]
+    );
+    iter.restart();
+    assert_eq!(
+        iter.map(|pauli| pauli.to_string()).collect::<Vec<_>>(),
+        vec!["+X_", "+_X"]
+    );
 }
 
 #[test]
@@ -558,6 +654,21 @@ fn flex(text: &str) -> FlexPauliString {
 
 fn cnot_tableau() -> Tableau {
     Tableau::gate2("+XX", "+Z_", "+_X", "+ZZ").expect("CNOT tableau")
+}
+
+fn collect_pauli_iter(
+    num_qubits: usize,
+    min_weight: usize,
+    max_weight: usize,
+    allow_x: bool,
+    allow_y: bool,
+    allow_z: bool,
+) -> Vec<String> {
+    PauliStringIterator::new(
+        num_qubits, min_weight, max_weight, allow_x, allow_y, allow_z,
+    )
+    .map(|pauli| pauli.to_string())
+    .collect()
 }
 
 fn upstream_clifford_gate_order() -> Vec<SingleQubitClifford> {
