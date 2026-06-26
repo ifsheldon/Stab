@@ -422,6 +422,25 @@ fn parses_mpad_optional_probability_like_stim() {
 }
 
 #[test]
+fn parses_observable_include_pauli_targets_like_stim() {
+    // Adapted from Stim v1.16.0 src/stim/gates/gate_data_annotations.cc OBSERVABLE_INCLUDE examples.
+    let circuit = Circuit::from_stim_str("OBSERVABLE_INCLUDE(0) X0 Z1 rec[-1]\n")
+        .expect("parse observable include");
+    assert_eq!(
+        circuit.to_stim_string(),
+        "OBSERVABLE_INCLUDE(0) X0 Z1 rec[-1]\n"
+    );
+
+    for invalid in [
+        "OBSERVABLE_INCLUDE(0) 0\n",
+        "OBSERVABLE_INCLUDE(0) sweep[0]\n",
+        "OBSERVABLE_INCLUDE(0) X0*Z1\n",
+    ] {
+        assert!(Circuit::from_stim_str(invalid).is_err(), "{invalid}");
+    }
+}
+
+#[test]
 fn gates_lookup_is_case_insensitive_and_canonicalizes_aliases() {
     let h = Gate::from_name("h").expect("H");
     let h_xz = Gate::from_name("H_XZ").expect("H_XZ");

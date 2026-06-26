@@ -168,6 +168,7 @@ enum TargetRule {
     MeasurementPads,
     Pairs,
     RecOnly,
+    RecOrPauli,
     QubitCoords,
     PauliProducts,
     PauliList,
@@ -198,6 +199,9 @@ impl TargetRule {
                 validate_targets(gate, targets, Target::is_classical_or_qubit)
             }
             Self::RecOnly => validate_targets(gate, targets, Target::is_measurement_record),
+            Self::RecOrPauli => validate_targets(gate, targets, |target| {
+                target.is_measurement_record_target() || target.is_pauli_target()
+            }),
             Self::QubitCoords => validate_targets(gate, targets, Target::is_qubit_like),
             Self::PauliProducts => {
                 validate_targets(gate, targets, Target::is_pauli_product_part)?;
@@ -212,9 +216,11 @@ impl TargetRule {
     fn target_group_kind(self) -> TargetGroupKind {
         match self {
             Self::None => TargetGroupKind::None,
-            Self::AnySingleQubit | Self::MeasurementPads | Self::RecOnly | Self::QubitCoords => {
-                TargetGroupKind::Singles
-            }
+            Self::AnySingleQubit
+            | Self::MeasurementPads
+            | Self::RecOnly
+            | Self::RecOrPauli
+            | Self::QubitCoords => TargetGroupKind::Singles,
             Self::Pairs => TargetGroupKind::Pairs,
             Self::PauliProducts => TargetGroupKind::PauliProducts,
             Self::PauliList => TargetGroupKind::AllTargets,
@@ -324,7 +330,7 @@ const GATES: &[GateInfo] = &[
         "OBSERVABLE_INCLUDE",
         GateCategory::Annotation,
         ArgRule::UnsignedInteger,
-        TargetRule::RecOnly,
+        TargetRule::RecOrPauli,
     ),
     not_fusable_gate(
         "TICK",
