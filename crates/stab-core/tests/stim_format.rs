@@ -456,6 +456,78 @@ fn target_from_str_matches_stim_surface_forms() {
         Target::from_str("Z11").unwrap(),
         Target::pauli(Pauli::Z, QubitId::new(11).unwrap(), false)
     );
+    assert!(Target::from_str("4294967295").is_err());
+    assert!(Target::from_str("X4294967295").is_err());
+    assert!(Target::from_str("rec[0]").is_err());
+    assert!(Target::from_str("rec[-1073741824]").is_err());
+}
+
+#[test]
+fn target_typed_accessors_match_stim_gate_target_boundaries() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/gate_target.test.cc.
+    let qubit_id = QubitId::new(5).unwrap();
+    let qubit = Target::qubit(qubit_id, false);
+    assert_eq!(qubit.qubit_id(), Some(qubit_id));
+    assert_eq!(qubit.measurement_record_offset(), None);
+    assert_eq!(qubit.sweep_bit_id(), None);
+
+    let pauli_id = QubitId::new(7).unwrap();
+    let pauli = Target::pauli(Pauli::Y, pauli_id, true);
+    assert_eq!(pauli.qubit_id(), Some(pauli_id));
+    assert_eq!(pauli.measurement_record_offset(), None);
+    assert_eq!(pauli.sweep_bit_id(), None);
+
+    let offset = MeasureRecordOffset::try_new(-5).unwrap();
+    let record = Target::measurement_record(offset);
+    assert_eq!(record.qubit_id(), None);
+    assert_eq!(record.measurement_record_offset(), Some(offset));
+    assert_eq!(record.sweep_bit_id(), None);
+
+    let sweep = Target::sweep_bit(11);
+    assert_eq!(sweep.qubit_id(), None);
+    assert_eq!(sweep.measurement_record_offset(), None);
+    assert_eq!(sweep.sweep_bit_id(), Some(11));
+
+    let combiner = Target::combiner();
+    assert_eq!(combiner.qubit_id(), None);
+    assert_eq!(combiner.measurement_record_offset(), None);
+    assert_eq!(combiner.sweep_bit_id(), None);
+}
+
+#[test]
+fn target_inversion_matches_stim_gate_target() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/gate_target.test.cc inverse.
+    let qubit_id = QubitId::new(5).unwrap();
+    assert_eq!(
+        Target::qubit(qubit_id, false).try_inverted().unwrap(),
+        Target::qubit(qubit_id, true)
+    );
+    assert_eq!(
+        Target::qubit(qubit_id, true).try_inverted().unwrap(),
+        Target::qubit(qubit_id, false)
+    );
+
+    let pauli_id = QubitId::new(9).unwrap();
+    assert_eq!(
+        Target::pauli(Pauli::Z, pauli_id, false)
+            .try_inverted()
+            .unwrap(),
+        Target::pauli(Pauli::Z, pauli_id, true)
+    );
+    assert_eq!(
+        Target::pauli(Pauli::Z, pauli_id, true)
+            .try_inverted()
+            .unwrap(),
+        Target::pauli(Pauli::Z, pauli_id, false)
+    );
+
+    assert!(Target::combiner().try_inverted().is_err());
+    assert!(
+        Target::measurement_record(MeasureRecordOffset::try_new(-3).unwrap())
+            .try_inverted()
+            .is_err()
+    );
+    assert!(Target::sweep_bit(6).try_inverted().is_err());
 }
 
 #[test]

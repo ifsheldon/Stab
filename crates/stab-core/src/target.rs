@@ -82,6 +82,50 @@ impl Target {
         Self::Combiner
     }
 
+    /// Returns the qubit id carried by a qubit or Pauli target.
+    pub fn qubit_id(&self) -> Option<QubitId> {
+        match self {
+            Self::Qubit { id, .. } | Self::Pauli { id, .. } => Some(*id),
+            Self::MeasurementRecord { .. } | Self::SweepBit { .. } | Self::Combiner => None,
+        }
+    }
+
+    /// Returns the measurement-record offset carried by this target.
+    pub fn measurement_record_offset(&self) -> Option<MeasureRecordOffset> {
+        match self {
+            Self::MeasurementRecord { offset } => Some(*offset),
+            Self::Qubit { .. } | Self::SweepBit { .. } | Self::Pauli { .. } | Self::Combiner => {
+                None
+            }
+        }
+    }
+
+    /// Returns the sweep-bit id carried by this target.
+    pub fn sweep_bit_id(&self) -> Option<u32> {
+        match self {
+            Self::SweepBit { id } => Some(*id),
+            Self::Qubit { .. }
+            | Self::MeasurementRecord { .. }
+            | Self::Pauli { .. }
+            | Self::Combiner => None,
+        }
+    }
+
+    /// Returns this target with its inversion flag toggled.
+    pub fn try_inverted(&self) -> CircuitResult<Self> {
+        match self {
+            Self::Qubit { id, inverted } => Ok(Self::qubit(*id, !*inverted)),
+            Self::Pauli {
+                pauli,
+                id,
+                inverted,
+            } => Ok(Self::pauli(*pauli, *id, !*inverted)),
+            Self::MeasurementRecord { .. } | Self::SweepBit { .. } | Self::Combiner => Err(
+                CircuitError::invalid_domain_value("invertible target", self),
+            ),
+        }
+    }
+
     /// Returns true when this target is a plain qubit target.
     pub fn is_qubit_target(&self) -> bool {
         matches!(self, Self::Qubit { .. })
