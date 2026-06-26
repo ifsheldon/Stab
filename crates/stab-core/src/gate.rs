@@ -46,6 +46,10 @@ impl Gate {
         self.info.arg_rule.validate(self.info.name, args)?;
         self.info.target_rule.validate(self.info.name, targets)
     }
+
+    pub(crate) fn target_group_kind(self) -> TargetGroupKind {
+        self.info.target_rule.target_group_kind()
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -192,6 +196,25 @@ impl TargetRule {
             }),
         }
     }
+
+    fn target_group_kind(self) -> TargetGroupKind {
+        match self {
+            Self::None => TargetGroupKind::None,
+            Self::AnySingleQubit | Self::RecOnly | Self::QubitCoords => TargetGroupKind::Singles,
+            Self::Pairs => TargetGroupKind::Pairs,
+            Self::PauliProducts => TargetGroupKind::PauliProducts,
+            Self::PauliList => TargetGroupKind::AllTargets,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum TargetGroupKind {
+    None,
+    Singles,
+    Pairs,
+    PauliProducts,
+    AllTargets,
 }
 
 fn validate_targets(
@@ -690,7 +713,7 @@ const GATES: &[GateInfo] = &[
     gate(
         "MPP",
         GateCategory::PauliProduct,
-        ArgRule::Exact(0),
+        ArgRule::ZeroOrOneProbability,
         TargetRule::PauliProducts,
     ),
     gate(

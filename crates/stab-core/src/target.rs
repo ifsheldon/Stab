@@ -165,6 +165,9 @@ impl Display for Target {
 }
 
 pub(crate) fn parse_target_token(token: &str) -> CircuitResult<Vec<Target>> {
+    if token == "*" {
+        return Ok(vec![Target::combiner()]);
+    }
     if !token.contains('*') {
         return Ok(vec![Target::from_str(token)?]);
     }

@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 
+use crate::gate::TargetGroupKind;
 use crate::target::parse_target_token;
 use crate::{CircuitError, CircuitResult, Gate, RepeatCount, Target};
 
@@ -91,6 +92,22 @@ impl CircuitInstruction {
 
     pub fn tag(&self) -> Option<&str> {
         self.tag.as_deref()
+    }
+
+    pub fn target_groups(&self) -> Vec<&[Target]> {
+        match self.gate.target_group_kind() {
+            TargetGroupKind::None => Vec::new(),
+            TargetGroupKind::Singles => self.targets.chunks(1).collect(),
+            TargetGroupKind::Pairs => self.targets.chunks(2).collect(),
+            TargetGroupKind::PauliProducts => pauli_product_target_groups(&self.targets),
+            TargetGroupKind::AllTargets => {
+                if self.targets.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![self.targets.as_slice()]
+                }
+            }
+        }
     }
 
     fn write_stim(&self, out: &mut String, indent: usize) {
@@ -331,6 +348,22 @@ fn parse_targets(rest: &str) -> CircuitResult<Vec<Target>> {
         targets.extend(parse_target_token(token)?);
     }
     Ok(targets)
+}
+
+fn pauli_product_target_groups(targets: &[Target]) -> Vec<&[Target]> {
+    let mut groups = Vec::new();
+    let mut start = 0;
+    while start < targets.len() {
+        let mut end = start + 1;
+        while matches!(targets.get(end), Some(target) if target.is_combiner()) {
+            end = (end + 2).min(targets.len());
+        }
+        if let Some(group) = targets.get(start..end) {
+            groups.push(group);
+        }
+        start = end;
+    }
+    groups
 }
 
 fn strip_comment(line: &str) -> Option<&str> {

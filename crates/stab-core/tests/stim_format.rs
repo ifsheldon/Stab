@@ -83,6 +83,116 @@ fn parses_targets_tags_arguments_comments_and_repeat_blocks() {
 }
 
 #[test]
+fn target_groups_follow_stim_circuit_instruction_semantics() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/circuit_instruction.test.cc.
+    let circuit = Circuit::from_stim_str(
+        r#"
+            X
+            CX
+            S 1
+            H 0 2
+            TICK
+            CX 0 1 2 3
+            CY 3 5
+            SPP
+            MPP X0*X1*Z2 Z7 X5*X9
+            SPP Z5
+        "#,
+    )
+    .expect("parse target group fixture");
+    let items = circuit.items();
+
+    assert_eq!(
+        target_groups(items.first().unwrap()),
+        Vec::<Vec<Target>>::new()
+    );
+    assert_eq!(
+        target_groups(items.get(1).unwrap()),
+        Vec::<Vec<Target>>::new()
+    );
+    assert_eq!(
+        target_groups(items.get(2).unwrap()),
+        vec![vec![Target::qubit(QubitId::new(1).unwrap(), false)]]
+    );
+    assert_eq!(
+        target_groups(items.get(3).unwrap()),
+        vec![
+            vec![Target::qubit(QubitId::new(0).unwrap(), false)],
+            vec![Target::qubit(QubitId::new(2).unwrap(), false)]
+        ]
+    );
+    assert_eq!(
+        target_groups(items.get(4).unwrap()),
+        Vec::<Vec<Target>>::new()
+    );
+    assert_eq!(
+        target_groups(items.get(5).unwrap()),
+        vec![
+            vec![
+                Target::qubit(QubitId::new(0).unwrap(), false),
+                Target::qubit(QubitId::new(1).unwrap(), false)
+            ],
+            vec![
+                Target::qubit(QubitId::new(2).unwrap(), false),
+                Target::qubit(QubitId::new(3).unwrap(), false)
+            ],
+        ]
+    );
+    assert_eq!(
+        target_groups(items.get(6).unwrap()),
+        vec![vec![
+            Target::qubit(QubitId::new(3).unwrap(), false),
+            Target::qubit(QubitId::new(5).unwrap(), false)
+        ]]
+    );
+    assert_eq!(
+        target_groups(items.get(7).unwrap()),
+        Vec::<Vec<Target>>::new()
+    );
+    assert_eq!(
+        target_groups(items.get(8).unwrap()),
+        vec![
+            vec![
+                Target::pauli(Pauli::X, QubitId::new(0).unwrap(), false),
+                Target::combiner(),
+                Target::pauli(Pauli::X, QubitId::new(1).unwrap(), false),
+                Target::combiner(),
+                Target::pauli(Pauli::Z, QubitId::new(2).unwrap(), false),
+            ],
+            vec![Target::pauli(Pauli::Z, QubitId::new(7).unwrap(), false)],
+            vec![
+                Target::pauli(Pauli::X, QubitId::new(5).unwrap(), false),
+                Target::combiner(),
+                Target::pauli(Pauli::X, QubitId::new(9).unwrap(), false),
+            ],
+        ]
+    );
+    assert_eq!(
+        target_groups(items.get(9).unwrap()),
+        vec![vec![Target::pauli(
+            Pauli::Z,
+            QubitId::new(5).unwrap(),
+            false
+        )]]
+    );
+}
+
+#[test]
+fn parses_mpp_optional_probability_like_stim() {
+    let circuit = Circuit::from_stim_str("MPP(0.125) X1*Y2 Z3 * Z4\n").expect("parse MPP");
+    let instruction = circuit
+        .items()
+        .first()
+        .and_then(CircuitItemExt::as_instruction)
+        .expect("MPP instruction");
+
+    assert_eq!(instruction.args(), &[0.125]);
+    assert_eq!(circuit.to_stim_string(), "MPP(0.125) X1*Y2 Z3*Z4\n");
+    assert!(Circuit::from_stim_str("MPP(1.1) X1\n").is_err());
+    assert!(Circuit::from_stim_str("MPP(-0.5) X1\n").is_err());
+}
+
+#[test]
 fn gates_lookup_is_case_insensitive_and_canonicalizes_aliases() {
     let h = Gate::from_name("h").expect("H");
     let h_xz = Gate::from_name("H_XZ").expect("H_XZ");
@@ -159,4 +269,13 @@ impl CircuitItemExt for CircuitItem {
             Self::RepeatBlock(repeat) => Some(repeat),
         }
     }
+}
+
+fn target_groups(item: &CircuitItem) -> Vec<Vec<Target>> {
+    item.as_instruction()
+        .expect("instruction")
+        .target_groups()
+        .into_iter()
+        .map(<[Target]>::to_vec)
+        .collect()
 }
