@@ -17,6 +17,6 @@ pub use gate::{Gate, GateCategory};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};
 pub use stabilizers::{
     CliffordString, FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString,
-    SingleQubitClifford, StabilizerError, StabilizerResult,
+    SingleQubitClifford, StabilizerError, StabilizerResult, Tableau,
 };
 pub use target::{Pauli, Target};

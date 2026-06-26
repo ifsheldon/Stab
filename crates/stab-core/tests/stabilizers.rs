@@ -8,7 +8,8 @@ use std::str::FromStr;
 
 use proptest::prelude::*;
 use stab_core::{
-    CliffordString, FlexPauliString, Gate, PauliBasis, PauliPhase, PauliString, SingleQubitClifford,
+    CliffordString, FlexPauliString, Gate, PauliBasis, PauliPhase, PauliString,
+    SingleQubitClifford, Tableau,
 };
 
 #[test]
@@ -354,6 +355,102 @@ fn stabilizers_single_qubit_clifford_multiplication_is_associative() {
     }
 }
 
+#[test]
+fn stabilizers_tableau_identity_and_string_format_match_stim() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc identity and str.
+    let identity = Tableau::identity(4);
+    assert_eq!(
+        identity.to_string(),
+        "+-xz-xz-xz-xz-\n\
+         | ++ ++ ++ ++\n\
+         | XZ __ __ __\n\
+         | __ XZ __ __\n\
+         | __ __ XZ __\n\
+         | __ __ __ XZ"
+    );
+
+    assert_eq!(
+        Tableau::gate1("+X", "-Z").expect("gate1").to_string(),
+        "+-xz-\n\
+         | +-\n\
+         | XZ"
+    );
+}
+
+#[test]
+fn stabilizers_tableau_gate1_gate2_and_eval_y_match_stim() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc gate1 and eval_y.
+    let gate1 = Tableau::gate1("+X", "+Z").expect("gate1");
+    assert_eq!(gate1.x_output(0).expect("x output").to_string(), "+X");
+    assert_eq!(gate1.y_output(0).expect("y output").to_string(), "+Y");
+    assert_eq!(gate1.z_output(0).expect("z output").to_string(), "+Z");
+
+    let sqrt_z = Tableau::gate1("+Y", "+Z").expect("sqrt_z");
+    assert_eq!(sqrt_z.y_output(0).expect("sqrt_z y").to_string(), "-X");
+
+    let sqrt_x = Tableau::gate1("+X", "-Y").expect("sqrt_x");
+    assert_eq!(sqrt_x.y_output(0).expect("sqrt_x y").to_string(), "+Z");
+
+    let zcx = cnot_tableau();
+    assert_eq!(zcx.z_output(1).expect("z1 output").to_string(), "+ZZ");
+    assert_eq!(zcx.y_output(1).expect("y1 output").to_string(), "+ZY");
+}
+
+#[test]
+fn stabilizers_tableau_eval_matches_stim_examples() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc eval.
+    let cnot = cnot_tableau();
+    assert_eq!(cnot.apply(&pauli("-XX")).expect("eval").to_string(), "-X_");
+    assert_eq!(cnot.apply(&pauli("+XX")).expect("eval").to_string(), "+X_");
+    assert_eq!(cnot.apply(&pauli("+ZZ")).expect("eval").to_string(), "+_Z");
+    assert_eq!(cnot.apply(&pauli("+IY")).expect("eval").to_string(), "+ZY");
+    assert_eq!(cnot.apply(&pauli("+YI")).expect("eval").to_string(), "+YX");
+    assert_eq!(cnot.apply(&pauli("+YY")).expect("eval").to_string(), "-XZ");
+
+    let sqrt_x = Tableau::gate1("+X", "-Y").expect("sqrt_x");
+    assert_eq!(sqrt_x.apply(&pauli("+X")).expect("eval").to_string(), "+X");
+    assert_eq!(sqrt_x.apply(&pauli("+Y")).expect("eval").to_string(), "+Z");
+    assert_eq!(sqrt_x.apply(&pauli("+Z")).expect("eval").to_string(), "-Y");
+
+    let sqrt_z = Tableau::gate1("+Y", "+Z").expect("sqrt_z");
+    assert_eq!(sqrt_z.apply(&pauli("+X")).expect("eval").to_string(), "+Y");
+    assert_eq!(sqrt_z.apply(&pauli("+Y")).expect("eval").to_string(), "-X");
+    assert_eq!(sqrt_z.apply(&pauli("+Z")).expect("eval").to_string(), "+Z");
+}
+
+#[test]
+fn stabilizers_tableau_then_and_pauli_product_round_trip_match_stim() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc then and from_pauli_string.
+    let cnot = cnot_tableau();
+    assert_eq!(cnot.then(&cnot).expect("cnot twice"), Tableau::identity(2));
+
+    let pauli_string_empty = pauli("");
+    let tableau_empty =
+        Tableau::from_pauli_string(&pauli_string_empty).expect("empty pauli tableau");
+    assert_eq!(
+        tableau_empty
+            .to_pauli_string()
+            .expect("empty pauli round trip"),
+        pauli_string_empty
+    );
+
+    let pauli_string = pauli("+_XZX__YZZX");
+    let tableau = Tableau::from_pauli_string(&pauli_string).expect("pauli tableau");
+    assert_eq!(
+        tableau.to_pauli_string().expect("pauli round trip"),
+        pauli_string
+    );
+}
+
+proptest! {
+    #[test]
+    fn stabilizers_tableau_identity_preserves_dense_pauli_strings(body in bare_pauli_body_strategy(10)) {
+        let pauli = pauli(&body);
+        let identity = Tableau::identity(pauli.len());
+        prop_assert_eq!(identity.apply(&pauli).expect("identity eval"), pauli);
+    }
+}
+
 proptest! {
     #[test]
     fn stabilizers_pauli_product_is_associative_for_small_dense_strings(
@@ -388,6 +485,10 @@ fn pauli(text: &str) -> PauliString {
 
 fn flex(text: &str) -> FlexPauliString {
     FlexPauliString::from_str(text).expect("parse FlexPauliString")
+}
+
+fn cnot_tableau() -> Tableau {
+    Tableau::gate2("+XX", "+Z_", "+_X", "+ZZ").expect("CNOT tableau")
 }
 
 fn upstream_clifford_gate_order() -> Vec<SingleQubitClifford> {

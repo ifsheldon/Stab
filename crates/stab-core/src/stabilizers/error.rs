@@ -30,4 +30,10 @@ pub enum StabilizerError {
 
     #[error("invalid single-qubit Clifford product")]
     InvalidSingleQubitCliffordProduct,
+
+    #[error("Tableau index {index} is outside length {len}")]
+    TableauIndexOutOfRange { index: usize, len: usize },
+
+    #[error("Tableau is not a Pauli product")]
+    NotPauliProduct,
 }

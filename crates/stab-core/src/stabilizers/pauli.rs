@@ -4,6 +4,8 @@ use std::str::FromStr;
 use super::{StabilizerError, StabilizerResult};
 use crate::{BitError, BitVec};
 
+const WORD_BITS: usize = 64;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PauliSign {
     Plus,
@@ -206,17 +208,30 @@ impl PauliString {
         }
     }
 
-    pub fn from_bases(
-        sign: PauliSign,
-        bases: impl IntoIterator<Item = PauliBasis>,
-    ) -> StabilizerResult<Self> {
+    pub fn from_bases(sign: PauliSign, bases: impl IntoIterator<Item = PauliBasis>) -> Self {
         let bases = bases.into_iter().collect::<Vec<_>>();
-        let mut result = Self::identity(bases.len());
-        result.sign = sign;
-        for (index, basis) in bases.into_iter().enumerate() {
-            result.set(index, basis)?;
+        let mut x_words = vec![0_u64; bases.len().div_ceil(WORD_BITS)];
+        let mut z_words = vec![0_u64; bases.len().div_ceil(WORD_BITS)];
+        for (index, basis) in bases.iter().copied().enumerate() {
+            let word = index / WORD_BITS;
+            let bit = index % WORD_BITS;
+            let mask = 1_u64 << bit;
+            if basis.x_bit()
+                && let Some(word) = x_words.get_mut(word)
+            {
+                *word |= mask;
+            }
+            if basis.z_bit()
+                && let Some(word) = z_words.get_mut(word)
+            {
+                *word |= mask;
+            }
         }
-        Ok(result)
+        Self {
+            sign,
+            xs: BitVec::from_words_truncated(bases.len(), x_words),
+            zs: BitVec::from_words_truncated(bases.len(), z_words),
+        }
     }
 
     pub fn sign(&self) -> PauliSign {
@@ -477,7 +492,7 @@ impl FlexPauliString {
         bases: impl IntoIterator<Item = PauliBasis>,
     ) -> StabilizerResult<Self> {
         let imaginary = phase.is_imaginary();
-        let value = PauliString::from_bases(phase.sign(), bases)?;
+        let value = PauliString::from_bases(phase.sign(), bases);
         Ok(Self { value, imaginary })
     }
 
@@ -487,6 +502,11 @@ impl FlexPauliString {
             value,
             imaginary: phase.is_imaginary(),
         })
+    }
+
+    pub(crate) fn multiply_phase(self, phase: PauliPhase) -> StabilizerResult<Self> {
+        let phase = self.phase().multiply(phase);
+        Self::from_phase_and_bits(phase, self.value.xs, self.value.zs)
     }
 
     fn extra_imaginary_phase(&self) -> PauliPhase {
