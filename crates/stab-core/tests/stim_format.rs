@@ -323,6 +323,59 @@ fn target_from_str_matches_stim_surface_forms() {
     );
 }
 
+#[test]
+fn target_classification_matches_stim_gate_target() {
+    // Adapted from Stim v1.16.0 src/stim/circuit/gate_target.test.cc.
+    let qubit = Target::qubit(QubitId::new(2).unwrap(), false);
+    let inverted_qubit = Target::qubit(QubitId::new(3).unwrap(), true);
+    let sweep = Target::sweep_bit(5);
+    let rec = Target::measurement_record(MeasureRecordOffset::try_new(-7).unwrap());
+    let x = Target::pauli(Pauli::X, QubitId::new(11).unwrap(), false);
+    let inverted_x = Target::pauli(Pauli::X, QubitId::new(13).unwrap(), true);
+    let y = Target::pauli(Pauli::Y, QubitId::new(17).unwrap(), false);
+    let inverted_y = Target::pauli(Pauli::Y, QubitId::new(19).unwrap(), true);
+    let z = Target::pauli(Pauli::Z, QubitId::new(23).unwrap(), false);
+    let inverted_z = Target::pauli(Pauli::Z, QubitId::new(29).unwrap(), true);
+    let combiner = Target::combiner();
+
+    for target in [&qubit, &inverted_qubit, &sweep, &rec, &combiner] {
+        assert!(!target.is_pauli_target(), "{target}");
+    }
+    for target in [&x, &inverted_x, &y, &inverted_y, &z, &inverted_z] {
+        assert!(target.is_pauli_target(), "{target}");
+    }
+
+    assert!(sweep.is_classical_bit_target());
+    assert!(rec.is_classical_bit_target());
+    for target in [
+        &qubit,
+        &inverted_qubit,
+        &x,
+        &inverted_x,
+        &y,
+        &inverted_y,
+        &z,
+        &inverted_z,
+        &combiner,
+    ] {
+        assert!(!target.is_classical_bit_target(), "{target}");
+    }
+
+    assert!(qubit.is_qubit_target());
+    assert!(inverted_qubit.is_qubit_target());
+    assert!(sweep.is_sweep_bit_target());
+    assert!(rec.is_measurement_record_target());
+    assert!(combiner.is_combiner());
+    assert!(inverted_qubit.is_inverted_result_target());
+    assert!(inverted_x.is_inverted_result_target());
+    assert!(!rec.is_inverted_result_target());
+    assert!(x.is_x_target());
+    assert!(y.is_y_target());
+    assert!(z.is_z_target());
+    assert_eq!(x.pauli_type(), Some(Pauli::X));
+    assert_eq!(qubit.pauli_type(), None);
+}
+
 trait CircuitItemExt {
     fn as_instruction(&self) -> Option<&stab_core::CircuitInstruction>;
     fn as_repeat_block(&self) -> Option<&stab_core::RepeatBlock>;

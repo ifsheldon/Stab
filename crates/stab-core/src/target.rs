@@ -53,18 +53,22 @@ pub enum Target {
 }
 
 impl Target {
+    /// Creates a qubit target.
     pub fn qubit(id: QubitId, inverted: bool) -> Self {
         Self::Qubit { id, inverted }
     }
 
+    /// Creates a measurement-record target such as `rec[-1]`.
     pub fn measurement_record(offset: MeasureRecordOffset) -> Self {
         Self::MeasurementRecord { offset }
     }
 
+    /// Creates a sweep-bit target such as `sweep[0]`.
     pub fn sweep_bit(id: u32) -> Self {
         Self::SweepBit { id }
     }
 
+    /// Creates a Pauli product target such as `X0` or `!Z1`.
     pub fn pauli(pauli: Pauli, id: QubitId, inverted: bool) -> Self {
         Self::Pauli {
             pauli,
@@ -73,31 +77,107 @@ impl Target {
         }
     }
 
+    /// Creates the `*` combiner used inside Pauli product targets.
     pub fn combiner() -> Self {
         Self::Combiner
     }
 
-    pub(crate) fn is_qubit_like(&self) -> bool {
+    /// Returns true when this target is a plain qubit target.
+    pub fn is_qubit_target(&self) -> bool {
         matches!(self, Self::Qubit { .. })
     }
 
-    pub(crate) fn is_classical_or_qubit(&self) -> bool {
+    /// Returns true when this target is inverted with `!`.
+    pub fn is_inverted_result_target(&self) -> bool {
         matches!(
             self,
-            Self::Qubit { .. } | Self::SweepBit { .. } | Self::MeasurementRecord { .. }
+            Self::Qubit { inverted: true, .. } | Self::Pauli { inverted: true, .. }
         )
     }
 
-    pub(crate) fn is_measurement_record(&self) -> bool {
+    /// Returns true when this target is a measurement-record target.
+    pub fn is_measurement_record_target(&self) -> bool {
         matches!(self, Self::MeasurementRecord { .. })
     }
 
-    pub(crate) fn is_pauli_product_part(&self) -> bool {
-        matches!(self, Self::Pauli { .. } | Self::Combiner)
+    /// Returns true when this target is a sweep-bit target.
+    pub fn is_sweep_bit_target(&self) -> bool {
+        matches!(self, Self::SweepBit { .. })
     }
 
-    pub(crate) fn is_combiner(&self) -> bool {
+    /// Returns true when this target is one of `X`, `Y`, or `Z`.
+    pub fn is_pauli_target(&self) -> bool {
+        matches!(self, Self::Pauli { .. })
+    }
+
+    /// Returns true when this target is an `X` Pauli target.
+    pub fn is_x_target(&self) -> bool {
+        matches!(
+            self,
+            Self::Pauli {
+                pauli: Pauli::X,
+                ..
+            }
+        )
+    }
+
+    /// Returns true when this target is a `Y` Pauli target.
+    pub fn is_y_target(&self) -> bool {
+        matches!(
+            self,
+            Self::Pauli {
+                pauli: Pauli::Y,
+                ..
+            }
+        )
+    }
+
+    /// Returns true when this target is a `Z` Pauli target.
+    pub fn is_z_target(&self) -> bool {
+        matches!(
+            self,
+            Self::Pauli {
+                pauli: Pauli::Z,
+                ..
+            }
+        )
+    }
+
+    /// Returns true when this target refers to a classical bit source.
+    pub fn is_classical_bit_target(&self) -> bool {
+        matches!(self, Self::SweepBit { .. } | Self::MeasurementRecord { .. })
+    }
+
+    /// Returns true when this target is the `*` Pauli-product combiner.
+    pub fn is_combiner(&self) -> bool {
         matches!(self, Self::Combiner)
+    }
+
+    /// Returns the Pauli type for Pauli targets.
+    pub fn pauli_type(&self) -> Option<Pauli> {
+        match self {
+            Self::Pauli { pauli, .. } => Some(*pauli),
+            Self::Qubit { .. }
+            | Self::MeasurementRecord { .. }
+            | Self::SweepBit { .. }
+            | Self::Combiner => None,
+        }
+    }
+
+    pub(crate) fn is_qubit_like(&self) -> bool {
+        self.is_qubit_target()
+    }
+
+    pub(crate) fn is_classical_or_qubit(&self) -> bool {
+        self.is_qubit_target() || self.is_classical_bit_target()
+    }
+
+    pub(crate) fn is_measurement_record(&self) -> bool {
+        self.is_measurement_record_target()
+    }
+
+    pub(crate) fn is_pauli_product_part(&self) -> bool {
+        self.is_pauli_target() || self.is_combiner()
     }
 }
 
