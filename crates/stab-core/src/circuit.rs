@@ -43,6 +43,10 @@ impl Circuit {
         crate::circuit_inverse_unitary(self)
     }
 
+    pub fn simplified(&self) -> CircuitResult<Self> {
+        crate::simplified_circuit(self)
+    }
+
     /// Appends an instruction, fusing it into the previous instruction when Stim formatting allows it.
     pub fn append_instruction(&mut self, instruction: CircuitInstruction) {
         self.push_instruction(instruction);
