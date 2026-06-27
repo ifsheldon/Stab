@@ -6,6 +6,7 @@ mod error_decomp;
 mod folded;
 mod gauge;
 mod instructions;
+mod mpp;
 mod probabilities;
 
 use crate::{
@@ -181,6 +182,7 @@ impl Analyzer {
             "DEPOLARIZE2" => self.record_depolarize2(instruction),
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => self.record_measurements(instruction),
             "MXX" | "MYY" | "MZZ" => self.record_pair_measurements(instruction),
+            "MPP" => self.record_pauli_product_measurements(instruction),
             "R" | "RX" | "RY" => self.record_resets(instruction),
             "HERALDED_ERASE" => self.record_heralded_erase(instruction),
             "HERALDED_PAULI_CHANNEL_1" => self.record_heralded_pauli_channel1(instruction),

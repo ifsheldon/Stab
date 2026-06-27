@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, QubitId};
 
+use super::mpp::pauli_product_terms;
 use super::{AnalyzerBasis, DemTarget};
 
 pub(super) fn find_gauge_errors(
@@ -92,6 +93,7 @@ impl GaugeTracker {
             "MXX" => self.undo_pair_measurements(instruction, AnalyzerBasis::X),
             "MYY" => self.undo_pair_measurements(instruction, AnalyzerBasis::Y),
             "MZZ" => self.undo_pair_measurements(instruction, AnalyzerBasis::Z),
+            "MPP" => self.undo_pauli_product_measurements(instruction),
             "MR" => self.undo_measure_resets(instruction, AnalyzerBasis::Z),
             "MRX" => self.undo_measure_resets(instruction, AnalyzerBasis::X),
             "MRY" => self.undo_measure_resets(instruction, AnalyzerBasis::Y),
@@ -173,6 +175,19 @@ impl GaugeTracker {
             })?;
             let sensitivity = self.pop_record_sensitivity()?;
             let terms = [(left, basis), (right, basis)];
+            self.toggle_product_sensitivity(&terms, &sensitivity)?;
+            self.check_product_measurement_gauge(&terms)?;
+        }
+        Ok(())
+    }
+
+    fn undo_pauli_product_measurements(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<()> {
+        for group in instruction.target_groups().iter().rev() {
+            let terms = pauli_product_terms(instruction.gate().canonical_name(), group)?;
+            let sensitivity = self.pop_record_sensitivity()?;
             self.toggle_product_sensitivity(&terms, &sensitivity)?;
             self.check_product_measurement_gauge(&terms)?;
         }
