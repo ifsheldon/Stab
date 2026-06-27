@@ -14,22 +14,21 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 mod analyze_errors;
+mod detection;
 mod input;
 mod sample_dem;
 
 use analyze_errors::{AnalyzeErrorsArgs, run_analyze_errors};
 use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
+use detection::{DetectArgs, M2dArgs, run_detect, run_m2d};
 pub(crate) use input::read_limited_input;
 use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_core::{
     Circuit, CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask, CompiledSampler,
-    DetectionConversionOptions, DetectionConversionOutput, DetectionObservableOutputMode,
     GeneratedCircuit, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    SampleFormat, SurfaceCodeParams, SurfaceCodeTask, convert_measurements_to_detection_events,
-    generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
-    measurement_record_count, result_formats::read_measurement_records, sample_detection_events,
-    validate_detection_sampling_circuit, write_detection_records, write_observable_records,
+    SampleFormat, SurfaceCodeParams, SurfaceCodeTask, generate_color_code_circuit,
+    generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 use thiserror::Error;
 
@@ -144,6 +143,8 @@ enum RecordFormatArg {
     B8,
     #[value(name = "r8")]
     R8,
+    #[value(name = "ptb64")]
+    Ptb64,
     #[value(name = "hits")]
     Hits,
     #[value(name = "dets")]
@@ -160,6 +161,7 @@ impl RecordFormatArg {
             Self::R8 => Ok(SampleFormat::R8),
             Self::Hits => Ok(SampleFormat::Hits),
             Self::Dets => Ok(SampleFormat::Dets),
+            Self::Ptb64 => Err(CliError::UnsupportedDetectionFormat { format: "ptb64" }),
             Self::Stim => Err(CliError::UnsupportedDetectionFormat { format: "stim" }),
         }
     }
@@ -264,88 +266,6 @@ struct SampleArgs {
     frame0: bool,
 }
 
-#[derive(Debug, Args)]
-struct DetectArgs {
-    /// Number of shots to sample.
-    #[arg(long, default_value_t = 1, value_parser = parse_stim_usize)]
-    shots: usize,
-
-    /// Input circuit path. Defaults to stdin.
-    #[arg(long = "in")]
-    input: Option<PathBuf>,
-
-    /// Output detection-event path. Defaults to stdout.
-    #[arg(long = "out")]
-    output: Option<PathBuf>,
-
-    /// Output detection-event format.
-    #[arg(long = "out_format", value_enum, default_value = "01")]
-    out_format: SampleOutFormatArg,
-
-    /// Partially deterministic random seed for noisy detection.
-    #[arg(long, value_parser = parse_stim_u64)]
-    seed: Option<u64>,
-
-    /// Append observable flips after detector-event bits.
-    #[arg(long = "append_observables")]
-    append_observables: bool,
-
-    /// Deprecated Stim alias that writes observable flips before detector bits.
-    #[arg(long = "prepend_observables", hide = true)]
-    prepend_observables: bool,
-
-    /// Optional separate observable-flip output path.
-    #[arg(long = "obs_out")]
-    obs_output: Option<PathBuf>,
-
-    /// Separate observable-flip output format.
-    #[arg(long = "obs_out_format", value_enum, default_value = "01")]
-    obs_out_format: RecordFormatArg,
-}
-
-#[derive(Debug, Args)]
-struct M2dArgs {
-    /// Circuit path used to interpret measurement records.
-    #[arg(long)]
-    circuit: PathBuf,
-
-    /// Input measurement path. Defaults to stdin.
-    #[arg(long = "in")]
-    input: Option<PathBuf>,
-
-    /// Output detection-event path. Defaults to stdout.
-    #[arg(long = "out")]
-    output: Option<PathBuf>,
-
-    /// Input measurement format.
-    #[arg(long = "in_format", value_enum)]
-    in_format: RecordFormatArg,
-
-    /// Output detection-event format.
-    #[arg(long = "out_format", value_enum, default_value = "01")]
-    out_format: RecordFormatArg,
-
-    /// Append observable flips after detector-event bits.
-    #[arg(long = "append_observables")]
-    append_observables: bool,
-
-    /// Compare measurements directly instead of subtracting the circuit reference sample.
-    #[arg(long = "skip_reference_sample")]
-    skip_reference_sample: bool,
-
-    /// Optional separate observable-flip output path.
-    #[arg(long = "obs_out")]
-    obs_output: Option<PathBuf>,
-
-    /// Separate observable-flip output format.
-    #[arg(long = "obs_out_format", value_enum, default_value = "01")]
-    obs_out_format: RecordFormatArg,
-
-    /// Stim compatibility flag for externally transformed circuits.
-    #[arg(long = "ran_without_feedback")]
-    ran_without_feedback: bool,
-}
-
 #[derive(Debug, Error)]
 pub(crate) enum CliError {
     #[error("failed to read stdin: {0}")]
@@ -401,6 +321,20 @@ pub(crate) enum CliError {
 
     #[error("{kind} is too large; limit is {limit} bytes")]
     InputTooLarge { kind: &'static str, limit: u64 },
+
+    #[error("{kind} decodes to {actual} records but the limit is {limit}")]
+    DecodedRecordCountTooLarge {
+        kind: &'static str,
+        actual: usize,
+        limit: usize,
+    },
+
+    #[error("{kind} decodes to {actual} record bits but the limit is {limit}")]
+    DecodedRecordBitsTooLarge {
+        kind: &'static str,
+        actual: usize,
+        limit: usize,
+    },
 
     #[error("not enough information given to parse input file")]
     MissingRecordWidth,
@@ -789,6 +723,7 @@ where
         RecordFormatArg::Dets => write_dets_records(&records, &args),
         RecordFormatArg::B8
         | RecordFormatArg::R8
+        | RecordFormatArg::Ptb64
         | RecordFormatArg::Hits
         | RecordFormatArg::Stim => {
             return Err(CliError::UnsupportedConversion);
@@ -1021,125 +956,9 @@ where
     write_output(args.output.as_ref(), stdout, &output)
 }
 
-fn run_detect<R, W, E>(
-    args: DetectArgs,
-    input: &mut R,
-    stdout: &mut W,
-    stderr: &mut E,
-) -> Result<(), CliError>
-where
-    R: Read,
-    W: Write,
-    E: Write,
-{
-    if args.prepend_observables {
-        writeln!(
-            stderr,
-            "[DEPRECATION] Avoid using `--prepend_observables`. Data readers assume observables are appended, not prepended."
-        )
-        .map_err(CliError::WriteOutput)?;
-    }
-    validate_detect_observable_routing(&args)?;
-    if args.shots == 0 {
-        write_output(args.output.as_ref(), stdout, &[])?;
-        return write_empty_observables(args.obs_output.as_ref(), stdout);
-    }
-    let input_bytes = read_input(args.input.as_ref(), input)?;
-    let circuit = parse_circuit_bytes(&input_bytes)?;
-    validate_detection_sampling_circuit(&circuit)?;
-    let detection_output = sample_detection_events(&circuit, args.shots, args.seed)?;
-    let observable_mode = detect_observable_output_mode(&args);
-    let output = write_detection_records(
-        &detection_output,
-        observable_mode,
-        args.out_format.sample_format()?,
-    )?;
-    write_output(args.output.as_ref(), stdout, &output)?;
-    write_optional_observables(
-        args.obs_output.as_ref(),
-        args.obs_out_format,
-        stdout,
-        &detection_output,
-    )
-}
-
-fn run_m2d<R, W>(args: M2dArgs, input: &mut R, stdout: &mut W) -> Result<(), CliError>
-where
-    R: Read,
-    W: Write,
-{
-    if args.ran_without_feedback {
-        return Err(CliError::UnsupportedRanWithoutFeedback);
-    }
-    let circuit_bytes = std::fs::read(&args.circuit).map_err(|source| CliError::ReadPath {
-        path: args.circuit.clone(),
-        source,
-    })?;
-    let circuit = parse_circuit_bytes(&circuit_bytes)?;
-    let measurement_width = measurement_record_count(&circuit)?;
-    let input_bytes =
-        read_limited_input(args.input.as_ref(), input, MAX_M2D_INPUT_BYTES, "m2d input")?;
-    let measurements = read_measurement_records(
-        &input_bytes,
-        args.in_format.sample_format()?,
-        measurement_width,
-    )?;
-    let detection_output = convert_measurements_to_detection_events(
-        &circuit,
-        &measurements,
-        DetectionConversionOptions {
-            skip_reference_sample: args.skip_reference_sample,
-        },
-    )?;
-    let output = write_detection_records(
-        &detection_output,
-        observable_output_mode(args.append_observables),
-        args.out_format.sample_format()?,
-    )?;
-    write_output(args.output.as_ref(), stdout, &output)?;
-    write_optional_observables(
-        args.obs_output.as_ref(),
-        args.obs_out_format,
-        stdout,
-        &detection_output,
-    )
-}
-
-const MAX_M2D_INPUT_BYTES: u64 = 64 * 1024 * 1024;
-
 pub(crate) fn parse_circuit_bytes(input: &[u8]) -> Result<Circuit, CliError> {
     let circuit_text = std::str::from_utf8(input).map_err(|_| CliError::InvalidUtf8Input)?;
     Ok(Circuit::from_stim_str(circuit_text)?)
-}
-
-fn validate_detect_observable_routing(args: &DetectArgs) -> Result<(), CliError> {
-    let effective_prepend = args.prepend_observables
-        || (args.out_format == SampleOutFormatArg::Dets && !args.append_observables);
-    let selected_routes = usize::from(effective_prepend)
-        + usize::from(args.append_observables)
-        + usize::from(args.obs_output.is_some());
-    if selected_routes > 1 {
-        return Err(CliError::ConflictingObservableRouting);
-    }
-    Ok(())
-}
-
-fn detect_observable_output_mode(args: &DetectArgs) -> DetectionObservableOutputMode {
-    if args.append_observables {
-        DetectionObservableOutputMode::Append
-    } else if args.prepend_observables || args.out_format == SampleOutFormatArg::Dets {
-        DetectionObservableOutputMode::Prepend
-    } else {
-        DetectionObservableOutputMode::DetectorsOnly
-    }
-}
-
-fn observable_output_mode(append_observables: bool) -> DetectionObservableOutputMode {
-    if append_observables {
-        DetectionObservableOutputMode::Append
-    } else {
-        DetectionObservableOutputMode::DetectorsOnly
-    }
 }
 
 fn write_empty_observables<W>(output_path: Option<&PathBuf>, stdout: &mut W) -> Result<(), CliError>
@@ -1150,22 +969,6 @@ where
         return Ok(());
     };
     write_output(Some(output_path), stdout, &[])
-}
-
-fn write_optional_observables<W>(
-    output_path: Option<&PathBuf>,
-    format: RecordFormatArg,
-    stdout: &mut W,
-    detection_output: &DetectionConversionOutput,
-) -> Result<(), CliError>
-where
-    W: Write,
-{
-    let Some(output_path) = output_path else {
-        return Ok(());
-    };
-    let output = write_observable_records(detection_output, format.sample_format()?)?;
-    write_output(Some(output_path), stdout, &output)
 }
 
 #[cfg(test)]

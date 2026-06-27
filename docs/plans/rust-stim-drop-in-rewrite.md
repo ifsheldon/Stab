@@ -325,6 +325,9 @@ Tasks:
 - Add round-trip tests for bit-packed input/output and text input/output across circuit fixtures generated in M7.
 
 The M9 scalar frame subset for Pauli-target observable detection includes annotations, `R`/`RX`/`RY`, `M`/`MX`/`MY`, `MR`/`MRX`/`MRY`, `MXX`/`MYY`/`MZZ`, `MPP`, `MPAD`, `CX`/`CY`/`CZ` including measurement-record feedback where supported, tableau-backed Clifford gates, single-qubit and two-qubit Pauli noise, depolarizing noise, correlated errors, and heralded single-qubit noise. Unsupported instructions must fail with an explicit sampler-compilation error, and bit-parallel frame storage plus streaming-scale detection conversion remain M12 or later work unless promoted by a future plan amendment.
+M9 bit-packed detection parity includes `b8` for `detect` and `m2d` detector and observable streams, plus `ptb64` for `detect` detector output, `detect --obs_out`, and `m2d` measurement input.
+`m2d --out_format=ptb64` and `m2d --obs_out_format=ptb64` must reject like pinned Stim v1.16.0 because its detection-event writer does not accept `ptb64` output for `m2d`.
+The `ptb64` paths must enforce Stim-compatible 64-shot grouping for generated outputs, read complete measurement-major input groups for `m2d`, reject zero-width `ptb64` measurement input because the shot count is ambiguous, and bound decoded `m2d` shot records before allocation.
 
 Linked tests and benchmarks:
 
@@ -339,6 +342,7 @@ Done criteria:
 - `just oracle::run --milestone M9 --structural` passes gauge-detector structural equivalence cases.
 - `cargo test -p stab-core detection` covers coordinate shifts, repeats, measurement-record observables, Pauli-target observable flips, empty-detector circuits, and invalid measurement references.
 - `cargo test -p stab-core detection_sampling` covers frame-simulator Pauli-target observable parity for basis resets and product measurements.
+- `cargo test -p stab-cli m9` covers public `detect` and `m2d` CLI behavior, including `b8`, `detect` `ptb64` outputs, `m2d` `ptb64` input, `m2d` `ptb64` output rejection, `dets`, observable side outputs, route conflicts, zero-shot `detect`, zero-width and oversized `ptb64` input rejection, and Pauli-target observable behavior.
 - `just bench::compare --milestone M9` reports `detect` and `m2d` throughput separately for text and bit-packed formats.
 
 ### M10: Detector Error Model Core

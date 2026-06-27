@@ -98,6 +98,35 @@ pub fn read_ptb64_records(
     Ok(records)
 }
 
+pub fn read_ptb64_records_all(
+    input: &[u8],
+    bits_per_record: usize,
+) -> CircuitResult<Vec<Vec<bool>>> {
+    let shots = ptb64_record_count(input, bits_per_record)?;
+    read_ptb64_records(input, bits_per_record, shots)
+}
+
+pub fn ptb64_record_count(input: &[u8], bits_per_record: usize) -> CircuitResult<usize> {
+    if bits_per_record == 0 {
+        return Err(CircuitError::invalid_result_format(
+            "ptb64 input cannot infer a shot count for zero-width records",
+        ));
+    }
+    let bytes_per_group = bits_per_record
+        .checked_mul(8)
+        .ok_or_else(|| CircuitError::invalid_result_format("ptb64 record byte width overflowed"))?;
+    if !input.len().is_multiple_of(bytes_per_group) {
+        return Err(CircuitError::invalid_result_format(format!(
+            "ptb64 input length {} is not a multiple of shot-group byte width {bytes_per_group}",
+            input.len()
+        )));
+    }
+    let shot_groups = input.len() / bytes_per_group;
+    shot_groups
+        .checked_mul(64)
+        .ok_or_else(|| CircuitError::invalid_result_format("ptb64 shot count overflowed"))
+}
+
 pub fn validate_ptb64_shot_count(shots: usize) -> CircuitResult<()> {
     if !shots.is_multiple_of(64) {
         return Err(CircuitError::invalid_sampler_compilation(
@@ -1070,5 +1099,10 @@ mod tests {
         assert!(write_ptb64_records_checked(&records[..63]).is_err());
         assert!(read_ptb64_records(&encoded[..31], 4, 64).is_err());
         assert!(read_ptb64_records(&encoded, 0, 64).is_err());
+        assert_eq!(read_ptb64_records_all(&encoded, 4).unwrap(), records);
+        assert!(read_ptb64_records_all(&encoded[..31], 4).is_err());
+        assert!(read_ptb64_records_all(&encoded, 0).is_err());
+        assert!(read_ptb64_records_all(&[], 0).is_err());
+        assert_eq!(ptb64_record_count(&encoded, 4).unwrap(), 64);
     }
 }

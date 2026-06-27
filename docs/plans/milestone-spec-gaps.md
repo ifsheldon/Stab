@@ -221,12 +221,12 @@ Resolution: pending plan update.
 
 ## 2026-06-27 - M9: Detection Bit-Packed Format Scope
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit against pinned Stim `command_detect.cc`, `command_m2d.cc`, and `measurements_to_detection_events.test.cc`.
 Current text: M9 requires `stim detect` with bit-packed modes and `stim m2d` with measurement input parsing, while the benchmark plan names text and bit-packed input.
 Gap: the milestone does not say whether M9 bit-packed parity means the `b8` subset needed by current decoder workflows or every Stim v1.16.0 bit-packed format including `ptb64`, nor does it name zero-width bit-packed input behavior as an acceptance case.
-Proposed amendment: either define M9 bit-packed parity as `b8` input/output plus explicit zero-width rejection, with `ptb64` deferred to a named result-format hardening milestone, or require `ptb64` detection and m2d input/output support with shot-count multiple-of-64 constraints and exact fixture coverage.
-Resolution: pending plan update.
+Proposed amendment: define the exact M9 bit-packed parity boundary by command and stream: `b8` for public detector and observable streams, `ptb64` for `detect` detector output and `detect --obs_out`, and `ptb64` for `m2d` measurement input only. Require `m2d --out_format=ptb64` and `m2d --obs_out_format=ptb64` to reject like pinned Stim v1.16.0, require zero-width `ptb64` input rejection, and require decoded-record bounds before allocation.
+Resolution: M9 now requires `b8` parity for public `detect` and `m2d` detector and observable streams, `ptb64` parity for `detect` detector output, `detect --obs_out`, and `m2d` measurement input, plus explicit rejection for `m2d` `ptb64` detector and observable outputs. Evidence is `cargo test -p stab-cli m9`, including `detect_writes_ptb64_detector_and_observable_outputs`, `detect_rejects_ptb64_shots_that_are_not_multiple_of_64`, `m2d_reads_ptb64_records_and_writes_supported_formats`, `m2d_rejects_ptb64_detector_output_like_stim`, `m2d_rejects_ptb64_observable_output_like_stim`, `m2d_rejects_zero_width_ptb64_input`, and `m2d_rejects_excessive_ptb64_decoded_shots_before_expansion`, plus `cargo test -p stab-core result_formats::tests::ptb64_records_are_measurement_major_over_64_shot_groups`.
 
 ## 2026-06-27 - M9: Generated Fixture Round-Trip Coverage
 

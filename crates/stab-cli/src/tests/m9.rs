@@ -1,6 +1,10 @@
 use super::run_from;
 use tempfile::tempdir;
 
+fn ptb64_words(words: &[u64]) -> Vec<u8> {
+    words.iter().flat_map(|word| word.to_le_bytes()).collect()
+}
+
 #[test]
 fn detect_basic_matches_m9_oracle_golden() {
     let mut stdout = Vec::new();
@@ -155,6 +159,56 @@ fn detect_appends_observables_and_writes_bit_packed_output() {
     assert_eq!(b8_status, 0);
     assert_eq!(b8_stdout, [0b0000_0011]);
     assert_eq!(String::from_utf8(b8_stderr).unwrap(), "");
+}
+
+#[test]
+fn detect_writes_ptb64_detector_and_observable_outputs() {
+    let temp_dir = tempdir().expect("temp dir");
+    let obs_path = temp_dir.path().join("obs.ptb64");
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "detect",
+            "--shots=64",
+            "--out_format=ptb64",
+            "--obs_out_format=ptb64",
+            "--obs_out",
+            obs_path.to_str().expect("utf-8 path"),
+        ],
+        "X_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(stdout, ptb64_words(&[u64::MAX]));
+    assert_eq!(
+        std::fs::read(obs_path).expect("read obs"),
+        ptb64_words(&[u64::MAX])
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn detect_rejects_ptb64_shots_that_are_not_multiple_of_64() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "detect", "--shots=63", "--out_format=ptb64"],
+        "M 0\nDETECTOR rec[-1]\n".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("shots must be a multiple of 64 to use ptb64 format")
+    );
 }
 
 #[test]
@@ -373,6 +427,182 @@ fn m2d_ignores_pauli_target_observables_like_stim_conversion() {
     assert_eq!(status, 0);
     assert_eq!(String::from_utf8(stdout).unwrap(), "01\n");
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn m2d_reads_ptb64_records_and_writes_supported_formats() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    let obs_path = temp_dir.path().join("obs.b8");
+    std::fs::write(
+        &circuit_path,
+        "M 0 1\nDETECTOR rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .expect("write circuit");
+
+    let alternating = 0xAAAAAAAA_AAAAAAAAu64;
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=ptb64",
+            "--out_format=01",
+            "--obs_out_format=b8",
+            "--obs_out",
+            obs_path.to_str().expect("utf-8 path"),
+            "--circuit",
+            circuit_path.to_str().expect("utf-8 path"),
+        ],
+        ptb64_words(&[u64::MAX, alternating]).as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "1\n".repeat(64));
+    let expected_obs: Vec<_> = (0..64)
+        .map(|shot_index| u8::from(alternating & (1u64 << shot_index) != 0))
+        .collect();
+    assert_eq!(std::fs::read(obs_path).expect("read obs"), expected_obs);
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn m2d_rejects_ptb64_detector_output_like_stim() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    std::fs::write(&circuit_path, "M 0\nDETECTOR rec[-1]\n").expect("write circuit");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=01",
+            "--out_format=ptb64",
+            "--circuit",
+            circuit_path.to_str().expect("utf-8 path"),
+        ],
+        b"1\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("format ptb64 is not supported for detection data")
+    );
+}
+
+#[test]
+fn m2d_rejects_ptb64_observable_output_like_stim() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    let obs_path = temp_dir.path().join("obs.ptb64");
+    std::fs::write(
+        &circuit_path,
+        "M 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .expect("write circuit");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=01",
+            "--out_format=01",
+            "--obs_out_format=ptb64",
+            "--obs_out",
+            obs_path.to_str().expect("utf-8 path"),
+            "--circuit",
+            circuit_path.to_str().expect("utf-8 path"),
+        ],
+        b"1\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert!(!obs_path.exists());
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("format ptb64 is not supported for detection data")
+    );
+}
+
+#[test]
+fn m2d_rejects_zero_width_ptb64_input() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    std::fs::write(&circuit_path, "TICK\n").expect("write circuit");
+    let nonempty_ptb64 = ptb64_words(&[0]);
+
+    for input in [&[][..], nonempty_ptb64.as_slice()] {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            [
+                "stab",
+                "m2d",
+                "--in_format=ptb64",
+                "--out_format=01",
+                "--circuit",
+                circuit_path.to_str().expect("utf-8 path"),
+            ],
+            input,
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, 1);
+        assert_eq!(stdout, b"");
+        assert!(
+            String::from_utf8(stderr)
+                .unwrap()
+                .contains("ptb64 input cannot infer a shot count for zero-width records")
+        );
+    }
+}
+
+#[test]
+fn m2d_rejects_excessive_ptb64_decoded_shots_before_expansion() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    std::fs::write(&circuit_path, "M 0\nDETECTOR rec[-1]\n").expect("write circuit");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=ptb64",
+            "--out_format=01",
+            "--circuit",
+            circuit_path.to_str().expect("utf-8 path"),
+        ],
+        vec![0; 125_008].as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("m2d ptb64 input decodes to 1000064 records but the limit is 1000000")
+    );
 }
 
 #[test]
