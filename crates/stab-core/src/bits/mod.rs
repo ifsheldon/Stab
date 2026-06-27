@@ -574,7 +574,7 @@ impl SparseXorVec {
     }
 
     pub fn xor_assign(&mut self, rhs: &Self) {
-        self.items = symmetric_difference_sorted(&self.items, &rhs.items);
+        symmetric_difference_sorted_in_place(&mut self.items, &rhs.items);
     }
 
     pub fn is_superset_of(&self, rhs: &[u32]) -> bool {
@@ -644,29 +644,63 @@ pub fn first_set_bit(value: u64, start: u32) -> Option<u32> {
     (shifted != 0).then(|| start + shifted.trailing_zeros())
 }
 
-fn symmetric_difference_sorted(left: &[u32], right: &[u32]) -> Vec<u32> {
-    let mut out = Vec::with_capacity(left.len() + right.len());
-    let mut left_iter = left.iter().peekable();
-    let mut right_iter = right.iter().peekable();
-    while let (Some(left_item), Some(right_item)) = (left_iter.peek(), right_iter.peek()) {
-        match left_item.cmp(right_item) {
+#[allow(
+    clippy::indexing_slicing,
+    reason = "loop bounds guard sparse vector indexing while merging in place from the back"
+)]
+fn symmetric_difference_sorted_in_place(left: &mut Vec<u32>, right: &[u32]) {
+    if right.is_empty() {
+        return;
+    }
+    if left.is_empty() {
+        left.extend_from_slice(right);
+        return;
+    }
+
+    let left_len = left.len();
+    let total_len = left_len + right.len();
+    left.resize(total_len, 0);
+    let mut left_index = left_len;
+    let mut right_index = right.len();
+    let mut write_index = total_len;
+
+    while left_index > 0 && right_index > 0 {
+        let left_item = left[left_index - 1];
+        let right_item = right[right_index - 1];
+        match left_item.cmp(&right_item) {
             std::cmp::Ordering::Less => {
-                out.push(**left_item);
-                left_iter.next();
+                write_index -= 1;
+                right_index -= 1;
+                left[write_index] = right_item;
             }
             std::cmp::Ordering::Equal => {
-                left_iter.next();
-                right_iter.next();
+                left_index -= 1;
+                right_index -= 1;
             }
             std::cmp::Ordering::Greater => {
-                out.push(**right_item);
-                right_iter.next();
+                write_index -= 1;
+                left_index -= 1;
+                left[write_index] = left_item;
             }
         }
     }
-    out.extend(left_iter.copied());
-    out.extend(right_iter.copied());
-    out
+
+    while right_index > 0 {
+        write_index -= 1;
+        right_index -= 1;
+        left[write_index] = right[right_index];
+    }
+    while left_index > 0 {
+        write_index -= 1;
+        left_index -= 1;
+        left[write_index] = left[left_index];
+    }
+
+    let output_len = total_len - write_index;
+    if write_index > 0 {
+        left.copy_within(write_index..total_len, 0);
+    }
+    left.truncate(output_len);
 }
 
 fn get_bit(words: &[u64], bit_len: BitLen, index: usize) -> Option<bool> {
