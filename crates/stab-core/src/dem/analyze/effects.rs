@@ -165,10 +165,28 @@ impl PendingError {
         self.effects.retain(|effect| effect.qubit != qubit);
     }
 
-    pub(super) fn flips_measurement(&self, qubit: QubitId, basis: AnalyzerBasis) -> bool {
-        self.effects.iter().any(|effect| {
-            effect.qubit == qubit && pauli_flips_basis_measurement(effect.pauli, basis)
-        })
+    pub(super) fn project_through_measurement(
+        &mut self,
+        qubit: QubitId,
+        basis: AnalyzerBasis,
+        measurement: usize,
+        reset_after_measurement: bool,
+    ) {
+        let mut masks = self.effect_masks();
+        let Some(mask) = masks.remove(&qubit) else {
+            return;
+        };
+        if masks_anticommute(mask, analyzer_basis_mask(basis)) {
+            self.measurements.push(measurement);
+            if !reset_after_measurement {
+                insert_effect_mask(
+                    &mut masks,
+                    qubit,
+                    measurement_flip_representative_mask(basis),
+                );
+            }
+        }
+        self.effects = effects_from_masks(masks);
     }
 
     pub(super) fn flips_product_measurement(&self, terms: &[(QubitId, AnalyzerBasis)]) -> bool {
@@ -465,16 +483,26 @@ fn non_identity_mapped_to_identity(clifford: SingleQubitClifford) -> CircuitErro
 }
 
 fn pauli_flips_basis_measurement(pauli: AnalyzerPauli, basis: AnalyzerBasis) -> bool {
-    matches!(
-        (pauli, basis),
-        (AnalyzerPauli::X, AnalyzerBasis::Y | AnalyzerBasis::Z)
-            | (AnalyzerPauli::Y, AnalyzerBasis::X | AnalyzerBasis::Z)
-            | (AnalyzerPauli::Z, AnalyzerBasis::X | AnalyzerBasis::Y)
-    )
+    masks_anticommute(analyzer_pauli_mask(pauli), analyzer_basis_mask(basis))
 }
 
 fn analyzer_pauli_mask(pauli: AnalyzerPauli) -> u8 {
     pauli_mask(pauli.into())
+}
+
+fn analyzer_basis_mask(basis: AnalyzerBasis) -> u8 {
+    match basis {
+        AnalyzerBasis::X => pauli_mask(Pauli::X),
+        AnalyzerBasis::Y => pauli_mask(Pauli::Y),
+        AnalyzerBasis::Z => pauli_mask(Pauli::Z),
+    }
+}
+
+fn measurement_flip_representative_mask(basis: AnalyzerBasis) -> u8 {
+    match basis {
+        AnalyzerBasis::X => pauli_mask(Pauli::Z),
+        AnalyzerBasis::Y | AnalyzerBasis::Z => pauli_mask(Pauli::X),
+    }
 }
 
 fn basis_anticommutes_with_pauli(basis: PauliBasis, pauli: AnalyzerPauli) -> bool {

@@ -7,6 +7,7 @@ mod feedback;
 mod folded;
 mod gauge;
 mod instructions;
+mod measurements;
 mod mpp;
 mod probabilities;
 
@@ -32,8 +33,7 @@ use error_decomp::{
 use folded::FoldedAnalyzer;
 use gauge::find_gauge_errors;
 use instructions::{
-    is_measurement_instruction, is_noise_instruction, measurement_basis, pair_measurement_basis,
-    shifted_coordinates,
+    is_measurement_instruction, is_noise_instruction, pair_measurement_basis, shifted_coordinates,
 };
 use probabilities::{merge_disjoint_probability, merge_independent_probability, toggle_all};
 
@@ -690,63 +690,6 @@ impl Analyzer {
                     disjoint_group,
                 );
             }
-        }
-        Ok(())
-    }
-
-    fn record_measurements(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        let basis = measurement_basis(instruction.gate().canonical_name()).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("unknown measurement basis")
-        })?;
-        for group in instruction.target_groups() {
-            let Some(target) = group.first() else {
-                continue;
-            };
-            let Some(qubit) = target.qubit_id() else {
-                return Err(CircuitError::invalid_detector_error_model(format!(
-                    "{} target {target} is not a qubit",
-                    instruction.gate().canonical_name()
-                )));
-            };
-            let measurement_index = self.measurement_count;
-            self.measurement_count = self.measurement_count.checked_add(1).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model("measurement count overflowed")
-            })?;
-            for pending in &mut self.pending_errors {
-                if pending.flips_measurement(qubit, basis) {
-                    pending.measurements.push(measurement_index);
-                }
-            }
-            if let Some(probability) = instruction.probability_argument()?
-                && probability.get() > 0.0
-            {
-                self.completed_errors.push(PendingError {
-                    probability,
-                    effects: Vec::new(),
-                    measurements: vec![measurement_index],
-                    observables: Vec::new(),
-                    disjoint_group: None,
-                });
-            }
-            let mut still_pending_channels = Vec::new();
-            for pending in self.pending_pauli_channels.drain(..) {
-                if pending.qubit == qubit {
-                    let probability = pending.flip_probability(basis)?;
-                    if probability.get() > 0.0 {
-                        self.completed_errors.push(PendingError {
-                            probability,
-                            effects: Vec::new(),
-                            measurements: vec![measurement_index],
-                            observables: Vec::new(),
-                            disjoint_group: None,
-                        });
-                    }
-                } else {
-                    still_pending_channels.push(pending);
-                }
-            }
-            self.pending_pauli_channels = still_pending_channels;
-            self.cut_pending_errors_at_qubit(qubit);
         }
         Ok(())
     }
