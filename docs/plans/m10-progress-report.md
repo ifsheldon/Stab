@@ -7,19 +7,20 @@ M10: Detector Error Model Core
 ## Status
 
 Partial progress, not milestone-complete.
-This slice implements the `.dem` format core and the first staged `analyze_errors` path needed by the existing deterministic oracle rows.
-M10 still requires graphlike and hypergraph analyzer internals, general loop folding, decomposition behavior, gauge-detector handling, sparse reverse detector-frame tracking, structural DEM equivalence for generated QEC circuits, and complete benchmark coverage before milestone audit can accept it.
+This slice implements the `.dem` format core and staged `analyze_errors` paths needed by the existing deterministic oracle rows, the high-repeat loop-folding row, and the first approximate disjoint-error row.
+M10 still requires graphlike and hypergraph analyzer internals, general loop folding, decomposition behavior, gauge-detector handling, broader approximation behavior, sparse reverse detector-frame tracking, structural DEM equivalence for generated QEC circuits, and complete benchmark coverage before milestone audit can accept it.
 
 ## Tests Ported Or Created
 
-- `cargo test -p stab-core dem` covers DEM target limits, repeat blocks, detector shifts, coordinates, observables, probabilities, separators, invalid input, deterministic detector declarations, simple Pauli-error analyzer output, shifted detector coordinates, and top-level folded repeat output.
-- `cargo test -p stab-cli m10` covers `stab analyze_errors`, the legacy `--analyze_errors` alias, simple Pauli-error output, `--fold_loops` on a high-repeat fixture, and current flag parsing on supported circuits.
+- `cargo test -p stab-core dem` covers DEM target limits, repeat blocks, detector shifts, coordinates, observables, probabilities, separators, invalid input, deterministic detector declarations, simple Pauli-error analyzer output, approximate single-qubit `PAULI_CHANNEL_1` analyzer output, shifted detector coordinates, and top-level folded repeat output.
+- `cargo test -p stab-cli m10` covers `stab analyze_errors`, the legacy `--analyze_errors` alias, simple Pauli-error output, `--approximate_disjoint_errors` for a `PAULI_CHANNEL_1` fixture, `--fold_loops` on a high-repeat fixture, and current flag parsing on supported circuits.
 - `cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners` covers Stab-side M10 `.dem` parse, `.dem` print, and loop-folding analyzer benchmark runners.
 
 ## Implementation Areas
 
 - Added `DetectorErrorModel`, DEM instruction, target, repeat block, detector id, observable id, parser, canonical printer, detector counting, observable counting, and detector-shift helpers in `stab-core`.
 - Added a staged circuit-to-DEM analyzer for deterministic detector declarations and simple single-qubit `X_ERROR`, `Y_ERROR`, and `Z_ERROR` effects feeding measurement-record detectors and observables.
+- Added approximate `PAULI_CHANNEL_1` handling for single-qubit channels under `--approximate_disjoint_errors`, including rejection when approximation is not explicitly enabled.
 - Added top-level `--fold_loops` handling for repeat blocks by analyzing one body, wrapping it in a DEM repeat block, and appending the body detector shift.
 - Added `stab analyze_errors` CLI dispatch, including the legacy `--analyze_errors` alias and current staged flag parsing.
 - Extended the oracle core fixture runner to support `core-dem-parse-print`.
@@ -33,6 +34,7 @@ M10 still requires graphlike and hypergraph analyzer internals, general loop fol
 | `.dem` parser and canonical printer | Partial | `DetectorErrorModel::from_dem_str`, `DetectorErrorModel::to_dem_string`, `just oracle::run --milestone M10 --exact` |
 | DEM core types, repeats, coordinates, detector shifts, observables, separators, probability validation | Partial | `cargo test -p stab-core dem` |
 | `stim analyze_errors` staged default behavior | Partial | `cargo test -p stab-cli m10`, `just oracle::run --milestone M10 --structural` |
+| `stim analyze_errors --approximate_disjoint_errors` | Partial | `m10-analyze-errors-approx-pauli-channel1`, `cargo test -p stab-core pauli_channel1`, `cargo test -p stab-cli approx_pauli_channel1`, `just oracle::run --milestone M10 --exact` |
 | Structural DEM comparators for generated QEC circuits | Missing | Remaining M10 manifest-only structural rows |
 | Loop folding without flattening high-repeat circuits | Partial | `m10-analyze-errors-fold-repeat`, `cargo test -p stab-core dem_analyzer_fold`, `just bench::compare --milestone M10` |
 | M10 benchmark reporting | Partial | `just bench::compare --milestone M10` measures `.dem` parse, `.dem` print, and loop-folding rows; decomposition, graphlike, and full analyzer rows remain pending or missing baseline |

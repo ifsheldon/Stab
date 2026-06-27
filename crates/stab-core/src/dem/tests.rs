@@ -89,6 +89,67 @@ fn dem_analyzer_maps_simple_pauli_noise_to_detector_and_observable() {
 }
 
 #[test]
+fn dem_analyzer_approximates_disjoint_pauli_channel1_when_enabled() {
+    let circuit = Circuit::from_stim_str(
+        "R 0\nPAULI_CHANNEL_1(0.125, 0.25, 0.375) 0\nM 0\nDETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            approximate_disjoint_errors: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .unwrap()
+    .to_dem_string();
+
+    assert_eq!(dem, "error(0.375) D0\n");
+}
+
+#[test]
+fn dem_analyzer_approximates_pauli_channel1_by_measurement_basis() {
+    let circuit = Circuit::from_stim_str(
+        "R 0 1 2\n\
+         PAULI_CHANNEL_1(0.125, 0.25, 0.375) 0\n\
+         PAULI_CHANNEL_1(0.125, 0.25, 0.375) 1\n\
+         PAULI_CHANNEL_1(0.125, 0.25, 0.375) 2\n\
+         MX 0\n\
+         MY 1\n\
+         M 2\n\
+         DETECTOR rec[-3]\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            approximate_disjoint_errors: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .unwrap()
+    .to_dem_string();
+
+    assert_eq!(dem, "error(0.625) D0\nerror(0.5) D1\nerror(0.375) D2\n");
+}
+
+#[test]
+fn dem_analyzer_rejects_disjoint_pauli_channel1_without_approximation() {
+    let circuit = Circuit::from_stim_str(
+        "R 0\nPAULI_CHANNEL_1(0.125, 0.25, 0.375) 0\nM 0\nDETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let result = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default());
+
+    assert!(result.is_err());
+}
+
+#[test]
 fn dem_analyzer_preserves_shifted_detector_coordinates() {
     let circuit = Circuit::from_stim_str("SHIFT_COORDS(2, 3)\nM 0\nDETECTOR(5) rec[-1]\n").unwrap();
 

@@ -88,6 +88,7 @@ struct Analyzer {
     detector_count: u64,
     coord_offset: Vec<f64>,
     pending_errors: Vec<PendingError>,
+    pending_pauli_channels: Vec<PendingPauliChannel1>,
     completed_errors: Vec<PendingError>,
     detector_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
     observable_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
@@ -102,6 +103,7 @@ impl Analyzer {
             detector_count: 0,
             coord_offset: Vec::new(),
             pending_errors: Vec::new(),
+            pending_pauli_channels: Vec::new(),
             completed_errors: Vec::new(),
             detector_terms_by_measurement: BTreeMap::new(),
             observable_terms_by_measurement: BTreeMap::new(),
@@ -154,6 +156,7 @@ impl Analyzer {
     fn visit_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         match instruction.gate().canonical_name() {
             "X_ERROR" | "Y_ERROR" | "Z_ERROR" => self.record_single_pauli_error(instruction),
+            "PAULI_CHANNEL_1" => self.record_pauli_channel1(instruction),
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => self.record_measurements(instruction),
             "MPAD" => self.record_measurement_pads(instruction),
             "DETECTOR" => self.record_detector(instruction),
@@ -201,6 +204,36 @@ impl Analyzer {
         Ok(())
     }
 
+    fn record_pauli_channel1(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        if !self.options.approximate_disjoint_errors {
+            return Err(CircuitError::invalid_detector_error_model(
+                "PAULI_CHANNEL_1 requires approximate_disjoint_errors during error analysis",
+            ));
+        }
+        let Some(probabilities) = instruction.probability_arguments()? else {
+            return Ok(());
+        };
+        let [x_probability, y_probability, z_probability] = probabilities.as_slice() else {
+            return Err(CircuitError::invalid_detector_error_model(
+                "PAULI_CHANNEL_1 expected three probabilities",
+            ));
+        };
+        for target in instruction.targets() {
+            let Some(qubit) = target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "PAULI_CHANNEL_1 target {target} is not a qubit"
+                )));
+            };
+            self.pending_pauli_channels.push(PendingPauliChannel1 {
+                qubit,
+                x_probability: *x_probability,
+                y_probability: *y_probability,
+                z_probability: *z_probability,
+            });
+        }
+        Ok(())
+    }
+
     fn record_measurements(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         let basis = measurement_basis(instruction.gate().canonical_name()).ok_or_else(|| {
             CircuitError::invalid_detector_error_model("unknown measurement basis")
@@ -224,6 +257,22 @@ impl Analyzer {
                     pending.measurements.push(measurement_index);
                 }
             }
+            let mut still_pending_channels = Vec::new();
+            for pending in self.pending_pauli_channels.drain(..) {
+                if pending.qubit == qubit {
+                    let probability = pending.flip_probability(basis)?;
+                    if probability.get() > 0.0 {
+                        self.completed_errors.push(PendingError {
+                            probability,
+                            effects: Vec::new(),
+                            measurements: vec![measurement_index],
+                        });
+                    }
+                } else {
+                    still_pending_channels.push(pending);
+                }
+            }
+            self.pending_pauli_channels = still_pending_channels;
             let mut still_pending = Vec::new();
             for pending in self.pending_errors.drain(..) {
                 if pending.touches_qubit(qubit) {
@@ -406,6 +455,25 @@ struct PendingError {
     probability: Probability,
     effects: Vec<NoiseEffect>,
     measurements: Vec<usize>,
+}
+
+#[derive(Clone, Debug)]
+struct PendingPauliChannel1 {
+    qubit: QubitId,
+    x_probability: Probability,
+    y_probability: Probability,
+    z_probability: Probability,
+}
+
+impl PendingPauliChannel1 {
+    fn flip_probability(&self, basis: AnalyzerBasis) -> CircuitResult<Probability> {
+        let probability = match basis {
+            AnalyzerBasis::X => self.y_probability.get() + self.z_probability.get(),
+            AnalyzerBasis::Y => self.x_probability.get() + self.z_probability.get(),
+            AnalyzerBasis::Z => self.x_probability.get() + self.y_probability.get(),
+        };
+        Probability::try_new(probability)
+    }
 }
 
 impl PendingError {
