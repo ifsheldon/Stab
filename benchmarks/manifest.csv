@@ -50,7 +50,7 @@ m8-sample-throughput-1000000,M8,report-only,stim-cli,src/stim/cmd/command_sample
 m8-sample-primary-repetition-contract,M8,report-only,contract-only,src/stim/cmd/command_sample.test.cc,,,,throughput,sample-primary-matrix,repetition primary matrix sampling contract
 m8-sample-primary-rotated-surface-contract,M8,report-only,contract-only,src/stim/cmd/command_sample.test.cc,,,,throughput,sample-primary-matrix,rotated surface primary matrix sampling contract
 m8-sample-primary-unrotated-surface-contract,M8,report-only,contract-only,src/stim/cmd/command_sample.test.cc,,,,throughput,sample-primary-matrix,unrotated surface primary matrix sampling contract
-m8-sample-high-repeat-contract,M8,report-only,contract-only,src/stim/cmd/command_sample.test.cc,,,,analysis,sample-loop-folding,high repeat loop sampling analysis contract
+m8-sample-high-repeat-contract,M8,report-only,stim-cli,src/stim/cmd/command_sample.test.cc,,sample|--shots|1|--out_format=b8|--seed|5,benchmarks/fixtures/m8_sample_high_repeat_contract.stim,analysis,sample-loop-folding,high repeat loop sampling CLI workload
 m9-detect-text-cli,M9,report-only,stim-cli,src/stim/cmd/command_detect.test.cc,,detect|--shots|1024|--out_format=dets,oracle/fixtures/inputs/detect_basic.stim,throughput,detect-text,stim detect text output throughput workload
 m9-detect-bitpacked-cli,M9,report-only,stim-cli,src/stim/cmd/command_detect.test.cc,,detect|--shots|1024|--out_format=b8,oracle/fixtures/inputs/detect_basic.stim,throughput,detect-bitpacked,stim detect bit-packed output throughput workload
 m9-detect-primary-matrix-contract,M9,report-only,contract-only,src/stim/cmd/command_detect.test.cc,,,,throughput,detect-primary-matrix,detect primary matrix text and bit-packed contract

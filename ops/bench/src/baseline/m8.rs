@@ -17,6 +17,8 @@ use super::{measure_stab, measure_stab_iterations, stab_runner_error};
 
 const SAMPLE_NOISY_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/sample_noisy.stim");
+const HIGH_REPEAT_CONTRACT_FIXTURE: &str =
+    include_str!("../../../../benchmarks/fixtures/m8_sample_high_repeat_contract.stim");
 const MEASURE_READER_BITS: usize = 10_000;
 const PROBABILITY_UTIL_BITS: usize = 1024;
 const PROBABILITY_UTIL_WORDS: usize = PROBABILITY_UTIL_BITS / u64::BITS as usize;
@@ -41,10 +43,7 @@ const PRIMARY_MATRIX_ROUNDS: u64 = 3;
 const PRIMARY_MATRIX_SHOTS: usize = 64;
 #[cfg(test)]
 const PRIMARY_MATRIX_SHOTS: usize = 2;
-#[cfg(not(test))]
 const HIGH_REPEAT_CONTRACT_REPS: u64 = 512;
-#[cfg(test)]
-const HIGH_REPEAT_CONTRACT_REPS: u64 = 4;
 #[cfg(not(test))]
 const REFERENCE_SAMPLE_OUTER_REPS: usize = 20;
 #[cfg(test)]
@@ -181,7 +180,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-representative: Stab samples a generated unrotated-surface d3/r3 circuit; full primary matrix thresholds remain M12 work",
         ),
         "m8-sample-high-repeat-contract" => Some(
-            "contract-representative: Stab samples a repeat-heavy circuit without flattening during compilation; optimized loop folding remains a logged M8 spec gap",
+            "cli-baseline: Stab samples the source-owned repeat-heavy fixture with b8 output against pinned Stim sample on the same fixture; optimized loop folding remains a logged M8 spec gap",
         ),
         _ => None,
     }
@@ -406,8 +405,7 @@ fn run_primary_generated_sample_row(
 }
 
 fn run_high_repeat_contract_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let fixture = high_repeat_contract_fixture();
-    let circuit = sample_circuit(&row.id, &fixture)?;
+    let circuit = sample_circuit(&row.id, HIGH_REPEAT_CONTRACT_FIXTURE)?;
     let sampler = compile_sampler(&row.id, &circuit)?;
     Ok(vec![measure_stab_iterations(
         "stab_sample_high_repeat_contract",
@@ -470,10 +468,6 @@ fn reference_sample_tree_fixture() -> String {
     format!(
         "M 0\nREPEAT {REFERENCE_SAMPLE_OUTER_REPS} {{\n    REPEAT {REFERENCE_SAMPLE_INNER_REPS} {{\n        X 0\n        M 0\n    }}\n    X 0\n    M 0\n}}\nX 0\nM 0\n"
     )
-}
-
-fn high_repeat_contract_fixture() -> String {
-    format!("REPEAT {HIGH_REPEAT_CONTRACT_REPS} {{\n    H 0\n    M 0\n    R 0\n}}\n")
 }
 
 #[cfg(test)]

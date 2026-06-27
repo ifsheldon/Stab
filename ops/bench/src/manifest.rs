@@ -571,6 +571,11 @@ mod tests {
                 "oracle/fixtures/inputs/analyze_errors_fold_repeat.stim",
             ),
             (
+                "m8-sample-high-repeat-contract",
+                "sample|--shots|1|--out_format=b8|--seed|5",
+                "benchmarks/fixtures/m8_sample_high_repeat_contract.stim",
+            ),
+            (
                 "m11-sample-dem-sparse-contract",
                 "sample_dem|--shots|64|--out_format=b8|--seed|5",
                 "benchmarks/fixtures/m11_sample_dem_sparse_contract.dem",
