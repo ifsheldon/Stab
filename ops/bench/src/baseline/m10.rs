@@ -13,6 +13,8 @@ use super::{STAB_COMPARE_ITERATIONS, measure_stab_iterations, stab_runner_error}
 
 const DEM_PARSE_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/sample_dem_deterministic.dem");
+const ANALYZE_BASIC_FIXTURE: &str =
+    include_str!("../../../../oracle/fixtures/inputs/analyze_errors_basic.stim");
 const ANALYZE_FOLD_REPEAT_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/analyze_errors_fold_repeat.stim");
 const GRAPHLIKE_SEARCH_DETECTORS: u64 = 128;
@@ -25,6 +27,7 @@ pub(super) fn run_dem_compare_row(
         "m10-graphlike-search" => run_graphlike_search_row(row).map(Some),
         "m10-dem-parse-contract" => run_dem_parse_row(row).map(Some),
         "m10-dem-print-contract" => run_dem_print_row(row).map(Some),
+        "m10-analyze-errors-decompose-cli" => run_analyze_decompose_row(row).map(Some),
         "m10-analyze-errors-fold-cli" => run_analyze_fold_row(row).map(Some),
         "m10-analyze-errors-high-repeat-contract" => run_analyze_fold_row(row).map(Some),
         _ => Ok(None),
@@ -43,6 +46,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         | ("m10-analyze-errors-high-repeat-contract", "stab_analyze_errors_fold_repeat") => {
             Some((1000.0, "folded-rounds/s"))
         }
+        ("m10-analyze-errors-decompose-cli", "stab_analyze_errors_decompose_basic") => {
+            Some((1.0, "circuits/s"))
+        }
         ("m10-graphlike-search", "stab_graphlike_search_chain") => {
             Some((GRAPHLIKE_SEARCH_GRAPH_EDGES, "graphlike-edges/s"))
         }
@@ -57,6 +63,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m10-analyze-errors-fold-cli" | "m10-analyze-errors-high-repeat-contract" => Some(
             "contract-representative: Stab measures in-process analyze_errors --fold_loops on the current high-repeat fixture",
+        ),
+        "m10-analyze-errors-decompose-cli" => Some(
+            "contract-representative: Stab measures in-process analyze_errors --decompose_errors on the pinned basic CLI fixture; deeper decomposition stress remains covered by the m10-error-decomp contract",
         ),
         "m10-graphlike-search" => Some(
             "contract-representative: Stab measures in-process shortest graphlike logical-error search on a deterministic chain DEM",
@@ -103,6 +112,27 @@ fn run_analyze_fold_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErr
                 &circuit,
                 ErrorAnalyzerOptions {
                     fold_loops: true,
+                    ..ErrorAnalyzerOptions::default()
+                },
+            )
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(dem.items().len());
+            Ok(())
+        },
+    )?])
+}
+
+fn run_analyze_decompose_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = Circuit::from_stim_str(ANALYZE_BASIC_FIXTURE)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(vec![measure_stab_iterations(
+        "stab_analyze_errors_decompose_basic",
+        STAB_COMPARE_ITERATIONS,
+        || {
+            let dem = circuit_to_detector_error_model(
+                &circuit,
+                ErrorAnalyzerOptions {
+                    decompose_errors: true,
                     ..ErrorAnalyzerOptions::default()
                 },
             )

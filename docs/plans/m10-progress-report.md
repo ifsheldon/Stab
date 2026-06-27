@@ -16,7 +16,7 @@ M10 still requires broader graphlike algorithm integration and benchmark coverag
 - `cargo test -p stab-core error_decomp` covers the M10-owned independent/disjoint XYZ conversion and depolarizing-channel conversion subset ported from `src/stim/util_bot/error_decomp.test.cc`.
 - `cargo test -p stab-core graphlike` covers the M10-owned graphlike edge, node, graph, search-state, and shortest-undetectable-logical-error construction, canonicalization, equality, ordering, hashing, display, graph target conversion, separator handling, repeat flattening, DEM transition, no-error, distance-1, distance-2, distance-3, ignore-ungraphlike, and high-observable direct DEM subsets ported from `src/stim/search/graphlike/edge.test.cc`, `src/stim/search/graphlike/node.test.cc`, `src/stim/search/graphlike/graph.test.cc`, `src/stim/search/graphlike/search_state.test.cc`, and `src/stim/search/graphlike/algo.test.cc`.
 - `cargo test -p stab-cli m10` covers `stab analyze_errors`, the legacy `--analyze_errors` alias, measurement-flip output, unconditional and conditional correlated-error output, `H`, `H_XY`, and `CX` Pauli-error propagation fixtures, `--decompose_errors` fallback output, `--block_decompose_from_introducing_remnant_edges`, `--ignore_decomposition_failures`, `--allow_gauge_detectors` on upstream CLI and `H_XY` gauge examples, default gauge rejection, gauge-observable rejection even with gauge detectors allowed, identity-noise no-op output, reset cutoff output, simple Pauli-error output, `DEPOLARIZE1`, `DEPOLARIZE2`, exact-solved `PAULI_CHANNEL_1`, bare and numeric-threshold `--approximate_disjoint_errors` for `PAULI_CHANNEL_1`, numeric-threshold `--approximate_disjoint_errors` for `PAULI_CHANNEL_2`, `HERALDED_ERASE`, `ELSE_CORRELATED_ERROR` fixtures, `--fold_loops` on a high-repeat fixture, and current flag parsing on supported circuits.
-- `cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners` covers Stab-side M10 graphlike search, `.dem` parse, `.dem` print, and loop-folding analyzer benchmark runners.
+- `cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners` covers Stab-side M10 graphlike search, `analyze_errors --decompose_errors`, `.dem` parse, `.dem` print, and loop-folding analyzer benchmark runners.
 
 ## Implementation Areas
 
@@ -38,7 +38,7 @@ M10 still requires broader graphlike algorithm integration and benchmark coverag
 - Added `stab analyze_errors` CLI dispatch, including the legacy `--analyze_errors` alias and current staged flag parsing.
 - Extended the oracle core fixture runner to support `core-dem-parse-print`.
 - Implemented the current M10 exact and structural rows for `.dem` parse-print and basic `analyze_errors`.
-- Added Stab-side benchmark compare runners for the M10 `.dem` parse, `.dem` print, and loop-folding analyzer rows.
+- Added Stab-side benchmark compare runners for the M10 graphlike search, `analyze_errors --decompose_errors`, `.dem` parse, `.dem` print, and loop-folding analyzer rows.
 
 ## Current Evidence
 
@@ -49,7 +49,7 @@ M10 still requires broader graphlike algorithm integration and benchmark coverag
 | Graphlike search structures and direct shortest-error algorithm | Partial | `coverage-search-graphlike-algo`, `coverage-search-graphlike-edge`, `coverage-search-graphlike-node`, `coverage-search-graphlike-graph`, `coverage-search-graphlike-search-state`, `cargo test -p stab-core graphlike`, `cargo test -p stab-core dem_shortest_graphlike_logical_error_api_matches_direct_dem`, `cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners`, `just oracle::run --milestone M10 --structural`, `just bench::compare --milestone M10` |
 | `stim analyze_errors` staged default behavior | Partial | `cargo test -p stab-cli m10`, `just oracle::run --milestone M10 --structural` |
 | `stim analyze_errors` unconditional correlated Pauli errors | Partial | `m10-analyze-errors-correlated-error`, `cargo test -p stab-core correlated_error`, `cargo test -p stab-cli correlated_error`, `just oracle::run --milestone M10 --exact`, `just oracle::record --check-clean` |
-| `stim analyze_errors --decompose_errors` graphlike decomposition | Partial | `m10-analyze-errors-decompose-fallback`, `m10-analyze-errors-decompose-known-components`, `cargo test -p stab-core decompose`, `cargo test -p stab-cli decompose`, `cargo test -p stab-cli ignore_decomposition`, `just oracle::run --milestone M10 --exact` |
+| `stim analyze_errors --decompose_errors` graphlike decomposition | Partial | `m10-analyze-errors-decompose-fallback`, `m10-analyze-errors-decompose-known-components`, `cargo test -p stab-core decompose`, `cargo test -p stab-cli decompose`, `cargo test -p stab-cli ignore_decomposition`, `cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners`, `just oracle::run --milestone M10 --exact`, `just bench::compare --milestone M10` |
 | `stim analyze_errors --allow_gauge_detectors` | Partial | `m10-analyze-errors-allow-gauge-detectors`, `m10-analyze-errors-allow-gauge-detectors-hxy`, `cargo test -p stab-core gauge`, `cargo test -p stab-cli gauge`, `just oracle::run --milestone M10 --exact`, `just oracle::record --check-clean` |
 | `stim analyze_errors --approximate_disjoint_errors` conditional correlated Pauli errors | Partial | `m10-analyze-errors-else-correlated-error`, `cargo test -p stab-core else_correlated`, `cargo test -p stab-cli else_correlated`, `just oracle::run --milestone M10 --exact`, `just oracle::record --check-clean` |
 | `stim analyze_errors` identity-noise no-ops | Partial | `m10-analyze-errors-identity-noise`, `cargo test -p stab-core identity_noise`, `cargo test -p stab-cli identity_noise`, `just oracle::run --milestone M10 --exact` |
@@ -64,7 +64,7 @@ M10 still requires broader graphlike algorithm integration and benchmark coverag
 | `circuit_to_dem` heralded Pauli channel basis behavior | Partial | `coverage-util-top-circuit-to-dem`, `cargo test -p stab-core circuit_to_dem`, `just oracle::run --milestone M10 --structural` |
 | Structural DEM comparators for generated QEC circuits | Missing | Remaining M10 manifest-only structural rows |
 | Loop folding without flattening high-repeat circuits | Partial | `m10-analyze-errors-fold-repeat`, `cargo test -p stab-core dem_analyzer_fold`, `just bench::compare --milestone M10` |
-| M10 benchmark reporting | Partial | `just bench::compare --milestone M10` measures graphlike search, `.dem` parse, `.dem` print, and loop-folding rows; decomposition and full analyzer rows remain pending or missing baseline |
+| M10 benchmark reporting | Partial | `just bench::compare --milestone M10` measures graphlike search, `analyze_errors --decompose_errors`, `.dem` parse, `.dem` print, and loop-folding rows; error-decomposition utility and full analyzer rows remain pending or missing baseline |
 
 ## Verification Commands
 

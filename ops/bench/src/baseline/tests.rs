@@ -383,6 +383,11 @@ fn m10_dem_benchmark_rows_have_stab_compare_runners() {
             &["stab_graphlike_search_chain"][..],
         ),
         (
+            "m10-analyze-errors-decompose-cli",
+            Runner::StimCli,
+            &["stab_analyze_errors_decompose_basic"][..],
+        ),
+        (
             "m10-dem-parse-contract",
             Runner::StimCli,
             &["stab_dem_parse_sample"][..],
