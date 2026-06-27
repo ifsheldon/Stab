@@ -12,6 +12,13 @@ fn analyze(text: &str) -> String {
         .to_dem_string()
 }
 
+fn analyze_with_options(text: &str, options: ErrorAnalyzerOptions) -> String {
+    let circuit = Circuit::from_stim_str(text).expect("circuit");
+    circuit_to_detector_error_model(&circuit, options)
+        .expect("analyze")
+        .to_dem_string()
+}
+
 #[test]
 fn dem_analyzer_quantum_controlled_pauli_gates_propagate_upstream_subset() {
     for circuit in [
@@ -80,4 +87,52 @@ fn dem_analyzer_quantum_controlled_pauli_gates_propagate_upstream_subset() {
     ] {
         assert_eq!(analyze(circuit), "error(0.125) D0\n");
     }
+}
+
+#[test]
+fn dem_analyzer_composite_controlled_pauli_case_matches_upstream_subset() {
+    let dem = analyze_with_options(
+        "
+        XCX 0 1 0 3 0 4
+        MR 0
+        XCZ 0 1 0 2 0 4 0 5
+        MR 0
+        XCX 0 2 0 5 0 6
+        MR 0
+        XCZ 0 3 0 4 0 7
+        MR 0
+        XCX 0 4 0 5 0 7 0 8
+        MR 0
+        XCZ 0 5 0 6 0 7
+        MR 0
+        DEPOLARIZE1(0.01) 4
+        XCX 0 1 0 3 0 4
+        MR 0
+        XCZ 0 1 0 2 0 4 0 5
+        MR 0
+        XCX 0 2 0 5 0 6
+        MR 0
+        XCZ 0 3 0 4 0 7
+        MR 0
+        XCX 0 4 0 5 0 7 0 8
+        MR 0
+        XCZ 0 5 0 6 0 7
+        MR 0
+        DETECTOR rec[-6] rec[-12]
+        DETECTOR rec[-5] rec[-11]
+        DETECTOR rec[-4] rec[-10]
+        DETECTOR rec[-3] rec[-9]
+        DETECTOR rec[-2] rec[-8]
+        DETECTOR rec[-1] rec[-7]
+        ",
+        ErrorAnalyzerOptions {
+            decompose_errors: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    );
+
+    assert_eq!(
+        dem,
+        "error(0.003344519141621982161183268544846214) D0 D4\nerror(0.003344519141621982161183268544846214) D0 D4 ^ D1 D3\nerror(0.003344519141621982161183268544846214) D1 D3\ndetector D2\ndetector D5\n"
+    );
 }
