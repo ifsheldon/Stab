@@ -877,6 +877,9 @@ impl Analyzer {
                     "CX expected paired qubit targets during error analysis",
                 ));
             };
+            if control.sweep_bit_id().is_some() {
+                continue;
+            }
             let Some(control) = control.qubit_id() else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
                     "CX control target {control} is not a qubit"

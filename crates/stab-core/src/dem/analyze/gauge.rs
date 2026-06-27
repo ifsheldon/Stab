@@ -434,6 +434,9 @@ impl GaugeTracker {
                     "CX expected paired qubit targets during gauge analysis",
                 ));
             };
+            if control.sweep_bit_id().is_some() {
+                continue;
+            }
             let control = control.qubit_id().ok_or_else(|| {
                 CircuitError::invalid_detector_error_model(format!(
                     "CX control target {control} is not a qubit"
