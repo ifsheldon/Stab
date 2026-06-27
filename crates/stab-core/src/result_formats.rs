@@ -35,6 +35,78 @@ pub fn write_ptb64_records(records: &[Vec<bool>]) -> Vec<u8> {
     output
 }
 
+pub fn write_ptb64_records_checked(records: &[Vec<bool>]) -> CircuitResult<Vec<u8>> {
+    validate_ptb64_shot_count(records.len())?;
+    validate_uniform_record_width(records, "ptb64")?;
+    Ok(write_ptb64_records(records))
+}
+
+pub fn read_ptb64_records(
+    input: &[u8],
+    bits_per_record: usize,
+    max_shots: usize,
+) -> CircuitResult<Vec<Vec<bool>>> {
+    validate_ptb64_shot_count(max_shots)?;
+    if max_shots == 0 {
+        return Ok(Vec::new());
+    }
+    if bits_per_record == 0 {
+        return Err(CircuitError::invalid_result_format(
+            "ptb64 input cannot represent a nonzero number of zero-width records",
+        ));
+    }
+
+    let shot_groups = max_shots / 64;
+    let bytes_per_group = bits_per_record
+        .checked_mul(8)
+        .ok_or_else(|| CircuitError::invalid_result_format("ptb64 record byte width overflowed"))?;
+    let expected_bytes = shot_groups.checked_mul(bytes_per_group).ok_or_else(|| {
+        CircuitError::invalid_result_format("ptb64 expected byte count overflowed")
+    })?;
+    if input.len() < expected_bytes {
+        return Err(CircuitError::invalid_result_format(format!(
+            "ptb64 input expected at least {expected_bytes} bytes for {max_shots} records with {bits_per_record} bits each, got {}",
+            input.len()
+        )));
+    }
+
+    let input = input.get(..expected_bytes).ok_or_else(|| {
+        CircuitError::invalid_result_format("ptb64 expected byte range was out of bounds")
+    })?;
+    let mut records = vec![vec![false; bits_per_record]; max_shots];
+    for (group_records, group_bytes) in records
+        .chunks_exact_mut(64)
+        .zip(input.chunks_exact(bytes_per_group))
+        .take(shot_groups)
+    {
+        for (bit_index, word_chunk) in group_bytes.chunks_exact(8).enumerate() {
+            let mut word_bytes = [0u8; 8];
+            word_bytes.copy_from_slice(word_chunk);
+            let word = u64::from_le_bytes(word_bytes);
+            for (shot_offset, record) in group_records.iter_mut().enumerate() {
+                if word & (1u64 << shot_offset) != 0 {
+                    let bit = record.get_mut(bit_index).ok_or_else(|| {
+                        CircuitError::invalid_result_format(
+                            "ptb64 bit index was out of decoded record bounds",
+                        )
+                    })?;
+                    *bit = true;
+                }
+            }
+        }
+    }
+    Ok(records)
+}
+
+pub fn validate_ptb64_shot_count(shots: usize) -> CircuitResult<()> {
+    if !shots.is_multiple_of(64) {
+        return Err(CircuitError::invalid_sampler_compilation(
+            "shots must be a multiple of 64 to use ptb64 format",
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MeasureRecord {
     storage: Vec<bool>,
@@ -613,6 +685,22 @@ fn unpack_b8_chunk(chunk: &[u8], bits_per_record: usize) -> Vec<bool> {
         .collect()
 }
 
+fn validate_uniform_record_width(records: &[Vec<bool>], kind: &'static str) -> CircuitResult<()> {
+    let Some(first) = records.first() else {
+        return Ok(());
+    };
+    let expected = first.len();
+    for (index, record) in records.iter().enumerate() {
+        if record.len() != expected {
+            return Err(CircuitError::invalid_result_format(format!(
+                "{kind} record {index} expected {expected} bits, got {}",
+                record.len()
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn xor_reference(record: &[bool], reference_sample: &[bool]) -> CircuitResult<Vec<bool>> {
     if record.len() != reference_sample.len() {
         return Err(CircuitError::invalid_result_format(format!(
@@ -901,5 +989,17 @@ mod tests {
                 0, 0, 0, 0, 0,
             ]
         );
+        let encoded = write_ptb64_records_checked(&records).unwrap();
+        assert_eq!(read_ptb64_records(&encoded, 4, 64).unwrap(), records);
+
+        let mut encoded_with_extra_group = encoded.clone();
+        encoded_with_extra_group.extend_from_slice(&encoded);
+        assert_eq!(
+            read_ptb64_records(&encoded_with_extra_group, 4, 64).unwrap(),
+            records
+        );
+        assert!(write_ptb64_records_checked(&records[..63]).is_err());
+        assert!(read_ptb64_records(&encoded[..31], 4, 64).is_err());
+        assert!(read_ptb64_records(&encoded, 0, 64).is_err());
     }
 }

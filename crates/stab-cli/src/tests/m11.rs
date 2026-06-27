@@ -1,6 +1,11 @@
 use super::run_from;
+use stab_core::result_formats::write_ptb64_records;
 use std::ffi::OsString;
 use tempfile::tempdir;
+
+fn ptb64_words(words: &[u64]) -> Vec<u8> {
+    words.iter().flat_map(|word| word.to_le_bytes()).collect()
+}
 
 #[test]
 fn sample_dem_deterministic_matches_m11_oracle_golden() {
@@ -158,6 +163,49 @@ fn sample_dem_writes_error_records_to_err_out_like_upstream() {
 }
 
 #[test]
+fn sample_dem_writes_ptb64_detector_observable_and_error_streams() {
+    let dir = tempdir().expect("tempdir");
+    let obs_path = dir.path().join("obs.ptb64");
+    let err_path = dir.path().join("errors.ptb64");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--out_format"),
+        OsString::from("ptb64"),
+        OsString::from("--obs_out"),
+        obs_path.clone().into_os_string(),
+        OsString::from("--obs_out_format"),
+        OsString::from("ptb64"),
+        OsString::from("--err_out"),
+        err_path.clone().into_os_string(),
+        OsString::from("--err_out_format"),
+        OsString::from("ptb64"),
+        OsString::from("--shots"),
+        OsString::from("64"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        args,
+        b"error(1) D0 L0\nerror(0) D1\nerror(1) D1\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(stdout, ptb64_words(&[u64::MAX, u64::MAX]));
+    assert_eq!(
+        std::fs::read(obs_path).expect("obs output"),
+        ptb64_words(&[u64::MAX])
+    );
+    assert_eq!(
+        std::fs::read(err_path).expect("error output"),
+        ptb64_words(&[u64::MAX, 0, u64::MAX])
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
 fn sample_dem_replays_error_records_into_detector_and_observable_streams() {
     let dir = tempdir().expect("tempdir");
     let replay_path = dir.path().join("errors.dets");
@@ -205,6 +253,99 @@ fn sample_dem_replays_error_records_into_detector_and_observable_streams() {
         "0\n1\n0,1\n"
     );
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_dem_replays_ptb64_error_records() {
+    let dir = tempdir().expect("tempdir");
+    let replay_path = dir.path().join("errors.ptb64");
+    let obs_path = dir.path().join("obs.01");
+    let mut replay_input = write_ptb64_records(&vec![vec![true, false]; 64]);
+    replay_input.push(0xA5);
+    std::fs::write(&replay_path, replay_input).expect("write replay input");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--replay_err_in"),
+        replay_path.into_os_string(),
+        OsString::from("--replay_err_in_format"),
+        OsString::from("ptb64"),
+        OsString::from("--obs_out"),
+        obs_path.clone().into_os_string(),
+        OsString::from("--shots"),
+        OsString::from("64"),
+        OsString::from("--seed"),
+        OsString::from("0"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        args,
+        b"error(0.25) D0 L0\nerror(0.25) D1\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "10\n".repeat(64));
+    assert_eq!(
+        std::fs::read_to_string(obs_path).expect("obs output"),
+        "1\n".repeat(64)
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_dem_rejects_truncated_ptb64_replay_input() {
+    let dir = tempdir().expect("tempdir");
+    let replay_path = dir.path().join("errors.ptb64");
+    std::fs::write(&replay_path, ptb64_words(&[u64::MAX])).expect("write truncated replay input");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--replay_err_in"),
+        replay_path.into_os_string(),
+        OsString::from("--replay_err_in_format"),
+        OsString::from("ptb64"),
+        OsString::from("--shots"),
+        OsString::from("64"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        args,
+        b"error(0.25) D0 L0\nerror(0.25) D1\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("ptb64 input expected at least 16 bytes")
+    );
+}
+
+#[test]
+fn sample_dem_rejects_ptb64_shots_that_are_not_multiple_of_64() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample_dem", "--out_format=ptb64", "--shots=63"],
+        b"error(1) D0\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("shots must be a multiple of 64 to use ptb64 format")
+    );
 }
 
 #[test]

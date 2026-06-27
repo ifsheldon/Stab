@@ -1,17 +1,47 @@
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
-use clap::Args;
+use clap::{Args, ValueEnum};
 use stab_core::{
-    CompiledDemSampler, DetectionObservableOutputMode, DetectorErrorModel,
-    result_formats::{read_measurement_records, write_records},
-    write_detection_records,
+    CompiledDemSampler, DetectionObservableOutputMode, DetectorErrorModel, SampleFormat,
+    result_formats::{
+        read_measurement_records, read_ptb64_records, validate_ptb64_shot_count,
+        write_ptb64_records_checked, write_records,
+    },
+    write_detection_records, write_observable_records, write_ptb64_detection_records,
+    write_ptb64_observable_records,
 };
 
-use super::{
-    CliError, RecordFormatArg, SampleOutFormatArg, read_input, write_empty_observables,
-    write_optional_observables, write_output,
-};
+use super::{CliError, SampleOutFormatArg, read_input, write_empty_observables, write_output};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum SampleDemRecordFormatArg {
+    #[value(name = "01")]
+    ZeroOne,
+    #[value(name = "b8")]
+    B8,
+    #[value(name = "r8")]
+    R8,
+    #[value(name = "ptb64")]
+    Ptb64,
+    #[value(name = "hits")]
+    Hits,
+    #[value(name = "dets")]
+    Dets,
+}
+
+impl SampleDemRecordFormatArg {
+    fn sample_format(self) -> Result<SampleFormat, CliError> {
+        match self {
+            Self::ZeroOne => Ok(SampleFormat::ZeroOne),
+            Self::B8 => Ok(SampleFormat::B8),
+            Self::R8 => Ok(SampleFormat::R8),
+            Self::Hits => Ok(SampleFormat::Hits),
+            Self::Dets => Ok(SampleFormat::Dets),
+            Self::Ptb64 => Err(CliError::UnsupportedDetectionFormat { format: "ptb64" }),
+        }
+    }
+}
 
 #[derive(Debug, Args)]
 pub(super) struct SampleDemArgs {
@@ -49,7 +79,7 @@ pub(super) struct SampleDemArgs {
 
     /// Separate observable-flip output format.
     #[arg(long = "obs_out_format", value_enum, default_value = "01")]
-    obs_out_format: RecordFormatArg,
+    obs_out_format: SampleDemRecordFormatArg,
 
     /// Optional sampled-error output path.
     #[arg(long = "err_out")]
@@ -57,7 +87,7 @@ pub(super) struct SampleDemArgs {
 
     /// Sampled-error output format.
     #[arg(long = "err_out_format", value_enum, default_value = "01")]
-    err_out_format: RecordFormatArg,
+    err_out_format: SampleDemRecordFormatArg,
 
     /// Optional sampled-error replay input path.
     #[arg(long = "replay_err_in")]
@@ -65,7 +95,7 @@ pub(super) struct SampleDemArgs {
 
     /// Sampled-error replay input format.
     #[arg(long = "replay_err_in_format", value_enum, default_value = "01")]
-    replay_err_in_format: RecordFormatArg,
+    replay_err_in_format: SampleDemRecordFormatArg,
 }
 
 pub(super) fn run_sample_dem<R, W>(
@@ -78,6 +108,7 @@ where
     W: Write,
 {
     validate_observable_routing(&args)?;
+    validate_ptb64_routing(&args)?;
     if args.shots == 0 {
         write_output(args.output.as_ref(), stdout, &[])?;
         write_empty_observables(args.obs_output.as_ref(), stdout)?;
@@ -106,10 +137,9 @@ where
         sampler.sample_detection_events_with_seed(args.shots, args.seed)?
     };
     let observable_mode = observable_output_mode(&args);
-    let bytes =
-        write_detection_records(&output, observable_mode, args.out_format.sample_format()?)?;
+    let bytes = write_sample_dem_detection_records(&output, observable_mode, args.out_format)?;
     write_output(args.output.as_ref(), stdout, &bytes)?;
-    write_optional_observables(
+    write_optional_sample_dem_observables(
         args.obs_output.as_ref(),
         args.obs_out_format,
         stdout,
@@ -138,9 +168,21 @@ fn validate_observable_routing(args: &SampleDemArgs) -> Result<(), CliError> {
     Ok(())
 }
 
+fn validate_ptb64_routing(args: &SampleDemArgs) -> Result<(), CliError> {
+    let uses_ptb64 = args.out_format == SampleOutFormatArg::Ptb64
+        || (args.obs_output.is_some() && args.obs_out_format == SampleDemRecordFormatArg::Ptb64)
+        || (args.error_output.is_some() && args.err_out_format == SampleDemRecordFormatArg::Ptb64)
+        || (args.replay_error_input.is_some()
+            && args.replay_err_in_format == SampleDemRecordFormatArg::Ptb64);
+    if uses_ptb64 {
+        validate_ptb64_shot_count(args.shots)?;
+    }
+    Ok(())
+}
+
 fn read_replay_error_records(
     path: &PathBuf,
-    format: RecordFormatArg,
+    format: SampleDemRecordFormatArg,
     error_count: usize,
     expected_shots: usize,
 ) -> Result<Vec<Vec<bool>>, CliError> {
@@ -148,7 +190,11 @@ fn read_replay_error_records(
         path: path.clone(),
         source,
     })?;
-    let mut records = read_measurement_records(&input, format.sample_format()?, error_count)?;
+    let mut records = if format == SampleDemRecordFormatArg::Ptb64 {
+        read_ptb64_records(&input, error_count, expected_shots)?
+    } else {
+        read_measurement_records(&input, format.sample_format()?, error_count)?
+    };
     if records.len() < expected_shots {
         return Err(CliError::ReplayErrorRecordCountMismatch {
             expected: expected_shots,
@@ -157,6 +203,45 @@ fn read_replay_error_records(
     }
     records.truncate(expected_shots);
     Ok(records)
+}
+
+fn write_sample_dem_detection_records(
+    output: &stab_core::DetectionConversionOutput,
+    observable_mode: DetectionObservableOutputMode,
+    format: SampleOutFormatArg,
+) -> Result<Vec<u8>, CliError> {
+    match format {
+        SampleOutFormatArg::Ptb64 => Ok(write_ptb64_detection_records(output, observable_mode)?),
+        SampleOutFormatArg::ZeroOne
+        | SampleOutFormatArg::B8
+        | SampleOutFormatArg::R8
+        | SampleOutFormatArg::Hits
+        | SampleOutFormatArg::Dets => Ok(write_detection_records(
+            output,
+            observable_mode,
+            format.sample_format()?,
+        )?),
+    }
+}
+
+fn write_optional_sample_dem_observables<W>(
+    output_path: Option<&PathBuf>,
+    format: SampleDemRecordFormatArg,
+    stdout: &mut W,
+    detection_output: &stab_core::DetectionConversionOutput,
+) -> Result<(), CliError>
+where
+    W: Write,
+{
+    let Some(output_path) = output_path else {
+        return Ok(());
+    };
+    let output = if format == SampleDemRecordFormatArg::Ptb64 {
+        write_ptb64_observable_records(detection_output)?
+    } else {
+        write_observable_records(detection_output, format.sample_format()?)?
+    };
+    write_output(Some(output_path), stdout, &output)
 }
 
 fn write_empty_errors<W>(output_path: Option<&PathBuf>, stdout: &mut W) -> Result<(), CliError>
@@ -171,7 +256,7 @@ where
 
 fn write_optional_error_records<W>(
     output_path: Option<&PathBuf>,
-    format: RecordFormatArg,
+    format: SampleDemRecordFormatArg,
     stdout: &mut W,
     error_records: &[Vec<bool>],
 ) -> Result<(), CliError>
@@ -181,7 +266,11 @@ where
     let Some(output_path) = output_path else {
         return Ok(());
     };
-    let output = write_records(error_records, format.sample_format()?);
+    let output = if format == SampleDemRecordFormatArg::Ptb64 {
+        write_ptb64_records_checked(error_records)?
+    } else {
+        write_records(error_records, format.sample_format()?)
+    };
     write_output(Some(output_path), stdout, &output)
 }
 

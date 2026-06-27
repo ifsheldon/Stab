@@ -50,6 +50,7 @@ pub use detection::{
     DetectionObservableOutputMode, convert_measurements_to_detection_events,
     detection_record_width, measurement_record_count, sample_detection_events,
     validate_detection_sampling_circuit, write_detection_records, write_observable_records,
+    write_ptb64_detection_records, write_ptb64_observable_records,
 };
 pub use error::{CircuitError, CircuitResult};
 pub use error_matcher::explain_errors_from_circuit;

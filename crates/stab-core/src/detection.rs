@@ -1,6 +1,7 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, CompiledSampler,
-    RepeatBlock, SampleFormat, result_formats::MeasureRecordWriter,
+    RepeatBlock, SampleFormat,
+    result_formats::{MeasureRecordWriter, write_ptb64_records_checked},
 };
 
 const MAX_DETECTION_RECORD_BITS: usize = 1_000_000;
@@ -154,6 +155,21 @@ pub fn write_observable_records(
         writer.write_end();
     }
     Ok(writer.into_bytes())
+}
+
+pub fn write_ptb64_detection_records(
+    output: &DetectionConversionOutput,
+    observable_mode: DetectionObservableOutputMode,
+) -> CircuitResult<Vec<u8>> {
+    let records = detection_records_as_bits(output, observable_mode)?;
+    write_ptb64_records_checked(&records)
+}
+
+pub fn write_ptb64_observable_records(
+    output: &DetectionConversionOutput,
+) -> CircuitResult<Vec<u8>> {
+    let records = observable_records_as_bits(output)?;
+    write_ptb64_records_checked(&records)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -389,6 +405,52 @@ fn validate_buffer_bits(kind: &str, shots: usize, bits_per_shot: usize) -> Circu
         )));
     }
     Ok(())
+}
+
+fn detection_records_as_bits(
+    output: &DetectionConversionOutput,
+    observable_mode: DetectionObservableOutputMode,
+) -> CircuitResult<Vec<Vec<bool>>> {
+    output
+        .records
+        .iter()
+        .map(|record| {
+            validate_record_widths(output, record)?;
+            let capacity = match observable_mode {
+                DetectionObservableOutputMode::DetectorsOnly => output.detector_count,
+                DetectionObservableOutputMode::Append | DetectionObservableOutputMode::Prepend => {
+                    output
+                        .detector_count
+                        .checked_add(output.observable_count)
+                        .ok_or_else(|| {
+                            CircuitError::invalid_result_format(
+                                "detection record width overflowed while writing ptb64 output",
+                            )
+                        })?
+                }
+            };
+            let mut bits = Vec::with_capacity(capacity);
+            if observable_mode == DetectionObservableOutputMode::Prepend {
+                bits.extend_from_slice(&record.observables);
+            }
+            bits.extend_from_slice(&record.detectors);
+            if observable_mode == DetectionObservableOutputMode::Append {
+                bits.extend_from_slice(&record.observables);
+            }
+            Ok(bits)
+        })
+        .collect()
+}
+
+fn observable_records_as_bits(output: &DetectionConversionOutput) -> CircuitResult<Vec<Vec<bool>>> {
+    output
+        .records
+        .iter()
+        .map(|record| {
+            validate_record_widths(output, record)?;
+            Ok(record.observables.clone())
+        })
+        .collect()
 }
 
 fn validate_sampling_observables(circuit: &Circuit) -> CircuitResult<()> {
@@ -719,6 +781,30 @@ mod tests {
         assert_eq!(
             write_observable_records(&output, SampleFormat::B8).unwrap(),
             [0b0000_0010, 0b0000_0001]
+        );
+
+        let ptb64_output = DetectionConversionOutput {
+            detector_count: 2,
+            observable_count: 1,
+            records: vec![
+                DetectionEventRecord {
+                    detectors: vec![true, false],
+                    observables: vec![true],
+                };
+                64
+            ],
+        };
+        assert_eq!(
+            write_ptb64_detection_records(&ptb64_output, DetectionObservableOutputMode::Append)
+                .unwrap(),
+            [
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff,
+                0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            ]
+        );
+        assert_eq!(
+            write_ptb64_observable_records(&ptb64_output).unwrap(),
+            [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
         );
     }
 

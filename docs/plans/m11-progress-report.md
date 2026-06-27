@@ -7,12 +7,13 @@ M11: Detector Error Model Sampling
 ## Status
 
 Partial progress, not milestone-complete.
-This slice implements the first deterministic `sample_dem` path, the first one-bit noisy statistical `sample_dem` row, the M11-owned structural subset of `src/stim/simulators/dem_sampler.test.cc`, initial M11 benchmark comparison runners, `sample_dem` error-record output and replay for the currently supported result formats, and two audit fixes for `sample_dem` detector/observable routing and hostile nested DEM repeats.
+This slice implements the first deterministic `sample_dem` path, the first one-bit noisy statistical `sample_dem` row, the M11-owned structural subset of `src/stim/simulators/dem_sampler.test.cc`, initial M11 benchmark comparison runners, `sample_dem` error-record output and replay for Stim result formats including `ptb64`, and two audit fixes for `sample_dem` detector/observable routing and hostile nested DEM repeats.
 
 ## Tests Ported Or Created
 
 - `cargo test -p stab-core --test dem_sampler` covers the initial `CompiledDemSampler` subset ported from `src/stim/simulators/dem_sampler.test.cc`, including empty and sparse sizing, high detector and observable ids, observables-only errors, `error(1)` detector toggling, `error(0)` no-op behavior, p=0.25, p=0.5, and p=0.75 probability bands, separator handling, detector-observable correlation, correlated detector-combination parity, detector shifts, repeat blocks, bounded repeat-expansion rejection, logical observable flips, sampled-error recording and replay width validation, dense bit-packed detector and observable output, fixed-seed noisy sampling reproducibility, and one-bit p=0.25 statistical behavior.
-- `cargo test -p stab-cli sample_dem` covers the existing `m11-sample-dem-deterministic` oracle row for `stab sample_dem --shots 3` against pinned Stim v1.16.0 output, the `m11-sample-dem-noisy-statistical` one-bit seeded distribution row, the upstream `--obs_out` detector/observable split behavior, `--out_format=dets` detector-only stdout with separate observable output, `--err_out` sampled-error output, `--replay_err_in` replay into detector and observable streams, replayed error copying through `--err_out`, and replay shot-count validation.
+- `cargo test -p stab-core result_formats` and `cargo test -p stab-core detection_record_writers_cover_text_and_bit_packed_formats` cover `ptb64` byte layout, replay decoding, detector stream output, and observable stream output helpers.
+- `cargo test -p stab-cli sample_dem` covers the existing `m11-sample-dem-deterministic` oracle row for `stab sample_dem --shots 3` against pinned Stim v1.16.0 output, the `m11-sample-dem-noisy-statistical` one-bit seeded distribution row, the upstream `--obs_out` detector/observable split behavior, `--out_format=dets` detector-only stdout with separate observable output, `--err_out` sampled-error output, `--replay_err_in` replay into detector and observable streams, replayed error copying through `--err_out`, `ptb64` detector, observable, error, and replay streams, and replay shot-count validation.
 - `just oracle::run --milestone M11 --exact` covers the implemented deterministic exact-output row after the manifest status is promoted from `red` to `implemented`.
 - `just oracle::run --milestone M11 --statistical` covers the implemented noisy one-bit statistical row.
 - `just oracle::run --milestone M11 --structural` covers the implemented `coverage-simulators-dem-sampler` structural row.
@@ -23,7 +24,7 @@ This slice implements the first deterministic `sample_dem` path, the first one-b
 - Added `CompiledDemSampler` in `stab-core` with reusable compiled DEM operations, seeded sampling, detector-shift handling, repeat-block unrolling with a bounded initial limit, and shared `DetectionConversionOutput` records.
 - Added `stab sample_dem` in `stab-cli` with `--shots`, `--in`, `--out`, `--out_format`, `--seed`, `--append_observables`, hidden `--prepend_observables`, `--obs_out`, `--obs_out_format`, `--err_out`, `--err_out_format`, `--replay_err_in`, and `--replay_err_in_format` arguments.
 - Reused the existing detection-event and observable record writers so `sample_dem` uses the same output format behavior as `detect` and `m2d`.
-- Reused the existing result-format readers and writers so `sample_dem` can write sampled-error records and replay error records in `01`, `b8`, `r8`, `hits`, and `dets` formats.
+- Reused the existing result-format readers and writers so `sample_dem` can write sampled-error records and replay error records in `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` formats.
 - Fixed `sample_dem --out_format=dets` so detector output remains detector-only and `--obs_out` can be used for observables, matching Stim's independent detector and observable stream semantics for the covered subset.
 - Added a pre-count DEM sampler compilation budget so oversized and nested repeat expansion is rejected before detector counting can perform unbounded work.
 - Promoted `m11-sample-dem-deterministic`, `m11-sample-dem-noisy-statistical`, and `coverage-simulators-dem-sampler` in `oracle/fixtures/manifest.csv` to `implemented`.
@@ -36,7 +37,8 @@ This slice implements the first deterministic `sample_dem` path, the first one-b
 | `CompiledDemSampler` reusable sampling state | Partial | `CompiledDemSampler::compile`, `CompiledDemSampler::sample_detection_events_with_seed`, `CompiledDemSampler::sample_detection_events_and_errors_with_seed`, `CompiledDemSampler::sample_detection_events_from_error_records`, bounded repeat-expansion rejection, and `cargo test -p stab-core --test dem_sampler` including dense `b8` output coverage |
 | `stim sample_dem` deterministic CLI output | Partial | `m11-sample-dem-deterministic`, `cargo test -p stab-cli sample_dem_deterministic`, `cargo test -p stab-cli sample_dem_writes_observables`, `cargo test -p stab-cli sample_dem_dets_output`, `cargo test -p stab-cli sample_dem_writes_error_records`, `cargo test -p stab-cli sample_dem_replays_error_records`, `just oracle::run --milestone M11 --exact` |
 | `stim sample_dem` one-bit noisy statistical CLI output | Partial | `m11-sample-dem-noisy-statistical`, `cargo test -p stab-cli sample_dem_noisy`, `just oracle::run --milestone M11 --statistical` |
-| `stim sample_dem` sampled-error output and replay | Partial | `cargo test -p stab-core --test dem_sampler`, `cargo test -p stab-cli sample_dem_writes_error_records`, `cargo test -p stab-cli sample_dem_replays_error_records`, `cargo test -p stab-cli sample_dem_rejects_replay_record_count_mismatch`; `ptb64` remains outside the covered subset |
+| `stim sample_dem` sampled-error output and replay | Partial | `cargo test -p stab-core --test dem_sampler`, `cargo test -p stab-core result_formats`, `cargo test -p stab-cli sample_dem_writes_error_records`, `cargo test -p stab-cli sample_dem_writes_ptb64_detector_observable_and_error_streams`, `cargo test -p stab-cli sample_dem_replays_error_records`, `cargo test -p stab-cli sample_dem_replays_ptb64_error_records`, `cargo test -p stab-cli sample_dem_rejects_replay_record_count_mismatch` |
+| `ptb64` result-format helpers for `sample_dem` streams | Satisfied | `cargo test -p stab-core result_formats`, `cargo test -p stab-core detection_record_writers_cover_text_and_bit_packed_formats`, `cargo test -p stab-cli sample_dem_writes_ptb64_detector_observable_and_error_streams`, `cargo test -p stab-cli sample_dem_replays_ptb64_error_records`, `cargo test -p stab-cli sample_dem_rejects_truncated_ptb64_replay_input`, `cargo test -p stab-cli sample_dem_rejects_ptb64_shots_that_are_not_multiple_of_64` |
 | Sparse, dense, repeated, high-detector-count, and correlated-error fixture groups | Partial | `coverage-simulators-dem-sampler`, `cargo test -p stab-core --test dem_sampler`, `just oracle::run --milestone M11 --structural`; benchmark-scale fixture groups remain future work |
 | M11 benchmark reporting | Partial | `cargo test -p stab-bench m11_benchmark_rows_have_stab_compare_runners`; `just bench::compare --milestone M11` now reports all M11 Stab-side benchmark rows, while strict Stab-vs-Stim comparison still depends on the selected baseline artifact containing measured M11 pinned-Stim rows |
 
@@ -44,7 +46,7 @@ This slice implements the first deterministic `sample_dem` path, the first one-b
 
 - Milestone audit and full-code-review found and this slice fixed the `sample_dem --out_format=dets` observable-routing incompatibility.
 - Milestone audit and full-code-review found and this slice fixed the nested-repeat denial-of-service path by validating sampler repeat expansion before detector counting.
-- This slice partially addresses the open `sample_dem` flag-scope gap by implementing error-record output and replay for `01`, `b8`, `r8`, `hits`, and `dets` formats.
+- This slice further addresses the open `sample_dem` flag-scope gap by implementing detector, observable, error, and replay streams for `ptb64`.
 - Remaining under-specified M11 scope is logged in `docs/plans/milestone-spec-gaps.md`: full `sample_dem` flag and format scope, fixture-group acceptance, streaming and scale limits, and benchmark baseline comparability.
 
 ## Verification Commands
@@ -52,6 +54,7 @@ This slice implements the first deterministic `sample_dem` path, the first one-b
 - `cargo fmt --check --all`
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo test --workspace --quiet`
+- `cargo test -p stab-core result_formats --quiet`
 - `cargo test -p stab-core --test dem_sampler --quiet`
 - `cargo test -p stab-cli sample_dem --quiet`
 - `just oracle::run --milestone M11 --exact`
