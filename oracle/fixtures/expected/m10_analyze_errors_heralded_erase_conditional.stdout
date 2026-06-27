@@ -1,0 +1,26 @@
+error(0.5) D5
+error(0.5) D7
+error(0.25) D10
+error(0.25) D10 D11
+error(0.25) D11
+error(1) D12
+error(0.5) D15
+error(0.5) D15 D17
+error(0.5) D18
+error(0.5) D18 D19
+error(0.25) D21
+error(0.25) D21 D22
+error(0.25) D21 D22 D23
+error(0.25) D21 D23
+detector D0
+detector D1
+detector D2
+detector D3
+detector D4
+detector D6
+detector D8
+detector D9
+detector D13
+detector D14
+detector D16
+detector D20
