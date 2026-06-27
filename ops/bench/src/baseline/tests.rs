@@ -339,7 +339,13 @@ fn m6_benchmark_rows_have_stab_compare_runners() {
                 "stab_pauli_string_multiplication_10K",
             ][..],
         ),
-        ("m6-pauli-iter", &["stab_pauli_iter_16q_weight_1_to_3"][..]),
+        (
+            "m6-pauli-iter",
+            &[
+                "stab_pauli_iter_xz_2_to_5_of_5",
+                "stab_pauli_iter_xyz_1_of_1000",
+            ][..],
+        ),
         (
             "m6-tableau",
             &[

@@ -317,6 +317,26 @@ fn stabilizers_pauli_string_iter_empty_and_restart_cases_match_stim() {
 }
 
 #[test]
+fn stabilizers_pauli_string_iter_borrowed_result_matches_stim_order() {
+    let mut iter = PauliStringIterator::new(3, 1, 2, true, false, true);
+    let mut results = Vec::new();
+    while iter.iter_next() {
+        results.push(iter.result().to_string());
+    }
+    assert_eq!(
+        results,
+        vec![
+            "+X__", "+Z__", "+_X_", "+_Z_", "+__X", "+__Z", "+XX_", "+XZ_", "+ZX_", "+ZZ_", "+X_X",
+            "+X_Z", "+Z_X", "+Z_Z", "+_XX", "+_XZ", "+_ZX", "+_ZZ"
+        ]
+    );
+
+    iter.restart();
+    assert!(iter.iter_next());
+    assert_eq!(iter.result().to_string(), "+X__");
+}
+
+#[test]
 fn stabilizers_flex_pauli_dense_and_sparse_text_follow_stim() {
     // Adapted from Stim v1.16.0 src/stim/stabilizers/flex_pauli_string.test.cc.
     let f = flex("-iIXYZ_xyz");

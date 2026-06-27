@@ -44,8 +44,8 @@ const M6_PAULI_CASES: [(&str, usize); 3] = [
     ("stab_pauli_string_multiplication_100K", 100_000),
     ("stab_pauli_string_multiplication_10K", 10_000),
 ];
-const M6_PAULI_ITER_QUBITS: usize = 16;
-const M6_PAULI_ITER_MAX_WEIGHT: usize = 3;
+const M6_PAULI_ITER_XZ_COUNT: f64 = 232.0;
+const M6_PAULI_ITER_XYZ_COUNT: f64 = 3_000.0;
 const M6_TABLEAU_QUBITS: usize = 32;
 const M6_TABLEAU_ITER_QUBITS: usize = 2;
 const M6_STABILIZER_QUBITS: usize = 16;
@@ -395,26 +395,18 @@ pub(crate) fn run_stab_compare_row(
             }
             Ok(Some(measurements))
         }
-        "m6-pauli-iter" => Ok(Some(vec![measure_stab(
-            "stab_pauli_iter_16q_weight_1_to_3",
-            || {
-                let mut count = 0_usize;
-                let mut total_weight = 0_usize;
-                for pauli in PauliStringIterator::new(
-                    M6_PAULI_ITER_QUBITS,
-                    1,
-                    M6_PAULI_ITER_MAX_WEIGHT,
-                    true,
-                    true,
-                    true,
-                ) {
-                    count += 1;
-                    total_weight += pauli.weight();
-                }
-                black_box((count, total_weight));
-                Ok(())
-            },
-        )?])),
+        "m6-pauli-iter" => Ok(Some(vec![
+            measure_pauli_iter("stab_pauli_iter_xz_2_to_5_of_5", 5, 2, 5, true, false, true)?,
+            measure_pauli_iter(
+                "stab_pauli_iter_xyz_1_of_1000",
+                1000,
+                1,
+                1,
+                true,
+                true,
+                true,
+            )?,
+        ])),
         "m6-tableau" => {
             let circuit = m6_tableau_circuit(&row.id)?;
             let tableau = circuit
@@ -614,6 +606,30 @@ fn splitmix64(mut value: u64) -> u64 {
     value ^ (value >> 31)
 }
 
+fn measure_pauli_iter(
+    name: &str,
+    num_qubits: usize,
+    min_weight: usize,
+    max_weight: usize,
+    allow_x: bool,
+    allow_y: bool,
+    allow_z: bool,
+) -> Result<Measurement, BenchError> {
+    measure_stab(name, || {
+        let mut count = 0_usize;
+        let mut total_len = 0_usize;
+        let mut iter = PauliStringIterator::new(
+            num_qubits, min_weight, max_weight, allow_x, allow_y, allow_z,
+        );
+        while iter.iter_next() {
+            count += 1;
+            total_len += iter.result().len();
+        }
+        black_box((count, total_len));
+        Ok(())
+    })
+}
+
 fn stab_runner_error(row_id: &str, error: impl ToString) -> BenchError {
     BenchError::StabRunner {
         row_id: row_id.to_string(),
@@ -742,7 +758,12 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             Some((100_000.0, "qubits/s"))
         }
         ("m6-pauli-string", "stab_pauli_string_multiplication_10K") => Some((10_000.0, "qubits/s")),
-        ("m6-pauli-iter", "stab_pauli_iter_16q_weight_1_to_3") => Some((16_248.0, "paulis/s")),
+        ("m6-pauli-iter", "stab_pauli_iter_xz_2_to_5_of_5") => {
+            Some((M6_PAULI_ITER_XZ_COUNT, "PauliStrings/s"))
+        }
+        ("m6-pauli-iter", "stab_pauli_iter_xyz_1_of_1000") => {
+            Some((M6_PAULI_ITER_XYZ_COUNT, "PauliStrings/s"))
+        }
         ("m6-tableau", "stab_tableau_from_circuit_32q") => {
             Some(((M6_TABLEAU_QUBITS * 2) as f64, "gates/s"))
         }
@@ -797,7 +818,7 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
             "direct-match: Stab measures in-place PauliString multiplication at 10K, 100K, and 1M against the pinned Stim perf filters",
         ),
         "m6-pauli-iter" => Some(
-            "report-only: deterministic 16q weight-1-to-3 iterator workload; upstream filters cover different iterator ranges",
+            "direct-match: Stab measures borrowed-result PauliStringIterator workloads matching the pinned Stim perf filters",
         ),
         "m6-tableau" => Some(
             "report-only: Stab uses deterministic 32q circuit/tableau operations until M12 defines optimized random 10k-qubit parity thresholds",

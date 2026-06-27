@@ -308,6 +308,41 @@ impl PauliString {
         !self.has_terms
     }
 
+    pub(crate) fn clear_terms(&mut self) {
+        self.sign = PauliSign::Plus;
+        self.xs.clear();
+        self.zs.clear();
+        self.has_terms = false;
+    }
+
+    pub(crate) fn set_in_bounds(&mut self, index: usize, basis: PauliBasis) {
+        debug_assert!(index < self.len());
+        let word = index / WORD_BITS;
+        let bit = index % WORD_BITS;
+        let mask = 1_u64 << bit;
+        let Some(x_word) = self.xs.words_mut().get_mut(word) else {
+            return;
+        };
+        let Some(z_word) = self.zs.words_mut().get_mut(word) else {
+            return;
+        };
+        if basis.x_bit() {
+            *x_word |= mask;
+        } else {
+            *x_word &= !mask;
+        }
+        if basis.z_bit() {
+            *z_word |= mask;
+        } else {
+            *z_word &= !mask;
+        }
+        if basis == PauliBasis::I {
+            self.has_terms = bits_have_terms(&self.xs, &self.zs);
+        } else {
+            self.has_terms = true;
+        }
+    }
+
     pub fn intersects(&self, rhs: &Self) -> StabilizerResult<bool> {
         Ok(self
             .xs

@@ -289,6 +289,7 @@ pub struct PauliStringIterator {
     current_weight: usize,
     positions: Vec<usize>,
     active_bases: Vec<PauliBasis>,
+    result: PauliString,
     state: PauliStringIteratorState,
 }
 
@@ -313,16 +314,57 @@ impl PauliStringIterator {
             current_weight: min_weight,
             positions: Vec::new(),
             active_bases: Vec::new(),
+            result: PauliString::identity(num_qubits),
             state: PauliStringIteratorState::Done,
         };
         result.restart();
         result
     }
 
+    /// Returns the current borrowed iterator result.
+    ///
+    /// The value is updated after each successful [`Self::iter_next`] call. This avoids allocating
+    /// a fresh Pauli string for callers that only need to inspect the current result.
+    pub fn result(&self) -> &PauliString {
+        &self.result
+    }
+
+    /// Advances to the next Pauli string while reusing the borrowed [`Self::result`] storage.
+    ///
+    /// The standard [`Iterator`] implementation remains available for callers that need owned
+    /// `PauliString` values.
+    pub fn iter_next(&mut self) -> bool {
+        loop {
+            match self.state {
+                PauliStringIteratorState::Done => return false,
+                PauliStringIteratorState::NeedFirst => {
+                    if self.prepare_current_weight() {
+                        return true;
+                    }
+                    self.advance_to_next_weight();
+                }
+                PauliStringIteratorState::Active => {
+                    if let Some(first_changed_basis) = self.advance_basis_digits() {
+                        self.sync_active_result_from(first_changed_basis);
+                        return true;
+                    }
+                    if self.advance_positions_and_reset_bases() {
+                        self.rewrite_active_result();
+                        return true;
+                    }
+                    if !self.advance_to_next_weight() {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
     pub fn restart(&mut self) {
         self.current_weight = self.min_weight;
         self.positions.clear();
         self.active_bases.clear();
+        self.result.clear_terms();
         self.state = if self.max_weight < self.min_weight {
             PauliStringIteratorState::Done
         } else {
@@ -333,6 +375,7 @@ impl PauliStringIterator {
     fn prepare_current_weight(&mut self) -> bool {
         self.positions.clear();
         self.active_bases.clear();
+        self.result.clear_terms();
         if self.current_weight > 0 {
             let Some(first_basis) = self.allowed.first() else {
                 return false;
@@ -340,34 +383,13 @@ impl PauliStringIterator {
             self.positions.extend(0..self.current_weight);
             self.active_bases
                 .extend(std::iter::repeat_n(first_basis, self.current_weight));
+            self.sync_active_result_from(0);
         }
         self.state = PauliStringIteratorState::Active;
         true
     }
 
-    fn current_result(&self) -> PauliString {
-        let mut active_terms = self
-            .positions
-            .iter()
-            .copied()
-            .zip(self.active_bases.iter().copied())
-            .peekable();
-        let bases = (0..self.num_qubits).map(|index| {
-            if active_terms
-                .peek()
-                .is_some_and(|(position, _basis)| *position == index)
-            {
-                active_terms
-                    .next()
-                    .map_or(PauliBasis::I, |(_position, basis)| basis)
-            } else {
-                PauliBasis::I
-            }
-        });
-        PauliString::from_bases(PauliSign::Plus, bases)
-    }
-
-    fn advance_basis_digits(&mut self) -> bool {
+    fn advance_basis_digits(&mut self) -> Option<usize> {
         for index in (0..self.active_bases.len()).rev() {
             let next_basis = self
                 .active_bases
@@ -379,10 +401,10 @@ impl PauliStringIterator {
                     *active_basis = next_basis;
                 }
                 self.reset_bases_after(index);
-                return true;
+                return Some(index);
             }
         }
-        false
+        None
     }
 
     fn advance_positions_and_reset_bases(&mut self) -> bool {
@@ -440,30 +462,33 @@ impl PauliStringIterator {
             }
         }
     }
+
+    fn rewrite_active_result(&mut self) {
+        self.result.clear_terms();
+        self.sync_active_result_from(0);
+    }
+
+    fn sync_active_result_from(&mut self, start: usize) {
+        for (position, basis) in self
+            .positions
+            .iter()
+            .copied()
+            .zip(self.active_bases.iter().copied())
+            .skip(start)
+        {
+            self.result.set_in_bounds(position, basis);
+        }
+    }
 }
 
 impl Iterator for PauliStringIterator {
     type Item = PauliString;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.state {
-                PauliStringIteratorState::Done => return None,
-                PauliStringIteratorState::NeedFirst => {
-                    if self.prepare_current_weight() {
-                        return Some(self.current_result());
-                    }
-                    self.advance_to_next_weight();
-                }
-                PauliStringIteratorState::Active => {
-                    if self.advance_basis_digits() || self.advance_positions_and_reset_bases() {
-                        return Some(self.current_result());
-                    }
-                    if !self.advance_to_next_weight() {
-                        return None;
-                    }
-                }
-            }
+        if self.iter_next() {
+            Some(self.result.clone())
+        } else {
+            None
         }
     }
 }
