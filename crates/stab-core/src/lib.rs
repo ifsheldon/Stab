@@ -14,6 +14,7 @@ mod detection;
 mod error;
 mod gate;
 mod ids;
+mod matched_error;
 mod mbqc_decomposition;
 mod reference_sample_tree;
 pub mod result_formats;
@@ -49,6 +50,10 @@ pub use detection::{
 pub use error::{CircuitError, CircuitResult};
 pub use gate::{Gate, GateCategory};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};
+pub use matched_error::{
+    CircuitErrorLocation, CircuitErrorLocationStackFrame, CircuitTargetsInsideInstruction,
+    DemTargetWithCoords, ExplainedError, FlippedMeasurement, GateTargetWithCoords,
+};
 pub use mbqc_decomposition::mbqc_decomposition;
 pub use reference_sample_tree::ReferenceSampleTree;
 pub use result_formats::SampleFormat;
