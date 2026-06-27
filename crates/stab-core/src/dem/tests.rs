@@ -176,6 +176,70 @@ fn dem_analyzer_maps_correlated_error_to_joint_detector_error() {
 }
 
 #[test]
+fn dem_analyzer_maps_else_correlated_error_block() {
+    let circuit = Circuit::from_stim_str(
+        "CORRELATED_ERROR(0.25) X0\n\
+         ELSE_CORRELATED_ERROR(0.25) X1\n\
+         ELSE_CORRELATED_ERROR(0.25) X2\n\
+         M 0 1 2\n\
+         DETECTOR rec[-3]\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            approximate_disjoint_errors: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .unwrap()
+    .to_dem_string();
+
+    assert_eq!(
+        dem,
+        "error(0.25) D0\nerror(0.1875) D1\nerror(0.140625) D2\n"
+    );
+}
+
+#[test]
+fn dem_analyzer_rejects_else_correlated_error_without_active_block() {
+    let missing_option =
+        Circuit::from_stim_str("CORRELATED_ERROR(0.25) X0\nELSE_CORRELATED_ERROR(0.25) X1\n")
+            .unwrap();
+    let dangling = Circuit::from_stim_str("ELSE_CORRELATED_ERROR(0.25) X1\n").unwrap();
+    let separated =
+        Circuit::from_stim_str("CORRELATED_ERROR(0.25) X0\nH 1\nELSE_CORRELATED_ERROR(0.25) X1\n")
+            .unwrap();
+
+    assert!(
+        circuit_to_detector_error_model(&missing_option, ErrorAnalyzerOptions::default()).is_err()
+    );
+    assert!(
+        circuit_to_detector_error_model(
+            &dangling,
+            ErrorAnalyzerOptions {
+                approximate_disjoint_errors: true,
+                ..ErrorAnalyzerOptions::default()
+            },
+        )
+        .is_err()
+    );
+    assert!(
+        circuit_to_detector_error_model(
+            &separated,
+            ErrorAnalyzerOptions {
+                approximate_disjoint_errors: true,
+                ..ErrorAnalyzerOptions::default()
+            },
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn dem_analyzer_merges_identical_error_symptoms() {
     let circuit =
         Circuit::from_stim_str("X_ERROR(0.125) 0\nX_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n")

@@ -89,6 +89,7 @@ struct Analyzer {
     coord_offset: Vec<f64>,
     pending_errors: Vec<PendingError>,
     pending_pauli_channels: Vec<PendingSingleQubitPauliChannel>,
+    else_correlated_error_remainder: Option<Probability>,
     completed_errors: Vec<PendingError>,
     detector_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
     observable_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
@@ -104,6 +105,7 @@ impl Analyzer {
             coord_offset: Vec::new(),
             pending_errors: Vec::new(),
             pending_pauli_channels: Vec::new(),
+            else_correlated_error_remainder: None,
             completed_errors: Vec::new(),
             detector_terms_by_measurement: BTreeMap::new(),
             observable_terms_by_measurement: BTreeMap::new(),
@@ -129,7 +131,11 @@ impl Analyzer {
         for item in circuit.items() {
             match item {
                 CircuitItem::Instruction(instruction) => self.visit_instruction(instruction)?,
-                CircuitItem::RepeatBlock(repeat) => self.visit_repeat(repeat)?,
+                CircuitItem::RepeatBlock(repeat) => {
+                    self.end_else_correlated_error_block();
+                    self.visit_repeat(repeat)?;
+                    self.end_else_correlated_error_block();
+                }
             }
         }
         Ok(())
@@ -148,15 +154,25 @@ impl Analyzer {
             )));
         }
         for _ in 0..repeat_count {
+            self.end_else_correlated_error_block();
             self.visit_circuit(repeat.body())?;
+            self.end_else_correlated_error_block();
         }
         Ok(())
     }
 
     fn visit_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        match instruction.gate().canonical_name() {
+        let gate_name = instruction.gate().canonical_name();
+        if !matches!(
+            gate_name,
+            "E" | "CORRELATED_ERROR" | "ELSE_CORRELATED_ERROR"
+        ) {
+            self.end_else_correlated_error_block();
+        }
+        match gate_name {
             "X_ERROR" | "Y_ERROR" | "Z_ERROR" => self.record_single_pauli_error(instruction),
             "E" | "CORRELATED_ERROR" => self.record_correlated_error(instruction),
+            "ELSE_CORRELATED_ERROR" => self.record_else_correlated_error(instruction),
             "I_ERROR" | "II_ERROR" => Ok(()),
             "PAULI_CHANNEL_1" => self.record_pauli_channel1(instruction),
             "DEPOLARIZE1" => self.record_depolarize1(instruction),
@@ -208,10 +224,49 @@ impl Analyzer {
         Ok(())
     }
 
+    fn end_else_correlated_error_block(&mut self) {
+        self.else_correlated_error_remainder = None;
+    }
+
     fn record_correlated_error(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         let Some(probability) = instruction.probability_argument()? else {
             return Ok(());
         };
+        self.record_correlated_error_with_probability(instruction, probability)?;
+        self.else_correlated_error_remainder = Some(Probability::try_new(1.0 - probability.get())?);
+        Ok(())
+    }
+
+    fn record_else_correlated_error(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<()> {
+        if !self.options.approximate_disjoint_errors {
+            return Err(CircuitError::invalid_detector_error_model(
+                "ELSE_CORRELATED_ERROR requires approximate_disjoint_errors during error analysis",
+            ));
+        }
+        let Some(probability) = instruction.probability_argument()? else {
+            return Ok(());
+        };
+        let Some(remainder) = self.else_correlated_error_remainder else {
+            return Err(CircuitError::invalid_detector_error_model(
+                "ELSE_CORRELATED_ERROR must immediately follow CORRELATED_ERROR or ELSE_CORRELATED_ERROR",
+            ));
+        };
+        let actual_probability = Probability::try_new(remainder.get() * probability.get())?;
+        self.record_correlated_error_with_probability(instruction, actual_probability)?;
+        self.else_correlated_error_remainder = Some(Probability::try_new(
+            remainder.get() * (1.0 - probability.get()),
+        )?);
+        Ok(())
+    }
+
+    fn record_correlated_error_with_probability(
+        &mut self,
+        instruction: &CircuitInstruction,
+        probability: Probability,
+    ) -> CircuitResult<()> {
         if probability.get() == 0.0 {
             return Ok(());
         }
