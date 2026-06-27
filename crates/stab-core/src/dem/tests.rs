@@ -100,15 +100,42 @@ fn dem_analyzer_preserves_shifted_detector_coordinates() {
 }
 
 #[test]
-fn dem_analyzer_rejects_unimplemented_loop_folding() {
+fn dem_analyzer_fold_loops_preserves_repeat_detector_shift() {
     let circuit = Circuit::from_stim_str("REPEAT 2 {\n    M 0\n    DETECTOR rec[-1]\n}\n").unwrap();
-    let result = circuit_to_detector_error_model(
+    let dem = circuit_to_detector_error_model(
         &circuit,
         ErrorAnalyzerOptions {
             fold_loops: true,
             ..ErrorAnalyzerOptions::default()
         },
-    );
+    )
+    .unwrap()
+    .to_dem_string();
 
-    assert!(result.is_err());
+    assert_eq!(
+        dem,
+        "repeat 2 {\n    detector D0\n    shift_detectors 1\n}\n"
+    );
+}
+
+#[test]
+fn dem_analyzer_fold_loops_preserves_repeat_noise_errors() {
+    let circuit = Circuit::from_stim_str(
+        "REPEAT 1000 {\n    R 0\n    X_ERROR(0.25) 0\n    M 0\n    DETECTOR rec[-1]\n}\n",
+    )
+    .unwrap();
+    let dem = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .unwrap()
+    .to_dem_string();
+
+    assert_eq!(
+        dem,
+        "repeat 1000 {\n    error(0.25) D0\n    shift_detectors 1\n}\n"
+    );
 }

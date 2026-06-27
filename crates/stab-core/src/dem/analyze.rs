@@ -5,7 +5,7 @@ use crate::{
     RepeatBlock,
 };
 
-use super::{DemInstruction, DemTarget, DetectorErrorModel};
+use super::{DemInstruction, DemRepeatBlock, DemTarget, DetectorErrorModel};
 
 const MAX_ANALYZER_REPEAT_UNROLL: u64 = 100_000;
 
@@ -21,7 +21,65 @@ pub fn circuit_to_detector_error_model(
     circuit: &Circuit,
     options: ErrorAnalyzerOptions,
 ) -> CircuitResult<DetectorErrorModel> {
+    if options.fold_loops
+        && circuit
+            .items()
+            .iter()
+            .any(|item| matches!(item, CircuitItem::RepeatBlock(_)))
+    {
+        return FoldedAnalyzer::new(options).analyze(circuit);
+    }
     Analyzer::new(options).analyze(circuit)
+}
+
+struct FoldedAnalyzer {
+    options: ErrorAnalyzerOptions,
+}
+
+impl FoldedAnalyzer {
+    fn new(options: ErrorAnalyzerOptions) -> Self {
+        Self { options }
+    }
+
+    fn analyze(&self, circuit: &Circuit) -> CircuitResult<DetectorErrorModel> {
+        let mut dem = DetectorErrorModel::new();
+        for item in circuit.items() {
+            match item {
+                CircuitItem::Instruction(_) => {
+                    return Err(CircuitError::invalid_detector_error_model(
+                        "analyze_errors --fold_loops currently supports top-level repeat blocks only",
+                    ));
+                }
+                CircuitItem::RepeatBlock(repeat) => {
+                    dem.push_repeat_block(self.analyze_repeat(repeat)?);
+                }
+            }
+        }
+        Ok(dem)
+    }
+
+    fn analyze_repeat(&self, repeat: &RepeatBlock) -> CircuitResult<DemRepeatBlock> {
+        let mut body_options = self.options;
+        body_options.fold_loops = false;
+        let mut result = Analyzer::new(body_options).analyze_with_stats(repeat.body())?;
+        if result.detector_count > 0 {
+            result.dem.push_instruction(DemInstruction::shift_detectors(
+                Vec::new(),
+                result.detector_count,
+                None,
+            )?);
+        }
+        Ok(DemRepeatBlock::new(
+            repeat.repeat_count(),
+            result.dem,
+            repeat.tag().map(ToOwned::to_owned),
+        ))
+    }
+}
+
+struct AnalyzerResult {
+    dem: DetectorErrorModel,
+    detector_count: u64,
 }
 
 struct Analyzer {
@@ -51,9 +109,18 @@ impl Analyzer {
         }
     }
 
-    fn analyze(mut self, circuit: &Circuit) -> CircuitResult<DetectorErrorModel> {
+    fn analyze(self, circuit: &Circuit) -> CircuitResult<DetectorErrorModel> {
+        self.analyze_with_stats(circuit).map(|result| result.dem)
+    }
+
+    fn analyze_with_stats(mut self, circuit: &Circuit) -> CircuitResult<AnalyzerResult> {
         self.visit_circuit(circuit)?;
-        self.into_dem()
+        let detector_count = self.detector_count;
+        let dem = self.into_dem()?;
+        Ok(AnalyzerResult {
+            dem,
+            detector_count,
+        })
     }
 
     fn visit_circuit(&mut self, circuit: &Circuit) -> CircuitResult<()> {

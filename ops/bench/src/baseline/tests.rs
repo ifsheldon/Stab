@@ -368,6 +368,16 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
 fn m10_dem_benchmark_rows_have_stab_compare_runners() {
     for (id, runner, expected_measurements) in [
         (
+            "m10-analyze-errors-fold-cli",
+            Runner::StimCli,
+            &["stab_analyze_errors_fold_repeat"][..],
+        ),
+        (
+            "m10-analyze-errors-high-repeat-contract",
+            Runner::ContractOnly,
+            &["stab_analyze_errors_fold_repeat"][..],
+        ),
+        (
             "m10-dem-parse-contract",
             Runner::StimCli,
             &["stab_dem_parse_sample"][..],
