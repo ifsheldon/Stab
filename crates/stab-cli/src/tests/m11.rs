@@ -115,3 +115,120 @@ fn sample_dem_dets_output_keeps_observables_separate_like_upstream() {
     );
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
 }
+
+#[test]
+fn sample_dem_writes_error_records_to_err_out_like_upstream() {
+    let dir = tempdir().expect("tempdir");
+    let err_path = dir.path().join("errors.01");
+    let obs_path = dir.path().join("obs.01");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--err_out"),
+        err_path.clone().into_os_string(),
+        OsString::from("--err_out_format"),
+        OsString::from("01"),
+        OsString::from("--obs_out"),
+        obs_path.clone().into_os_string(),
+        OsString::from("--obs_out_format"),
+        OsString::from("01"),
+        OsString::from("--shots"),
+        OsString::from("2"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        args,
+        b"error(1) D0 L0\nerror(0) D1\nerror(1) D1\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "11\n11\n");
+    assert_eq!(
+        std::fs::read_to_string(err_path).expect("error output"),
+        "101\n101\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(obs_path).expect("obs output"),
+        "1\n1\n"
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_dem_replays_error_records_into_detector_and_observable_streams() {
+    let dir = tempdir().expect("tempdir");
+    let replay_path = dir.path().join("errors.dets");
+    let err_copy_path = dir.path().join("errors.hits");
+    let obs_path = dir.path().join("obs.01");
+    std::fs::write(&replay_path, "shot M0\nshot M1\nshot M0 M1\nshot M0\n")
+        .expect("write replay input");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--replay_err_in"),
+        replay_path.clone().into_os_string(),
+        OsString::from("--replay_err_in_format"),
+        OsString::from("dets"),
+        OsString::from("--err_out"),
+        err_copy_path.clone().into_os_string(),
+        OsString::from("--err_out_format"),
+        OsString::from("hits"),
+        OsString::from("--obs_out"),
+        obs_path.clone().into_os_string(),
+        OsString::from("--obs_out_format"),
+        OsString::from("01"),
+        OsString::from("--shots"),
+        OsString::from("3"),
+        OsString::from("--seed"),
+        OsString::from("0"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        args,
+        b"error(0.25) D0 L0\nerror(0.25) D1\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "10\n01\n11\n");
+    assert_eq!(
+        std::fs::read_to_string(obs_path).expect("obs output"),
+        "1\n0\n1\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(err_copy_path).expect("error copy output"),
+        "0\n1\n0,1\n"
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_dem_rejects_replay_record_count_mismatch() {
+    let dir = tempdir().expect("tempdir");
+    let replay_path = dir.path().join("errors.01");
+    std::fs::write(&replay_path, "1\n").expect("write replay input");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--replay_err_in"),
+        replay_path.into_os_string(),
+        OsString::from("--shots"),
+        OsString::from("2"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(args, b"error(1) D0\n".as_slice(), &mut stdout, &mut stderr);
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("replay error input has 1 records but --shots requested 2")
+    );
+}

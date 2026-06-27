@@ -390,6 +390,9 @@ pub(crate) enum CliError {
     #[error("cannot combine --prepend_observables, --append_observables, or --obs_out")]
     ConflictingObservableRouting,
 
+    #[error("replay error input has {actual} records but --shots requested {expected}")]
+    ReplayErrorRecordCountMismatch { expected: usize, actual: usize },
+
     #[error("{kind} is too large; limit is {limit} bytes")]
     InputTooLarge { kind: &'static str, limit: u64 },
 

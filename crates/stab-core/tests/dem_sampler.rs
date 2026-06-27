@@ -115,6 +115,62 @@ fn dem_sampler_samples_observables_only_errors() {
 }
 
 #[test]
+fn dem_sampler_records_sampled_errors_and_replays_them() {
+    let sampler = compile_dem(
+        "
+        error(1) D0 L0
+        error(0) D1
+        error(1) D1
+        ",
+    );
+    assert_eq!(sampler.error_count(), 3);
+
+    let (sampled_output, error_records) = sampler
+        .sample_detection_events_and_errors_with_seed(2, Some(5))
+        .expect("sample with errors");
+    assert_eq!(
+        error_records,
+        vec![vec![true, false, true], vec![true, false, true]]
+    );
+    assert!(
+        sampled_output
+            .records
+            .iter()
+            .all(|record| { record.detectors == [true, true] && record.observables == [true] })
+    );
+
+    let replayed = sampler
+        .sample_detection_events_from_error_records(&[
+            vec![true, false, false],
+            vec![false, true, false],
+            vec![true, true, true],
+        ])
+        .expect("replay errors");
+    assert_eq!(
+        replayed.records,
+        vec![
+            DetectionEventRecord {
+                detectors: vec![true, false],
+                observables: vec![true],
+            },
+            DetectionEventRecord {
+                detectors: vec![false, true],
+                observables: vec![false],
+            },
+            DetectionEventRecord {
+                detectors: vec![true, false],
+                observables: vec![true],
+            },
+        ]
+    );
+
+    let error = sampler
+        .sample_detection_events_from_error_records(&[vec![true]])
+        .expect_err("reject wrong replay width");
+    assert!(error.to_string().contains("expected 3 bits"), "{error}");
+}
+
+#[test]
 fn dem_sampler_writes_dense_bit_packed_detector_and_observable_output() {
     let sampler = compile_dem("error(1) D0 D1 D2 D3 D4 D5 D6 D7 D8 L0\n");
     let output = sampler
