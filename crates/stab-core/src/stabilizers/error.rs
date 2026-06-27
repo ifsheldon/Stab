@@ -86,4 +86,20 @@ pub enum StabilizerError {
 
     #[error("failed to synthesize a stabilizer Tableau")]
     InvalidStabilizerTableauSynthesis,
+
+    #[error("unitary matrix height must be a non-zero power of 2, got {height}")]
+    UnitaryMatrixHeightNotPowerOfTwo { height: usize },
+
+    #[error("unitary matrix row {row} had width {width}, expected square width {height}")]
+    UnitaryMatrixRowWidthMismatch {
+        row: usize,
+        width: usize,
+        height: usize,
+    },
+
+    #[error("matrix is not unitary")]
+    MatrixNotUnitary,
+
+    #[error("unitary matrix is not a Clifford operation")]
+    UnitaryMatrixNotClifford,
 }

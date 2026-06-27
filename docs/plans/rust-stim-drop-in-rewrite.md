@@ -234,17 +234,21 @@ Passing a seeded Rust RNG gives reproducible Stab output, but M6 does not requir
 `PauliString` samples the sign uniformly and each basis independently uniformly over `I`, `X`, `Y`, and `Z`, including sign sampling for zero-length strings.
 `CliffordString` samples uniformly over the 24 single-qubit Clifford gates, while `Tableau::random` samples valid Clifford tableaus from a random Clifford-circuit shape instead of promising a uniform Clifford-group distribution.
 Exact uniform tableau sampling or random-workload performance parity belongs to M12 if it becomes a primary performance requirement.
+M6 owns the algebra-only `unitary_to_tableau` subset from Stim's `stabilizers_vs_amplitudes` tests: square power-of-two matrices are validated as unitary Clifford operations, interpreted with Stim's little-endian or big-endian amplitude order, snapped with Stim's stabilizer-state phase-smoothing threshold, and converted into tableaus up to global phase.
+The current M6 fixture covers selected single-qubit gate-data matrices for `I`, `X`, `Y`, `Z`, `H`, `S`, and `S_DAG`, the upstream controlled-gate endian cases for `XCY`, `XCZ`, `ZCX`, and `YCX`, and malformed or non-Clifford rejection cases.
+`tableau_to_unitary`, the exhaustive upstream loop over every known-unitary gate matrix, random tableau/unitary roundtrips, and amplitude-simulator cross-checks stay deferred because they require broader gate-unitary tables, state-vector, or matrix-synthesis scope beyond this stabilizer algebra slice.
 
 Linked tests and benchmarks:
 
 - Direct tests: C++ Stabilizers And Algebra group.
-- Related util-top tests: `circuit_vs_tableau`, `stabilizers_to_tableau`, `stabilizers_vs_amplitudes`, and `circuit_inverse_unitary` when their dependencies are in scope.
+- Related util-top tests: `circuit_vs_tableau`, `stabilizers_to_tableau`, the selected M6-owned `unitary_to_tableau` subset of `stabilizers_vs_amplitudes`, and `circuit_inverse_unitary` when their dependencies are in scope.
 - Semantic-mining tests: Python `pauli_string_pybind`, `clifford_string_pybind`, `tableau_pybind`, `flow_pybind`, and `tableau_simulator_pybind` cases that express core algebra semantics.
 - Benchmarks: `src/stim/stabilizers/*.perf.cc` and `src/stim/util_top/stabilizers_to_tableau.perf.cc`.
 
 Done criteria:
 
 - `cargo test -p stab-core stabilizers` passes direct and property tests.
+- `cargo test -p stab-core --test stabilizers_vs_amplitudes` passes the M6-owned unitary-to-tableau parity subset.
 - `just oracle::run --milestone M6` passes selected C++ Stim algebra comparisons.
 - `just bench::compare --milestone M6` reports Pauli, Clifford, tableau, tableau-iterator, and stabilizers-to-tableau workloads.
 - Public algebra APIs avoid Python-hostile lifetime or generic shapes unless documented.

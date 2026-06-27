@@ -311,11 +311,20 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines M7 benchmark a
 
 ## 2026-06-27 - M6: Stabilizers Versus Amplitudes Dependency
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of the M6 linked-test list and compatibility matrix.
 Current text: M6 lists `stabilizers_vs_amplitudes` as a related util-top test when dependencies are in scope.
 Gap: the plan does not say which amplitude-state or simulator dependency brings this row into scope, and no M6 fixture manifest row currently names the semantic subset that should be proven by the algebra milestone alone.
 Proposed amendment: either add a deterministic algebra-only fixture for the subcases that can be checked without an amplitude simulator, or move `stabilizers_vs_amplitudes` to the tableau simulator milestone with a clear dependency note.
+Resolution: M6 now owns the deterministic algebra-only `unitary_to_tableau` subset from `stabilizers_vs_amplitudes`, covering selected single-qubit gate-data matrices, controlled-gate endian mapping, Stim-style phase smoothing, and malformed or non-Clifford matrix rejection via `coverage-util-top-stabilizers-vs-amplitudes`. `tableau_to_unitary`, random tableau/unitary roundtrips, and amplitude-simulator cross-checks are explicitly deferred.
+
+## 2026-06-28 - M6: Stabilizers Vs Amplitudes Gate-Data Breadth
+
+Status: Open
+Revealed by: milestone audit of the `coverage-util-top-stabilizers-vs-amplitudes` fixture after implementing `unitary_to_tableau`.
+Current text: M6 tracks a selected `unitary_to_tableau` subset from `stabilizers_vs_amplitudes` and the fixture manifest marks that selected subset as implemented.
+Gap: upstream Stim's `unitary_to_tableau_vs_gate_data` test iterates every gate with a known unitary matrix, but Stab currently proves only selected single-qubit matrices plus the four upstream endian examples. The plan does not yet assign the exhaustive known-unitary gate-data matrix sweep to a specific milestone or manifest row.
+Proposed amendment: add a separate compatibility row for exhaustive known-unitary gate matrix coverage once Stab has centralized gate-unitary data, or explicitly defer that sweep to the matrix/state-vector milestone that also owns `tableau_to_unitary`.
 Resolution: pending plan update.
 
 ## 2026-06-27 - M6: Stabilizer Benchmark Exact Workload Parity
