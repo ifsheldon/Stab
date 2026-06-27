@@ -341,18 +341,26 @@ impl Display for SingleQubitClifford {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CliffordString {
     gates: Vec<SingleQubitClifford>,
+    non_identity_count: usize,
 }
 
 impl CliffordString {
     pub fn identity(num_qubits: usize) -> Self {
         Self {
             gates: vec![SingleQubitClifford::I; num_qubits],
+            non_identity_count: 0,
         }
     }
 
     pub fn from_gates(gates: impl IntoIterator<Item = SingleQubitClifford>) -> Self {
+        let gates = gates.into_iter().collect::<Vec<_>>();
+        let non_identity_count = gates
+            .iter()
+            .filter(|gate| **gate != SingleQubitClifford::I)
+            .count();
         Self {
-            gates: gates.into_iter().collect(),
+            gates,
+            non_identity_count,
         }
     }
 
@@ -374,6 +382,7 @@ impl CliffordString {
             .gates
             .get_mut(index)
             .ok_or(StabilizerError::CliffordIndexOutOfRange { index, len })?;
+        update_non_identity_count(&mut self.non_identity_count, *target, gate);
         *target = gate;
         Ok(())
     }
@@ -389,7 +398,10 @@ impl CliffordString {
         let mut gates = Vec::with_capacity(new_len);
         gates.extend_from_slice(&self.gates);
         gates.extend_from_slice(&rhs.gates);
-        Ok(Self { gates })
+        Ok(Self {
+            gates,
+            non_identity_count: self.non_identity_count + rhs.non_identity_count,
+        })
     }
 
     pub fn repeat(&self, repetitions: usize) -> StabilizerResult<Self> {
@@ -404,18 +416,56 @@ impl CliffordString {
         for _ in 0..repetitions {
             gates.extend_from_slice(&self.gates);
         }
-        Ok(Self { gates })
+        Ok(Self {
+            gates,
+            non_identity_count: self.non_identity_count * repetitions,
+        })
     }
 
     pub fn multiply(&self, rhs: &Self) -> StabilizerResult<Self> {
-        let len = self.len().max(rhs.len());
-        let mut gates = Vec::with_capacity(len);
-        for index in 0..len {
-            let left = self.gate_at(index).unwrap_or(SingleQubitClifford::I);
-            let right = rhs.gate_at(index).unwrap_or(SingleQubitClifford::I);
-            gates.push(left.multiply(right)?);
+        let mut result = self.clone();
+        result.right_multiply_in_place(rhs)?;
+        Ok(result)
+    }
+
+    /// Right-multiplies `rhs` into this Clifford string in place.
+    ///
+    /// If `rhs` is longer than this string, this string is extended with identity rotations before
+    /// multiplication.
+    pub fn right_multiply_in_place(&mut self, rhs: &Self) -> StabilizerResult<()> {
+        self.ensure_len(rhs.len());
+        if rhs.non_identity_count == 0 {
+            return Ok(());
         }
-        Ok(Self { gates })
+        for (left, right) in self.gates.iter_mut().zip(&rhs.gates) {
+            if *right != SingleQubitClifford::I {
+                let product = left.multiply(*right)?;
+                update_non_identity_count(&mut self.non_identity_count, *left, product);
+                *left = product;
+            }
+        }
+        Ok(())
+    }
+
+    fn ensure_len(&mut self, len: usize) {
+        if len > self.len() {
+            self.gates.resize(len, SingleQubitClifford::I);
+        }
+    }
+}
+
+fn update_non_identity_count(
+    non_identity_count: &mut usize,
+    old_gate: SingleQubitClifford,
+    new_gate: SingleQubitClifford,
+) {
+    match (
+        old_gate == SingleQubitClifford::I,
+        new_gate == SingleQubitClifford::I,
+    ) {
+        (true, false) => *non_identity_count += 1,
+        (false, true) => *non_identity_count -= 1,
+        _ => {}
     }
 }
 
@@ -441,4 +491,67 @@ fn sign_from_bit(negative: bool) -> PauliSign {
 
 fn signed_pauli_string(pauli: SignedPauli) -> PauliString {
     PauliString::from_bases(pauli.sign, [pauli.basis])
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        reason = "stabilizer algebra tests use compact literal Clifford fixtures"
+    )]
+
+    use super::*;
+
+    #[test]
+    fn right_multiply_in_place_matches_per_gate_products() {
+        let mut left = CliffordString::from_gates([
+            SingleQubitClifford::H,
+            SingleQubitClifford::S,
+            SingleQubitClifford::I,
+        ]);
+        let right = CliffordString::from_gates([
+            SingleQubitClifford::S,
+            SingleQubitClifford::H,
+            SingleQubitClifford::SqrtX,
+        ]);
+        let expected = CliffordString::from_gates([
+            SingleQubitClifford::H
+                .multiply(SingleQubitClifford::S)
+                .unwrap(),
+            SingleQubitClifford::S
+                .multiply(SingleQubitClifford::H)
+                .unwrap(),
+            SingleQubitClifford::I
+                .multiply(SingleQubitClifford::SqrtX)
+                .unwrap(),
+        ]);
+
+        left.right_multiply_in_place(&right).unwrap();
+
+        assert_eq!(left, expected);
+    }
+
+    #[test]
+    fn right_multiply_in_place_extends_shorter_left_side() {
+        let mut left = CliffordString::from_gates([SingleQubitClifford::H]);
+        let right = CliffordString::from_gates([SingleQubitClifford::I, SingleQubitClifford::S]);
+
+        left.right_multiply_in_place(&right).unwrap();
+
+        assert_eq!(left.gate_at(0), Some(SingleQubitClifford::H));
+        assert_eq!(left.gate_at(1), Some(SingleQubitClifford::S));
+    }
+
+    #[test]
+    fn right_multiply_in_place_extends_for_longer_identity_rhs() {
+        let mut left = CliffordString::from_gates([SingleQubitClifford::H]);
+        let right = CliffordString::identity(3);
+
+        left.right_multiply_in_place(&right).unwrap();
+
+        assert_eq!(left.len(), 3);
+        assert_eq!(left.gate_at(0), Some(SingleQubitClifford::H));
+        assert_eq!(left.gate_at(1), Some(SingleQubitClifford::I));
+        assert_eq!(left.gate_at(2), Some(SingleQubitClifford::I));
+    }
 }

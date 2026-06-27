@@ -5,8 +5,7 @@ use std::time::{Duration, Instant};
 
 use stab_core::{
     BitMatrix, BitVec, Circuit, CliffordString, Gate, PauliBasis, PauliSign, PauliString,
-    PauliStringIterator, SingleQubitClifford, SparseXorVec, TableauIterator,
-    stabilizers_to_tableau,
+    PauliStringIterator, SparseXorVec, TableauIterator, stabilizers_to_tableau,
 };
 
 use crate::allocations::measure_allocations;
@@ -39,8 +38,12 @@ const M5_BITVEC_BITS: usize = 10_000;
 const M5_POPCOUNT_BITS: usize = 1024 * 256;
 const M5_SPARSE_ROWS_USIZE: usize = 1000;
 const M5_SPARSE_ROWS_U32: u32 = 1000;
-const M6_CLIFFORD_QUBITS: usize = 4096;
-const M6_PAULI_QUBITS: usize = 10_000;
+const M6_CLIFFORD_QUBITS: usize = 10_000;
+const M6_PAULI_CASES: [(&str, usize); 3] = [
+    ("stab_pauli_string_multiplication_1M", 1_000_000),
+    ("stab_pauli_string_multiplication_100K", 100_000),
+    ("stab_pauli_string_multiplication_10K", 10_000),
+];
 const M6_PAULI_ITER_QUBITS: usize = 16;
 const M6_PAULI_ITER_MAX_WEIGHT: usize = 3;
 const M6_TABLEAU_QUBITS: usize = 32;
@@ -365,38 +368,32 @@ pub(crate) fn run_stab_compare_row(
             ]))
         }
         "m6-clifford-string" => {
-            let left = m6_clifford_string(M6_CLIFFORD_QUBITS, 0);
-            let right = m6_clifford_string(M6_CLIFFORD_QUBITS, 7);
+            let mut left = CliffordString::identity(M6_CLIFFORD_QUBITS);
+            let right = CliffordString::identity(M6_CLIFFORD_QUBITS);
             Ok(Some(vec![measure_stab(
-                "stab_clifford_string_multiply_4096",
+                "stab_clifford_string_multiplication_10K",
                 || {
-                    let product = left
-                        .multiply(&right)
+                    left.right_multiply_in_place(&right)
                         .map_err(|error| stab_runner_error(&row.id, error))?;
-                    black_box(product);
+                    black_box(&left);
                     Ok(())
                 },
             )?]))
         }
         "m6-pauli-string" => {
-            let left = m6_pauli_string(M6_PAULI_QUBITS, 0x6eed_5eed);
-            let right = m6_pauli_string(M6_PAULI_QUBITS, 0x51ab_51ab);
-            Ok(Some(vec![
-                measure_stab("stab_pauli_string_multiply_10k", || {
-                    let product = left
-                        .multiply(&right)
+            let mut measurements = Vec::with_capacity(M6_PAULI_CASES.len());
+            for (name, num_qubits) in M6_PAULI_CASES {
+                let mut left = PauliString::identity(num_qubits);
+                let right = PauliString::identity(num_qubits);
+                measurements.push(measure_stab(name, || {
+                    let log_i = left
+                        .right_multiply_in_place_returning_log_i_scalar(&right)
                         .map_err(|error| stab_runner_error(&row.id, error))?;
-                    black_box(product);
+                    black_box((log_i, &left));
                     Ok(())
-                })?,
-                measure_stab("stab_pauli_string_commutes_10k", || {
-                    let commutes = left
-                        .commutes(&right)
-                        .map_err(|error| stab_runner_error(&row.id, error))?;
-                    black_box(commutes);
-                    Ok(())
-                })?,
-            ]))
+                })?);
+            }
+            Ok(Some(measurements))
         }
         "m6-pauli-iter" => Ok(Some(vec![measure_stab(
             "stab_pauli_iter_16q_weight_1_to_3",
@@ -550,39 +547,6 @@ fn sparse_table_row_xor(table: &mut [SparseXorVec]) {
         if let (Some(target), Some(source)) = (prefix.last_mut(), suffix.first()) {
             target.xor_assign(source);
         }
-    }
-}
-
-fn m6_clifford_string(num_qubits: usize, offset: usize) -> CliffordString {
-    CliffordString::from_gates((0..num_qubits).map(|index| m6_clifford_gate(index + offset)))
-}
-
-fn m6_clifford_gate(index: usize) -> SingleQubitClifford {
-    match index % 24 {
-        0 => SingleQubitClifford::I,
-        1 => SingleQubitClifford::X,
-        2 => SingleQubitClifford::Y,
-        3 => SingleQubitClifford::Z,
-        4 => SingleQubitClifford::H,
-        5 => SingleQubitClifford::SqrtYDag,
-        6 => SingleQubitClifford::Hnxz,
-        7 => SingleQubitClifford::SqrtY,
-        8 => SingleQubitClifford::S,
-        9 => SingleQubitClifford::Hxy,
-        10 => SingleQubitClifford::Hnxy,
-        11 => SingleQubitClifford::SDag,
-        12 => SingleQubitClifford::SqrtXDag,
-        13 => SingleQubitClifford::SqrtX,
-        14 => SingleQubitClifford::Hnyz,
-        15 => SingleQubitClifford::Hyz,
-        16 => SingleQubitClifford::Cxyz,
-        17 => SingleQubitClifford::Cxynz,
-        18 => SingleQubitClifford::Cnxyz,
-        19 => SingleQubitClifford::Cxnyz,
-        20 => SingleQubitClifford::Czyx,
-        21 => SingleQubitClifford::Cznyx,
-        22 => SingleQubitClifford::Cnzyx,
-        _ => SingleQubitClifford::Czynx,
     }
 }
 
@@ -768,13 +732,16 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             Some(((M5_SPARSE_ROWS_USIZE * 2) as f64, "row-xors/s"))
         }
         ("m5-sparse-xor", "stab_sparse_xor_item_7") => Some((7.0, "items/s")),
-        ("m6-clifford-string", "stab_clifford_string_multiply_4096") => {
+        ("m6-clifford-string", "stab_clifford_string_multiplication_10K") => {
             Some((M6_CLIFFORD_QUBITS as f64, "single-qubit-products/s"))
         }
-        ("m6-pauli-string", "stab_pauli_string_multiply_10k")
-        | ("m6-pauli-string", "stab_pauli_string_commutes_10k") => {
-            Some((M6_PAULI_QUBITS as f64, "qubits/s"))
+        ("m6-pauli-string", "stab_pauli_string_multiplication_1M") => {
+            Some((1_000_000.0, "qubits/s"))
         }
+        ("m6-pauli-string", "stab_pauli_string_multiplication_100K") => {
+            Some((100_000.0, "qubits/s"))
+        }
+        ("m6-pauli-string", "stab_pauli_string_multiplication_10K") => Some((10_000.0, "qubits/s")),
         ("m6-pauli-iter", "stab_pauli_iter_16q_weight_1_to_3") => Some((16_248.0, "paulis/s")),
         ("m6-tableau", "stab_tableau_from_circuit_32q") => {
             Some(((M6_TABLEAU_QUBITS * 2) as f64, "gates/s"))
@@ -824,10 +791,10 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
             "partial-match: xor/not_zero use upstream 10k size; masked/range/copy are Stab M5 contract extras; randomize is not implemented in M5",
         ),
         "m6-clifford-string" => Some(
-            "report-only: deterministic 4096-qubit multiplication workload; upstream baseline uses a 10K CliffordString multiplication filter",
+            "direct-match: Stab measures in-place 10K CliffordString multiplication against the pinned Stim perf filter",
         ),
         "m6-pauli-string" => Some(
-            "partial-match: Stab reports 10K multiplication plus commutation; upstream baseline includes 10K, 100K, and 1M multiplication filters",
+            "direct-match: Stab measures in-place PauliString multiplication at 10K, 100K, and 1M against the pinned Stim perf filters",
         ),
         "m6-pauli-iter" => Some(
             "report-only: deterministic 16q weight-1-to-3 iterator workload; upstream filters cover different iterator ranges",

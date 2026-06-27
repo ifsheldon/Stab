@@ -329,13 +329,14 @@ fn m6_benchmark_rows_have_stab_compare_runners() {
     for (id, expected_measurements) in [
         (
             "m6-clifford-string",
-            &["stab_clifford_string_multiply_4096"][..],
+            &["stab_clifford_string_multiplication_10K"][..],
         ),
         (
             "m6-pauli-string",
             &[
-                "stab_pauli_string_multiply_10k",
-                "stab_pauli_string_commutes_10k",
+                "stab_pauli_string_multiplication_1M",
+                "stab_pauli_string_multiplication_100K",
+                "stab_pauli_string_multiplication_10K",
             ][..],
         ),
         ("m6-pauli-iter", &["stab_pauli_iter_16q_weight_1_to_3"][..]),

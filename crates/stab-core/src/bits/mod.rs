@@ -206,6 +206,10 @@ impl BitVec {
         &self.words
     }
 
+    pub(crate) fn words_mut(&mut self) -> &mut [u64] {
+        &mut self.words
+    }
+
     pub fn as_bitslice(&self) -> BitSlice<'_> {
         BitSlice {
             words: &self.words,

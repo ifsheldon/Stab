@@ -23,6 +23,13 @@ impl PauliSign {
             Self::Minus => PauliPhase::Minus,
         }
     }
+
+    fn flipped(self) -> Self {
+        match self {
+            Self::Plus => Self::Minus,
+            Self::Minus => Self::Plus,
+        }
+    }
 }
 
 impl Display for PauliSign {
@@ -197,6 +204,7 @@ pub struct PauliString {
     sign: PauliSign,
     xs: BitVec,
     zs: BitVec,
+    has_terms: bool,
 }
 
 impl PauliString {
@@ -205,6 +213,7 @@ impl PauliString {
             sign: PauliSign::Plus,
             xs: BitVec::zeros(num_qubits),
             zs: BitVec::zeros(num_qubits),
+            has_terms: false,
         }
     }
 
@@ -212,7 +221,9 @@ impl PauliString {
         let bases = bases.into_iter().collect::<Vec<_>>();
         let mut x_words = vec![0_u64; bases.len().div_ceil(WORD_BITS)];
         let mut z_words = vec![0_u64; bases.len().div_ceil(WORD_BITS)];
+        let mut has_terms = false;
         for (index, basis) in bases.iter().copied().enumerate() {
+            has_terms |= basis != PauliBasis::I;
             let word = index / WORD_BITS;
             let bit = index % WORD_BITS;
             let mask = 1_u64 << bit;
@@ -231,6 +242,7 @@ impl PauliString {
             sign,
             xs: BitVec::from_words_truncated(bases.len(), x_words),
             zs: BitVec::from_words_truncated(bases.len(), z_words),
+            has_terms,
         }
     }
 
@@ -264,8 +276,14 @@ impl PauliString {
     }
 
     pub fn set(&mut self, index: usize, basis: PauliBasis) -> StabilizerResult<()> {
+        let old_basis = self.get_or_error(index)?;
         self.xs.set(index, basis.x_bit())?;
         self.zs.set(index, basis.z_bit())?;
+        match (old_basis == PauliBasis::I, basis == PauliBasis::I) {
+            (true, false) => self.has_terms = true,
+            (false, true) => self.has_terms = bits_have_terms(&self.xs, &self.zs),
+            _ => {}
+        }
         Ok(())
     }
 
@@ -287,7 +305,7 @@ impl PauliString {
     }
 
     pub fn has_no_pauli_terms(&self) -> bool {
-        self.weight() == 0
+        !self.has_terms
     }
 
     pub fn intersects(&self, rhs: &Self) -> StabilizerResult<bool> {
@@ -317,22 +335,70 @@ impl PauliString {
     }
 
     pub fn multiply(&self, rhs: &Self) -> StabilizerResult<FlexPauliString> {
-        let len = self.len().max(rhs.len());
-        let mut bases = Vec::with_capacity(len);
-        let mut phase = self.phase().multiply(rhs.phase());
-        for index in 0..len {
-            let left = self.get_or_identity(index);
-            let right = rhs.get_or_identity(index);
-            let (basis, basis_phase) = left.multiply(right);
-            bases.push(basis);
-            phase = phase.multiply(basis_phase);
+        let mut value = self.clone();
+        let log_i = value.right_multiply_in_place_returning_log_i_scalar(rhs)?;
+        let imaginary = log_i & 1 != 0;
+        if log_i & 2 != 0 {
+            value.sign = value.sign.flipped();
         }
-        FlexPauliString::from_phase_and_bases(phase, bases)
+        Ok(FlexPauliString { value, imaginary })
     }
 
     pub fn multiply_real(&self, rhs: &Self) -> StabilizerResult<Self> {
         let product = self.multiply(rhs)?;
         product.try_into_real()
+    }
+
+    /// Right-multiplies `rhs` into this Pauli string and returns the missing scalar byproduct.
+    ///
+    /// The X/Z bits and real sign stored in this value are updated in place, except that the
+    /// returned base-`i` exponent still needs to be applied by the caller. For example, a return
+    /// value of `1` means the in-place result must still be multiplied by `i`, and a return value
+    /// of `2` means the caller should apply an additional `-1` scalar.
+    pub fn right_multiply_in_place_returning_log_i_scalar(
+        &mut self,
+        rhs: &Self,
+    ) -> StabilizerResult<u8> {
+        self.ensure_len(rhs.len());
+        if rhs.has_no_pauli_terms() {
+            return Ok(u8::from(rhs.sign.is_negative()) << 1);
+        }
+
+        let mut count_bit_1 = 0_u64;
+        let mut count_bit_2 = 0_u64;
+        let rhs_word_count = rhs.xs.word_count();
+        let mut has_terms = self
+            .xs
+            .words()
+            .iter()
+            .zip(self.zs.words())
+            .skip(rhs_word_count)
+            .any(|(x_word, z_word)| (x_word | z_word) != 0);
+        for (((left_x, left_z), right_x), right_z) in self
+            .xs
+            .words_mut()
+            .iter_mut()
+            .zip(self.zs.words_mut().iter_mut())
+            .zip(rhs.xs.words())
+            .zip(rhs.zs.words())
+        {
+            let old_left_x = *left_x;
+            let old_left_z = *left_z;
+            *left_x ^= right_x;
+            *left_z ^= right_z;
+
+            let old_x_new_z = old_left_x & right_z;
+            let anti_commutes = (right_x & old_left_z) ^ old_x_new_z;
+            count_bit_2 ^= (count_bit_1 ^ *left_x ^ *left_z ^ old_x_new_z) & anti_commutes;
+            count_bit_1 ^= anti_commutes;
+            has_terms |= (*left_x | *left_z) != 0;
+        }
+        self.has_terms = has_terms;
+
+        let mut log_i = popcount_mod_4(count_bit_1);
+        log_i ^= popcount_mod_4(count_bit_2) << 1;
+        log_i ^= u8::from(rhs.sign.is_negative()) << 1;
+        Ok(log_i & 3)
     }
 
     pub fn sparse_string(&self) -> String {
@@ -385,7 +451,13 @@ impl PauliString {
                 right: zs.len(),
             });
         }
-        Ok(Self { sign, xs, zs })
+        let has_terms = bits_have_terms(&xs, &zs);
+        Ok(Self {
+            sign,
+            xs,
+            zs,
+            has_terms,
+        })
     }
 
     fn ensure_len(&mut self, len: usize) {
@@ -694,4 +766,92 @@ fn flush_sparse_term(
         });
     }
     result.right_mul_basis(index, basis)
+}
+
+fn bits_have_terms(xs: &BitVec, zs: &BitVec) -> bool {
+    xs.words()
+        .iter()
+        .zip(zs.words())
+        .any(|(x_word, z_word)| (x_word | z_word) != 0)
+}
+
+fn popcount_mod_4(word: u64) -> u8 {
+    match word.count_ones() & 3 {
+        0 => 0,
+        1 => 1,
+        2 => 2,
+        _ => 3,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        reason = "stabilizer algebra tests use compact literal Pauli fixtures"
+    )]
+
+    use super::*;
+
+    #[test]
+    fn right_multiply_in_place_returns_missing_i_scalar() {
+        let mut left = PauliString::from_bases(
+            PauliSign::Plus,
+            [PauliBasis::X, PauliBasis::Y, PauliBasis::Z, PauliBasis::I],
+        );
+        let right = PauliString::from_bases(
+            PauliSign::Plus,
+            [PauliBasis::Y, PauliBasis::Z, PauliBasis::X, PauliBasis::Z],
+        );
+
+        let log_i = left
+            .right_multiply_in_place_returning_log_i_scalar(&right)
+            .unwrap();
+
+        assert_eq!(log_i, 3);
+        assert_eq!(left.to_string(), "+ZXYZ");
+    }
+
+    #[test]
+    fn multiply_uses_in_place_core_without_losing_phase() {
+        let left = PauliString::from_bases(
+            PauliSign::Plus,
+            [PauliBasis::X, PauliBasis::Y, PauliBasis::Z, PauliBasis::I],
+        );
+        let right = PauliString::from_bases(
+            PauliSign::Plus,
+            [PauliBasis::Y, PauliBasis::Z, PauliBasis::X, PauliBasis::Z],
+        );
+
+        let product = left.multiply(&right).unwrap();
+
+        assert_eq!(product.to_string(), "-iZXYZ");
+    }
+
+    #[test]
+    fn negative_identity_contributes_minus_one_scalar() {
+        let mut left = PauliString::identity(4);
+        let right =
+            PauliString::from_bases(PauliSign::Minus, std::iter::repeat_n(PauliBasis::I, 4));
+
+        let log_i = left
+            .right_multiply_in_place_returning_log_i_scalar(&right)
+            .unwrap();
+
+        assert_eq!(log_i, 2);
+        assert_eq!(left.to_string(), "+____");
+    }
+
+    #[test]
+    fn right_multiply_in_place_extends_for_longer_identity_rhs() {
+        let mut left = PauliString::from_bases(PauliSign::Plus, [PauliBasis::X]);
+        let right = PauliString::identity(3);
+
+        let log_i = left
+            .right_multiply_in_place_returning_log_i_scalar(&right)
+            .unwrap();
+
+        assert_eq!(log_i, 0);
+        assert_eq!(left.to_string(), "+X__");
+    }
 }
