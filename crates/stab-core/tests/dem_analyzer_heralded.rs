@@ -20,6 +20,18 @@ fn analyze(text: &str) -> String {
         .to_dem_string()
 }
 
+fn analyze_with_threshold(text: &str, threshold: f64) -> stab_core::CircuitResult<String> {
+    let circuit = Circuit::from_stim_str(text).expect("circuit");
+    circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            approximate_disjoint_errors_threshold: Some(Probability::try_new(threshold).unwrap()),
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .map(|dem| dem.to_dem_string())
+}
+
 fn conditional_erase_circuit(herald: bool, x: bool, z: bool) -> String {
     let herald_detector = if herald {
         "DETECTOR rec[-3]\n"
@@ -100,4 +112,54 @@ fn dem_analyzer_heralded_erase_conditional_division_matches_upstream() {
     ] {
         assert_eq!(analyze(&conditional_erase_circuit(herald, x, z)), expected);
     }
+}
+
+#[test]
+fn dem_analyzer_heralded_pauli_channel1_matches_upstream_subset() {
+    assert!(
+        analyze_with_threshold("HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.25, 0.03) 0\n", 0.3).is_ok()
+    );
+    assert!(
+        analyze_with_threshold("HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.25, 0.03) 0\n", 0.2)
+            .is_err()
+    );
+
+    let dem = analyze(
+        "
+        MZZ 0 1
+        MXX 0 1
+        HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 0
+        MZZ 0 1
+        MXX 0 1
+        DETECTOR rec[-1] rec[-4]
+        DETECTOR rec[-2] rec[-5]
+        DETECTOR rec[-3]
+        ",
+    );
+    assert_eq!(
+        dem,
+        "error(0.02999999999999999888977697537484346) D0 D1 D2\n\
+         error(0.04000000000000000083266726846886741) D0 D2\n\
+         error(0.0200000000000000004163336342344337) D1 D2\n\
+         error(0.01000000000000000020816681711721685) D2\n"
+    );
+
+    let dem = analyze(
+        "
+        MZZ 0 1
+        MXX 0 1
+        HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.1) 0
+        MZZ 0 1
+        MXX 0 1
+        DETECTOR
+        DETECTOR rec[-2] rec[-5]
+        DETECTOR rec[-3]
+        ",
+    );
+    assert_eq!(
+        dem,
+        "error(0.05000000000000000277555756156289135) D1 D2\n\
+         error(0.1100000000000000005551115123125783) D2\n\
+         detector D0\n"
+    );
 }

@@ -358,6 +358,35 @@ fn analyze_errors_heralded_erase_conditional_matches_m10_oracle_golden() {
 }
 
 #[test]
+fn analyze_errors_heralded_pauli_channel1_matches_m10_oracle_golden() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "analyze_errors",
+            "--approximate_disjoint_errors",
+            "1",
+        ],
+        include_bytes!(
+            "../../../../oracle/fixtures/inputs/analyze_errors_heralded_pauli_channel1.stim"
+        )
+        .as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!(
+            "../../../../oracle/fixtures/expected/m10_analyze_errors_heralded_pauli_channel1.stdout"
+        )
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
 fn analyze_errors_reset_clears_error_matches_m10_oracle_golden() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
