@@ -122,6 +122,49 @@ fn sample_dem_dets_output_keeps_observables_separate_like_upstream() {
 }
 
 #[test]
+fn sample_dem_rejects_conflicting_observable_routes() {
+    for args in [
+        vec![
+            OsString::from("stab"),
+            OsString::from("sample_dem"),
+            OsString::from("--append_observables"),
+            OsString::from("--prepend_observables"),
+        ],
+        vec![
+            OsString::from("stab"),
+            OsString::from("sample_dem"),
+            OsString::from("--append_observables"),
+            OsString::from("--obs_out"),
+            OsString::from("obs.01"),
+        ],
+        vec![
+            OsString::from("stab"),
+            OsString::from("sample_dem"),
+            OsString::from("--prepend_observables"),
+            OsString::from("--obs_out"),
+            OsString::from("obs.01"),
+        ],
+    ] {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            args,
+            b"error(1) D0 L0\n".as_slice(),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, 1);
+        assert_eq!(String::from_utf8(stdout).unwrap(), "");
+        assert!(
+            String::from_utf8(stderr).unwrap().contains(
+                "cannot combine --prepend_observables, --append_observables, or --obs_out"
+            )
+        );
+    }
+}
+
+#[test]
 fn sample_dem_writes_error_records_to_err_out_like_upstream() {
     let dir = tempdir().expect("tempdir");
     let err_path = dir.path().join("errors.01");
@@ -293,6 +336,125 @@ fn sample_dem_replays_ptb64_error_records() {
         "1\n".repeat(64)
     );
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_dem_round_trips_r8_detector_observable_error_and_replay_streams() {
+    let dir = tempdir().expect("tempdir");
+    let replay_path = dir.path().join("errors.r8");
+    let obs_path = dir.path().join("obs.r8");
+    let err_path = dir.path().join("errors-copy.r8");
+    std::fs::write(&replay_path, [0, 1, 1, 0]).expect("write r8 replay input");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--out_format"),
+        OsString::from("r8"),
+        OsString::from("--replay_err_in"),
+        replay_path.into_os_string(),
+        OsString::from("--replay_err_in_format"),
+        OsString::from("r8"),
+        OsString::from("--obs_out"),
+        obs_path.clone().into_os_string(),
+        OsString::from("--obs_out_format"),
+        OsString::from("r8"),
+        OsString::from("--err_out"),
+        err_path.clone().into_os_string(),
+        OsString::from("--err_out_format"),
+        OsString::from("r8"),
+        OsString::from("--shots"),
+        OsString::from("2"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        args,
+        b"error(0.25) D0 L0\nerror(0.25) D1 L1\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(stdout, [0, 1, 1, 0]);
+    assert_eq!(
+        std::fs::read(obs_path).expect("r8 observable output"),
+        [0, 1, 1, 0]
+    );
+    assert_eq!(
+        std::fs::read(err_path).expect("r8 error copy output"),
+        [0, 1, 1, 0]
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_dem_replays_stim_compatible_crlf_text_records() {
+    for (format, replay_input, dem_input, expected_stdout) in [
+        ("01", b"1\r\n".as_slice(), "error(0.25) D0\n", "1\n"),
+        (
+            "hits",
+            b"0\r\n".as_slice(),
+            "error(0.25) D0\nerror(0.25) D1\n",
+            "10\n",
+        ),
+        (
+            "dets",
+            b"shot M1\r\n\r\n\n   shot M0\r\n\n".as_slice(),
+            "error(0.25) D0\nerror(0.25) D1\n",
+            "01\n10\n",
+        ),
+    ] {
+        let dir = tempdir().expect("tempdir");
+        let replay_path = dir.path().join(format!("errors.{format}"));
+        std::fs::write(&replay_path, replay_input).expect("write CRLF replay input");
+        let args = vec![
+            OsString::from("stab"),
+            OsString::from("sample_dem"),
+            OsString::from("--replay_err_in"),
+            replay_path.into_os_string(),
+            OsString::from("--replay_err_in_format"),
+            OsString::from(format),
+            OsString::from("--shots"),
+            OsString::from(expected_stdout.lines().count().to_string()),
+        ];
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(args, dem_input.as_bytes(), &mut stdout, &mut stderr);
+
+        assert_eq!(status, 0);
+        assert_eq!(String::from_utf8(stdout).unwrap(), expected_stdout);
+        assert_eq!(String::from_utf8(stderr).unwrap(), "");
+    }
+}
+
+#[test]
+fn sample_dem_rejects_excessive_blank_dets_replay_prefix() {
+    let dir = tempdir().expect("tempdir");
+    let replay_path = dir.path().join("errors.dets");
+    let mut replay_input = vec![b'\n'; 1_048_577];
+    replay_input.extend_from_slice(b"shot M0\n");
+    std::fs::write(&replay_path, replay_input).expect("write over-budget blank replay prefix");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--replay_err_in"),
+        replay_path.into_os_string(),
+        OsString::from("--replay_err_in_format"),
+        OsString::from("dets"),
+        OsString::from("--shots"),
+        OsString::from("1"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(args, b"error(1) D0\n".as_slice(), &mut stdout, &mut stderr);
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("sample_dem replay text record is too large; limit is 1048576 bytes")
+    );
 }
 
 #[test]
@@ -470,6 +632,36 @@ fn sample_dem_rejects_oversized_input_file_before_reading() {
             .unwrap()
             .contains("sample_dem input is too large; limit is 67108864 bytes")
     );
+}
+
+#[test]
+fn sample_dem_zero_shots_validates_declared_input_paths_like_stim() {
+    let dir = tempdir().expect("tempdir");
+    for (flag, missing_path) in [
+        ("--in", dir.path().join("missing.dem")),
+        ("--replay_err_in", dir.path().join("missing.01")),
+    ] {
+        let args = vec![
+            OsString::from("stab"),
+            OsString::from("sample_dem"),
+            OsString::from("--shots"),
+            OsString::from("0"),
+            OsString::from(flag),
+            missing_path.clone().into_os_string(),
+        ];
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(args, b"".as_slice(), &mut stdout, &mut stderr);
+
+        assert_eq!(status, 1);
+        assert_eq!(String::from_utf8(stdout).unwrap(), "");
+        let stderr = String::from_utf8(stderr).unwrap();
+        assert!(stderr.contains("failed to read"), "{stderr}");
+        assert!(
+            stderr.contains(missing_path.file_name().unwrap().to_str().unwrap()),
+            "{stderr}"
+        );
+    }
 }
 
 #[test]

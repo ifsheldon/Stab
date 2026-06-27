@@ -517,6 +517,7 @@ fn read_zero_one_records(input: &[u8], bits_per_record: usize) -> CircuitResult<
         .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
     text.split_terminator('\n')
         .map(|line| {
+            let line = strip_trailing_cr(line);
             if line.len() != bits_per_record {
                 return Err(CircuitError::invalid_result_format(format!(
                     "01 record expected {bits_per_record} bits, got {}",
@@ -601,7 +602,7 @@ fn read_hits_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<
     let text = std::str::from_utf8(input)
         .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
     text.split_terminator('\n')
-        .map(|line| read_sparse_index_line(line, bits_per_record, None))
+        .map(|line| read_sparse_index_line(strip_trailing_cr(line), bits_per_record, None))
         .collect()
 }
 
@@ -618,16 +619,28 @@ fn read_dets_records(
 ) -> CircuitResult<Vec<Vec<bool>>> {
     let text = std::str::from_utf8(input)
         .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
-    text.split_terminator('\n')
-        .map(|line| {
-            let Some(rest) = line.strip_prefix("shot") else {
-                return Err(CircuitError::invalid_result_format(format!(
-                    "dets record does not start with shot: {line:?}"
-                )));
-            };
-            read_sparse_index_line(rest.trim(), bits_per_record, Some(token_mode))
-        })
-        .collect()
+    let mut records = Vec::new();
+    for line in text.split_terminator('\n') {
+        let line = strip_trailing_cr(line).trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Some(rest) = line.strip_prefix("shot") else {
+            return Err(CircuitError::invalid_result_format(format!(
+                "dets record does not start with shot: {line:?}"
+            )));
+        };
+        records.push(read_sparse_index_line(
+            rest.trim(),
+            bits_per_record,
+            Some(token_mode),
+        )?);
+    }
+    Ok(records)
+}
+
+fn strip_trailing_cr(line: &str) -> &str {
+    line.strip_suffix('\r').unwrap_or(line)
 }
 
 fn read_sparse_index_line(
@@ -899,6 +912,29 @@ mod tests {
         );
         assert!(read_measurement_records(b"shot D0\n", SampleFormat::Dets, 2).is_err());
         assert!(read_measurement_records(b"shot L0\n", SampleFormat::Dets, 2).is_err());
+    }
+
+    #[test]
+    fn measure_record_reader_accepts_stim_windows_newline_text_records() {
+        assert_eq!(
+            read_records(b"01\r\n01\r\n", SampleFormat::ZeroOne, 2).unwrap(),
+            vec![vec![false, true], vec![false, true]]
+        );
+        assert_eq!(
+            read_records(b"3\r\n1\r\n", SampleFormat::Hits, 4).unwrap(),
+            vec![
+                vec![false, false, false, true],
+                vec![false, true, false, false],
+            ]
+        );
+        assert_eq!(
+            read_measurement_records(b"shot M3\r\n\r\n\n   shot M1\r\n\n", SampleFormat::Dets, 4,)
+                .unwrap(),
+            vec![
+                vec![false, false, false, true],
+                vec![false, true, false, false],
+            ]
+        );
     }
 
     #[test]

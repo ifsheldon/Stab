@@ -116,6 +116,7 @@ where
     validate_observable_routing(&args)?;
     validate_ptb64_routing(&args)?;
     if args.shots == 0 {
+        validate_zero_shot_input_paths(&args)?;
         write_output(args.output.as_ref(), stdout, &[])?;
         write_empty_observables(args.obs_output.as_ref(), stdout)?;
         return write_empty_errors(args.error_output.as_ref(), stdout);
@@ -195,6 +196,25 @@ fn validate_ptb64_routing(args: &SampleDemArgs) -> Result<(), CliError> {
     Ok(())
 }
 
+fn validate_zero_shot_input_paths(args: &SampleDemArgs) -> Result<(), CliError> {
+    if let Some(path) = args.input.as_ref() {
+        ensure_readable_path(path)?;
+    }
+    if let Some(path) = args.replay_error_input.as_ref() {
+        ensure_readable_path(path)?;
+    }
+    Ok(())
+}
+
+fn ensure_readable_path(path: &Path) -> Result<(), CliError> {
+    std::fs::File::open(path)
+        .map(|_| ())
+        .map_err(|source| CliError::ReadPath {
+            path: path.to_path_buf(),
+            source,
+        })
+}
+
 fn read_replay_error_records(
     path: &Path,
     format: SampleDemRecordFormatArg,
@@ -271,13 +291,19 @@ fn read_line_replay_error_records(
     })?;
     let mut reader = BufReader::new(file);
     let mut records = Vec::with_capacity(expected_shots);
-    for _ in 0..expected_shots {
+    let mut skipped_dets_blank_bytes = 0usize;
+    while records.len() < expected_shots {
         let Some(line) = read_replay_line(path, &mut reader)? else {
             return Err(CliError::ReplayErrorRecordCountMismatch {
                 expected: expected_shots,
                 actual: records.len(),
             });
         };
+        if format == SampleDemRecordFormatArg::Dets && is_blank_dets_replay_line(&line) {
+            skipped_dets_blank_bytes =
+                checked_text_replay_scan_bytes(skipped_dets_blank_bytes, line.len())?;
+            continue;
+        }
         let parsed = read_measurement_records(&line, sample_format, error_count)?;
         let [record] = <[Vec<bool>; 1]>::try_from(parsed).map_err(|records| {
             CircuitError::InvalidResultFormat {
@@ -285,8 +311,24 @@ fn read_line_replay_error_records(
             }
         })?;
         records.push(record);
+        skipped_dets_blank_bytes = 0;
     }
     Ok(records)
+}
+
+fn is_blank_dets_replay_line(line: &[u8]) -> bool {
+    line.iter().all(|byte| byte.is_ascii_whitespace())
+}
+
+fn checked_text_replay_scan_bytes(current: usize, added: usize) -> Result<usize, CliError> {
+    let updated = current.saturating_add(added);
+    if updated > MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES {
+        return Err(CliError::InputTooLarge {
+            kind: "sample_dem replay text record",
+            limit: u64::try_from(MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES).unwrap_or(u64::MAX),
+        });
+    }
+    Ok(updated)
 }
 
 fn read_replay_line(path: &Path, reader: &mut impl BufRead) -> Result<Option<Vec<u8>>, CliError> {

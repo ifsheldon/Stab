@@ -357,6 +357,17 @@ fn dem_sampler_rejects_excessive_buffered_outputs_before_sampling() {
         "{error}"
     );
 
+    let high_observable = compile_dem("logical_observable L64000000\n");
+    let error = high_observable
+        .sample_detection_events_with_seed(1, Some(5))
+        .expect_err("reject excessive observable width");
+    assert!(
+        error
+            .to_string()
+            .contains("would require 64000001 buffered units"),
+        "{error}"
+    );
+
     let sampler_with_error_records = compile_dem("error(1) D0\n");
     let error = sampler_with_error_records
         .sample_detection_events_and_errors_with_seed(32_000_001, Some(5))
