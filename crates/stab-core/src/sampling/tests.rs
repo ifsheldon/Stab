@@ -61,6 +61,21 @@ fn samples_single_qubit_clifford_measurements() {
 }
 
 #[test]
+fn can_sample_against_zero_reference_sample() {
+    let circuit = Circuit::from_stim_str("H 0\nS 0\nS 0\nH 0\nM 0\n").expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+    assert_eq!(
+        sampler.sample_zero_one_with_seed_and_reference_mode(3, Some(5), false),
+        vec![vec![true]; 3]
+    );
+    assert_eq!(
+        sampler.sample_zero_one_with_seed_and_reference_mode(3, Some(5), true),
+        vec![vec![false]; 3]
+    );
+}
+
+#[test]
 fn samples_x_and_y_basis_measurements_deterministically() {
     assert_eq!(samples("H 0\nMX 0\n", 1), vec![vec![false]]);
     assert_eq!(samples("X 0\nH 0\nMX 0\n", 1), vec![vec![true]]);

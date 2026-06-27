@@ -1,7 +1,7 @@
 use rand::rngs::SmallRng;
 use rand::{Rng, RngExt as _, SeedableRng as _};
 
-use self::stabilizer_frame::{LocalTableauTransform, StabilizerFrame};
+use self::stabilizer_frame::{LocalTableauTransform, MeasurementRandomness, StabilizerFrame};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
     MeasureRecordOffset, Pauli, PauliBasis, SingleQubitClifford,
@@ -39,8 +39,20 @@ impl CompiledSampler {
     }
 
     pub fn sample_zero_one_with_seed(&self, shots: usize, seed: Option<u64>) -> Vec<Vec<bool>> {
+        self.sample_zero_one_with_seed_and_reference_mode(shots, seed, false)
+    }
+
+    pub fn sample_zero_one_with_seed_and_reference_mode(
+        &self,
+        shots: usize,
+        seed: Option<u64>,
+        skip_reference_sample: bool,
+    ) -> Vec<Vec<bool>> {
         let mut rng = sampler_rng(seed);
-        (0..shots).map(|_| self.sample_shot(&mut rng)).collect()
+        let reference_sample = skip_reference_sample.then(|| self.reference_sample());
+        (0..shots)
+            .map(|_| self.sample_shot_with_reference(&mut rng, reference_sample.as_deref()))
+            .collect()
     }
 
     pub fn sample_zero_one_bytes(&self, shots: usize) -> Vec<u8> {
@@ -57,10 +69,25 @@ impl CompiledSampler {
         format: SampleFormat,
         seed: Option<u64>,
     ) -> Vec<u8> {
+        self.sample_bytes_with_seed_and_reference_mode(shots, format, seed, false)
+    }
+
+    pub fn sample_bytes_with_seed_and_reference_mode(
+        &self,
+        shots: usize,
+        format: SampleFormat,
+        seed: Option<u64>,
+        skip_reference_sample: bool,
+    ) -> Vec<u8> {
         let mut rng = sampler_rng(seed);
+        let reference_sample = skip_reference_sample.then(|| self.reference_sample());
         let mut output = Vec::new();
         for _ in 0..shots {
-            append_sample(&self.sample_shot(&mut rng), format, &mut output);
+            append_sample(
+                &self.sample_shot_with_reference(&mut rng, reference_sample.as_deref()),
+                format,
+                &mut output,
+            );
         }
         output
     }
@@ -70,27 +97,88 @@ impl CompiledSampler {
         shots: usize,
         seed: Option<u64>,
     ) -> CircuitResult<Vec<u8>> {
+        self.sample_ptb64_bytes_with_seed_and_reference_mode(shots, seed, false)
+    }
+
+    pub fn sample_ptb64_bytes_with_seed_and_reference_mode(
+        &self,
+        shots: usize,
+        seed: Option<u64>,
+        skip_reference_sample: bool,
+    ) -> CircuitResult<Vec<u8>> {
         if !shots.is_multiple_of(64) {
             return Err(CircuitError::invalid_sampler_compilation(
                 "shots must be a multiple of 64 to use ptb64 format",
             ));
         }
         let mut rng = sampler_rng(seed);
+        let reference_sample = skip_reference_sample.then(|| self.reference_sample());
         let samples = (0..shots)
-            .map(|_| self.sample_shot(&mut rng))
+            .map(|_| self.sample_shot_with_reference(&mut rng, reference_sample.as_deref()))
             .collect::<Vec<_>>();
         Ok(ptb64_samples(&samples))
+    }
+
+    fn sample_shot_with_reference<R>(&self, rng: &mut R, reference: Option<&[bool]>) -> Vec<bool>
+    where
+        R: Rng,
+    {
+        let mut shot = self.sample_shot(rng);
+        if let Some(reference) = reference {
+            for (bit, reference_bit) in shot.iter_mut().zip(reference) {
+                *bit ^= *reference_bit;
+            }
+        }
+        shot
+    }
+
+    fn reference_sample(&self) -> Vec<bool> {
+        let mut rng = SmallRng::seed_from_u64(0);
+        self.sample_shot_in_mode(&mut rng, ExecutionMode::ReferenceSample)
     }
 
     fn sample_shot<R>(&self, rng: &mut R) -> Vec<bool>
     where
         R: Rng,
     {
+        self.sample_shot_in_mode(rng, ExecutionMode::Sample)
+    }
+
+    fn sample_shot_in_mode<R>(&self, rng: &mut R, mode: ExecutionMode) -> Vec<bool>
+    where
+        R: Rng,
+    {
         let mut frame = StabilizerFrame::new(self.qubit_count);
         let mut record = Vec::new();
         let mut output = Vec::new();
-        execute_operations(&self.operations, &mut frame, &mut record, &mut output, rng);
+        execute_operations(
+            &self.operations,
+            &mut frame,
+            &mut record,
+            &mut output,
+            rng,
+            mode,
+        );
         output
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ExecutionMode {
+    Sample,
+    ReferenceSample,
+}
+
+impl ExecutionMode {
+    fn measurement_randomness(self) -> MeasurementRandomness {
+        match self {
+            Self::Sample => MeasurementRandomness::Random,
+            Self::ReferenceSample => MeasurementRandomness::DeterministicFalse,
+        }
+    }
+
+    fn includes_noise(self) -> bool {
+        matches!(self, Self::Sample)
     }
 }
 
@@ -787,28 +875,42 @@ fn execute_operations(
     record: &mut Vec<bool>,
     output: &mut Vec<bool>,
     rng: &mut impl Rng,
+    mode: ExecutionMode,
 ) {
     for operation in operations {
         match operation {
             SampleOperation::ApplyTableau { targets, transform } => {
                 frame.apply_tableau(targets, transform);
             }
-            SampleOperation::Reset { qubit, basis } => frame.reset(*qubit, *basis, rng),
+            SampleOperation::Reset { qubit, basis } => {
+                frame.reset(*qubit, *basis, rng, mode.measurement_randomness());
+            }
             SampleOperation::Measure {
                 qubit,
                 basis,
                 inverted,
                 reset,
             } => {
-                let result = frame.measure(*qubit, *basis, *inverted, rng);
+                let result = frame.measure(
+                    *qubit,
+                    *basis,
+                    *inverted,
+                    rng,
+                    mode.measurement_randomness(),
+                );
                 record.push(result);
                 output.push(result);
                 if *reset {
-                    frame.reset(*qubit, *basis, rng);
+                    frame.reset(*qubit, *basis, rng, mode.measurement_randomness());
                 }
             }
             SampleOperation::MeasureProduct { terms, inverted } => {
-                let result = frame.measure_pauli_product(terms, *inverted, rng);
+                let result = frame.measure_pauli_product(
+                    terms,
+                    *inverted,
+                    rng,
+                    mode.measurement_randomness(),
+                );
                 record.push(result);
                 output.push(result);
             }
@@ -820,20 +922,28 @@ fn execute_operations(
                 qubit,
                 probabilities,
             } => {
-                apply_single_qubit_pauli_channel(frame, *qubit, probabilities, rng);
+                if mode.includes_noise() {
+                    apply_single_qubit_pauli_channel(frame, *qubit, probabilities, rng);
+                }
             }
             SampleOperation::TwoQubitPauliChannel {
                 left,
                 right,
                 probabilities,
             } => {
-                apply_two_qubit_pauli_channel(frame, *left, *right, probabilities, rng);
+                if mode.includes_noise() {
+                    apply_two_qubit_pauli_channel(frame, *left, *right, probabilities, rng);
+                }
             }
             SampleOperation::HeraldedPauliChannel {
                 qubit,
                 probabilities,
             } => {
-                apply_heralded_pauli_channel(frame, *qubit, probabilities, record, rng);
+                if mode.includes_noise() {
+                    apply_heralded_pauli_channel(frame, *qubit, probabilities, record, rng);
+                } else {
+                    record.push(false);
+                }
             }
             SampleOperation::FeedbackPauli {
                 offset,
@@ -846,7 +956,7 @@ fn execute_operations(
             }
             SampleOperation::Repeat { count, body } => {
                 for _ in 0..*count {
-                    execute_operations(body, frame, record, output, rng);
+                    execute_operations(body, frame, record, output, rng, mode);
                 }
             }
         }

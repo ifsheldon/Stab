@@ -286,7 +286,7 @@ where
     let result = match cli.command {
         Some(Command::Gen(args)) => run_gen(args, &mut stdout),
         Some(Command::Convert(args)) => run_convert(args, &mut input, &mut stdout),
-        Some(Command::Sample(args)) => run_sample(args, &mut input, &mut stdout),
+        Some(Command::Sample(args)) => run_sample(args, &mut input, &mut stdout, &mut stderr),
         None => {
             let error = Cli::command().error(
                 ErrorKind::MissingSubcommand,
@@ -731,15 +731,23 @@ where
     }
 }
 
-fn run_sample<R, W>(args: SampleArgs, input: &mut R, stdout: &mut W) -> Result<(), CliError>
+fn run_sample<R, W, E>(
+    args: SampleArgs,
+    input: &mut R,
+    stdout: &mut W,
+    stderr: &mut E,
+) -> Result<(), CliError>
 where
     R: Read,
     W: Write,
+    E: Write,
 {
-    if args.skip_reference_sample || args.frame0 {
-        return Err(CliError::UnsupportedSampleFlag {
-            flag: "--skip_reference_sample",
-        });
+    if args.frame0 {
+        writeln!(
+            stderr,
+            "[DEPRECATION] Use `--skip_reference_sample` instead of `--frame0`"
+        )
+        .map_err(CliError::WriteOutput)?;
     }
     if args.skip_loop_folding {
         return Err(CliError::UnsupportedSampleFlag {
@@ -751,23 +759,43 @@ where
     let circuit_text = std::str::from_utf8(&input_bytes).map_err(|_| CliError::InvalidUtf8Input)?;
     let circuit = Circuit::from_stim_str(circuit_text)?;
     let sampler = CompiledSampler::compile(&circuit)?;
+    let skip_reference_sample = args.skip_reference_sample || args.frame0;
     let output = match args.out_format {
-        SampleOutFormatArg::ZeroOne => {
-            sampler.sample_bytes_with_seed(args.shots, SampleFormat::ZeroOne, args.seed)
-        }
-        SampleOutFormatArg::B8 => {
-            sampler.sample_bytes_with_seed(args.shots, SampleFormat::B8, args.seed)
-        }
-        SampleOutFormatArg::R8 => {
-            sampler.sample_bytes_with_seed(args.shots, SampleFormat::R8, args.seed)
-        }
-        SampleOutFormatArg::Ptb64 => sampler.sample_ptb64_bytes_with_seed(args.shots, args.seed)?,
-        SampleOutFormatArg::Hits => {
-            sampler.sample_bytes_with_seed(args.shots, SampleFormat::Hits, args.seed)
-        }
-        SampleOutFormatArg::Dets => {
-            sampler.sample_bytes_with_seed(args.shots, SampleFormat::Dets, args.seed)
-        }
+        SampleOutFormatArg::ZeroOne => sampler.sample_bytes_with_seed_and_reference_mode(
+            args.shots,
+            SampleFormat::ZeroOne,
+            args.seed,
+            skip_reference_sample,
+        ),
+        SampleOutFormatArg::B8 => sampler.sample_bytes_with_seed_and_reference_mode(
+            args.shots,
+            SampleFormat::B8,
+            args.seed,
+            skip_reference_sample,
+        ),
+        SampleOutFormatArg::R8 => sampler.sample_bytes_with_seed_and_reference_mode(
+            args.shots,
+            SampleFormat::R8,
+            args.seed,
+            skip_reference_sample,
+        ),
+        SampleOutFormatArg::Ptb64 => sampler.sample_ptb64_bytes_with_seed_and_reference_mode(
+            args.shots,
+            args.seed,
+            skip_reference_sample,
+        )?,
+        SampleOutFormatArg::Hits => sampler.sample_bytes_with_seed_and_reference_mode(
+            args.shots,
+            SampleFormat::Hits,
+            args.seed,
+            skip_reference_sample,
+        ),
+        SampleOutFormatArg::Dets => sampler.sample_bytes_with_seed_and_reference_mode(
+            args.shots,
+            SampleFormat::Dets,
+            args.seed,
+            skip_reference_sample,
+        ),
     };
     write_output(args.output.as_ref(), stdout, &output)
 }

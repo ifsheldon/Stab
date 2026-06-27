@@ -768,6 +768,42 @@ fn sample_supports_single_qubit_clifford_measurements() {
 }
 
 #[test]
+fn sample_supports_skip_reference_sample_flag() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "--sample", "--skip_reference_sample"],
+        "H 0\nS 0\nS 0\nH 0\nM 0\n".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "0\n");
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_supports_deprecated_frame0_alias() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample", "--frame0"],
+        "H 0\nS 0\nS 0\nH 0\nM 0\n".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "0\n");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("[DEPRECATION] Use `--skip_reference_sample` instead of `--frame0`")
+    );
+}
+
+#[test]
 fn sample_reads_and_writes_paths() {
     let temp_dir = tempdir().expect("temp dir");
     let input_path = temp_dir.path().join("input.stim");

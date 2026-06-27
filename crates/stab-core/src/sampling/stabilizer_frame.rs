@@ -59,6 +59,12 @@ pub(super) struct StabilizerFrame {
     generators: Vec<StabilizerGenerator>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum MeasurementRandomness {
+    Random,
+    DeterministicFalse,
+}
+
 impl StabilizerFrame {
     pub(super) fn new(qubit_count: usize) -> Self {
         let generators = (0..qubit_count)
@@ -82,8 +88,14 @@ impl StabilizerFrame {
         }
     }
 
-    pub(super) fn reset(&mut self, qubit: usize, basis: PauliBasis, rng: &mut impl Rng) {
-        let measured = self.measure(qubit, basis, false, rng);
+    pub(super) fn reset(
+        &mut self,
+        qubit: usize,
+        basis: PauliBasis,
+        rng: &mut impl Rng,
+        randomness: MeasurementRandomness,
+    ) {
+        let measured = self.measure(qubit, basis, false, rng, randomness);
         if measured {
             self.apply_pauli(qubit, reset_correction(basis));
         }
@@ -95,9 +107,10 @@ impl StabilizerFrame {
         basis: PauliBasis,
         inverted: bool,
         rng: &mut impl Rng,
+        randomness: MeasurementRandomness,
     ) -> bool {
         let observable = StabilizerGenerator::single(self.len(), qubit, basis, false);
-        self.measure_observable(&observable, rng) ^ inverted
+        self.measure_observable(&observable, rng, randomness) ^ inverted
     }
 
     pub(super) fn measure_pauli_product(
@@ -105,6 +118,7 @@ impl StabilizerFrame {
         terms: &[(usize, PauliBasis)],
         inverted: bool,
         rng: &mut impl Rng,
+        randomness: MeasurementRandomness,
     ) -> bool {
         let mut observable = StabilizerGenerator::identity(self.len());
         for (qubit, basis) in terms {
@@ -115,10 +129,15 @@ impl StabilizerFrame {
                 false,
             ));
         }
-        self.measure_observable(&observable, rng) ^ inverted
+        self.measure_observable(&observable, rng, randomness) ^ inverted
     }
 
-    fn measure_observable(&mut self, observable: &StabilizerGenerator, rng: &mut impl Rng) -> bool {
+    fn measure_observable(
+        &mut self,
+        observable: &StabilizerGenerator,
+        rng: &mut impl Rng,
+        randomness: MeasurementRandomness,
+    ) -> bool {
         if let Some(bit) = self.deterministic_measurement_bit(observable) {
             return bit;
         }
@@ -129,7 +148,10 @@ impl StabilizerFrame {
         else {
             return observable.negative;
         };
-        let sampled = rng.random_bool(0.5);
+        let sampled = match randomness {
+            MeasurementRandomness::Random => rng.random_bool(0.5),
+            MeasurementRandomness::DeterministicFalse => false,
+        };
         let Some(pivot) = self.generators.get(pivot_index).cloned() else {
             return sampled;
         };
