@@ -118,16 +118,25 @@ Revealed by: milestone audit of `just bench::compare --milestone M8`.
 Current text: M8 requires `just bench::compare --milestone M8` to report compile/analysis time, single-shot latency, and batch throughput for `1`, `1024`, and `1_000_000` shots.
 Gap: non-strict benchmark comparison can exit successfully while M8 benchmark rows have missing pinned Stim baselines, and the milestone does not define which report-only rows are acceptable before completion. Pending Stab runners are no longer part of this gap because every M8 benchmark manifest row now has either a Stab comparison runner or an explicit contract-only runner.
 Proposed amendment: require `just bench::compare --milestone M8 --strict` for milestone completion, or explicitly list report-only exceptions with their owning follow-up milestone; every required M8 benchmark row should have a Stab runner and selected pinned Stim baseline before completion.
-Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now requires `just bench::compare --milestone M8 --strict` for M8 completion. The M8 benchmark manifest rows have Stab runners or explicit contract-only runners, and regenerating `target/benchmarks/baseline/latest/baseline.json` with `just bench::baseline --only M8` produced selected pinned Stim rows accepted by the strict comparison.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now requires `just bench::compare --milestone M8 --strict` for M8 completion. Strict comparison validates pinned Stim baseline metadata, fails empty contract-only placeholders, and the M8 benchmark manifest rows now have Stab runners or measured representative contract rows. Regenerating `target/benchmarks/baseline/latest/baseline.json` with `just bench::baseline --only M8` produced selected pinned Stim rows accepted by the strict comparison.
 
 ## 2026-06-27 - M8: Multi-Outcome Statistical Evidence
 
-Status: Partially Resolved
+Status: Resolved
 Revealed by: milestone audit of M8 statistical oracle rows.
 Current text: M8 requires statistical tests for noisy sampling that do not require C++ random-stream compatibility, and the test strategy names binomial and chi-square checks.
 Gap: the milestone does not specify which multi-outcome channels require multinomial or chi-square evidence, what bucket definitions should be used, or what sample counts and false-positive budgets are acceptable for channels such as `PAULI_CHANNEL_2` and heralded local noise.
 Proposed amendment: require binomial evidence for one-bit marginal fixtures and chi-square or equivalent multi-bucket evidence for multi-outcome noise fixtures, with fixture-specific bucket definitions, sample counts, fixed seeds, and confidence bounds recorded in the oracle manifest.
-Resolution: M8 now includes a bucketed statistical oracle comparator and `m8-sample-pauli-channel2-statistical`, which records four two-bit buckets, 4000 samples, fixed seed 5, and a 5-sigma tolerance in `oracle/fixtures/manifest.csv`. The broader list of required multi-outcome channels remains under-specified until the plan names each required bucketed fixture or chi-square row.
+Resolution: M8 now includes a bucketed statistical oracle comparator and fixture-specific bucketed rows for `PAULI_CHANNEL_2`, correlated errors, independent X/Y/Z errors, depolarizing basis variants, and multi-target `X_ERROR`. Each row records bucket definitions, sample counts, fixed seed 5, and a 5-sigma tolerance in `oracle/fixtures/manifest.csv`.
+
+## 2026-06-27 - M8: Skip Loop Folding Scope
+
+Status: Open
+Revealed by: milestone audit of M8 `--skip_loop_folding` evidence.
+Current text: M8 requires repeat handling, reference sample behavior, and `stim sample` core flags, but does not say whether `--skip_loop_folding` must change the Rust sampler implementation or only be accepted with output-compatible behavior.
+Gap: Stab currently accepts `--skip_loop_folding` and proves output parity on a repeat circuit, while optimized loop-folded reference-sample construction remains deferred by the `coverage-util-top-reference-sample-tree` manifest row. The milestone text does not state whether that is sufficient for M8 completion.
+Proposed amendment: state that M8 requires `--skip_loop_folding` to be accepted and output-compatible for repeat circuits, while optimized loop-folded reference-sample construction and performance parity are deferred to M12 unless promoted earlier.
+Resolution: pending plan update.
 
 ## 2026-06-27 - M7: Generated Fixture Matrix Scope
 

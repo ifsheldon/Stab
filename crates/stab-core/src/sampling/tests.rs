@@ -308,6 +308,66 @@ fn heralded_pauli_channel_samples_disjoint_probabilities() {
 }
 
 #[test]
+fn correlated_error_branches_match_stim_else_semantics() {
+    assert_eq!(
+        samples(
+            "CORRELATED_ERROR(0) X0 X1\nELSE_CORRELATED_ERROR(0) X1 X2\nELSE_CORRELATED_ERROR(0) X2 X3\nM 0 1 2 3\n",
+            1,
+        ),
+        vec![vec![false, false, false, false]]
+    );
+    assert_eq!(
+        samples(
+            "E(1) X0 X1\nELSE_CORRELATED_ERROR(1) X1 X2\nE(1) X3 X4\nM 0 1 2 3 4\n",
+            1,
+        ),
+        vec![vec![true, true, false, true, true]]
+    );
+    assert_eq!(
+        samples(
+            "CORRELATED_ERROR(0) X0 X1\nELSE_CORRELATED_ERROR(1) X1 X2\nELSE_CORRELATED_ERROR(1) X2 X3\nM 0 1 2 3\n",
+            1,
+        ),
+        vec![vec![false, true, true, false]]
+    );
+}
+
+#[test]
+fn correlated_error_samples_conditional_distribution() {
+    let circuit = Circuit::from_stim_str(
+        "CORRELATED_ERROR(0.5) X0\nELSE_CORRELATED_ERROR(0.25) X1\nELSE_CORRELATED_ERROR(0.75) X2\nM 0 1 2\n",
+    )
+    .expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+    let shots = sampler.sample_zero_one_with_seed(4000, Some(5));
+
+    let mut hits = [0usize; 3];
+    for shot in &shots {
+        for (index, count) in hits.iter_mut().enumerate() {
+            if shot.get(index) == Some(&true) {
+                *count += 1;
+            }
+        }
+    }
+    let [first_hits, second_hits, third_hits] = hits;
+    assert!(
+        (1800..=2200).contains(&first_hits),
+        "expected roughly 2000 first-branch hits, got {}",
+        first_hits
+    );
+    assert!(
+        (300..=700).contains(&second_hits),
+        "expected roughly 500 second-branch hits, got {}",
+        second_hits
+    );
+    assert!(
+        (925..=1325).contains(&third_hits),
+        "expected roughly 1125 third-branch hits, got {}",
+        third_hits
+    );
+}
+
+#[test]
 fn rejects_feedback_that_reads_missing_measurements() {
     let circuit = Circuit::from_stim_str("CX rec[-1] 0\n").expect("parse circuit");
 

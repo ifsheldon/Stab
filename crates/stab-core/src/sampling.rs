@@ -155,11 +155,13 @@ impl CompiledSampler {
         let mut frame = StabilizerFrame::new(self.qubit_count);
         let mut record = Vec::new();
         let mut output = Vec::new();
+        let mut correlated_error_occurred = false;
         execute_operations(
             &self.operations,
             &mut frame,
             &mut record,
             &mut output,
+            &mut correlated_error_occurred,
             rng,
             mode,
         );
@@ -221,6 +223,11 @@ enum SampleOperation {
         left: usize,
         right: usize,
         probabilities: [f64; 15],
+    },
+    CorrelatedError {
+        else_branch: bool,
+        probability: f64,
+        terms: Vec<(usize, PauliBasis)>,
     },
     HeraldedPauliChannel {
         qubit: usize,
@@ -338,6 +345,7 @@ where
             }
             SampleOperation::SingleQubitPauliChannel { .. }
             | SampleOperation::TwoQubitPauliChannel { .. }
+            | SampleOperation::CorrelatedError { .. }
             | SampleOperation::HeraldedPauliChannel { .. } => {}
         }
     }
@@ -529,6 +537,8 @@ fn compile_instruction(
             }
             compile_two_qubit_pauli_channel(instruction, operations, channel_probabilities)
         }
+        "E" => compile_correlated_error(instruction, operations, false),
+        "ELSE_CORRELATED_ERROR" => compile_correlated_error(instruction, operations, true),
         "HERALDED_ERASE" => {
             let probability = single_probability_argument(instruction)?.get() / 4.0;
             compile_heralded_pauli_channel(
@@ -832,6 +842,30 @@ fn compile_heralded_pauli_channel(
     Ok(())
 }
 
+fn compile_correlated_error(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    else_branch: bool,
+) -> CircuitResult<()> {
+    let probability = single_probability_argument(instruction)?.get();
+    let mut terms = Vec::new();
+    for target in instruction.targets() {
+        if target.is_inverted_result_target() || target.is_combiner() {
+            return Err(unsupported_sampler_instruction(instruction));
+        }
+        let Some(pauli) = target.pauli_type() else {
+            return Err(unsupported_sampler_instruction(instruction));
+        };
+        terms.push((qubit_index(instruction, target)?, pauli_basis(pauli)));
+    }
+    operations.push(SampleOperation::CorrelatedError {
+        else_branch,
+        probability,
+        terms,
+    });
+    Ok(())
+}
+
 fn single_probability_argument(
     instruction: &CircuitInstruction,
 ) -> CircuitResult<crate::Probability> {
@@ -885,6 +919,7 @@ fn execute_operations(
     frame: &mut StabilizerFrame,
     record: &mut Vec<bool>,
     output: &mut Vec<bool>,
+    correlated_error_occurred: &mut bool,
     rng: &mut impl Rng,
     mode: ExecutionMode,
 ) {
@@ -946,6 +981,24 @@ fn execute_operations(
                     apply_two_qubit_pauli_channel(frame, *left, *right, probabilities, rng);
                 }
             }
+            SampleOperation::CorrelatedError {
+                else_branch,
+                probability,
+                terms,
+            } => {
+                if mode.includes_noise() {
+                    apply_correlated_error(
+                        frame,
+                        terms,
+                        *probability,
+                        *else_branch,
+                        correlated_error_occurred,
+                        rng,
+                    );
+                } else if !else_branch {
+                    *correlated_error_occurred = false;
+                }
+            }
             SampleOperation::HeraldedPauliChannel {
                 qubit,
                 probabilities,
@@ -967,7 +1020,15 @@ fn execute_operations(
             }
             SampleOperation::Repeat { count, body } => {
                 for _ in 0..*count {
-                    execute_operations(body, frame, record, output, rng, mode);
+                    execute_operations(
+                        body,
+                        frame,
+                        record,
+                        output,
+                        correlated_error_occurred,
+                        rng,
+                        mode,
+                    );
                 }
             }
         }
@@ -1030,6 +1091,27 @@ fn apply_single_qubit_pauli_channel(
             return;
         }
         sampled_probability -= probability;
+    }
+}
+
+fn apply_correlated_error(
+    frame: &mut StabilizerFrame,
+    terms: &[(usize, PauliBasis)],
+    probability: f64,
+    else_branch: bool,
+    correlated_error_occurred: &mut bool,
+    rng: &mut impl Rng,
+) {
+    if else_branch && *correlated_error_occurred {
+        return;
+    }
+    if rng.random::<f64>() < probability {
+        for (qubit, basis) in terms {
+            frame.apply_pauli(*qubit, *basis);
+        }
+        *correlated_error_occurred = true;
+    } else if !else_branch {
+        *correlated_error_occurred = false;
     }
 }
 

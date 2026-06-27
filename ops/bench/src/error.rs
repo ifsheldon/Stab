@@ -118,4 +118,7 @@ pub(crate) enum BenchError {
 
     #[error("benchmark comparison is incomplete:\n{details}")]
     CompareIncomplete { details: Box<str> },
+
+    #[error("benchmark baseline metadata does not match pinned Stim v1.16.0:\n{details}")]
+    BaselineMetadataMismatch { details: Box<str> },
 }

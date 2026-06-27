@@ -22,6 +22,8 @@ use crate::stim::{ensure_stim_binaries, validate_stim_source};
 
 mod m7;
 mod m8;
+#[cfg(test)]
+mod tests;
 
 #[cfg(not(test))]
 const STAB_COMPARE_ITERATIONS: usize = 128;
@@ -41,6 +43,7 @@ const M6_TABLEAU_QUBITS: usize = 32;
 const M6_TABLEAU_ITER_QUBITS: usize = 2;
 const M6_STABILIZER_QUBITS: usize = 16;
 const M4_PARSE_FIXTURE: &str = include_str!("../../../oracle/fixtures/inputs/parser_basic.stim");
+const BASELINE_SCHEMA_VERSION: u32 = 1;
 const M4_STIM_PARSE_DENSE_FIXTURE: &str = r#"
 H 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 CNOT 4 5 6 7
@@ -144,6 +147,7 @@ pub(crate) fn run_compare(
 ) -> Result<(), BenchError> {
     let baseline_path = root.resolve_relative(&options.baseline);
     let baseline_report = read_baseline_report(&baseline_path)?;
+    validate_baseline_metadata(&baseline_report)?;
     let rows = manifest
         .rows
         .iter()
@@ -161,6 +165,7 @@ pub(crate) fn run_compare(
     );
     let mut pending = Vec::new();
     let mut missing_baselines = Vec::new();
+    let mut contract_only_without_measurements = Vec::new();
     for row in rows {
         let stim_summary = match summarize_baseline_row(&baseline_report, &row.id) {
             BaselineSummary::Present(summary) => summary,
@@ -174,14 +179,25 @@ pub(crate) fn run_compare(
                 let note = compare_note(&row.id)
                     .map(|note| format!(" note={note}"))
                     .unwrap_or_default();
-                println!(
-                    "- {} {} status=measured stab={} stim={}{}",
-                    row.milestone.as_str(),
-                    row.id,
-                    summarize_stab_measurements(&row.id, &measurements),
-                    stim_summary,
-                    note
-                );
+                if row.runner == Runner::ContractOnly && measurements.is_empty() {
+                    println!(
+                        "- {} {} status=contract-only stab=no-runner stim={}{}",
+                        row.milestone.as_str(),
+                        row.id,
+                        stim_summary,
+                        note
+                    );
+                    contract_only_without_measurements.push(row.id.clone());
+                } else {
+                    println!(
+                        "- {} {} status=measured stab={} stim={}{}",
+                        row.milestone.as_str(),
+                        row.id,
+                        summarize_stab_measurements(&row.id, &measurements),
+                        stim_summary,
+                        note
+                    );
+                }
             }
             None => {
                 println!(
@@ -194,9 +210,18 @@ pub(crate) fn run_compare(
             }
         }
     }
-    if options.strict && (!pending.is_empty() || !missing_baselines.is_empty()) {
+    if options.strict
+        && (!pending.is_empty()
+            || !missing_baselines.is_empty()
+            || !contract_only_without_measurements.is_empty())
+    {
         Err(BenchError::CompareIncomplete {
-            details: compare_incomplete_details(&pending, &missing_baselines).into_boxed_str(),
+            details: compare_incomplete_details(
+                &pending,
+                &missing_baselines,
+                &contract_only_without_measurements,
+            )
+            .into_boxed_str(),
         })
     } else {
         Ok(())
@@ -209,6 +234,47 @@ fn read_baseline_report(path: &Path) -> Result<BaselineReport, BenchError> {
         source,
     })?;
     Ok(serde_json::from_str(&content)?)
+}
+
+fn validate_baseline_metadata(report: &BaselineReport) -> Result<(), BenchError> {
+    let mut details = Vec::new();
+    if report.schema_version != BASELINE_SCHEMA_VERSION {
+        details.push(format!(
+            "schema_version={} expected {}",
+            report.schema_version, BASELINE_SCHEMA_VERSION
+        ));
+    }
+    if report.stim.expected_tag != STIM_TAG {
+        details.push(format!(
+            "expected_tag={} expected {STIM_TAG}",
+            report.stim.expected_tag
+        ));
+    }
+    if report.stim.actual_tag != STIM_TAG {
+        details.push(format!(
+            "actual_tag={} expected {STIM_TAG}",
+            report.stim.actual_tag
+        ));
+    }
+    if report.stim.expected_commit != STIM_COMMIT {
+        details.push(format!(
+            "expected_commit={} expected {STIM_COMMIT}",
+            report.stim.expected_commit
+        ));
+    }
+    if report.stim.actual_commit != STIM_COMMIT {
+        details.push(format!(
+            "actual_commit={} expected {STIM_COMMIT}",
+            report.stim.actual_commit
+        ));
+    }
+    if details.is_empty() {
+        Ok(())
+    } else {
+        Err(BenchError::BaselineMetadataMismatch {
+            details: details.join("\n").into_boxed_str(),
+        })
+    }
 }
 
 fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, BenchError> {
@@ -485,12 +551,15 @@ fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, 
                 })?,
             ]))
         }
-        _ if row.runner == Runner::ContractOnly => Ok(Some(Vec::new())),
         _ => {
             if let Some(measurements) = m8::run_sample_compare_row(row)? {
                 Ok(Some(measurements))
+            } else if let Some(measurements) = m7::run_generator_compare_row(row)? {
+                Ok(Some(measurements))
+            } else if row.runner == Runner::ContractOnly {
+                Ok(Some(Vec::new()))
             } else {
-                m7::run_generator_compare_row(row)
+                Ok(None)
             }
         }
     }
@@ -700,7 +769,11 @@ fn summarize_baseline_row(report: &BaselineReport, row_id: &str) -> BaselineSumm
     BaselineSummary::Present(summarize_measurements(&row.measurements))
 }
 
-fn compare_incomplete_details(pending: &[String], missing_baselines: &[String]) -> String {
+fn compare_incomplete_details(
+    pending: &[String],
+    missing_baselines: &[String],
+    contract_only_without_measurements: &[String],
+) -> String {
     let mut details = Vec::new();
     if !pending.is_empty() {
         details.push(format!(
@@ -712,6 +785,12 @@ fn compare_incomplete_details(pending: &[String], missing_baselines: &[String]) 
         details.push(format!(
             "missing baseline row(s): {}",
             missing_baselines.join(", ")
+        ));
+    }
+    if !contract_only_without_measurements.is_empty() {
+        details.push(format!(
+            "contract-only row(s) without Stab measurement(s): {}",
+            contract_only_without_measurements.join(", ")
         ));
     }
     details.join("\n")
@@ -1002,184 +1081,5 @@ fn duration_seconds(value: f64, unit: &str) -> Option<f64> {
         "ns" => Some(value / 1_000_000_000.0),
         "ps" => Some(value / 1_000_000_000_000.0),
         _ => None,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{
-        BaselineSummary, compare_note, measurement_work, parse_stim_perf_line,
-        run_stab_compare_row, summarize_baseline_row,
-    };
-    use crate::manifest::{BenchmarkRow, Milestone, Runner};
-    use crate::report::{BaselineReport, Measurement};
-
-    #[test]
-    fn parses_stim_perf_measurement_line() {
-        let measurement = parse_stim_perf_line(
-            "[..................*<|....................] 1.3 us (vs 950 ns) circuit_parse",
-        )
-        .expect("parse line");
-
-        assert_eq!(
-            measurement,
-            Measurement {
-                name: "circuit_parse".to_string(),
-                seconds: 0.0000013,
-                iterations: None,
-            }
-        );
-    }
-
-    #[test]
-    fn summarizes_present_contract_and_missing_baseline_rows() {
-        let report = serde_json::from_str::<BaselineReport>(
-            r#"{
-                "schema_version": 1,
-                "generated_unix_epoch_seconds": 0,
-                "machine": {
-                    "os": "linux",
-                    "arch": "x86_64",
-                    "family": "unix",
-                    "available_parallelism": 1,
-                    "rustc_version": "rustc test",
-                    "cmake_version": "cmake test"
-                },
-                "stim": {
-                    "source_path": "vendor/stim",
-                    "expected_tag": "v1.16.0",
-                    "expected_commit": "expected",
-                    "actual_tag": "v1.16.0",
-                    "actual_commit": "actual"
-                },
-                "command": {
-                    "target_seconds": 0.001,
-                    "cli_iterations": 1,
-                    "filters": []
-                },
-                "rows": [
-                    {
-                        "id": "measured-row",
-                        "milestone": "M4",
-                        "threshold_class": "report-only",
-                        "runner": "stim-perf",
-                        "upstream_source": "src/stim/circuit/circuit.perf.cc",
-                        "phase": "analysis",
-                        "measurement": "parser-throughput",
-                        "status": "measured",
-                        "command": {
-                            "program": "stim_perf",
-                            "args": [],
-                            "stdin_path": ""
-                        },
-                        "measurements": [
-                            {
-                                "name": "circuit_parse",
-                                "seconds": 0.0000013,
-                                "iterations": null
-                            }
-                        ]
-                    },
-                    {
-                        "id": "contract-row",
-                        "milestone": "M4",
-                        "threshold_class": "report-only",
-                        "runner": "contract-only",
-                        "upstream_source": "src/stim/circuit/circuit.test.cc",
-                        "phase": "analysis",
-                        "measurement": "canonical-print",
-                        "status": "contract-only",
-                        "command": {
-                            "program": "",
-                            "args": [],
-                            "stdin_path": ""
-                        },
-                        "measurements": []
-                    }
-                ]
-            }"#,
-        )
-        .expect("baseline report");
-
-        assert_eq!(
-            summarize_baseline_row(&report, "measured-row"),
-            BaselineSummary::Present("circuit_parse=0.000001300s".to_string())
-        );
-        assert_eq!(
-            summarize_baseline_row(&report, "contract-row"),
-            BaselineSummary::Present("contract-only".to_string())
-        );
-        assert_eq!(
-            summarize_baseline_row(&report, "missing-row"),
-            BaselineSummary::Missing
-        );
-    }
-
-    #[test]
-    fn m6_benchmark_rows_have_stab_compare_runners() {
-        for (id, expected_measurements) in [
-            (
-                "m6-clifford-string",
-                &["stab_clifford_string_multiply_4096"][..],
-            ),
-            (
-                "m6-pauli-string",
-                &[
-                    "stab_pauli_string_multiply_10k",
-                    "stab_pauli_string_commutes_10k",
-                ][..],
-            ),
-            ("m6-pauli-iter", &["stab_pauli_iter_16q_weight_1_to_3"][..]),
-            (
-                "m6-tableau",
-                &[
-                    "stab_tableau_from_circuit_32q",
-                    "stab_tableau_inverse_32q",
-                    "stab_tableau_apply_32q",
-                ][..],
-            ),
-            ("m6-tableau-iter", &["stab_tableau_iter_unsigned_2q"][..]),
-            (
-                "m6-stabilizers-to-tableau",
-                &[
-                    "stab_stabilizers_to_tableau_16q",
-                    "stab_stabilizers_to_inverse_tableau_16q",
-                ][..],
-            ),
-        ] {
-            let row = BenchmarkRow {
-                id: id.to_string(),
-                milestone: Milestone::M6,
-                threshold_class: "report-only".to_string(),
-                runner: Runner::StimPerf,
-                upstream_source: "src/stim/stabilizers/test.perf.cc".to_string(),
-                stim_perf_filter: "test".to_string(),
-                argv: String::new(),
-                stdin_path: String::new(),
-                phase: "throughput".to_string(),
-                measurement: "stabilizers".to_string(),
-                description: "test row".to_string(),
-            };
-
-            let measurements = run_stab_compare_row(&row)
-                .expect("run compare row")
-                .expect("Stab runner");
-            let names = measurements
-                .iter()
-                .map(|measurement| measurement.name.as_str())
-                .collect::<Vec<_>>();
-
-            assert_eq!(names.as_slice(), expected_measurements);
-            assert!(
-                compare_note(id).is_some(),
-                "{id} should explain benchmark comparability"
-            );
-            for name in names {
-                assert!(
-                    measurement_work(id, name).is_some(),
-                    "{id}/{name} should report normalized work"
-                );
-            }
-        }
     }
 }
