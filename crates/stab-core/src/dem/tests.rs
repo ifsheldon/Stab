@@ -18,6 +18,13 @@ fn threshold_options(threshold: f64) -> ErrorAnalyzerOptions {
     }
 }
 
+fn decompose_options() -> ErrorAnalyzerOptions {
+    ErrorAnalyzerOptions {
+        decompose_errors: true,
+        ..ErrorAnalyzerOptions::default()
+    }
+}
+
 #[test]
 fn dem_targets_parse_stim_limits() {
     assert_eq!(
@@ -184,6 +191,51 @@ fn dem_analyzer_maps_correlated_error_to_joint_detector_error() {
         .to_dem_string();
 
     assert_eq!(dem, "error(0.25) D0 D1\n");
+}
+
+#[test]
+fn dem_analyzer_decomposes_errors_using_known_graphlike_components() {
+    let circuit = Circuit::from_stim_str(
+        "X_ERROR(0.125) 0\n\
+         MR 0\n\
+         X_ERROR(0.25) 0\n\
+         MR 0\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-1] rec[-2]\n\
+         DETECTOR rec[-1] rec[-2]\n\
+         OBSERVABLE_INCLUDE(5) rec[-2]\n\
+         OBSERVABLE_INCLUDE(6) rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, decompose_options())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(
+        dem,
+        "error(0.25) D2 D3 L6\nerror(0.125) D2 D3 L6 ^ D0 D1 L5 L6\n"
+    );
+}
+
+#[test]
+fn dem_analyzer_rejects_undecomposable_detector_triples() {
+    let circuit = Circuit::from_stim_str(
+        "X_ERROR(0.001) 0\n\
+         M 0\n\
+         DETECTOR rec[-1]\n\
+         DETECTOR rec[-1]\n\
+         DETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let error = circuit_to_detector_error_model(&circuit, decompose_options())
+        .unwrap_err()
+        .to_string();
+
+    assert!(error.contains("Failed to decompose errors into graphlike components"));
+    assert!(error.contains("D0, D1, D2"));
 }
 
 #[test]

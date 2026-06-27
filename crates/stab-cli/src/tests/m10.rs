@@ -298,6 +298,28 @@ fn analyze_errors_correlated_error_matches_m10_oracle_golden() {
 }
 
 #[test]
+fn analyze_errors_decompose_fallback_matches_m10_oracle_golden() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "analyze_errors", "--decompose_errors"],
+        include_bytes!("../../../../oracle/fixtures/inputs/analyze_errors_decompose_fallback.stim")
+            .as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!(
+            "../../../../oracle/fixtures/expected/m10_analyze_errors_decompose_fallback.stdout"
+        )
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
 fn analyze_errors_else_correlated_error_matches_m10_oracle_golden() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();

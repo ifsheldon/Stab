@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+mod decompose;
 mod error_decomp;
 
 use crate::{
@@ -8,6 +9,7 @@ use crate::{
 };
 
 use super::{DemInstruction, DemRepeatBlock, DemTarget, DetectorErrorModel};
+use decompose::decompose_error_probabilities;
 use error_decomp::{
     depolarize2_independent_channel_probability, pauli_channel2_components,
     try_disjoint_to_independent_xyz_errors,
@@ -795,6 +797,10 @@ impl Analyzer {
             merge_independent_probability(&mut merged_error_probabilities, targets, probability)?;
         }
 
+        if self.options.decompose_errors {
+            merged_error_probabilities = decompose_error_probabilities(merged_error_probabilities)?;
+        }
+
         for (targets, probability) in merged_error_probabilities {
             if probability.get() == 0.0 {
                 continue;
@@ -970,7 +976,7 @@ fn merge_disjoint_probability(
     Ok(())
 }
 
-fn xor_probability(left: Probability, right: Probability) -> CircuitResult<Probability> {
+pub(super) fn xor_probability(left: Probability, right: Probability) -> CircuitResult<Probability> {
     Probability::try_new(left.get() + right.get() - 2.0 * left.get() * right.get())
 }
 
