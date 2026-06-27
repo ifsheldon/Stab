@@ -90,6 +90,7 @@ struct Analyzer {
     pending_errors: Vec<PendingError>,
     pending_pauli_channels: Vec<PendingSingleQubitPauliChannel>,
     else_correlated_error_remainder: Option<Probability>,
+    next_disjoint_group_id: u64,
     completed_errors: Vec<PendingError>,
     detector_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
     observable_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
@@ -106,6 +107,7 @@ impl Analyzer {
             pending_errors: Vec::new(),
             pending_pauli_channels: Vec::new(),
             else_correlated_error_remainder: None,
+            next_disjoint_group_id: 0,
             completed_errors: Vec::new(),
             detector_terms_by_measurement: BTreeMap::new(),
             observable_terms_by_measurement: BTreeMap::new(),
@@ -175,6 +177,7 @@ impl Analyzer {
             "ELSE_CORRELATED_ERROR" => self.record_else_correlated_error(instruction),
             "I_ERROR" | "II_ERROR" => Ok(()),
             "PAULI_CHANNEL_1" => self.record_pauli_channel1(instruction),
+            "PAULI_CHANNEL_2" => self.record_pauli_channel2(instruction),
             "DEPOLARIZE1" => self.record_depolarize1(instruction),
             "DEPOLARIZE2" => self.record_depolarize2(instruction),
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => self.record_measurements(instruction),
@@ -220,6 +223,7 @@ impl Analyzer {
                 probability,
                 effects: vec![NoiseEffect { qubit, pauli }],
                 measurements: Vec::new(),
+                disjoint_group: None,
             });
         }
         Ok(())
@@ -309,6 +313,7 @@ impl Analyzer {
                 })
                 .collect(),
             measurements: Vec::new(),
+            disjoint_group: None,
         });
         Ok(())
     }
@@ -353,6 +358,74 @@ impl Analyzer {
         Ok(())
     }
 
+    fn record_pauli_channel2(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
+            return Err(CircuitError::invalid_detector_error_model(
+                "PAULI_CHANNEL_2 requires approximate_disjoint_errors during error analysis",
+            ));
+        };
+        let Some(probabilities) = instruction.probability_arguments()? else {
+            return Ok(());
+        };
+        let probabilities: [Probability; 15] =
+            probabilities.try_into().map_err(|probabilities: Vec<_>| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "PAULI_CHANNEL_2 expected 15 probabilities, got {}",
+                    probabilities.len()
+                ))
+            })?;
+        for probability in &probabilities {
+            if probability.get() > threshold.get() {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "PAULI_CHANNEL_2 has a probability argument ({}) larger than the approximate_disjoint_errors threshold ({})",
+                    probability.get(),
+                    threshold.get()
+                )));
+            }
+        }
+        for group in instruction.target_groups() {
+            let [left, right] = group else {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "PAULI_CHANNEL_2 expected paired qubit targets",
+                ));
+            };
+            let Some(left_qubit) = left.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "PAULI_CHANNEL_2 target {left} is not a qubit"
+                )));
+            };
+            let Some(right_qubit) = right.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "PAULI_CHANNEL_2 target {right} is not a qubit"
+                )));
+            };
+            let group_id = self.allocate_disjoint_group_id()?;
+            for (probability, left_pauli, right_pauli) in pauli_channel2_components(probabilities) {
+                if probability.get() == 0.0 {
+                    continue;
+                }
+                self.push_two_qubit_pauli_error(
+                    probability,
+                    left_qubit,
+                    left_pauli,
+                    right_qubit,
+                    right_pauli,
+                    Some(group_id),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    fn allocate_disjoint_group_id(&mut self) -> CircuitResult<u64> {
+        let group_id = self.next_disjoint_group_id;
+        self.next_disjoint_group_id =
+            self.next_disjoint_group_id.checked_add(1).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("disjoint error group count overflowed")
+            })?;
+        Ok(group_id)
+    }
+
     fn record_depolarize2(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         let Some(probability) = instruction.probability_argument()? else {
             return Ok(());
@@ -389,6 +462,7 @@ impl Analyzer {
                         left_pauli,
                         right_qubit,
                         right_pauli,
+                        None,
                     );
                 }
             }
@@ -403,6 +477,7 @@ impl Analyzer {
         left_pauli: Option<AnalyzerPauli>,
         right_qubit: QubitId,
         right_pauli: Option<AnalyzerPauli>,
+        disjoint_group: Option<u64>,
     ) {
         let mut effects = Vec::new();
         if let Some(pauli) = left_pauli {
@@ -421,6 +496,7 @@ impl Analyzer {
             probability,
             effects,
             measurements: Vec::new(),
+            disjoint_group,
         });
     }
 
@@ -484,6 +560,7 @@ impl Analyzer {
                     probability,
                     effects: Vec::new(),
                     measurements: vec![measurement_index],
+                    disjoint_group: None,
                 });
             }
             let mut still_pending_channels = Vec::new();
@@ -495,6 +572,7 @@ impl Analyzer {
                             probability,
                             effects: Vec::new(),
                             measurements: vec![measurement_index],
+                            disjoint_group: None,
                         });
                     }
                 } else {
@@ -627,7 +705,7 @@ impl Analyzer {
     fn into_dem(self) -> CircuitResult<DetectorErrorModel> {
         let mut dem = DetectorErrorModel::new();
         let mut merged_error_probabilities = BTreeMap::new();
-        let mut merged_error_order = Vec::new();
+        let mut disjoint_error_probabilities = BTreeMap::new();
         let mut touched_detectors = BTreeSet::new();
         for pending in self
             .completed_errors
@@ -665,19 +743,26 @@ impl Analyzer {
             for observable in observables {
                 targets.push(DemTarget::logical_observable(observable)?);
             }
-            if let Some(probability) = merged_error_probabilities.get_mut(&targets) {
-                *probability = xor_probability(*probability, pending.probability)?;
+            if let Some(group_id) = pending.disjoint_group {
+                merge_disjoint_probability(
+                    &mut disjoint_error_probabilities,
+                    (group_id, targets),
+                    pending.probability,
+                )?;
             } else {
-                merged_error_order.push(targets.clone());
-                merged_error_probabilities.insert(targets, pending.probability);
+                merge_independent_probability(
+                    &mut merged_error_probabilities,
+                    targets,
+                    pending.probability,
+                )?;
             }
         }
 
-        merged_error_order.sort();
-        for targets in merged_error_order {
-            let Some(probability) = merged_error_probabilities.remove(&targets) else {
-                continue;
-            };
+        for ((_group_id, targets), probability) in disjoint_error_probabilities {
+            merge_independent_probability(&mut merged_error_probabilities, targets, probability)?;
+        }
+
+        for (targets, probability) in merged_error_probabilities {
             if probability.get() == 0.0 {
                 continue;
             }
@@ -729,6 +814,7 @@ struct PendingError {
     probability: Probability,
     effects: Vec<NoiseEffect>,
     measurements: Vec<usize>,
+    disjoint_group: Option<u64>,
 }
 
 #[derive(Clone, Debug)]
@@ -825,6 +911,32 @@ fn toggle_all(target: &mut BTreeSet<u64>, values: impl Iterator<Item = u64>) {
     }
 }
 
+fn merge_independent_probability(
+    probabilities: &mut BTreeMap<Vec<DemTarget>, Probability>,
+    targets: Vec<DemTarget>,
+    probability: Probability,
+) -> CircuitResult<()> {
+    if let Some(existing) = probabilities.get_mut(&targets) {
+        *existing = xor_probability(*existing, probability)?;
+    } else {
+        probabilities.insert(targets, probability);
+    }
+    Ok(())
+}
+
+fn merge_disjoint_probability(
+    probabilities: &mut BTreeMap<(u64, Vec<DemTarget>), Probability>,
+    key: (u64, Vec<DemTarget>),
+    probability: Probability,
+) -> CircuitResult<()> {
+    if let Some(existing) = probabilities.get_mut(&key) {
+        *existing = Probability::try_new(existing.get() + probability.get())?;
+    } else {
+        probabilities.insert(key, probability);
+    }
+    Ok(())
+}
+
 fn xor_probability(left: Probability, right: Probability) -> CircuitResult<Probability> {
     Probability::try_new(left.get() + right.get() - 2.0 * left.get() * right.get())
 }
@@ -838,6 +950,32 @@ fn depolarize2_independent_channel_probability(
         ));
     }
     Probability::try_new(0.5 - 0.5 * (1.0 - (16.0 * probability.get()) / 15.0).powf(0.125))
+}
+
+fn pauli_channel2_components(
+    probabilities: [Probability; 15],
+) -> impl Iterator<Item = (Probability, Option<AnalyzerPauli>, Option<AnalyzerPauli>)> {
+    const COMPONENTS: [(Option<AnalyzerPauli>, Option<AnalyzerPauli>); 15] = [
+        (None, Some(AnalyzerPauli::X)),
+        (None, Some(AnalyzerPauli::Y)),
+        (None, Some(AnalyzerPauli::Z)),
+        (Some(AnalyzerPauli::X), None),
+        (Some(AnalyzerPauli::X), Some(AnalyzerPauli::X)),
+        (Some(AnalyzerPauli::X), Some(AnalyzerPauli::Y)),
+        (Some(AnalyzerPauli::X), Some(AnalyzerPauli::Z)),
+        (Some(AnalyzerPauli::Y), None),
+        (Some(AnalyzerPauli::Y), Some(AnalyzerPauli::X)),
+        (Some(AnalyzerPauli::Y), Some(AnalyzerPauli::Y)),
+        (Some(AnalyzerPauli::Y), Some(AnalyzerPauli::Z)),
+        (Some(AnalyzerPauli::Z), None),
+        (Some(AnalyzerPauli::Z), Some(AnalyzerPauli::X)),
+        (Some(AnalyzerPauli::Z), Some(AnalyzerPauli::Y)),
+        (Some(AnalyzerPauli::Z), Some(AnalyzerPauli::Z)),
+    ];
+    probabilities
+        .into_iter()
+        .zip(COMPONENTS)
+        .map(|(probability, (left, right))| (probability, left, right))
 }
 
 fn pauli_mask(pauli: Pauli) -> u8 {

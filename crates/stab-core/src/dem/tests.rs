@@ -338,6 +338,47 @@ fn dem_analyzer_rejects_disjoint_pauli_channel1_above_threshold() {
 }
 
 #[test]
+fn dem_analyzer_approximates_disjoint_pauli_channel2_when_enabled() {
+    let circuit = Circuit::from_stim_str(
+        "R 0\n\
+         PAULI_CHANNEL_2(0.125, 0.25, 0.375, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 1 0\n\
+         M 0\n\
+         DETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, threshold_options(0.38))
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.375) D0\n");
+}
+
+#[test]
+fn dem_analyzer_rejects_disjoint_pauli_channel2_without_approximation() {
+    let circuit = Circuit::from_stim_str(
+        "PAULI_CHANNEL_2(0.125, 0.25, 0.375, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 1 0\n",
+    )
+    .unwrap();
+
+    let result = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default());
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn dem_analyzer_rejects_disjoint_pauli_channel2_above_threshold() {
+    let circuit = Circuit::from_stim_str(
+        "PAULI_CHANNEL_2(0.125, 0.25, 0.375, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0) 1 0\n",
+    )
+    .unwrap();
+
+    let result = circuit_to_detector_error_model(&circuit, threshold_options(0.3));
+
+    assert!(result.is_err());
+}
+
+#[test]
 fn dem_analyzer_rejects_else_correlated_error_above_threshold() {
     let circuit = Circuit::from_stim_str(
         "CORRELATED_ERROR(0.25) X0\n\
