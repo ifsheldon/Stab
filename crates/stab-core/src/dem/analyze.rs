@@ -20,8 +20,8 @@ use effects::{
     analyzer_pauli_from_mask, pauli_mask,
 };
 use error_decomp::{
-    depolarize2_independent_channel_probability, pauli_channel2_components,
-    try_disjoint_to_independent_xyz_errors,
+    depolarize1_independent_channel_probability, depolarize2_independent_channel_probability,
+    pauli_channel2_components, try_disjoint_to_independent_xyz_errors,
 };
 use folded::FoldedAnalyzer;
 use gauge::find_gauge_errors;
@@ -531,25 +531,16 @@ impl Analyzer {
         if probability.get() == 0.0 {
             return Ok(());
         }
-        if probability.get() > 0.75 {
-            return Err(CircuitError::invalid_detector_error_model(
-                "cannot analyze over-mixing DEPOLARIZE1 probability above 3/4",
-            ));
-        }
-        let axis_probability = Probability::try_new(probability.get() / 3.0)?;
+        let channel_probability = depolarize1_independent_channel_probability(probability)?;
         for target in instruction.targets() {
             let Some(qubit) = target.qubit_id() else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
                     "DEPOLARIZE1 target {target} is not a qubit"
                 )));
             };
-            self.pending_pauli_channels
-                .push(PendingSingleQubitPauliChannel {
-                    qubit,
-                    x_probability: axis_probability,
-                    y_probability: axis_probability,
-                    z_probability: axis_probability,
-                });
+            self.push_single_qubit_pauli_error(channel_probability, qubit, AnalyzerPauli::X);
+            self.push_single_qubit_pauli_error(channel_probability, qubit, AnalyzerPauli::Y);
+            self.push_single_qubit_pauli_error(channel_probability, qubit, AnalyzerPauli::Z);
         }
         Ok(())
     }
