@@ -20,6 +20,178 @@ fn analyze_allowing_gauge_detectors(text: &str) -> String {
     .to_dem_string()
 }
 
+fn analyze_error(text: &str, options: ErrorAnalyzerOptions) -> String {
+    let circuit = Circuit::from_stim_str(text).expect("circuit");
+    circuit_to_detector_error_model(&circuit, options)
+        .expect_err("analysis should reject gauge sensitivity")
+        .to_string()
+}
+
+#[test]
+fn dem_analyzer_rejects_gauge_observables_like_upstream() {
+    let circuit = "
+        R 0
+        H 0
+        M 0
+        OBSERVABLE_INCLUDE(0) rec[-1]
+    ";
+
+    for options in [
+        ErrorAnalyzerOptions::default(),
+        ErrorAnalyzerOptions {
+            allow_gauge_detectors: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    ] {
+        let error = analyze_error(circuit, options);
+        assert!(error.contains("non-deterministic observables"));
+        assert!(error.contains("L0"));
+    }
+}
+
+#[test]
+fn dem_analyzer_rejects_gauge_detectors_like_upstream() {
+    for circuit in [
+        "
+        R 0
+        H 0
+        M 0
+        DETECTOR rec[-1]
+        ",
+        "
+        M 0
+        H 0
+        M 0
+        DETECTOR rec[-1]
+        ",
+        "
+        MZ 0
+        MX 0
+        DETECTOR rec[-1]
+        ",
+        "
+        MY 0
+        MX 0
+        DETECTOR rec[-1]
+        ",
+        "
+        MX 0
+        MZ 0
+        DETECTOR rec[-1]
+        ",
+        "
+        RX 0
+        MZ 0
+        DETECTOR rec[-1]
+        ",
+        "
+        RY 0
+        MX 0
+        DETECTOR rec[-1]
+        ",
+        "
+        RZ 0
+        MX 0
+        DETECTOR rec[-1]
+        ",
+        "
+        MX 0
+        DETECTOR rec[-1]
+        ",
+    ] {
+        let error = analyze_error(circuit, ErrorAnalyzerOptions::default());
+        assert!(error.contains("non-deterministic detectors"));
+        assert!(error.contains("D0"));
+    }
+}
+
+#[test]
+fn dem_analyzer_allows_simple_gauge_detector_variants_like_upstream() {
+    for circuit in [
+        "
+        H 0
+        CNOT 0 1
+        M 0 1
+        DETECTOR rec[-1]
+        DETECTOR rec[-2]
+        ",
+        "
+        R 0
+        H 0
+        CNOT 0 1
+        M 0 1
+        DETECTOR rec[-1]
+        DETECTOR rec[-2]
+        ",
+        "
+        RX 0
+        CNOT 0 1
+        M 0 1
+        DETECTOR rec[-1]
+        DETECTOR rec[-2]
+        ",
+        "
+        RY 0
+        H_XY 0
+        CNOT 0 1
+        M 0 1
+        DETECTOR rec[-1]
+        DETECTOR rec[-2]
+        ",
+        "
+        MR 0
+        H 0
+        CNOT 0 1
+        M 0 1
+        DETECTOR rec[-1]
+        DETECTOR rec[-2]
+        ",
+        "
+        MRX 0
+        CNOT 0 1
+        M 0 1
+        DETECTOR rec[-1]
+        DETECTOR rec[-2]
+        ",
+        "
+        MRY 0
+        H_XY 0
+        CNOT 0 1
+        M 0 1
+        DETECTOR rec[-1]
+        DETECTOR rec[-2]
+        ",
+        "
+        M 0
+        H 0
+        CNOT 0 1
+        M 0 1
+        DETECTOR rec[-1]
+        DETECTOR rec[-2]
+        ",
+        "
+        MX 0
+        CNOT 0 1
+        M 0 1
+        DETECTOR rec[-1]
+        DETECTOR rec[-2]
+        ",
+        "
+        MY 0
+        H_XY 0
+        CNOT 0 1
+        M 0 1
+        DETECTOR rec[-1]
+        DETECTOR rec[-2]
+        ",
+    ] {
+        assert_eq!(
+            analyze_allowing_gauge_detectors(circuit),
+            "error(0.5) D0 D1\n"
+        );
+    }
+}
+
 #[test]
 fn dem_analyzer_multi_round_gauge_detectors_do_not_grow_upstream_subset() {
     let dem = analyze_allowing_gauge_detectors(
