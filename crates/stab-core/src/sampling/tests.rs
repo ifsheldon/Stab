@@ -308,6 +308,45 @@ fn heralded_pauli_channel_samples_disjoint_probabilities() {
 }
 
 #[test]
+fn measurement_probability_arguments_flip_reported_results() {
+    assert_eq!(samples("M(1) 0\n", 1), vec![vec![true]]);
+    assert_eq!(samples("MPAD(1) 0 1\n", 1), vec![vec![true, false]]);
+
+    let circuit = Circuit::from_stim_str("M(0.25) 0\nMPP(0.5) Z1\n").expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+    let shots = sampler.sample_zero_one_with_seed(4000, Some(5));
+
+    let first_hits = shots
+        .iter()
+        .filter(|shot| shot.first() == Some(&true))
+        .count();
+    let second_hits = shots
+        .iter()
+        .filter(|shot| shot.get(1) == Some(&true))
+        .count();
+    assert!(
+        (800..=1200).contains(&first_hits),
+        "expected roughly 1000 M(0.25) hits, got {first_hits}"
+    );
+    assert!(
+        (1800..=2200).contains(&second_hits),
+        "expected roughly 2000 MPP(0.5) hits, got {second_hits}"
+    );
+}
+
+#[test]
+fn anti_hermitian_mpp_products_are_rejected() {
+    let circuit = Circuit::from_stim_str("MPP X0*Z0\n").expect("parse circuit");
+
+    assert_eq!(
+        CompiledSampler::compile(&circuit),
+        Err(CircuitError::invalid_sampler_compilation(
+            "MPP Pauli product is anti-Hermitian"
+        ))
+    );
+}
+
+#[test]
 fn correlated_error_branches_match_stim_else_semantics() {
     assert_eq!(
         samples(

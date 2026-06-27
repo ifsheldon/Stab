@@ -333,6 +333,23 @@ fn bucket_statistical_plan_rejects_mixed_width_buckets() {
 }
 
 #[test]
+fn statistical_plan_rejects_unenforced_false_positive_claims() {
+    let zero_budget = "sample_count=1; fixed_seed=5; tolerate binomial p=0.5 within 5 sigma; false_positive_rate<=0";
+    assert!(
+        statistical::compare_statistical_plan(zero_budget, b"0\n")
+            .expect("zero false-positive budget should fail")
+            .contains("must be positive")
+    );
+
+    let impossible_budget = "sample_count=1000; fixed_seed=5; tolerate buckets 00=0.4,01=0.2,10=0.2,11=0.2 within 5 sigma; false_positive_rate<=0.0000001";
+    assert!(
+        statistical::compare_statistical_plan(impossible_budget, b"00\n")
+            .expect("overstated false-positive budget should fail")
+            .contains("is tighter than the estimated")
+    );
+}
+
+#[test]
 fn validation_rejects_statistical_plan_that_disagrees_with_argv() {
     let csv = format!(
         "{HEADER}bad,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample|--shots|10|--seed|5,inputs/sample_noisy.stim,,0,empty,red,sample_count=11; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001,hand-authored\n"

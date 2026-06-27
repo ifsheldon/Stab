@@ -170,7 +170,7 @@ struct ConvertArgs {
 #[derive(Debug, Args)]
 struct SampleArgs {
     /// Number of shots to sample.
-    #[arg(long, default_value_t = 1)]
+    #[arg(long, default_value_t = 1, value_parser = parse_stim_usize)]
     shots: usize,
 
     /// Input circuit path. Defaults to stdin.
@@ -186,7 +186,7 @@ struct SampleArgs {
     out_format: SampleOutFormatArg,
 
     /// Partially deterministic random seed for noisy sampling.
-    #[arg(long)]
+    #[arg(long, value_parser = parse_stim_u64)]
     seed: Option<u64>,
 
     /// Assert the noiseless reference sample is all zeroes.
@@ -259,6 +259,25 @@ enum CliError {
 
     #[error("measurement count overflowed")]
     MeasurementCountOverflow,
+}
+
+fn parse_stim_usize(value: &str) -> Result<usize, String> {
+    let parsed = parse_stim_i64_compatible_u64(value)?;
+    usize::try_from(parsed).map_err(|_| format!("{value:?} does not fit in usize"))
+}
+
+fn parse_stim_u64(value: &str) -> Result<u64, String> {
+    parse_stim_i64_compatible_u64(value)
+}
+
+fn parse_stim_i64_compatible_u64(value: &str) -> Result<u64, String> {
+    let parsed = value
+        .parse::<u64>()
+        .map_err(|error| format!("{value:?} is not a non-negative 64-bit integer: {error}"))?;
+    if parsed > i64::MAX as u64 {
+        return Err(format!("{value:?} is greater than Stim's i64 maximum"));
+    }
+    Ok(parsed)
 }
 
 /// Runs the CLI and returns a process exit code.

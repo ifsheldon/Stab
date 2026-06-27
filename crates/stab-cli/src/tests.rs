@@ -768,6 +768,32 @@ fn sample_supports_single_qubit_clifford_measurements() {
 }
 
 #[test]
+fn sample_rejects_values_past_stim_i64_cli_bound() {
+    for (flag, value) in [
+        ("--seed", "9223372036854775808"),
+        ("--shots", "9223372036854775808"),
+    ] {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            ["stab", "sample", flag, value],
+            "M 0\n".as_bytes(),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, 2, "{flag}");
+        assert_eq!(String::from_utf8(stdout).unwrap(), "", "{flag}");
+        assert!(
+            String::from_utf8(stderr)
+                .unwrap()
+                .contains("greater than Stim's i64 maximum"),
+            "{flag}"
+        );
+    }
+}
+
+#[test]
 fn sample_supports_skip_reference_sample_flag() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();

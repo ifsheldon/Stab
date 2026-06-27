@@ -10,6 +10,8 @@ use crate::{
     result_formats::{MeasureRecordWriter, write_ptb64_records},
 };
 
+mod measurement_flip;
+mod pauli_product;
 mod stabilizer_frame;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -206,14 +208,17 @@ enum SampleOperation {
         qubit: usize,
         basis: PauliBasis,
         inverted: bool,
+        flip_probability: f64,
         reset: bool,
     },
     MeasureProduct {
         terms: Vec<(usize, PauliBasis)>,
         inverted: bool,
+        flip_probability: f64,
     },
     Pad {
         value: bool,
+        flip_probability: f64,
     },
     SingleQubitPauliChannel {
         qubit: usize,
@@ -296,15 +301,19 @@ where
                 qubit,
                 basis,
                 inverted,
+                flip_probability,
                 reset,
             } => {
-                if frame.measure_is_deterministic(*qubit, *basis) {
+                if frame.measure_is_deterministic(*qubit, *basis)
+                    && measurement_flip::is_deterministic(*flip_probability)
+                {
                     count += 1;
                 }
+                let noisy_flip = measurement_flip::deterministic_value(*flip_probability);
                 let measured = frame.measure(
                     *qubit,
                     *basis,
-                    *inverted,
+                    *inverted ^ noisy_flip,
                     rng,
                     MeasurementRandomness::DeterministicFalse,
                 );
@@ -313,21 +322,33 @@ where
                     frame.apply_pauli(*qubit, reset_correction(*basis));
                 }
             }
-            SampleOperation::MeasureProduct { terms, inverted } => {
-                if frame.pauli_product_measurement_is_deterministic(terms) {
+            SampleOperation::MeasureProduct {
+                terms,
+                inverted,
+                flip_probability,
+            } => {
+                if frame.pauli_product_measurement_is_deterministic(terms)
+                    && measurement_flip::is_deterministic(*flip_probability)
+                {
                     count += 1;
                 }
+                let noisy_flip = measurement_flip::deterministic_value(*flip_probability);
                 let measured = frame.measure_pauli_product(
                     terms,
-                    *inverted,
+                    *inverted ^ noisy_flip,
                     rng,
                     MeasurementRandomness::DeterministicFalse,
                 );
                 record.push(measured);
             }
-            SampleOperation::Pad { value } => {
-                count += 1;
-                record.push(*value);
+            SampleOperation::Pad {
+                value,
+                flip_probability,
+            } => {
+                if measurement_flip::is_deterministic(*flip_probability) {
+                    count += 1;
+                }
+                record.push(*value ^ measurement_flip::deterministic_value(*flip_probability));
             }
             SampleOperation::FeedbackPauli {
                 offset,
@@ -594,13 +615,14 @@ fn compile_measurement(
     state: &mut CompileState,
 ) -> CircuitResult<()> {
     let basis = measurement_basis(instruction)?;
-    let flip = deterministic_measurement_flip(instruction)?;
+    let flip_probability = measurement_flip_probability(instruction)?;
     let reset = matches!(instruction.gate().canonical_name(), "MR" | "MRX" | "MRY");
     for target in instruction.targets() {
         operations.push(SampleOperation::Measure {
             qubit: qubit_index(instruction, target)?,
             basis,
-            inverted: target.is_inverted_result_target() ^ flip,
+            inverted: target.is_inverted_result_target(),
+            flip_probability,
             reset,
         });
     }
@@ -614,7 +636,7 @@ fn compile_pair_measurement(
     state: &mut CompileState,
 ) -> CircuitResult<()> {
     let basis = pair_measurement_basis(instruction)?;
-    let flip = deterministic_measurement_flip(instruction)?;
+    let flip_probability = measurement_flip_probability(instruction)?;
     let groups = instruction.target_groups();
     for target_pair in &groups {
         let [left, right] = *target_pair else {
@@ -625,7 +647,8 @@ fn compile_pair_measurement(
                 (qubit_index(instruction, left)?, basis),
                 (qubit_index(instruction, right)?, basis),
             ],
-            inverted: left.is_inverted_result_target() ^ right.is_inverted_result_target() ^ flip,
+            inverted: left.is_inverted_result_target() ^ right.is_inverted_result_target(),
+            flip_probability,
         });
     }
     state.add_measurements(groups.len())?;
@@ -637,11 +660,10 @@ fn compile_pauli_product_measurement(
     operations: &mut Vec<SampleOperation>,
     state: &mut CompileState,
 ) -> CircuitResult<()> {
-    let flip = deterministic_measurement_flip(instruction)?;
+    let flip_probability = measurement_flip_probability(instruction)?;
     let groups = instruction.target_groups();
     for target_group in &groups {
-        let mut terms = Vec::new();
-        let mut inverted = flip;
+        let mut raw_terms = Vec::new();
         for target in *target_group {
             if target.is_combiner() {
                 continue;
@@ -649,10 +671,18 @@ fn compile_pauli_product_measurement(
             let Some(pauli) = target.pauli_type() else {
                 return Err(unsupported_sampler_instruction(instruction));
             };
-            terms.push((qubit_index(instruction, target)?, pauli_basis(pauli)));
-            inverted ^= target.is_inverted_result_target();
+            raw_terms.push((
+                qubit_index(instruction, target)?,
+                pauli_basis(pauli),
+                target.is_inverted_result_target(),
+            ));
         }
-        operations.push(SampleOperation::MeasureProduct { terms, inverted });
+        let (terms, inverted) = pauli_product::normalize_terms(raw_terms, false)?;
+        operations.push(SampleOperation::MeasureProduct {
+            terms,
+            inverted,
+            flip_probability,
+        });
     }
     state.add_measurements(groups.len())?;
     Ok(())
@@ -689,13 +719,14 @@ fn compile_measurement_pads(
     operations: &mut Vec<SampleOperation>,
     state: &mut CompileState,
 ) -> CircuitResult<()> {
-    let flip = deterministic_measurement_flip(instruction)?;
+    let flip_probability = measurement_flip_probability(instruction)?;
     for target in instruction.targets() {
         let Some(qubit) = target.qubit_id() else {
             return Err(unsupported_sampler_instruction(instruction));
         };
         operations.push(SampleOperation::Pad {
-            value: (qubit.get() == 1) ^ flip,
+            value: qubit.get() == 1,
+            flip_probability,
         });
     }
     state.add_measurements(instruction.targets().len())?;
@@ -878,12 +909,10 @@ fn single_probability_argument(
     }
 }
 
-fn deterministic_measurement_flip(instruction: &CircuitInstruction) -> CircuitResult<bool> {
+fn measurement_flip_probability(instruction: &CircuitInstruction) -> CircuitResult<f64> {
     match instruction.probability_argument()? {
-        None => Ok(false),
-        Some(probability) if probability.get() == 0.0 => Ok(false),
-        Some(probability) if probability.get() == 1.0 => Ok(true),
-        Some(_) => Err(unsupported_sampler_instruction(instruction)),
+        None => Ok(0.0),
+        Some(probability) => Ok(probability.get()),
     }
 }
 
@@ -935,12 +964,14 @@ fn execute_operations(
                 qubit,
                 basis,
                 inverted,
+                flip_probability,
                 reset,
             } => {
+                let noisy_flip = measurement_flip::sample(*flip_probability, rng, mode);
                 let result = frame.measure(
                     *qubit,
                     *basis,
-                    *inverted,
+                    *inverted ^ noisy_flip,
                     rng,
                     mode.measurement_randomness(),
                 );
@@ -950,19 +981,28 @@ fn execute_operations(
                     frame.reset(*qubit, *basis, rng, mode.measurement_randomness());
                 }
             }
-            SampleOperation::MeasureProduct { terms, inverted } => {
+            SampleOperation::MeasureProduct {
+                terms,
+                inverted,
+                flip_probability,
+            } => {
+                let noisy_flip = measurement_flip::sample(*flip_probability, rng, mode);
                 let result = frame.measure_pauli_product(
                     terms,
-                    *inverted,
+                    *inverted ^ noisy_flip,
                     rng,
                     mode.measurement_randomness(),
                 );
                 record.push(result);
                 output.push(result);
             }
-            SampleOperation::Pad { value } => {
-                record.push(*value);
-                output.push(*value);
+            SampleOperation::Pad {
+                value,
+                flip_probability,
+            } => {
+                let result = *value ^ measurement_flip::sample(*flip_probability, rng, mode);
+                record.push(result);
+                output.push(result);
             }
             SampleOperation::SingleQubitPauliChannel {
                 qubit,

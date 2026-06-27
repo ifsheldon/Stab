@@ -95,7 +95,7 @@ cpp-inverse-qec,src/stim/util_top/circuit_inverse_qec.test.cc,cxx-test,tableau,s
 cpp-inverse-unitary,src/stim/util_top/circuit_inverse_unitary.test.cc,cxx-test,tableau,stab-core,M6,P1,structural,oracle,planned,,,M6 unitary inverse circuit tests
 cpp-circuit-to-dem,src/stim/util_top/circuit_to_dem.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,oracle,planned,,,M10 circuit to DEM equivalence tests
 cpp-detecting-regions,src/stim/util_top/circuit_to_detecting_regions.test.cc,cxx-test,detector-conversion,stab-core,M9,P1,structural,direct-rust,planned,,,M9 detecting region tests
-cpp-amplitudes,src/stim/util_top/circuit_vs_amplitudes.test.cc,cxx-test,sampler,stab-core,M8,P2,structural,direct-rust,planned,,,M8 small semantic vector cross-checks
+cpp-amplitudes,src/stim/util_top/circuit_vs_amplitudes.test.cc,cxx-test,sampler,stab-core,M12,P2,structural,direct-rust,planned,,,M12 amplitude simulator semantic cross-checks
 cpp-circuit-vs-tableau,src/stim/util_top/circuit_vs_tableau.test.cc,cxx-test,tableau,stab-core,M6,P1,structural,oracle,planned,,,M6 circuit versus tableau tests
 cpp-count-determined,src/stim/util_top/count_determined_measurements.test.cc,cxx-test,sampler,stab-core,M8,P1,structural,oracle,planned,,,M8 determined measurement count tests
 cpp-export-crumble,src/stim/util_top/export_crumble_url.test.cc,cxx-test,crumble,none,Future,P3,deferred,deferred,deferred,crumble,Crumble export deferred beyond core beta,Future Crumble compatibility plan

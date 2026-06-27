@@ -142,7 +142,7 @@ Tasks:
 
 - Create `stab-bench` or an equivalent benchmark package plus `ops` support for benchmark orchestration.
 - Add `just bench::baseline` to compile and benchmark C++ Stim v1.16.0 from `vendor/stim`.
-- Add `just bench::compare` to read a default or explicit C++ Stim baseline report, validate that the selected report targets pinned Stim v1.16.0, run Stab-side comparison runners for supported rows, report pending Stab runners explicitly, and make `--strict` fail when selected rows are still pending, missing from the selected baseline, or contract-only without a Stab-side measurement.
+- Add `just bench::compare` to read a default or explicit C++ Stim baseline report, validate that the selected report targets pinned Stim v1.16.0, run Stab-side comparison runners for supported rows, report pending Stab runners explicitly, reject unmatched milestone filters, and make `--strict` fail when selected rows are still pending, missing from the selected baseline, backed by invalid placeholder baseline rows, or contract-only without a Stab-side measurement.
 - Store benchmark results in machine-readable files under a documented generated-artifact directory and summarize them in a concise human-readable report.
 - Define benchmark contracts for parser/printer throughput, `gen`, tableau operations, sampling analysis time, sampling throughput, `detect`, `m2d`, `analyze_errors`, `.dem` parse/print, and `sample_dem`.
   Contracts without a direct pinned C++ executable benchmark runner are allowed as explicit contract-only rows, but they must name their upstream source and owning milestone and must become runnable before an implementation milestone claims a performance comparison for that workload.
@@ -294,7 +294,7 @@ Done criteria:
 - `just oracle::run --milestone M8 --exact` passes deterministic sampling cases.
 - `just oracle::run --milestone M8 --statistical` passes noisy sampling statistical cases with documented sample counts and confidence bounds.
 - `cargo test -p stab-core sampling` covers repeat blocks, feedback, reset/measurement edge cases, and output-format padding.
-- `just bench::compare --milestone M8 --strict` reports compile/analysis time, single-shot latency, batch throughput for `1`, `1024`, and `1_000_000` shots, and representative primary-matrix contract rows with no missing M8 Stab runners, empty contract-only placeholders, selected pinned Stim baseline rows, or baseline metadata mismatches.
+- `just bench::compare --milestone M8 --strict` reports compile/analysis time, single-shot latency, batch throughput for `1`, `1024`, and `1_000_000` shots, and representative primary-matrix contract rows with no missing M8 Stab runners, invalid placeholder baselines, empty contract-only placeholders, selected pinned Stim baseline rows, or baseline metadata mismatches.
 
 ### M9: Detection Event Workflows
 

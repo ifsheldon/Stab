@@ -158,6 +158,13 @@ pub(crate) fn run_compare(
                 .is_none_or(|milestone| milestone == row.milestone.as_str())
         })
         .collect::<Vec<_>>();
+    if let Some(milestone) = &options.milestone
+        && rows.is_empty()
+    {
+        return Err(BenchError::UnmatchedFilter(format!(
+            "milestone {milestone}"
+        )));
+    }
     println!(
         "[{PREFIX}] comparing {} row(s) against {}",
         rows.len(),
@@ -165,13 +172,18 @@ pub(crate) fn run_compare(
     );
     let mut pending = Vec::new();
     let mut missing_baselines = Vec::new();
+    let mut invalid_baselines = Vec::new();
     let mut contract_only_without_measurements = Vec::new();
     for row in rows {
-        let stim_summary = match summarize_baseline_row(&baseline_report, &row.id) {
+        let stim_summary = match summarize_baseline_row(&baseline_report, row) {
             BaselineSummary::Present(summary) => summary,
             BaselineSummary::Missing => {
                 missing_baselines.push(row.id.clone());
                 "missing-baseline".to_string()
+            }
+            BaselineSummary::Invalid(reason) => {
+                invalid_baselines.push(format!("{} ({reason})", row.id));
+                format!("invalid-baseline({reason})")
             }
         };
         match run_stab_compare_row(row)? {
@@ -213,12 +225,14 @@ pub(crate) fn run_compare(
     if options.strict
         && (!pending.is_empty()
             || !missing_baselines.is_empty()
+            || !invalid_baselines.is_empty()
             || !contract_only_without_measurements.is_empty())
     {
         Err(BenchError::CompareIncomplete {
             details: compare_incomplete_details(
                 &pending,
                 &missing_baselines,
+                &invalid_baselines,
                 &contract_only_without_measurements,
             )
             .into_boxed_str(),
@@ -757,21 +771,66 @@ fn measure_stab_iterations(
 enum BaselineSummary {
     Present(String),
     Missing,
+    Invalid(String),
 }
 
-fn summarize_baseline_row(report: &BaselineReport, row_id: &str) -> BaselineSummary {
-    let Some(row) = report.rows.iter().find(|row| row.id == row_id) else {
+fn summarize_baseline_row(report: &BaselineReport, row: &BenchmarkRow) -> BaselineSummary {
+    let Some(baseline_row) = report
+        .rows
+        .iter()
+        .find(|baseline_row| baseline_row.id == row.id)
+    else {
         return BaselineSummary::Missing;
     };
-    if row.measurements.is_empty() {
-        return BaselineSummary::Present(row.status.clone());
+    if baseline_row.milestone != row.milestone {
+        return BaselineSummary::Invalid(format!(
+            "milestone={} expected {}",
+            baseline_row.milestone.as_str(),
+            row.milestone.as_str()
+        ));
     }
-    BaselineSummary::Present(summarize_measurements(&row.measurements))
+    if baseline_row.runner != row.runner {
+        return BaselineSummary::Invalid(format!(
+            "runner={} expected {}",
+            baseline_row.runner.as_str(),
+            row.runner.as_str()
+        ));
+    }
+    if baseline_row.upstream_source != row.upstream_source {
+        return BaselineSummary::Invalid(format!(
+            "upstream_source={} expected {}",
+            baseline_row.upstream_source, row.upstream_source
+        ));
+    }
+    match row.runner {
+        Runner::ContractOnly => {
+            if baseline_row.measurements.is_empty() {
+                BaselineSummary::Present(baseline_row.status.clone())
+            } else {
+                BaselineSummary::Present(summarize_measurements(&baseline_row.measurements))
+            }
+        }
+        Runner::StimCli | Runner::StimPerf => {
+            if baseline_row.status != "measured" {
+                return BaselineSummary::Invalid(format!(
+                    "status={} expected measured",
+                    baseline_row.status
+                ));
+            }
+            if baseline_row.measurements.is_empty() {
+                return BaselineSummary::Invalid(
+                    "measured runnable row has no measurements".to_string(),
+                );
+            }
+            BaselineSummary::Present(summarize_measurements(&baseline_row.measurements))
+        }
+    }
 }
 
 fn compare_incomplete_details(
     pending: &[String],
     missing_baselines: &[String],
+    invalid_baselines: &[String],
     contract_only_without_measurements: &[String],
 ) -> String {
     let mut details = Vec::new();
@@ -785,6 +844,12 @@ fn compare_incomplete_details(
         details.push(format!(
             "missing baseline row(s): {}",
             missing_baselines.join(", ")
+        ));
+    }
+    if !invalid_baselines.is_empty() {
+        details.push(format!(
+            "invalid baseline row(s): {}",
+            invalid_baselines.join(", ")
         ));
     }
     if !contract_only_without_measurements.is_empty() {

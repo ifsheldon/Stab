@@ -196,9 +196,9 @@ fn parse_statistical_plan(plan: &str) -> Result<StatisticalPlan, String> {
             let parsed = value
                 .parse::<f64>()
                 .map_err(|error| format!("invalid false_positive_rate {value:?}: {error}"))?;
-            if !parsed.is_finite() || !(0.0..=1.0).contains(&parsed) {
+            if !parsed.is_finite() || !(0.0..=1.0).contains(&parsed) || parsed == 0.0 {
                 return Err(format!(
-                    "false_positive_rate {parsed} is outside the closed unit interval"
+                    "false_positive_rate {parsed} must be positive and at most 1"
                 ));
             }
             false_positive_rate = Some(parsed);
@@ -222,17 +222,40 @@ fn parse_statistical_plan(plan: &str) -> Result<StatisticalPlan, String> {
         }
         return Err(format!("unknown statistical plan token {token:?}"));
     }
-    false_positive_rate
+    let false_positive_rate = false_positive_rate
         .ok_or_else(|| "statistical plan does not contain false_positive_rate".to_string())?;
+    let tolerance = tolerance
+        .ok_or_else(|| "statistical plan does not contain a statistical tolerance".to_string())?;
+    validate_false_positive_budget(false_positive_rate, &tolerance)?;
     Ok(StatisticalPlan {
         sample_count: sample_count
             .ok_or_else(|| "statistical plan does not contain sample_count".to_string())?,
         fixed_seed: fixed_seed
             .ok_or_else(|| "statistical plan does not contain fixed_seed".to_string())?,
-        tolerance: tolerance.ok_or_else(|| {
-            "statistical plan does not contain a statistical tolerance".to_string()
-        })?,
+        tolerance,
     })
+}
+
+fn validate_false_positive_budget(
+    false_positive_rate: f64,
+    tolerance: &StatisticalTolerance,
+) -> Result<(), String> {
+    let (sigma, checked_rates) = match tolerance {
+        StatisticalTolerance::Binomial { sigma, .. } => (*sigma, 1usize),
+        StatisticalTolerance::Buckets { expected, sigma } => (*sigma, expected.len()),
+    };
+    let estimated_bound = (checked_rates as f64 * two_sided_normal_tail_bound(sigma)).min(1.0);
+    if estimated_bound > false_positive_rate {
+        return Err(format!(
+            "false_positive_rate<={false_positive_rate} is tighter than the estimated {estimated_bound:.6e} false-positive bound from {sigma} sigma over {checked_rates} checked rate(s)"
+        ));
+    }
+    Ok(())
+}
+
+fn two_sided_normal_tail_bound(sigma: f64) -> f64 {
+    (std::f64::consts::FRAC_2_SQRT_PI / std::f64::consts::SQRT_2) * (-0.5 * sigma * sigma).exp()
+        / sigma
 }
 
 fn parse_probability_and_sigma(token: &str, rest: &str, kind: &str) -> Result<(f64, f64), String> {

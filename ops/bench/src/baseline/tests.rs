@@ -93,16 +93,75 @@ fn summarizes_present_contract_and_missing_baseline_rows() {
     .expect("baseline report");
 
     assert_eq!(
-        summarize_baseline_row(&report, "measured-row"),
+        summarize_baseline_row(&report, &benchmark_row("measured-row", Runner::StimPerf)),
         BaselineSummary::Present("circuit_parse=0.000001300s".to_string())
     );
     assert_eq!(
-        summarize_baseline_row(&report, "contract-row"),
+        summarize_baseline_row(
+            &report,
+            &benchmark_row("contract-row", Runner::ContractOnly)
+        ),
         BaselineSummary::Present("contract-only".to_string())
     );
     assert_eq!(
-        summarize_baseline_row(&report, "missing-row"),
+        summarize_baseline_row(&report, &benchmark_row("missing-row", Runner::StimPerf)),
         BaselineSummary::Missing
+    );
+}
+
+#[test]
+fn rejects_placeholder_baseline_for_runnable_row() {
+    let report = serde_json::from_str::<BaselineReport>(
+        r#"{
+            "schema_version": 1,
+            "generated_unix_epoch_seconds": 0,
+            "machine": {
+                "os": "linux",
+                "arch": "x86_64",
+                "family": "unix",
+                "available_parallelism": 1,
+                "rustc_version": "rustc test",
+                "cmake_version": "cmake test"
+            },
+            "stim": {
+                "source_path": "vendor/stim",
+                "expected_tag": "v1.16.0",
+                "expected_commit": "expected",
+                "actual_tag": "v1.16.0",
+                "actual_commit": "actual"
+            },
+            "command": {
+                "target_seconds": 0.001,
+                "cli_iterations": 1,
+                "filters": []
+            },
+            "rows": [
+                {
+                    "id": "measured-row",
+                    "milestone": "M4",
+                    "threshold_class": "report-only",
+                    "runner": "stim-perf",
+                    "upstream_source": "src/stim/circuit/circuit.perf.cc",
+                    "phase": "analysis",
+                    "measurement": "parser-throughput",
+                    "status": "contract-only",
+                    "command": {
+                        "program": "",
+                        "args": [],
+                        "stdin_path": ""
+                    },
+                    "measurements": []
+                }
+            ]
+        }"#,
+    )
+    .expect("baseline report");
+
+    let summary = summarize_baseline_row(&report, &benchmark_row("measured-row", Runner::StimPerf));
+
+    assert_eq!(
+        summary,
+        BaselineSummary::Invalid("status=contract-only expected measured".to_string())
     );
 }
 
@@ -148,11 +207,13 @@ fn incomplete_details_names_empty_contract_only_rows() {
     let details = compare_incomplete_details(
         &["future-runner".to_string()],
         &["missing-baseline".to_string()],
+        &["placeholder-baseline".to_string()],
         &["contract-placeholder".to_string()],
     );
 
     assert!(details.contains("pending Stab comparison runner(s): future-runner"));
     assert!(details.contains("missing baseline row(s): missing-baseline"));
+    assert!(details.contains("invalid baseline row(s): placeholder-baseline"));
     assert!(
         details.contains("contract-only row(s) without Stab measurement(s): contract-placeholder")
     );
@@ -223,5 +284,26 @@ fn m6_benchmark_rows_have_stab_compare_runners() {
                 "{id}/{name} should report normalized work"
             );
         }
+    }
+}
+
+fn benchmark_row(id: &str, runner: Runner) -> BenchmarkRow {
+    let (upstream_source, measurement) = if runner == Runner::ContractOnly {
+        ("src/stim/circuit/circuit.test.cc", "canonical-print")
+    } else {
+        ("src/stim/circuit/circuit.perf.cc", "parser-throughput")
+    };
+    BenchmarkRow {
+        id: id.to_string(),
+        milestone: Milestone::M4,
+        threshold_class: "report-only".to_string(),
+        runner,
+        upstream_source: upstream_source.to_string(),
+        stim_perf_filter: "test".to_string(),
+        argv: String::new(),
+        stdin_path: String::new(),
+        phase: "analysis".to_string(),
+        measurement: measurement.to_string(),
+        description: "test row".to_string(),
     }
 }
