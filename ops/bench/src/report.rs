@@ -113,6 +113,8 @@ pub(crate) struct CompareCommandMetadata {
     pub(crate) primary: bool,
     pub(crate) require_profiler_notes: bool,
     pub(crate) require_beta_gate: bool,
+    pub(crate) require_memory_gate: bool,
+    pub(crate) memory_baseline_path: Option<String>,
     pub(crate) thresholds_path: Option<String>,
     pub(crate) track_allocations: bool,
     pub(crate) strict: bool,
@@ -145,6 +147,13 @@ pub(crate) struct CompareRowResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) stab_allocation_bytes_max: Option<u64>,
     pub(crate) pass_fail_status: String,
+    pub(crate) memory_gate_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) memory_gate_baseline_bytes_max: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) memory_gate_allowed_bytes_max: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) memory_gate_error: Option<String>,
     pub(crate) regression_threshold_status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) regression_threshold_max_ratio: Option<f64>,
@@ -241,6 +250,9 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
     ));
     out.push_str(&format!("- Profile: {}\n", report.command.profile));
     out.push_str(&format!("- Baseline: {}\n", report.command.baseline_path));
+    if let Some(memory_baseline_path) = &report.command.memory_baseline_path {
+        out.push_str(&format!("- Memory baseline: {memory_baseline_path}\n"));
+    }
     if let Some(thresholds_path) = &report.command.thresholds_path {
         out.push_str(&format!("- Thresholds: {thresholds_path}\n"));
     }
@@ -248,11 +260,11 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
         "- Machine: {} {} with {} worker(s)\n\n",
         report.machine.os, report.machine.arch, report.machine.available_parallelism
     ));
-    out.push_str("| Benchmark | Milestone | Status | Pass/Fail | Stim Median | Stab Median | Ratio | Stab Alloc Max | Regression Threshold | Profiler Note | Note |\n");
-    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+    out.push_str("| Benchmark | Milestone | Status | Pass/Fail | Stim Median | Stab Median | Ratio | Stab Alloc Max | Memory Gate | Regression Threshold | Profiler Note | Note |\n");
+    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
     for row in &report.rows {
         out.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
             row.id,
             row.milestone.as_str(),
             row.status,
@@ -261,6 +273,7 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
             format_optional_seconds(row.stab_median_seconds),
             format_optional_ratio(row.relative_ratio),
             format_optional_bytes(row.stab_allocation_bytes_max),
+            format_memory_gate(row),
             format_regression_threshold(row),
             format_profiler_note(row),
             row.note.as_deref().unwrap_or("")
@@ -287,6 +300,16 @@ fn format_profiler_note(row: &CompareRowResult) -> String {
         (Some(path), Some(error)) => format!("{} ({path}: {error})", row.profiler_note_status),
         (None, Some(error)) => format!("{} ({error})", row.profiler_note_status),
         (None, None) => row.profiler_note_status.clone(),
+    }
+}
+
+fn format_memory_gate(row: &CompareRowResult) -> String {
+    let allowed = row
+        .memory_gate_allowed_bytes_max
+        .map_or_else(String::new, |bytes| format!(" <= {bytes}"));
+    match &row.memory_gate_error {
+        Some(error) => format!("{}{} ({error})", row.memory_gate_status, allowed),
+        None => format!("{}{}", row.memory_gate_status, allowed),
     }
 }
 

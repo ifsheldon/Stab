@@ -22,6 +22,12 @@ pub(crate) enum BenchError {
         source: std::io::Error,
     },
 
+    #[error("failed to read benchmark compare report {path}: {source}")]
+    ReadCompareReport {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
     #[error("failed to read benchmark threshold file {path}: {source}")]
     ReadThresholds {
         path: PathBuf,
@@ -37,11 +43,20 @@ pub(crate) enum BenchError {
         source: serde_json::Error,
     },
 
+    #[error("failed to parse benchmark compare report {path}: {source}")]
+    ParseCompareReport {
+        path: PathBuf,
+        source: serde_json::Error,
+    },
+
     #[error("benchmark manifest validation failed:\n{0}")]
     ManifestValidation(Box<str>),
 
     #[error("benchmark threshold file {path} is invalid:\n{details}")]
     ThresholdValidation { path: PathBuf, details: Box<str> },
+
+    #[error("memory baseline compare report {path} is invalid:\n{details}")]
+    MemoryBaselineValidation { path: PathBuf, details: Box<str> },
 
     #[error("Stim source directory does not exist at {0}")]
     MissingStimSource(PathBuf),
@@ -147,6 +162,18 @@ pub(crate) enum BenchError {
 
     #[error("beta performance gate failed:\n{details}")]
     BetaGateFailed { details: Box<str> },
+
+    #[error("--require-memory-gate requires --track-allocations")]
+    MemoryGateRequiresAllocationTracking,
+
+    #[error("--require-memory-gate requires --memory-baseline")]
+    MemoryGateRequiresBaseline,
+
+    #[error("--memory-baseline requires --require-memory-gate")]
+    MemoryBaselineRequiresGate,
+
+    #[error("beta memory gate failed:\n{details}")]
+    MemoryGateFailed { details: Box<str> },
 
     #[error("regression threshold gate failed:\n{details}")]
     RegressionThresholdFailed { details: Box<str> },

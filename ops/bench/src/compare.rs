@@ -8,6 +8,7 @@ use crate::baseline::{
 use crate::config::PREFIX;
 use crate::error::BenchError;
 use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner};
+use crate::memory_gate::{apply_memory_gate, read_memory_baseline};
 use crate::report::{
     BaselineReport, CompareCommandMetadata, CompareReport, CompareRowResult, Measurement,
     machine_metadata, render_compare_markdown_report, stab_metadata, unix_epoch_seconds,
@@ -24,6 +25,8 @@ pub(crate) struct CompareOptions {
     pub(crate) report: Option<PathBuf>,
     pub(crate) require_profiler_notes: bool,
     pub(crate) require_beta_gate: bool,
+    pub(crate) require_memory_gate: bool,
+    pub(crate) memory_baseline: Option<PathBuf>,
     pub(crate) thresholds: Option<PathBuf>,
     pub(crate) track_allocations: bool,
     pub(crate) strict: bool,
@@ -37,6 +40,15 @@ pub(crate) fn run_compare(
     if options.require_profiler_notes && options.report.is_none() {
         return Err(BenchError::ProfilerNotesRequireReport);
     }
+    if options.memory_baseline.is_some() && !options.require_memory_gate {
+        return Err(BenchError::MemoryBaselineRequiresGate);
+    }
+    if options.require_memory_gate && !options.track_allocations {
+        return Err(BenchError::MemoryGateRequiresAllocationTracking);
+    }
+    if options.require_memory_gate && options.memory_baseline.is_none() {
+        return Err(BenchError::MemoryGateRequiresBaseline);
+    }
     let _allocation_tracking = AllocationTrackingGuard::set(options.track_allocations)?;
     let baseline_path = root.resolve_relative(&options.baseline);
     let baseline_report = read_baseline_report(&baseline_path)?;
@@ -46,6 +58,14 @@ pub(crate) fn run_compare(
         .as_ref()
         .map(|path| root.resolve_relative(path));
     let thresholds = threshold_path.as_deref().map(read_thresholds).transpose()?;
+    let memory_baseline_path = options
+        .memory_baseline
+        .as_ref()
+        .map(|path| root.resolve_relative(path));
+    let memory_baseline = memory_baseline_path
+        .as_deref()
+        .map(read_memory_baseline)
+        .transpose()?;
     let rows = manifest.compare_rows(options.milestone.as_deref(), options.primary)?;
     println!(
         "[{PREFIX}] comparing {} row(s) against {}",
@@ -147,17 +167,23 @@ pub(crate) fn run_compare(
         .map_or_else(Default::default, |thresholds| {
             apply_regression_thresholds(&mut report_rows, thresholds)
         });
+    let memory_gate_findings = memory_baseline
+        .as_ref()
+        .map_or_else(Default::default, |memory_baseline| {
+            apply_memory_gate(&mut report_rows, memory_baseline)
+        });
     let beta_gate_findings = find_beta_gate_failures(&report_rows);
     let profiler_note_findings = if let Some(report_dir) = &options.report {
-        write_compare_report(
+        write_compare_report(CompareReportWrite {
             root,
-            &baseline_report,
-            &baseline_path,
-            threshold_path.as_deref(),
+            baseline_report: &baseline_report,
+            baseline_path: &baseline_path,
+            memory_baseline_path: memory_baseline_path.as_deref(),
+            threshold_path: threshold_path.as_deref(),
             report_dir,
             options,
-            report_rows,
-        )?
+            rows: report_rows,
+        })?
     } else {
         ProfilerNoteFindings::default()
     };
@@ -169,6 +195,11 @@ pub(crate) fn run_compare(
     if options.require_beta_gate && !beta_gate_findings.blockers.is_empty() {
         return Err(BenchError::BetaGateFailed {
             details: beta_gate_findings.blockers.join("\n").into_boxed_str(),
+        });
+    }
+    if options.require_memory_gate && !memory_gate_findings.blockers.is_empty() {
+        return Err(BenchError::MemoryGateFailed {
+            details: memory_gate_findings.blockers.join("\n").into_boxed_str(),
         });
     }
     if !regression_threshold_findings.blockers.is_empty() {
@@ -199,15 +230,28 @@ pub(crate) fn run_compare(
     }
 }
 
-fn write_compare_report(
-    root: &RepoRoot,
-    baseline_report: &BaselineReport,
-    baseline_path: &Path,
-    threshold_path: Option<&Path>,
-    report_dir: &Path,
-    options: &CompareOptions,
-    mut rows: Vec<CompareRowResult>,
-) -> Result<ProfilerNoteFindings, BenchError> {
+struct CompareReportWrite<'a> {
+    root: &'a RepoRoot,
+    baseline_report: &'a BaselineReport,
+    baseline_path: &'a Path,
+    memory_baseline_path: Option<&'a Path>,
+    threshold_path: Option<&'a Path>,
+    report_dir: &'a Path,
+    options: &'a CompareOptions,
+    rows: Vec<CompareRowResult>,
+}
+
+fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFindings, BenchError> {
+    let CompareReportWrite {
+        root,
+        baseline_report,
+        baseline_path,
+        memory_baseline_path,
+        threshold_path,
+        report_dir,
+        options,
+        mut rows,
+    } = input;
     let out_dir = root.create_benchmark_output_dir(report_dir)?;
     let profiler_note_findings = apply_profiler_notes(&mut rows, &out_dir.join("profiler-notes"));
     let report = CompareReport {
@@ -223,6 +267,8 @@ fn write_compare_report(
             primary: options.primary,
             require_profiler_notes: options.require_profiler_notes,
             require_beta_gate: options.require_beta_gate,
+            require_memory_gate: options.require_memory_gate,
+            memory_baseline_path: memory_baseline_path.map(|path| path.display().to_string()),
             thresholds_path: threshold_path.map(|path| path.display().to_string()),
             track_allocations: options.track_allocations,
             strict: options.strict,
@@ -389,6 +435,10 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         stab_allocation_count_max,
         stab_allocation_bytes_max,
         pass_fail_status: compare_pass_fail_status(status, baseline_status, relative_ratio),
+        memory_gate_status: "not-required".to_string(),
+        memory_gate_baseline_bytes_max: None,
+        memory_gate_allowed_bytes_max: None,
+        memory_gate_error: None,
         regression_threshold_status: "not-configured".to_string(),
         regression_threshold_max_ratio: None,
         regression_threshold_error: None,

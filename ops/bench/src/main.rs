@@ -15,6 +15,7 @@ mod compare;
 mod config;
 mod error;
 mod manifest;
+mod memory_gate;
 mod process;
 mod report;
 mod root;
@@ -115,6 +116,14 @@ enum Command {
         #[arg(long)]
         require_beta_gate: bool,
 
+        /// Fail when Stab allocation bytes regress more than the M12 beta memory budget.
+        #[arg(long)]
+        require_memory_gate: bool,
+
+        /// Compare report from the first complete Stab allocation run used by the memory gate.
+        #[arg(long)]
+        memory_baseline: Option<PathBuf>,
+
         /// JSON regression threshold file checked against selected benchmark rows.
         #[arg(long)]
         thresholds: Option<PathBuf>,
@@ -183,6 +192,8 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             report,
             require_profiler_notes,
             require_beta_gate,
+            require_memory_gate,
+            memory_baseline,
             thresholds,
             track_allocations,
             strict,
@@ -198,6 +209,8 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     report,
                     require_profiler_notes,
                     require_beta_gate,
+                    require_memory_gate,
+                    memory_baseline,
                     thresholds,
                     track_allocations,
                     strict,

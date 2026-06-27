@@ -42,6 +42,8 @@ Only selected benchmark ids present in the threshold file are checked.
 Threshold ids must be benchmark-id safe because they are matched against report rows and may also be used by generated benchmark tooling.
 Use `just bench::compare-allocations` to build `stab-bench` with the optional `count-allocations` feature and pass `--track-allocations` automatically.
 Allocation tracking runs an extra Stab-side measurement pass per reported measurement and records allocation counts and maximum live allocated bytes in `compare.json`; use plain `just bench::compare` for timing-gate evidence.
+Pass `--require-memory-gate --memory-baseline <compare.json>` with `just bench::compare-allocations` to compare selected rows against the first complete Stab allocation report.
+The memory gate fails rows missing current or baseline allocation bytes and rows whose `stab_allocation_bytes_max` exceeds the baseline by more than 25 percent.
 Compare prints Stab-side timings for rows whose implementation milestone has a runner and prints pending rows explicitly for future milestones.
 When a comparison runner reports workload-specific rates or comparability notes, treat those notes as part of the benchmark evidence.
 For example, M5 labels Stab-only contract-smoke bit-kernel workloads separately from upstream Stim perf rows until M12 introduces optimized parity thresholds.
