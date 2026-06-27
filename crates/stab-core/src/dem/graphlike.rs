@@ -5,6 +5,8 @@
 
 mod algo;
 
+pub(super) use algo::shortest_graphlike_undetectable_logical_error;
+
 use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};

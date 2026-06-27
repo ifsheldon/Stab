@@ -35,6 +35,7 @@ pub use circuit_tableau::circuit_to_tableau;
 pub use dem::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock,
     DemTarget, DetectorErrorModel, ErrorAnalyzerOptions, circuit_to_detector_error_model,
+    shortest_graphlike_undetectable_logical_error,
 };
 pub use detection::{
     DetectionConversionOptions, DetectionConversionOutput, DetectionEventRecord,

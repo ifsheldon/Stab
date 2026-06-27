@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, VecDeque};
 use super::{Graph, ObservableMask, SearchState};
 use crate::{CircuitError, CircuitResult, DemItem, DetectorErrorModel};
 
-pub(super) fn shortest_graphlike_undetectable_logical_error(
+pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
     model: &DetectorErrorModel,
     ignore_ungraphlike_errors: bool,
 ) -> CircuitResult<DetectorErrorModel> {

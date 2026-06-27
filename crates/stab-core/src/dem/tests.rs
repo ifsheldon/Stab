@@ -173,6 +173,15 @@ fn dem_counts_detector_shift_detectors_and_observables_through_repeats() {
 }
 
 #[test]
+fn dem_shortest_graphlike_logical_error_api_matches_direct_dem() {
+    let dem = DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n").unwrap();
+
+    let shortest = shortest_graphlike_undetectable_logical_error(&dem, false).unwrap();
+
+    assert_eq!(shortest.to_dem_string(), "error(1) D0\nerror(1) D0 L0\n");
+}
+
+#[test]
 fn dem_analyzer_outputs_detector_declaration_for_deterministic_detector() {
     let circuit = Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n").unwrap();
 

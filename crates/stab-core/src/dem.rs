@@ -905,5 +905,12 @@ fn format_scientific_exponent(exponent: i32) -> String {
     }
 }
 
+pub fn shortest_graphlike_undetectable_logical_error(
+    model: &DetectorErrorModel,
+    ignore_ungraphlike_errors: bool,
+) -> CircuitResult<DetectorErrorModel> {
+    graphlike::shortest_graphlike_undetectable_logical_error(model, ignore_ungraphlike_errors)
+}
+
 #[cfg(test)]
 mod tests;
