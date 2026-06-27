@@ -1,8 +1,10 @@
 use std::fmt::{Display, Formatter};
 
+use rand::{Rng, RngExt as _};
+
 use super::{
-    FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError,
-    StabilizerResult,
+    FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString, SingleQubitClifford,
+    StabilizerError, StabilizerResult,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -30,6 +32,38 @@ impl Tableau {
             ));
         }
         Self { xs, zs }
+    }
+
+    /// Creates a random valid Clifford tableau using the caller-owned RNG.
+    ///
+    /// Passing a seeded `rand` RNG gives deterministic Stab output. This hook samples from a
+    /// random Clifford circuit shape and is not intended to be uniform over the Clifford group or
+    /// to match Stim's C++ RNG stream.
+    pub fn random<R>(num_qubits: usize, rng: &mut R) -> StabilizerResult<Self>
+    where
+        R: Rng + ?Sized,
+    {
+        let mut result = Self::identity(num_qubits);
+        for target in 0..num_qubits {
+            let gate =
+                single_qubit_gate_tableau(num_qubits, target, SingleQubitClifford::random(rng))?;
+            result = result.then(&gate)?;
+        }
+        if num_qubits <= 1 {
+            return Ok(result);
+        }
+        for _ in 0..num_qubits.saturating_mul(4) {
+            let gate = if rng.random_bool(0.5) {
+                let control = rng.random_range(0..num_qubits);
+                let target = random_distinct_target(num_qubits, control, rng);
+                cnot_gate_tableau(num_qubits, control, target)?
+            } else {
+                let target = rng.random_range(0..num_qubits);
+                single_qubit_gate_tableau(num_qubits, target, SingleQubitClifford::random(rng))?
+            };
+            result = result.then(&gate)?;
+        }
+        Ok(result)
     }
 
     pub(crate) fn from_output_columns_unchecked(
@@ -380,6 +414,105 @@ fn single_basis_row(len: usize, index: usize, basis: PauliBasis) -> Vec<PauliBas
             }
         })
         .collect()
+}
+
+fn single_qubit_gate_tableau(
+    num_qubits: usize,
+    target: usize,
+    clifford: SingleQubitClifford,
+) -> StabilizerResult<Tableau> {
+    ensure_tableau_target(num_qubits, target)?;
+    let local = clifford.tableau();
+    let mut result = Tableau::identity(num_qubits);
+    result.set_outputs(
+        target,
+        scatter_pauli(local.x_output(0)?, &[target], num_qubits)?,
+        scatter_pauli(local.z_output(0)?, &[target], num_qubits)?,
+    )?;
+    Ok(result)
+}
+
+fn cnot_gate_tableau(
+    num_qubits: usize,
+    control: usize,
+    target: usize,
+) -> StabilizerResult<Tableau> {
+    ensure_tableau_target(num_qubits, control)?;
+    ensure_tableau_target(num_qubits, target)?;
+    if control == target {
+        return Err(StabilizerError::DuplicateTableauTarget { target });
+    }
+    let local = Tableau::gate2("+XX", "+Z_", "+_X", "+ZZ")?;
+    let targets = [control, target];
+    let mut result = Tableau::identity(num_qubits);
+    for (local_index, global_index) in targets.iter().copied().enumerate() {
+        result.set_outputs(
+            global_index,
+            scatter_pauli(local.x_output(local_index)?, &targets, num_qubits)?,
+            scatter_pauli(local.z_output(local_index)?, &targets, num_qubits)?,
+        )?;
+    }
+    Ok(result)
+}
+
+fn scatter_pauli(
+    local: &PauliString,
+    targets: &[usize],
+    num_qubits: usize,
+) -> StabilizerResult<PauliString> {
+    if local.len() != targets.len() {
+        return Err(StabilizerError::LengthMismatch {
+            left: local.len(),
+            right: targets.len(),
+        });
+    }
+    let mut bases = vec![PauliBasis::I; num_qubits];
+    let mut seen = Vec::with_capacity(targets.len());
+    for (local_index, global_index) in targets.iter().copied().enumerate() {
+        ensure_tableau_target(num_qubits, global_index)?;
+        if seen.contains(&global_index) {
+            return Err(StabilizerError::DuplicateTableauTarget {
+                target: global_index,
+            });
+        }
+        seen.push(global_index);
+        let basis = local
+            .get(local_index)
+            .ok_or(StabilizerError::TableauIndexOutOfRange {
+                index: local_index,
+                len: local.len(),
+            })?;
+        let target =
+            bases
+                .get_mut(global_index)
+                .ok_or(StabilizerError::TableauIndexOutOfRange {
+                    index: global_index,
+                    len: num_qubits,
+                })?;
+        *target = basis;
+    }
+    Ok(PauliString::from_bases(local.sign(), bases))
+}
+
+fn random_distinct_target<R>(num_qubits: usize, first: usize, rng: &mut R) -> usize
+where
+    R: Rng + ?Sized,
+{
+    let mut target = rng.random_range(0..(num_qubits - 1));
+    if target >= first {
+        target += 1;
+    }
+    target
+}
+
+fn ensure_tableau_target(num_qubits: usize, target: usize) -> StabilizerResult<()> {
+    if target >= num_qubits {
+        return Err(StabilizerError::TableauIndexOutOfRange {
+            index: target,
+            len: num_qubits,
+        });
+    }
+    Ok(())
 }
 
 fn flex_from_pauli(pauli: &PauliString) -> StabilizerResult<FlexPauliString> {

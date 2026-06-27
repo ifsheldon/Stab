@@ -827,7 +827,7 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: deterministic unsigned 2q iterator workload; upstream baseline uses unsigned and signed 3q iterator filters",
         ),
         "m6-stabilizers-to-tableau" => Some(
-            "report-only: deterministic 16q conversion workload; upstream random/fuzz distribution remains M6 spec-follow-up input",
+            "report-only: deterministic 16q conversion workload; exact random/fuzz performance parity remains M12 work",
         ),
         _ => None,
     }

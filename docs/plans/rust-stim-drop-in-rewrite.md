@@ -229,6 +229,12 @@ Tasks:
 - Implement conversion helpers needed by later `Circuit::to_tableau`, inverse-circuit, flow, and stabilizer-to-tableau operations.
 - Add property tests for inverse, identity, associativity where applicable, commutation, conjugation, text round trips, and scalar/reference equivalence.
 
+M6 random-generation hooks use caller-owned `rand::Rng` values: `PauliString::random`, `PauliString::randomize`, `SingleQubitClifford::random`, `CliffordString::random`, `CliffordString::randomize`, and `Tableau::random`.
+Passing a seeded Rust RNG gives reproducible Stab output, but M6 does not require exact Stim C++ random-stream parity.
+`PauliString` samples the sign uniformly and each basis independently uniformly over `I`, `X`, `Y`, and `Z`, including sign sampling for zero-length strings.
+`CliffordString` samples uniformly over the 24 single-qubit Clifford gates, while `Tableau::random` samples valid Clifford tableaus from a random Clifford-circuit shape instead of promising a uniform Clifford-group distribution.
+Exact uniform tableau sampling or random-workload performance parity belongs to M12 if it becomes a primary performance requirement.
+
 Linked tests and benchmarks:
 
 - Direct tests: C++ Stabilizers And Algebra group.

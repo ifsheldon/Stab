@@ -1,6 +1,8 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
+use rand::{Rng, RngExt as _};
+
 use super::{StabilizerError, StabilizerResult};
 use crate::{BitError, BitVec};
 
@@ -217,6 +219,20 @@ impl PauliString {
         }
     }
 
+    /// Creates a random Pauli string using the caller-owned RNG.
+    ///
+    /// Passing a seeded `rand` RNG gives deterministic Stab output. The sign and each Pauli basis
+    /// are independently uniform, but the generated stream is not intended to match Stim's C++ RNG
+    /// stream.
+    pub fn random<R>(num_qubits: usize, rng: &mut R) -> Self
+    where
+        R: Rng + ?Sized,
+    {
+        let mut result = Self::identity(num_qubits);
+        result.randomize(rng);
+        result
+    }
+
     pub fn from_bases(sign: PauliSign, bases: impl IntoIterator<Item = PauliBasis>) -> Self {
         let bases = bases.into_iter().collect::<Vec<_>>();
         let mut x_words = vec![0_u64; bases.len().div_ceil(WORD_BITS)];
@@ -285,6 +301,22 @@ impl PauliString {
             _ => {}
         }
         Ok(())
+    }
+
+    /// Replaces this value with a random Pauli string of the same length.
+    pub fn randomize<R>(&mut self, rng: &mut R)
+    where
+        R: Rng + ?Sized,
+    {
+        let len = self.len();
+        self.sign = if rng.random_bool(0.5) {
+            PauliSign::Minus
+        } else {
+            PauliSign::Plus
+        };
+        self.xs = BitVec::from_words_truncated(len, random_words(len, rng));
+        self.zs = BitVec::from_words_truncated(len, random_words(len, rng));
+        self.has_terms = bits_have_terms(&self.xs, &self.zs);
     }
 
     pub fn x_bits(&self) -> &[u64] {
@@ -808,6 +840,15 @@ fn bits_have_terms(xs: &BitVec, zs: &BitVec) -> bool {
         .iter()
         .zip(zs.words())
         .any(|(x_word, z_word)| (x_word | z_word) != 0)
+}
+
+fn random_words<R>(bit_len: usize, rng: &mut R) -> Vec<u64>
+where
+    R: Rng + ?Sized,
+{
+    (0..bit_len.div_ceil(WORD_BITS))
+        .map(|_| rng.random::<u64>())
+        .collect()
 }
 
 fn popcount_mod_4(word: u64) -> u8 {

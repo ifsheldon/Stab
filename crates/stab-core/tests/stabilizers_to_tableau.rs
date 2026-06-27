@@ -6,6 +6,8 @@
 
 use std::str::FromStr;
 
+use rand::SeedableRng as _;
+use rand::rngs::SmallRng;
 use stab_core::{
     PauliBasis, PauliSign, PauliString, Tableau, TableauIterator, stabilizers_to_tableau,
 };
@@ -75,6 +77,28 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_valid_tableaus() {
         .expect("tableau iterator")
         .take(50)
     {
+        let stabilizers = (0..source.len())
+            .map(|index| source.z_output(index).expect("source z").clone())
+            .collect::<Vec<_>>();
+        let actual =
+            stabilizers_to_tableau(&stabilizers, false, false, false).expect("convert stabilizers");
+
+        for index in 0..source.len() {
+            assert_eq!(
+                actual.z_output(index).expect("actual z"),
+                source.z_output(index).expect("source z")
+            );
+        }
+        assert!(actual.satisfies_invariants().expect("invariants"));
+    }
+}
+
+#[test]
+fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
+    // Adapted from Stim v1.16.0 src/stim/util_top/stabilizers_to_tableau.test.cc fuzz coverage.
+    let mut rng = SmallRng::seed_from_u64(0x57ab_1ea7);
+    for num_qubits in 0..8 {
+        let source = Tableau::random(num_qubits, &mut rng).expect("random tableau");
         let stabilizers = (0..source.len())
             .map(|index| source.z_output(index).expect("source z").clone())
             .collect::<Vec<_>>();

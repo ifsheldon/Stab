@@ -7,6 +7,8 @@
 use std::str::FromStr;
 
 use proptest::prelude::*;
+use rand::SeedableRng as _;
+use rand::rngs::SmallRng;
 use stab_core::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Gate, PauliBasis, PauliPhase,
     PauliString, PauliStringIterator, SingleQubitClifford, Tableau, TableauIterator,
@@ -469,6 +471,123 @@ fn stabilizers_single_qubit_clifford_multiplication_is_associative() {
             }
         }
     }
+}
+
+#[test]
+fn stabilizers_pauli_random_hook_is_seeded_and_well_formed() {
+    // Adapted from Stim v1.16.0 PauliString::random semantics without requiring C++ RNG stream parity.
+    let mut first_rng = SmallRng::seed_from_u64(0x5a17);
+    let mut second_rng = SmallRng::seed_from_u64(0x5a17);
+    let first = PauliString::random(64, &mut first_rng);
+    let second = PauliString::random(64, &mut second_rng);
+
+    assert_eq!(first, second);
+    assert_eq!(first.len(), 64);
+    assert!(first.weight() > 0);
+    assert!(first.weight() < 64);
+
+    let mut zero_rng = SmallRng::seed_from_u64(0x5eed);
+    let mut empty_plus = false;
+    let mut empty_minus = false;
+    for _ in 0..64 {
+        let empty = PauliString::random(0, &mut zero_rng);
+        assert_eq!(empty.len(), 0);
+        empty_plus |= !empty.sign().is_negative();
+        empty_minus |= empty.sign().is_negative();
+    }
+    assert!(empty_plus);
+    assert!(empty_minus);
+
+    let mut distribution_rng = SmallRng::seed_from_u64(0x0bad_5eed);
+    let mut counts = [0usize; 4];
+    for _ in 0..64 {
+        let pauli = PauliString::random(64, &mut distribution_rng);
+        for index in 0..pauli.len() {
+            let count_index = match pauli.get(index).expect("random Pauli basis") {
+                PauliBasis::I => 0,
+                PauliBasis::X => 1,
+                PauliBasis::Y => 2,
+                PauliBasis::Z => 3,
+            };
+            counts[count_index] += 1;
+        }
+    }
+    let expected = 64.0 * 64.0 / 4.0;
+    for count in counts {
+        assert!(
+            (expected * 0.5) < count as f64 && (count as f64) < (expected * 1.5),
+            "Pauli basis count {count} outside broad uniformity band around {expected}"
+        );
+    }
+}
+
+#[test]
+fn stabilizers_clifford_random_hook_covers_single_qubit_cliffords() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/clifford_string.test.cc random.
+    let gates = upstream_clifford_gate_order();
+    let mut rng = SmallRng::seed_from_u64(0xc11f_f07d);
+    let mut cliffords = CliffordString::random(128, &mut rng);
+    let mut counts = vec![0usize; gates.len()];
+
+    for _ in 0..128 {
+        for index in 0..cliffords.len() {
+            let gate = cliffords.gate_at(index).expect("random Clifford gate");
+            let count_index = gates
+                .iter()
+                .position(|candidate| *candidate == gate)
+                .expect("random gate is in upstream Clifford set");
+            counts[count_index] += 1;
+        }
+        cliffords.randomize(&mut rng);
+    }
+
+    let expected = 128.0 * 128.0 / 24.0;
+    for (gate, count) in gates.into_iter().zip(counts) {
+        assert!(
+            (expected * 0.5) < count as f64 && (count as f64) < (expected * 1.5),
+            "{gate:?} count {count} outside broad uniformity band around {expected}"
+        );
+    }
+}
+
+#[test]
+fn stabilizers_tableau_random_hook_is_seeded_and_preserves_invariants() {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc random and inverse.
+    for num_qubits in [0, 1, 2, 3, 8] {
+        let mut first_rng = SmallRng::seed_from_u64(0x007a_b1ea + num_qubits as u64);
+        let mut second_rng = SmallRng::seed_from_u64(0x007a_b1ea + num_qubits as u64);
+        let first = Tableau::random(num_qubits, &mut first_rng).expect("random tableau");
+        let second = Tableau::random(num_qubits, &mut second_rng).expect("random tableau");
+
+        assert_eq!(first, second);
+        assert_eq!(first.len(), num_qubits);
+        assert!(first.satisfies_invariants().expect("tableau invariants"));
+
+        let inverse = first.inverse().expect("inverse");
+        assert!(
+            inverse
+                .satisfies_invariants()
+                .expect("inverse tableau invariants")
+        );
+        assert_eq!(
+            first.then(&inverse).expect("tableau then inverse"),
+            Tableau::identity(num_qubits)
+        );
+        assert_eq!(
+            inverse.then(&first).expect("inverse then tableau"),
+            Tableau::identity(num_qubits)
+        );
+    }
+
+    let mut rng = SmallRng::seed_from_u64(0x071a_b1ea);
+    let seen = (0..12)
+        .map(|_| {
+            Tableau::random(3, &mut rng)
+                .expect("random tableau")
+                .to_string()
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    assert!(seen.len() > 1);
 }
 
 #[test]

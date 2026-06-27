@@ -1,5 +1,7 @@
 use std::fmt::{Display, Formatter};
 
+use rand::{Rng, RngExt as _};
+
 use super::{
     PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError, StabilizerResult, Tableau,
 };
@@ -96,6 +98,18 @@ const SINGLE_QUBIT_CLIFFORDS: [SingleQubitClifford; 24] = [
 impl SingleQubitClifford {
     pub fn all() -> impl ExactSizeIterator<Item = Self> {
         SINGLE_QUBIT_CLIFFORDS.into_iter()
+    }
+
+    /// Samples one of the 24 single-qubit Clifford gates uniformly using the caller-owned RNG.
+    pub fn random<R>(rng: &mut R) -> Self
+    where
+        R: Rng + ?Sized,
+    {
+        let index = rng.random_range(0..SINGLE_QUBIT_CLIFFORDS.len());
+        SINGLE_QUBIT_CLIFFORDS
+            .get(index)
+            .copied()
+            .unwrap_or(Self::I)
     }
 
     pub fn from_gate(gate: Gate) -> StabilizerResult<Self> {
@@ -364,6 +378,19 @@ impl CliffordString {
         }
     }
 
+    /// Creates a random string of independent single-qubit Clifford gates.
+    ///
+    /// Passing a seeded `rand` RNG gives deterministic Stab output. The generated stream is not
+    /// intended to match Stim's C++ RNG stream.
+    pub fn random<R>(num_qubits: usize, rng: &mut R) -> Self
+    where
+        R: Rng + ?Sized,
+    {
+        let mut result = Self::identity(num_qubits);
+        result.randomize(rng);
+        result
+    }
+
     pub fn len(&self) -> usize {
         self.gates.len()
     }
@@ -385,6 +412,21 @@ impl CliffordString {
         update_non_identity_count(&mut self.non_identity_count, *target, gate);
         *target = gate;
         Ok(())
+    }
+
+    /// Replaces every position with a random single-qubit Clifford gate.
+    pub fn randomize<R>(&mut self, rng: &mut R)
+    where
+        R: Rng + ?Sized,
+    {
+        self.non_identity_count = 0;
+        for gate in &mut self.gates {
+            let next = SingleQubitClifford::random(rng);
+            if next != SingleQubitClifford::I {
+                self.non_identity_count += 1;
+            }
+            *gate = next;
+        }
     }
 
     pub fn concat(&self, rhs: &Self) -> StabilizerResult<Self> {

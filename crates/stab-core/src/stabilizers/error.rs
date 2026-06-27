@@ -34,6 +34,9 @@ pub enum StabilizerError {
     #[error("Tableau index {index} is outside length {len}")]
     TableauIndexOutOfRange { index: usize, len: usize },
 
+    #[error("duplicate Tableau target {target}")]
+    DuplicateTableauTarget { target: usize },
+
     #[error("commuting Pauli string iteration requires 1..64 qubits but got {num_qubits}")]
     InvalidCommutingPauliIteratorQubitCount { num_qubits: usize },
 

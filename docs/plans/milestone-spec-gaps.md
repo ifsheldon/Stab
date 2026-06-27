@@ -284,12 +284,12 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now splits M7 convert acce
 
 ## 2026-06-27 - M6: Random Generation Hook Ownership
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of the M6 stabilizer algebra implementation and benchmark rows.
 Current text: M6 requires random generation hooks and links upstream `tableau_random*`, Clifford random distribution, and stabilizers-to-tableau fuzz and perf coverage.
 Gap: the milestone does not define which Rust RNG type, seeding contract, distribution parity, or public random-constructor API must exist before Stab has simulator and sampling consumers.
 Proposed amendment: state that M6 must either introduce explicit deterministic random hooks for `CliffordString`, `PauliString`, and `Tableau` with documented seed and distribution contracts, or defer random generation to the first simulator/sampler milestone that consumes those hooks while keeping M6 deterministic algebra and iterator coverage.
-Resolution: pending plan update.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines caller-owned `rand::Rng` hooks for `PauliString`, `SingleQubitClifford`, `CliffordString`, and `Tableau`. Seeded Rust RNGs give reproducible Stab output and exact Stim C++ random-stream parity is not required. `PauliString` samples uniformly over sign and `I`/`X`/`Y`/`Z` bases, including zero-length sign sampling; `CliffordString` samples uniformly over the 24 single-qubit Clifford gates; `Tableau::random` samples valid Clifford tableaus from random Clifford-circuit shapes; and exact uniform tableau sampling or random-workload performance parity is deferred to M12 if needed.
 
 ## 2026-06-27 - M6: Util-Top Algorithm Subset Boundaries
 
