@@ -75,7 +75,7 @@ Broader profiler captures, optimization work across parser, sampler, detector, a
 | Add allocation tracking for primary hot paths | Partially satisfied | `--track-allocations`, `just bench::compare-allocations`, optional `count-allocations`, `compare_row_result_records_stab_allocation_maxima`, `--require-memory-gate`, and `memory_gate_marks_pass_fail_and_missing_allocation_rows` provide Stab-side allocation-count plumbing and memory-regression comparison; a full primary allocation report and source-owned baseline remain pending. |
 | Add regression thresholds for workloads that pass the beta gate | Partially satisfied | `--thresholds`, `regression_thresholds_mark_pass_fail_and_uncomparable_rows`, and `regression_thresholds_validate_schema_ids_and_ratios` provide the gate and schema validation; source-owned threshold rows remain pending a complete primary report with passing workloads. |
 | `just oracle::run --implemented-only` passes before and after performance changes | Partially satisfied | This slice changes sampler hot-path behavior and re-ran the focused M8 oracle with `just oracle::run --milestone M8`; the full implemented-only oracle remains required before M12 completion. |
-| `just bench::compare --profile release --primary` has no missing primary workloads | Missing | `--require-beta-gate` now enforces comparable passing rows, but a full primary compare requires a complete pinned-Stim baseline and remains pending. |
+| `just bench::compare --profile release --primary` has no missing primary workloads | Partially satisfied | `just bench::baseline --primary --out target/benchmarks/m12-primary-baseline-probe` and `just bench::compare --primary --baseline target/benchmarks/m12-primary-baseline-probe/baseline.json --report target/benchmarks/m12-primary-compare-probe` produced 71 selected primary rows with no missing, pending, or invalid baseline rows. The report is a local probe, not a committed or archived completion artifact, and it still has 10 beta-gate failures plus 10 missing profiler notes. |
 
 ## Audit And Review Notes
 
@@ -96,6 +96,8 @@ Broader profiler captures, optimization work across parser, sampler, detector, a
 - `cargo clippy -p stab-cli --all-targets -- -D warnings`
 - `just bench::smoke`
 - `just bench::baseline --primary --only M4 --out target/benchmarks/m12-primary-baseline-m4-smoke`
+- `just bench::baseline --primary --out target/benchmarks/m12-primary-baseline-probe`
+- `just bench::compare --primary --baseline target/benchmarks/m12-primary-baseline-probe/baseline.json --report target/benchmarks/m12-primary-compare-probe`
 - `just oracle::run --milestone M8`
 - `just bench::compare --help`
 - `just bench::compare --primary --report target/benchmarks/m12-primary-probe`
@@ -110,6 +112,9 @@ Broader profiler captures, optimization work across parser, sampler, detector, a
 
 The M4 compare-report smoke wrote `compare.json` and `report.md` successfully.
 The M4 primary-baseline smoke wrote `target/benchmarks/m12-primary-baseline-m4-smoke/baseline.json` and `report.md` with `command.primary=true` and selected only M4 primary rows.
+The primary-baseline probe wrote `target/benchmarks/m12-primary-baseline-probe/baseline.json` and `report.md` for the 71-row primary matrix.
+The matching primary-compare probe wrote `target/benchmarks/m12-primary-compare-probe/compare.json` and `report.md`; it reported 46 passing comparable rows, 10 failing comparable rows, 15 not-comparable contract rows, and no missing, pending, or invalid baseline rows.
+The failing comparable rows in that probe were `m4-circuit-parse`, `m4-gate-lookup`, `m5-sparse-xor`, `m6-clifford-string`, `m6-pauli-string`, `m6-pauli-iter`, `m8-probability-util`, `m8-measure-reader`, `m8-sample-throughput-1000000`, and `m10-error-decomp`; each still needs a profiler note before optimization or threshold decisions.
 The local baseline at `target/benchmarks/baseline/latest/baseline.json` did not include M4 rows, so the smoke report correctly marked those rows as `missing-baseline`; a complete primary baseline remains required before M12 can satisfy the beta performance gate.
 Because those rows had no Stim baseline measurements, the smoke report had no relative ratios and correctly marked profiler notes as `not-required`.
 The beta-gate smoke command failed as expected because the local baseline has missing M4 rows, proving the enforcement path rejects unproven rows.
