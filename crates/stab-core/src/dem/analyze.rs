@@ -939,9 +939,11 @@ impl Analyzer {
             CircuitError::invalid_detector_error_model("OBSERVABLE_INCLUDE missing observable id")
         })?;
         let mut has_pauli_target = false;
+        let mut has_measurement_record_target = false;
         let has_targets = !instruction.targets().is_empty();
         for target in instruction.targets() {
             if let Some(offset) = target.measurement_record_offset() {
+                has_measurement_record_target = true;
                 let measurement = self.measurement_index_from_offset(offset.get())?;
                 self.observable_terms_by_measurement
                     .entry(measurement)
@@ -965,7 +967,11 @@ impl Analyzer {
                 )));
             }
         }
-        if has_pauli_target || instruction.tag().is_some() || !has_targets {
+        if has_pauli_target
+            || has_measurement_record_target
+            || instruction.tag().is_some()
+            || !has_targets
+        {
             self.observable_declarations.push(ObservableDeclaration {
                 observable: observable.get(),
                 tag: instruction.tag().map(str::to_owned),

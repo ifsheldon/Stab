@@ -73,3 +73,49 @@ fn dem_analyzer_obs_include_pauli_commuting_and_propagated_cases_match_upstream_
     );
     assert_eq!(propagated, "logical_observable L0\nlogical_observable L0\n");
 }
+
+#[test]
+fn dem_analyzer_omits_only_vacuous_detector_and_observable_declarations_like_upstream() {
+    for (circuit, expected) in [
+        (
+            "
+            X_ERROR(0.25) 3
+            M 3
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D0\n",
+        ),
+        (
+            "
+            X_ERROR(0.25) 3
+            M 3
+            DETECTOR(1, 0) rec[-1]
+            ",
+            "error(0.25) D0\ndetector(1, 0) D0\n",
+        ),
+        (
+            "
+            M 3
+            DETECTOR rec[-1]
+            ",
+            "detector D0\n",
+        ),
+        (
+            "
+            X_ERROR(0.25) 3
+            M 3
+            OBSERVABLE_INCLUDE(0) rec[-1]
+            ",
+            "error(0.25) L0\n",
+        ),
+        (
+            "
+            M 3
+            OBSERVABLE_INCLUDE(0) rec[-1]
+            ",
+            "logical_observable L0\n",
+        ),
+    ] {
+        assert_eq!(analyze(circuit), expected);
+    }
+}
