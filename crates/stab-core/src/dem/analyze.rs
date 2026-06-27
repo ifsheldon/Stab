@@ -10,7 +10,7 @@ mod probabilities;
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Probability, QubitId,
-    RepeatBlock,
+    RepeatBlock, SingleQubitClifford,
 };
 
 use super::{DemInstruction, DemRepeatBlock, DemTarget, DetectorErrorModel};
@@ -172,22 +172,27 @@ impl Analyzer {
             "DEPOLARIZE2" => self.record_depolarize2(instruction),
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => self.record_measurements(instruction),
             "R" | "RX" | "RY" => self.record_resets(instruction),
-            "H" => self.apply_h(instruction),
             "CX" => self.apply_cx(instruction),
             "MPAD" => self.record_measurement_pads(instruction),
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
             "SHIFT_COORDS" => self.shift_coordinates(instruction),
             "TICK" | "QUBIT_COORDS" => Ok(()),
-            name if is_noise_instruction(name) => Err(CircuitError::invalid_detector_error_model(
-                format!("analyze_errors does not yet support {name}"),
-            )),
-            name if is_measurement_instruction(name) => {
-                Err(CircuitError::invalid_detector_error_model(format!(
-                    "analyze_errors does not yet support measurement instruction {name}"
-                )))
+            name => {
+                if let Ok(clifford) = SingleQubitClifford::from_gate(instruction.gate()) {
+                    self.apply_single_qubit_clifford(instruction, clifford)
+                } else if is_noise_instruction(name) {
+                    Err(CircuitError::invalid_detector_error_model(format!(
+                        "analyze_errors does not yet support {name}"
+                    )))
+                } else if is_measurement_instruction(name) {
+                    Err(CircuitError::invalid_detector_error_model(format!(
+                        "analyze_errors does not yet support measurement instruction {name}"
+                    )))
+                } else {
+                    Ok(())
+                }
             }
-            _ => Ok(()),
         }
     }
 
@@ -629,19 +634,24 @@ impl Analyzer {
         Ok(())
     }
 
-    fn apply_h(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn apply_single_qubit_clifford(
+        &mut self,
+        instruction: &CircuitInstruction,
+        clifford: SingleQubitClifford,
+    ) -> CircuitResult<()> {
+        let gate_name = instruction.gate().canonical_name();
         for target in instruction.targets() {
             let Some(qubit) = target.qubit_id() else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
-                    "H target {target} is not a qubit"
+                    "{gate_name} target {target} is not a qubit"
                 )));
             };
             for pending in &mut self.pending_errors {
-                pending.apply_h(qubit);
+                pending.apply_single_qubit_clifford(qubit, clifford)?;
             }
             for pending in &mut self.pending_pauli_channels {
                 if pending.qubit == qubit {
-                    pending.swap_xz();
+                    pending.apply_single_qubit_clifford(clifford)?;
                 }
             }
         }

@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::{CircuitResult, Pauli, Probability, QubitId};
+use crate::{
+    CircuitError, CircuitResult, Pauli, PauliBasis, Probability, QubitId, SingleQubitClifford,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum AnalyzerPauli {
@@ -39,8 +41,32 @@ pub(super) struct PendingSingleQubitPauliChannel {
 }
 
 impl PendingSingleQubitPauliChannel {
-    pub(super) fn swap_xz(&mut self) {
-        std::mem::swap(&mut self.x_probability, &mut self.z_probability);
+    pub(super) fn apply_single_qubit_clifford(
+        &mut self,
+        clifford: SingleQubitClifford,
+    ) -> CircuitResult<()> {
+        let mut x_probability = None;
+        let mut y_probability = None;
+        let mut z_probability = None;
+        for (basis, probability) in [
+            (PauliBasis::X, self.x_probability),
+            (PauliBasis::Y, self.y_probability),
+            (PauliBasis::Z, self.z_probability),
+        ] {
+            let output_basis = apply_clifford_basis(clifford, basis)?;
+            match output_basis {
+                PauliBasis::I => {
+                    return Err(non_identity_mapped_to_identity(clifford));
+                }
+                PauliBasis::X => assign_probability(&mut x_probability, probability, clifford)?,
+                PauliBasis::Y => assign_probability(&mut y_probability, probability, clifford)?,
+                PauliBasis::Z => assign_probability(&mut z_probability, probability, clifford)?,
+            }
+        }
+        self.x_probability = x_probability.ok_or_else(|| missing_channel_basis(clifford, "X"))?;
+        self.y_probability = y_probability.ok_or_else(|| missing_channel_basis(clifford, "Y"))?;
+        self.z_probability = z_probability.ok_or_else(|| missing_channel_basis(clifford, "Z"))?;
+        Ok(())
     }
 
     pub(super) fn flip_probability(&self, basis: AnalyzerBasis) -> CircuitResult<Probability> {
@@ -54,16 +80,17 @@ impl PendingSingleQubitPauliChannel {
 }
 
 impl PendingError {
-    pub(super) fn apply_h(&mut self, qubit: QubitId) {
+    pub(super) fn apply_single_qubit_clifford(
+        &mut self,
+        qubit: QubitId,
+        clifford: SingleQubitClifford,
+    ) -> CircuitResult<()> {
         for effect in &mut self.effects {
             if effect.qubit == qubit {
-                effect.pauli = match effect.pauli {
-                    AnalyzerPauli::X => AnalyzerPauli::Z,
-                    AnalyzerPauli::Y => AnalyzerPauli::Y,
-                    AnalyzerPauli::Z => AnalyzerPauli::X,
-                };
+                effect.pauli = apply_clifford_pauli(clifford, effect.pauli)?;
             }
         }
+        Ok(())
     }
 
     pub(super) fn apply_cx(&mut self, control: QubitId, target: QubitId) {
@@ -154,6 +181,68 @@ impl From<AnalyzerPauli> for Pauli {
             AnalyzerPauli::Z => Self::Z,
         }
     }
+}
+
+impl From<AnalyzerPauli> for PauliBasis {
+    fn from(value: AnalyzerPauli) -> Self {
+        match value {
+            AnalyzerPauli::X => Self::X,
+            AnalyzerPauli::Y => Self::Y,
+            AnalyzerPauli::Z => Self::Z,
+        }
+    }
+}
+
+fn apply_clifford_pauli(
+    clifford: SingleQubitClifford,
+    pauli: AnalyzerPauli,
+) -> CircuitResult<AnalyzerPauli> {
+    match apply_clifford_basis(clifford, pauli.into())? {
+        PauliBasis::I => Err(non_identity_mapped_to_identity(clifford)),
+        PauliBasis::X => Ok(AnalyzerPauli::X),
+        PauliBasis::Y => Ok(AnalyzerPauli::Y),
+        PauliBasis::Z => Ok(AnalyzerPauli::Z),
+    }
+}
+
+fn apply_clifford_basis(
+    clifford: SingleQubitClifford,
+    basis: PauliBasis,
+) -> CircuitResult<PauliBasis> {
+    clifford.apply_basis(basis).map_err(|error| {
+        CircuitError::invalid_detector_error_model(format!(
+            "failed to propagate Pauli basis through {}: {error}",
+            clifford.canonical_name()
+        ))
+    })
+}
+
+fn assign_probability(
+    slot: &mut Option<Probability>,
+    probability: Probability,
+    clifford: SingleQubitClifford,
+) -> CircuitResult<()> {
+    if slot.replace(probability).is_some() {
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "{} maps multiple PAULI_CHANNEL_1 components to the same basis",
+            clifford.canonical_name()
+        )));
+    }
+    Ok(())
+}
+
+fn missing_channel_basis(clifford: SingleQubitClifford, basis: &str) -> CircuitError {
+    CircuitError::invalid_detector_error_model(format!(
+        "{} did not map any PAULI_CHANNEL_1 component to {basis}",
+        clifford.canonical_name()
+    ))
+}
+
+fn non_identity_mapped_to_identity(clifford: SingleQubitClifford) -> CircuitError {
+    CircuitError::invalid_detector_error_model(format!(
+        "{} mapped a non-identity Pauli to identity",
+        clifford.canonical_name()
+    ))
 }
 
 fn insert_effect_mask(masks: &mut BTreeMap<QubitId, u8>, qubit: QubitId, mask: u8) {

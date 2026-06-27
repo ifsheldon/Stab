@@ -202,6 +202,12 @@ impl SingleQubitClifford {
         )
     }
 
+    pub(crate) fn apply_basis(self, basis: PauliBasis) -> StabilizerResult<PauliBasis> {
+        Ok(self
+            .apply_signed(SignedPauli::new(PauliSign::Plus, basis))?
+            .basis)
+    }
+
     fn from_outputs(x_output: SignedPauli, z_output: SignedPauli) -> Option<Self> {
         let bits = [
             z_output.sign == PauliSign::Minus,

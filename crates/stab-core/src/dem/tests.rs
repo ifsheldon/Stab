@@ -288,6 +288,24 @@ fn dem_analyzer_propagates_pauli_errors_through_cnot_order() {
 }
 
 #[test]
+fn dem_analyzer_propagates_pauli_errors_through_hxy() {
+    let circuit = Circuit::from_stim_str(
+        "RY 0\n\
+         X_ERROR(0.25) 0\n\
+         H_XY 0\n\
+         MX 0\n\
+         DETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.25) D0\n");
+}
+
+#[test]
 fn dem_analyzer_ignores_identity_noise_channels() {
     let circuit = Circuit::from_stim_str(
         "I_ERROR(0.25) 0\n\
@@ -540,6 +558,24 @@ fn dem_analyzer_approximates_pauli_channel1_by_measurement_basis() {
         .to_dem_string();
 
     assert_eq!(dem, "error(0.625) D0\nerror(0.5) D1\nerror(0.375) D2\n");
+}
+
+#[test]
+fn dem_analyzer_propagates_pauli_channel1_through_hxy() {
+    let circuit = Circuit::from_stim_str(
+        "RY 0\n\
+         PAULI_CHANNEL_1(0.125, 0.25, 0.375) 0\n\
+         H_XY 0\n\
+         MX 0\n\
+         DETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, approximate_options())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.5) D0\n");
 }
 
 #[test]
