@@ -79,7 +79,9 @@ just bench::list
 just bench::smoke
 just bench::baseline --stim vendor/stim
 just bench::compare --milestone M4
+just bench::compare --profile release --primary --report target/benchmarks/latest
 ```
 
 `just bench::baseline` writes `baseline.json` and `report.md` to `target/benchmarks/baseline/latest` by default.
 Use a small `--target-seconds` value for quick local smoke runs, and increase it when recording durable baseline artifacts.
+`just bench::compare` runs the benchmark ops binary with Cargo's release profile, reads `target/benchmarks/baseline/latest/baseline.json` by default, and can write `compare.json` plus `report.md` to a repository-relative directory under `target/benchmarks/`.

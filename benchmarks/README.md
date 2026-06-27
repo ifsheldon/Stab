@@ -17,6 +17,9 @@ Use `--only` with exact benchmark ids or milestone names, for example `--only m4
 
 `just bench::compare` reads `target/benchmarks/baseline/latest/baseline.json` by default.
 Pass `--baseline <path>` to compare against a different generated baseline report.
+Pass `--primary` to select the frozen M12 primary matrix, which currently includes M4 through M11 benchmark rows except metadata anchors and the M12 placeholder row.
+Pass `--profile release` to record the intended Cargo profile in compare output; the `just bench::compare` recipe builds the benchmark ops binary with Cargo's release profile before running the subcommand.
+Pass `--report target/benchmarks/latest` or another repository-relative directory below `target/benchmarks/` to write `compare.json` and `report.md`.
 Compare prints Stab-side timings for rows whose implementation milestone has a runner and prints pending rows explicitly for future milestones.
 When a comparison runner reports workload-specific rates or comparability notes, treat those notes as part of the benchmark evidence.
 For example, M5 labels Stab-only contract-smoke bit-kernel workloads separately from upstream Stim perf rows until M12 introduces optimized parity thresholds.

@@ -417,6 +417,9 @@ Tasks:
 - Add allocation tracking for parser, sampler compilation, detector conversion, analyzer, and DEM sampler hot paths.
 - Add regression thresholds for all workloads that pass the beta gate so future work cannot accidentally erase performance wins.
 
+For M12 benchmark operations, the frozen primary matrix is every benchmark contract row from M4 through M11 except baseline metadata anchors.
+The M12 `performance-gate` placeholder row documents the gate and is not itself part of `just bench::compare --primary`.
+
 Linked tests and benchmarks:
 
 - Full Benchmark Plan below, including `.stim` parse/print, `gen`, tableau/Pauli primitives, `sample`, `detect`, `m2d`, `analyze_errors`, `.dem` parse/print, and `sample_dem`.

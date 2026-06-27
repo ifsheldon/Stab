@@ -16,4 +16,4 @@ baseline *args:
 # Report planned Stab-vs-Stim benchmark comparisons.
 [working-directory: '..']
 compare *args:
-    cargo run -q -p stab-bench -- compare {{args}}
+    cargo run -q -p stab-bench --profile release -- compare {{args}}

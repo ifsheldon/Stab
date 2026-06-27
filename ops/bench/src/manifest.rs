@@ -274,6 +274,30 @@ impl BenchmarkManifest {
             .collect())
     }
 
+    pub(crate) fn compare_rows<'a>(
+        &'a self,
+        milestone: Option<&str>,
+        primary: bool,
+    ) -> Result<Vec<&'a BenchmarkRow>, BenchError> {
+        let rows = self
+            .rows
+            .iter()
+            .filter(|row| milestone.is_none_or(|milestone| milestone == row.milestone.as_str()))
+            .filter(|row| !primary || row.is_primary())
+            .collect::<Vec<_>>();
+        if let Some(milestone) = milestone
+            && rows.is_empty()
+        {
+            return Err(BenchError::UnmatchedFilter(format!(
+                "milestone {milestone}"
+            )));
+        }
+        if primary && rows.is_empty() {
+            return Err(BenchError::UnmatchedFilter("primary".to_string()));
+        }
+        Ok(rows)
+    }
+
     fn check_compatibility_coverage(&self, root: &RepoRoot, violations: &mut Vec<String>) {
         let benchmark_sources = self
             .rows
@@ -329,6 +353,10 @@ impl BenchmarkManifest {
 }
 
 impl BenchmarkRow {
+    pub(crate) fn is_primary(&self) -> bool {
+        self.milestone != Milestone::M12 && self.threshold_class != "baseline-metadata"
+    }
+
     pub(crate) fn argv_tokens(&self) -> Vec<String> {
         self.argv
             .split('|')
@@ -479,5 +507,35 @@ mod tests {
         let root = crate::root::RepoRoot::resolve(root).expect("resolve repo root");
 
         manifest.check(&root).expect("manifest validation");
+    }
+
+    #[test]
+    fn primary_compare_rows_freeze_m4_through_m11_without_metadata_or_m12_placeholders() {
+        let mut reader = csv::ReaderBuilder::new()
+            .trim(csv::Trim::All)
+            .from_reader(MANIFEST_CSV.as_bytes());
+        let rows = reader
+            .deserialize()
+            .collect::<Result<Vec<_>, _>>()
+            .expect("parse manifest");
+        let manifest = BenchmarkManifest { rows };
+
+        let primary = manifest
+            .compare_rows(None, true)
+            .expect("primary compare rows");
+
+        assert!(!primary.is_empty());
+        assert!(primary.iter().all(|row| row.is_primary()));
+        assert!(primary.iter().any(|row| row.id == "m4-circuit-parse"));
+        assert!(
+            primary
+                .iter()
+                .any(|row| row.id == "m11-sample-dem-high-detector-contract")
+        );
+        assert!(
+            primary
+                .iter()
+                .all(|row| row.id != "m7-perf-harness" && row.milestone != super::Milestone::M12)
+        );
     }
 }

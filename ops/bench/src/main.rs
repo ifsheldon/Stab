@@ -10,6 +10,7 @@
 )]
 
 mod baseline;
+mod compare;
 mod config;
 mod error;
 mod manifest;
@@ -21,8 +22,9 @@ mod stim;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use baseline::{BaselineOptions, CompareOptions, run_baseline, run_compare};
+use baseline::{BaselineOptions, run_baseline};
 use clap::{Parser, Subcommand};
+use compare::{CompareOptions, run_compare};
 use config::{DEFAULT_BASELINE_DIR, DEFAULT_BASELINE_REPORT, DEFAULT_STIM_PATH, PREFIX};
 use error::BenchError;
 use manifest::BenchmarkManifest;
@@ -87,9 +89,21 @@ enum Command {
         #[arg(long)]
         milestone: Option<String>,
 
+        /// Run the benchmark comparison under the named Cargo profile.
+        #[arg(long, default_value = "release")]
+        profile: String,
+
+        /// Compare the frozen M12 primary matrix instead of every manifest row.
+        #[arg(long)]
+        primary: bool,
+
         /// Baseline JSON report produced by `bench::baseline`.
         #[arg(long, default_value = DEFAULT_BASELINE_REPORT)]
         baseline: PathBuf,
+
+        /// Directory receiving compare.json and report.md.
+        #[arg(long)]
+        report: Option<PathBuf>,
 
         /// Exit with an error while Stab benchmark comparison runners are pending.
         #[arg(long)]
@@ -145,7 +159,10 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         }
         Command::Compare {
             milestone,
+            profile,
+            primary,
             baseline,
+            report,
             strict,
         } => {
             run_compare(
@@ -154,6 +171,9 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                 &CompareOptions {
                     baseline,
                     milestone,
+                    profile,
+                    primary,
+                    report,
                     strict,
                 },
             )?;

@@ -40,6 +40,12 @@ pub(crate) struct StimMetadata {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct StabMetadata {
+    pub(crate) commit: String,
+    pub(crate) local_modifications: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct BaselineCommandMetadata {
     pub(crate) target_seconds: f64,
     pub(crate) cli_iterations: u32,
@@ -71,7 +77,54 @@ pub(crate) struct RowCommandMetadata {
 pub(crate) struct Measurement {
     pub(crate) name: String,
     pub(crate) seconds: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) variance_seconds: Option<f64>,
     pub(crate) iterations: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct CompareReport {
+    pub(crate) schema_version: u32,
+    pub(crate) generated_unix_epoch_seconds: u64,
+    pub(crate) machine: MachineMetadata,
+    pub(crate) stim: StimMetadata,
+    pub(crate) stab: StabMetadata,
+    pub(crate) command: CompareCommandMetadata,
+    pub(crate) rows: Vec<CompareRowResult>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct CompareCommandMetadata {
+    pub(crate) baseline_path: String,
+    pub(crate) profile: String,
+    pub(crate) milestone: Option<String>,
+    pub(crate) primary: bool,
+    pub(crate) strict: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct CompareRowResult {
+    pub(crate) id: String,
+    pub(crate) milestone: Milestone,
+    pub(crate) threshold_class: String,
+    pub(crate) runner: Runner,
+    pub(crate) upstream_source: String,
+    pub(crate) phase: String,
+    pub(crate) measurement: String,
+    pub(crate) status: String,
+    pub(crate) baseline_summary: String,
+    pub(crate) stab_summary: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) note: Option<String>,
+    pub(crate) stim_measurements: Vec<Measurement>,
+    pub(crate) stab_measurements: Vec<Measurement>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) stim_median_seconds: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) stab_median_seconds: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) relative_ratio: Option<f64>,
+    pub(crate) pass_fail_status: String,
 }
 
 pub(crate) fn machine_metadata(root: &RepoRoot) -> Result<MachineMetadata, BenchError> {
@@ -82,6 +135,16 @@ pub(crate) fn machine_metadata(root: &RepoRoot) -> Result<MachineMetadata, Bench
         available_parallelism: std::thread::available_parallelism().map_or(1, NonZeroUsize::get),
         rustc_version: command_first_line("rustc", ["--version"], &root.path)?,
         cmake_version: command_first_line("cmake", ["--version"], &root.path)?,
+    })
+}
+
+pub(crate) fn stab_metadata(root: &RepoRoot) -> Result<StabMetadata, BenchError> {
+    let status_args = [OsString::from("status"), OsString::from("--short")];
+    let status = run_process(Path::new("git"), &status_args, b"", &root.path, true)?;
+    check_success(Path::new("git"), &status)?;
+    Ok(StabMetadata {
+        commit: command_first_line("git", ["rev-parse", "HEAD"], &root.path)?,
+        local_modifications: !status.stdout.is_empty(),
     })
 }
 
@@ -128,6 +191,54 @@ pub(crate) fn render_markdown_report(report: &BaselineReport) -> String {
         ));
     }
     out
+}
+
+pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
+    let mut out = String::new();
+    out.push_str("# Stab Benchmark Compare\n\n");
+    out.push_str(&format!(
+        "- Generated Unix epoch seconds: {}\n",
+        report.generated_unix_epoch_seconds
+    ));
+    out.push_str(&format!(
+        "- Stim: {} ({})\n",
+        report.stim.actual_tag, report.stim.actual_commit
+    ));
+    out.push_str(&format!("- Stab commit: {}\n", report.stab.commit));
+    out.push_str(&format!(
+        "- Stab local modifications: {}\n",
+        report.stab.local_modifications
+    ));
+    out.push_str(&format!("- Profile: {}\n", report.command.profile));
+    out.push_str(&format!("- Baseline: {}\n", report.command.baseline_path));
+    out.push_str(&format!(
+        "- Machine: {} {} with {} worker(s)\n\n",
+        report.machine.os, report.machine.arch, report.machine.available_parallelism
+    ));
+    out.push_str("| Benchmark | Milestone | Status | Pass/Fail | Stim Median | Stab Median | Ratio | Note |\n");
+    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- |\n");
+    for row in &report.rows {
+        out.push_str(&format!(
+            "| {} | {} | {} | {} | {} | {} | {} | {} |\n",
+            row.id,
+            row.milestone.as_str(),
+            row.status,
+            row.pass_fail_status,
+            format_optional_seconds(row.stim_median_seconds),
+            format_optional_seconds(row.stab_median_seconds),
+            format_optional_ratio(row.relative_ratio),
+            row.note.as_deref().unwrap_or("")
+        ));
+    }
+    out
+}
+
+fn format_optional_seconds(seconds: Option<f64>) -> String {
+    seconds.map_or_else(String::new, |seconds| format!("{seconds:.9}s"))
+}
+
+fn format_optional_ratio(ratio: Option<f64>) -> String {
+    ratio.map_or_else(String::new, |ratio| format!("{ratio:.3}x"))
 }
 
 fn command_first_line<I, S>(

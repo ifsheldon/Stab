@@ -1,6 +1,10 @@
 use super::{
-    BaselineSummary, compare_incomplete_details, compare_note, measurement_work,
-    parse_stim_perf_line, run_stab_compare_row, summarize_baseline_row, validate_baseline_metadata,
+    compare_note, measurement_work, parse_stim_perf_line, run_stab_compare_row,
+    validate_baseline_metadata,
+};
+use crate::compare::{
+    BaselineCompareStatus, BaselineSummary, CompareRowBuild, build_compare_row_result,
+    compare_incomplete_details, summarize_baseline_row,
 };
 use crate::manifest::{BenchmarkRow, Milestone, Runner};
 use crate::report::{BaselineReport, Measurement};
@@ -17,6 +21,7 @@ fn parses_stim_perf_measurement_line() {
         Measurement {
             name: "circuit_parse".to_string(),
             seconds: 0.0000013,
+            variance_seconds: None,
             iterations: None,
         }
     );
@@ -217,6 +222,70 @@ fn incomplete_details_names_empty_contract_only_rows() {
     assert!(
         details.contains("contract-only row(s) without Stab measurement(s): contract-placeholder")
     );
+}
+
+#[test]
+fn compare_row_result_records_ratio_and_beta_gate_status() {
+    let row = benchmark_row("measured-row", Runner::StimPerf);
+    let result = build_compare_row_result(CompareRowBuild {
+        row: &row,
+        status: "measured",
+        baseline_summary: "stim=0.001s",
+        stab_summary: "stab=0.0015s",
+        note: Some("same workload".to_string()),
+        stim_measurements: vec![Measurement {
+            name: "stim".to_string(),
+            seconds: 0.001,
+            variance_seconds: None,
+            iterations: None,
+        }],
+        stab_measurements: vec![Measurement {
+            name: "stab".to_string(),
+            seconds: 0.0015,
+            variance_seconds: Some(0.0),
+            iterations: Some(1),
+        }],
+        baseline_status: BaselineCompareStatus::Comparable,
+    });
+
+    assert_eq!(result.stim_median_seconds, Some(0.001));
+    assert_eq!(result.stab_median_seconds, Some(0.0015));
+    assert_eq!(result.relative_ratio, Some(1.5));
+    assert_eq!(result.pass_fail_status, "pass");
+    assert_eq!(result.note.as_deref(), Some("same workload"));
+}
+
+#[test]
+fn compare_row_result_distinguishes_missing_baseline_from_uncomparable_contracts() {
+    let row = benchmark_row("contract-row", Runner::ContractOnly);
+    let missing = build_compare_row_result(CompareRowBuild {
+        row: &row,
+        status: "measured",
+        baseline_summary: "missing-baseline",
+        stab_summary: "stab=0.001s",
+        note: None,
+        stim_measurements: Vec::new(),
+        stab_measurements: vec![Measurement {
+            name: "stab".to_string(),
+            seconds: 0.001,
+            variance_seconds: Some(0.0),
+            iterations: Some(1),
+        }],
+        baseline_status: BaselineCompareStatus::Missing,
+    });
+    let contract_only = build_compare_row_result(CompareRowBuild {
+        row: &row,
+        status: "contract-only",
+        baseline_summary: "contract-only",
+        stab_summary: "no-runner",
+        note: None,
+        stim_measurements: Vec::new(),
+        stab_measurements: Vec::new(),
+        baseline_status: BaselineCompareStatus::Comparable,
+    });
+
+    assert_eq!(missing.pass_fail_status, "missing-baseline");
+    assert_eq!(contract_only.pass_fail_status, "not-comparable");
 }
 
 #[test]

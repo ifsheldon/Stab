@@ -63,13 +63,6 @@ pub(crate) struct BaselineOptions {
     pub(crate) rebuild_stim: bool,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct CompareOptions {
-    pub(crate) baseline: PathBuf,
-    pub(crate) milestone: Option<String>,
-    pub(crate) strict: bool,
-}
-
 pub(crate) fn run_baseline(
     root: &RepoRoot,
     manifest: &BenchmarkManifest,
@@ -143,109 +136,7 @@ pub(crate) fn run_baseline(
     Ok(())
 }
 
-pub(crate) fn run_compare(
-    root: &RepoRoot,
-    manifest: &BenchmarkManifest,
-    options: &CompareOptions,
-) -> Result<(), BenchError> {
-    let baseline_path = root.resolve_relative(&options.baseline);
-    let baseline_report = read_baseline_report(&baseline_path)?;
-    validate_baseline_metadata(&baseline_report)?;
-    let rows = manifest
-        .rows
-        .iter()
-        .filter(|row| {
-            options
-                .milestone
-                .as_deref()
-                .is_none_or(|milestone| milestone == row.milestone.as_str())
-        })
-        .collect::<Vec<_>>();
-    if let Some(milestone) = &options.milestone
-        && rows.is_empty()
-    {
-        return Err(BenchError::UnmatchedFilter(format!(
-            "milestone {milestone}"
-        )));
-    }
-    println!(
-        "[{PREFIX}] comparing {} row(s) against {}",
-        rows.len(),
-        baseline_path.display()
-    );
-    let mut pending = Vec::new();
-    let mut missing_baselines = Vec::new();
-    let mut invalid_baselines = Vec::new();
-    let mut contract_only_without_measurements = Vec::new();
-    for row in rows {
-        let stim_summary = match summarize_baseline_row(&baseline_report, row) {
-            BaselineSummary::Present(summary) => summary,
-            BaselineSummary::Missing => {
-                missing_baselines.push(row.id.clone());
-                "missing-baseline".to_string()
-            }
-            BaselineSummary::Invalid(reason) => {
-                invalid_baselines.push(format!("{} ({reason})", row.id));
-                format!("invalid-baseline({reason})")
-            }
-        };
-        match run_stab_compare_row(row)? {
-            Some(measurements) => {
-                let note = compare_note(&row.id)
-                    .map(|note| format!(" note={note}"))
-                    .unwrap_or_default();
-                if row.runner == Runner::ContractOnly && measurements.is_empty() {
-                    println!(
-                        "- {} {} status=contract-only stab=no-runner stim={}{}",
-                        row.milestone.as_str(),
-                        row.id,
-                        stim_summary,
-                        note
-                    );
-                    contract_only_without_measurements.push(row.id.clone());
-                } else {
-                    println!(
-                        "- {} {} status=measured stab={} stim={}{}",
-                        row.milestone.as_str(),
-                        row.id,
-                        summarize_stab_measurements(&row.id, &measurements),
-                        stim_summary,
-                        note
-                    );
-                }
-            }
-            None => {
-                println!(
-                    "- {} {} status=pending stab=no-runner stim={}",
-                    row.milestone.as_str(),
-                    row.id,
-                    stim_summary
-                );
-                pending.push(row.id.clone());
-            }
-        }
-    }
-    if options.strict
-        && (!pending.is_empty()
-            || !missing_baselines.is_empty()
-            || !invalid_baselines.is_empty()
-            || !contract_only_without_measurements.is_empty())
-    {
-        Err(BenchError::CompareIncomplete {
-            details: compare_incomplete_details(
-                &pending,
-                &missing_baselines,
-                &invalid_baselines,
-                &contract_only_without_measurements,
-            )
-            .into_boxed_str(),
-        })
-    } else {
-        Ok(())
-    }
-}
-
-fn read_baseline_report(path: &Path) -> Result<BaselineReport, BenchError> {
+pub(crate) fn read_baseline_report(path: &Path) -> Result<BaselineReport, BenchError> {
     let content = std::fs::read_to_string(path).map_err(|source| BenchError::ReadBaseline {
         path: path.to_path_buf(),
         source,
@@ -253,7 +144,7 @@ fn read_baseline_report(path: &Path) -> Result<BaselineReport, BenchError> {
     Ok(serde_json::from_str(&content)?)
 }
 
-fn validate_baseline_metadata(report: &BaselineReport) -> Result<(), BenchError> {
+pub(crate) fn validate_baseline_metadata(report: &BaselineReport) -> Result<(), BenchError> {
     let mut details = Vec::new();
     if report.schema_version != BASELINE_SCHEMA_VERSION {
         details.push(format!(
@@ -294,7 +185,9 @@ fn validate_baseline_metadata(report: &BaselineReport) -> Result<(), BenchError>
     }
 }
 
-fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, BenchError> {
+pub(crate) fn run_stab_compare_row(
+    row: &BenchmarkRow,
+) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
         "m7-cli-dispatch" => Ok(Some(m7::run_cli_dispatch_row(row)?)),
         "m7-convert-stim-canonical" => Ok(Some(m7::run_convert_stim_row(row)?)),
@@ -764,6 +657,7 @@ fn measure_stab_iterations(
         operation()?;
         timings.push(start.elapsed());
     }
+    let variance_seconds = duration_variance_seconds(&timings);
     timings.sort();
     let seconds = timings
         .get(timings.len() / 2)
@@ -772,105 +666,12 @@ fn measure_stab_iterations(
     Ok(Measurement {
         name: name.to_string(),
         seconds,
+        variance_seconds,
         iterations: Some(iterations),
     })
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum BaselineSummary {
-    Present(String),
-    Missing,
-    Invalid(String),
-}
-
-fn summarize_baseline_row(report: &BaselineReport, row: &BenchmarkRow) -> BaselineSummary {
-    let Some(baseline_row) = report
-        .rows
-        .iter()
-        .find(|baseline_row| baseline_row.id == row.id)
-    else {
-        return BaselineSummary::Missing;
-    };
-    if baseline_row.milestone != row.milestone {
-        return BaselineSummary::Invalid(format!(
-            "milestone={} expected {}",
-            baseline_row.milestone.as_str(),
-            row.milestone.as_str()
-        ));
-    }
-    if baseline_row.runner != row.runner {
-        return BaselineSummary::Invalid(format!(
-            "runner={} expected {}",
-            baseline_row.runner.as_str(),
-            row.runner.as_str()
-        ));
-    }
-    if baseline_row.upstream_source != row.upstream_source {
-        return BaselineSummary::Invalid(format!(
-            "upstream_source={} expected {}",
-            baseline_row.upstream_source, row.upstream_source
-        ));
-    }
-    match row.runner {
-        Runner::ContractOnly => {
-            if baseline_row.measurements.is_empty() {
-                BaselineSummary::Present(baseline_row.status.clone())
-            } else {
-                BaselineSummary::Present(summarize_measurements(&baseline_row.measurements))
-            }
-        }
-        Runner::StimCli | Runner::StimPerf => {
-            if baseline_row.status != "measured" {
-                return BaselineSummary::Invalid(format!(
-                    "status={} expected measured",
-                    baseline_row.status
-                ));
-            }
-            if baseline_row.measurements.is_empty() {
-                return BaselineSummary::Invalid(
-                    "measured runnable row has no measurements".to_string(),
-                );
-            }
-            BaselineSummary::Present(summarize_measurements(&baseline_row.measurements))
-        }
-    }
-}
-
-fn compare_incomplete_details(
-    pending: &[String],
-    missing_baselines: &[String],
-    invalid_baselines: &[String],
-    contract_only_without_measurements: &[String],
-) -> String {
-    let mut details = Vec::new();
-    if !pending.is_empty() {
-        details.push(format!(
-            "pending Stab comparison runner(s): {}",
-            pending.join(", ")
-        ));
-    }
-    if !missing_baselines.is_empty() {
-        details.push(format!(
-            "missing baseline row(s): {}",
-            missing_baselines.join(", ")
-        ));
-    }
-    if !invalid_baselines.is_empty() {
-        details.push(format!(
-            "invalid baseline row(s): {}",
-            invalid_baselines.join(", ")
-        ));
-    }
-    if !contract_only_without_measurements.is_empty() {
-        details.push(format!(
-            "contract-only row(s) without Stab measurement(s): {}",
-            contract_only_without_measurements.join(", ")
-        ));
-    }
-    details.join("\n")
-}
-
-fn summarize_measurements(measurements: &[Measurement]) -> String {
+pub(crate) fn summarize_measurements(measurements: &[Measurement]) -> String {
     measurements
         .iter()
         .map(|measurement| format!("{}={:.9}s", measurement.name, measurement.seconds))
@@ -878,7 +679,7 @@ fn summarize_measurements(measurements: &[Measurement]) -> String {
         .join(",")
 }
 
-fn summarize_stab_measurements(row_id: &str, measurements: &[Measurement]) -> String {
+pub(crate) fn summarize_stab_measurements(row_id: &str, measurements: &[Measurement]) -> String {
     let summary = summarize_measurements(measurements);
     let rates = summarize_measurement_rates(row_id, measurements);
     if rates.is_empty() {
@@ -905,7 +706,7 @@ fn summarize_measurement_rates(row_id: &str, measurements: &[Measurement]) -> St
         .join(",")
 }
 
-fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
+pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     if let Some(work) = m8::measurement_work(row_id, name) {
         return Some(work);
     }
@@ -971,7 +772,7 @@ fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     }
 }
 
-fn compare_note(row_id: &str) -> Option<&'static str> {
+pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
     if let Some(note) = m8::compare_note(row_id) {
         return Some(note);
     }
@@ -1114,6 +915,7 @@ fn run_stim_cli_row(
         check_success(&root.stim_binary(), &output)?;
         timings.push(start.elapsed());
     }
+    let variance_seconds = duration_variance_seconds(&timings);
     timings.sort();
     let median = timings
         .get(timings.len() / 2)
@@ -1139,6 +941,7 @@ fn run_stim_cli_row(
         measurements: vec![Measurement {
             name: row.id.clone(),
             seconds: median,
+            variance_seconds,
             iterations: Some(iterations),
         }],
     })
@@ -1161,6 +964,7 @@ fn parse_stim_perf_line(line: &str) -> Option<Measurement> {
     Some(Measurement {
         name,
         seconds,
+        variance_seconds: None,
         iterations: None,
     })
 }
@@ -1174,4 +978,24 @@ fn duration_seconds(value: f64, unit: &str) -> Option<f64> {
         "ps" => Some(value / 1_000_000_000_000.0),
         _ => None,
     }
+}
+
+fn duration_variance_seconds(timings: &[Duration]) -> Option<f64> {
+    if timings.is_empty() {
+        return None;
+    }
+    let seconds = timings
+        .iter()
+        .map(Duration::as_secs_f64)
+        .collect::<Vec<_>>();
+    let mean = seconds.iter().sum::<f64>() / seconds.len() as f64;
+    let variance = seconds
+        .iter()
+        .map(|sample| {
+            let delta = sample - mean;
+            delta * delta
+        })
+        .sum::<f64>()
+        / seconds.len() as f64;
+    Some(variance)
 }
