@@ -20,6 +20,7 @@ Pass `--baseline <path>` to compare against a different generated baseline repor
 Pass `--primary` to select the frozen M12 primary matrix, which currently includes M4 through M11 benchmark rows except metadata anchors and the M12 placeholder row.
 Pass `--profile release` to record the intended Cargo profile in compare output; the `just bench::compare` recipe builds the benchmark ops binary with Cargo's release profile before running the subcommand.
 Pass `--report target/benchmarks/latest` or another repository-relative directory below `target/benchmarks/` to write `compare.json` and `report.md`.
+Pass `--require-beta-gate` to fail when any selected row does not prove a pass against the 2.0x pinned-Stim beta performance gate.
 Pass `--require-profiler-notes` with `--report` to fail when a row slower than 1.5x pinned Stim lacks a valid note at `<report>/profiler-notes/<benchmark-id>.md`.
 Profiler notes must include non-empty `Dominant cost:` and `Next owner action:` lines.
 Use `just bench::compare-allocations` to build `stab-bench` with the optional `count-allocations` feature and pass `--track-allocations` automatically.

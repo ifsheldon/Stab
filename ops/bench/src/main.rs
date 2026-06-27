@@ -110,6 +110,10 @@ enum Command {
         #[arg(long)]
         require_profiler_notes: bool,
 
+        /// Fail when selected rows do not prove the 2.0x beta performance gate.
+        #[arg(long)]
+        require_beta_gate: bool,
+
         /// Measure Stab-side allocation counts using the count-allocations feature.
         #[arg(long)]
         track_allocations: bool,
@@ -173,6 +177,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             baseline,
             report,
             require_profiler_notes,
+            require_beta_gate,
             track_allocations,
             strict,
         } => {
@@ -186,6 +191,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     primary,
                     report,
                     require_profiler_notes,
+                    require_beta_gate,
                     track_allocations,
                     strict,
                 },

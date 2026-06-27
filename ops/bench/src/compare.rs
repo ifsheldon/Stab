@@ -22,6 +22,7 @@ pub(crate) struct CompareOptions {
     pub(crate) primary: bool,
     pub(crate) report: Option<PathBuf>,
     pub(crate) require_profiler_notes: bool,
+    pub(crate) require_beta_gate: bool,
     pub(crate) track_allocations: bool,
     pub(crate) strict: bool,
 }
@@ -134,6 +135,7 @@ pub(crate) fn run_compare(
             }
         }
     }
+    let beta_gate_findings = find_beta_gate_failures(&report_rows);
     let profiler_note_findings = if let Some(report_dir) = &options.report {
         write_compare_report(
             root,
@@ -149,6 +151,11 @@ pub(crate) fn run_compare(
     if options.require_profiler_notes && !profiler_note_findings.blockers.is_empty() {
         return Err(BenchError::ProfilerNotesMissing {
             details: profiler_note_findings.blockers.join("\n").into_boxed_str(),
+        });
+    }
+    if options.require_beta_gate && !beta_gate_findings.blockers.is_empty() {
+        return Err(BenchError::BetaGateFailed {
+            details: beta_gate_findings.blockers.join("\n").into_boxed_str(),
         });
     }
     if options.strict
@@ -193,6 +200,7 @@ fn write_compare_report(
             milestone: options.milestone.clone(),
             primary: options.primary,
             require_profiler_notes: options.require_profiler_notes,
+            require_beta_gate: options.require_beta_gate,
             track_allocations: options.track_allocations,
             strict: options.strict,
         },
@@ -243,6 +251,11 @@ pub(crate) struct CompareRowBuild<'a> {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct ProfilerNoteFindings {
+    blockers: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct BetaGateFindings {
     blockers: Vec<String>,
 }
 
@@ -452,6 +465,26 @@ pub(crate) fn compare_incomplete_details(
     details.join("\n")
 }
 
+fn find_beta_gate_failures(rows: &[CompareRowResult]) -> BetaGateFindings {
+    let mut findings = BetaGateFindings::default();
+    for row in rows {
+        match row.pass_fail_status.as_str() {
+            "pass" => {}
+            "fail" => findings.blockers.push(format!(
+                "{}: ratio {} exceeds 2.000x beta gate",
+                row.id,
+                row.relative_ratio
+                    .map_or_else(|| "unknown".to_string(), |ratio| format!("{ratio:.3}x"))
+            )),
+            other => findings.blockers.push(format!(
+                "{}: beta gate is not proven because status is {other}",
+                row.id
+            )),
+        }
+    }
+    findings
+}
+
 fn apply_profiler_notes(rows: &mut [CompareRowResult], notes_dir: &Path) -> ProfilerNoteFindings {
     let mut findings = ProfilerNoteFindings::default();
     for row in rows {
@@ -547,7 +580,7 @@ mod tests {
 
     use super::{
         BaselineCompareStatus, CompareRowBuild, HOT_PATH_PROFILER_NOTE_RATIO, apply_profiler_notes,
-        build_compare_row_result, validate_profiler_note_content,
+        build_compare_row_result, find_beta_gate_failures, validate_profiler_note_content,
     };
     use crate::manifest::{BenchmarkRow, Milestone, Runner};
     use crate::report::{AllocationMeasurement, Measurement};
@@ -647,6 +680,25 @@ mod tests {
 
         assert_eq!(result.stab_allocation_count_max, Some(3));
         assert_eq!(result.stab_allocation_bytes_max, Some(2048));
+    }
+
+    #[test]
+    fn beta_gate_requires_every_selected_row_to_prove_a_pass() {
+        let pass = compare_row("passing-row", Some(1.25));
+        let fail = compare_row("failing-row", Some(2.25));
+        let missing = compare_row("missing-row", None);
+
+        let findings = find_beta_gate_failures(&[pass]);
+        assert!(findings.blockers.is_empty());
+
+        let findings = find_beta_gate_failures(&[fail, missing]);
+        assert_eq!(
+            findings.blockers,
+            vec![
+                "failing-row: ratio 2.250x exceeds 2.000x beta gate",
+                "missing-row: beta gate is not proven because status is not-comparable",
+            ]
+        );
     }
 
     fn compare_row(id: &str, ratio: Option<f64>) -> crate::report::CompareRowResult {

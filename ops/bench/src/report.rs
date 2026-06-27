@@ -112,6 +112,7 @@ pub(crate) struct CompareCommandMetadata {
     pub(crate) milestone: Option<String>,
     pub(crate) primary: bool,
     pub(crate) require_profiler_notes: bool,
+    pub(crate) require_beta_gate: bool,
     pub(crate) track_allocations: bool,
     pub(crate) strict: bool,
 }
