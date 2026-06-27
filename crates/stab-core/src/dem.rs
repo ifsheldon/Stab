@@ -330,6 +330,12 @@ impl DemInstruction {
         &self.targets
     }
 
+    pub fn target_groups(&self) -> Vec<&[DemTarget]> {
+        self.targets
+            .split(|target| matches!(target, DemTarget::Separator))
+            .collect()
+    }
+
     pub fn tag(&self) -> Option<&str> {
         self.tag.as_deref()
     }

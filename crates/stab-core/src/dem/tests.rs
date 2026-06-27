@@ -49,8 +49,18 @@ fn allow_gauge_options() -> ErrorAnalyzerOptions {
     }
 }
 
+fn first_dem_instruction(dem: &DetectorErrorModel) -> &DemInstruction {
+    dem.items()
+        .first()
+        .and_then(|item| match item {
+            DemItem::Instruction(instruction) => Some(instruction),
+            DemItem::RepeatBlock(_) => None,
+        })
+        .unwrap()
+}
+
 #[test]
-fn dem_targets_parse_stim_limits() {
+fn dem_instruction_targets_parse_stim_limits() {
     assert_eq!(
         "D4611686018427387903".parse::<DemTarget>().unwrap(),
         DemTarget::relative_detector(4_611_686_018_427_387_903).unwrap()
@@ -67,6 +77,45 @@ fn dem_targets_parse_stim_limits() {
     assert!("D-1".parse::<DemTarget>().is_err());
     assert!("Da".parse::<DemTarget>().is_err());
     assert!("".parse::<DemTarget>().is_err());
+}
+
+#[test]
+fn dem_instruction_target_groups_follow_stim_separators() {
+    let dem = DetectorErrorModel::from_dem_str("error(0.1) D0 ^ D2 L0 ^ D1 D2 D3\n").unwrap();
+    let instruction = first_dem_instruction(&dem);
+
+    let groups: Vec<Vec<DemTarget>> = instruction
+        .target_groups()
+        .into_iter()
+        .map(<[DemTarget]>::to_vec)
+        .collect();
+
+    assert_eq!(
+        groups,
+        vec![
+            vec![DemTarget::relative_detector(0).unwrap()],
+            vec![
+                DemTarget::relative_detector(2).unwrap(),
+                DemTarget::logical_observable(0).unwrap(),
+            ],
+            vec![
+                DemTarget::relative_detector(1).unwrap(),
+                DemTarget::relative_detector(2).unwrap(),
+                DemTarget::relative_detector(3).unwrap(),
+            ],
+        ]
+    );
+
+    let dem = DetectorErrorModel::from_dem_str("error(0.1) D0\n").unwrap();
+    let instruction = first_dem_instruction(&dem);
+    assert_eq!(
+        instruction.target_groups(),
+        vec![&[DemTarget::relative_detector(0).unwrap()][..]]
+    );
+
+    let dem = DetectorErrorModel::from_dem_str("error(0.1)\n").unwrap();
+    let instruction = first_dem_instruction(&dem);
+    assert_eq!(instruction.target_groups(), vec![&[][..]]);
 }
 
 #[test]
