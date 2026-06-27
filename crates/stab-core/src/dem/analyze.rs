@@ -176,6 +176,7 @@ impl Analyzer {
             "I_ERROR" | "II_ERROR" => Ok(()),
             "PAULI_CHANNEL_1" => self.record_pauli_channel1(instruction),
             "DEPOLARIZE1" => self.record_depolarize1(instruction),
+            "DEPOLARIZE2" => self.record_depolarize2(instruction),
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => self.record_measurements(instruction),
             "R" | "RX" | "RY" => self.record_resets(instruction),
             "MPAD" => self.record_measurement_pads(instruction),
@@ -350,6 +351,77 @@ impl Analyzer {
                 });
         }
         Ok(())
+    }
+
+    fn record_depolarize2(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let Some(probability) = instruction.probability_argument()? else {
+            return Ok(());
+        };
+        if probability.get() == 0.0 {
+            return Ok(());
+        }
+        let channel_probability = depolarize2_independent_channel_probability(probability)?;
+        for group in instruction.target_groups() {
+            let [left, right] = group else {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "DEPOLARIZE2 expected paired qubit targets",
+                ));
+            };
+            let Some(left_qubit) = left.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "DEPOLARIZE2 target {left} is not a qubit"
+                )));
+            };
+            let Some(right_qubit) = right.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "DEPOLARIZE2 target {right} is not a qubit"
+                )));
+            };
+            let paulis = [AnalyzerPauli::X, AnalyzerPauli::Y, AnalyzerPauli::Z];
+            for left_pauli in [None, Some(paulis[0]), Some(paulis[1]), Some(paulis[2])] {
+                for right_pauli in [None, Some(paulis[0]), Some(paulis[1]), Some(paulis[2])] {
+                    if left_pauli.is_none() && right_pauli.is_none() {
+                        continue;
+                    }
+                    self.push_two_qubit_pauli_error(
+                        channel_probability,
+                        left_qubit,
+                        left_pauli,
+                        right_qubit,
+                        right_pauli,
+                    );
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn push_two_qubit_pauli_error(
+        &mut self,
+        probability: Probability,
+        left_qubit: QubitId,
+        left_pauli: Option<AnalyzerPauli>,
+        right_qubit: QubitId,
+        right_pauli: Option<AnalyzerPauli>,
+    ) {
+        let mut effects = Vec::new();
+        if let Some(pauli) = left_pauli {
+            effects.push(NoiseEffect {
+                qubit: left_qubit,
+                pauli,
+            });
+        }
+        if let Some(pauli) = right_pauli {
+            effects.push(NoiseEffect {
+                qubit: right_qubit,
+                pauli,
+            });
+        }
+        self.pending_errors.push(PendingError {
+            probability,
+            effects,
+            measurements: Vec::new(),
+        });
     }
 
     fn record_depolarize1(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
@@ -601,6 +673,7 @@ impl Analyzer {
             }
         }
 
+        merged_error_order.sort();
         for targets in merged_error_order {
             let Some(probability) = merged_error_probabilities.remove(&targets) else {
                 continue;
@@ -754,6 +827,17 @@ fn toggle_all(target: &mut BTreeSet<u64>, values: impl Iterator<Item = u64>) {
 
 fn xor_probability(left: Probability, right: Probability) -> CircuitResult<Probability> {
     Probability::try_new(left.get() + right.get() - 2.0 * left.get() * right.get())
+}
+
+fn depolarize2_independent_channel_probability(
+    probability: Probability,
+) -> CircuitResult<Probability> {
+    if probability.get() > 15.0 / 16.0 {
+        return Err(CircuitError::invalid_detector_error_model(
+            "cannot analyze over-mixing DEPOLARIZE2 probability above 15/16",
+        ));
+    }
+    Probability::try_new(0.5 - 0.5 * (1.0 - (16.0 * probability.get()) / 15.0).powf(0.125))
 }
 
 fn pauli_mask(pauli: Pauli) -> u8 {

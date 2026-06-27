@@ -1,0 +1,5 @@
+DEPOLARIZE2(0.25) 3 5
+M 3
+M 5
+DETECTOR rec[-1]
+DETECTOR rec[-2]

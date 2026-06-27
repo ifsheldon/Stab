@@ -375,8 +375,42 @@ fn dem_analyzer_maps_depolarize1_to_basis_flip_probability() {
 }
 
 #[test]
+fn dem_analyzer_maps_depolarize2_to_pair_flip_probabilities() {
+    let circuit = Circuit::from_stim_str(
+        "DEPOLARIZE2(0.25) 3 5\n\
+         M 3\n\
+         M 5\n\
+         DETECTOR rec[-1]\n\
+         DETECTOR rec[-2]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(
+        dem,
+        "error(0.07182558071116236508846242259096471) D0\n\
+         error(0.07182558071116236508846242259096471) D0 D1\n\
+         error(0.07182558071116236508846242259096471) D1\n"
+    );
+}
+
+#[test]
 fn dem_analyzer_rejects_overmixing_depolarize1() {
     let circuit = Circuit::from_stim_str("DEPOLARIZE1(1) 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+
+    let result = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default());
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn dem_analyzer_rejects_overmixing_depolarize2() {
+    let circuit =
+        Circuit::from_stim_str("DEPOLARIZE2(1) 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n")
+            .unwrap();
 
     let result = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default());
 
