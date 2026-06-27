@@ -1,6 +1,7 @@
 use super::run_from;
 
 mod channels;
+mod parity_rows;
 
 #[test]
 fn analyze_errors_basic_matches_m10_oracle_golden() {
