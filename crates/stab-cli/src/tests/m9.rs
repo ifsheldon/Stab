@@ -158,6 +158,71 @@ fn detect_appends_observables_and_writes_bit_packed_output() {
 }
 
 #[test]
+fn detect_supports_pauli_target_observable_flips() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "detect",
+            "--append_observables",
+            "--shots",
+            "128",
+            "--seed",
+            "5",
+        ],
+        b"RZ 0\nOBSERVABLE_INCLUDE(0) X0\nOBSERVABLE_INCLUDE(1) Y0\nOBSERVABLE_INCLUDE(2) Z0\n"
+            .as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    let text = String::from_utf8(stdout).unwrap();
+    let mut x_or_y_hits = 0;
+    for line in text.lines() {
+        assert_eq!(line.len(), 3);
+        let bytes = line.as_bytes();
+        assert_eq!(bytes.first(), bytes.get(1));
+        assert_eq!(bytes.get(2), Some(&b'0'));
+        x_or_y_hits += usize::from(bytes.first() == Some(&b'1'));
+    }
+    assert!((32..96).contains(&x_or_y_hits));
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn detect_supports_product_measurements_with_pauli_observable_flips() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "detect",
+            "--append_observables",
+            "--shots",
+            "128",
+            "--seed",
+            "5",
+        ],
+        b"RX 0 1\nMXX 0 1\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) Z0\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    let text = String::from_utf8(stdout).unwrap();
+    let mut observable_hits = 0;
+    for line in text.lines() {
+        let bytes = line.as_bytes();
+        assert_eq!(bytes.first(), Some(&b'0'));
+        observable_hits += usize::from(bytes.get(1) == Some(&b'1'));
+    }
+    assert!((32..96).contains(&observable_hits));
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
 fn detect_can_write_observables_to_a_separate_file() {
     let temp_dir = tempdir().expect("temp dir");
     let obs_path = temp_dir.path().join("obs.b8");
@@ -274,6 +339,39 @@ fn m2d_supports_reference_skip_observables_and_b8_input() {
         String::from_utf8(stdout).unwrap(),
         "00000\n01001\n10000\n11001\n"
     );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn m2d_ignores_pauli_target_observables_like_stim_conversion() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    std::fs::write(
+        &circuit_path,
+        "M 0\nOBSERVABLE_INCLUDE(0) X0\nOBSERVABLE_INCLUDE(1) rec[-1]\n",
+    )
+    .expect("write circuit");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=01",
+            "--out_format=01",
+            "--append_observables",
+            "--skip_reference_sample",
+            "--circuit",
+            circuit_path.to_str().expect("utf-8 path"),
+        ],
+        b"1\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "01\n");
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
 }
 

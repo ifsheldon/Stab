@@ -239,12 +239,12 @@ Resolution: pending plan update.
 
 ## 2026-06-27 - M9: Pauli-Target Observable Detection Scope
 
-Status: Open
+Status: Resolved
 Revealed by: full code review against pinned Stim `frame_simulator` observable handling.
 Current text: M9 requires `stim detect` with observables and detector output handling.
-Gap: the milestone does not distinguish measurement-record observables from `OBSERVABLE_INCLUDE` Pauli target observables. Current Stab rejects Pauli-target observables for `detect` to avoid silently returning incorrect logical flips, while `m2d` continues to ignore Pauli targets like pinned Stim's measurement-to-detection converter.
+Gap: the milestone did not distinguish measurement-record observables from `OBSERVABLE_INCLUDE` Pauli target observables. The prior implementation rejected Pauli-target observables for `detect` to avoid silently returning incorrect logical flips, while `m2d` continued to ignore Pauli targets like pinned Stim's measurement-to-detection converter.
 Proposed amendment: either require M9 to implement frame-simulator-style Pauli-target observable flips for `detect`, including deterministic and random observable fixtures, or defer Pauli-target observable detection to the simulator-completeness milestone while requiring an explicit error in the M9 CLI and Rust API.
-Resolution: pending plan update.
+Resolution: M9 now requires `stim detect` to implement frame-simulator-style Pauli-target observable flips for the documented scalar frame subset while leaving `m2d` conversion behavior unchanged. Evidence is `coverage-simulators-frame-simulator-pauli-observables`, `cargo test -p stab-core detection_sampling`, including RX/RY/RZ Pauli observable parity, product-measurement frame updates, and reference-sample measurement-bit cancellation, plus `cargo test -p stab-cli detect_supports_pauli_target_observable_flips`, `cargo test -p stab-cli detect_supports_product_measurements_with_pauli_observable_flips`, and `cargo test -p stab-cli m2d_ignores_pauli_target_observables_like_stim_conversion`.
 
 ## 2026-06-27 - M9: Detection Conversion Streaming And Scale Limits
 

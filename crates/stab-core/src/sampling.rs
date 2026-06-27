@@ -16,7 +16,7 @@ use crate::{
 mod direct_z_measurement;
 mod measurement_flip;
 mod operation;
-mod pauli_product;
+pub(crate) mod pauli_product;
 mod stabilizer_frame;
 
 #[derive(Clone, Debug, PartialEq)]

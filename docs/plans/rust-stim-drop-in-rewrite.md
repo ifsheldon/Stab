@@ -320,12 +320,15 @@ Tasks:
 - Implement measurement-to-detection conversion from measurement records and circuits with detectors, observables, coordinate shifts, and repeats.
 - Implement `stim detect` with supported input/output formats, bit-packed modes, observables, and detector output handling.
 - Implement `stim m2d` with measurement input parsing, detector conversion, observable output, and error handling for inconsistent inputs.
+- Treat `stim detect` Pauli-target `OBSERVABLE_INCLUDE` targets as frame-simulator observable flips for the supported M9 scalar frame subset, while keeping `m2d` measurement-record conversion compatible with pinned Stim by ignoring Pauli targets in conversion plans.
 - Handle gauge detector semantics structurally, without requiring identical arbitrary choices when Stim documents nondeterminism.
 - Add round-trip tests for bit-packed input/output and text input/output across circuit fixtures generated in M7.
 
+The M9 scalar frame subset for Pauli-target observable detection includes annotations, `R`/`RX`/`RY`, `M`/`MX`/`MY`, `MR`/`MRX`/`MRY`, `MXX`/`MYY`/`MZZ`, `MPP`, `MPAD`, `CX`/`CY`/`CZ` including measurement-record feedback where supported, tableau-backed Clifford gates, single-qubit and two-qubit Pauli noise, depolarizing noise, correlated errors, and heralded single-qubit noise. Unsupported instructions must fail with an explicit sampler-compilation error, and bit-parallel frame storage plus streaming-scale detection conversion remain M12 or later work unless promoted by a future plan amendment.
+
 Linked tests and benchmarks:
 
-- Direct tests: `src/stim/simulators/measurements_to_detection_events.test.cc`, M9-owned `src/stim/simulators/frame_simulator_util.test.cc` detection-output helpers, and related Python `measurements_to_detection_events_test.py`.
+- Direct tests: `src/stim/simulators/measurements_to_detection_events.test.cc`, M9-owned `src/stim/simulators/frame_simulator_util.test.cc` detection-output helpers, `src/stim/simulators/frame_simulator.test.cc` Pauli-target observable cases, and related Python `measurements_to_detection_events_test.py`.
 - CLI tests: `src/stim/cmd/command_detect.test.cc` and `src/stim/cmd/command_m2d.test.cc`.
 - IO tests: C++ Input And Output Formats group for bit-packed and text result formats.
 - Benchmarks: `stim detect` and `stim m2d` on text and bit-packed input from the Benchmark Plan.
@@ -334,7 +337,8 @@ Done criteria:
 
 - `just oracle::run --milestone M9 --exact` passes deterministic detection examples.
 - `just oracle::run --milestone M9 --structural` passes gauge-detector structural equivalence cases.
-- `cargo test -p stab-core detection` covers coordinate shifts, repeats, observables, empty-detector circuits, and invalid measurement references.
+- `cargo test -p stab-core detection` covers coordinate shifts, repeats, measurement-record observables, Pauli-target observable flips, empty-detector circuits, and invalid measurement references.
+- `cargo test -p stab-core detection_sampling` covers frame-simulator Pauli-target observable parity for basis resets and product measurements.
 - `just bench::compare --milestone M9` reports `detect` and `m2d` throughput separately for text and bit-packed formats.
 
 ### M10: Detector Error Model Core

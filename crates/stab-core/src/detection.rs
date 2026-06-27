@@ -1,3 +1,10 @@
+mod frame;
+
+use frame::{
+    circuit_has_pauli_observable_targets, sample_detection_events_with_frame,
+    validate_frame_detection_circuit,
+};
+
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, CompiledSampler,
     RepeatBlock, SampleFormat,
@@ -80,6 +87,9 @@ pub fn sample_detection_events(
     shots: usize,
     seed: Option<u64>,
 ) -> CircuitResult<DetectionConversionOutput> {
+    if circuit_has_pauli_observable_targets(circuit) {
+        return sample_detection_events_with_frame(circuit, shots, seed);
+    }
     validate_detection_sampling_circuit(circuit)?;
     let plan = ConversionPlan::from_circuit(circuit)?;
     plan.validate_shot_count(shots)?;
@@ -105,7 +115,11 @@ pub fn detection_record_width(circuit: &Circuit) -> CircuitResult<usize> {
 }
 
 pub fn validate_detection_sampling_circuit(circuit: &Circuit) -> CircuitResult<()> {
-    validate_sampling_observables(circuit)
+    if circuit_has_pauli_observable_targets(circuit) {
+        validate_frame_detection_circuit(circuit)
+    } else {
+        Ok(())
+    }
 }
 
 pub fn write_detection_records(
@@ -453,27 +467,6 @@ fn observable_records_as_bits(output: &DetectionConversionOutput) -> CircuitResu
         .collect()
 }
 
-fn validate_sampling_observables(circuit: &Circuit) -> CircuitResult<()> {
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction)
-                if instruction.gate().canonical_name() == "OBSERVABLE_INCLUDE"
-                    && instruction
-                        .targets()
-                        .iter()
-                        .any(crate::Target::is_pauli_target) =>
-            {
-                return Err(CircuitError::invalid_sampler_compilation(
-                    "detect does not yet support OBSERVABLE_INCLUDE Pauli targets",
-                ));
-            }
-            CircuitItem::Instruction(_) => {}
-            CircuitItem::RepeatBlock(repeat) => validate_sampling_observables(repeat.body())?,
-        }
-    }
-    Ok(())
-}
-
 fn instruction_measurement_count(instruction: &CircuitInstruction) -> usize {
     match instruction.gate().canonical_name() {
         "M"
@@ -690,10 +683,83 @@ mod tests {
     }
 
     #[test]
-    fn detection_sampling_rejects_pauli_target_observables_until_supported() {
-        let circuit = Circuit::from_stim_str("RZ 0\nOBSERVABLE_INCLUDE(0) X0\n").expect("parse");
+    fn detection_sampling_supports_pauli_target_observables_like_frame_simulator() {
+        // Adapted from Stim v1.16.0 src/stim/simulators/frame_simulator.test.cc
+        // observable_include_paulis_rx/ry/rz.
+        for (reset, random_pair, stable_observable) in
+            [("RZ", (0, 1), 2), ("RY", (0, 2), 1), ("RX", (1, 2), 0)]
+        {
+            let circuit = Circuit::from_stim_str(&format!(
+                "{reset} 0\n\
+                 OBSERVABLE_INCLUDE(0) X0\n\
+                 OBSERVABLE_INCLUDE(1) Y0\n\
+                 OBSERVABLE_INCLUDE(2) Z0\n"
+            ))
+            .expect("parse");
+            let output = sample_detection_events(&circuit, 1024, Some(5)).expect("detect");
 
-        assert!(sample_detection_events(&circuit, 1, Some(5)).is_err());
+            let hits = |observable: usize| {
+                output
+                    .records
+                    .iter()
+                    .filter(|record| record.observables[observable])
+                    .count()
+            };
+            let first_hits = hits(random_pair.0);
+            assert_eq!(first_hits, hits(random_pair.1));
+            assert!((300..700).contains(&first_hits));
+            assert_eq!(hits(stable_observable), 0);
+        }
+    }
+
+    #[test]
+    fn detection_sampling_supports_product_measurements_with_pauli_observables() {
+        for circuit_text in [
+            "RX 0 1\nMXX 0 1\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) Z0\n",
+            "RY 0 1\nMYY 0 1\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) X0\n",
+            "R 0 1\nMZZ 0 1\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) X0\n",
+            "RX 0\nRY 1\nR 2\nMPP X0*Y1*Z2\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) Z0\n",
+        ] {
+            let circuit = Circuit::from_stim_str(circuit_text).expect("parse");
+            let output = sample_detection_events(&circuit, 1024, Some(5)).expect("detect");
+
+            assert!(
+                output
+                    .records
+                    .iter()
+                    .all(|record| record.detectors.first() == Some(&false))
+            );
+            let hits = output
+                .records
+                .iter()
+                .filter(|record| record.observables[0])
+                .count();
+            assert!((300..700).contains(&hits));
+        }
+    }
+
+    #[test]
+    fn detection_sampling_frame_path_ignores_reference_sample_measurement_bits() {
+        let circuit = Circuit::from_stim_str(
+            "M !0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) Z0\n",
+        )
+        .expect("parse");
+        let output = sample_detection_events(&circuit, 8, Some(5)).expect("detect");
+
+        assert!(
+            output.records.iter().all(|record| {
+                record.detectors == [false] && record.observables == [false, false]
+            })
+        );
+    }
+
+    #[test]
+    fn detection_sampling_frame_path_rejects_invalid_feedback_measurement_references() {
+        let circuit =
+            Circuit::from_stim_str("CX rec[-1] 0\nOBSERVABLE_INCLUDE(0) Z0\n").expect("parse");
+        let result = sample_detection_events(&circuit, 1, Some(5));
+
+        assert!(result.is_err());
     }
 
     #[test]

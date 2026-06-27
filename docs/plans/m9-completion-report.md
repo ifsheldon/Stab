@@ -10,20 +10,21 @@ Objective: implement measurement-to-detection conversion and the CLI workflows t
 
 Complete with spec follow-ups.
 
-The public M9 workflow slice is implemented and verified for measurement-record detector conversion, `detect`, `m2d`, observable routing, text formats, `b8`, structural gauge behavior, and report-only benchmark runners.
+The public M9 workflow slice is implemented and verified for measurement-record detector conversion, `detect`, `m2d`, observable routing, Pauli-target observable flips in `detect`, product-measurement frame updates, text formats, `b8`, structural gauge behavior, and report-only benchmark runners.
 The remaining work is explicitly logged as milestone under-specification because the current roadmap does not yet define whether it belongs in M9, a detector-analysis submilestone, or M12 performance hardening.
 
 ## Tests Ported Or Created
 
-- Added `crates/stab-core/src/detection.rs` tests for reference-sample subtraction, `--skip_reference_sample`, repeats, coordinate annotations, empty detectors, empty-detector circuits, invalid `rec` references, observable ids, `dets`/`hits`/`01`/`b8` writers, gauge-detector structural behavior, unsupported Pauli-target observables in `detect`, and bounded record-shape validation.
-- Added `crates/stab-cli/src/tests.rs` coverage for `detect`, `--detect`, `m2d`, `--m2d`, `--append_observables`, deprecated `--prepend_observables`, `--obs_out`, `b8` input/output, `dets` default observable placement, zero-shot `detect`, observable-route conflicts, and measurement-width errors.
+- Added `crates/stab-core/src/detection.rs` tests for reference-sample subtraction, `--skip_reference_sample`, repeats, coordinate annotations, empty detectors, empty-detector circuits, invalid `rec` references, observable ids, `dets`/`hits`/`01`/`b8` writers, gauge-detector structural behavior, Pauli-target observable flips in `detect`, product-measurement frame updates, frame-path reference-sample measurement-bit cancellation, invalid frame-path feedback references, and bounded record-shape validation.
+- Added `crates/stab-cli/src/tests.rs` coverage for `detect`, `--detect`, `m2d`, `--m2d`, `--append_observables`, deprecated `--prepend_observables`, `--obs_out`, Pauli-target observable flips in `detect`, product-measurement Pauli-observable flips in `detect`, `m2d` Pauli-target conversion ignore behavior, `b8` input/output, `dets` default observable placement, zero-shot `detect`, observable-route conflicts, and measurement-width errors.
 - Added M9 exact oracle fixtures for public `detect`, public `m2d`, and reference-sample parity from `measurements_to_detection_events`.
-- Added M9 structural oracle rows for detection-event sampling and measurement-to-detection conversion subsets.
+- Added M9 structural oracle rows for detection-event sampling, Pauli-target observable frame-simulator parity, and measurement-to-detection conversion subsets.
 - Added M9 benchmark compare runners for `detect`, `m2d`, `b8`, `dets`, and generated repetition-code representative workloads.
 
 ## Implementation Areas
 
 - `crates/stab-core/src/detection.rs` owns the M9 conversion plan, reference-sample subtraction, detector and observable record construction, output writers, explicit observable placement modes, detection-sampling validation, and temporary resource limits.
+- `crates/stab-core/src/detection/frame.rs` owns the M9 scalar detector-frame path for Pauli-target observable flips in `detect`, including basis measurements, product measurements, Pauli noise, selected Clifford propagation, and explicit unsupported-instruction errors.
 - `crates/stab-core/src/result_formats.rs` now has a measurement-only `dets` reader for `m2d` so `D` and `L` tokens are not misread as measurement tokens.
 - `crates/stab-cli/src/lib.rs` implements `detect` and `m2d`, Stim legacy aliases, zero-shot `detect` behavior, observable-output routing validation, limited `m2d` input reads, and clear unsupported-scope errors for `--ran_without_feedback` and unsupported detection formats.
 - `ops/oracle` now supports `--structural` fixture filtering.
@@ -34,8 +35,8 @@ The remaining work is explicitly logged as milestone under-specification because
 | Requirement | Status | Evidence |
 | --- | --- | --- |
 | Deterministic detection oracle rows pass | Satisfied | `just oracle::run --milestone M9 --exact` |
-| Gauge-detector structural rows pass | Satisfied with manifest-only utility reports | `just oracle::run --milestone M9 --structural` |
-| Core detection tests cover coordinate shifts, repeats, observables, empty-detector circuits, and invalid measurement references | Satisfied | `cargo test -p stab-core detection` |
+| Gauge-detector and Pauli-observable structural rows pass | Satisfied with manifest-only utility reports for utility rows | `just oracle::run --milestone M9 --structural` |
+| Core detection tests cover coordinate shifts, repeats, observables, Pauli-target observable flips, empty-detector circuits, and invalid measurement references | Satisfied | `cargo test -p stab-core detection` |
 | CLI tests cover public `detect` and `m2d` workflows | Satisfied | `cargo test -p stab-cli detect`; `cargo test -p stab-cli m2d` |
 | Benchmarks report `detect` and `m2d` throughput for text and bit-packed formats | Satisfied as report-only | `just bench::compare --milestone M9` |
 
@@ -50,7 +51,7 @@ Those items are logged in `docs/plans/milestone-spec-gaps.md`.
 ## Full Code Review Outcome
 
 Full code review found compatibility and resource issues in `detect` observable placement, `m2d --in_format=dets`, zero-shot `detect`, deprecated `--prepend_observables`, top-level `--m2d`, Pauli-target observable detection, unbounded detection planning, whole-workload materialization, and duplicate sampler analysis.
-The concrete implementation issues were fixed with explicit observable output modes, measurement-only `dets` parsing, zero-shot early return, legacy alias support, observable-route validation, Pauli-target observable rejection for `detect`, bounded planning and buffering limits, limited `m2d` reads, and reference-sample reuse from the compiled sampler.
+The concrete implementation issues were fixed with explicit observable output modes, measurement-only `dets` parsing, zero-shot early return, legacy alias support, observable-route validation, scalar frame-simulator Pauli-target observable support for `detect`, product-measurement frame updates, bounded planning and buffering limits, limited `m2d` reads, and reference-sample reuse from the compiled sampler.
 
 Open M9 spec follow-ups:
 
@@ -60,12 +61,12 @@ Open M9 spec follow-ups:
 - `2026-06-27 - M9: Benchmark Baseline Completeness`
 - `2026-06-27 - M9: Detection Bit-Packed Format Scope`
 - `2026-06-27 - M9: Generated Fixture Round-Trip Coverage`
-- `2026-06-27 - M9: Pauli-Target Observable Detection Scope`
 - `2026-06-27 - M9: Detection Conversion Streaming And Scale Limits`
 
 Resolved M9 spec entry:
 
 - `2026-06-27 - M9: Structural Oracle Flag Mismatch`
+- `2026-06-27 - M9: Pauli-Target Observable Detection Scope`
 
 ## Verification Commands
 
@@ -73,9 +74,13 @@ Resolved M9 spec entry:
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo test --workspace`
 - `cargo test -p stab-core detection`
+- `cargo test -p stab-core detection_sampling`
 - `cargo test -p stab-core measure_record_reader_handles_multiple_records`
 - `cargo test -p stab-cli detect`
+- `cargo test -p stab-cli detect_supports_pauli_target_observable_flips`
+- `cargo test -p stab-cli detect_supports_product_measurements_with_pauli_observable_flips`
 - `cargo test -p stab-cli m2d`
+- `cargo test -p stab-cli m2d_ignores_pauli_target_observables_like_stim_conversion`
 - `cargo test -p stab-bench m9_benchmark_rows_have_stab_compare_runners`
 - `just oracle::matrix --check`
 - `just oracle::run --milestone M9 --exact`

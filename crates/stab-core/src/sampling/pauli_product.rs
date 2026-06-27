@@ -1,6 +1,6 @@
 use crate::{CircuitError, CircuitResult, PauliBasis};
 
-pub(super) fn normalize_terms(
+pub(crate) fn normalize_terms(
     raw_terms: Vec<(usize, PauliBasis, bool)>,
     base_inverted: bool,
 ) -> CircuitResult<(Vec<(usize, PauliBasis)>, bool)> {

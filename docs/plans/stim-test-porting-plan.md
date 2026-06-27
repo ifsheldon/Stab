@@ -258,7 +258,7 @@ src/stim/simulators/vector_simulator.test.cc
 
 Small features:
 
-- Frame simulation, tableau simulation, vector simulation, graph simulation, error analysis, error matching, DEM sampling, measurement-to-detection conversion, matched errors, and sparse reverse-frame tracking.
+- Frame simulation, frame-simulator detection-output helpers, Pauli-target observable include behavior, tableau simulation, vector simulation, graph simulation, error analysis, error matching, DEM sampling, measurement-to-detection conversion, matched errors, and sparse reverse-frame tracking.
 
 ### Stabilizers And Algebra
 
