@@ -82,8 +82,14 @@ fn run_filter_matches_exact_and_statistical_fixture_rows() {
         .iter()
         .find(|row| row.id == "m8-sample-noisy-statistical")
         .expect("M8 statistical row");
+    let structural_exact_row = manifest
+        .rows
+        .iter()
+        .find(|row| row.id == "coverage-io-measure-record-writer")
+        .expect("M8 structural exact-parity row");
 
     assert!(RunFilter::Exact.matches(exact_row));
+    assert!(RunFilter::Exact.matches(structural_exact_row));
     assert!(!RunFilter::Exact.matches(statistical_row));
     assert!(RunFilter::Statistical.matches(statistical_row));
     assert!(!RunFilter::Statistical.matches(exact_row));

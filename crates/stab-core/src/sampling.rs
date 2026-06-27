@@ -4,7 +4,8 @@ use rand::{Rng, RngExt as _, SeedableRng as _};
 use self::stabilizer_frame::{LocalTableauTransform, MeasurementRandomness, StabilizerFrame};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
-    MeasureRecordOffset, Pauli, PauliBasis, SingleQubitClifford,
+    MeasureRecordOffset, Pauli, PauliBasis, SampleFormat, SingleQubitClifford,
+    result_formats::{MeasureRecordWriter, write_ptb64_records},
 };
 
 mod stabilizer_frame;
@@ -13,15 +14,6 @@ mod stabilizer_frame;
 pub struct CompiledSampler {
     qubit_count: usize,
     operations: Vec<SampleOperation>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SampleFormat {
-    ZeroOne,
-    B8,
-    R8,
-    Hits,
-    Dets,
 }
 
 impl CompiledSampler {
@@ -81,15 +73,14 @@ impl CompiledSampler {
     ) -> Vec<u8> {
         let mut rng = sampler_rng(seed);
         let reference_sample = skip_reference_sample.then(|| self.reference_sample());
-        let mut output = Vec::new();
+        let mut writer = MeasureRecordWriter::new(format);
         for _ in 0..shots {
-            append_sample(
+            writer.write_bits(
                 &self.sample_shot_with_reference(&mut rng, reference_sample.as_deref()),
-                format,
-                &mut output,
             );
+            writer.write_end();
         }
-        output
+        writer.into_bytes()
     }
 
     pub fn sample_ptb64_bytes_with_seed(
@@ -116,7 +107,7 @@ impl CompiledSampler {
         let samples = (0..shots)
             .map(|_| self.sample_shot_with_reference(&mut rng, reference_sample.as_deref()))
             .collect::<Vec<_>>();
-        Ok(ptb64_samples(&samples))
+        Ok(write_ptb64_records(&samples))
     }
 
     fn sample_shot_with_reference<R>(&self, rng: &mut R, reference: Option<&[bool]>) -> Vec<bool>
@@ -252,96 +243,6 @@ const TWO_QUBIT_PAULI_CHANNEL_BASES: [(Option<PauliBasis>, Option<PauliBasis>); 
 
 fn sampler_rng(seed: Option<u64>) -> SmallRng {
     SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random))
-}
-
-fn append_sample(sample: &[bool], format: SampleFormat, output: &mut Vec<u8>) {
-    match format {
-        SampleFormat::ZeroOne => {
-            for bit in sample {
-                output.push(if *bit { b'1' } else { b'0' });
-            }
-        }
-        SampleFormat::B8 => append_b8_sample(sample, output),
-        SampleFormat::R8 => append_r8_sample(sample, output),
-        SampleFormat::Hits => append_hits_sample(sample, output),
-        SampleFormat::Dets => append_dets_sample(sample, output),
-    }
-    if !matches!(format, SampleFormat::B8 | SampleFormat::R8) {
-        output.push(b'\n');
-    }
-}
-
-fn append_b8_sample(sample: &[bool], output: &mut Vec<u8>) {
-    for byte_bits in sample.chunks(8) {
-        let mut byte = 0u8;
-        for (bit_index, bit) in byte_bits.iter().enumerate() {
-            if *bit {
-                byte |= 1u8 << bit_index;
-            }
-        }
-        output.push(byte);
-    }
-}
-
-fn ptb64_samples(samples: &[Vec<bool>]) -> Vec<u8> {
-    let mut output = Vec::new();
-    for shot_group in samples.chunks_exact(64) {
-        let bits_per_shot = shot_group.first().map_or(0, Vec::len);
-        for measurement_index in 0..bits_per_shot {
-            let mut word = 0u64;
-            for (shot_index, shot) in shot_group.iter().enumerate() {
-                if shot.get(measurement_index).copied().unwrap_or(false) {
-                    word |= 1u64 << shot_index;
-                }
-            }
-            output.extend_from_slice(&word.to_le_bytes());
-        }
-    }
-    output
-}
-
-fn append_r8_sample(sample: &[bool], output: &mut Vec<u8>) {
-    let mut false_run = 0u8;
-    for bit in sample.iter().copied().chain(std::iter::once(true)) {
-        if bit {
-            if false_run == u8::MAX {
-                output.push(u8::MAX);
-                false_run = 0;
-            }
-            output.push(false_run);
-            false_run = 0;
-        } else {
-            if false_run == u8::MAX {
-                output.push(u8::MAX);
-                false_run = 0;
-            }
-            false_run = false_run.saturating_add(1);
-        }
-    }
-}
-
-fn append_hits_sample(sample: &[bool], output: &mut Vec<u8>) {
-    let mut first = true;
-    for (index, bit) in sample.iter().enumerate() {
-        if !bit {
-            continue;
-        }
-        if !first {
-            output.push(b',');
-        }
-        first = false;
-        output.extend_from_slice(index.to_string().as_bytes());
-    }
-}
-
-fn append_dets_sample(sample: &[bool], output: &mut Vec<u8>) {
-    output.extend_from_slice(b"shot");
-    for (index, bit) in sample.iter().enumerate() {
-        if *bit {
-            output.extend_from_slice(b" M");
-            output.extend_from_slice(index.to_string().as_bytes());
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -41,6 +41,9 @@ pub enum CircuitError {
     #[error("cannot compile circuit sampler: {message}")]
     InvalidSamplerCompilation { message: String },
 
+    #[error("invalid result format data: {message}")]
+    InvalidResultFormat { message: String },
+
     #[error("unterminated repeat block")]
     UnterminatedRepeatBlock,
 
@@ -77,6 +80,12 @@ impl CircuitError {
 
     pub(crate) fn invalid_sampler_compilation(message: impl Into<String>) -> Self {
         Self::InvalidSamplerCompilation {
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn invalid_result_format(message: impl Into<String>) -> Self {
+        Self::InvalidResultFormat {
             message: message.into(),
         }
     }

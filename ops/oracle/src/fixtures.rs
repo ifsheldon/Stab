@@ -54,7 +54,12 @@ impl RunFilter {
 
     fn matches(self, row: &FixtureRow) -> bool {
         match self {
-            Self::Exact => row.comparator == FixtureComparator::ExactOutput,
+            Self::Exact => {
+                matches!(
+                    row.parity_mode,
+                    ParityMode::ExactOutput | ParityMode::ExactOutputAndStatistical
+                ) && row.comparator != FixtureComparator::Statistical
+            }
             Self::Statistical => row.comparator == FixtureComparator::Statistical,
         }
     }
