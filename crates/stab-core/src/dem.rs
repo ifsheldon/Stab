@@ -2,6 +2,8 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 mod analyze;
+#[cfg(test)]
+mod generated_qec_tests;
 mod graphlike;
 mod hyper;
 mod sat;
