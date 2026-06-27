@@ -104,12 +104,12 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now makes comparator imple
 
 ## 2026-06-27 - M8: Linked Simulator And Result-Format Subcase Ownership
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of M8 oracle coverage.
 Current text: M8 links the C++ Simulators group for frame, tableau, vector, and graph simulation cases that apply to sampling, and links the C++ Input And Output Formats group for measurement record formats and sparse shots.
-Gap: the milestone does not enumerate which upstream subcases are required for the public sampler milestone, which are direct Rust API compatibility tests, and which are later simulator or IO-library work. The first M8-owned result-format, count-determined-measurement, basic reference-sample-tree, and benchmark-proxy subsets are now runnable, but the simulator utility, graph/vector simulator, sparse reverse frame tracking, and optimized reference-sample construction rows remain ambiguous blockers.
+Gap: the milestone did not enumerate which upstream simulator subcases are required for the public sampler milestone, which are direct Rust API compatibility tests, and which are later simulator or IO-library work.
 Proposed amendment: split M8 acceptance into explicit subcase groups for public `stim sample` CLI parity, result writer byte layouts, result reader/parser APIs, frame/tableau sampling semantics, reference-sample behavior, and simulator-only structural utilities; require every M8-owned group to have runnable fixtures or a named deferred owner before milestone completion.
-Resolution: partially mitigated by runnable M8 result-format rows, sampler statistical rows, and Stab benchmark runners for every M8 benchmark manifest row. The upstream simulator-only rows still need a plan update that names their owner milestone or converts their M8-owned subcases into runnable tests.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md`, `oracle/compatibility-matrix.csv`, and `oracle/fixtures/manifest.csv` now scope M8 to frame/tableau sampling semantics, move detection-output helpers to M9, move sparse reverse detector-frame tracking to M10, and move graph/vector simulator internals to M12. The M8 frame and tableau simulator coverage rows are runnable through `cargo test -p stab-core sampling`.
 
 ## 2026-06-27 - M8: Benchmark Strictness And Baseline Completeness
 

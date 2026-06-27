@@ -69,13 +69,13 @@ cpp-dem-sampler,src/stim/simulators/dem_sampler.test.cc,cxx-test,sampler,stab-co
 cpp-error-analyzer,src/stim/simulators/error_analyzer.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,oracle,planned,,,M10 circuit to DEM analyzer tests
 cpp-error-matcher,src/stim/simulators/error_matcher.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,direct-rust,planned,,,M10 error matcher tests
 cpp-frame-simulator,src/stim/simulators/frame_simulator.test.cc,cxx-test,sampler,stab-core,M8,P0,exact-output-and-statistical,oracle,planned,,,M8 frame simulator sampling tests
-cpp-frame-simulator-util,src/stim/simulators/frame_simulator_util.test.cc,cxx-test,sampler,stab-core,M8,P0,structural,direct-rust,planned,,,M8 frame simulator utility tests
-cpp-graph-simulator,src/stim/simulators/graph_simulator.test.cc,cxx-test,sampler,stab-core,M8,P0,structural,direct-rust,planned,,,M8 graph simulator structural checks
+cpp-frame-simulator-util,src/stim/simulators/frame_simulator_util.test.cc,cxx-test,detector-conversion,stab-core,M9,P0,structural,direct-rust,planned,,,M9 detection simulator output utility tests
+cpp-graph-simulator,src/stim/simulators/graph_simulator.test.cc,cxx-test,sampler,stab-core,M12,P0,structural,direct-rust,planned,,,M12 internal graph-state simulator structural checks
 cpp-matched-error,src/stim/simulators/matched_error.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,direct-rust,planned,,,M10 matched error analyzer structures
 cpp-m2d,src/stim/simulators/measurements_to_detection_events.test.cc,cxx-test,detector-conversion,stab-core,M9,P0,exact-output,oracle,planned,,,M9 measurement to detection conversion tests
-cpp-sparse-rev-frame-tracker,src/stim/simulators/sparse_rev_frame_tracker.test.cc,cxx-test,sampler,stab-core,M8,P0,structural,direct-rust,planned,,,M8 sparse reverse frame tracker tests
+cpp-sparse-rev-frame-tracker,src/stim/simulators/sparse_rev_frame_tracker.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,direct-rust,planned,,,M10 sparse reverse detector frame tracker tests
 cpp-tableau-simulator,src/stim/simulators/tableau_simulator.test.cc,cxx-test,sampler,stab-core,M8,P0,structural,oracle,planned,,,M8 tableau simulator semantic tests
-cpp-vector-simulator,src/stim/simulators/vector_simulator.test.cc,cxx-test,sampler,stab-core,M8,P0,structural,direct-rust,planned,,,M8 vector simulator semantic cross-checks
+cpp-vector-simulator,src/stim/simulators/vector_simulator.test.cc,cxx-test,sampler,stab-core,M12,P0,structural,direct-rust,planned,,,M12 vector simulator semantic cross-checks
 cpp-clifford-string,src/stim/stabilizers/clifford_string.test.cc,cxx-test,pauli-string,stab-core,M6,P0,property,direct-rust,planned,,,M6 Clifford string algebra tests
 cpp-flex-pauli-string,src/stim/stabilizers/flex_pauli_string.test.cc,cxx-test,pauli-string,stab-core,M6,P0,property,direct-rust,planned,,,M6 flexible Pauli string tests
 cpp-flow,src/stim/stabilizers/flow.test.cc,cxx-test,tableau,stab-core,M6,P0,structural,direct-rust,planned,,,M6 flow and stabilizer relation tests

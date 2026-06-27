@@ -282,7 +282,8 @@ Tasks:
 
 Linked tests and benchmarks:
 
-- Direct tests: C++ Simulators group for frame, tableau, vector, and graph simulation cases that apply to sampling.
+- Direct tests: M8-owned frame and tableau sampling semantics from the C++ Simulators group.
+- Deferred simulator tests: detection-output helpers are owned by M9, sparse reverse detector-frame tracking is owned by M10, and graph/vector simulator internals are owned by M12.
 - Direct tests: C++ Input And Output Formats group for measurement record formats and sparse shots.
 - CLI tests: `src/stim/cmd/command_sample.test.cc`.
 - Semantic-mining tests: Python compiled measurement sampler, frame simulator, tableau simulator, and circuit sampling tests.
@@ -309,7 +310,7 @@ Tasks:
 
 Linked tests and benchmarks:
 
-- Direct tests: `src/stim/simulators/measurements_to_detection_events.test.cc` and related Python `measurements_to_detection_events_test.py`.
+- Direct tests: `src/stim/simulators/measurements_to_detection_events.test.cc`, M9-owned `src/stim/simulators/frame_simulator_util.test.cc` detection-output helpers, and related Python `measurements_to_detection_events_test.py`.
 - CLI tests: `src/stim/cmd/command_detect.test.cc` and `src/stim/cmd/command_m2d.test.cc`.
 - IO tests: C++ Input And Output Formats group for bit-packed and text result formats.
 - Benchmarks: `stim detect` and `stim m2d` on text and bit-packed input from the Benchmark Plan.
@@ -336,7 +337,7 @@ Tasks:
 Linked tests and benchmarks:
 
 - Direct tests: C++ Detector Error Model group.
-- Analyzer tests: `src/stim/simulators/error_analyzer.test.cc`, `src/stim/simulators/error_matcher.test.cc`, and `src/stim/util_top/circuit_to_dem.test.cc`.
+- Analyzer tests: `src/stim/simulators/error_analyzer.test.cc`, `src/stim/simulators/error_matcher.test.cc`, `src/stim/simulators/sparse_rev_frame_tracker.test.cc`, and `src/stim/util_top/circuit_to_dem.test.cc`.
 - CLI tests: `src/stim/cmd/command_analyze_errors.test.cc`.
 - Semantic-mining tests: Python detector error model, DEM instruction, DEM target, matched error, and circuit detector-error-model tests.
 - Benchmarks: `src/stim/simulators/error_analyzer.perf.cc`, `.dem` parse/print workloads, and `analyze_errors --decompose_errors` and `--fold_loops` workloads.
@@ -393,6 +394,7 @@ Linked tests and benchmarks:
 
 - Full Benchmark Plan below, including `.stim` parse/print, `gen`, tableau/Pauli primitives, `sample`, `detect`, `m2d`, `analyze_errors`, `.dem` parse/print, and `sample_dem`.
 - Benchmark source hierarchy from `docs/plans/stim-test-porting-plan.md`.
+- Internal simulator cross-checks for graph and vector simulator behavior from `src/stim/simulators/graph_simulator.test.cc` and `src/stim/simulators/vector_simulator.test.cc`.
 - All oracle suites for M4 through M11, because performance changes must preserve functional parity.
 
 Done criteria:
