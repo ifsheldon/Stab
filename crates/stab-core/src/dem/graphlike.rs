@@ -7,8 +7,11 @@ use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 
-use super::{DemDetectorId, DemInstruction, DemObservableId, DemTarget, DetectorErrorModel};
-use crate::{CircuitResult, Probability};
+use super::{
+    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemTarget,
+    DetectorErrorModel,
+};
+use crate::{CircuitError, CircuitResult, Probability};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct ObservableMask {
@@ -30,6 +33,16 @@ impl ObservableMask {
             }
         }
         Self { observables }
+    }
+
+    fn toggle(&mut self, observable: DemObservableId) {
+        if !self.observables.insert(observable) {
+            self.observables.remove(&observable);
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.observables.is_empty()
     }
 
     fn write_suffix(&self, out: &mut String) {
@@ -106,12 +119,205 @@ impl Node {
     pub(super) fn new(edges: Vec<Edge>) -> Self {
         Self { edges }
     }
+
+    fn add_edge(&mut self, edge: Edge) {
+        if !self.edges.contains(&edge) {
+            self.edges.push(edge);
+        }
+    }
 }
 
 impl Display for Node {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for edge in &self.edges {
             writeln!(f, "    {edge}")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct Graph {
+    nodes: Vec<Node>,
+    num_observables: usize,
+    distance_1_error_mask: ObservableMask,
+}
+
+impl Graph {
+    pub(super) fn new(node_count: usize, num_observables: usize) -> Self {
+        Self {
+            nodes: vec![Node::default(); node_count],
+            num_observables,
+            distance_1_error_mask: ObservableMask::new(),
+        }
+    }
+
+    pub(super) fn from_parts(
+        nodes: Vec<Node>,
+        num_observables: usize,
+        distance_1_error_mask: ObservableMask,
+    ) -> Self {
+        Self {
+            nodes,
+            num_observables,
+            distance_1_error_mask,
+        }
+    }
+
+    pub(super) fn add_outward_edge(
+        &mut self,
+        source: DemDetectorId,
+        destination: Option<DemDetectorId>,
+        observables: ObservableMask,
+    ) -> CircuitResult<()> {
+        let source_index = usize::try_from(source.get()).map_err(|_| {
+            CircuitError::invalid_detector_error_model(format!(
+                "graphlike source detector D{} does not fit usize",
+                source.get()
+            ))
+        })?;
+        let Some(node) = self.nodes.get_mut(source_index) else {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "graphlike source detector D{} is outside the graph",
+                source.get()
+            )));
+        };
+        node.add_edge(Edge::new(destination, observables));
+        Ok(())
+    }
+
+    pub(super) fn add_edges_from_targets_with_no_separators(
+        &mut self,
+        targets: &[DemTarget],
+        ignore_ungraphlike_errors: bool,
+    ) -> CircuitResult<()> {
+        let mut detectors = Vec::new();
+        let mut observables = ObservableMask::new();
+        for target in targets {
+            match *target {
+                DemTarget::RelativeDetector(detector) => {
+                    if detectors.len() == 2 {
+                        if ignore_ungraphlike_errors {
+                            return Ok(());
+                        }
+                        return Err(CircuitError::invalid_detector_error_model(
+                            "The detector error model contained a non-graphlike error mechanism.\nYou can ignore such errors using `ignore_ungraphlike_errors`.\nYou can use `decompose_errors` when converting a circuit into a model to ensure no such errors are present.",
+                        ));
+                    }
+                    detectors.push(detector);
+                }
+                DemTarget::LogicalObservable(observable) => observables.toggle(observable),
+                DemTarget::Separator | DemTarget::Numeric(_) => {}
+            }
+        }
+
+        match detectors.as_slice() {
+            [detector] => self.add_outward_edge(*detector, None, observables)?,
+            [left, right] => {
+                self.add_outward_edge(*left, Some(*right), observables.clone())?;
+                self.add_outward_edge(*right, Some(*left), observables)?;
+            }
+            [] if self.distance_1_error_mask.is_empty() && !observables.is_empty() => {
+                self.distance_1_error_mask = observables;
+            }
+            [] => {}
+            _ => unreachable!("detector count was limited above"),
+        }
+        Ok(())
+    }
+
+    pub(super) fn add_edges_from_separable_targets(
+        &mut self,
+        targets: &[DemTarget],
+        ignore_ungraphlike_errors: bool,
+    ) -> CircuitResult<()> {
+        let mut start = 0;
+        for (index, target) in targets.iter().enumerate() {
+            if matches!(target, DemTarget::Separator) {
+                if ignore_ungraphlike_errors {
+                    return Ok(());
+                }
+                let component = targets.get(start..index).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "graphlike target component range is invalid",
+                    )
+                })?;
+                self.add_edges_from_targets_with_no_separators(component, false)?;
+                start = index + 1;
+            }
+        }
+        let component = targets.get(start..).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "graphlike target component range is invalid",
+            )
+        })?;
+        self.add_edges_from_targets_with_no_separators(component, ignore_ungraphlike_errors)
+    }
+
+    pub(super) fn from_dem(
+        model: &DetectorErrorModel,
+        ignore_ungraphlike_errors: bool,
+    ) -> CircuitResult<Self> {
+        let node_count = usize::try_from(model.count_detectors()?).map_err(|_| {
+            CircuitError::invalid_detector_error_model("detector count does not fit usize")
+        })?;
+        let num_observables = usize::try_from(model.count_observables()?).map_err(|_| {
+            CircuitError::invalid_detector_error_model("observable count does not fit usize")
+        })?;
+        let mut graph = Self::new(node_count, num_observables);
+        graph.add_flattened_dem(model, 0, ignore_ungraphlike_errors)?;
+        Ok(graph)
+    }
+
+    fn add_flattened_dem(
+        &mut self,
+        model: &DetectorErrorModel,
+        mut detector_offset: u64,
+        ignore_ungraphlike_errors: bool,
+    ) -> CircuitResult<u64> {
+        for item in model.items() {
+            match item {
+                DemItem::Instruction(instruction) => match instruction.kind() {
+                    DemInstructionKind::Error => {
+                        if instruction.args().first().copied().unwrap_or(0.0) != 0.0 {
+                            let shifted = shifted_targets(instruction.targets(), detector_offset)?;
+                            self.add_edges_from_separable_targets(
+                                &shifted,
+                                ignore_ungraphlike_errors,
+                            )?;
+                        }
+                    }
+                    DemInstructionKind::ShiftDetectors => {
+                        detector_offset = detector_offset
+                            .checked_add(instruction.detector_shift()?)
+                            .ok_or_else(|| {
+                                CircuitError::invalid_detector_error_model(
+                                    "graphlike detector offset overflowed",
+                                )
+                            })?;
+                    }
+                    DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
+                },
+                DemItem::RepeatBlock(repeat) => {
+                    for _ in 0..repeat.repeat_count().get() {
+                        detector_offset = self.add_flattened_dem(
+                            repeat.body(),
+                            detector_offset,
+                            ignore_ungraphlike_errors,
+                        )?;
+                    }
+                }
+            }
+        }
+        Ok(detector_offset)
+    }
+}
+
+impl Display for Graph {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for (index, node) in self.nodes.iter().enumerate() {
+            writeln!(f, "{index}:")?;
+            write!(f, "{node}")?;
         }
         Ok(())
     }
@@ -257,6 +463,26 @@ fn format_observable(observable: DemObservableId) -> String {
     format!("L{}", observable.get())
 }
 
+fn shifted_targets(targets: &[DemTarget], detector_offset: u64) -> CircuitResult<Vec<DemTarget>> {
+    targets
+        .iter()
+        .map(|target| match *target {
+            DemTarget::RelativeDetector(detector) => DemTarget::relative_detector(
+                detector_offset.checked_add(detector.get()).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "graphlike detector target overflowed",
+                    )
+                })?,
+            ),
+            DemTarget::LogicalObservable(observable) => {
+                DemTarget::logical_observable(observable.get())
+            }
+            DemTarget::Separator => Ok(DemTarget::separator()),
+            DemTarget::Numeric(value) => Ok(DemTarget::numeric(value)),
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(
@@ -334,6 +560,337 @@ mod tests {
         assert_eq!(n2, n2);
         assert_eq!(n3, n3);
         assert_ne!(n1, n3);
+    }
+
+    #[test]
+    fn graphlike_graph_equality_matches_upstream() {
+        assert_eq!(Graph::new(1, 5), Graph::new(1, 5));
+        assert_ne!(Graph::new(1, 5), Graph::new(2, 5));
+        assert_ne!(Graph::new(1, 5), Graph::new(1, 4));
+
+        let a = Graph::new(1, 5);
+        let mut b = Graph::new(1, 5);
+        assert_eq!(a, b);
+        b.distance_1_error_mask = obs_mask(1);
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn graphlike_graph_add_outward_edge_matches_upstream() {
+        let mut g = Graph::new(3, 64);
+
+        g.add_outward_edge(detector(1), Some(detector(2)), obs_mask(3))
+            .unwrap();
+        assert_eq!(
+            g,
+            Graph::from_parts(
+                vec![
+                    Node::default(),
+                    Node::new(vec![Edge::new(Some(detector(2)), obs_mask(3))]),
+                    Node::default(),
+                ],
+                64,
+                obs_mask(0),
+            )
+        );
+
+        g.add_outward_edge(detector(1), Some(detector(2)), obs_mask(3))
+            .unwrap();
+        assert_eq!(
+            g,
+            Graph::from_parts(
+                vec![
+                    Node::default(),
+                    Node::new(vec![Edge::new(Some(detector(2)), obs_mask(3))]),
+                    Node::default(),
+                ],
+                64,
+                obs_mask(0),
+            )
+        );
+
+        g.add_outward_edge(detector(1), Some(detector(2)), obs_mask(4))
+            .unwrap();
+        assert_eq!(
+            g,
+            Graph::from_parts(
+                vec![
+                    Node::default(),
+                    Node::new(vec![
+                        Edge::new(Some(detector(2)), obs_mask(3)),
+                        Edge::new(Some(detector(2)), obs_mask(4)),
+                    ]),
+                    Node::default(),
+                ],
+                64,
+                obs_mask(0),
+            )
+        );
+
+        g.add_outward_edge(detector(2), Some(detector(1)), obs_mask(3))
+            .unwrap();
+        assert_eq!(
+            g,
+            Graph::from_parts(
+                vec![
+                    Node::default(),
+                    Node::new(vec![
+                        Edge::new(Some(detector(2)), obs_mask(3)),
+                        Edge::new(Some(detector(2)), obs_mask(4)),
+                    ]),
+                    Node::new(vec![Edge::new(Some(detector(1)), obs_mask(3))]),
+                ],
+                64,
+                obs_mask(0),
+            )
+        );
+
+        g.add_outward_edge(detector(2), None, obs_mask(3)).unwrap();
+        assert_eq!(
+            g,
+            Graph::from_parts(
+                vec![
+                    Node::default(),
+                    Node::new(vec![
+                        Edge::new(Some(detector(2)), obs_mask(3)),
+                        Edge::new(Some(detector(2)), obs_mask(4)),
+                    ]),
+                    Node::new(vec![
+                        Edge::new(Some(detector(1)), obs_mask(3)),
+                        Edge::new(None, obs_mask(3)),
+                    ]),
+                ],
+                64,
+                obs_mask(0),
+            )
+        );
+    }
+
+    #[test]
+    fn graphlike_graph_add_edges_from_targets_with_no_separators_matches_upstream() {
+        let mut g = Graph::new(4, 64);
+
+        g.add_edges_from_targets_with_no_separators(
+            &[DemTarget::relative_detector(1).unwrap()],
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            g,
+            Graph::from_parts(
+                vec![
+                    Node::default(),
+                    Node::new(vec![Edge::new(None, obs_mask(0))]),
+                    Node::default(),
+                    Node::default(),
+                ],
+                64,
+                obs_mask(0),
+            )
+        );
+
+        g.add_edges_from_targets_with_no_separators(
+            &[
+                DemTarget::relative_detector(1).unwrap(),
+                DemTarget::relative_detector(3).unwrap(),
+                DemTarget::logical_observable(5).unwrap(),
+            ],
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            g,
+            Graph::from_parts(
+                vec![
+                    Node::default(),
+                    Node::new(vec![
+                        Edge::new(None, obs_mask(0)),
+                        Edge::new(Some(detector(3)), obs_mask(32)),
+                    ]),
+                    Node::default(),
+                    Node::new(vec![Edge::new(Some(detector(1)), obs_mask(32))]),
+                ],
+                64,
+                obs_mask(0),
+            )
+        );
+
+        g.add_edges_from_targets_with_no_separators(
+            &[
+                DemTarget::logical_observable(3).unwrap(),
+                DemTarget::logical_observable(7).unwrap(),
+            ],
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            g,
+            Graph::from_parts(
+                vec![
+                    Node::default(),
+                    Node::new(vec![
+                        Edge::new(None, obs_mask(0)),
+                        Edge::new(Some(detector(3)), obs_mask(32)),
+                    ]),
+                    Node::default(),
+                    Node::new(vec![Edge::new(Some(detector(1)), obs_mask(32))]),
+                ],
+                64,
+                obs_mask((1 << 3) + (1 << 7)),
+            )
+        );
+
+        let too_big = [
+            DemTarget::relative_detector(1).unwrap(),
+            DemTarget::relative_detector(2).unwrap(),
+            DemTarget::relative_detector(3).unwrap(),
+        ];
+        let mut same_g = g.clone();
+        assert!(
+            same_g
+                .add_edges_from_targets_with_no_separators(&too_big, false)
+                .is_err()
+        );
+        assert_eq!(g, same_g);
+        same_g
+            .add_edges_from_targets_with_no_separators(&too_big, true)
+            .unwrap();
+        assert_eq!(g, same_g);
+    }
+
+    #[test]
+    fn graphlike_graph_string_matches_upstream() {
+        let graph = Graph::from_parts(
+            vec![
+                Node::default(),
+                Node::new(vec![
+                    Edge::new(None, obs_mask(0)),
+                    Edge::new(Some(detector(3)), obs_mask(32)),
+                ]),
+                Node::default(),
+                Node::new(vec![Edge::new(Some(detector(1)), obs_mask(32))]),
+            ],
+            64,
+            obs_mask(0),
+        );
+        assert_eq!(
+            graph.to_string(),
+            "0:\n1:\n    [boundary]\n    D3 L5\n2:\n3:\n    D1 L5\n"
+        );
+    }
+
+    #[test]
+    fn graphlike_graph_add_edges_from_separable_targets_matches_upstream() {
+        let mut g = Graph::new(4, 64);
+
+        g.add_edges_from_separable_targets(
+            &[
+                DemTarget::relative_detector(1).unwrap(),
+                DemTarget::separator(),
+                DemTarget::relative_detector(1).unwrap(),
+                DemTarget::relative_detector(2).unwrap(),
+                DemTarget::logical_observable(4).unwrap(),
+            ],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(
+            g,
+            Graph::from_parts(
+                vec![
+                    Node::default(),
+                    Node::new(vec![
+                        Edge::new(None, obs_mask(0)),
+                        Edge::new(Some(detector(2)), obs_mask(16)),
+                    ]),
+                    Node::new(vec![Edge::new(Some(detector(1)), obs_mask(16))]),
+                    Node::default(),
+                ],
+                64,
+                obs_mask(0),
+            )
+        );
+    }
+
+    #[test]
+    fn graphlike_graph_from_dem_matches_upstream() {
+        let model = DetectorErrorModel::from_dem_str(
+            "error(0.1) D0\n\
+             repeat 3 {\n\
+                 error(0.1) D0 D1\n\
+                 shift_detectors 1\n\
+             }\n\
+             error(0.1) D0 L7\n\
+             error(0.1) D2 ^ D3 D4 L2\n\
+             detector D5\n",
+        )
+        .unwrap();
+
+        assert_eq!(
+            Graph::from_dem(&model, false).unwrap(),
+            Graph::from_parts(
+                vec![
+                    Node::new(vec![
+                        Edge::new(None, obs_mask(0)),
+                        Edge::new(Some(detector(1)), obs_mask(0)),
+                    ]),
+                    Node::new(vec![
+                        Edge::new(Some(detector(0)), obs_mask(0)),
+                        Edge::new(Some(detector(2)), obs_mask(0)),
+                    ]),
+                    Node::new(vec![
+                        Edge::new(Some(detector(1)), obs_mask(0)),
+                        Edge::new(Some(detector(3)), obs_mask(0)),
+                    ]),
+                    Node::new(vec![
+                        Edge::new(Some(detector(2)), obs_mask(0)),
+                        Edge::new(None, obs_mask(128)),
+                    ]),
+                    Node::default(),
+                    Node::new(vec![Edge::new(None, obs_mask(0))]),
+                    Node::new(vec![Edge::new(Some(detector(7)), obs_mask(4))]),
+                    Node::new(vec![Edge::new(Some(detector(6)), obs_mask(4))]),
+                    Node::default(),
+                ],
+                8,
+                obs_mask(0),
+            )
+        );
+    }
+
+    #[test]
+    fn graphlike_graph_add_edges_from_separable_targets_ignore_matches_upstream() {
+        let mut actual = Graph::new(10, 64);
+        let mut expected = Graph::new(10, 64);
+        let dem = DetectorErrorModel::from_dem_str("error(0.125) D0 ^ D4 D6\n").unwrap();
+        let targets = dem
+            .items()
+            .first()
+            .and_then(|item| match item {
+                DemItem::Instruction(instruction) => Some(instruction.targets()),
+                DemItem::RepeatBlock(_) => None,
+            })
+            .expect("DEM input parsed to an instruction");
+
+        assert_eq!(actual, expected);
+        actual
+            .add_edges_from_separable_targets(targets, true)
+            .unwrap();
+        assert_eq!(actual, expected);
+        actual
+            .add_edges_from_separable_targets(targets, false)
+            .unwrap();
+        expected
+            .add_outward_edge(detector(4), Some(detector(6)), obs_mask(0))
+            .unwrap();
+        expected
+            .add_outward_edge(detector(6), Some(detector(4)), obs_mask(0))
+            .unwrap();
+        expected
+            .add_outward_edge(detector(0), None, obs_mask(0))
+            .unwrap();
+        assert_eq!(actual, expected);
     }
 
     #[test]
