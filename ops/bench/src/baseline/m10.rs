@@ -1,8 +1,9 @@
 use std::hint::black_box;
 
 use stab_core::{
-    Circuit, DetectorErrorModel, ErrorAnalyzerOptions, circuit_to_detector_error_model,
-    shortest_graphlike_undetectable_logical_error,
+    Circuit, CodeDistance, DetectorErrorModel, ErrorAnalyzerOptions, Probability, RoundCount,
+    SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
+    generate_surface_code_circuit, shortest_graphlike_undetectable_logical_error,
 };
 
 use crate::error::BenchError;
@@ -17,6 +18,9 @@ const ANALYZE_BASIC_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/analyze_errors_basic.stim");
 const ANALYZE_FOLD_REPEAT_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/analyze_errors_fold_repeat.stim");
+const ERROR_ANALYZER_COMPARE_ITERATIONS: usize = 16;
+const ERROR_ANALYZER_ROUNDS: u32 = 3;
+const ERROR_ANALYZER_DISTANCE: u32 = 3;
 const GRAPHLIKE_SEARCH_DETECTORS: u64 = 128;
 const GRAPHLIKE_SEARCH_GRAPH_EDGES: f64 = (GRAPHLIKE_SEARCH_DETECTORS * 2) as f64;
 
@@ -25,6 +29,7 @@ pub(super) fn run_dem_compare_row(
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
         "m10-graphlike-search" => run_graphlike_search_row(row).map(Some),
+        "m10-error-analyzer" => run_error_analyzer_row(row).map(Some),
         "m10-dem-parse-contract" => run_dem_parse_row(row).map(Some),
         "m10-dem-print-contract" => run_dem_print_row(row).map(Some),
         "m10-analyze-errors-decompose-cli" => run_analyze_decompose_row(row).map(Some),
@@ -49,6 +54,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("m10-analyze-errors-decompose-cli", "stab_analyze_errors_decompose_basic") => {
             Some((1.0, "circuits/s"))
         }
+        ("m10-error-analyzer", "stab_error_analyzer_surface_code") => {
+            Some((error_analyzer_detector_count(), "detectors/s"))
+        }
         ("m10-graphlike-search", "stab_graphlike_search_chain") => {
             Some((GRAPHLIKE_SEARCH_GRAPH_EDGES, "graphlike-edges/s"))
         }
@@ -66,6 +74,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m10-analyze-errors-decompose-cli" => Some(
             "contract-representative: Stab measures in-process analyze_errors --decompose_errors on the pinned basic CLI fixture; deeper decomposition stress remains covered by the m10-error-decomp contract",
+        ),
+        "m10-error-analyzer" => Some(
+            "contract-representative: Stab measures in-process generated rotated-memory-z surface-code analysis at d3/r3; the upstream Stim perf row uses d11/r100 and remains the eventual scale target",
         ),
         "m10-graphlike-search" => Some(
             "contract-representative: Stab measures in-process shortest graphlike logical-error search on a deterministic chain DEM",
@@ -143,6 +154,20 @@ fn run_analyze_decompose_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Ben
     )?])
 }
 
+fn run_error_analyzer_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = error_analyzer_surface_code(&row.id)?;
+    Ok(vec![measure_stab_iterations(
+        "stab_error_analyzer_surface_code",
+        ERROR_ANALYZER_COMPARE_ITERATIONS,
+        || {
+            let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(dem.items().len());
+            Ok(())
+        },
+    )?])
+}
+
 fn run_graphlike_search_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let model = graphlike_search_model(&row.id)?;
     Ok(vec![measure_stab_iterations(
@@ -155,6 +180,31 @@ fn run_graphlike_search_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Benc
             Ok(())
         },
     )?])
+}
+
+fn error_analyzer_surface_code(row_id: &str) -> Result<Circuit, BenchError> {
+    let probability =
+        Probability::try_new(0.001).map_err(|error| stab_runner_error(row_id, error))?;
+    let params = SurfaceCodeParams::new(
+        RoundCount::try_new(u64::from(ERROR_ANALYZER_ROUNDS))
+            .map_err(|error| stab_runner_error(row_id, error))?,
+        CodeDistance::try_new(ERROR_ANALYZER_DISTANCE)
+            .map_err(|error| stab_runner_error(row_id, error))?,
+        SurfaceCodeTask::RotatedMemoryZ,
+    )
+    .map_err(|error| stab_runner_error(row_id, error))?
+    .with_before_measure_flip_probability(probability)
+    .with_after_reset_flip_probability(probability)
+    .with_after_clifford_depolarization(probability);
+    let generated =
+        generate_surface_code_circuit(&params).map_err(|error| stab_runner_error(row_id, error))?;
+    Ok(generated.circuit().clone())
+}
+
+fn error_analyzer_detector_count() -> f64 {
+    let distance = ERROR_ANALYZER_DISTANCE as f64;
+    let rounds = ERROR_ANALYZER_ROUNDS as f64;
+    (distance * distance - 1.0) * rounds
 }
 
 fn graphlike_search_model(row_id: &str) -> Result<DetectorErrorModel, BenchError> {
