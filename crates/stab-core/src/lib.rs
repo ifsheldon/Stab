@@ -12,6 +12,7 @@ mod circuit_tableau;
 mod dem;
 mod detection;
 mod error;
+mod error_matcher;
 mod gate;
 mod ids;
 mod matched_error;
@@ -49,6 +50,7 @@ pub use detection::{
     validate_detection_sampling_circuit, write_detection_records, write_observable_records,
 };
 pub use error::{CircuitError, CircuitResult};
+pub use error_matcher::explain_errors_from_circuit;
 pub use gate::{Gate, GateCategory};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};
 pub use matched_error::{

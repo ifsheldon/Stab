@@ -348,7 +348,7 @@ impl DemInstruction {
         self.tag.as_deref()
     }
 
-    fn detector_shift(&self) -> CircuitResult<u64> {
+    pub(crate) fn detector_shift(&self) -> CircuitResult<u64> {
         if self.kind != DemInstructionKind::ShiftDetectors {
             return Err(CircuitError::invalid_detector_error_model(
                 "non-shift instruction has no detector shift",

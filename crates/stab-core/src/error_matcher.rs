@@ -1,0 +1,924 @@
+use std::collections::{BTreeMap, BTreeSet};
+
+use crate::{
+    Circuit, CircuitError, CircuitErrorLocation, CircuitErrorLocationStackFrame,
+    CircuitInstruction, CircuitItem, CircuitResult, CircuitTargetsInsideInstruction, DemItem,
+    DemTarget, DetectorErrorModel, ErrorAnalyzerOptions, ExplainedError, FlippedMeasurement, Gate,
+    GateTargetWithCoords, Pauli, Probability, QubitId, RepeatBlock, Target,
+    circuit_to_detector_error_model,
+};
+
+pub fn explain_errors_from_circuit(
+    circuit: &Circuit,
+    filter: Option<&DetectorErrorModel>,
+    reduce_to_one_representative_error: bool,
+) -> CircuitResult<Vec<ExplainedError>> {
+    let detector_coords = detector_coordinates(circuit)?;
+    let filter_keys = filter
+        .map(error_keys_from_dem)
+        .transpose()?
+        .unwrap_or_default();
+    let allow_new_entries = filter.is_none();
+    let mut output = BTreeMap::new();
+    for key in filter_keys {
+        output.entry(key).or_insert_with(|| ExplainedError {
+            dem_error_terms: Vec::new(),
+            circuit_error_locations: Vec::new(),
+        });
+    }
+
+    for candidate in CandidateCollector::new(circuit)?.collect()? {
+        let candidate_circuit = isolate_candidate(circuit, &candidate)?;
+        let candidate_dem = circuit_to_detector_error_model(
+            &candidate_circuit,
+            ErrorAnalyzerOptions {
+                approximate_disjoint_errors_threshold: Some(Probability::try_new(1.0)?),
+                ..ErrorAnalyzerOptions::default()
+            },
+        )?;
+        for key in error_keys_from_dem(&candidate_dem)? {
+            if key.is_empty() {
+                continue;
+            }
+            let entry_exists = output.contains_key(&key);
+            if !allow_new_entries && !entry_exists {
+                continue;
+            }
+            let entry = output.entry(key).or_insert_with(|| ExplainedError {
+                dem_error_terms: Vec::new(),
+                circuit_error_locations: Vec::new(),
+            });
+            add_location(
+                entry,
+                candidate.location.clone(),
+                reduce_to_one_representative_error,
+            );
+        }
+    }
+
+    let mut result = Vec::new();
+    for (key, mut explained) in output {
+        explained.fill_in_dem_targets(&key, &detector_coords);
+        result.push(explained);
+    }
+    Ok(result)
+}
+
+fn add_location(
+    explained: &mut ExplainedError,
+    mut location: CircuitErrorLocation,
+    reduce_to_one_representative_error: bool,
+) {
+    location.canonicalize();
+    if explained.circuit_error_locations.is_empty() || !reduce_to_one_representative_error {
+        explained.circuit_error_locations.push(location);
+    } else if let Some(existing) = explained.circuit_error_locations.first_mut()
+        && location.is_simpler_than(existing)
+    {
+        *existing = location;
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ErrorCandidate {
+    instruction_offset: usize,
+    target_range_start: usize,
+    target_range_end: usize,
+    replacement: CandidateReplacement,
+    location: CircuitErrorLocation,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum CandidateReplacement {
+    Noise { gate_name: Option<&'static str> },
+    Measurement,
+}
+
+struct CandidateCollector<'a> {
+    circuit: &'a Circuit,
+    state: ScanState,
+}
+
+impl<'a> CandidateCollector<'a> {
+    fn new(circuit: &'a Circuit) -> CircuitResult<Self> {
+        Ok(Self {
+            circuit,
+            state: ScanState::default(),
+        })
+    }
+
+    fn collect(mut self) -> CircuitResult<Vec<ErrorCandidate>> {
+        let mut candidates = Vec::new();
+        for (instruction_offset, item) in self.circuit.items().iter().enumerate() {
+            match item {
+                CircuitItem::Instruction(instruction) => {
+                    self.collect_instruction_candidates(
+                        instruction_offset,
+                        instruction,
+                        &mut candidates,
+                    )?;
+                    self.state.apply_instruction(instruction)?;
+                }
+                CircuitItem::RepeatBlock(repeat) => self.state.apply_repeat(repeat)?,
+            }
+        }
+        Ok(candidates)
+    }
+
+    fn collect_instruction_candidates(
+        &self,
+        instruction_offset: usize,
+        instruction: &CircuitInstruction,
+        candidates: &mut Vec<ErrorCandidate>,
+    ) -> CircuitResult<()> {
+        let gate_name = instruction.gate().canonical_name();
+        match gate_name {
+            "X_ERROR" => self.collect_single_qubit_pauli_errors(
+                instruction_offset,
+                instruction,
+                Pauli::X,
+                candidates,
+            ),
+            "Y_ERROR" => self.collect_single_qubit_pauli_errors(
+                instruction_offset,
+                instruction,
+                Pauli::Y,
+                candidates,
+            ),
+            "Z_ERROR" => self.collect_single_qubit_pauli_errors(
+                instruction_offset,
+                instruction,
+                Pauli::Z,
+                candidates,
+            ),
+            "E" | "CORRELATED_ERROR" | "ELSE_CORRELATED_ERROR" => {
+                self.collect_correlated_error(instruction_offset, instruction, candidates)
+            }
+            "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => {
+                self.collect_single_measurement_errors(instruction_offset, instruction, candidates)
+            }
+            "MXX" | "MYY" | "MZZ" => {
+                self.collect_pair_measurement_errors(instruction_offset, instruction, candidates)
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn collect_single_qubit_pauli_errors(
+        &self,
+        instruction_offset: usize,
+        instruction: &CircuitInstruction,
+        pauli: Pauli,
+        candidates: &mut Vec<ErrorCandidate>,
+    ) -> CircuitResult<()> {
+        if instruction
+            .probability_argument()?
+            .is_none_or(|probability| probability.get() == 0.0)
+        {
+            return Ok(());
+        }
+        for (target_index, target) in instruction.targets().iter().enumerate() {
+            let Some(qubit) = target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{} target {target} is not a qubit",
+                    instruction.gate().canonical_name()
+                )));
+            };
+            let flipped_pauli_product = vec![self.pauli_with_coords(pauli, qubit)?];
+            candidates.push(ErrorCandidate {
+                instruction_offset,
+                target_range_start: target_index,
+                target_range_end: target_index + 1,
+                replacement: CandidateReplacement::Noise { gate_name: None },
+                location: self.location(
+                    instruction,
+                    instruction_offset,
+                    target_index,
+                    target_index + 1,
+                    flipped_pauli_product,
+                    FlippedMeasurement::none(),
+                )?,
+            });
+        }
+        Ok(())
+    }
+
+    fn collect_correlated_error(
+        &self,
+        instruction_offset: usize,
+        instruction: &CircuitInstruction,
+        candidates: &mut Vec<ErrorCandidate>,
+    ) -> CircuitResult<()> {
+        if instruction
+            .probability_argument()?
+            .is_none_or(|probability| probability.get() == 0.0)
+        {
+            return Ok(());
+        }
+        let flipped_pauli_product = self.resolve_targets_with_coords(instruction.targets())?;
+        let gate_name =
+            (instruction.gate().canonical_name() == "ELSE_CORRELATED_ERROR").then_some("E");
+        candidates.push(ErrorCandidate {
+            instruction_offset,
+            target_range_start: 0,
+            target_range_end: instruction.targets().len(),
+            replacement: CandidateReplacement::Noise { gate_name },
+            location: self.location(
+                instruction,
+                instruction_offset,
+                0,
+                instruction.targets().len(),
+                flipped_pauli_product,
+                FlippedMeasurement::none(),
+            )?,
+        });
+        Ok(())
+    }
+
+    fn collect_single_measurement_errors(
+        &self,
+        instruction_offset: usize,
+        instruction: &CircuitInstruction,
+        candidates: &mut Vec<ErrorCandidate>,
+    ) -> CircuitResult<()> {
+        if instruction
+            .probability_argument()?
+            .is_none_or(|probability| probability.get() == 0.0)
+        {
+            return Ok(());
+        }
+        let basis = measurement_basis(instruction.gate().canonical_name()).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model("unknown measurement basis")
+        })?;
+        for (target_index, target) in instruction.targets().iter().enumerate() {
+            let Some(qubit) = target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{} target {target} is not a qubit",
+                    instruction.gate().canonical_name()
+                )));
+            };
+            let measurement_record_index = self
+                .state
+                .measurement_count
+                .checked_add(target_index)
+                .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("measurement index overflowed")
+            })?;
+            candidates.push(ErrorCandidate {
+                instruction_offset,
+                target_range_start: target_index,
+                target_range_end: target_index + 1,
+                replacement: CandidateReplacement::Measurement,
+                location: self.location(
+                    instruction,
+                    instruction_offset,
+                    target_index,
+                    target_index + 1,
+                    Vec::new(),
+                    FlippedMeasurement {
+                        measurement_record_index: Some(
+                            u64::try_from(measurement_record_index).map_err(|_| {
+                                CircuitError::invalid_detector_error_model(
+                                    "measurement index does not fit u64",
+                                )
+                            })?,
+                        ),
+                        measured_observable: vec![self.pauli_with_coords(basis, qubit)?],
+                    },
+                )?,
+            });
+        }
+        Ok(())
+    }
+
+    fn collect_pair_measurement_errors(
+        &self,
+        instruction_offset: usize,
+        instruction: &CircuitInstruction,
+        candidates: &mut Vec<ErrorCandidate>,
+    ) -> CircuitResult<()> {
+        if instruction
+            .probability_argument()?
+            .is_none_or(|probability| probability.get() == 0.0)
+        {
+            return Ok(());
+        }
+        let basis =
+            pair_measurement_basis(instruction.gate().canonical_name()).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("unknown pair measurement basis")
+            })?;
+        for (group_index, group) in instruction.target_groups().iter().enumerate() {
+            let [left, right] = *group else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{} expected paired targets during error matching",
+                    instruction.gate().canonical_name()
+                )));
+            };
+            let Some(left) = left.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{} target {left} is not a qubit",
+                    instruction.gate().canonical_name()
+                )));
+            };
+            let Some(right) = right.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{} target {right} is not a qubit",
+                    instruction.gate().canonical_name()
+                )));
+            };
+            let target_range_start = group_index.checked_mul(2).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("target range overflowed")
+            })?;
+            let target_range_end = target_range_start.checked_add(2).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("target range overflowed")
+            })?;
+            let measurement_record_index = self
+                .state
+                .measurement_count
+                .checked_add(group_index)
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model("measurement index overflowed")
+                })?;
+            candidates.push(ErrorCandidate {
+                instruction_offset,
+                target_range_start,
+                target_range_end,
+                replacement: CandidateReplacement::Measurement,
+                location: self.location(
+                    instruction,
+                    instruction_offset,
+                    target_range_start,
+                    target_range_end,
+                    Vec::new(),
+                    FlippedMeasurement {
+                        measurement_record_index: Some(
+                            u64::try_from(measurement_record_index).map_err(|_| {
+                                CircuitError::invalid_detector_error_model(
+                                    "measurement index does not fit u64",
+                                )
+                            })?,
+                        ),
+                        measured_observable: vec![
+                            self.pauli_with_coords(basis, left)?,
+                            self.pauli_with_coords(basis, right)?,
+                        ],
+                    },
+                )?,
+            });
+        }
+        Ok(())
+    }
+
+    fn location(
+        &self,
+        instruction: &CircuitInstruction,
+        instruction_offset: usize,
+        target_range_start: usize,
+        target_range_end: usize,
+        flipped_pauli_product: Vec<GateTargetWithCoords>,
+        flipped_measurement: FlippedMeasurement,
+    ) -> CircuitResult<CircuitErrorLocation> {
+        let mut instruction_targets = CircuitTargetsInsideInstruction {
+            gate: None,
+            gate_tag: None,
+            args: Vec::new(),
+            target_range_start,
+            target_range_end,
+            targets_in_range: Vec::new(),
+        };
+        instruction_targets
+            .fill_args_and_targets_in_range(instruction, &self.state.qubit_coords)?;
+        Ok(CircuitErrorLocation {
+            noise_tag: instruction.tag().map(ToOwned::to_owned),
+            tick_offset: self.state.tick_count,
+            flipped_pauli_product,
+            flipped_measurement,
+            instruction_targets,
+            stack_frames: vec![CircuitErrorLocationStackFrame {
+                instruction_offset: u64::try_from(instruction_offset).map_err(|_| {
+                    CircuitError::invalid_detector_error_model(
+                        "instruction offset does not fit u64",
+                    )
+                })?,
+                iteration_index: 0,
+                instruction_repetitions_arg: 0,
+            }],
+        })
+    }
+
+    fn pauli_with_coords(
+        &self,
+        pauli: Pauli,
+        qubit: QubitId,
+    ) -> CircuitResult<GateTargetWithCoords> {
+        Ok(GateTargetWithCoords {
+            gate_target: Target::pauli(pauli, qubit, false),
+            coords: self
+                .state
+                .qubit_coords
+                .get(&u64::from(qubit.get()))
+                .cloned()
+                .unwrap_or_default(),
+        })
+    }
+
+    fn resolve_targets_with_coords(
+        &self,
+        targets: &[Target],
+    ) -> CircuitResult<Vec<GateTargetWithCoords>> {
+        let mut result = Vec::new();
+        for target in targets {
+            if target.is_combiner() {
+                continue;
+            }
+            let coords = target
+                .qubit_id()
+                .and_then(|qubit| self.state.qubit_coords.get(&u64::from(qubit.get())))
+                .cloned()
+                .unwrap_or_default();
+            result.push(GateTargetWithCoords {
+                gate_target: target.clone(),
+                coords,
+            });
+        }
+        Ok(result)
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct ScanState {
+    tick_count: u64,
+    measurement_count: usize,
+    detector_count: u64,
+    coord_offset: Vec<f64>,
+    qubit_coords: BTreeMap<u64, Vec<f64>>,
+    detector_coords: BTreeMap<u64, Vec<f64>>,
+}
+
+impl ScanState {
+    fn apply_repeat(&mut self, repeat: &RepeatBlock) -> CircuitResult<()> {
+        for _ in 0..repeat.repeat_count().get() {
+            for item in repeat.body().items() {
+                match item {
+                    CircuitItem::Instruction(instruction) => self.apply_instruction(instruction)?,
+                    CircuitItem::RepeatBlock(nested) => self.apply_repeat(nested)?,
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        match instruction.gate().canonical_name() {
+            "TICK" => {
+                self.tick_count = self.tick_count.checked_add(1).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model("tick count overflowed")
+                })?;
+            }
+            "QUBIT_COORDS" => self.apply_qubit_coords(instruction)?,
+            "SHIFT_COORDS" => self.apply_shift_coords(instruction),
+            "DETECTOR" => self.apply_detector(instruction)?,
+            name if produces_single_measurements(name) => {
+                self.measurement_count = self
+                    .measurement_count
+                    .checked_add(instruction.targets().len())
+                    .ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model("measurement count overflowed")
+                    })?;
+            }
+            "MXX" | "MYY" | "MZZ" | "MPP" => {
+                self.measurement_count = self
+                    .measurement_count
+                    .checked_add(instruction.target_groups().len())
+                    .ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model("measurement count overflowed")
+                    })?;
+            }
+            "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" | "MPAD" => {
+                self.measurement_count = self
+                    .measurement_count
+                    .checked_add(instruction.targets().len())
+                    .ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model("measurement count overflowed")
+                    })?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn apply_qubit_coords(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let coords = shifted_coordinates(instruction.args(), &self.coord_offset);
+        for target in instruction.targets() {
+            let Some(qubit) = target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "QUBIT_COORDS target {target} is not a qubit"
+                )));
+            };
+            self.qubit_coords
+                .insert(u64::from(qubit.get()), coords.clone());
+        }
+        Ok(())
+    }
+
+    fn apply_shift_coords(&mut self, instruction: &CircuitInstruction) {
+        if self.coord_offset.len() < instruction.args().len() {
+            self.coord_offset.resize(instruction.args().len(), 0.0);
+        }
+        for (index, value) in instruction.args().iter().copied().enumerate() {
+            if let Some(offset) = self.coord_offset.get_mut(index) {
+                *offset += value;
+            }
+        }
+    }
+
+    fn apply_detector(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        if !instruction.args().is_empty() {
+            self.detector_coords.insert(
+                self.detector_count,
+                shifted_coordinates(instruction.args(), &self.coord_offset),
+            );
+        }
+        self.detector_count = self.detector_count.checked_add(1).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model("detector count overflowed")
+        })?;
+        Ok(())
+    }
+}
+
+fn detector_coordinates(circuit: &Circuit) -> CircuitResult<BTreeMap<u64, Vec<f64>>> {
+    let mut state = ScanState::default();
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(instruction) => state.apply_instruction(instruction)?,
+            CircuitItem::RepeatBlock(repeat) => state.apply_repeat(repeat)?,
+        }
+    }
+    Ok(state.detector_coords)
+}
+
+fn isolate_candidate(circuit: &Circuit, candidate: &ErrorCandidate) -> CircuitResult<Circuit> {
+    let mut result = Circuit::new();
+    for (instruction_offset, item) in circuit.items().iter().enumerate() {
+        match item {
+            CircuitItem::Instruction(instruction)
+                if instruction_offset == candidate.instruction_offset =>
+            {
+                append_candidate_instruction(&mut result, instruction, candidate)?;
+            }
+            CircuitItem::Instruction(instruction) => {
+                append_sanitized_instruction(&mut result, instruction)?;
+            }
+            CircuitItem::RepeatBlock(repeat) => result.append_repeat_block(repeat.clone()),
+        }
+    }
+    Ok(result)
+}
+
+fn append_candidate_instruction(
+    circuit: &mut Circuit,
+    instruction: &CircuitInstruction,
+    candidate: &ErrorCandidate,
+) -> CircuitResult<()> {
+    match candidate.replacement {
+        CandidateReplacement::Noise { gate_name } => {
+            let gate = Gate::from_name(gate_name.unwrap_or(instruction.gate().canonical_name()))?;
+            let targets = instruction
+                .targets()
+                .get(candidate.target_range_start..candidate.target_range_end)
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "candidate target range is outside instruction targets",
+                    )
+                })?
+                .to_vec();
+            circuit.append_instruction(CircuitInstruction::new(
+                gate,
+                instruction.args().to_vec(),
+                targets,
+                instruction.tag().map(ToOwned::to_owned),
+            )?);
+        }
+        CandidateReplacement::Measurement => {
+            append_measurement_slice(
+                circuit,
+                instruction,
+                0,
+                candidate.target_range_start,
+                Vec::new(),
+            )?;
+            append_measurement_slice(
+                circuit,
+                instruction,
+                candidate.target_range_start,
+                candidate.target_range_end,
+                instruction.args().to_vec(),
+            )?;
+            append_measurement_slice(
+                circuit,
+                instruction,
+                candidate.target_range_end,
+                instruction.targets().len(),
+                Vec::new(),
+            )?;
+        }
+    }
+    Ok(())
+}
+
+fn append_measurement_slice(
+    circuit: &mut Circuit,
+    instruction: &CircuitInstruction,
+    start: usize,
+    end: usize,
+    args: Vec<f64>,
+) -> CircuitResult<()> {
+    if start == end {
+        return Ok(());
+    }
+    let targets = instruction
+        .targets()
+        .get(start..end)
+        .ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "candidate target range is outside instruction targets",
+            )
+        })?
+        .to_vec();
+    circuit.append_instruction(CircuitInstruction::new(
+        instruction.gate(),
+        args,
+        targets,
+        instruction.tag().map(ToOwned::to_owned),
+    )?);
+    Ok(())
+}
+
+fn append_sanitized_instruction(
+    circuit: &mut Circuit,
+    instruction: &CircuitInstruction,
+) -> CircuitResult<()> {
+    match instruction.gate().canonical_name() {
+        name if is_pure_noise(name) => {}
+        name if measurement_basis(name).is_some() || pair_measurement_basis(name).is_some() => {
+            circuit.append_instruction(CircuitInstruction::new(
+                instruction.gate(),
+                Vec::new(),
+                instruction.targets().to_vec(),
+                instruction.tag().map(ToOwned::to_owned),
+            )?);
+        }
+        "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
+            circuit.append_instruction(CircuitInstruction::new(
+                instruction.gate(),
+                vec![0.0; instruction.args().len()],
+                instruction.targets().to_vec(),
+                instruction.tag().map(ToOwned::to_owned),
+            )?);
+        }
+        _ => circuit.append_instruction(instruction.clone()),
+    }
+    Ok(())
+}
+
+fn error_keys_from_dem(model: &DetectorErrorModel) -> CircuitResult<Vec<Vec<DemTarget>>> {
+    let mut keys = Vec::new();
+    collect_error_keys_from_dem(model, 0, &mut keys)?;
+    Ok(keys)
+}
+
+fn collect_error_keys_from_dem(
+    model: &DetectorErrorModel,
+    detector_offset: u64,
+    keys: &mut Vec<Vec<DemTarget>>,
+) -> CircuitResult<()> {
+    let mut current_detector_offset = detector_offset;
+    for item in model.items() {
+        match item {
+            DemItem::Instruction(instruction) => match instruction.kind() {
+                crate::DemInstructionKind::Error => {
+                    keys.push(canonical_error_key(
+                        instruction.targets(),
+                        current_detector_offset,
+                    )?);
+                }
+                crate::DemInstructionKind::ShiftDetectors => {
+                    current_detector_offset = current_detector_offset
+                        .checked_add(instruction.detector_shift()?)
+                        .ok_or_else(|| {
+                            CircuitError::invalid_detector_error_model("detector shift overflowed")
+                        })?;
+                }
+                crate::DemInstructionKind::Detector
+                | crate::DemInstructionKind::LogicalObservable => {}
+            },
+            DemItem::RepeatBlock(repeat) => {
+                let body_shift = repeat.body().total_detector_shift()?;
+                for _ in 0..repeat.repeat_count().get() {
+                    collect_error_keys_from_dem(repeat.body(), current_detector_offset, keys)?;
+                    current_detector_offset = current_detector_offset
+                        .checked_add(body_shift)
+                        .ok_or_else(|| {
+                            CircuitError::invalid_detector_error_model(
+                                "repeat detector shift overflowed",
+                            )
+                        })?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn canonical_error_key(
+    targets: &[DemTarget],
+    detector_offset: u64,
+) -> CircuitResult<Vec<DemTarget>> {
+    let mut toggled = BTreeSet::new();
+    for target in targets {
+        let shifted = match *target {
+            DemTarget::RelativeDetector(detector) => DemTarget::relative_detector(
+                detector.get().checked_add(detector_offset).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model("detector id overflowed")
+                })?,
+            )?,
+            DemTarget::LogicalObservable(_) => *target,
+            DemTarget::Separator | DemTarget::Numeric(_) => continue,
+        };
+        if !toggled.insert(shifted) {
+            toggled.remove(&shifted);
+        }
+    }
+    Ok(toggled.into_iter().collect())
+}
+
+fn shifted_coordinates(args: &[f64], coord_offset: &[f64]) -> Vec<f64> {
+    args.iter()
+        .copied()
+        .enumerate()
+        .map(|(index, value)| value + coord_offset.get(index).copied().unwrap_or(0.0))
+        .collect()
+}
+
+fn is_pure_noise(name: &str) -> bool {
+    matches!(
+        name,
+        "X_ERROR"
+            | "Y_ERROR"
+            | "Z_ERROR"
+            | "I_ERROR"
+            | "II_ERROR"
+            | "E"
+            | "CORRELATED_ERROR"
+            | "ELSE_CORRELATED_ERROR"
+            | "DEPOLARIZE1"
+            | "DEPOLARIZE2"
+            | "PAULI_CHANNEL_1"
+            | "PAULI_CHANNEL_2"
+    )
+}
+
+fn produces_single_measurements(name: &str) -> bool {
+    matches!(
+        name,
+        "M" | "MX"
+            | "MY"
+            | "MR"
+            | "MRX"
+            | "MRY"
+            | "HERALDED_ERASE"
+            | "HERALDED_PAULI_CHANNEL_1"
+            | "MPAD"
+    )
+}
+
+fn measurement_basis(name: &str) -> Option<Pauli> {
+    match name {
+        "MX" | "MRX" => Some(Pauli::X),
+        "MY" | "MRY" => Some(Pauli::Y),
+        "M" | "MR" => Some(Pauli::Z),
+        _ => None,
+    }
+}
+
+fn pair_measurement_basis(name: &str) -> Option<Pauli> {
+    match name {
+        "MXX" => Some(Pauli::X),
+        "MYY" => Some(Pauli::Y),
+        "MZZ" => Some(Pauli::Z),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::indexing_slicing,
+        clippy::unwrap_used,
+        reason = "unit tests use direct fixture assertions for compact diagnostics"
+    )]
+
+    use super::*;
+
+    fn explain(text: &str) -> Vec<ExplainedError> {
+        let circuit = Circuit::from_stim_str(text).unwrap();
+        explain_errors_from_circuit(&circuit, None, false).unwrap()
+    }
+
+    #[test]
+    fn error_matcher_x_error_matches_upstream_subset() {
+        let actual = explain(
+            "
+            QUBIT_COORDS(5, 6) 0
+            X_ERROR(0.25) 0
+            M 0
+            DETECTOR(2, 3) rec[-1]
+            ",
+        );
+
+        assert_eq!(actual.len(), 1);
+        assert_eq!(
+            actual[0].to_string(),
+            "ExplainedError {\n    dem_error_terms: D0[coords 2,3]\n    CircuitErrorLocation {\n        flipped_pauli_product: X0[coords 5,6]\n        Circuit location stack trace:\n            (after 0 TICKs)\n            at instruction #2 (X_ERROR) in the circuit\n            at target #1 of the instruction\n            resolving to X_ERROR(0.25) 0[coords 5,6]\n    }\n}"
+        );
+    }
+
+    #[test]
+    fn error_matcher_correlated_error_matches_upstream_subset() {
+        let actual = explain(
+            "
+            SHIFT_COORDS(10, 20)
+            QUBIT_COORDS(5, 6) 0
+            SHIFT_COORDS(100, 200)
+            CORRELATED_ERROR(0.25) X0 Y1
+            M 0
+            DETECTOR(2, 3) rec[-1]
+            ",
+        );
+
+        assert_eq!(actual.len(), 1);
+        assert_eq!(
+            actual[0].to_string(),
+            "ExplainedError {\n    dem_error_terms: D0[coords 112,223]\n    CircuitErrorLocation {\n        flipped_pauli_product: X0[coords 15,26]*Y1\n        Circuit location stack trace:\n            (after 0 TICKs)\n            at instruction #4 (E) in the circuit\n            at targets #1 to #2 of the instruction\n            resolving to E(0.25) X0[coords 15,26] Y1\n    }\n}"
+        );
+    }
+
+    #[test]
+    fn error_matcher_mx_error_matches_upstream_subset() {
+        let actual = explain(
+            "
+            QUBIT_COORDS(5, 6) 0
+            RX 0
+            REPEAT 10 {
+                TICK
+            }
+            MX(0.125) 1 2 3 0 4
+            DETECTOR(2, 3) rec[-2]
+            ",
+        );
+
+        assert_eq!(actual.len(), 1);
+        assert_eq!(
+            actual[0].to_string(),
+            "ExplainedError {\n    dem_error_terms: D0[coords 2,3]\n    CircuitErrorLocation {\n        flipped_measurement.measurement_record_index: 3\n        flipped_measurement.measured_observable: X0[coords 5,6]\n        Circuit location stack trace:\n            (after 10 TICKs)\n            at instruction #4 (MX) in the circuit\n            at target #4 of the instruction\n            resolving to MX(0.125) 0[coords 5,6]\n    }\n}"
+        );
+    }
+
+    #[test]
+    fn error_matcher_mxx_error_matches_upstream_subset() {
+        let actual = explain(
+            "
+            QUBIT_COORDS(5, 6) 0
+            RX 0
+            CX 0 1
+            MXX(0.125) 0 1
+            DETECTOR(2, 3) rec[-1]
+            ",
+        );
+
+        assert_eq!(actual.len(), 1);
+        assert_eq!(
+            actual[0].to_string(),
+            "ExplainedError {\n    dem_error_terms: D0[coords 2,3]\n    CircuitErrorLocation {\n        flipped_measurement.measurement_record_index: 0\n        flipped_measurement.measured_observable: X0[coords 5,6]*X1\n        Circuit location stack trace:\n            (after 0 TICKs)\n            at instruction #4 (MXX) in the circuit\n            at targets #1 to #2 of the instruction\n            resolving to MXX(0.125) 0[coords 5,6] 1\n    }\n}"
+        );
+    }
+
+    #[test]
+    fn error_matcher_filter_keeps_unmatched_errors() {
+        let circuit = Circuit::from_stim_str(
+            "
+            M 0
+            DETECTOR rec[-1]
+            ",
+        )
+        .unwrap();
+        let filter = DetectorErrorModel::from_dem_str("error(1) D0\n").unwrap();
+        let actual = explain_errors_from_circuit(&circuit, Some(&filter), false).unwrap();
+
+        assert_eq!(actual.len(), 1);
+        assert_eq!(
+            actual[0].to_string(),
+            "ExplainedError {\n    dem_error_terms: D0\n    [no single circuit error had these exact symptoms]\n}"
+        );
+    }
+}
