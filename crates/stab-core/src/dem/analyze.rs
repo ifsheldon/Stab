@@ -187,7 +187,9 @@ impl Analyzer {
             "R" | "RX" | "RY" => self.record_resets(instruction),
             "HERALDED_ERASE" => self.record_heralded_erase(instruction),
             "HERALDED_PAULI_CHANNEL_1" => self.record_heralded_pauli_channel1(instruction),
-            "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => self.apply_controlled_pauli(instruction),
+            "CX" | "CY" | "CZ" | "XCX" | "XCY" | "XCZ" | "YCX" | "YCY" | "YCZ" => {
+                self.apply_controlled_pauli(instruction)
+            }
             "MPAD" => self.record_measurement_pads(instruction),
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
@@ -871,28 +873,36 @@ impl Analyzer {
         Ok(())
     }
 
-    fn apply_quantum_cx(&mut self, control: QubitId, target: QubitId) -> CircuitResult<()> {
-        self.reject_pending_single_qubit_channels_through_cx(control, target)?;
+    fn apply_quantum_controlled_pauli(
+        &mut self,
+        gate_name: &str,
+        left: QubitId,
+        right: QubitId,
+        left_basis: AnalyzerPauli,
+        right_basis: AnalyzerPauli,
+    ) -> CircuitResult<()> {
+        self.reject_pending_single_qubit_channels_through_controlled_pauli(gate_name, left, right)?;
         for pending in &mut self.pending_errors {
-            pending.apply_cx(control, target);
+            pending.apply_controlled_pauli(left, right, left_basis, right_basis);
         }
-        self.observable_sensitivity.apply_cx(control, target);
-        Ok(())
+        self.observable_sensitivity
+            .apply_controlled_pauli(left, right, left_basis, right_basis)
     }
 
-    fn reject_pending_single_qubit_channels_through_cx(
+    fn reject_pending_single_qubit_channels_through_controlled_pauli(
         &self,
-        control: QubitId,
-        target: QubitId,
+        gate_name: &str,
+        left: QubitId,
+        right: QubitId,
     ) -> CircuitResult<()> {
         if self
             .pending_pauli_channels
             .iter()
-            .any(|pending| pending.qubit == control || pending.qubit == target)
+            .any(|pending| pending.qubit == left || pending.qubit == right)
         {
-            return Err(CircuitError::invalid_detector_error_model(
-                "analyze_errors does not yet support propagating pending single-qubit Pauli channels through CX",
-            ));
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "analyze_errors does not yet support propagating pending single-qubit Pauli channels through {gate_name}"
+            )));
         }
         Ok(())
     }

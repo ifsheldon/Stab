@@ -110,30 +110,30 @@ impl PendingError {
         Ok(())
     }
 
-    pub(super) fn apply_cx(&mut self, control: QubitId, target: QubitId) {
+    pub(super) fn apply_controlled_pauli(
+        &mut self,
+        left: QubitId,
+        right: QubitId,
+        left_basis: AnalyzerPauli,
+        right_basis: AnalyzerPauli,
+    ) {
         let mut masks = self.effect_masks();
-        let control_mask = masks.remove(&control).unwrap_or(0);
-        let target_mask = masks.remove(&target).unwrap_or(0);
-        let mut output_control = 0;
-        let mut output_target = 0;
+        let left_mask = masks.remove(&left).unwrap_or(0);
+        let right_mask = masks.remove(&right).unwrap_or(0);
+        let left_basis_mask = analyzer_pauli_mask(left_basis);
+        let right_basis_mask = analyzer_pauli_mask(right_basis);
+        let mut output_left = left_mask;
+        let mut output_right = right_mask;
 
-        if control_mask & ANALYZER_X_MASK != 0 {
-            output_control ^= ANALYZER_X_MASK;
-            output_target ^= ANALYZER_X_MASK;
+        if masks_anticommute(left_mask, left_basis_mask) {
+            output_right ^= right_basis_mask;
         }
-        if control_mask & ANALYZER_Z_MASK != 0 {
-            output_control ^= ANALYZER_Z_MASK;
-        }
-        if target_mask & ANALYZER_X_MASK != 0 {
-            output_target ^= ANALYZER_X_MASK;
-        }
-        if target_mask & ANALYZER_Z_MASK != 0 {
-            output_control ^= ANALYZER_Z_MASK;
-            output_target ^= ANALYZER_Z_MASK;
+        if masks_anticommute(right_mask, right_basis_mask) {
+            output_left ^= left_basis_mask;
         }
 
-        insert_effect_mask(&mut masks, control, output_control);
-        insert_effect_mask(&mut masks, target, output_target);
+        insert_effect_mask(&mut masks, left, output_left);
+        insert_effect_mask(&mut masks, right, output_right);
         self.effects = effects_from_masks(masks);
     }
 
@@ -266,21 +266,54 @@ impl ObservableSensitivity {
         Ok(())
     }
 
-    pub(super) fn apply_cx(&mut self, control: QubitId, target: QubitId) {
-        let control_xs = self.xs.remove(&control).unwrap_or_default();
-        let control_zs = self.zs.remove(&control).unwrap_or_default();
-        let target_xs = self.xs.remove(&target).unwrap_or_default();
-        let target_zs = self.zs.remove(&target).unwrap_or_default();
+    pub(super) fn apply_controlled_pauli(
+        &mut self,
+        left: QubitId,
+        right: QubitId,
+        left_basis: AnalyzerPauli,
+        right_basis: AnalyzerPauli,
+    ) -> CircuitResult<()> {
+        let left_xs = self.xs.remove(&left).unwrap_or_default();
+        let left_zs = self.zs.remove(&left).unwrap_or_default();
+        let right_xs = self.xs.remove(&right).unwrap_or_default();
+        let right_zs = self.zs.remove(&right).unwrap_or_default();
 
-        toggle_all(self.xs.entry(control).or_default(), &control_xs);
-        toggle_all(self.xs.entry(target).or_default(), &control_xs);
-        toggle_all(self.zs.entry(control).or_default(), &control_zs);
-        toggle_all(self.xs.entry(target).or_default(), &target_xs);
-        toggle_all(self.zs.entry(control).or_default(), &target_zs);
-        toggle_all(self.zs.entry(target).or_default(), &target_zs);
+        self.apply_controlled_basis_component(
+            left,
+            PauliBasis::X,
+            &left_xs,
+            left_basis,
+            right,
+            right_basis,
+        )?;
+        self.apply_controlled_basis_component(
+            left,
+            PauliBasis::Z,
+            &left_zs,
+            left_basis,
+            right,
+            right_basis,
+        )?;
+        self.apply_controlled_basis_component(
+            right,
+            PauliBasis::X,
+            &right_xs,
+            right_basis,
+            left,
+            left_basis,
+        )?;
+        self.apply_controlled_basis_component(
+            right,
+            PauliBasis::Z,
+            &right_zs,
+            right_basis,
+            left,
+            left_basis,
+        )?;
 
-        self.remove_empty(control);
-        self.remove_empty(target);
+        self.remove_empty(left);
+        self.remove_empty(right);
+        Ok(())
     }
 
     fn apply_basis_set(
@@ -307,6 +340,22 @@ impl ObservableSensitivity {
                 Ok(())
             }
         }
+    }
+
+    fn apply_controlled_basis_component(
+        &mut self,
+        qubit: QubitId,
+        basis: PauliBasis,
+        observables: &BTreeSet<u64>,
+        qubit_control_basis: AnalyzerPauli,
+        other_qubit: QubitId,
+        other_basis: AnalyzerPauli,
+    ) -> CircuitResult<()> {
+        self.apply_basis_set(qubit, basis, observables)?;
+        if basis_anticommutes_with_pauli(basis, qubit_control_basis) {
+            self.apply_basis_set(other_qubit, other_basis.into(), observables)?;
+        }
+        Ok(())
     }
 
     fn remove_empty(&mut self, qubit: QubitId) {
@@ -337,6 +386,10 @@ pub(super) fn analyzer_pauli_from_mask(mask: u8) -> AnalyzerPauli {
         0b11 => AnalyzerPauli::Y,
         _ => unreachable!("pauli masks are maintained by xor of X/Z bits"),
     }
+}
+
+pub(super) fn analyzer_paulis_anticommute(left: AnalyzerPauli, right: AnalyzerPauli) -> bool {
+    masks_anticommute(analyzer_pauli_mask(left), analyzer_pauli_mask(right))
 }
 
 impl From<AnalyzerPauli> for Pauli {
@@ -418,6 +471,25 @@ fn pauli_flips_basis_measurement(pauli: AnalyzerPauli, basis: AnalyzerBasis) -> 
             | (AnalyzerPauli::Y, AnalyzerBasis::X | AnalyzerBasis::Z)
             | (AnalyzerPauli::Z, AnalyzerBasis::X | AnalyzerBasis::Y)
     )
+}
+
+fn analyzer_pauli_mask(pauli: AnalyzerPauli) -> u8 {
+    pauli_mask(pauli.into())
+}
+
+fn basis_anticommutes_with_pauli(basis: PauliBasis, pauli: AnalyzerPauli) -> bool {
+    match basis {
+        PauliBasis::I => false,
+        PauliBasis::X => analyzer_paulis_anticommute(AnalyzerPauli::X, pauli),
+        PauliBasis::Y => analyzer_paulis_anticommute(AnalyzerPauli::Y, pauli),
+        PauliBasis::Z => analyzer_paulis_anticommute(AnalyzerPauli::Z, pauli),
+    }
+}
+
+fn masks_anticommute(left: u8, right: u8) -> bool {
+    let left_x_right_z = (left & ANALYZER_X_MASK != 0) && (right & ANALYZER_Z_MASK != 0);
+    let left_z_right_x = (left & ANALYZER_Z_MASK != 0) && (right & ANALYZER_X_MASK != 0);
+    left_x_right_z ^ left_z_right_x
 }
 
 fn toggle_all(target: &mut BTreeSet<u64>, values: &BTreeSet<u64>) {

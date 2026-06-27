@@ -4,9 +4,11 @@ use super::{Analyzer, AnalyzerPauli, NoiseEffect, PendingError};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum ControlledPauliAction {
-    QuantumCx {
-        control: QubitId,
-        target: QubitId,
+    QuantumControlledPauli {
+        left: QubitId,
+        right: QubitId,
+        left_basis: AnalyzerPauli,
+        right_basis: AnalyzerPauli,
     },
     MeasurementFeedback {
         record_offset: i32,
@@ -29,8 +31,19 @@ impl Analyzer {
                 )));
             };
             match controlled_pauli_action(gate_name, first, second)? {
-                ControlledPauliAction::QuantumCx { control, target } => {
-                    self.apply_quantum_cx(control, target)?;
+                ControlledPauliAction::QuantumControlledPauli {
+                    left,
+                    right,
+                    left_basis,
+                    right_basis,
+                } => {
+                    self.apply_quantum_controlled_pauli(
+                        gate_name,
+                        left,
+                        right,
+                        left_basis,
+                        right_basis,
+                    )?;
                 }
                 ControlledPauliAction::MeasurementFeedback {
                     record_offset,
@@ -88,24 +101,47 @@ pub(super) fn controlled_pauli_action(
     first: &Target,
     second: &Target,
 ) -> CircuitResult<ControlledPauliAction> {
+    let (left_basis, right_basis) = controlled_pauli_bases(gate_name)?;
+    if let (Some(left), Some(right)) = (first.qubit_id(), second.qubit_id()) {
+        return Ok(ControlledPauliAction::QuantumControlledPauli {
+            left,
+            right,
+            left_basis,
+            right_basis,
+        });
+    }
     match gate_name {
-        "CX" => z_controlled_action(gate_name, first, second, AnalyzerPauli::X, true),
-        "CY" => z_controlled_action(gate_name, first, second, AnalyzerPauli::Y, false),
+        "CX" => z_controlled_feedback_action(gate_name, first, second, AnalyzerPauli::X),
+        "CY" => z_controlled_feedback_action(gate_name, first, second, AnalyzerPauli::Y),
         "CZ" => symmetric_z_controlled_action(gate_name, first, second),
         "XCZ" => reversed_z_controlled_action(gate_name, first, second, AnalyzerPauli::X),
         "YCZ" => reversed_z_controlled_action(gate_name, first, second, AnalyzerPauli::Y),
+        _ => Ok(ControlledPauliAction::NoEffect),
+    }
+}
+
+fn controlled_pauli_bases(gate_name: &str) -> CircuitResult<(AnalyzerPauli, AnalyzerPauli)> {
+    match gate_name {
+        "CX" => Ok((AnalyzerPauli::Z, AnalyzerPauli::X)),
+        "CY" => Ok((AnalyzerPauli::Z, AnalyzerPauli::Y)),
+        "CZ" => Ok((AnalyzerPauli::Z, AnalyzerPauli::Z)),
+        "XCX" => Ok((AnalyzerPauli::X, AnalyzerPauli::X)),
+        "XCY" => Ok((AnalyzerPauli::X, AnalyzerPauli::Y)),
+        "XCZ" => Ok((AnalyzerPauli::X, AnalyzerPauli::Z)),
+        "YCX" => Ok((AnalyzerPauli::Y, AnalyzerPauli::X)),
+        "YCY" => Ok((AnalyzerPauli::Y, AnalyzerPauli::Y)),
+        "YCZ" => Ok((AnalyzerPauli::Y, AnalyzerPauli::Z)),
         name => Err(CircuitError::invalid_detector_error_model(format!(
             "{name} is not a supported controlled Pauli analyzer gate"
         ))),
     }
 }
 
-fn z_controlled_action(
+fn z_controlled_feedback_action(
     gate_name: &str,
     control: &Target,
     target: &Target,
     pauli: AnalyzerPauli,
-    supports_quantum_cx: bool,
 ) -> CircuitResult<ControlledPauliAction> {
     if control.sweep_bit_id().is_some() {
         require_qubit(gate_name, "target", target)?;
@@ -118,11 +154,6 @@ fn z_controlled_action(
             qubit,
             pauli,
         });
-    }
-    if supports_quantum_cx {
-        let control = require_qubit(gate_name, "control target", control)?;
-        let target = require_qubit(gate_name, "target", target)?;
-        return Ok(ControlledPauliAction::QuantumCx { control, target });
     }
     Ok(ControlledPauliAction::NoEffect)
 }

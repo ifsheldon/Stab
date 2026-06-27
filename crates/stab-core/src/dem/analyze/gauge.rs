@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, QubitId};
 
+use super::effects::analyzer_paulis_anticommute;
 use super::feedback::{ControlledPauliAction, controlled_pauli_action};
 use super::mpp::pauli_product_terms;
 use super::{AnalyzerBasis, AnalyzerPauli, DemTarget};
@@ -107,7 +108,9 @@ impl GaugeTracker {
             "RY" => self.undo_resets(instruction, AnalyzerBasis::Y),
             "H" => self.undo_h(instruction),
             "H_XY" => self.undo_h_xy(instruction),
-            "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => self.undo_controlled_pauli(instruction),
+            "CX" | "CY" | "CZ" | "XCX" | "XCY" | "XCZ" | "YCX" | "YCY" | "YCZ" => {
+                self.undo_controlled_pauli(instruction)
+            }
             "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
             _ => Ok(()),
         }
@@ -437,8 +440,13 @@ impl GaugeTracker {
                 )));
             };
             match controlled_pauli_action(gate_name, first, second)? {
-                ControlledPauliAction::QuantumCx { control, target } => {
-                    self.undo_quantum_cx(control, target)?;
+                ControlledPauliAction::QuantumControlledPauli {
+                    left,
+                    right,
+                    left_basis,
+                    right_basis,
+                } => {
+                    self.undo_quantum_controlled_pauli(left, right, left_basis, right_basis)?;
                 }
                 ControlledPauliAction::MeasurementFeedback {
                     record_offset,
@@ -451,11 +459,35 @@ impl GaugeTracker {
         Ok(())
     }
 
-    fn undo_quantum_cx(&mut self, control: QubitId, target: QubitId) -> CircuitResult<()> {
-        let target_zs = self.zs_for(target)?.clone();
-        self.toggle_zs(control, &target_zs)?;
-        let control_xs = self.xs_for(control)?.clone();
-        self.toggle_xs(target, &control_xs)?;
+    fn undo_quantum_controlled_pauli(
+        &mut self,
+        left: QubitId,
+        right: QubitId,
+        left_basis: AnalyzerPauli,
+        right_basis: AnalyzerPauli,
+    ) -> CircuitResult<()> {
+        let left_xs = self.xs_for(left)?.clone();
+        let left_zs = self.zs_for(left)?.clone();
+        let right_xs = self.xs_for(right)?.clone();
+        let right_zs = self.zs_for(right)?.clone();
+        self.toggle_if_anticommutes(AnalyzerPauli::X, left_basis, right, right_basis, &left_xs)?;
+        self.toggle_if_anticommutes(AnalyzerPauli::Z, left_basis, right, right_basis, &left_zs)?;
+        self.toggle_if_anticommutes(AnalyzerPauli::X, right_basis, left, left_basis, &right_xs)?;
+        self.toggle_if_anticommutes(AnalyzerPauli::Z, right_basis, left, left_basis, &right_zs)?;
+        Ok(())
+    }
+
+    fn toggle_if_anticommutes(
+        &mut self,
+        input_basis: AnalyzerPauli,
+        control_basis: AnalyzerPauli,
+        output_qubit: QubitId,
+        output_basis: AnalyzerPauli,
+        sensitivity: &BTreeSet<DemTarget>,
+    ) -> CircuitResult<()> {
+        if analyzer_paulis_anticommute(input_basis, control_basis) {
+            self.toggle_pauli_sensitivity(output_qubit, output_basis, sensitivity)?;
+        }
         Ok(())
     }
 
@@ -499,6 +531,23 @@ impl GaugeTracker {
                 }
                 AnalyzerBasis::Z => self.toggle_zs(*qubit, sensitivity)?,
             }
+        }
+        Ok(())
+    }
+
+    fn toggle_pauli_sensitivity(
+        &mut self,
+        qubit: QubitId,
+        pauli: AnalyzerPauli,
+        sensitivity: &BTreeSet<DemTarget>,
+    ) -> CircuitResult<()> {
+        match pauli {
+            AnalyzerPauli::X => self.toggle_xs(qubit, sensitivity)?,
+            AnalyzerPauli::Y => {
+                self.toggle_xs(qubit, sensitivity)?;
+                self.toggle_zs(qubit, sensitivity)?;
+            }
+            AnalyzerPauli::Z => self.toggle_zs(qubit, sensitivity)?,
         }
         Ok(())
     }
