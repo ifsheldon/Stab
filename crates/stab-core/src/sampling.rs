@@ -1,10 +1,13 @@
 use rand::rngs::SmallRng;
 use rand::{Rng, RngExt as _, SeedableRng as _};
 
+use self::stabilizer_frame::{LocalTableauTransform, StabilizerFrame};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
-    MeasureRecordOffset, PauliBasis, PauliSign, PauliString, SingleQubitClifford,
+    MeasureRecordOffset, PauliBasis, SingleQubitClifford,
 };
+
+mod stabilizer_frame;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledSampler {
@@ -83,7 +86,7 @@ impl CompiledSampler {
     where
         R: Rng,
     {
-        let mut frame = LocalFrame::new(self.qubit_count);
+        let mut frame = StabilizerFrame::new(self.qubit_count);
         let mut record = Vec::new();
         let mut output = Vec::new();
         execute_operations(&self.operations, &mut frame, &mut record, &mut output, rng);
@@ -93,9 +96,9 @@ impl CompiledSampler {
 
 #[derive(Clone, Debug, PartialEq)]
 enum SampleOperation {
-    ApplyClifford {
-        qubit: usize,
-        transform: LocalCliffordTransform,
+    ApplyTableau {
+        targets: Vec<usize>,
+        transform: LocalTableauTransform,
     },
     Reset {
         qubit: usize,
@@ -154,150 +157,6 @@ const TWO_QUBIT_PAULI_CHANNEL_BASES: [(Option<PauliBasis>, Option<PauliBasis>); 
     (Some(PauliBasis::Z), Some(PauliBasis::Y)),
     (Some(PauliBasis::Z), Some(PauliBasis::Z)),
 ];
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct SignedBasis {
-    negative: bool,
-    basis: PauliBasis,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct LocalCliffordTransform {
-    x: SignedBasis,
-    y: SignedBasis,
-    z: SignedBasis,
-}
-
-impl LocalCliffordTransform {
-    fn from_clifford(clifford: SingleQubitClifford) -> CircuitResult<Self> {
-        let tableau = clifford.tableau();
-        Ok(Self {
-            x: transform_signed_basis(&tableau, PauliBasis::X)?,
-            y: transform_signed_basis(&tableau, PauliBasis::Y)?,
-            z: transform_signed_basis(&tableau, PauliBasis::Z)?,
-        })
-    }
-
-    fn output_for(self, basis: PauliBasis) -> SignedBasis {
-        match basis {
-            PauliBasis::X => self.x,
-            PauliBasis::Y => self.y,
-            PauliBasis::Z => self.z,
-            PauliBasis::I => SignedBasis {
-                negative: false,
-                basis: PauliBasis::I,
-            },
-        }
-    }
-}
-
-fn transform_signed_basis(
-    tableau: &crate::Tableau,
-    basis: PauliBasis,
-) -> CircuitResult<SignedBasis> {
-    let input = PauliString::from_bases(PauliSign::Plus, [basis]);
-    let output = tableau
-        .apply(&input)
-        .map_err(|error| CircuitError::invalid_sampler_compilation(error.to_string()))?;
-    let Some(output_basis) = output.get(0) else {
-        return Err(CircuitError::invalid_sampler_compilation(
-            "single-qubit Clifford output is missing its Pauli basis",
-        ));
-    };
-    Ok(SignedBasis {
-        negative: output.sign().is_negative(),
-        basis: output_basis,
-    })
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct LocalQubitState {
-    negative: bool,
-    basis: PauliBasis,
-}
-
-impl LocalQubitState {
-    fn plus_z() -> Self {
-        Self {
-            negative: false,
-            basis: PauliBasis::Z,
-        }
-    }
-
-    fn apply_clifford(&mut self, transform: LocalCliffordTransform) {
-        let output = transform.output_for(self.basis);
-        self.negative ^= output.negative;
-        self.basis = output.basis;
-    }
-
-    fn apply_pauli(&mut self, pauli: PauliBasis) {
-        if pauli != self.basis && self.basis != PauliBasis::I {
-            self.negative = !self.negative;
-        }
-    }
-
-    fn reset(&mut self, basis: PauliBasis) {
-        self.basis = basis;
-        self.negative = false;
-    }
-
-    fn measure(&mut self, basis: PauliBasis, inverted: bool, rng: &mut impl Rng) -> bool {
-        let raw_result = match self.basis {
-            state_basis if state_basis == basis => self.negative,
-            PauliBasis::I | PauliBasis::X | PauliBasis::Y | PauliBasis::Z => {
-                let sampled = rng.random_bool(0.5);
-                self.basis = basis;
-                self.negative = sampled;
-                sampled
-            }
-        };
-        raw_result ^ inverted
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct LocalFrame {
-    states: Vec<LocalQubitState>,
-}
-
-impl LocalFrame {
-    fn new(qubit_count: usize) -> Self {
-        Self {
-            states: vec![LocalQubitState::plus_z(); qubit_count],
-        }
-    }
-
-    fn apply_clifford(&mut self, qubit: usize, transform: LocalCliffordTransform) {
-        if let Some(state) = self.states.get_mut(qubit) {
-            state.apply_clifford(transform);
-        }
-    }
-
-    fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) {
-        if let Some(state) = self.states.get_mut(qubit) {
-            state.apply_pauli(basis);
-        }
-    }
-
-    fn reset(&mut self, qubit: usize, basis: PauliBasis) {
-        if let Some(state) = self.states.get_mut(qubit) {
-            state.reset(basis);
-        }
-    }
-
-    fn measure(
-        &mut self,
-        qubit: usize,
-        basis: PauliBasis,
-        inverted: bool,
-        rng: &mut impl Rng,
-    ) -> bool {
-        self.states
-            .get_mut(qubit)
-            .map(|state| state.measure(basis, inverted, rng))
-            .unwrap_or(inverted)
-    }
-}
 
 fn sampler_rng(seed: Option<u64>) -> SmallRng {
     SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random))
@@ -495,11 +354,14 @@ fn compile_instruction(
             compile_measurement(instruction, operations, state)
         }
         "MPAD" => compile_measurement_pads(instruction, operations, state),
-        "CX" => compile_feedback_pauli(instruction, operations, state, PauliBasis::X),
-        "CY" => compile_feedback_pauli(instruction, operations, state, PauliBasis::Y),
-        "CZ" => compile_feedback_pauli(instruction, operations, state, PauliBasis::Z),
+        "CX" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::X),
+        "CY" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Y),
+        "CZ" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Z),
         _ if SingleQubitClifford::from_gate(gate).is_ok() => {
             compile_single_qubit_clifford(instruction, operations)
+        }
+        _ if crate::circuit_tableau::gate_tableau(gate.canonical_name()).is_ok() => {
+            compile_unitary_tableau(instruction, operations)
         }
         "X_ERROR" => compile_single_qubit_pauli_channel(
             instruction,
@@ -658,26 +520,51 @@ fn compile_measurement_pads(
     Ok(())
 }
 
-fn compile_feedback_pauli(
+fn compile_controlled_or_feedback(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    state: &CompileState,
+    feedback_basis: PauliBasis,
+) -> CircuitResult<()> {
+    for target_group in instruction.target_groups() {
+        if target_group
+            .first()
+            .and_then(|target| target.measurement_record_offset())
+            .is_some()
+        {
+            compile_feedback_pauli_group(
+                instruction,
+                operations,
+                state,
+                feedback_basis,
+                target_group,
+            )?;
+        } else {
+            compile_unitary_tableau_group(instruction, operations, target_group)?;
+        }
+    }
+    Ok(())
+}
+
+fn compile_feedback_pauli_group(
     instruction: &CircuitInstruction,
     operations: &mut Vec<SampleOperation>,
     state: &CompileState,
     basis: PauliBasis,
+    target_group: &[crate::Target],
 ) -> CircuitResult<()> {
-    for target_pair in instruction.target_groups() {
-        let [record, target] = target_pair else {
-            return Err(unsupported_sampler_instruction(instruction));
-        };
-        let Some(offset) = record.measurement_record_offset() else {
-            return Err(unsupported_sampler_instruction(instruction));
-        };
-        state.validate_record_offset(instruction, offset)?;
-        operations.push(SampleOperation::FeedbackPauli {
-            offset,
-            qubit: qubit_index(instruction, target)?,
-            basis,
-        });
-    }
+    let [record, target] = target_group else {
+        return Err(unsupported_sampler_instruction(instruction));
+    };
+    let Some(offset) = record.measurement_record_offset() else {
+        return Err(unsupported_sampler_instruction(instruction));
+    };
+    state.validate_record_offset(instruction, offset)?;
+    operations.push(SampleOperation::FeedbackPauli {
+        offset,
+        qubit: qubit_index(instruction, target)?,
+        basis,
+    });
     Ok(())
 }
 
@@ -687,13 +574,41 @@ fn compile_single_qubit_clifford(
 ) -> CircuitResult<()> {
     let clifford = SingleQubitClifford::from_gate(instruction.gate())
         .map_err(|error| CircuitError::invalid_sampler_compilation(error.to_string()))?;
-    let transform = LocalCliffordTransform::from_clifford(clifford)?;
+    let transform = LocalTableauTransform::from_tableau(&clifford.tableau())?;
     for target in instruction.targets() {
-        operations.push(SampleOperation::ApplyClifford {
-            qubit: qubit_index(instruction, target)?,
-            transform,
+        operations.push(SampleOperation::ApplyTableau {
+            targets: vec![qubit_index(instruction, target)?],
+            transform: transform.clone(),
         });
     }
+    Ok(())
+}
+
+fn compile_unitary_tableau(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+) -> CircuitResult<()> {
+    for target_group in instruction.target_groups() {
+        compile_unitary_tableau_group(instruction, operations, target_group)?;
+    }
+    Ok(())
+}
+
+fn compile_unitary_tableau_group(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    target_group: &[crate::Target],
+) -> CircuitResult<()> {
+    let tableau = crate::circuit_tableau::gate_tableau(instruction.gate().canonical_name())?;
+    let transform = LocalTableauTransform::from_tableau(&tableau)?;
+    let targets = target_group
+        .iter()
+        .map(|target| qubit_index(instruction, target))
+        .collect::<CircuitResult<Vec<_>>>()?;
+    if targets.len() != transform.target_count() {
+        return Err(unsupported_sampler_instruction(instruction));
+    }
+    operations.push(SampleOperation::ApplyTableau { targets, transform });
     Ok(())
 }
 
@@ -795,17 +710,17 @@ fn qubit_index(instruction: &CircuitInstruction, target: &crate::Target) -> Circ
 
 fn execute_operations(
     operations: &[SampleOperation],
-    frame: &mut LocalFrame,
+    frame: &mut StabilizerFrame,
     record: &mut Vec<bool>,
     output: &mut Vec<bool>,
     rng: &mut impl Rng,
 ) {
     for operation in operations {
         match operation {
-            SampleOperation::ApplyClifford { qubit, transform } => {
-                frame.apply_clifford(*qubit, *transform);
+            SampleOperation::ApplyTableau { targets, transform } => {
+                frame.apply_tableau(targets, transform);
             }
-            SampleOperation::Reset { qubit, basis } => frame.reset(*qubit, *basis),
+            SampleOperation::Reset { qubit, basis } => frame.reset(*qubit, *basis, rng),
             SampleOperation::Measure {
                 qubit,
                 basis,
@@ -816,7 +731,7 @@ fn execute_operations(
                 record.push(result);
                 output.push(result);
                 if *reset {
-                    frame.reset(*qubit, *basis);
+                    frame.reset(*qubit, *basis, rng);
                 }
             }
             SampleOperation::Pad { value } => {
@@ -872,7 +787,7 @@ fn measurement_record_bit(measurements: &[bool], offset: MeasureRecordOffset) ->
 }
 
 fn apply_heralded_pauli_channel(
-    frame: &mut LocalFrame,
+    frame: &mut StabilizerFrame,
     qubit: usize,
     probabilities: &[f64; 4],
     measurements: &mut Vec<bool>,
@@ -901,7 +816,7 @@ fn apply_heralded_pauli_channel(
 }
 
 fn apply_single_qubit_pauli_channel(
-    frame: &mut LocalFrame,
+    frame: &mut StabilizerFrame,
     qubit: usize,
     probabilities: &[f64; 3],
     rng: &mut impl Rng,
@@ -920,7 +835,7 @@ fn apply_single_qubit_pauli_channel(
 }
 
 fn apply_two_qubit_pauli_channel(
-    frame: &mut LocalFrame,
+    frame: &mut StabilizerFrame,
     left: usize,
     right: usize,
     probabilities: &[f64; 15],
@@ -946,7 +861,7 @@ fn apply_two_qubit_pauli_channel(
 
 fn unsupported_sampler_instruction(instruction: &CircuitInstruction) -> CircuitError {
     CircuitError::invalid_sampler_compilation(format!(
-        "local M8 sampler subset does not support {}",
+        "M8 sampler subset does not support {}",
         instruction.gate().canonical_name()
     ))
 }

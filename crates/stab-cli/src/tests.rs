@@ -801,7 +801,7 @@ fn sample_reads_and_writes_paths() {
 }
 
 #[test]
-fn sample_rejects_unsupported_tableau_semantics() {
+fn sample_supports_deterministic_entangling_clifford_measurements() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(
@@ -811,13 +811,9 @@ fn sample_rejects_unsupported_tableau_semantics() {
         &mut stderr,
     );
 
-    assert_eq!(status, 1);
-    assert_eq!(String::from_utf8(stdout).unwrap(), "");
-    assert!(
-        String::from_utf8(stderr)
-            .unwrap()
-            .contains("local M8 sampler subset does not support CX")
-    );
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "00\n");
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
 }
 
 #[test]

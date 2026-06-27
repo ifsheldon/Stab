@@ -142,7 +142,7 @@ fn target_qubit_ids(gate_name: &str, targets: &[Target]) -> CircuitResult<Vec<Qu
         .collect()
 }
 
-fn gate_tableau(gate_name: &str) -> CircuitResult<Tableau> {
+pub(crate) fn gate_tableau(gate_name: &str) -> CircuitResult<Tableau> {
     if let Ok(gate) = crate::Gate::from_name(gate_name)
         && let Ok(clifford) = SingleQubitClifford::from_gate(gate)
     {

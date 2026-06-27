@@ -123,6 +123,68 @@ fn measurement_record_feedback_applies_local_paulis() {
 }
 
 #[test]
+fn entangling_clifford_measurements_preserve_bell_correlations() {
+    let circuit = Circuit::from_stim_str("H 0\nCX 0 1\nM 0 1\n").expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+    let shots = sampler.sample_zero_one_with_seed(1000, Some(5));
+
+    let hits = shots
+        .iter()
+        .filter(|shot| shot.first() == Some(&true))
+        .count();
+    assert!(
+        (400..=600).contains(&hits),
+        "expected roughly balanced Bell-pair measurements, got {hits}"
+    );
+    assert!(
+        shots
+            .iter()
+            .all(|shot| shot.first().copied() == shot.get(1).copied()),
+        "Bell-pair measurements should be perfectly correlated"
+    );
+}
+
+#[test]
+fn entangling_measure_reset_collapses_then_resets_only_measured_qubit() {
+    let circuit = Circuit::from_stim_str("H 0\nCX 0 1\nMR 0\nM 0 1\n").expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+    let shots = sampler.sample_zero_one_with_seed(1000, Some(5));
+
+    assert!(
+        shots.iter().all(|shot| {
+            shot.get(1) == Some(&false) && shot.first().copied() == shot.get(2).copied()
+        }),
+        "MR should record the Bell collapse, reset qubit 0, and leave qubit 1 collapsed"
+    );
+}
+
+#[test]
+fn qubit_cx_and_feedback_cx_can_coexist() {
+    let circuit =
+        Circuit::from_stim_str("H 0\nCX 0 1\nM 0\nCX rec[-1] 2\nM 1 2\n").expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+    let shots = sampler.sample_zero_one_with_seed(1000, Some(5));
+
+    assert!(
+        shots.iter().all(|shot| {
+            let Some(measured) = shot.first() else {
+                return false;
+            };
+            shot.get(1) == Some(measured) && shot.get(2) == Some(measured)
+        }),
+        "qubit CX should create a Bell correlation and feedback CX should read the measurement record"
+    );
+}
+
+#[test]
+fn two_qubit_tableau_gates_act_on_stabilizer_frame() {
+    assert_eq!(
+        samples("X 0\nSWAP 0 1\nM 0 1\n", 1),
+        vec![vec![false, true]]
+    );
+}
+
+#[test]
 fn heralded_pauli_channel_records_and_applies_local_paulis() {
     assert_eq!(
         samples("HERALDED_PAULI_CHANNEL_1(0, 0, 0, 0) 0\n", 1),
@@ -384,12 +446,12 @@ fn pauli_channel2_uses_stim_probability_order_for_z_basis_toggles() {
 }
 
 #[test]
-fn rejects_entangling_gates_until_tableau_sampling_lands() {
-    let circuit = Circuit::from_stim_str("CX 0 1\nM 0 1\n").expect("parse circuit");
+fn rejects_pauli_product_measurements_until_mpp_sampling_lands() {
+    let circuit = Circuit::from_stim_str("MPP X0*X1\n").expect("parse circuit");
     assert_eq!(
         CompiledSampler::compile(&circuit),
         Err(CircuitError::invalid_sampler_compilation(
-            "local M8 sampler subset does not support CX"
+            "M8 sampler subset does not support MPP"
         ))
     );
 }
