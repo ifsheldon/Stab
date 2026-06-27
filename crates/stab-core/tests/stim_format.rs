@@ -654,6 +654,15 @@ fn gates_table_matches_stim_v116_canonical_names_and_aliases() {
     );
     assert_eq!(names.len(), 81);
 
+    for gate in Gate::all() {
+        assert_eq!(
+            Gate::from_name(gate.canonical_name()).unwrap(),
+            gate,
+            "{}",
+            gate.canonical_name()
+        );
+    }
+
     for (alias, canonical) in [
         ("MZ", "M"),
         ("MRZ", "MR"),

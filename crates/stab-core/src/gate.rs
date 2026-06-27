@@ -25,24 +25,24 @@ pub struct Gate {
 
 impl Gate {
     /// Iterates over the canonical gates defined by Stim v1.16.0.
+    #[inline]
     pub fn all() -> impl ExactSizeIterator<Item = Self> {
         GATES.iter().map(|info| Self { info })
     }
 
+    #[inline]
     pub fn from_name(name: &str) -> CircuitResult<Self> {
-        let canonical =
-            canonical_gate_name(name).ok_or_else(|| CircuitError::UnknownGate(name.to_string()))?;
-        let info = GATES
-            .iter()
-            .find(|gate| gate.name == canonical)
-            .ok_or_else(|| CircuitError::UnknownGate(name.to_string()))?;
-        Ok(Self { info })
+        gate_info_from_name(name)
+            .map(|info| Self { info })
+            .ok_or_else(|| CircuitError::UnknownGate(name.to_string()))
     }
 
+    #[inline]
     pub fn canonical_name(self) -> &'static str {
         self.info.name
     }
 
+    #[inline]
     pub fn category(self) -> GateCategory {
         self.info.category
     }
@@ -350,33 +350,109 @@ fn validate_finite_arg(gate: &'static str, arg: f64) -> CircuitResult<()> {
     }
 }
 
-fn canonical_gate_name(name: &str) -> Option<&'static str> {
-    let name = name.to_ascii_uppercase();
-    for (alias, canonical) in GATE_ALIASES {
-        if name == *alias {
-            return Some(canonical);
-        }
+#[inline]
+fn gate_info_from_name(name: &str) -> Option<&'static GateInfo> {
+    if let Some(info) = gate_info_from_uppercase_name(name) {
+        return Some(info);
     }
-    GATES
-        .iter()
-        .find(|gate| gate.name == name)
-        .map(|gate| gate.name)
+    if !name.bytes().any(|byte| byte.is_ascii_lowercase()) {
+        return None;
+    }
+    let uppercase = name.to_ascii_uppercase();
+    gate_info_from_uppercase_name(&uppercase)
 }
 
-const GATE_ALIASES: &[(&str, &str)] = &[
-    ("MZ", "M"),
-    ("MRZ", "MR"),
-    ("RZ", "R"),
-    ("CNOT", "CX"),
-    ("ZCX", "CX"),
-    ("ZCY", "CY"),
-    ("ZCZ", "CZ"),
-    ("H_XZ", "H"),
-    ("SQRT_Z", "S"),
-    ("SQRT_Z_DAG", "S_DAG"),
-    ("CORRELATED_ERROR", "E"),
-    ("SWAPCZ", "CZSWAP"),
-];
+#[inline]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
+)]
+fn gate_info_from_uppercase_name(name: &str) -> Option<&'static GateInfo> {
+    Some(match name {
+        "DETECTOR" => &GATES[0],
+        "OBSERVABLE_INCLUDE" => &GATES[1],
+        "TICK" => &GATES[2],
+        "QUBIT_COORDS" => &GATES[3],
+        "SHIFT_COORDS" => &GATES[4],
+        "REPEAT" => &GATES[5],
+        "MPAD" => &GATES[6],
+        "MX" => &GATES[7],
+        "MY" => &GATES[8],
+        "M" | "MZ" => &GATES[9],
+        "MRX" => &GATES[10],
+        "MRY" => &GATES[11],
+        "MR" | "MRZ" => &GATES[12],
+        "RX" => &GATES[13],
+        "RY" => &GATES[14],
+        "R" | "RZ" => &GATES[15],
+        "XCX" => &GATES[16],
+        "XCY" => &GATES[17],
+        "XCZ" => &GATES[18],
+        "YCX" => &GATES[19],
+        "YCY" => &GATES[20],
+        "YCZ" => &GATES[21],
+        "CX" | "CNOT" | "ZCX" => &GATES[22],
+        "CY" | "ZCY" => &GATES[23],
+        "CZ" | "ZCZ" => &GATES[24],
+        "H" | "H_XZ" => &GATES[25],
+        "H_XY" => &GATES[26],
+        "H_YZ" => &GATES[27],
+        "H_NXY" => &GATES[28],
+        "H_NXZ" => &GATES[29],
+        "H_NYZ" => &GATES[30],
+        "DEPOLARIZE1" => &GATES[31],
+        "DEPOLARIZE2" => &GATES[32],
+        "X_ERROR" => &GATES[33],
+        "Y_ERROR" => &GATES[34],
+        "Z_ERROR" => &GATES[35],
+        "I_ERROR" => &GATES[36],
+        "II_ERROR" => &GATES[37],
+        "PAULI_CHANNEL_1" => &GATES[38],
+        "PAULI_CHANNEL_2" => &GATES[39],
+        "E" | "CORRELATED_ERROR" => &GATES[40],
+        "ELSE_CORRELATED_ERROR" => &GATES[41],
+        "HERALDED_ERASE" => &GATES[42],
+        "HERALDED_PAULI_CHANNEL_1" => &GATES[43],
+        "I" => &GATES[44],
+        "X" => &GATES[45],
+        "Y" => &GATES[46],
+        "Z" => &GATES[47],
+        "C_XYZ" => &GATES[48],
+        "C_ZYX" => &GATES[49],
+        "C_NXYZ" => &GATES[50],
+        "C_XNYZ" => &GATES[51],
+        "C_XYNZ" => &GATES[52],
+        "C_NZYX" => &GATES[53],
+        "C_ZNYX" => &GATES[54],
+        "C_ZYNX" => &GATES[55],
+        "SQRT_X" => &GATES[56],
+        "SQRT_X_DAG" => &GATES[57],
+        "SQRT_Y" => &GATES[58],
+        "SQRT_Y_DAG" => &GATES[59],
+        "S" | "SQRT_Z" => &GATES[60],
+        "S_DAG" | "SQRT_Z_DAG" => &GATES[61],
+        "II" => &GATES[62],
+        "SQRT_XX" => &GATES[63],
+        "SQRT_XX_DAG" => &GATES[64],
+        "SQRT_YY" => &GATES[65],
+        "SQRT_YY_DAG" => &GATES[66],
+        "SQRT_ZZ" => &GATES[67],
+        "SQRT_ZZ_DAG" => &GATES[68],
+        "MPP" => &GATES[69],
+        "SPP" => &GATES[70],
+        "SPP_DAG" => &GATES[71],
+        "SWAP" => &GATES[72],
+        "ISWAP" => &GATES[73],
+        "CXSWAP" => &GATES[74],
+        "SWAPCX" => &GATES[75],
+        "CZSWAP" | "SWAPCZ" => &GATES[76],
+        "ISWAP_DAG" => &GATES[77],
+        "MXX" => &GATES[78],
+        "MYY" => &GATES[79],
+        "MZZ" => &GATES[80],
+        _ => return None,
+    })
+}
 
 const GATES: &[GateInfo] = &[
     not_fusable_gate(
