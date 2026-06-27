@@ -571,6 +571,21 @@ mod tests {
                 "oracle/fixtures/inputs/analyze_errors_fold_repeat.stim",
             ),
             (
+                "m8-sample-primary-repetition-contract",
+                "sample|--shots|64|--out_format=b8|--seed|5",
+                "benchmarks/fixtures/m8_sample_primary_repetition_d3_r3.stim",
+            ),
+            (
+                "m8-sample-primary-rotated-surface-contract",
+                "sample|--shots|64|--out_format=b8|--seed|5",
+                "benchmarks/fixtures/m8_sample_primary_rotated_surface_d3_r3.stim",
+            ),
+            (
+                "m8-sample-primary-unrotated-surface-contract",
+                "sample|--shots|64|--out_format=b8|--seed|5",
+                "benchmarks/fixtures/m8_sample_primary_unrotated_surface_d3_r3.stim",
+            ),
+            (
                 "m8-sample-high-repeat-contract",
                 "sample|--shots|1|--out_format=b8|--seed|5",
                 "benchmarks/fixtures/m8_sample_high_repeat_contract.stim",

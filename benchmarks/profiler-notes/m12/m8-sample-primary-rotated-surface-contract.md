@@ -1,0 +1,2 @@
+Dominant cost: the comparable rotated-surface sampling row exercises Stab's current generic compiled-sampler frame path on a generated d3/r3 surface-code circuit, which is much slower than pinned Stim's optimized sampling path for the same source-owned fixture.
+Next owner action: profile `CompiledSampler::sample_bytes_with_seed` on `benchmarks/fixtures/m8_sample_primary_rotated_surface_d3_r3.stim`, then optimize the generic frame update/output path or add a faithful batched path before adding this row to the 1.25x regression threshold file.

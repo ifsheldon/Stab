@@ -3,9 +3,8 @@ use std::hint::black_box;
 use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_core::{
-    Circuit, CodeDistance, CompiledSampler, Probability, ReferenceSampleTree, RepetitionCodeParams,
-    RepetitionCodeTask, RoundCount, SampleFormat, SurfaceCodeParams, SurfaceCodeTask,
-    biased_randomize_bits, generate_repetition_code_circuit, generate_surface_code_circuit,
+    Circuit, CompiledSampler, Probability, ReferenceSampleTree, SampleFormat,
+    biased_randomize_bits,
     result_formats::{read_records, write_records},
 };
 
@@ -17,6 +16,12 @@ use super::{measure_stab, measure_stab_iterations, stab_runner_error};
 
 const SAMPLE_NOISY_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/sample_noisy.stim");
+const PRIMARY_REPETITION_FIXTURE: &str =
+    include_str!("../../../../benchmarks/fixtures/m8_sample_primary_repetition_d3_r3.stim");
+const PRIMARY_ROTATED_SURFACE_FIXTURE: &str =
+    include_str!("../../../../benchmarks/fixtures/m8_sample_primary_rotated_surface_d3_r3.stim");
+const PRIMARY_UNROTATED_SURFACE_FIXTURE: &str =
+    include_str!("../../../../benchmarks/fixtures/m8_sample_primary_unrotated_surface_d3_r3.stim");
 const HIGH_REPEAT_CONTRACT_FIXTURE: &str =
     include_str!("../../../../benchmarks/fixtures/m8_sample_high_repeat_contract.stim");
 const MEASURE_READER_BITS: usize = 10_000;
@@ -37,8 +42,6 @@ const FRAME_SIMULATOR_SHOTS: usize = 4;
 #[cfg(test)]
 const FRAME_SIMULATOR_SHOTS: usize = 2;
 const TABLEAU_SIMULATOR_QUBITS: usize = 16;
-const PRIMARY_MATRIX_DISTANCE: u32 = 3;
-const PRIMARY_MATRIX_ROUNDS: u64 = 3;
 #[cfg(not(test))]
 const PRIMARY_MATRIX_SHOTS: usize = 64;
 #[cfg(test)]
@@ -91,13 +94,13 @@ pub(super) fn run_sample_compare_row(
         "m8-sample-primary-rotated-surface-contract" => run_primary_surface_row(
             row,
             "stab_sample_primary_rotated_surface_d3_r3",
-            SurfaceCodeTask::RotatedMemoryZ,
+            PRIMARY_ROTATED_SURFACE_FIXTURE,
         )
         .map(Some),
         "m8-sample-primary-unrotated-surface-contract" => run_primary_surface_row(
             row,
             "stab_sample_primary_unrotated_surface_d3_r3",
-            SurfaceCodeTask::UnrotatedMemoryZ,
+            PRIMARY_UNROTATED_SURFACE_FIXTURE,
         )
         .map(Some),
         "m8-sample-high-repeat-contract" => run_high_repeat_contract_row(row).map(Some),
@@ -171,13 +174,13 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "direct-match: Stab measures the biased random bit utility against the pinned Stim probability_util perf filters",
         ),
         "m8-sample-primary-repetition-contract" => Some(
-            "contract-representative: Stab samples a generated repetition-code d3/r3 circuit; full primary matrix thresholds remain M12 work",
+            "cli-baseline: Stab samples the source-owned generated repetition-code d3/r3 fixture with b8 output against pinned Stim sample on the same fixture",
         ),
         "m8-sample-primary-rotated-surface-contract" => Some(
-            "contract-representative: Stab samples a generated rotated-surface d3/r3 circuit; full primary matrix thresholds remain M12 work",
+            "cli-baseline: Stab samples the source-owned generated rotated-surface d3/r3 fixture with b8 output against pinned Stim sample on the same fixture",
         ),
         "m8-sample-primary-unrotated-surface-contract" => Some(
-            "contract-representative: Stab samples a generated unrotated-surface d3/r3 circuit; full primary matrix thresholds remain M12 work",
+            "cli-baseline: Stab samples the source-owned generated unrotated-surface d3/r3 fixture with b8 output against pinned Stim sample on the same fixture",
         ),
         "m8-sample-high-repeat-contract" => Some(
             "cli-baseline: Stab samples the source-owned repeat-heavy fixture with b8 output against pinned Stim sample on the same fixture; optimized loop folding remains a logged M8 spec gap",
@@ -345,53 +348,28 @@ fn run_sample_throughput_row(
 }
 
 fn run_primary_repetition_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let params = RepetitionCodeParams::new(
-        RoundCount::try_new(PRIMARY_MATRIX_ROUNDS)
-            .map_err(|error| stab_runner_error(&row.id, error))?,
-        CodeDistance::try_new(PRIMARY_MATRIX_DISTANCE)
-            .map_err(|error| stab_runner_error(&row.id, error))?,
-        RepetitionCodeTask::Memory,
-    )
-    .map_err(|error| stab_runner_error(&row.id, error))?
-    .with_before_measure_flip_probability(
-        Probability::try_new(0.001).map_err(|error| stab_runner_error(&row.id, error))?,
-    );
-    let generated = generate_repetition_code_circuit(&params)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
     run_primary_generated_sample_row(
         row,
         "stab_sample_primary_repetition_d3_r3",
-        generated.circuit(),
+        PRIMARY_REPETITION_FIXTURE,
     )
 }
 
 fn run_primary_surface_row(
     row: &BenchmarkRow,
     measurement_name: &'static str,
-    task: SurfaceCodeTask,
+    fixture: &str,
 ) -> Result<Vec<Measurement>, BenchError> {
-    let params = SurfaceCodeParams::new(
-        RoundCount::try_new(PRIMARY_MATRIX_ROUNDS)
-            .map_err(|error| stab_runner_error(&row.id, error))?,
-        CodeDistance::try_new(PRIMARY_MATRIX_DISTANCE)
-            .map_err(|error| stab_runner_error(&row.id, error))?,
-        task,
-    )
-    .map_err(|error| stab_runner_error(&row.id, error))?
-    .with_after_clifford_depolarization(
-        Probability::try_new(0.001).map_err(|error| stab_runner_error(&row.id, error))?,
-    );
-    let generated = generate_surface_code_circuit(&params)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-    run_primary_generated_sample_row(row, measurement_name, generated.circuit())
+    run_primary_generated_sample_row(row, measurement_name, fixture)
 }
 
 fn run_primary_generated_sample_row(
     row: &BenchmarkRow,
     measurement_name: &'static str,
-    circuit: &Circuit,
+    fixture: &str,
 ) -> Result<Vec<Measurement>, BenchError> {
-    let sampler = compile_sampler(&row.id, circuit)?;
+    let circuit = sample_circuit(&row.id, fixture)?;
+    let sampler = compile_sampler(&row.id, &circuit)?;
     Ok(vec![measure_stab_iterations(
         measurement_name,
         SIMULATOR_COMPARE_ITERATIONS,
