@@ -123,6 +123,85 @@ fn measurement_record_feedback_applies_local_paulis() {
 }
 
 #[test]
+fn heralded_pauli_channel_records_and_applies_local_paulis() {
+    assert_eq!(
+        samples("HERALDED_PAULI_CHANNEL_1(0, 0, 0, 0) 0\n", 1),
+        vec![vec![]]
+    );
+    assert_eq!(
+        samples("HERALDED_PAULI_CHANNEL_1(1, 0, 0, 0) 0\nM 0\n", 1),
+        vec![vec![false]]
+    );
+    assert_eq!(
+        samples("HERALDED_PAULI_CHANNEL_1(0, 1, 0, 0) 0\nM 0\n", 1),
+        vec![vec![true]]
+    );
+    assert_eq!(
+        samples("HERALDED_PAULI_CHANNEL_1(0, 0, 1, 0) 0\nM 0\n", 1),
+        vec![vec![true]]
+    );
+    assert_eq!(
+        samples("H 0\nHERALDED_PAULI_CHANNEL_1(0, 0, 0, 1) 0\nMX 0\n", 1),
+        vec![vec![true]]
+    );
+    assert_eq!(
+        samples(
+            "HERALDED_PAULI_CHANNEL_1(0, 1, 0, 0) 0\nCX rec[-1] 1\nM 0 1\n",
+            1
+        ),
+        vec![vec![true, true]]
+    );
+}
+
+#[test]
+fn heralded_erase_records_heralds_and_randomizes_state() {
+    assert_eq!(
+        samples("HERALDED_ERASE(0) 0 1\nM 0 1\n", 1),
+        vec![vec![false, false]]
+    );
+
+    let circuit = Circuit::from_stim_str("HERALDED_ERASE(1) 0\nM 0\n").expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+    let shots = sampler.sample_zero_one_with_seed(1000, Some(5));
+
+    let hits = shots
+        .iter()
+        .filter(|shot| shot.first() == Some(&true))
+        .count();
+    assert!(
+        (400..=600).contains(&hits),
+        "expected roughly 500 heralded erase Z-basis hits, got {hits}"
+    );
+}
+
+#[test]
+fn heralded_pauli_channel_samples_disjoint_probabilities() {
+    let circuit = Circuit::from_stim_str(
+        "HERALDED_PAULI_CHANNEL_1(0.05, 0.10, 0.15, 0.25) 0\nCX rec[-1] 1\nM 0 1\n",
+    )
+    .expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+    let shots = sampler.sample_zero_one_with_seed(1000, Some(5));
+
+    let heralds = shots
+        .iter()
+        .filter(|shot| shot.get(1) == Some(&true))
+        .count();
+    let hits = shots
+        .iter()
+        .filter(|shot| shot.first() == Some(&true))
+        .count();
+    assert!(
+        (465..=635).contains(&heralds),
+        "expected roughly 550 heralded pauli heralds, got {heralds}"
+    );
+    assert!(
+        (165..=335).contains(&hits),
+        "expected roughly 250 heralded pauli Z-basis hits, got {hits}"
+    );
+}
+
+#[test]
 fn rejects_feedback_that_reads_missing_measurements() {
     let circuit = Circuit::from_stim_str("CX rec[-1] 0\n").expect("parse circuit");
 

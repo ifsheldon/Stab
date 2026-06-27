@@ -84,9 +84,10 @@ impl CompiledSampler {
         R: Rng,
     {
         let mut frame = LocalFrame::new(self.qubit_count);
-        let mut measurements = Vec::new();
-        execute_operations(&self.operations, &mut frame, &mut measurements, rng);
-        measurements
+        let mut record = Vec::new();
+        let mut output = Vec::new();
+        execute_operations(&self.operations, &mut frame, &mut record, &mut output, rng);
+        output
     }
 }
 
@@ -117,6 +118,10 @@ enum SampleOperation {
         left: usize,
         right: usize,
         probabilities: [f64; 15],
+    },
+    HeraldedPauliChannel {
+        qubit: usize,
+        probabilities: [f64; 4],
     },
     FeedbackPauli {
         offset: MeasureRecordOffset,
@@ -557,6 +562,36 @@ fn compile_instruction(
             }
             compile_two_qubit_pauli_channel(instruction, operations, channel_probabilities)
         }
+        "HERALDED_ERASE" => {
+            let probability = single_probability_argument(instruction)?.get() / 4.0;
+            compile_heralded_pauli_channel(
+                instruction,
+                operations,
+                state,
+                [probability, probability, probability, probability],
+            )
+        }
+        "HERALDED_PAULI_CHANNEL_1" => {
+            let Some(probabilities) = instruction.probability_arguments()? else {
+                return Err(unsupported_sampler_instruction(instruction));
+            };
+            let [i_probability, x_probability, y_probability, z_probability] =
+                probabilities.as_slice()
+            else {
+                return Err(unsupported_sampler_instruction(instruction));
+            };
+            compile_heralded_pauli_channel(
+                instruction,
+                operations,
+                state,
+                [
+                    i_probability.get(),
+                    x_probability.get(),
+                    y_probability.get(),
+                    z_probability.get(),
+                ],
+            )
+        }
         _ if zero_probability_noise(instruction)? => Ok(()),
         _ => Err(unsupported_sampler_instruction(instruction)),
     }
@@ -694,6 +729,22 @@ fn compile_two_qubit_pauli_channel(
     Ok(())
 }
 
+fn compile_heralded_pauli_channel(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    state: &mut CompileState,
+    probabilities: [f64; 4],
+) -> CircuitResult<()> {
+    for target in instruction.targets() {
+        operations.push(SampleOperation::HeraldedPauliChannel {
+            qubit: qubit_index(instruction, target)?,
+            probabilities,
+        });
+    }
+    state.add_measurements(instruction.targets().len())?;
+    Ok(())
+}
+
 fn single_probability_argument(
     instruction: &CircuitInstruction,
 ) -> CircuitResult<crate::Probability> {
@@ -745,7 +796,8 @@ fn qubit_index(instruction: &CircuitInstruction, target: &crate::Target) -> Circ
 fn execute_operations(
     operations: &[SampleOperation],
     frame: &mut LocalFrame,
-    measurements: &mut Vec<bool>,
+    record: &mut Vec<bool>,
+    output: &mut Vec<bool>,
     rng: &mut impl Rng,
 ) {
     for operation in operations {
@@ -760,12 +812,17 @@ fn execute_operations(
                 inverted,
                 reset,
             } => {
-                measurements.push(frame.measure(*qubit, *basis, *inverted, rng));
+                let result = frame.measure(*qubit, *basis, *inverted, rng);
+                record.push(result);
+                output.push(result);
                 if *reset {
                     frame.reset(*qubit, *basis);
                 }
             }
-            SampleOperation::Pad { value } => measurements.push(*value),
+            SampleOperation::Pad { value } => {
+                record.push(*value);
+                output.push(*value);
+            }
             SampleOperation::SingleQubitPauliChannel {
                 qubit,
                 probabilities,
@@ -779,18 +836,24 @@ fn execute_operations(
             } => {
                 apply_two_qubit_pauli_channel(frame, *left, *right, probabilities, rng);
             }
+            SampleOperation::HeraldedPauliChannel {
+                qubit,
+                probabilities,
+            } => {
+                apply_heralded_pauli_channel(frame, *qubit, probabilities, record, rng);
+            }
             SampleOperation::FeedbackPauli {
                 offset,
                 qubit,
                 basis,
             } => {
-                if measurement_record_bit(measurements, *offset) {
+                if measurement_record_bit(record, *offset) {
                     frame.apply_pauli(*qubit, *basis);
                 }
             }
             SampleOperation::Repeat { count, body } => {
                 for _ in 0..*count {
-                    execute_operations(body, frame, measurements, rng);
+                    execute_operations(body, frame, record, output, rng);
                 }
             }
         }
@@ -806,6 +869,35 @@ fn measurement_record_bit(measurements: &[bool], offset: MeasureRecordOffset) ->
         return false;
     };
     measurements.get(index).copied().unwrap_or(false)
+}
+
+fn apply_heralded_pauli_channel(
+    frame: &mut LocalFrame,
+    qubit: usize,
+    probabilities: &[f64; 4],
+    measurements: &mut Vec<bool>,
+    rng: &mut impl Rng,
+) {
+    let [i_probability, x_probability, y_probability, z_probability] = *probabilities;
+    let mut sampled_probability = rng.random::<f64>();
+    if sampled_probability < i_probability {
+        measurements.push(true);
+        return;
+    }
+    sampled_probability -= i_probability;
+    for (basis, probability) in [
+        (PauliBasis::X, x_probability),
+        (PauliBasis::Y, y_probability),
+        (PauliBasis::Z, z_probability),
+    ] {
+        if sampled_probability < probability {
+            measurements.push(true);
+            frame.apply_pauli(qubit, basis);
+            return;
+        }
+        sampled_probability -= probability;
+    }
+    measurements.push(false);
 }
 
 fn apply_single_qubit_pauli_channel(
