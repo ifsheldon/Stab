@@ -21,6 +21,7 @@ use crate::root::RepoRoot;
 use crate::stim::{ensure_stim_binaries, validate_stim_source};
 
 mod m10;
+mod m11;
 mod m7;
 mod m8;
 mod m9;
@@ -574,6 +575,8 @@ fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, 
                 Ok(Some(measurements))
             } else if let Some(measurements) = m10::run_dem_compare_row(row)? {
                 Ok(Some(measurements))
+            } else if let Some(measurements) = m11::run_dem_sampling_compare_row(row)? {
+                Ok(Some(measurements))
             } else if let Some(measurements) = m7::run_generator_compare_row(row)? {
                 Ok(Some(measurements))
             } else if row.runner == Runner::ContractOnly {
@@ -912,6 +915,9 @@ fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     if let Some(work) = m10::measurement_work(row_id, name) {
         return Some(work);
     }
+    if let Some(work) = m11::measurement_work(row_id, name) {
+        return Some(work);
+    }
     if row_id.starts_with("m7-gen-") && name.starts_with("stab_gen_") {
         return Some((1.0, "circuits/s"));
     }
@@ -973,6 +979,9 @@ fn compare_note(row_id: &str) -> Option<&'static str> {
         return Some(note);
     }
     if let Some(note) = m10::compare_note(row_id) {
+        return Some(note);
+    }
+    if let Some(note) = m11::compare_note(row_id) {
         return Some(note);
     }
     match row_id {
