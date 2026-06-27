@@ -97,6 +97,7 @@ impl GaugeTracker {
             "RX" => self.undo_resets(instruction, AnalyzerBasis::X),
             "RY" => self.undo_resets(instruction, AnalyzerBasis::Y),
             "H" => self.undo_h(instruction),
+            "H_XY" => self.undo_h_xy(instruction),
             "CX" => self.undo_cx(instruction),
             _ => Ok(()),
         }
@@ -296,6 +297,19 @@ impl GaugeTracker {
                 ))
             })?;
             std::mem::swap(xs, zs);
+        }
+        Ok(())
+    }
+
+    fn undo_h_xy(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        for target in instruction.targets().iter().rev() {
+            let qubit = target.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "H_XY target {target} is not a qubit"
+                ))
+            })?;
+            let xs = self.xs_for(qubit)?.clone();
+            self.toggle_zs(qubit, &xs)?;
         }
         Ok(())
     }

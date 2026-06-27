@@ -175,6 +175,37 @@ fn dem_analyzer_allows_gauge_detectors_as_half_probability_errors() {
 }
 
 #[test]
+fn dem_analyzer_allows_gauge_detectors_through_hxy_basis_change() {
+    let circuit = Circuit::from_stim_str(
+        "RY 0\n\
+         H_XY 0\n\
+         CNOT 0 1\n\
+         M 0 1\n\
+         DETECTOR rec[-1]\n\
+         DETECTOR rec[-2]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, allow_gauge_options())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.5) D0 D1\n");
+}
+
+#[test]
+fn dem_analyzer_allow_gauge_detectors_still_rejects_gauge_observables() {
+    let circuit = Circuit::from_stim_str("R 0\nH 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
+
+    let error = circuit_to_detector_error_model(&circuit, allow_gauge_options())
+        .unwrap_err()
+        .to_string();
+
+    assert!(error.contains("non-deterministic observables"));
+    assert!(error.contains("L0"));
+}
+
+#[test]
 fn dem_analyzer_maps_simple_pauli_noise_to_detector_and_observable() {
     let circuit = Circuit::from_stim_str(
         "X_ERROR(0.25) 0\nX_ERROR(0.125) 1\nM 0 1\nOBSERVABLE_INCLUDE(3) rec[-1]\nDETECTOR rec[-2]\n",

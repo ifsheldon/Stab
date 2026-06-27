@@ -1,0 +1,6 @@
+RY 0
+H_XY 0
+CNOT 0 1
+M 0 1
+DETECTOR rec[-1]
+DETECTOR rec[-2]
