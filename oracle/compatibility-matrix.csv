@@ -65,7 +65,7 @@ cpp-hyper-graph,src/stim/search/hyper/graph.test.cc,cxx-test,dem-analysis,stab-c
 cpp-hyper-node,src/stim/search/hyper/node.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,direct-rust,planned,,,M10 hypergraph node model tests
 cpp-hyper-state,src/stim/search/hyper/search_state.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,direct-rust,planned,,,M10 hypergraph search-state tests
 cpp-sat-wcnf,src/stim/search/sat/wcnf.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,direct-rust,planned,,,M10 WCNF output tests for analyzer internals
-cpp-dem-sampler,src/stim/simulators/dem_sampler.test.cc,cxx-test,sampler,stab-core,M11,P0,exact-output-and-statistical,oracle,planned,,,M11 compiled DEM sampler tests
+cpp-dem-sampler,src/stim/simulators/dem_sampler.test.cc,cxx-test,sampler,stab-core,M11,P0,structural,direct-rust,planned,,,M11 compiled DEM sampler structural and statistical-property tests
 cpp-error-analyzer,src/stim/simulators/error_analyzer.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,oracle,planned,,,M10 circuit to DEM analyzer tests
 cpp-error-matcher,src/stim/simulators/error_matcher.test.cc,cxx-test,dem-analysis,stab-core,M10,P0,structural,direct-rust,planned,,,M10 error matcher tests
 cpp-frame-simulator,src/stim/simulators/frame_simulator.test.cc,cxx-test,sampler,stab-core,M8,P0,exact-output-and-statistical,oracle,planned,,,M8 frame simulator sampling tests
