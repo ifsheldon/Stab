@@ -295,3 +295,135 @@ fn dem_analyzer_noisy_basis_measurements_match_upstream_subset() {
         assert_eq!(analyze(circuit), expected);
     }
 }
+
+#[test]
+fn dem_analyzer_measure_reset_basis_matches_upstream_subset() {
+    for (circuit, expected) in [
+        (
+            "
+            RZ 0 1 2
+            X_ERROR(0.25) 0
+            Y_ERROR(0.25) 1
+            Z_ERROR(0.25) 2
+            MZ 0 1 2
+            DETECTOR rec[-3]
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D0\nerror(0.25) D1\ndetector D2\n",
+        ),
+        (
+            "
+            RX 0 1 2
+            X_ERROR(0.25) 0
+            Y_ERROR(0.25) 1
+            Z_ERROR(0.25) 2
+            MX 0 1 2
+            DETECTOR rec[-3]
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D1\nerror(0.25) D2\ndetector D0\n",
+        ),
+        (
+            "
+            RY 0 1 2
+            X_ERROR(0.25) 0
+            Y_ERROR(0.25) 1
+            Z_ERROR(0.25) 2
+            MY 0 1 2
+            DETECTOR rec[-3]
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D0\nerror(0.25) D2\ndetector D1\n",
+        ),
+        (
+            "
+            MRZ 0 1 2
+            X_ERROR(0.25) 0
+            Y_ERROR(0.25) 1
+            Z_ERROR(0.25) 2
+            MRZ 0 1 2
+            DETECTOR rec[-3]
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D0\nerror(0.25) D1\ndetector D2\n",
+        ),
+        (
+            "
+            MRX 0 1 2
+            X_ERROR(0.25) 0
+            Y_ERROR(0.25) 1
+            Z_ERROR(0.25) 2
+            MRX 0 1 2
+            DETECTOR rec[-3]
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D1\nerror(0.25) D2\ndetector D0\n",
+        ),
+        (
+            "
+            MRY 0 1 2
+            X_ERROR(0.25) 0
+            Y_ERROR(0.25) 1
+            Z_ERROR(0.25) 2
+            MRY 0 1 2
+            DETECTOR rec[-3]
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D0\nerror(0.25) D2\ndetector D1\n",
+        ),
+    ] {
+        assert_eq!(analyze(circuit), expected);
+    }
+}
+
+#[test]
+fn dem_analyzer_repeated_measure_reset_matches_upstream_subset() {
+    for (circuit, expected) in [
+        (
+            "
+            MRZ 0 0
+            X_ERROR(0.25) 0
+            MRZ 0 0
+            DETECTOR rec[-4]
+            DETECTOR rec[-3]
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D2\ndetector D0\ndetector D1\ndetector D3\n",
+        ),
+        (
+            "
+            RY 0 0
+            MRY 0 0
+            X_ERROR(0.25) 0
+            MRY 0 0
+            DETECTOR rec[-4]
+            DETECTOR rec[-3]
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D2\ndetector D0\ndetector D1\ndetector D3\n",
+        ),
+        (
+            "
+            RX 0 0
+            MRX 0 0
+            Z_ERROR(0.25) 0
+            MRX 0 0
+            DETECTOR rec[-4]
+            DETECTOR rec[-3]
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D2\ndetector D0\ndetector D1\ndetector D3\n",
+        ),
+    ] {
+        assert_eq!(analyze(circuit), expected);
+    }
+}
