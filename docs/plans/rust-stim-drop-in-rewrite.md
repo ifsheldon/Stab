@@ -362,8 +362,8 @@ Tasks:
 - Add sparse, dense, repeated, and high-detector-count DEM fixture groups.
 
 M11 accepts a bounded materialized sampler for the initial Rust core and CLI surface.
-Completion requires explicit rejection tests for oversized DEM input, bounded repeat expansion, excessive detector or observable output width, excessive sampled-error materialization, replay buffers that would exceed the current materialized limit, truncated `ptb64` replay, and invalid replay shot counts.
-The accepted M11 limits are a 64 MiB `sample_dem` DEM input cap, a 64,000,000 buffered-unit materialization cap, the existing DEM sampler repeat and expanded-instruction caps, and a 1,048,576 byte cap per requested text replay record.
+Completion requires explicit rejection tests for oversized DEM input, bounded DEM line and repeat nesting during parse, bounded repeat expansion, excessive detector or observable output width, excessive sampled-error materialization, replay buffers that would exceed the current materialized limit, truncated `ptb64` replay, and invalid replay shot counts.
+The accepted M11 limits are a 64 MiB `sample_dem` DEM input cap, a 1,000,000 line DEM parser cap, a 256 level DEM repeat nesting cap, a 64,000,000 buffered-unit materialization cap, a 64 MiB estimated materialized-buffer byte cap, the existing DEM sampler repeat and expanded-instruction caps, and a 1,048,576 byte cap per requested text replay record.
 True streaming output, folded repeat sampling without bounded unrolling, exact output-byte budgeting, and performance thresholds are deferred to M12 performance hardening.
 
 The required M11 `sample_dem` CLI surface is the pinned Stim v1.16.0 flag set `--shots`, `--in`, `--out`, `--out_format`, `--seed`, `--obs_out`, `--obs_out_format`, `--err_out`, `--err_out_format`, `--replay_err_in`, and `--replay_err_in_format`.

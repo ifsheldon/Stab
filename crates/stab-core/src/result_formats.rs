@@ -18,7 +18,7 @@ pub fn write_records(records: &[Vec<bool>], format: SampleFormat) -> Vec<u8> {
     writer.into_bytes()
 }
 
-pub fn write_ptb64_records(records: &[Vec<bool>]) -> Vec<u8> {
+fn write_ptb64_records(records: &[Vec<bool>]) -> Vec<u8> {
     let mut output = Vec::new();
     for shot_group in records.chunks_exact(64) {
         let bits_per_shot = shot_group.first().map_or(0, Vec::len);

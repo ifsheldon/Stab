@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+use std::str::Lines;
 
 mod analyze;
 #[cfg(test)]
@@ -18,6 +19,8 @@ pub use sat::{likeliest_error_sat_problem, shortest_error_sat_problem};
 use crate::{CircuitError, CircuitResult, Probability, RepeatCount};
 
 const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
+const MAX_DEM_PARSE_LINES: usize = 1_000_000;
+pub(crate) const MAX_DEM_REPEAT_NESTING: usize = 256;
 const DEM_FLOAT_PRECISION: i32 = 34;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -590,31 +593,34 @@ fn validate_targets(
 }
 
 struct DemParser<'a> {
-    lines: Vec<&'a str>,
-    index: usize,
+    lines: Lines<'a>,
+    line_number: usize,
 }
 
 impl<'a> DemParser<'a> {
     fn new(input: &'a str) -> Self {
         Self {
-            lines: input.lines().collect(),
-            index: 0,
+            lines: input.lines(),
+            line_number: 0,
         }
     }
 
     fn parse(mut self) -> CircuitResult<DetectorErrorModel> {
-        let model = self.parse_block(false)?;
-        if self.index < self.lines.len() {
-            return Err(CircuitError::UnexpectedRepeatTerminator);
-        }
-        Ok(model)
+        self.parse_block(false, 0)
     }
 
-    fn parse_block(&mut self, stop_on_terminator: bool) -> CircuitResult<DetectorErrorModel> {
+    fn parse_block(
+        &mut self,
+        stop_on_terminator: bool,
+        depth: usize,
+    ) -> CircuitResult<DetectorErrorModel> {
+        if depth > MAX_DEM_REPEAT_NESTING {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "DEM repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
+            )));
+        }
         let mut model = DetectorErrorModel::new();
-        while let Some(raw_line) = self.lines.get(self.index).copied() {
-            let line_number = self.index + 1;
-            self.index += 1;
+        while let Some((line_number, raw_line)) = self.next_line()? {
             let Some(line) = strip_comment(raw_line) else {
                 continue;
             };
@@ -629,7 +635,11 @@ impl<'a> DemParser<'a> {
                 return Err(CircuitError::UnexpectedRepeatTerminator);
             }
             if let Some(prefix) = line.strip_suffix('{') {
-                model.push_repeat_block(self.parse_repeat(line_number, prefix.trim_end())?);
+                model.push_repeat_block(self.parse_repeat(
+                    line_number,
+                    prefix.trim_end(),
+                    depth,
+                )?);
             } else {
                 model.push_instruction(parse_dem_instruction(line_number, line)?);
             }
@@ -641,7 +651,27 @@ impl<'a> DemParser<'a> {
         }
     }
 
-    fn parse_repeat(&mut self, line_number: usize, line: &str) -> CircuitResult<DemRepeatBlock> {
+    fn next_line(&mut self) -> CircuitResult<Option<(usize, &'a str)>> {
+        let Some(raw_line) = self.lines.next() else {
+            return Ok(None);
+        };
+        self.line_number = self.line_number.checked_add(1).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model("DEM line count overflowed")
+        })?;
+        if self.line_number > MAX_DEM_PARSE_LINES {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "DEM input has more than {MAX_DEM_PARSE_LINES} lines"
+            )));
+        }
+        Ok(Some((self.line_number, raw_line)))
+    }
+
+    fn parse_repeat(
+        &mut self,
+        line_number: usize,
+        line: &str,
+        parent_depth: usize,
+    ) -> CircuitResult<DemRepeatBlock> {
         let (name, rest) = parse_name(line_number, line)?;
         if !name.eq_ignore_ascii_case("repeat") {
             return Err(CircuitError::parse_line(
@@ -663,7 +693,7 @@ impl<'a> DemParser<'a> {
         let count = count
             .parse::<u64>()
             .map_err(|_| CircuitError::parse_line(line_number, "invalid repeat count"))?;
-        let body = self.parse_block(true)?;
+        let body = self.parse_block(true, parent_depth + 1)?;
         Ok(DemRepeatBlock::new(RepeatCount::try_new(count)?, body, tag))
     }
 }

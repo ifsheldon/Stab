@@ -1,5 +1,5 @@
 use super::run_from;
-use stab_core::result_formats::write_ptb64_records;
+use stab_core::result_formats::write_ptb64_records_checked;
 use std::ffi::OsString;
 use tempfile::tempdir;
 
@@ -303,7 +303,8 @@ fn sample_dem_replays_ptb64_error_records() {
     let dir = tempdir().expect("tempdir");
     let replay_path = dir.path().join("errors.ptb64");
     let obs_path = dir.path().join("obs.01");
-    let mut replay_input = write_ptb64_records(&vec![vec![true, false]; 64]);
+    let mut replay_input =
+        write_ptb64_records_checked(&vec![vec![true, false]; 64]).expect("ptb64 replay fixture");
     replay_input.push(0xA5);
     std::fs::write(&replay_path, replay_input).expect("write replay input");
     let args = vec![
@@ -605,6 +606,26 @@ fn sample_dem_rejects_excessive_buffered_output_before_sampling() {
         String::from_utf8(stderr)
             .unwrap()
             .contains("DEM sampler would require 64000001 buffered units")
+    );
+}
+
+#[test]
+fn sample_dem_rejects_materialized_byte_pressure_before_sampling() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample_dem", "--shots", "3000000"],
+        b"".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("materialized bytes")
     );
 }
 

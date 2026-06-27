@@ -161,6 +161,31 @@ fn dem_rejects_invalid_probabilities_and_separators() {
 }
 
 #[test]
+fn dem_parser_rejects_hostile_line_count_and_repeat_depth() {
+    let too_many_lines = "\n".repeat(1_000_001);
+    let error =
+        DetectorErrorModel::from_dem_str(&too_many_lines).expect_err("reject too many lines");
+    assert!(
+        error.to_string().contains("more than 1000000 lines"),
+        "{error}"
+    );
+
+    let mut too_deep = String::new();
+    for _ in 0..257 {
+        too_deep.push_str("repeat 1 {\n");
+    }
+    too_deep.push_str("error(1) D0\n");
+    for _ in 0..257 {
+        too_deep.push_str("}\n");
+    }
+    let error = DetectorErrorModel::from_dem_str(&too_deep).expect_err("reject deep repeats");
+    assert!(
+        error.to_string().contains("repeat nesting exceeds"),
+        "{error}"
+    );
+}
+
+#[test]
 fn dem_counts_detector_shift_detectors_and_observables_through_repeats() {
     let dem = DetectorErrorModel::from_dem_str(
         "shift_detectors 50\nrepeat 3 {\n    detector D0\n    error(0.1) D0 D2 L6\n    shift_detectors 4\n}\nlogical_observable L5\n",

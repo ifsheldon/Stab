@@ -7,7 +7,7 @@ use self::stabilizer_frame::{
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
     MeasureRecordOffset, Pauli, PauliBasis, SampleFormat, SingleQubitClifford,
-    result_formats::{MeasureRecordWriter, write_ptb64_records},
+    result_formats::{MeasureRecordWriter, write_ptb64_records_checked},
 };
 
 mod measurement_flip;
@@ -111,7 +111,7 @@ impl CompiledSampler {
         let samples = (0..shots)
             .map(|_| self.sample_shot_with_reference(&mut rng, reference_sample.as_deref()))
             .collect::<Vec<_>>();
-        Ok(write_ptb64_records(&samples))
+        write_ptb64_records_checked(&samples)
     }
 
     pub fn count_determined_measurements(&self, unknown_input: bool) -> u64 {

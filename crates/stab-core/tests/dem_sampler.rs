@@ -4,8 +4,8 @@
 )]
 
 use stab_core::{
-    CompiledDemSampler, DetectionEventRecord, DetectionObservableOutputMode, DetectorErrorModel,
-    SampleFormat, write_detection_records,
+    CompiledDemSampler, DemRepeatBlock, DetectionEventRecord, DetectionObservableOutputMode,
+    DetectorErrorModel, RepeatCount, SampleFormat, write_detection_records,
 };
 
 fn compile_dem(text: &str) -> CompiledDemSampler {
@@ -394,6 +394,35 @@ fn dem_sampler_rejects_excessive_buffered_outputs_before_sampling() {
         error
             .to_string()
             .contains("would require 64100641 buffered units"),
+        "{error}"
+    );
+}
+
+#[test]
+fn dem_sampler_rejects_materialized_heap_pressure_before_sampling() {
+    let empty = compile_dem("");
+    let error = empty
+        .sample_detection_events_with_seed(3_000_000, Some(5))
+        .expect_err("reject excessive materialized record overhead");
+    assert!(error.to_string().contains("materialized bytes"), "{error}");
+}
+
+#[test]
+fn dem_sampler_rejects_programmatic_deep_repeat_nesting() {
+    let mut model = DetectorErrorModel::new();
+    for _ in 0..257 {
+        let mut outer = DetectorErrorModel::new();
+        outer.push_repeat_block(DemRepeatBlock::new(
+            RepeatCount::try_new(1).expect("repeat count"),
+            model,
+            None,
+        ));
+        model = outer;
+    }
+
+    let error = CompiledDemSampler::compile(&model).expect_err("reject deep repeat nesting");
+    assert!(
+        error.to_string().contains("repeat nesting exceeds"),
         "{error}"
     );
 }

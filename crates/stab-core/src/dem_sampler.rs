@@ -4,12 +4,14 @@ use rand::{Rng, RngExt as _, SeedableRng as _};
 use crate::{
     CircuitError, CircuitResult, DemInstruction, DemInstructionKind, DemItem, DemTarget,
     DetectionConversionOutput, DetectionEventRecord, DetectorErrorModel,
+    dem::MAX_DEM_REPEAT_NESTING,
 };
 
 const MAX_DEM_SAMPLER_REPEAT_UNROLL: u64 = 100_000;
 const MAX_DEM_SAMPLER_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
 const MAX_DEM_SAMPLER_REPEAT_ITERATIONS: u64 = 1_000_000;
 const MAX_DEM_SAMPLER_BUFFER_UNITS: usize = 64_000_000;
+const MAX_DEM_SAMPLER_BUFFER_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledDemSampler {
@@ -89,7 +91,45 @@ impl CompiledDemSampler {
                 "DEM sampler would require {total_units} buffered units; current limit is {MAX_DEM_SAMPLER_BUFFER_UNITS}"
             )));
         }
+        let bytes_per_shot = self.materialized_bytes_per_shot(include_error_records)?;
+        let total_bytes = shots.checked_mul(bytes_per_shot).ok_or_else(|| {
+            CircuitError::invalid_sampler_compilation("DEM sampler buffer byte size overflowed")
+        })?;
+        if total_bytes > MAX_DEM_SAMPLER_BUFFER_BYTES {
+            return Err(CircuitError::invalid_sampler_compilation(format!(
+                "DEM sampler would require at least {total_bytes} materialized bytes; current limit is {MAX_DEM_SAMPLER_BUFFER_BYTES}"
+            )));
+        }
         Ok(())
+    }
+
+    fn materialized_bytes_per_shot(&self, include_error_records: bool) -> CircuitResult<usize> {
+        let detector_observable_bytes = self
+            .detector_count
+            .checked_add(self.observable_count)
+            .ok_or_else(|| {
+                CircuitError::invalid_sampler_compilation(
+                    "DEM sampler output width overflowed while validating buffer bytes",
+                )
+            })?;
+        let mut bytes = std::mem::size_of::<DetectionEventRecord>()
+            .checked_add(detector_observable_bytes)
+            .ok_or_else(|| {
+                CircuitError::invalid_sampler_compilation(
+                    "DEM sampler per-shot output byte size overflowed",
+                )
+            })?;
+        if include_error_records {
+            bytes = bytes
+                .checked_add(std::mem::size_of::<Vec<bool>>())
+                .and_then(|value| value.checked_add(self.operations.len()))
+                .ok_or_else(|| {
+                    CircuitError::invalid_sampler_compilation(
+                        "DEM sampler per-shot error byte size overflowed",
+                    )
+                })?;
+        }
+        Ok(bytes.max(1))
     }
 
     pub fn sample_detection_events_and_errors_with_seed(
@@ -260,14 +300,20 @@ impl DemSampleOperation {
 
 fn validate_compile_budget(items: &[DemItem]) -> CircuitResult<()> {
     let mut budget = DemSamplerCompileBudget::default();
-    validate_compile_budget_items(items, 1, &mut budget)
+    validate_compile_budget_items(items, 1, 0, &mut budget)
 }
 
 fn validate_compile_budget_items(
     items: &[DemItem],
     multiplier: u64,
+    depth: usize,
     budget: &mut DemSamplerCompileBudget,
 ) -> CircuitResult<()> {
+    if depth > MAX_DEM_REPEAT_NESTING {
+        return Err(CircuitError::invalid_sampler_compilation(format!(
+            "DEM repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
+        )));
+    }
     for item in items {
         match item {
             DemItem::Instruction(_) => budget.add_expanded_instructions(multiplier)?,
@@ -285,7 +331,12 @@ fn validate_compile_budget_items(
                         )
                     })?;
                 budget.add_repeat_iterations(repeated_multiplier)?;
-                validate_compile_budget_items(repeat.body().items(), repeated_multiplier, budget)?;
+                validate_compile_budget_items(
+                    repeat.body().items(),
+                    repeated_multiplier,
+                    depth + 1,
+                    budget,
+                )?;
             }
         }
     }
