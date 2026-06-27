@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+mod clifford;
 mod declarations;
 mod decompose;
 mod effects;
@@ -187,6 +188,10 @@ impl Analyzer {
                 self.apply_controlled_pauli(instruction)
             }
             "SWAP" => self.apply_swap(instruction),
+            "ISWAP" | "ISWAP_DAG" | "CXSWAP" | "SWAPCX" | "CZSWAP" | "SQRT_XX" | "SQRT_XX_DAG"
+            | "SQRT_YY" | "SQRT_YY_DAG" | "SQRT_ZZ" | "SQRT_ZZ_DAG" => {
+                self.apply_two_qubit_clifford(instruction)
+            }
             "MPAD" => self.record_measurement_pads(instruction),
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),

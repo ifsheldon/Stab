@@ -1,7 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    CircuitError, CircuitResult, Pauli, PauliBasis, Probability, QubitId, SingleQubitClifford,
+    CircuitError, CircuitResult, Pauli, PauliBasis, PauliSign, PauliString, Probability, QubitId,
+    SingleQubitClifford, Tableau,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -155,6 +156,24 @@ impl PendingError {
         insert_effect_mask(&mut masks, left, output_left);
         insert_effect_mask(&mut masks, right, output_right);
         self.effects = effects_from_masks(masks);
+    }
+
+    pub(super) fn apply_two_qubit_tableau(
+        &mut self,
+        gate_name: &str,
+        left: QubitId,
+        right: QubitId,
+        tableau: &Tableau,
+    ) -> CircuitResult<()> {
+        let mut masks = self.effect_masks();
+        let left_mask = masks.remove(&left).unwrap_or(0);
+        let right_mask = masks.remove(&right).unwrap_or(0);
+        let [output_left, output_right] =
+            apply_two_qubit_tableau_to_masks(gate_name, left_mask, right_mask, tableau)?;
+        insert_effect_mask(&mut masks, left, output_left);
+        insert_effect_mask(&mut masks, right, output_right);
+        self.effects = effects_from_masks(masks);
+        Ok(())
     }
 
     pub(super) fn toggle_effect(&mut self, effect: NoiseEffect) {
@@ -359,6 +378,64 @@ impl ObservableSensitivity {
         Ok(())
     }
 
+    pub(super) fn apply_two_qubit_tableau(
+        &mut self,
+        gate_name: &str,
+        left: QubitId,
+        right: QubitId,
+        tableau: &Tableau,
+    ) -> CircuitResult<()> {
+        let left_xs = self.xs.remove(&left).unwrap_or_default();
+        let left_zs = self.zs.remove(&left).unwrap_or_default();
+        let right_xs = self.xs.remove(&right).unwrap_or_default();
+        let right_zs = self.zs.remove(&right).unwrap_or_default();
+
+        self.apply_pauli_string_sensitivity(
+            left,
+            right,
+            tableau.x_output(0).map_err(|error| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "failed to read {gate_name} left X output during error analysis: {error}"
+                ))
+            })?,
+            &left_xs,
+        )?;
+        self.apply_pauli_string_sensitivity(
+            left,
+            right,
+            tableau.z_output(0).map_err(|error| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "failed to read {gate_name} left Z output during error analysis: {error}"
+                ))
+            })?,
+            &left_zs,
+        )?;
+        self.apply_pauli_string_sensitivity(
+            left,
+            right,
+            tableau.x_output(1).map_err(|error| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "failed to read {gate_name} right X output during error analysis: {error}"
+                ))
+            })?,
+            &right_xs,
+        )?;
+        self.apply_pauli_string_sensitivity(
+            left,
+            right,
+            tableau.z_output(1).map_err(|error| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "failed to read {gate_name} right Z output during error analysis: {error}"
+                ))
+            })?,
+            &right_zs,
+        )?;
+
+        self.remove_empty(left);
+        self.remove_empty(right);
+        Ok(())
+    }
+
     fn apply_basis_set(
         &mut self,
         qubit: QubitId,
@@ -383,6 +460,35 @@ impl ObservableSensitivity {
                 Ok(())
             }
         }
+    }
+
+    fn apply_pauli_string_sensitivity(
+        &mut self,
+        left: QubitId,
+        right: QubitId,
+        pauli: &PauliString,
+        observables: &BTreeSet<u64>,
+    ) -> CircuitResult<()> {
+        let mut has_term = false;
+        for (index, basis) in pauli.active_terms() {
+            has_term = true;
+            let qubit = match index {
+                0 => left,
+                1 => right,
+                _ => {
+                    return Err(CircuitError::invalid_detector_error_model(
+                        "two-qubit tableau output has an out-of-range Pauli term",
+                    ));
+                }
+            };
+            self.apply_basis_set(qubit, basis, observables)?;
+        }
+        if !has_term && !observables.is_empty() {
+            return Err(CircuitError::invalid_detector_error_model(
+                "logical observable sensitivity mapped to identity",
+            ));
+        }
+        Ok(())
     }
 
     fn apply_controlled_basis_component(
@@ -443,6 +549,63 @@ pub(super) fn analyzer_pauli_from_mask(mask: u8) -> AnalyzerPauli {
         0b11 => AnalyzerPauli::Y,
         _ => unreachable!("pauli masks are maintained by xor of X/Z bits"),
     }
+}
+
+fn apply_two_qubit_tableau_to_masks(
+    gate_name: &str,
+    left_mask: u8,
+    right_mask: u8,
+    tableau: &Tableau,
+) -> CircuitResult<[u8; 2]> {
+    let input = PauliString::from_bases(
+        PauliSign::Plus,
+        [
+            pauli_basis_from_mask(left_mask, gate_name)?,
+            pauli_basis_from_mask(right_mask, gate_name)?,
+        ],
+    );
+    let output = tableau.apply(&input).map_err(|error| {
+        CircuitError::invalid_detector_error_model(format!(
+            "failed to propagate Pauli effect through {gate_name}: {error}"
+        ))
+    })?;
+    Ok([
+        output
+            .get(0)
+            .map(mask_from_pauli_basis)
+            .ok_or_else(|| two_qubit_tableau_output_length_error(gate_name, 0))?,
+        output
+            .get(1)
+            .map(mask_from_pauli_basis)
+            .ok_or_else(|| two_qubit_tableau_output_length_error(gate_name, 1))?,
+    ])
+}
+
+fn pauli_basis_from_mask(mask: u8, gate_name: &str) -> CircuitResult<PauliBasis> {
+    match mask {
+        0b00 => Ok(PauliBasis::I),
+        0b01 => Ok(PauliBasis::X),
+        0b10 => Ok(PauliBasis::Z),
+        0b11 => Ok(PauliBasis::Y),
+        _ => Err(CircuitError::invalid_detector_error_model(format!(
+            "{gate_name} saw an invalid Pauli mask {mask}"
+        ))),
+    }
+}
+
+fn mask_from_pauli_basis(basis: PauliBasis) -> u8 {
+    match basis {
+        PauliBasis::I => 0,
+        PauliBasis::X => ANALYZER_X_MASK,
+        PauliBasis::Y => ANALYZER_X_MASK | ANALYZER_Z_MASK,
+        PauliBasis::Z => ANALYZER_Z_MASK,
+    }
+}
+
+fn two_qubit_tableau_output_length_error(gate_name: &str, index: usize) -> CircuitError {
+    CircuitError::invalid_detector_error_model(format!(
+        "{gate_name} two-qubit tableau output is missing qubit {index}"
+    ))
 }
 
 pub(super) fn analyzer_paulis_anticommute(left: AnalyzerPauli, right: AnalyzerPauli) -> bool {

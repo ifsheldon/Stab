@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, PauliBasis, QubitId,
-    SingleQubitClifford,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, PauliBasis, PauliString,
+    QubitId, SingleQubitClifford, Tableau, circuit_tableau::gate_tableau,
 };
 
 use super::effects::analyzer_paulis_anticommute;
@@ -112,6 +112,10 @@ impl GaugeTracker {
             "SWAP" => self.undo_swap(instruction),
             "CX" | "CY" | "CZ" | "XCX" | "XCY" | "XCZ" | "YCX" | "YCY" | "YCZ" => {
                 self.undo_controlled_pauli(instruction)
+            }
+            "ISWAP" | "ISWAP_DAG" | "CXSWAP" | "SWAPCX" | "CZSWAP" | "SQRT_XX" | "SQRT_XX_DAG"
+            | "SQRT_YY" | "SQRT_YY_DAG" | "SQRT_ZZ" | "SQRT_ZZ_DAG" => {
+                self.undo_two_qubit_clifford(instruction)
             }
             "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
             _ => {
@@ -487,6 +491,123 @@ impl GaugeTracker {
             }
             PauliBasis::Z => self.toggle_zs(qubit, sensitivity),
         }
+    }
+
+    fn undo_two_qubit_clifford(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let gate_name = instruction.gate().canonical_name();
+        let tableau = gate_tableau(gate_name).map_err(|error| {
+            CircuitError::invalid_detector_error_model(format!(
+                "failed to load {gate_name} tableau during gauge analysis: {error}"
+            ))
+        })?;
+        let inverse = tableau.inverse_skipping_signs().map_err(|error| {
+            CircuitError::invalid_detector_error_model(format!(
+                "failed to invert {gate_name} tableau during gauge analysis: {error}"
+            ))
+        })?;
+        for group in instruction.target_groups().into_iter().rev() {
+            let [left, right] = group else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} expected paired targets during gauge analysis"
+                )));
+            };
+            let left = left.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} target {left} is not a qubit"
+                ))
+            })?;
+            let right = right.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} target {right} is not a qubit"
+                ))
+            })?;
+            self.apply_two_qubit_tableau_sensitivity(gate_name, left, right, &inverse)?;
+        }
+        Ok(())
+    }
+
+    fn apply_two_qubit_tableau_sensitivity(
+        &mut self,
+        gate_name: &str,
+        left: QubitId,
+        right: QubitId,
+        tableau: &Tableau,
+    ) -> CircuitResult<()> {
+        let left_xs = self.xs_for(left)?.clone();
+        let left_zs = self.zs_for(left)?.clone();
+        let right_xs = self.xs_for(right)?.clone();
+        let right_zs = self.zs_for(right)?.clone();
+        self.clear_qubit(left)?;
+        self.clear_qubit(right)?;
+        self.toggle_pauli_string_sensitivity(
+            left,
+            right,
+            tableau.x_output(0).map_err(|error| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "failed to read {gate_name} inverse left X output during gauge analysis: {error}"
+                ))
+            })?,
+            &left_xs,
+        )?;
+        self.toggle_pauli_string_sensitivity(
+            left,
+            right,
+            tableau.z_output(0).map_err(|error| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "failed to read {gate_name} inverse left Z output during gauge analysis: {error}"
+                ))
+            })?,
+            &left_zs,
+        )?;
+        self.toggle_pauli_string_sensitivity(
+            left,
+            right,
+            tableau.x_output(1).map_err(|error| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "failed to read {gate_name} inverse right X output during gauge analysis: {error}"
+                ))
+            })?,
+            &right_xs,
+        )?;
+        self.toggle_pauli_string_sensitivity(
+            left,
+            right,
+            tableau.z_output(1).map_err(|error| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "failed to read {gate_name} inverse right Z output during gauge analysis: {error}"
+                ))
+            })?,
+            &right_zs,
+        )
+    }
+
+    fn toggle_pauli_string_sensitivity(
+        &mut self,
+        left: QubitId,
+        right: QubitId,
+        pauli: &PauliString,
+        sensitivity: &BTreeSet<DemTarget>,
+    ) -> CircuitResult<()> {
+        let mut has_term = false;
+        for (index, basis) in pauli.active_terms() {
+            has_term = true;
+            let qubit = match index {
+                0 => left,
+                1 => right,
+                _ => {
+                    return Err(CircuitError::invalid_detector_error_model(
+                        "two-qubit tableau output has an out-of-range Pauli term during gauge analysis",
+                    ));
+                }
+            };
+            self.toggle_clifford_basis_sensitivity(qubit, basis, sensitivity)?;
+        }
+        if !has_term && !sensitivity.is_empty() {
+            return Err(CircuitError::invalid_detector_error_model(
+                "two-qubit tableau sensitivity mapped to identity during gauge analysis",
+            ));
+        }
+        Ok(())
     }
 
     fn undo_controlled_pauli(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
