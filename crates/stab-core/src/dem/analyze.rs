@@ -9,12 +9,12 @@ use super::{DemInstruction, DemRepeatBlock, DemTarget, DetectorErrorModel};
 
 const MAX_ANALYZER_REPEAT_UNROLL: u64 = 100_000;
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ErrorAnalyzerOptions {
     pub fold_loops: bool,
     pub decompose_errors: bool,
     pub allow_gauge_detectors: bool,
-    pub approximate_disjoint_errors: bool,
+    pub approximate_disjoint_errors_threshold: Option<Probability>,
 }
 
 pub fn circuit_to_detector_error_model(
@@ -241,11 +241,11 @@ impl Analyzer {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> CircuitResult<()> {
-        if !self.options.approximate_disjoint_errors {
+        let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
             return Err(CircuitError::invalid_detector_error_model(
                 "ELSE_CORRELATED_ERROR requires approximate_disjoint_errors during error analysis",
             ));
-        }
+        };
         let Some(probability) = instruction.probability_argument()? else {
             return Ok(());
         };
@@ -255,6 +255,13 @@ impl Analyzer {
             ));
         };
         let actual_probability = Probability::try_new(remainder.get() * probability.get())?;
+        if actual_probability.get() > threshold.get() {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "CORRELATED_ERROR/ELSE_CORRELATED_ERROR block has a component probability {} larger than the approximate_disjoint_errors threshold {}",
+                actual_probability.get(),
+                threshold.get()
+            )));
+        }
         self.record_correlated_error_with_probability(instruction, actual_probability)?;
         self.else_correlated_error_remainder = Some(Probability::try_new(
             remainder.get() * (1.0 - probability.get()),
@@ -306,11 +313,11 @@ impl Analyzer {
     }
 
     fn record_pauli_channel1(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        if !self.options.approximate_disjoint_errors {
+        let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
             return Err(CircuitError::invalid_detector_error_model(
                 "PAULI_CHANNEL_1 requires approximate_disjoint_errors during error analysis",
             ));
-        }
+        };
         let Some(probabilities) = instruction.probability_arguments()? else {
             return Ok(());
         };
@@ -319,6 +326,15 @@ impl Analyzer {
                 "PAULI_CHANNEL_1 expected three probabilities",
             ));
         };
+        for probability in &probabilities {
+            if probability.get() > threshold.get() {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "PAULI_CHANNEL_1 has a probability argument ({}) larger than the approximate_disjoint_errors threshold ({})",
+                    probability.get(),
+                    threshold.get()
+                )));
+            }
+        }
         for target in instruction.targets() {
             let Some(qubit) = target.qubit_id() else {
                 return Err(CircuitError::invalid_detector_error_model(format!(

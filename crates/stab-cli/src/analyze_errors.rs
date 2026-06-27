@@ -2,7 +2,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use clap::Args;
-use stab_core::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_core::{ErrorAnalyzerOptions, Probability, circuit_to_detector_error_model};
 
 use crate::{CliError, parse_circuit_bytes, read_input, write_output};
 
@@ -28,9 +28,14 @@ pub(crate) struct AnalyzeErrorsArgs {
     #[arg(long = "allow_gauge_detectors")]
     allow_gauge_detectors: bool,
 
-    /// Approximate disjoint error channels during analysis.
-    #[arg(long = "approximate_disjoint_errors")]
-    approximate_disjoint_errors: bool,
+    /// Approximate disjoint error channels during analysis, optionally limited to a threshold.
+    #[arg(
+        long = "approximate_disjoint_errors",
+        num_args = 0..=1,
+        default_missing_value = "1",
+        value_parser = parse_probability_threshold,
+    )]
+    approximate_disjoint_errors: Option<Probability>,
 }
 
 pub(crate) fn run_analyze_errors<R, W>(
@@ -50,8 +55,16 @@ where
             fold_loops: args.fold_loops,
             decompose_errors: args.decompose_errors,
             allow_gauge_detectors: args.allow_gauge_detectors,
-            approximate_disjoint_errors: args.approximate_disjoint_errors,
+            approximate_disjoint_errors_threshold: args.approximate_disjoint_errors,
         },
     )?;
     write_output(args.output.as_ref(), stdout, dem.to_dem_string().as_bytes())
+}
+
+fn parse_probability_threshold(value: &str) -> Result<Probability, String> {
+    let parsed = value
+        .parse::<f64>()
+        .map_err(|_| format!("invalid probability threshold {value}"))?;
+    Probability::try_new(parsed)
+        .map_err(|_| format!("probability threshold {value} is not in [0, 1]"))
 }

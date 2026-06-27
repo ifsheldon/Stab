@@ -7,6 +7,17 @@
 use super::*;
 use crate::Circuit;
 
+fn approximate_options() -> ErrorAnalyzerOptions {
+    threshold_options(1.0)
+}
+
+fn threshold_options(threshold: f64) -> ErrorAnalyzerOptions {
+    ErrorAnalyzerOptions {
+        approximate_disjoint_errors_threshold: Some(Probability::try_new(threshold).unwrap()),
+        ..ErrorAnalyzerOptions::default()
+    }
+}
+
 #[test]
 fn dem_targets_parse_stim_limits() {
     assert_eq!(
@@ -188,15 +199,9 @@ fn dem_analyzer_maps_else_correlated_error_block() {
     )
     .unwrap();
 
-    let dem = circuit_to_detector_error_model(
-        &circuit,
-        ErrorAnalyzerOptions {
-            approximate_disjoint_errors: true,
-            ..ErrorAnalyzerOptions::default()
-        },
-    )
-    .unwrap()
-    .to_dem_string();
+    let dem = circuit_to_detector_error_model(&circuit, approximate_options())
+        .unwrap()
+        .to_dem_string();
 
     assert_eq!(
         dem,
@@ -217,26 +222,8 @@ fn dem_analyzer_rejects_else_correlated_error_without_active_block() {
     assert!(
         circuit_to_detector_error_model(&missing_option, ErrorAnalyzerOptions::default()).is_err()
     );
-    assert!(
-        circuit_to_detector_error_model(
-            &dangling,
-            ErrorAnalyzerOptions {
-                approximate_disjoint_errors: true,
-                ..ErrorAnalyzerOptions::default()
-            },
-        )
-        .is_err()
-    );
-    assert!(
-        circuit_to_detector_error_model(
-            &separated,
-            ErrorAnalyzerOptions {
-                approximate_disjoint_errors: true,
-                ..ErrorAnalyzerOptions::default()
-            },
-        )
-        .is_err()
-    );
+    assert!(circuit_to_detector_error_model(&dangling, approximate_options(),).is_err());
+    assert!(circuit_to_detector_error_model(&separated, approximate_options(),).is_err());
 }
 
 #[test]
@@ -283,15 +270,9 @@ fn dem_analyzer_approximates_disjoint_pauli_channel1_when_enabled() {
     )
     .unwrap();
 
-    let dem = circuit_to_detector_error_model(
-        &circuit,
-        ErrorAnalyzerOptions {
-            approximate_disjoint_errors: true,
-            ..ErrorAnalyzerOptions::default()
-        },
-    )
-    .unwrap()
-    .to_dem_string();
+    let dem = circuit_to_detector_error_model(&circuit, approximate_options())
+        .unwrap()
+        .to_dem_string();
 
     assert_eq!(dem, "error(0.375) D0\n");
 }
@@ -312,15 +293,9 @@ fn dem_analyzer_approximates_pauli_channel1_by_measurement_basis() {
     )
     .unwrap();
 
-    let dem = circuit_to_detector_error_model(
-        &circuit,
-        ErrorAnalyzerOptions {
-            approximate_disjoint_errors: true,
-            ..ErrorAnalyzerOptions::default()
-        },
-    )
-    .unwrap()
-    .to_dem_string();
+    let dem = circuit_to_detector_error_model(&circuit, approximate_options())
+        .unwrap()
+        .to_dem_string();
 
     assert_eq!(dem, "error(0.625) D0\nerror(0.5) D1\nerror(0.375) D2\n");
 }
@@ -332,15 +307,9 @@ fn dem_analyzer_reset_clears_pending_pauli_channel1() {
     )
     .unwrap();
 
-    let dem = circuit_to_detector_error_model(
-        &circuit,
-        ErrorAnalyzerOptions {
-            approximate_disjoint_errors: true,
-            ..ErrorAnalyzerOptions::default()
-        },
-    )
-    .unwrap()
-    .to_dem_string();
+    let dem = circuit_to_detector_error_model(&circuit, approximate_options())
+        .unwrap()
+        .to_dem_string();
 
     assert_eq!(dem, "detector D0\n");
 }
@@ -353,6 +322,33 @@ fn dem_analyzer_rejects_disjoint_pauli_channel1_without_approximation() {
     .unwrap();
 
     let result = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default());
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn dem_analyzer_rejects_disjoint_pauli_channel1_above_threshold() {
+    let circuit =
+        Circuit::from_stim_str("R 0\nPAULI_CHANNEL_1(0, 0.25, 0.375) 0\nM 0\nDETECTOR rec[-1]\n")
+            .unwrap();
+
+    let result = circuit_to_detector_error_model(&circuit, threshold_options(0.3));
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn dem_analyzer_rejects_else_correlated_error_above_threshold() {
+    let circuit = Circuit::from_stim_str(
+        "CORRELATED_ERROR(0.25) X0\n\
+         ELSE_CORRELATED_ERROR(0.75) X1\n\
+         M 0 1\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let result = circuit_to_detector_error_model(&circuit, threshold_options(0.5));
 
     assert!(result.is_err());
 }
