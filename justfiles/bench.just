@@ -22,3 +22,8 @@ compare *args:
 [working-directory: '..']
 compare-allocations *args:
     cargo run -q -p stab-bench --features count-allocations --profile release -- compare --track-allocations {{args}}
+
+# Check source-owned M12 primary timing-regression thresholds.
+[working-directory: '..']
+primary-regression *args:
+    cargo run -q -p stab-bench --profile release -- compare --primary --thresholds benchmarks/m12-primary-thresholds.json {{args}}

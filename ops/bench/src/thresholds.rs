@@ -111,7 +111,9 @@ impl BenchmarkThresholds {
 
 #[cfg(test)]
 mod tests {
-    use super::{BenchmarkThresholds, apply_regression_thresholds};
+    use std::path::Path;
+
+    use super::{BenchmarkThresholds, apply_regression_thresholds, read_thresholds};
     use crate::manifest::{Milestone, Runner};
     use crate::report::CompareRowResult;
 
@@ -180,6 +182,22 @@ mod tests {
         assert!(text.contains("schema_version=2 expected 1"));
         assert!(text.contains("../bad has unsafe id"));
         assert!(text.contains("bad-ratio has invalid max_relative_ratio 0"));
+    }
+
+    #[test]
+    fn m12_primary_thresholds_validate_source_file() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmarks/m12-primary-thresholds.json");
+        let thresholds = read_thresholds(&path).expect("read source-owned M12 thresholds");
+
+        assert_eq!(thresholds.schema_version, 1);
+        assert_eq!(thresholds.rows.len(), 49);
+        assert!(
+            thresholds
+                .rows
+                .iter()
+                .all(|row| row.max_relative_ratio == 1.25)
+        );
     }
 
     fn row(id: &str, ratio: Option<f64>) -> CompareRowResult {
