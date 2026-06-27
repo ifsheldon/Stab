@@ -241,11 +241,6 @@ enum CliError {
     )]
     UnsupportedConversion,
 
-    #[error(
-        "sample flag {flag} requires noisy or reference-sample support that is not in this M8 slice"
-    )]
-    UnsupportedSampleFlag { flag: &'static str },
-
     #[error("not enough information given to parse input file")]
     MissingRecordWidth,
 
@@ -749,12 +744,6 @@ where
         )
         .map_err(CliError::WriteOutput)?;
     }
-    if args.skip_loop_folding {
-        return Err(CliError::UnsupportedSampleFlag {
-            flag: "--skip_loop_folding",
-        });
-    }
-
     let input_bytes = read_input(args.input.as_ref(), input)?;
     let circuit_text = std::str::from_utf8(&input_bytes).map_err(|_| CliError::InvalidUtf8Input)?;
     let circuit = Circuit::from_stim_str(circuit_text)?;
