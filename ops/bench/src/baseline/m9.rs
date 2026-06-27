@@ -88,8 +88,11 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "m9-m2d-bitpacked-contract" => Some(
             "cli-baseline: Stab measures in-process measurement-to-detection conversion with b8 output against pinned Stim m2d on the same fixture",
         ),
-        "m9-detect-primary-matrix-contract" | "m9-m2d-primary-matrix-contract" => Some(
-            "contract-representative: Stab uses a generated repetition-code d3/r3 circuit for the M9 primary detection matrix",
+        "m9-detect-primary-matrix-contract" => Some(
+            "cli-baseline: Stab detects the source-owned generated repetition-code d3/r3 fixture with b8 output against pinned Stim detect on the same fixture",
+        ),
+        "m9-m2d-primary-matrix-contract" => Some(
+            "cli-baseline: Stab converts source-owned generated repetition-code d3/r3 measurement records to b8 detection events against pinned Stim m2d on the same fixture",
         ),
         _ => None,
     }

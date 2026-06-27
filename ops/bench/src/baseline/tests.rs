@@ -419,7 +419,7 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
         ),
         (
             "m9-detect-primary-matrix-contract",
-            Runner::ContractOnly,
+            Runner::StimCli,
             &[
                 "stab_detect_primary_repetition_d3_r3_dets",
                 "stab_detect_primary_repetition_d3_r3_b8",
@@ -433,7 +433,7 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
         ),
         (
             "m9-m2d-primary-matrix-contract",
-            Runner::ContractOnly,
+            Runner::StimCli,
             &[
                 "stab_m2d_primary_repetition_d3_r3_dets",
                 "stab_m2d_primary_repetition_d3_r3_b8",

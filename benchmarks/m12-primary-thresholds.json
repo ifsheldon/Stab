@@ -52,7 +52,9 @@
     { "id": "m8-tableau-simulator", "max_relative_ratio": 1.25 },
     { "id": "m9-convert-measurements-dets", "max_relative_ratio": 1.25 },
     { "id": "m9-detect-bitpacked-cli", "max_relative_ratio": 1.25 },
+    { "id": "m9-detect-primary-matrix-contract", "max_relative_ratio": 1.25 },
     { "id": "m9-detect-text-cli", "max_relative_ratio": 1.25 },
+    { "id": "m9-m2d-primary-matrix-contract", "max_relative_ratio": 1.25 },
     { "id": "m9-m2d-text-cli", "max_relative_ratio": 1.25 }
   ]
 }
