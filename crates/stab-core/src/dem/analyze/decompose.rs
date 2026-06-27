@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{CircuitError, CircuitResult, DemTarget, Probability};
 
-use super::xor_probability;
+use super::probabilities::xor_probability;
 
 type KnownGraphlikeComponents = BTreeMap<Vec<DemTarget>, Vec<DemTarget>>;
 

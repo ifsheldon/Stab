@@ -1,21 +1,34 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 mod decompose;
+mod effects;
 mod error_decomp;
+mod folded;
 mod gauge;
+mod instructions;
+mod probabilities;
 
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Pauli, Probability,
-    QubitId, RepeatBlock,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Probability, QubitId,
+    RepeatBlock,
 };
 
 use super::{DemInstruction, DemRepeatBlock, DemTarget, DetectorErrorModel};
 use decompose::decompose_error_probabilities;
+use effects::{
+    AnalyzerBasis, AnalyzerPauli, NoiseEffect, PendingError, PendingSingleQubitPauliChannel,
+    analyzer_pauli_from_mask, pauli_mask,
+};
 use error_decomp::{
     depolarize2_independent_channel_probability, pauli_channel2_components,
     try_disjoint_to_independent_xyz_errors,
 };
+use folded::FoldedAnalyzer;
 use gauge::find_gauge_errors;
+use instructions::{
+    is_measurement_instruction, is_noise_instruction, measurement_basis, shifted_coordinates,
+};
+use probabilities::{merge_disjoint_probability, merge_independent_probability, toggle_all};
 
 const MAX_ANALYZER_REPEAT_UNROLL: u64 = 100_000;
 
@@ -42,51 +55,6 @@ pub fn circuit_to_detector_error_model(
         return FoldedAnalyzer::new(options).analyze(circuit);
     }
     Analyzer::new(options).analyze(circuit)
-}
-
-struct FoldedAnalyzer {
-    options: ErrorAnalyzerOptions,
-}
-
-impl FoldedAnalyzer {
-    fn new(options: ErrorAnalyzerOptions) -> Self {
-        Self { options }
-    }
-
-    fn analyze(&self, circuit: &Circuit) -> CircuitResult<DetectorErrorModel> {
-        let mut dem = DetectorErrorModel::new();
-        for item in circuit.items() {
-            match item {
-                CircuitItem::Instruction(_) => {
-                    return Err(CircuitError::invalid_detector_error_model(
-                        "analyze_errors --fold_loops currently supports top-level repeat blocks only",
-                    ));
-                }
-                CircuitItem::RepeatBlock(repeat) => {
-                    dem.push_repeat_block(self.analyze_repeat(repeat)?);
-                }
-            }
-        }
-        Ok(dem)
-    }
-
-    fn analyze_repeat(&self, repeat: &RepeatBlock) -> CircuitResult<DemRepeatBlock> {
-        let mut body_options = self.options;
-        body_options.fold_loops = false;
-        let mut result = Analyzer::new(body_options).analyze_with_stats(repeat.body())?;
-        if result.detector_count > 0 {
-            result.dem.push_instruction(DemInstruction::shift_detectors(
-                Vec::new(),
-                result.detector_count,
-                None,
-            )?);
-        }
-        Ok(DemRepeatBlock::new(
-            repeat.repeat_count(),
-            result.dem,
-            repeat.tag().map(ToOwned::to_owned),
-        ))
-    }
 }
 
 struct AnalyzerResult {
@@ -917,256 +885,8 @@ impl Analyzer {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum AnalyzerPauli {
-    X,
-    Y,
-    Z,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum AnalyzerBasis {
-    X,
-    Y,
-    Z,
-}
-
-#[derive(Clone, Debug)]
-struct NoiseEffect {
-    qubit: QubitId,
-    pauli: AnalyzerPauli,
-}
-
-#[derive(Clone, Debug)]
-struct PendingError {
-    probability: Probability,
-    effects: Vec<NoiseEffect>,
-    measurements: Vec<usize>,
-    disjoint_group: Option<u64>,
-}
-
-#[derive(Clone, Debug)]
-struct PendingSingleQubitPauliChannel {
-    qubit: QubitId,
-    x_probability: Probability,
-    y_probability: Probability,
-    z_probability: Probability,
-}
-
-impl PendingSingleQubitPauliChannel {
-    fn swap_xz(&mut self) {
-        std::mem::swap(&mut self.x_probability, &mut self.z_probability);
-    }
-
-    fn flip_probability(&self, basis: AnalyzerBasis) -> CircuitResult<Probability> {
-        let probability = match basis {
-            AnalyzerBasis::X => self.y_probability.get() + self.z_probability.get(),
-            AnalyzerBasis::Y => self.x_probability.get() + self.z_probability.get(),
-            AnalyzerBasis::Z => self.x_probability.get() + self.y_probability.get(),
-        };
-        Probability::try_new(probability)
-    }
-}
-
-impl PendingError {
-    fn apply_h(&mut self, qubit: QubitId) {
-        for effect in &mut self.effects {
-            if effect.qubit == qubit {
-                effect.pauli = match effect.pauli {
-                    AnalyzerPauli::X => AnalyzerPauli::Z,
-                    AnalyzerPauli::Y => AnalyzerPauli::Y,
-                    AnalyzerPauli::Z => AnalyzerPauli::X,
-                };
-            }
-        }
-    }
-
-    fn apply_cx(&mut self, control: QubitId, target: QubitId) {
-        let mut masks = self.effect_masks();
-        let control_mask = masks.remove(&control).unwrap_or(0);
-        let target_mask = masks.remove(&target).unwrap_or(0);
-        let mut output_control = 0;
-        let mut output_target = 0;
-
-        if control_mask & ANALYZER_X_MASK != 0 {
-            output_control ^= ANALYZER_X_MASK;
-            output_target ^= ANALYZER_X_MASK;
-        }
-        if control_mask & ANALYZER_Z_MASK != 0 {
-            output_control ^= ANALYZER_Z_MASK;
-        }
-        if target_mask & ANALYZER_X_MASK != 0 {
-            output_target ^= ANALYZER_X_MASK;
-        }
-        if target_mask & ANALYZER_Z_MASK != 0 {
-            output_control ^= ANALYZER_Z_MASK;
-            output_target ^= ANALYZER_Z_MASK;
-        }
-
-        insert_effect_mask(&mut masks, control, output_control);
-        insert_effect_mask(&mut masks, target, output_target);
-        self.effects = effects_from_masks(masks);
-    }
-
-    fn effect_masks(&self) -> BTreeMap<QubitId, u8> {
-        let mut masks = BTreeMap::new();
-        for effect in &self.effects {
-            let entry = masks.entry(effect.qubit).or_insert(0);
-            *entry ^= pauli_mask(effect.pauli.into());
-            if *entry == 0 {
-                masks.remove(&effect.qubit);
-            }
-        }
-        masks
-    }
-
-    fn touches_qubit(&self, qubit: QubitId) -> bool {
-        self.effects.iter().any(|effect| effect.qubit == qubit)
-    }
-
-    fn remove_effects_touching(&mut self, qubit: QubitId) {
-        self.effects.retain(|effect| effect.qubit != qubit);
-    }
-
-    fn flips_measurement(&self, qubit: QubitId, basis: AnalyzerBasis) -> bool {
-        self.effects.iter().any(|effect| {
-            effect.qubit == qubit
-                && matches!(
-                    (effect.pauli, basis),
-                    (AnalyzerPauli::X, AnalyzerBasis::Y | AnalyzerBasis::Z)
-                        | (AnalyzerPauli::Y, AnalyzerBasis::X | AnalyzerBasis::Z)
-                        | (AnalyzerPauli::Z, AnalyzerBasis::X | AnalyzerBasis::Y)
-                )
-        })
-    }
-}
-
 #[derive(Clone, Debug)]
 struct DetectorDeclaration {
     detector_id: u64,
     coordinates: Vec<f64>,
-}
-
-fn shifted_coordinates(offset: &[f64], local: &[f64]) -> Vec<f64> {
-    local
-        .iter()
-        .copied()
-        .enumerate()
-        .map(|(index, value)| offset.get(index).copied().unwrap_or(0.0) + value)
-        .collect()
-}
-
-fn measurement_basis(name: &str) -> Option<AnalyzerBasis> {
-    match name {
-        "M" | "MR" => Some(AnalyzerBasis::Z),
-        "MX" | "MRX" => Some(AnalyzerBasis::X),
-        "MY" | "MRY" => Some(AnalyzerBasis::Y),
-        _ => None,
-    }
-}
-
-fn is_measurement_instruction(name: &str) -> bool {
-    matches!(
-        name,
-        "MXX" | "MYY" | "MZZ" | "MPP" | "HERALDED_PAULI_CHANNEL_1"
-    )
-}
-
-fn is_noise_instruction(name: &str) -> bool {
-    matches!(
-        name,
-        "DEPOLARIZE1"
-            | "DEPOLARIZE2"
-            | "I_ERROR"
-            | "II_ERROR"
-            | "PAULI_CHANNEL_1"
-            | "PAULI_CHANNEL_2"
-            | "ELSE_CORRELATED_ERROR"
-            | "E"
-    )
-}
-
-const ANALYZER_X_MASK: u8 = 0b01;
-const ANALYZER_Z_MASK: u8 = 0b10;
-
-fn toggle_all(target: &mut BTreeSet<u64>, values: impl Iterator<Item = u64>) {
-    for value in values {
-        if !target.insert(value) {
-            target.remove(&value);
-        }
-    }
-}
-
-fn merge_independent_probability(
-    probabilities: &mut BTreeMap<Vec<DemTarget>, Probability>,
-    targets: Vec<DemTarget>,
-    probability: Probability,
-) -> CircuitResult<()> {
-    if let Some(existing) = probabilities.get_mut(&targets) {
-        *existing = xor_probability(*existing, probability)?;
-    } else {
-        probabilities.insert(targets, probability);
-    }
-    Ok(())
-}
-
-fn merge_disjoint_probability(
-    probabilities: &mut BTreeMap<(u64, Vec<DemTarget>), Probability>,
-    key: (u64, Vec<DemTarget>),
-    probability: Probability,
-) -> CircuitResult<()> {
-    if let Some(existing) = probabilities.get_mut(&key) {
-        *existing = Probability::try_new(existing.get() + probability.get())?;
-    } else {
-        probabilities.insert(key, probability);
-    }
-    Ok(())
-}
-
-pub(super) fn xor_probability(left: Probability, right: Probability) -> CircuitResult<Probability> {
-    Probability::try_new(left.get() + right.get() - 2.0 * left.get() * right.get())
-}
-
-fn pauli_mask(pauli: Pauli) -> u8 {
-    match pauli {
-        Pauli::X => ANALYZER_X_MASK,
-        Pauli::Y => 0b11,
-        Pauli::Z => ANALYZER_Z_MASK,
-    }
-}
-
-fn analyzer_pauli_from_mask(mask: u8) -> AnalyzerPauli {
-    match mask {
-        0b01 => AnalyzerPauli::X,
-        0b10 => AnalyzerPauli::Z,
-        0b11 => AnalyzerPauli::Y,
-        _ => unreachable!("pauli masks are maintained by xor of X/Z bits"),
-    }
-}
-
-impl From<AnalyzerPauli> for Pauli {
-    fn from(value: AnalyzerPauli) -> Self {
-        match value {
-            AnalyzerPauli::X => Self::X,
-            AnalyzerPauli::Y => Self::Y,
-            AnalyzerPauli::Z => Self::Z,
-        }
-    }
-}
-
-fn insert_effect_mask(masks: &mut BTreeMap<QubitId, u8>, qubit: QubitId, mask: u8) {
-    if mask == 0 {
-        return;
-    }
-    masks.insert(qubit, mask);
-}
-
-fn effects_from_masks(masks: BTreeMap<QubitId, u8>) -> Vec<NoiseEffect> {
-    masks
-        .into_iter()
-        .map(|(qubit, mask)| NoiseEffect {
-            qubit,
-            pauli: analyzer_pauli_from_mask(mask),
-        })
-        .collect()
 }
