@@ -52,6 +52,9 @@ just oracle::run --all
 The fixture manifest lives at `oracle/fixtures/manifest.csv`.
 It records fixture ids, upstream sources, command shapes, parity modes, comparator types, expected statuses, implementation status, statistical plans, and source-license notes.
 Manifest validation also requires every planned M4 through M11 P0/P1 C++ source from the compatibility matrix to have an explicit fixture row with the matching milestone and parity mode.
+Manifest `argv` tokens may use `{fixture_input:inputs/name.ext}` for validated fixture-relative side inputs and `{fixture_output:expected/name.ext}` for exact-output side files written by Stim and Stab during comparison.
+Both placeholder forms reject absolute paths, parent-directory traversal, symlinks in fixture paths, and missing fixture inputs; fixture-output placeholders also require committed expected files during normal validation and `just oracle::record --check-clean`.
+During oracle runs, fixture-output placeholders are rewritten to fresh scratch paths under `target/oracle/fixture-outputs`; the scratch parent is rejected if any path component is a symlink, and side-output bytes are compared in addition to stdout.
 `just oracle::run --milestone Mx` scopes execution to implemented fixture rows for that milestone and reports pending red, ignored, or manifest-only rows in the same milestone.
 `just oracle::record --check-clean` checks runnable exact-output rows against pinned Stim; library-only parser/printer rows are run in-process by `stab-oracle` and are skipped by recording because they do not have a Stim CLI command.
 

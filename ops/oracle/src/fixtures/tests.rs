@@ -1,7 +1,8 @@
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement, Milestone,
-    RunFilter, RunMode, is_recordable, run_core_fixture, run_direct_rust_fixture, statistical,
-    validate_fixture_path,
+    RunFilter, RunMode, is_recordable,
+    outputs::{self, FixtureArgToken},
+    run_core_fixture, run_direct_rust_fixture, statistical, validate_fixture_path,
 };
 
 const MANIFEST_CSV: &str = include_str!("../../../../oracle/fixtures/manifest.csv");
@@ -216,6 +217,98 @@ fn repository_exact_output_files_exist() {
 }
 
 #[test]
+fn repository_fixture_placeholder_files_exist() {
+    let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+
+    for row in &manifest.rows {
+        for token in row.argv_tokens() {
+            match outputs::parse_fixture_arg_token(&row.id, &token)
+                .expect("parse fixture placeholder token")
+            {
+                Some(FixtureArgToken::Input(relative) | FixtureArgToken::Output(relative)) => {
+                    let path = super::fixture_file(&root, relative).unwrap();
+                    assert!(path.is_file(), "{} {}", row.id, relative);
+                }
+                None => {}
+            };
+        }
+    }
+}
+
+#[test]
+fn fixture_output_placeholders_are_replaced_with_target_paths() {
+    let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+    let row = manifest
+        .rows
+        .iter()
+        .find(|row| row.id == "m11-sample-dem-observable-output-exact")
+        .expect("M11 fixture output row");
+
+    let command = outputs::prepare_command(&root, row, "test").expect("prepare command");
+    let output = command.outputs.first().expect("one fixture output");
+
+    assert_eq!(command.outputs.len(), 1);
+    assert_eq!(
+        output.expected_relative,
+        "expected/m11_sample_dem_observable_obs.stdout"
+    );
+    assert!(
+        output.actual_path.starts_with(
+            root.path
+                .join("target")
+                .join("oracle")
+                .join("fixture-outputs")
+        )
+    );
+    assert!(
+        command
+            .argv
+            .iter()
+            .any(|token| token.to_string_lossy().contains("fixture-outputs"))
+    );
+}
+
+#[test]
+fn fixture_input_placeholders_are_replaced_with_fixture_paths() {
+    let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+    let row = manifest
+        .rows
+        .iter()
+        .find(|row| row.id == "m11-sample-dem-replay-side-outputs-exact")
+        .expect("M11 fixture input row");
+
+    let command = outputs::prepare_command(&root, row, "test").expect("prepare command");
+    let expected_path = root
+        .path
+        .join("oracle")
+        .join("fixtures")
+        .join("inputs")
+        .join("sample_dem_replay_errors.01");
+
+    assert!(
+        command
+            .argv
+            .iter()
+            .any(|token| token == expected_path.as_os_str())
+    );
+}
+
+#[test]
 fn validation_rejects_cargo_test_row_without_cargo_arguments() {
     let csv = format!(
         "{HEADER}bad,M4,src/stim/circuit/gate_target.test.cc,structural,structural,cargo test,cargo-test,,,0,any,implemented,Run direct Rust gate target parity tests,hand-authored\n"
@@ -404,6 +497,115 @@ fn validation_rejects_empty_argv_tokens() {
         .expect_err("empty argv token should fail");
 
     assert!(error.to_string().contains("has an empty argv token"));
+}
+
+#[test]
+fn validation_rejects_unsafe_fixture_output_placeholder() {
+    let csv = format!(
+        "{HEADER}bad,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,stim sample_dem,sample_dem|--obs_out|{{fixture_output:../escape.stdout}},inputs/sample_dem_deterministic.dem,expected/m11_sample_dem_deterministic.stdout,0,empty,red,,hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+    let error = manifest
+        .check_with_expected_stdout_policy(&root, ExpectedStdoutPolicy::AllowMissing)
+        .expect_err("unsafe fixture output should fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("bad has unsafe fixture_output ../escape.stdout")
+    );
+}
+
+#[test]
+fn validation_rejects_unsafe_fixture_input_placeholder() {
+    let csv = format!(
+        "{HEADER}bad,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,stim sample_dem,sample_dem|--replay_err_in|{{fixture_input:../escape.01}},inputs/sample_dem_deterministic.dem,expected/m11_sample_dem_deterministic.stdout,0,empty,red,,hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+    let error = manifest
+        .check_with_expected_stdout_policy(&root, ExpectedStdoutPolicy::AllowMissing)
+        .expect_err("unsafe fixture input should fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("bad has unsafe fixture_input ../escape.01")
+    );
+}
+
+#[test]
+fn validation_rejects_malformed_fixture_output_placeholder() {
+    let csv = format!(
+        "{HEADER}bad,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,stim sample_dem,sample_dem|--obs_out|{{fixture_output:expected/missing.stdout,inputs/sample_dem_deterministic.dem,expected/m11_sample_dem_deterministic.stdout,0,empty,red,,hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+    let error = manifest
+        .check_with_expected_stdout_policy(&root, ExpectedStdoutPolicy::AllowMissing)
+        .expect_err("malformed fixture output should fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("bad has malformed fixture output token")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn fixture_output_scratch_rejects_symlinked_parent() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let root = crate::RepoRoot::resolve(temp.path()).expect("resolve temp root");
+    let fixture_parent = temp.path().join("oracle").join("fixtures");
+    std::fs::create_dir_all(fixture_parent.join("inputs")).expect("create fixture inputs");
+    std::fs::create_dir_all(fixture_parent.join("expected")).expect("create fixture expected");
+    std::fs::write(
+        fixture_parent.join("inputs").join("sample.dem"),
+        b"error(1) D0\n",
+    )
+    .expect("write input");
+    std::fs::write(
+        fixture_parent
+            .join("expected")
+            .join("sample_dem_observable_obs.stdout"),
+        b"1\n",
+    )
+    .expect("write expected side output");
+    std::fs::write(
+        fixture_parent.join("expected").join("sample.stdout"),
+        b"1\n",
+    )
+    .expect("write expected stdout");
+    let oracle_target = temp.path().join("target").join("oracle");
+    std::fs::create_dir_all(&oracle_target).expect("create oracle target");
+    let outside = temp.path().join("outside");
+    std::fs::create_dir(&outside).expect("create outside dir");
+    std::os::unix::fs::symlink(&outside, oracle_target.join("fixture-outputs"))
+        .expect("create scratch symlink");
+    let csv = format!(
+        "{HEADER}bad,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,stim sample_dem,sample_dem|--obs_out|{{fixture_output:expected/sample_dem_observable_obs.stdout}},inputs/sample.dem,expected/sample.stdout,0,empty,red,,hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let row = manifest.rows.first().expect("one fixture row");
+
+    let error = outputs::prepare_command(&root, row, "test")
+        .expect_err("symlinked scratch parent should fail");
+
+    assert!(error.to_string().contains("scratch path contains symlink"));
 }
 
 #[test]

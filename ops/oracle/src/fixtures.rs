@@ -9,6 +9,7 @@ use thiserror::Error;
 
 use crate::{OracleError, RepoRoot, StderrClass, compare_exact, compare_help_health};
 
+mod outputs;
 mod paths;
 mod statistical;
 
@@ -420,6 +421,12 @@ pub(crate) enum FixtureError {
         source: std::io::Error,
     },
 
+    #[error("failed to inspect fixture output {path}: {source}")]
+    InspectOutput {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
     #[error("failed to create fixture output directory {path}: {source}")]
     CreateOutputDir {
         path: PathBuf,
@@ -431,6 +438,9 @@ pub(crate) enum FixtureError {
         path: PathBuf,
         source: std::io::Error,
     },
+
+    #[error("unsafe fixture scratch path {path}: {reason}")]
+    UnsafeScratchPath { path: PathBuf, reason: String },
 
     #[error("{id} expected status {expected}, got {actual:?}")]
     StatusMismatch {
@@ -448,6 +458,16 @@ pub(crate) enum FixtureError {
 
     #[error("{id} expected stdout differs from {path}")]
     ExpectedStdoutMismatch { id: String, path: PathBuf },
+
+    #[error("{id} expected fixture output differs from {path}")]
+    ExpectedFixtureOutputMismatch { id: String, path: PathBuf },
+
+    #[error("{id} fixture output {path} exceeds {limit} bytes")]
+    AuxiliaryOutputTooLarge {
+        id: String,
+        path: PathBuf,
+        limit: u64,
+    },
 
     #[error("{id} failed core fixture execution: {reason}")]
     CoreFixtureFailed { id: String, reason: String },
@@ -513,6 +533,12 @@ impl FixtureManifest {
             if row.argv.split('|').any(str::is_empty) {
                 violations.push(format!("{} has an empty argv token", row.id));
             }
+            outputs::validate_row_tokens(
+                row,
+                &fixture_root,
+                expected_stdout_policy,
+                &mut violations,
+            );
             if is_direct_rust_fixture(row) && row.argv_tokens().len() < 2 {
                 violations.push(format!("{} cargo-test row has no cargo arguments", row.id));
             }
@@ -722,7 +748,8 @@ pub(crate) fn record_fixtures(
     let stim_binary = crate::ensure_stim_binary(root, rebuild_stim)?;
     for row in manifest.rows.iter().filter(|row| is_recordable(row)) {
         let stdin = row.stdin(root)?;
-        let output = crate::run_process(&stim_binary, row.argv_tokens(), &stdin, Some(&root.path))?;
+        let command = outputs::prepare_command(root, row, "stim-record")?;
+        let output = crate::run_process(&stim_binary, &command.argv, &stdin, Some(&root.path))?;
         check_expected_process_shape(row, &output)?;
         let expected_path = row.expected_stdout_file(root)?;
         if check_clean {
@@ -738,6 +765,7 @@ pub(crate) fn record_fixtures(
                 }
                 .into());
             }
+            outputs::compare_expected_outputs(row, root, &command.outputs)?;
             println!("[stab-oracle] CLEAN {}", row.id);
         } else {
             prepare_fixture_output_file(root, &row.expected_stdout_path)?;
@@ -747,6 +775,7 @@ pub(crate) fn record_fixtures(
                     source,
                 }
             })?;
+            outputs::record_outputs(row, root, &command.outputs)?;
             println!("[stab-oracle] RECORDED {}", row.id);
         }
     }
@@ -786,15 +815,25 @@ pub(crate) fn run_fixtures(
                     run_direct_rust_fixture(root, row)?
                 } else {
                     let stdin = row.stdin(root)?;
-                    let argv = row.argv_tokens();
                     let stim_binary_path =
                         cached_stim_binary(root, rebuild_stim, &mut stim_binary)?;
                     let stab_binary_path = cached_stab_binary(root, &mut stab_binary)?;
-                    let stim =
-                        crate::run_process(&stim_binary_path, &argv, &stdin, Some(&root.path))?;
-                    let stab =
-                        crate::run_process(&stab_binary_path, &argv, &stdin, Some(&root.path))?;
+                    let stim_command = outputs::prepare_command(root, row, "stim")?;
+                    let stab_command = outputs::prepare_command(root, row, "stab")?;
+                    let stim = crate::run_process(
+                        &stim_binary_path,
+                        &stim_command.argv,
+                        &stdin,
+                        Some(&root.path),
+                    )?;
+                    let stab = crate::run_process(
+                        &stab_binary_path,
+                        &stab_command.argv,
+                        &stdin,
+                        Some(&root.path),
+                    )?;
                     compare_fixture(row, &stim, &stab)?;
+                    outputs::compare_outputs(row, &stim_command.outputs, &stab_command.outputs)?;
                     stab
                 };
                 println!(
