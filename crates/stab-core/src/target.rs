@@ -317,6 +317,15 @@ pub(crate) fn parse_target_token_into(token: &str, targets: &mut Vec<Target>) ->
     Ok(())
 }
 
+pub(crate) fn parse_plain_qubit_target_token_into(
+    token: &str,
+    targets: &mut Vec<Target>,
+) -> CircuitResult<()> {
+    let id = parse_u24(token, "qubit target")?;
+    targets.push(Target::qubit(QubitId::new(id)?, false));
+    Ok(())
+}
+
 fn parse_u24(text: &str, kind: &'static str) -> CircuitResult<u32> {
     if text.is_empty() {
         return Err(CircuitError::invalid_domain_value(kind, text));

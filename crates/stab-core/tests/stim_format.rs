@@ -190,6 +190,23 @@ fn fuses_compatible_adjacent_instructions_like_stim() {
 }
 
 #[test]
+fn parser_preserves_sparse_repeated_plain_target_pattern() {
+    let circuit = Circuit::from_stim_str(concat!(
+        "H 0\n",
+        "CNOT 1 2\n",
+        "M 0\n",
+        "H 0\n",
+        "CNOT 1 2\n",
+        "M 0\n",
+    ))
+    .expect("parse sparse repeated pattern");
+    assert_eq!(
+        circuit.to_stim_string(),
+        concat!("H 0\n", "CX 1 2\n", "M 0\n", "H 0\n", "CX 1 2\n", "M 0\n",)
+    );
+}
+
+#[test]
 fn strips_tags_recursively_like_stim() {
     // Adapted from Stim v1.16.0 src/stim/circuit/circuit.test.cc without_tags.
     let initial = Circuit::from_stim_str(

@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use crate::gate::{ArgRule, TargetGroupKind};
-use crate::target::parse_target_token_into;
+use crate::target::{parse_plain_qubit_target_token_into, parse_target_token_into};
 use crate::{CircuitError, CircuitResult, Gate, ObservableId, Probability, RepeatCount, Target};
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -12,6 +12,12 @@ pub struct Circuit {
 impl Circuit {
     pub fn new() -> Self {
         Self { items: Vec::new() }
+    }
+
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+        }
     }
 
     pub fn from_stim_str(input: &str) -> CircuitResult<Self> {
@@ -466,7 +472,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_block(&mut self, stop_on_terminator: bool) -> CircuitResult<Circuit> {
-        let mut circuit = Circuit::new();
+        let mut circuit = if stop_on_terminator {
+            Circuit::new()
+        } else {
+            Circuit::with_capacity(self.lines.len().saturating_sub(self.index))
+        };
         while let Some(raw_line) = self.lines.get(self.index).copied() {
             let line_number = self.index + 1;
             self.index += 1;
@@ -535,18 +545,20 @@ fn parse_instruction(line_number: usize, line: &str) -> CircuitResult<CircuitIns
 }
 
 fn parse_name(line_number: usize, line: &str) -> CircuitResult<(&str, &str)> {
-    let end = line
-        .char_indices()
-        .take_while(|(index, ch)| {
-            if *index == 0 {
-                ch.is_ascii_alphabetic()
-            } else {
-                ch.is_ascii_alphanumeric() || *ch == '_'
-            }
-        })
-        .last()
-        .map(|(index, ch)| index + ch.len_utf8())
-        .ok_or_else(|| CircuitError::parse_line(line_number, "missing instruction name"))?;
+    let mut end = None;
+    for (index, byte) in line.bytes().enumerate() {
+        let valid = if index == 0 {
+            byte.is_ascii_alphabetic()
+        } else {
+            byte.is_ascii_alphanumeric() || byte == b'_'
+        };
+        if !valid {
+            break;
+        }
+        end = Some(index + 1);
+    }
+    let end =
+        end.ok_or_else(|| CircuitError::parse_line(line_number, "missing instruction name"))?;
     Ok(line.split_at(end))
 }
 
@@ -620,11 +632,37 @@ fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(Vec<f64
 }
 
 fn parse_targets(rest: &str) -> CircuitResult<Vec<Target>> {
+    if let Some(target_count) = plain_qubit_target_count(rest) {
+        let mut targets = Vec::with_capacity(target_count);
+        for token in rest.split_ascii_whitespace() {
+            parse_plain_qubit_target_token_into(token, &mut targets)?;
+        }
+        return Ok(targets);
+    }
+
     let mut targets = Vec::new();
     for token in rest.split_whitespace() {
         parse_target_token_into(token, &mut targets)?;
     }
     Ok(targets)
+}
+
+fn plain_qubit_target_count(rest: &str) -> Option<usize> {
+    let mut count = 0usize;
+    let mut in_token = false;
+    for byte in rest.bytes() {
+        if byte.is_ascii_digit() {
+            if !in_token {
+                count += 1;
+                in_token = true;
+            }
+        } else if byte.is_ascii_whitespace() {
+            in_token = false;
+        } else {
+            return None;
+        }
+    }
+    Some(count)
 }
 
 fn pauli_product_target_groups(targets: &[Target]) -> Vec<&[Target]> {
@@ -644,6 +682,10 @@ fn pauli_product_target_groups(targets: &[Target]) -> Vec<&[Target]> {
 }
 
 fn strip_comment(line: &str) -> Option<&str> {
+    if !line.as_bytes().contains(&b'#') {
+        return Some(line);
+    }
+
     let mut in_tag = false;
     let mut escaped = false;
     for (index, ch) in line.char_indices() {
