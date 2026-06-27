@@ -13,6 +13,7 @@ pub struct CompiledSampler {
 pub enum SampleFormat {
     ZeroOne,
     B8,
+    R8,
     Hits,
     Dets,
 }
@@ -159,10 +160,11 @@ fn append_sample(sample: &[bool], format: SampleFormat, output: &mut Vec<u8>) {
             }
         }
         SampleFormat::B8 => append_b8_sample(sample, output),
+        SampleFormat::R8 => append_r8_sample(sample, output),
         SampleFormat::Hits => append_hits_sample(sample, output),
         SampleFormat::Dets => append_dets_sample(sample, output),
     }
-    if format != SampleFormat::B8 {
+    if !matches!(format, SampleFormat::B8 | SampleFormat::R8) {
         output.push(b'\n');
     }
 }
@@ -176,6 +178,26 @@ fn append_b8_sample(sample: &[bool], output: &mut Vec<u8>) {
             }
         }
         output.push(byte);
+    }
+}
+
+fn append_r8_sample(sample: &[bool], output: &mut Vec<u8>) {
+    let mut false_run = 0u8;
+    for bit in sample.iter().copied().chain(std::iter::once(true)) {
+        if bit {
+            if false_run == u8::MAX {
+                output.push(u8::MAX);
+                false_run = 0;
+            }
+            output.push(false_run);
+            false_run = 0;
+        } else {
+            if false_run == u8::MAX {
+                output.push(u8::MAX);
+                false_run = 0;
+            }
+            false_run = false_run.saturating_add(1);
+        }
     }
 }
 
@@ -535,6 +557,10 @@ mod tests {
 
         assert_eq!(sampler.sample_bytes(1, SampleFormat::ZeroOne), b"001101\n");
         assert_eq!(sampler.sample_bytes(1, SampleFormat::B8), &[0x2c]);
+        assert_eq!(
+            sampler.sample_bytes(1, SampleFormat::R8),
+            &[0x02, 0x00, 0x01, 0x00]
+        );
         assert_eq!(sampler.sample_bytes(1, SampleFormat::Hits), b"2,3,5\n");
         assert_eq!(
             sampler.sample_bytes(1, SampleFormat::Dets),
@@ -543,6 +569,24 @@ mod tests {
         assert_eq!(
             sampler.sample_bytes(2, SampleFormat::Hits),
             b"2,3,5\n2,3,5\n"
+        );
+    }
+
+    #[test]
+    fn writes_r8_samples_with_long_false_runs() {
+        let circuit =
+            Circuit::from_stim_str("X 1\nM 0 0 0 0 0 0 0 0 0 1\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+        assert_eq!(sampler.sample_bytes(1, SampleFormat::R8), &[0x09, 0x00]);
+
+        let long_zero_circuit =
+            Circuit::from_stim_str(&format!("MPAD {}\n", "0 ".repeat(260))).expect("parse circuit");
+        let long_zero_sampler =
+            CompiledSampler::compile(&long_zero_circuit).expect("compile sampler");
+        assert_eq!(
+            long_zero_sampler.sample_bytes(1, SampleFormat::R8),
+            &[0xff, 0x05]
         );
     }
 

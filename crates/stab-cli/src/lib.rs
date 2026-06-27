@@ -137,9 +137,10 @@ impl SampleOutFormatArg {
         match self {
             Self::ZeroOne => Ok(SampleFormat::ZeroOne),
             Self::B8 => Ok(SampleFormat::B8),
+            Self::R8 => Ok(SampleFormat::R8),
             Self::Hits => Ok(SampleFormat::Hits),
             Self::Dets => Ok(SampleFormat::Dets),
-            Self::R8 | Self::Ptb64 => Err(CliError::UnsupportedSampleOutputFormat),
+            Self::Ptb64 => Err(CliError::UnsupportedSampleOutputFormat),
         }
     }
 }
@@ -254,7 +255,7 @@ enum CliError {
     UnsupportedConversion,
 
     #[error(
-        "unsupported sample output format; this M8 slice supports --out_format=01, b8, hits, or dets"
+        "unsupported sample output format; this M8 slice supports --out_format=01, b8, r8, hits, or dets"
     )]
     UnsupportedSampleOutputFormat,
 

@@ -579,26 +579,40 @@ fn sample_writes_b8_format_like_stim() {
 }
 
 #[test]
-fn sample_rejects_r8_and_ptb64_until_m8_result_writers_land() {
-    for format in ["r8", "ptb64"] {
-        let mut stdout = Vec::new();
-        let mut stderr = Vec::new();
-        let status = run_from(
-            ["stab", "sample", "--out_format", format],
-            "M 0\n".as_bytes(),
-            &mut stdout,
-            &mut stderr,
-        );
+fn sample_writes_r8_format_like_stim() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample", "--out_format=r8"],
+        include_bytes!("../../../oracle/fixtures/inputs/sample_sparse_text_formats.stim")
+            .as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
 
-        assert_eq!(status, 1, "{format}");
-        assert_eq!(String::from_utf8(stdout).unwrap(), "", "{format}");
-        assert!(
-            String::from_utf8(stderr)
-                .unwrap()
-                .contains("unsupported sample output format"),
-            "{format}"
-        );
-    }
+    assert_eq!(status, 0);
+    assert_eq!(stdout, vec![0x02, 0x00, 0x01, 0x00]);
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_rejects_ptb64_until_fallible_batch_writer_lands() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample", "--out_format", "ptb64"],
+        "M 0\n".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("unsupported sample output format")
+    );
 }
 
 #[test]
