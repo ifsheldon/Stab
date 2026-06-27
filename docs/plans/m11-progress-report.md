@@ -11,7 +11,7 @@ This slice implements the first deterministic `sample_dem` path, the first one-b
 
 ## Tests Ported Or Created
 
-- `cargo test -p stab-core --test dem_sampler` covers the initial `CompiledDemSampler` subset ported from `src/stim/simulators/dem_sampler.test.cc`, including empty and sparse sizing, high detector and observable ids, `error(1)` detector toggling, `error(0)` no-op behavior, p=0.25, p=0.5, and p=0.75 probability bands, separator handling, detector-observable correlation, correlated detector-combination parity, detector shifts, repeat blocks, logical observable flips, fixed-seed noisy sampling reproducibility, and one-bit p=0.25 statistical behavior.
+- `cargo test -p stab-core --test dem_sampler` covers the initial `CompiledDemSampler` subset ported from `src/stim/simulators/dem_sampler.test.cc`, including empty and sparse sizing, high detector and observable ids, `error(1)` detector toggling, `error(0)` no-op behavior, p=0.25, p=0.5, and p=0.75 probability bands, separator handling, detector-observable correlation, correlated detector-combination parity, detector shifts, repeat blocks, logical observable flips, dense bit-packed detector and observable output, fixed-seed noisy sampling reproducibility, and one-bit p=0.25 statistical behavior.
 - `cargo test -p stab-cli sample_dem` covers the existing `m11-sample-dem-deterministic` oracle row for `stab sample_dem --shots 3` against pinned Stim v1.16.0 output, the `m11-sample-dem-noisy-statistical` one-bit seeded distribution row, and the upstream `--obs_out` detector/observable split behavior.
 - `just oracle::run --milestone M11 --exact` covers the implemented deterministic exact-output row after the manifest status is promoted from `red` to `implemented`.
 - `just oracle::run --milestone M11 --statistical` covers the implemented noisy one-bit statistical row.
@@ -30,7 +30,7 @@ This slice implements the first deterministic `sample_dem` path, the first one-b
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| `CompiledDemSampler` reusable sampling state | Partial | `CompiledDemSampler::compile`, `CompiledDemSampler::sample_detection_events_with_seed`, `cargo test -p stab-core --test dem_sampler` |
+| `CompiledDemSampler` reusable sampling state | Partial | `CompiledDemSampler::compile`, `CompiledDemSampler::sample_detection_events_with_seed`, `cargo test -p stab-core --test dem_sampler` including dense `b8` output coverage |
 | `stim sample_dem` deterministic CLI output | Partial | `m11-sample-dem-deterministic`, `cargo test -p stab-cli sample_dem_deterministic`, `cargo test -p stab-cli sample_dem_writes_observables`, `just oracle::run --milestone M11 --exact` |
 | `stim sample_dem` one-bit noisy statistical CLI output | Partial | `m11-sample-dem-noisy-statistical`, `cargo test -p stab-cli sample_dem_noisy`, `just oracle::run --milestone M11 --statistical` |
 | Sparse, dense, repeated, high-detector-count, and correlated-error fixture groups | Partial | `coverage-simulators-dem-sampler`, `cargo test -p stab-core --test dem_sampler`, `just oracle::run --milestone M11 --structural`; benchmark-scale fixture groups remain future work |

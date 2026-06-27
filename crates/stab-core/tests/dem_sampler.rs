@@ -98,6 +98,30 @@ fn dem_sampler_samples_deterministic_detector_error_each_shot() {
 }
 
 #[test]
+fn dem_sampler_writes_dense_bit_packed_detector_and_observable_output() {
+    let sampler = compile_dem("error(1) D0 D1 D2 D3 D4 D5 D6 D7 D8 L0\n");
+    let output = sampler
+        .sample_detection_events_with_seed(2, Some(5))
+        .expect("sample");
+
+    assert_eq!(output.detector_count, 9);
+    assert_eq!(output.observable_count, 1);
+    assert!(output.records.iter().all(|record| {
+        record.detectors.len() == 9
+            && record.detectors.iter().all(|bit| *bit)
+            && record.observables == [true]
+    }));
+
+    let bytes = write_detection_records(
+        &output,
+        DetectionObservableOutputMode::Append,
+        SampleFormat::B8,
+    )
+    .expect("write bit-packed output");
+    assert_eq!(bytes, [0xff, 0x03, 0xff, 0x03]);
+}
+
+#[test]
 fn dem_sampler_basic_probabilities_match_upstream_semantics() {
     let sampler = compile_dem(
         "
