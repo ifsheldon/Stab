@@ -1086,7 +1086,7 @@ fn dem_analyzer_preserves_shifted_detector_coordinates() {
         .unwrap()
         .to_dem_string();
 
-    assert_eq!(dem, "detector(7) D0\n");
+    assert_eq!(dem, "shift_detectors(2, 3) 0\ndetector(5) D0\n");
 }
 
 #[test]

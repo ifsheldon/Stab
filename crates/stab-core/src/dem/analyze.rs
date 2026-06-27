@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+mod declarations;
 mod decompose;
 mod effects;
 mod error_decomp;
@@ -17,6 +18,7 @@ use crate::{
 };
 
 use super::{DemInstruction, DemRepeatBlock, DemTarget, DetectorErrorModel};
+use declarations::Declaration;
 use decompose::decompose_tagged_error_probabilities;
 use effects::{
     AnalyzerBasis, AnalyzerPauli, NoiseEffect, ObservableSensitivity, PendingError,
@@ -32,9 +34,7 @@ use error_decomp::{
 };
 use folded::FoldedAnalyzer;
 use gauge::find_gauge_errors;
-use instructions::{
-    is_measurement_instruction, is_noise_instruction, pair_measurement_basis, shifted_coordinates,
-};
+use instructions::{is_measurement_instruction, is_noise_instruction, pair_measurement_basis};
 use probabilities::{merge_disjoint_probability, merge_independent_probability, toggle_all};
 
 const MAX_ANALYZER_REPEAT_UNROLL: u64 = 100_000;
@@ -73,7 +73,6 @@ struct Analyzer {
     options: ErrorAnalyzerOptions,
     measurement_count: usize,
     detector_count: u64,
-    coord_offset: Vec<f64>,
     pending_errors: Vec<PendingError>,
     pending_pauli_channels: Vec<PendingSingleQubitPauliChannel>,
     else_correlated_error_remainder: Option<Probability>,
@@ -83,9 +82,7 @@ struct Analyzer {
     detector_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
     observable_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
     observable_sensitivity: ObservableSensitivity,
-    observable_declarations: Vec<ObservableDeclaration>,
-    detector_declarations: Vec<DetectorDeclaration>,
-    shift_declarations: Vec<ShiftDeclaration>,
+    declarations: Vec<Declaration>,
 }
 
 impl Analyzer {
@@ -94,7 +91,6 @@ impl Analyzer {
             options,
             measurement_count: 0,
             detector_count: 0,
-            coord_offset: Vec::new(),
             pending_errors: Vec::new(),
             pending_pauli_channels: Vec::new(),
             else_correlated_error_remainder: None,
@@ -104,9 +100,7 @@ impl Analyzer {
             detector_terms_by_measurement: BTreeMap::new(),
             observable_terms_by_measurement: BTreeMap::new(),
             observable_sensitivity: ObservableSensitivity::default(),
-            observable_declarations: Vec::new(),
-            detector_declarations: Vec::new(),
-            shift_declarations: Vec::new(),
+            declarations: Vec::new(),
         }
     }
 
@@ -913,7 +907,6 @@ impl Analyzer {
         self.detector_count = self.detector_count.checked_add(1).ok_or_else(|| {
             CircuitError::invalid_detector_error_model("detector count overflowed")
         })?;
-        let coordinates = shifted_coordinates(&self.coord_offset, instruction.args());
         for target in instruction.targets() {
             let Some(offset) = target.measurement_record_offset() else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
@@ -926,9 +919,9 @@ impl Analyzer {
                 .or_default()
                 .push(detector_id);
         }
-        self.detector_declarations.push(DetectorDeclaration {
+        self.declarations.push(Declaration::Detector {
             detector_id,
-            coordinates,
+            coordinates: instruction.args().to_vec(),
             tag: instruction.tag().map(str::to_owned),
         });
         Ok(())
@@ -972,7 +965,7 @@ impl Analyzer {
             || instruction.tag().is_some()
             || !has_targets
         {
-            self.observable_declarations.push(ObservableDeclaration {
+            self.declarations.push(Declaration::Observable {
                 observable: observable.get(),
                 tag: instruction.tag().map(str::to_owned),
             });
@@ -981,20 +974,11 @@ impl Analyzer {
     }
 
     fn shift_coordinates(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        for (index, value) in instruction.args().iter().copied().enumerate() {
-            if index == self.coord_offset.len() {
-                self.coord_offset.push(value);
-            } else if let Some(offset) = self.coord_offset.get_mut(index) {
-                *offset += value;
-            }
-        }
-        if let Some(tag) = instruction.tag() {
-            self.shift_declarations.push(ShiftDeclaration {
-                coordinates: instruction.args().to_vec(),
-                detector_shift: 0,
-                tag: Some(tag.to_owned()),
-            });
-        }
+        self.declarations.push(Declaration::Shift {
+            coordinates: instruction.args().to_vec(),
+            detector_shift: 0,
+            tag: instruction.tag().map(str::to_owned),
+        });
         Ok(())
     }
 
@@ -1117,58 +1101,46 @@ impl Analyzer {
             dem.push_instruction(DemInstruction::error(probability, targets, tag)?);
         }
 
-        for declaration in self.detector_declarations {
-            if declaration.coordinates.is_empty()
-                && declaration.tag.is_none()
-                && touched_detectors.contains(&declaration.detector_id)
-            {
-                continue;
+        for declaration in self.declarations {
+            match declaration {
+                Declaration::Detector {
+                    detector_id,
+                    coordinates,
+                    tag,
+                } => {
+                    if coordinates.is_empty()
+                        && tag.is_none()
+                        && touched_detectors.contains(&detector_id)
+                    {
+                        continue;
+                    }
+                    dem.push_instruction(DemInstruction::detector(
+                        coordinates,
+                        DemTarget::relative_detector(detector_id)?,
+                        tag,
+                    )?);
+                }
+                Declaration::Observable { observable, tag } => {
+                    if tag.is_some() || !touched_logical_observables.contains(&observable) {
+                        dem.push_instruction(DemInstruction::logical_observable(
+                            DemTarget::logical_observable(observable)?,
+                            tag,
+                        )?);
+                    }
+                }
+                Declaration::Shift {
+                    coordinates,
+                    detector_shift,
+                    tag,
+                } => {
+                    dem.push_instruction(DemInstruction::shift_detectors(
+                        coordinates,
+                        detector_shift,
+                        tag,
+                    )?);
+                }
             }
-            dem.push_instruction(DemInstruction::detector(
-                declaration.coordinates,
-                DemTarget::relative_detector(declaration.detector_id)?,
-                declaration.tag,
-            )?);
-        }
-
-        for declaration in self.observable_declarations {
-            if declaration.tag.is_some()
-                || !touched_logical_observables.contains(&declaration.observable)
-            {
-                dem.push_instruction(DemInstruction::logical_observable(
-                    DemTarget::logical_observable(declaration.observable)?,
-                    declaration.tag,
-                )?);
-            }
-        }
-
-        for declaration in self.shift_declarations {
-            dem.push_instruction(DemInstruction::shift_detectors(
-                declaration.coordinates,
-                declaration.detector_shift,
-                declaration.tag,
-            )?);
         }
         Ok(dem)
     }
-}
-
-#[derive(Clone, Debug)]
-struct DetectorDeclaration {
-    detector_id: u64,
-    coordinates: Vec<f64>,
-    tag: Option<String>,
-}
-
-#[derive(Clone, Debug)]
-struct ObservableDeclaration {
-    observable: u64,
-    tag: Option<String>,
-}
-
-#[derive(Clone, Debug)]
-struct ShiftDeclaration {
-    coordinates: Vec<f64>,
-    detector_shift: u64,
-    tag: Option<String>,
 }

@@ -1,14 +1,5 @@
 use super::AnalyzerBasis;
 
-pub(super) fn shifted_coordinates(offset: &[f64], local: &[f64]) -> Vec<f64> {
-    local
-        .iter()
-        .copied()
-        .enumerate()
-        .map(|(index, value)| offset.get(index).copied().unwrap_or(0.0) + value)
-        .collect()
-}
-
 pub(super) fn measurement_basis(name: &str) -> Option<AnalyzerBasis> {
     match name {
         "M" | "MR" => Some(AnalyzerBasis::Z),

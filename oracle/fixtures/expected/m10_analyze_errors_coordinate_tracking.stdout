@@ -1,0 +1,3 @@
+detector(1, 2) D0
+shift_detectors(10, 20) 0
+detector(100, 200) D1
