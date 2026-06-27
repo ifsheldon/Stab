@@ -61,6 +61,14 @@ enum Command {
         #[arg(long = "case")]
         case: Option<OracleCase>,
 
+        /// Run only exact-output fixture comparisons within the selected fixture set.
+        #[arg(long)]
+        exact: bool,
+
+        /// Run only statistical fixture comparisons within the selected fixture set.
+        #[arg(long)]
+        statistical: bool,
+
         /// Run all manifest fixtures that are marked implemented.
         #[arg(long)]
         implemented_only: bool,
@@ -357,12 +365,25 @@ fn run(cli: Cli) -> Result<(), OracleError> {
         }
         Command::Run {
             case,
+            exact,
+            statistical,
             implemented_only,
             all,
             milestone,
             rebuild_stim,
         } => {
-            run_selected_cases(&root, case, implemented_only, all, milestone, rebuild_stim)?;
+            run_selected_cases(
+                &root,
+                RunSelection {
+                    case,
+                    exact,
+                    statistical,
+                    implemented_only,
+                    all,
+                    milestone,
+                    rebuild_stim,
+                },
+            )?;
         }
         Command::List { milestone } => {
             fixtures::list_fixtures(&root, milestone.as_deref())?;
@@ -380,33 +401,55 @@ fn run(cli: Cli) -> Result<(), OracleError> {
     Ok(())
 }
 
-fn run_selected_cases(
-    root: &RepoRoot,
+#[derive(Clone, Debug)]
+struct RunSelection {
     case: Option<OracleCase>,
+    exact: bool,
+    statistical: bool,
     implemented_only: bool,
     all: bool,
     milestone: Option<String>,
     rebuild_stim: bool,
-) -> Result<(), OracleError> {
-    let selected = usize::from(case.is_some())
-        + usize::from(implemented_only)
-        + usize::from(all)
-        + usize::from(milestone.is_some());
+}
+
+fn run_selected_cases(root: &RepoRoot, selection: RunSelection) -> Result<(), OracleError> {
+    let selected = usize::from(selection.case.is_some())
+        + usize::from(selection.implemented_only)
+        + usize::from(selection.all)
+        + usize::from(selection.milestone.is_some());
     if selected != 1 {
         return Err(OracleError::InvalidRunSelection(
             "choose exactly one of --case, --implemented-only, --all, or --milestone".to_string(),
         ));
     }
-    if let Some(case) = case {
-        return run_smoke_case(root, case, rebuild_stim);
+    let filter = fixtures::RunFilter::from_flags(selection.exact, selection.statistical)
+        .map_err(OracleError::InvalidRunSelection)?;
+    if selection.case.is_some() && filter.is_some() {
+        return Err(OracleError::InvalidRunSelection(
+            "fixture filters --exact and --statistical require --implemented-only, --all, or --milestone"
+                .to_string(),
+        ));
     }
-    if implemented_only {
-        return fixtures::run_fixtures(root, fixtures::RunMode::ImplementedOnly, rebuild_stim);
+    if let Some(case) = selection.case {
+        return run_smoke_case(root, case, selection.rebuild_stim);
     }
-    if let Some(milestone) = milestone {
-        return fixtures::run_fixtures(root, fixtures::RunMode::Milestone(milestone), rebuild_stim);
+    if selection.implemented_only {
+        return fixtures::run_fixtures(
+            root,
+            fixtures::RunMode::ImplementedOnly,
+            filter,
+            selection.rebuild_stim,
+        );
     }
-    fixtures::run_fixtures(root, fixtures::RunMode::All, rebuild_stim)
+    if let Some(milestone) = selection.milestone {
+        return fixtures::run_fixtures(
+            root,
+            fixtures::RunMode::Milestone(milestone),
+            filter,
+            selection.rebuild_stim,
+        );
+    }
+    fixtures::run_fixtures(root, fixtures::RunMode::All, filter, selection.rebuild_stim)
 }
 
 fn run_matrix_command(
@@ -856,8 +899,10 @@ fn display_status(status: Option<i32>) -> String {
 
 #[cfg(test)]
 mod tests {
+    use clap::Parser;
+
     use super::{
-        Comparator, OracleCase, ProcessOutput, SmokeCase, StderrClass, compare_exact,
+        Cli, Command, Comparator, OracleCase, ProcessOutput, SmokeCase, StderrClass, compare_exact,
         compare_help_health, smoke_case,
     };
 
@@ -879,6 +924,24 @@ mod tests {
         assert_eq!(case.args, vec!["--help"]);
         assert_eq!(case.stdin, b"");
         assert_eq!(case.comparator, Comparator::HelpHealth);
+    }
+
+    #[test]
+    fn run_command_accepts_exact_and_statistical_filters() {
+        let exact = Cli::try_parse_from(["stab-oracle", "run", "--milestone", "M8", "--exact"])
+            .expect("parse exact run command");
+        let statistical =
+            Cli::try_parse_from(["stab-oracle", "run", "--milestone", "M8", "--statistical"])
+                .expect("parse statistical run command");
+
+        assert!(matches!(exact.command, Command::Run { exact: true, .. }));
+        assert!(matches!(
+            statistical.command,
+            Command::Run {
+                statistical: true,
+                ..
+            }
+        ));
     }
 
     #[test]

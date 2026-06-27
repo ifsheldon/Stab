@@ -36,6 +36,30 @@ impl RunMode {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum RunFilter {
+    Exact,
+    Statistical,
+}
+
+impl RunFilter {
+    pub(crate) fn from_flags(exact: bool, statistical: bool) -> Result<Option<Self>, String> {
+        match (exact, statistical) {
+            (false, false) => Ok(None),
+            (true, false) => Ok(Some(Self::Exact)),
+            (false, true) => Ok(Some(Self::Statistical)),
+            (true, true) => Err("choose at most one of --exact or --statistical".to_string()),
+        }
+    }
+
+    fn matches(self, row: &FixtureRow) -> bool {
+        match self {
+            Self::Exact => row.comparator == FixtureComparator::ExactOutput,
+            Self::Statistical => row.comparator == FixtureComparator::Statistical,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 struct FixtureRow {
     id: String,
@@ -495,6 +519,17 @@ impl FixtureManifest {
                     row.id
                 ));
             }
+            if row.comparator == FixtureComparator::Statistical
+                && row.status != FixtureStatus::ManifestOnly
+            {
+                let argv_tokens = row.argv_tokens();
+                if let Some(reason) = statistical::validate_binomial_statistical_plan(
+                    &row.statistical_plan,
+                    &argv_tokens,
+                ) {
+                    violations.push(format!("{} invalid statistical plan: {reason}", row.id));
+                }
+            }
             validate_vendor_source(root, row, &mut violations);
             for (field, relative, must_exist) in [
                 (
@@ -714,6 +749,7 @@ fn is_recordable(row: &FixtureRow) -> bool {
 pub(crate) fn run_fixtures(
     root: &RepoRoot,
     mode: RunMode,
+    filter: Option<RunFilter>,
     rebuild_stim: bool,
 ) -> Result<(), OracleError> {
     let manifest = load_manifest(root)?;
@@ -723,6 +759,9 @@ pub(crate) fn run_fixtures(
     let mut stab_binary = None;
     for row in &manifest.rows {
         if !matches_milestone_filter(row, milestone_filter) {
+            continue;
+        }
+        if filter.is_some_and(|filter| !filter.matches(row)) {
             continue;
         }
         match row.status {

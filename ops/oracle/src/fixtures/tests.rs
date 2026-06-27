@@ -1,6 +1,6 @@
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement, Milestone,
-    RunMode, is_recordable, run_core_fixture, run_direct_rust_fixture, statistical,
+    RunFilter, RunMode, is_recordable, run_core_fixture, run_direct_rust_fixture, statistical,
     validate_fixture_path,
 };
 
@@ -49,6 +49,44 @@ fn milestone_run_mode_parses_m4_filter() {
     let mode = RunMode::Milestone("M4".to_string());
 
     assert_eq!(mode.milestone_filter().unwrap(), Some(Milestone::M4));
+}
+
+#[test]
+fn run_filter_flags_select_one_comparator_family() {
+    assert_eq!(RunFilter::from_flags(false, false).unwrap(), None);
+    assert_eq!(
+        RunFilter::from_flags(true, false).unwrap(),
+        Some(RunFilter::Exact)
+    );
+    assert_eq!(
+        RunFilter::from_flags(false, true).unwrap(),
+        Some(RunFilter::Statistical)
+    );
+    assert!(
+        RunFilter::from_flags(true, true)
+            .expect_err("conflicting filters should fail")
+            .contains("choose at most one")
+    );
+}
+
+#[test]
+fn run_filter_matches_exact_and_statistical_fixture_rows() {
+    let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
+    let exact_row = manifest
+        .rows
+        .iter()
+        .find(|row| row.id == "m8-sample-basic")
+        .expect("M8 exact row");
+    let statistical_row = manifest
+        .rows
+        .iter()
+        .find(|row| row.id == "m8-sample-noisy-statistical")
+        .expect("M8 statistical row");
+
+    assert!(RunFilter::Exact.matches(exact_row));
+    assert!(!RunFilter::Exact.matches(statistical_row));
+    assert!(RunFilter::Statistical.matches(statistical_row));
+    assert!(!RunFilter::Statistical.matches(exact_row));
 }
 
 #[test]
@@ -223,12 +261,45 @@ fn binomial_statistical_comparator_rejects_samples_outside_tolerance() {
 
 #[test]
 fn binomial_statistical_comparator_rejects_non_bit_output() {
-    let plan = "tolerate binomial p=0.25 within 5 sigma";
+    let plan = "sample_count=1; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
 
     assert!(
         statistical::compare_binomial_statistical_plan(plan, b"shot M0\n")
             .expect("statistical rejection")
             .contains("expected one 0/1 bit per shot")
+    );
+}
+
+#[test]
+fn binomial_statistical_comparator_rejects_sample_count_mismatch() {
+    let plan = "sample_count=2; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
+
+    assert!(
+        statistical::compare_binomial_statistical_plan(plan, b"0\n")
+            .expect("statistical rejection")
+            .contains("expected 2 samples")
+    );
+}
+
+#[test]
+fn validation_rejects_statistical_plan_that_disagrees_with_argv() {
+    let csv = format!(
+        "{HEADER}bad,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample|--shots|10|--seed|5,inputs/sample_noisy.stim,,0,empty,red,sample_count=11; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001,hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+    let error = manifest
+        .check(&root)
+        .expect_err("mismatched plan should fail");
+
+    assert!(
+        error
+            .to_string()
+            .contains("sample_count=11 does not match --shots 10")
     );
 }
 
