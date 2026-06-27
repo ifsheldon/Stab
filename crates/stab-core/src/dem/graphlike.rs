@@ -3,6 +3,8 @@
     reason = "M10 graphlike search internals are being landed in parity-tested slices before the full search algorithm consumes them"
 )]
 
+mod algo;
+
 use std::collections::BTreeSet;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -162,6 +164,15 @@ impl Graph {
             num_observables,
             distance_1_error_mask,
         }
+    }
+
+    pub(super) fn detector_for_node_index(&self, index: usize) -> CircuitResult<DemDetectorId> {
+        let index = u64::try_from(index).map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "graphlike node index does not fit detector id",
+            )
+        })?;
+        DemDetectorId::try_new(index)
     }
 
     pub(super) fn add_outward_edge(
