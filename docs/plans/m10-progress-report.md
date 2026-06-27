@@ -1,0 +1,46 @@
+# M10 Progress Report
+
+## Milestone
+
+M10: Detector Error Model Core
+
+## Status
+
+Partial progress, not milestone-complete.
+This slice implements the `.dem` format core and the first staged `analyze_errors` path needed by the existing deterministic oracle rows.
+M10 still requires graphlike and hypergraph analyzer internals, loop folding, decomposition behavior, gauge-detector handling, sparse reverse detector-frame tracking, structural DEM equivalence for generated QEC circuits, and complete benchmark coverage before milestone audit can accept it.
+
+## Tests Ported Or Created
+
+- `cargo test -p stab-core dem` covers DEM target limits, repeat blocks, detector shifts, coordinates, observables, probabilities, separators, invalid input, deterministic detector declarations, simple Pauli-error analyzer output, shifted detector coordinates, and explicit rejection of unimplemented loop folding.
+- `cargo test -p stab-cli m10` covers `stab analyze_errors`, the legacy `--analyze_errors` alias, simple Pauli-error output, and current flag parsing on supported circuits.
+- `cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners` covers Stab-side M10 `.dem` parse and print benchmark runners.
+
+## Implementation Areas
+
+- Added `DetectorErrorModel`, DEM instruction, target, repeat block, detector id, observable id, parser, canonical printer, detector counting, observable counting, and detector-shift helpers in `stab-core`.
+- Added a staged circuit-to-DEM analyzer for deterministic detector declarations and simple single-qubit `X_ERROR`, `Y_ERROR`, and `Z_ERROR` effects feeding measurement-record detectors and observables.
+- Added `stab analyze_errors` CLI dispatch, including the legacy `--analyze_errors` alias and current staged flag parsing.
+- Extended the oracle core fixture runner to support `core-dem-parse-print`.
+- Implemented the current M10 exact and structural rows for `.dem` parse-print and basic `analyze_errors`.
+- Added Stab-side benchmark compare runners for the M10 `.dem` parse and print rows.
+
+## Current Evidence
+
+| Requirement | Status | Evidence |
+| --- | --- | --- |
+| `.dem` parser and canonical printer | Partial | `DetectorErrorModel::from_dem_str`, `DetectorErrorModel::to_dem_string`, `just oracle::run --milestone M10 --exact` |
+| DEM core types, repeats, coordinates, detector shifts, observables, separators, probability validation | Partial | `cargo test -p stab-core dem` |
+| `stim analyze_errors` staged default behavior | Partial | `cargo test -p stab-cli m10`, `just oracle::run --milestone M10 --structural` |
+| Structural DEM comparators for generated QEC circuits | Missing | Remaining M10 manifest-only structural rows |
+| Loop folding without flattening high-repeat circuits | Missing | Current analyzer rejects `--fold_loops` on repeated circuits |
+| M10 benchmark reporting | Partial | `just bench::compare --milestone M10` measures `.dem` parse and print rows; analyzer, decomposition, graphlike, and loop-folding rows remain pending or missing baseline |
+
+## Verification Commands
+
+- `cargo fmt --check --all`
+- `cargo clippy --workspace --all-targets -- -D warnings`
+- `cargo test --workspace`
+- `just oracle::run --milestone M10 --exact`
+- `just oracle::run --milestone M10 --structural`
+- `just bench::compare --milestone M10`

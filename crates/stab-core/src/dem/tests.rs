@@ -1,0 +1,114 @@
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "unit tests use direct assertions for compact diagnostics"
+)]
+
+use super::*;
+use crate::Circuit;
+
+#[test]
+fn dem_targets_parse_stim_limits() {
+    assert_eq!(
+        "D4611686018427387903".parse::<DemTarget>().unwrap(),
+        DemTarget::relative_detector(4_611_686_018_427_387_903).unwrap()
+    );
+    assert_eq!(
+        "L4294967295".parse::<DemTarget>().unwrap(),
+        DemTarget::logical_observable(4_294_967_295).unwrap()
+    );
+    assert_eq!("^".parse::<DemTarget>().unwrap(), DemTarget::separator());
+    assert_eq!("10".parse::<DemTarget>().unwrap(), DemTarget::numeric(10));
+
+    assert!("D4611686018427387904".parse::<DemTarget>().is_err());
+    assert!("L4294967296".parse::<DemTarget>().is_err());
+    assert!("D-1".parse::<DemTarget>().is_err());
+    assert!("Da".parse::<DemTarget>().is_err());
+    assert!("".parse::<DemTarget>().is_err());
+}
+
+#[test]
+fn dem_parse_print_round_trip_includes_repeats_shifts_coordinates_and_tags() {
+    let text = "error(0.125) D0\nrepeat[test\\Ctag] 100 {\n    error(0.25) D0 D1 L0 ^ D2\n    shift_detectors(1.5, 3) 10\n    detector(0.5) D0\n    logical_observable L0\n}\n";
+
+    let dem = DetectorErrorModel::from_dem_str(text).unwrap();
+
+    assert_eq!(dem.to_dem_string(), text);
+    assert_eq!(
+        DetectorErrorModel::from_dem_str(&dem.to_dem_string()).unwrap(),
+        dem
+    );
+}
+
+#[test]
+fn dem_rejects_invalid_probabilities_and_separators() {
+    assert!(DetectorErrorModel::from_dem_str("error(1.5) D0\n").is_err());
+    assert!(DetectorErrorModel::from_dem_str("error(0.25) ^ D0\n").is_err());
+    assert!(DetectorErrorModel::from_dem_str("error(0.25) D0 ^\n").is_err());
+    assert!(DetectorErrorModel::from_dem_str("error(0.25) D0 ^ ^ D1\n").is_err());
+    assert!(DetectorErrorModel::from_dem_str("detector L0\n").is_err());
+    assert!(DetectorErrorModel::from_dem_str("logical_observable D0\n").is_err());
+    assert!(DetectorErrorModel::from_dem_str("shift_detectors D0\n").is_err());
+}
+
+#[test]
+fn dem_counts_detector_shift_detectors_and_observables_through_repeats() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "shift_detectors 50\nrepeat 3 {\n    detector D0\n    error(0.1) D0 D2 L6\n    shift_detectors 4\n}\nlogical_observable L5\n",
+    )
+    .unwrap();
+
+    assert_eq!(dem.total_detector_shift().unwrap(), 62);
+    assert_eq!(dem.count_detectors().unwrap(), 61);
+    assert_eq!(dem.count_observables().unwrap(), 7);
+}
+
+#[test]
+fn dem_analyzer_outputs_detector_declaration_for_deterministic_detector() {
+    let circuit = Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n").unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "detector D0\n");
+}
+
+#[test]
+fn dem_analyzer_maps_simple_pauli_noise_to_detector_and_observable() {
+    let circuit = Circuit::from_stim_str(
+        "X_ERROR(0.25) 0\nX_ERROR(0.125) 1\nM 0 1\nOBSERVABLE_INCLUDE(3) rec[-1]\nDETECTOR rec[-2]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.25) D0\nerror(0.125) L3\n");
+}
+
+#[test]
+fn dem_analyzer_preserves_shifted_detector_coordinates() {
+    let circuit = Circuit::from_stim_str("SHIFT_COORDS(2, 3)\nM 0\nDETECTOR(5) rec[-1]\n").unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "detector(7) D0\n");
+}
+
+#[test]
+fn dem_analyzer_rejects_unimplemented_loop_folding() {
+    let circuit = Circuit::from_stim_str("REPEAT 2 {\n    M 0\n    DETECTOR rec[-1]\n}\n").unwrap();
+    let result = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    );
+
+    assert!(result.is_err());
+}

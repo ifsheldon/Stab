@@ -44,6 +44,9 @@ pub enum CircuitError {
     #[error("invalid result format data: {message}")]
     InvalidResultFormat { message: String },
 
+    #[error("invalid detector error model: {message}")]
+    InvalidDetectorErrorModel { message: String },
+
     #[error("unterminated repeat block")]
     UnterminatedRepeatBlock,
 
@@ -86,6 +89,12 @@ impl CircuitError {
 
     pub(crate) fn invalid_result_format(message: impl Into<String>) -> Self {
         Self::InvalidResultFormat {
+            message: message.into(),
+        }
+    }
+
+    pub(crate) fn invalid_detector_error_model(message: impl Into<String>) -> Self {
+        Self::InvalidDetectorErrorModel {
             message: message.into(),
         }
     }

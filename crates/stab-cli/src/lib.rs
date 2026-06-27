@@ -13,6 +13,9 @@ use std::ffi::OsString;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
+mod analyze_errors;
+
+use analyze_errors::{AnalyzeErrorsArgs, run_analyze_errors};
 use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use stab_core::{
@@ -56,6 +59,10 @@ enum Command {
     /// Converts measurements into detector events.
     #[command(name = "m2d")]
     M2d(M2dArgs),
+
+    /// Converts a circuit into a detector error model.
+    #[command(name = "analyze_errors")]
+    AnalyzeErrors(AnalyzeErrorsArgs),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -328,7 +335,7 @@ struct M2dArgs {
 }
 
 #[derive(Debug, Error)]
-enum CliError {
+pub(crate) enum CliError {
     #[error("failed to read stdin: {0}")]
     ReadInput(std::io::Error),
 
@@ -442,6 +449,7 @@ where
         Some(Command::Sample(args)) => run_sample(args, &mut input, &mut stdout, &mut stderr),
         Some(Command::Detect(args)) => run_detect(args, &mut input, &mut stdout, &mut stderr),
         Some(Command::M2d(args)) => run_m2d(args, &mut input, &mut stdout),
+        Some(Command::AnalyzeErrors(args)) => run_analyze_errors(args, &mut input, &mut stdout),
         None => {
             let error = Cli::command().error(
                 ErrorKind::MissingSubcommand,
@@ -535,6 +543,10 @@ where
         && let Some(arg) = args.get_mut(1)
     {
         *arg = OsString::from("m2d");
+    } else if legacy_arg == "--analyze_errors"
+        && let Some(arg) = args.get_mut(1)
+    {
+        *arg = OsString::from("analyze_errors");
     }
     args
 }
@@ -788,7 +800,7 @@ fn convert_record_width(args: &ConvertArgs) -> Result<usize, CliError> {
     }
 }
 
-fn read_input<R>(path: Option<&PathBuf>, stdin: &mut R) -> Result<Vec<u8>, CliError>
+pub(crate) fn read_input<R>(path: Option<&PathBuf>, stdin: &mut R) -> Result<Vec<u8>, CliError>
 where
     R: Read,
 {
@@ -804,7 +816,11 @@ where
     }
 }
 
-fn write_output<W>(path: Option<&PathBuf>, stdout: &mut W, output: &[u8]) -> Result<(), CliError>
+pub(crate) fn write_output<W>(
+    path: Option<&PathBuf>,
+    stdout: &mut W,
+    output: &[u8],
+) -> Result<(), CliError>
 where
     W: Write,
 {
@@ -1064,7 +1080,7 @@ where
 
 const MAX_M2D_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 
-fn parse_circuit_bytes(input: &[u8]) -> Result<Circuit, CliError> {
+pub(crate) fn parse_circuit_bytes(input: &[u8]) -> Result<Circuit, CliError> {
     let circuit_text = std::str::from_utf8(input).map_err(|_| CliError::InvalidUtf8Input)?;
     Ok(Circuit::from_stim_str(circuit_text)?)
 }

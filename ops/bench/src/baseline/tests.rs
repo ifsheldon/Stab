@@ -364,6 +364,56 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
     }
 }
 
+#[test]
+fn m10_dem_benchmark_rows_have_stab_compare_runners() {
+    for (id, runner, expected_measurements) in [
+        (
+            "m10-dem-parse-contract",
+            Runner::StimCli,
+            &["stab_dem_parse_sample"][..],
+        ),
+        (
+            "m10-dem-print-contract",
+            Runner::ContractOnly,
+            &["stab_dem_print_sample"][..],
+        ),
+    ] {
+        let row = BenchmarkRow {
+            id: id.to_string(),
+            milestone: Milestone::M10,
+            threshold_class: "report-only".to_string(),
+            runner,
+            upstream_source: "src/stim/dem/detector_error_model.test.cc".to_string(),
+            stim_perf_filter: String::new(),
+            argv: String::new(),
+            stdin_path: String::new(),
+            phase: "analysis".to_string(),
+            measurement: "dem-format".to_string(),
+            description: "test row".to_string(),
+        };
+
+        let measurements = run_stab_compare_row(&row)
+            .expect("run compare row")
+            .expect("Stab runner");
+        let names = measurements
+            .iter()
+            .map(|measurement| measurement.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(names.as_slice(), expected_measurements);
+        assert!(
+            compare_note(id).is_some(),
+            "{id} should explain benchmark comparability"
+        );
+        for name in names {
+            assert!(
+                measurement_work(id, name).is_some(),
+                "{id}/{name} should report normalized work"
+            );
+        }
+    }
+}
+
 fn benchmark_row(id: &str, runner: Runner) -> BenchmarkRow {
     let (upstream_source, measurement) = if runner == Runner::ContractOnly {
         ("src/stim/circuit/circuit.test.cc", "canonical-print")

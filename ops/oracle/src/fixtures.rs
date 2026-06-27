@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
-use stab_core::Circuit;
+use stab_core::{Circuit, DetectorErrorModel};
 use thiserror::Error;
 
 use crate::{OracleError, RepoRoot, StderrClass, compare_exact, compare_help_health};
@@ -868,7 +868,7 @@ fn cached_stab_binary(
 fn is_core_fixture(row: &FixtureRow) -> bool {
     matches!(
         row.argv.as_str(),
-        "core-parse-print" | "core-circuit-parse-print"
+        "core-parse-print" | "core-circuit-parse-print" | "core-dem-parse-print"
     )
 }
 
@@ -943,6 +943,20 @@ fn core_parse_print_output(
         });
     }
     let input = fixture_utf8(row, "stdin", stdin)?;
+    if row.argv == "core-dem-parse-print" {
+        let dem = parse_core_dem(row, "stdin", input)?;
+        return Ok(crate::ProcessOutput {
+            status: Some(0),
+            stdout: crate::CapturedOutput {
+                bytes: dem.to_dem_string().into_bytes(),
+                truncated: false,
+            },
+            stderr: crate::CapturedOutput {
+                bytes: Vec::new(),
+                truncated: false,
+            },
+        });
+    }
     let circuit = parse_core_circuit(row, "stdin", input)?;
     Ok(crate::ProcessOutput {
         status: Some(0),
@@ -981,6 +995,18 @@ fn compare_core_parse_print_structure(
     stdin: &[u8],
     stdout: &[u8],
 ) -> Result<(), FixtureError> {
+    if row.argv == "core-dem-parse-print" {
+        let original = parse_core_dem(row, "stdin", fixture_utf8(row, "stdin", stdin)?)?;
+        let reparsed = parse_core_dem(row, "printed stdout", fixture_utf8(row, "stdout", stdout)?)?;
+        if original != reparsed {
+            return Err(FixtureError::ComparatorMismatch {
+                id: row.id.clone(),
+                comparator: row.comparator.as_str(),
+                reason: "parse-print-parse changed DEM semantics".to_string(),
+            });
+        }
+        return Ok(());
+    }
     let original = parse_core_circuit(row, "stdin", fixture_utf8(row, "stdin", stdin)?)?;
     let reparsed = parse_core_circuit(row, "printed stdout", fixture_utf8(row, "stdout", stdout)?)?;
     if original != reparsed {
@@ -997,6 +1023,17 @@ fn parse_core_circuit(row: &FixtureRow, label: &str, input: &str) -> Result<Circ
     Circuit::from_stim_str(input).map_err(|source| FixtureError::CoreFixtureFailed {
         id: row.id.clone(),
         reason: format!("{label} parse failed: {source}"),
+    })
+}
+
+fn parse_core_dem(
+    row: &FixtureRow,
+    label: &str,
+    input: &str,
+) -> Result<DetectorErrorModel, FixtureError> {
+    DetectorErrorModel::from_dem_str(input).map_err(|source| FixtureError::CoreFixtureFailed {
+        id: row.id.clone(),
+        reason: format!("{label} DEM parse failed: {source}"),
     })
 }
 

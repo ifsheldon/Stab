@@ -1,6 +1,7 @@
 use super::run_from;
 use tempfile::tempdir;
 
+mod m10;
 mod m9;
 
 #[test]

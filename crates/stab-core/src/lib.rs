@@ -9,6 +9,7 @@ mod circuit_generation;
 mod circuit_inverse;
 mod circuit_simplify;
 mod circuit_tableau;
+mod dem;
 mod detection;
 mod error;
 mod gate;
@@ -31,6 +32,10 @@ pub use circuit_generation::{
 pub use circuit_inverse::{circuit_inverse_qec, circuit_inverse_unitary};
 pub use circuit_simplify::simplified_circuit;
 pub use circuit_tableau::circuit_to_tableau;
+pub use dem::{
+    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock,
+    DemTarget, DetectorErrorModel, ErrorAnalyzerOptions, circuit_to_detector_error_model,
+};
 pub use detection::{
     DetectionConversionOptions, DetectionConversionOutput, DetectionEventRecord,
     DetectionObservableOutputMode, convert_measurements_to_detection_events,
