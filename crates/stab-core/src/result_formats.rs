@@ -423,7 +423,20 @@ pub fn read_records(
         SampleFormat::B8 => read_b8_records(input, bits_per_record),
         SampleFormat::R8 => read_r8_records(input, bits_per_record),
         SampleFormat::Hits => read_hits_records(input, bits_per_record),
-        SampleFormat::Dets => read_dets_records(input, bits_per_record),
+        SampleFormat::Dets => read_dets_records(input, bits_per_record, DetsTokenMode::Any),
+    }
+}
+
+pub fn read_measurement_records(
+    input: &[u8],
+    format: SampleFormat,
+    bits_per_record: usize,
+) -> CircuitResult<Vec<Vec<bool>>> {
+    match format {
+        SampleFormat::Dets => {
+            read_dets_records(input, bits_per_record, DetsTokenMode::MeasurementsOnly)
+        }
+        _ => read_records(input, format, bits_per_record),
     }
 }
 
@@ -454,13 +467,9 @@ fn read_zero_one_records(input: &[u8], bits_per_record: usize) -> CircuitResult<
 fn read_b8_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<Vec<bool>>> {
     let bytes_per_record = bits_per_record.div_ceil(8);
     if bytes_per_record == 0 {
-        return if input.is_empty() {
-            Ok(Vec::new())
-        } else {
-            Err(CircuitError::invalid_result_format(
-                "b8 input has bytes for zero-width records",
-            ))
-        };
+        return Err(CircuitError::invalid_result_format(
+            "b8 input cannot represent zero-width records",
+        ));
     }
     if !input.len().is_multiple_of(bytes_per_record) {
         return Err(CircuitError::invalid_result_format(format!(
@@ -520,11 +529,21 @@ fn read_hits_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<
     let text = std::str::from_utf8(input)
         .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
     text.split_terminator('\n')
-        .map(|line| read_sparse_index_line(line, bits_per_record, false))
+        .map(|line| read_sparse_index_line(line, bits_per_record, None))
         .collect()
 }
 
-fn read_dets_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<Vec<bool>>> {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DetsTokenMode {
+    Any,
+    MeasurementsOnly,
+}
+
+fn read_dets_records(
+    input: &[u8],
+    bits_per_record: usize,
+    token_mode: DetsTokenMode,
+) -> CircuitResult<Vec<Vec<bool>>> {
     let text = std::str::from_utf8(input)
         .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
     text.split_terminator('\n')
@@ -534,7 +553,7 @@ fn read_dets_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<
                     "dets record does not start with shot: {line:?}"
                 )));
             };
-            read_sparse_index_line(rest.trim(), bits_per_record, true)
+            read_sparse_index_line(rest.trim(), bits_per_record, Some(token_mode))
         })
         .collect()
 }
@@ -542,21 +561,26 @@ fn read_dets_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<
 fn read_sparse_index_line(
     line: &str,
     bits_per_record: usize,
-    dets_tokens: bool,
+    dets_tokens: Option<DetsTokenMode>,
 ) -> CircuitResult<Vec<bool>> {
     let mut record = vec![false; bits_per_record];
     if line.is_empty() {
         return Ok(record);
     }
-    for token in line.split(if dets_tokens { ' ' } else { ',' }) {
+    for token in line.split(if dets_tokens.is_some() { ' ' } else { ',' }) {
         if token.is_empty() {
             continue;
         }
-        let index = if dets_tokens {
+        let index = if let Some(token_mode) = dets_tokens {
             let mut chars = token.chars();
-            if !matches!(chars.next(), Some('M' | 'D' | 'L')) {
+            let Some(prefix @ ('M' | 'D' | 'L')) = chars.next() else {
                 return Err(CircuitError::invalid_result_format(format!(
                     "invalid dets token {token:?}"
+                )));
+            };
+            if token_mode == DetsTokenMode::MeasurementsOnly && prefix != 'M' {
+                return Err(CircuitError::invalid_result_format(format!(
+                    "measurement dets input cannot contain {prefix} tokens"
                 )));
             }
             parse_sparse_index(chars.as_str())?
@@ -735,6 +759,8 @@ mod tests {
                 vec![expected.clone()]
             );
         }
+
+        assert!(read_records(&[], SampleFormat::B8, 0).is_err());
     }
 
     #[test]
@@ -779,6 +805,12 @@ mod tests {
                 vec![false, false],
             ]
         );
+        assert_eq!(
+            read_measurement_records(b"shot M0\nshot\n", SampleFormat::Dets, 2).unwrap(),
+            vec![vec![true, false], vec![false, false]]
+        );
+        assert!(read_measurement_records(b"shot D0\n", SampleFormat::Dets, 2).is_err());
+        assert!(read_measurement_records(b"shot L0\n", SampleFormat::Dets, 2).is_err());
     }
 
     #[test]

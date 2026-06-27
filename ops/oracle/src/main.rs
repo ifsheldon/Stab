@@ -69,6 +69,10 @@ enum Command {
         #[arg(long)]
         statistical: bool,
 
+        /// Run only structural fixture comparisons within the selected fixture set.
+        #[arg(long)]
+        structural: bool,
+
         /// Run all manifest fixtures that are marked implemented.
         #[arg(long)]
         implemented_only: bool,
@@ -367,6 +371,7 @@ fn run(cli: Cli) -> Result<(), OracleError> {
             case,
             exact,
             statistical,
+            structural,
             implemented_only,
             all,
             milestone,
@@ -378,6 +383,7 @@ fn run(cli: Cli) -> Result<(), OracleError> {
                     case,
                     exact,
                     statistical,
+                    structural,
                     implemented_only,
                     all,
                     milestone,
@@ -406,6 +412,7 @@ struct RunSelection {
     case: Option<OracleCase>,
     exact: bool,
     statistical: bool,
+    structural: bool,
     implemented_only: bool,
     all: bool,
     milestone: Option<String>,
@@ -422,11 +429,15 @@ fn run_selected_cases(root: &RepoRoot, selection: RunSelection) -> Result<(), Or
             "choose exactly one of --case, --implemented-only, --all, or --milestone".to_string(),
         ));
     }
-    let filter = fixtures::RunFilter::from_flags(selection.exact, selection.statistical)
-        .map_err(OracleError::InvalidRunSelection)?;
+    let filter = fixtures::RunFilter::from_flags(
+        selection.exact,
+        selection.statistical,
+        selection.structural,
+    )
+    .map_err(OracleError::InvalidRunSelection)?;
     if selection.case.is_some() && filter.is_some() {
         return Err(OracleError::InvalidRunSelection(
-            "fixture filters --exact and --statistical require --implemented-only, --all, or --milestone"
+            "fixture filters --exact, --statistical, and --structural require --implemented-only, --all, or --milestone"
                 .to_string(),
         ));
     }
@@ -927,18 +938,28 @@ mod tests {
     }
 
     #[test]
-    fn run_command_accepts_exact_and_statistical_filters() {
+    fn run_command_accepts_fixture_filters() {
         let exact = Cli::try_parse_from(["stab-oracle", "run", "--milestone", "M8", "--exact"])
             .expect("parse exact run command");
         let statistical =
             Cli::try_parse_from(["stab-oracle", "run", "--milestone", "M8", "--statistical"])
                 .expect("parse statistical run command");
+        let structural =
+            Cli::try_parse_from(["stab-oracle", "run", "--milestone", "M9", "--structural"])
+                .expect("parse structural run command");
 
         assert!(matches!(exact.command, Command::Run { exact: true, .. }));
         assert!(matches!(
             statistical.command,
             Command::Run {
                 statistical: true,
+                ..
+            }
+        ));
+        assert!(matches!(
+            structural.command,
+            Command::Run {
+                structural: true,
                 ..
             }
         ));

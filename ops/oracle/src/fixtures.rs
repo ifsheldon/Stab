@@ -40,15 +40,21 @@ impl RunMode {
 pub(crate) enum RunFilter {
     Exact,
     Statistical,
+    Structural,
 }
 
 impl RunFilter {
-    pub(crate) fn from_flags(exact: bool, statistical: bool) -> Result<Option<Self>, String> {
-        match (exact, statistical) {
-            (false, false) => Ok(None),
-            (true, false) => Ok(Some(Self::Exact)),
-            (false, true) => Ok(Some(Self::Statistical)),
-            (true, true) => Err("choose at most one of --exact or --statistical".to_string()),
+    pub(crate) fn from_flags(
+        exact: bool,
+        statistical: bool,
+        structural: bool,
+    ) -> Result<Option<Self>, String> {
+        match (exact, statistical, structural) {
+            (false, false, false) => Ok(None),
+            (true, false, false) => Ok(Some(Self::Exact)),
+            (false, true, false) => Ok(Some(Self::Statistical)),
+            (false, false, true) => Ok(Some(Self::Structural)),
+            _ => Err("choose at most one of --exact, --statistical, or --structural".to_string()),
         }
     }
 
@@ -61,6 +67,10 @@ impl RunFilter {
                 ) && row.comparator != FixtureComparator::Statistical
             }
             Self::Statistical => row.comparator == FixtureComparator::Statistical,
+            Self::Structural => {
+                row.parity_mode == ParityMode::Structural
+                    || row.comparator == FixtureComparator::Structural
+            }
         }
     }
 }

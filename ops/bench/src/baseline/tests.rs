@@ -287,6 +287,83 @@ fn m6_benchmark_rows_have_stab_compare_runners() {
     }
 }
 
+#[test]
+fn m9_benchmark_rows_have_stab_compare_runners() {
+    for (id, runner, expected_measurements) in [
+        (
+            "m9-convert-measurements-dets",
+            Runner::StimCli,
+            &["stab_convert_measurements_to_dets"][..],
+        ),
+        (
+            "m9-detect-text-cli",
+            Runner::StimCli,
+            &["stab_detect_1024_dets"][..],
+        ),
+        (
+            "m9-detect-bitpacked-cli",
+            Runner::StimCli,
+            &["stab_detect_1024_b8"][..],
+        ),
+        (
+            "m9-detect-primary-matrix-contract",
+            Runner::ContractOnly,
+            &[
+                "stab_detect_primary_repetition_d3_r3_dets",
+                "stab_detect_primary_repetition_d3_r3_b8",
+            ][..],
+        ),
+        ("m9-m2d-text-cli", Runner::StimCli, &["stab_m2d_dets"][..]),
+        (
+            "m9-m2d-bitpacked-contract",
+            Runner::ContractOnly,
+            &["stab_m2d_b8"][..],
+        ),
+        (
+            "m9-m2d-primary-matrix-contract",
+            Runner::ContractOnly,
+            &[
+                "stab_m2d_primary_repetition_d3_r3_dets",
+                "stab_m2d_primary_repetition_d3_r3_b8",
+            ][..],
+        ),
+    ] {
+        let row = BenchmarkRow {
+            id: id.to_string(),
+            milestone: Milestone::M9,
+            threshold_class: "report-only".to_string(),
+            runner,
+            upstream_source: "src/stim/cmd/command_detect.test.cc".to_string(),
+            stim_perf_filter: String::new(),
+            argv: "detect|--shots|1024".to_string(),
+            stdin_path: String::new(),
+            phase: "throughput".to_string(),
+            measurement: "detector-conversion".to_string(),
+            description: "test row".to_string(),
+        };
+
+        let measurements = run_stab_compare_row(&row)
+            .expect("run compare row")
+            .expect("Stab runner");
+        let names = measurements
+            .iter()
+            .map(|measurement| measurement.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(names.as_slice(), expected_measurements);
+        assert!(
+            compare_note(id).is_some(),
+            "{id} should explain benchmark comparability"
+        );
+        for name in names {
+            assert!(
+                measurement_work(id, name).is_some(),
+                "{id}/{name} should report normalized work"
+            );
+        }
+    }
+}
+
 fn benchmark_row(id: &str, runner: Runner) -> BenchmarkRow {
     let (upstream_source, measurement) = if runner == Runner::ContractOnly {
         ("src/stim/circuit/circuit.test.cc", "canonical-print")

@@ -1,6 +1,8 @@
 use super::run_from;
 use tempfile::tempdir;
 
+mod m9;
+
 #[test]
 fn gen_repetition_code_matches_m7_oracle_golden() {
     let mut stdout = Vec::new();

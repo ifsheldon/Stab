@@ -53,24 +53,33 @@ fn milestone_run_mode_parses_m4_filter() {
 
 #[test]
 fn run_filter_flags_select_one_comparator_family() {
-    assert_eq!(RunFilter::from_flags(false, false).unwrap(), None);
+    assert_eq!(RunFilter::from_flags(false, false, false).unwrap(), None);
     assert_eq!(
-        RunFilter::from_flags(true, false).unwrap(),
+        RunFilter::from_flags(true, false, false).unwrap(),
         Some(RunFilter::Exact)
     );
     assert_eq!(
-        RunFilter::from_flags(false, true).unwrap(),
+        RunFilter::from_flags(false, true, false).unwrap(),
         Some(RunFilter::Statistical)
     );
+    assert_eq!(
+        RunFilter::from_flags(false, false, true).unwrap(),
+        Some(RunFilter::Structural)
+    );
     assert!(
-        RunFilter::from_flags(true, true)
+        RunFilter::from_flags(true, true, false)
+            .expect_err("conflicting filters should fail")
+            .contains("choose at most one")
+    );
+    assert!(
+        RunFilter::from_flags(false, true, true)
             .expect_err("conflicting filters should fail")
             .contains("choose at most one")
     );
 }
 
 #[test]
-fn run_filter_matches_exact_and_statistical_fixture_rows() {
+fn run_filter_matches_fixture_rows() {
     let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
     let exact_row = manifest
         .rows
@@ -87,12 +96,20 @@ fn run_filter_matches_exact_and_statistical_fixture_rows() {
         .iter()
         .find(|row| row.id == "coverage-io-measure-record-writer")
         .expect("M8 structural exact-parity row");
+    let structural_row = manifest
+        .rows
+        .iter()
+        .find(|row| row.id == "coverage-simulators-frame-simulator-util")
+        .expect("M9 structural row");
 
     assert!(RunFilter::Exact.matches(exact_row));
     assert!(RunFilter::Exact.matches(structural_exact_row));
     assert!(!RunFilter::Exact.matches(statistical_row));
     assert!(RunFilter::Statistical.matches(statistical_row));
     assert!(!RunFilter::Statistical.matches(exact_row));
+    assert!(RunFilter::Structural.matches(structural_row));
+    assert!(RunFilter::Structural.matches(structural_exact_row));
+    assert!(!RunFilter::Structural.matches(exact_row));
 }
 
 #[test]

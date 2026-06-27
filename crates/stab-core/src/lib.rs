@@ -9,6 +9,7 @@ mod circuit_generation;
 mod circuit_inverse;
 mod circuit_simplify;
 mod circuit_tableau;
+mod detection;
 mod error;
 mod gate;
 mod ids;
@@ -30,6 +31,12 @@ pub use circuit_generation::{
 pub use circuit_inverse::{circuit_inverse_qec, circuit_inverse_unitary};
 pub use circuit_simplify::simplified_circuit;
 pub use circuit_tableau::circuit_to_tableau;
+pub use detection::{
+    DetectionConversionOptions, DetectionConversionOutput, DetectionEventRecord,
+    DetectionObservableOutputMode, convert_measurements_to_detection_events,
+    detection_record_width, measurement_record_count, sample_detection_events,
+    validate_detection_sampling_circuit, write_detection_records, write_observable_records,
+};
 pub use error::{CircuitError, CircuitResult};
 pub use gate::{Gate, GateCategory};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};

@@ -19,6 +19,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Resolved Entries
 
+## 2026-06-27 - M9: Structural Oracle Flag Mismatch
+
+Status: Resolved
+Revealed by: running M9 done criteria after implementing the first detection workflow slice.
+Current text: M9 lists `just oracle::run --milestone M9 --structural` as a done criterion.
+Gap: `stab-oracle run` supported `--exact`, `--statistical`, `--implemented-only`, `--all`, and `--milestone`, but did not support a `--structural` filter; structural implemented rows ran under plain `just oracle::run --milestone M9`.
+Proposed amendment: either add a `--structural` filter to `stab-oracle run`, or change milestone done criteria to say that structural rows are checked by `just oracle::run --milestone M9` and exact rows can be checked separately with `--exact`.
+Resolution: `stab-oracle run` now supports `--structural`; `just oracle::run --milestone M9 --structural` runs implemented structural rows and reports remaining structural manifest-only rows.
+
 ## 2026-06-27 - M5: Memory Test Subcase Granularity
 
 Status: Resolved
@@ -128,6 +137,78 @@ Proposed amendment: require binomial evidence for one-bit marginal fixtures and 
 Resolution: M8 now includes a bucketed statistical oracle comparator and fixture-specific bucketed rows for `PAULI_CHANNEL_2`, correlated errors, independent X/Y/Z errors, depolarizing basis variants, multi-target `X_ERROR`, and measurement-result flip probabilities. Each row records bucket definitions, sample counts, fixed seed 5, and a 5-sigma tolerance in `oracle/fixtures/manifest.csv`; the oracle harness validates that the declared false-positive budget is not tighter than the tolerance can support.
 
 ## Open Entries
+
+## 2026-06-27 - M9: Feedback-Removal Conversion Scope
+
+Status: Open
+Revealed by: implementing `stab m2d` and inspecting pinned Stim `command_m2d.test.cc` plus `transform_without_feedback.test.cc`.
+Current text: M9 requires `stim m2d` with measurement input parsing, detector conversion, observable output, and inconsistent-input errors, and the compatibility matrix assigns `transform_without_feedback.test.cc` to M9.
+Gap: the milestone does not explicitly say whether `m2d --ran_without_feedback` and circuit feedback inlining are required for the initial M9 CLI surface, even though pinned Stim tests exercise that path and Stab currently rejects the flag instead of silently returning incorrect output.
+Proposed amendment: add an explicit M9 task and fixture group for `--ran_without_feedback` if feedback-removal parity is required now, or defer it to a named later detector-conversion submilestone while requiring the CLI to reject the flag with a clear error.
+Resolution: pending plan update.
+
+## 2026-06-27 - M9: Detector Analysis Utility Row Ownership
+
+Status: Open
+Revealed by: M9 oracle manifest after implementing detector sampling, measurement-to-detection conversion, observable output, and M9 benchmark runners.
+Current text: M9 links detector-conversion workflows and the compatibility matrix assigns `circuit_to_detecting_regions.test.cc`, `missing_detectors.test.cc`, and `transform_without_feedback.test.cc` to M9.
+Gap: the milestone objective and tasks describe public `detect` and `m2d` workflows, but they do not define public Rust APIs, fixture subsets, or done criteria for detecting regions, missing-detector analysis, or feedback-removal transforms; those rows remain manifest-only while the public CLI/core conversion rows are implemented.
+Proposed amendment: split M9 into explicit public workflow acceptance and detector-analysis utility acceptance, naming the APIs and upstream subcases required for each utility row, or move the utility rows to the DEM/analyzer milestone that introduces the required analysis structures.
+Resolution: pending plan update.
+
+## 2026-06-27 - M9: Sweep-Conditioned Detection Conversion Scope
+
+Status: Open
+Revealed by: milestone audit against pinned Stim `measurements_to_detection_events.test.cc`.
+Current text: M9 requires measurement-to-detection conversion from measurement records and circuits with detectors, observables, coordinate shifts, and repeats, but it does not mention sweep data or sweep-conditioned detector expectations.
+Gap: upstream measurement-to-detection tests include sweep-bit inputs that can alter expected detector parities through sweep-controlled operations, while the current Stab converter and `m2d` CLI accept only measurements, a circuit, and reference-sample options.
+Proposed amendment: state whether sweep-conditioned conversion is in M9 scope. If it is, require typed sweep inputs, `--sweep` and `--sweep_format` CLI flags, and fixtures for sweep count mismatches and sweep-controlled parity changes. If not, move those upstream subcases to the first milestone that introduces sweep-aware simulation.
+Resolution: pending plan update.
+
+## 2026-06-27 - M9: Benchmark Baseline Completeness
+
+Status: Open
+Revealed by: milestone audit of `just bench::compare --milestone M9` and `just bench::compare --milestone M9 --strict`.
+Current text: M9 requires `just bench::compare --milestone M9` to report `detect` and `m2d` throughput separately for text and bit-packed formats, while the benchmark plan describes comparisons against pinned Stim v1.16.0.
+Gap: the non-strict compare command reports Stab-side M9 timings, but the current baseline artifact has no M9 pinned Stim rows, so `--strict` fails and the command is not a complete Stab-vs-Stim comparison.
+Proposed amendment: either require M9 to record selected pinned Stim detect and m2d baselines before completion and run the strict comparison, or label M9 benchmark evidence as report-only until M12 freezes the primary performance matrix.
+Resolution: pending plan update.
+
+## 2026-06-27 - M9: Detection Bit-Packed Format Scope
+
+Status: Open
+Revealed by: milestone audit against pinned Stim `command_detect.cc`, `command_m2d.cc`, and `measurements_to_detection_events.test.cc`.
+Current text: M9 requires `stim detect` with bit-packed modes and `stim m2d` with measurement input parsing, while the benchmark plan names text and bit-packed input.
+Gap: the milestone does not say whether M9 bit-packed parity means the `b8` subset needed by current decoder workflows or every Stim v1.16.0 bit-packed format including `ptb64`, nor does it name zero-width bit-packed input behavior as an acceptance case.
+Proposed amendment: either define M9 bit-packed parity as `b8` input/output plus explicit zero-width rejection, with `ptb64` deferred to a named result-format hardening milestone, or require `ptb64` detection and m2d input/output support with shot-count multiple-of-64 constraints and exact fixture coverage.
+Resolution: pending plan update.
+
+## 2026-06-27 - M9: Generated Fixture Round-Trip Coverage
+
+Status: Open
+Revealed by: milestone audit comparing the M9 task list to current oracle and benchmark evidence.
+Current text: M9 says to add round-trip tests for bit-packed input/output and text input/output across circuit fixtures generated in M7.
+Gap: current M9 exact oracle rows use hand-authored circuits and measurement records, while generated repetition-code coverage exists in benchmark runners instead of runnable oracle or test acceptance rows; the plan does not define the generated fixture matrix, output formats, round-trip direction, or whether benchmark primary-matrix representatives count as acceptance evidence.
+Proposed amendment: add explicit generated-fixture M9 oracle or Rust tests for selected M7 repetition, rotated surface, unrotated surface, and color-code circuits across `01`, `dets`, and `b8` conversion paths, or narrow the task to say generated-fixture coverage is benchmark evidence only until the primary matrix is frozen.
+Resolution: pending plan update.
+
+## 2026-06-27 - M9: Pauli-Target Observable Detection Scope
+
+Status: Open
+Revealed by: full code review against pinned Stim `frame_simulator` observable handling.
+Current text: M9 requires `stim detect` with observables and detector output handling.
+Gap: the milestone does not distinguish measurement-record observables from `OBSERVABLE_INCLUDE` Pauli target observables. Current Stab rejects Pauli-target observables for `detect` to avoid silently returning incorrect logical flips, while `m2d` continues to ignore Pauli targets like pinned Stim's measurement-to-detection converter.
+Proposed amendment: either require M9 to implement frame-simulator-style Pauli-target observable flips for `detect`, including deterministic and random observable fixtures, or defer Pauli-target observable detection to the simulator-completeness milestone while requiring an explicit error in the M9 CLI and Rust API.
+Resolution: pending plan update.
+
+## 2026-06-27 - M9: Detection Conversion Streaming And Scale Limits
+
+Status: Open
+Revealed by: full code review of `detect` and `m2d` resource behavior.
+Current text: M9 requires decoder-pipeline detection workflows and benchmark reporting but does not define streaming, batching, loop-folding, or maximum supported record sizes.
+Gap: current Stab materializes measurement records and detection records in memory and unrolls detection-conversion repeats within explicit temporary limits. This prevents unbounded CPU or memory use for hostile inputs, but it is not a final decoder-scale streaming design and does not match Stim's ability to process large files and folded repeats efficiently.
+Proposed amendment: add a follow-up milestone or M12 task for compiled/streaming detection conversion that processes records in bounded batches, preserves repeat structure where possible, avoids duplicate sampler analysis, documents or removes temporary limits, and includes benchmark rows for large generated-code detector workloads.
+Resolution: pending plan update.
 
 ## 2026-06-27 - M8: Skip Loop Folding Scope
 
