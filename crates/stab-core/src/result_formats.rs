@@ -517,28 +517,48 @@ pub fn read_measurement_records(
 }
 
 fn read_zero_one_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<Vec<bool>>> {
-    let text = std::str::from_utf8(input)
-        .map_err(|error| CircuitError::invalid_result_format(error.to_string()))?;
-    text.split_terminator('\n')
-        .map(|line| {
-            let line = strip_trailing_cr(line);
-            if line.len() != bits_per_record {
-                return Err(CircuitError::invalid_result_format(format!(
-                    "01 record expected {bits_per_record} bits, got {}",
-                    line.len()
-                )));
-            }
-            line.bytes()
-                .map(|byte| match byte {
-                    b'0' => Ok(false),
-                    b'1' => Ok(true),
-                    _ => Err(CircuitError::invalid_result_format(format!(
+    if input.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut records = Vec::new();
+    let mut offset = 0usize;
+    while offset < input.len() {
+        let line_start = offset;
+        while input.get(offset).is_some_and(|byte| *byte != b'\n') {
+            offset += 1;
+        }
+        let mut line_end = offset;
+        if line_end > line_start && input.get(line_end - 1).is_some_and(|byte| *byte == b'\r') {
+            line_end -= 1;
+        }
+        let line = input.get(line_start..line_end).ok_or_else(|| {
+            CircuitError::invalid_result_format("01 record byte range was out of bounds")
+        })?;
+        if line.len() != bits_per_record {
+            return Err(CircuitError::invalid_result_format(format!(
+                "01 record expected {bits_per_record} bits, got {}",
+                line.len()
+            )));
+        }
+        let mut record = vec![false; bits_per_record];
+        for (bit, byte) in record.iter_mut().zip(line) {
+            match byte {
+                b'0' => {}
+                b'1' => *bit = true,
+                _ => {
+                    return Err(CircuitError::invalid_result_format(format!(
                         "01 record contains non-bit byte {byte}"
-                    ))),
-                })
-                .collect()
-        })
-        .collect()
+                    )));
+                }
+            }
+        }
+        records.push(record);
+        if offset < input.len() {
+            offset += 1;
+        }
+    }
+    Ok(records)
 }
 
 fn read_b8_records(input: &[u8], bits_per_record: usize) -> CircuitResult<Vec<Vec<bool>>> {
@@ -939,6 +959,15 @@ mod tests {
                 vec![false, true, false, false],
             ]
         );
+    }
+
+    #[test]
+    fn measure_record_reader_accepts_final_01_record_without_newline_and_rejects_non_bits() {
+        assert_eq!(
+            read_records(b"10", SampleFormat::ZeroOne, 2).unwrap(),
+            vec![vec![true, false]]
+        );
+        assert!(read_records(&[b'0', 0xFF], SampleFormat::ZeroOne, 2).is_err());
     }
 
     #[test]
