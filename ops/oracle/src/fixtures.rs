@@ -528,10 +528,9 @@ impl FixtureManifest {
                 && row.status != FixtureStatus::ManifestOnly
             {
                 let argv_tokens = row.argv_tokens();
-                if let Some(reason) = statistical::validate_binomial_statistical_plan(
-                    &row.statistical_plan,
-                    &argv_tokens,
-                ) {
+                if let Some(reason) =
+                    statistical::validate_statistical_plan(&row.statistical_plan, &argv_tokens)
+                {
                     violations.push(format!("{} invalid statistical plan: {reason}", row.id));
                 }
             }
@@ -1056,10 +1055,9 @@ fn compare_fixture(
     let reason = match row.comparator {
         FixtureComparator::ExactOutput => compare_exact(stim, stab),
         FixtureComparator::HelpHealth => compare_help_health(stim, stab),
-        FixtureComparator::Statistical => statistical::compare_binomial_statistical_plan(
-            &row.statistical_plan,
-            &stab.stdout.bytes,
-        ),
+        FixtureComparator::Statistical => {
+            statistical::compare_statistical_plan(&row.statistical_plan, &stab.stdout.bytes)
+        }
         FixtureComparator::Property | FixtureComparator::Structural => Some(format!(
             "{} comparator is not runnable until the milestone implementation defines it",
             row.comparator.as_str()

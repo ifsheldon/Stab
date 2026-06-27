@@ -245,10 +245,7 @@ fn binomial_statistical_comparator_accepts_samples_within_tolerance() {
     stdout.extend(std::iter::repeat_n(b"1\n", 250).flatten());
     stdout.extend(std::iter::repeat_n(b"0\n", 750).flatten());
 
-    assert_eq!(
-        statistical::compare_binomial_statistical_plan(plan, &stdout),
-        None
-    );
+    assert_eq!(statistical::compare_statistical_plan(plan, &stdout), None);
 }
 
 #[test]
@@ -259,7 +256,7 @@ fn binomial_statistical_comparator_rejects_samples_outside_tolerance() {
     stdout.extend(std::iter::repeat_n(b"0\n", 500).flatten());
 
     assert!(
-        statistical::compare_binomial_statistical_plan(plan, &stdout)
+        statistical::compare_statistical_plan(plan, &stdout)
             .expect("statistical rejection")
             .contains("outside 5 sigma")
     );
@@ -270,7 +267,7 @@ fn binomial_statistical_comparator_rejects_non_bit_output() {
     let plan = "sample_count=1; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
 
     assert!(
-        statistical::compare_binomial_statistical_plan(plan, b"shot M0\n")
+        statistical::compare_statistical_plan(plan, b"shot M0\n")
             .expect("statistical rejection")
             .contains("expected one 0/1 bit per shot")
     );
@@ -281,9 +278,57 @@ fn binomial_statistical_comparator_rejects_sample_count_mismatch() {
     let plan = "sample_count=2; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
 
     assert!(
-        statistical::compare_binomial_statistical_plan(plan, b"0\n")
+        statistical::compare_statistical_plan(plan, b"0\n")
             .expect("statistical rejection")
             .contains("expected 2 samples")
+    );
+}
+
+#[test]
+fn bucket_statistical_comparator_accepts_samples_within_tolerance() {
+    let plan = "sample_count=1000; fixed_seed=5; tolerate buckets 00=0.4,01=0.2,10=0.2,11=0.2 within 5 sigma; false_positive_rate<=0.001";
+    let mut stdout = Vec::new();
+    stdout.extend(std::iter::repeat_n(b"00\n", 400).flatten());
+    stdout.extend(std::iter::repeat_n(b"01\n", 200).flatten());
+    stdout.extend(std::iter::repeat_n(b"10\n", 200).flatten());
+    stdout.extend(std::iter::repeat_n(b"11\n", 200).flatten());
+
+    assert_eq!(statistical::compare_statistical_plan(plan, &stdout), None);
+}
+
+#[test]
+fn bucket_statistical_comparator_rejects_unplanned_buckets() {
+    let plan = "sample_count=1; fixed_seed=5; tolerate buckets 00=0.5,01=0.5 within 5 sigma; false_positive_rate<=0.001";
+
+    assert!(
+        statistical::compare_statistical_plan(plan, b"10\n")
+            .expect("statistical rejection")
+            .contains("unplanned bucket")
+    );
+}
+
+#[test]
+fn bucket_statistical_comparator_rejects_samples_outside_tolerance() {
+    let plan = "sample_count=1000; fixed_seed=5; tolerate buckets 00=0.4,01=0.2,10=0.2,11=0.2 within 5 sigma; false_positive_rate<=0.001";
+    let mut stdout = Vec::new();
+    stdout.extend(std::iter::repeat_n(b"00\n", 900).flatten());
+    stdout.extend(std::iter::repeat_n(b"01\n", 100).flatten());
+
+    assert!(
+        statistical::compare_statistical_plan(plan, &stdout)
+            .expect("statistical rejection")
+            .contains("actual bucket")
+    );
+}
+
+#[test]
+fn bucket_statistical_plan_rejects_mixed_width_buckets() {
+    let plan = "sample_count=1; fixed_seed=5; tolerate buckets 0=0.5,11=0.5 within 5 sigma; false_positive_rate<=0.001";
+
+    assert!(
+        statistical::compare_statistical_plan(plan, b"0\n")
+            .expect("statistical rejection")
+            .contains("mixes bucket widths")
     );
 }
 

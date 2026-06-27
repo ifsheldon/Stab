@@ -107,27 +107,27 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now makes comparator imple
 Status: Open
 Revealed by: milestone audit of M8 oracle coverage.
 Current text: M8 links the C++ Simulators group for frame, tableau, vector, and graph simulation cases that apply to sampling, and links the C++ Input And Output Formats group for measurement record formats and sparse shots.
-Gap: the milestone does not enumerate which upstream subcases are required for the public sampler milestone, which are direct Rust API compatibility tests, and which are later simulator or IO-library work. The first M8-owned result-format, count-determined-measurement, and basic reference-sample-tree subsets are now runnable, but the simulator utility, graph/vector simulator, sparse reverse frame tracking, and optimized reference-sample construction rows remain ambiguous blockers.
+Gap: the milestone does not enumerate which upstream subcases are required for the public sampler milestone, which are direct Rust API compatibility tests, and which are later simulator or IO-library work. The first M8-owned result-format, count-determined-measurement, basic reference-sample-tree, and benchmark-proxy subsets are now runnable, but the simulator utility, graph/vector simulator, sparse reverse frame tracking, and optimized reference-sample construction rows remain ambiguous blockers.
 Proposed amendment: split M8 acceptance into explicit subcase groups for public `stim sample` CLI parity, result writer byte layouts, result reader/parser APIs, frame/tableau sampling semantics, reference-sample behavior, and simulator-only structural utilities; require every M8-owned group to have runnable fixtures or a named deferred owner before milestone completion.
-Resolution: pending plan update.
+Resolution: partially mitigated by runnable M8 result-format rows, sampler statistical rows, and Stab benchmark runners for every M8 benchmark manifest row. The upstream simulator-only rows still need a plan update that names their owner milestone or converts their M8-owned subcases into runnable tests.
 
 ## 2026-06-27 - M8: Benchmark Strictness And Baseline Completeness
 
 Status: Open
 Revealed by: milestone audit of `just bench::compare --milestone M8`.
 Current text: M8 requires `just bench::compare --milestone M8` to report compile/analysis time, single-shot latency, and batch throughput for `1`, `1024`, and `1_000_000` shots.
-Gap: non-strict benchmark comparison can exit successfully while M8 benchmark rows have pending Stab runners or missing pinned Stim baselines, and the milestone does not define which report-only rows are acceptable before completion.
+Gap: non-strict benchmark comparison can exit successfully while M8 benchmark rows have missing pinned Stim baselines, and the milestone does not define which report-only rows are acceptable before completion. Pending Stab runners are no longer part of this gap because every M8 benchmark manifest row now has either a Stab comparison runner or an explicit contract-only runner.
 Proposed amendment: require `just bench::compare --milestone M8 --strict` for milestone completion, or explicitly list report-only exceptions with their owning follow-up milestone; every required M8 benchmark row should have a Stab runner and selected pinned Stim baseline before completion.
-Resolution: pending plan update.
+Resolution: partially mitigated by Stab runners for `m8-measure-reader`, `m8-frame-simulator`, `m8-tableau-simulator`, and `m8-reference-sample-tree`. Strict comparison still fails until `target/benchmarks/baseline/latest/baseline.json` is regenerated with M8 pinned Stim rows or the plan names baseline exceptions.
 
 ## 2026-06-27 - M8: Multi-Outcome Statistical Evidence
 
-Status: Open
+Status: Partially Resolved
 Revealed by: milestone audit of M8 statistical oracle rows.
 Current text: M8 requires statistical tests for noisy sampling that do not require C++ random-stream compatibility, and the test strategy names binomial and chi-square checks.
 Gap: the milestone does not specify which multi-outcome channels require multinomial or chi-square evidence, what bucket definitions should be used, or what sample counts and false-positive budgets are acceptable for channels such as `PAULI_CHANNEL_2` and heralded local noise.
 Proposed amendment: require binomial evidence for one-bit marginal fixtures and chi-square or equivalent multi-bucket evidence for multi-outcome noise fixtures, with fixture-specific bucket definitions, sample counts, fixed seeds, and confidence bounds recorded in the oracle manifest.
-Resolution: pending plan update.
+Resolution: M8 now includes a bucketed statistical oracle comparator and `m8-sample-pauli-channel2-statistical`, which records four two-bit buckets, 4000 samples, fixed seed 5, and a 5-sigma tolerance in `oracle/fixtures/manifest.csv`. The broader list of required multi-outcome channels remains under-specified until the plan names each required bucketed fixture or chi-square row.
 
 ## 2026-06-27 - M7: Generated Fixture Matrix Scope
 

@@ -753,6 +753,9 @@ fn summarize_measurement_rates(row_id: &str, measurements: &[Measurement]) -> St
 }
 
 fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
+    if let Some(work) = m8::measurement_work(row_id, name) {
+        return Some(work);
+    }
     if row_id.starts_with("m7-gen-") && name.starts_with("stab_gen_") {
         return Some((1.0, "circuits/s"));
     }
@@ -802,22 +805,14 @@ fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
         | ("m6-stabilizers-to-tableau", "stab_stabilizers_to_inverse_tableau_16q") => {
             Some((M6_STABILIZER_QUBITS as f64, "stabilizers/s"))
         }
-        ("m8-sample-analysis-1shot", "stab_sample_compile_noisy_1q") => {
-            Some((1.0, "compilations/s"))
-        }
-        ("m8-sample-analysis-1shot", "stab_sample_1shot_zero_one") => Some((1.0, "shots/s")),
-        ("m8-sample-throughput-1024", "stab_sample_1024_zero_one") => Some((1024.0, "shots/s")),
-        ("m8-sample-throughput-1000000", "stab_sample_1000000_zero_one") => {
-            Some((1_000_000.0, "shots/s"))
-        }
-        ("m8-probability-util", "stab_sample_biased_probability_1024") => {
-            Some((1024.0, "probability-draws/s"))
-        }
         _ => None,
     }
 }
 
 fn compare_note(row_id: &str) -> Option<&'static str> {
+    if let Some(note) = m8::compare_note(row_id) {
+        return Some(note);
+    }
     match row_id {
         "m7-perf-harness" => Some(
             "contract-only: verifies baseline metadata coverage; no Stab runtime workload is expected",
@@ -854,15 +849,6 @@ fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m6-stabilizers-to-tableau" => Some(
             "report-only: deterministic 16q conversion workload; upstream random/fuzz distribution remains M6 spec-follow-up input",
-        ),
-        "m8-sample-analysis-1shot" => Some(
-            "report-only: Stab splits core sampler compilation and one-shot sampling; pinned Stim baseline is end-to-end CLI sample",
-        ),
-        "m8-sample-throughput-1024" | "m8-sample-throughput-1000000" => Some(
-            "report-only: Stab measures in-process core sampler throughput with default 01 output; pinned Stim baseline includes CLI process, parse, and output costs",
-        ),
-        "m8-probability-util" => Some(
-            "contract-proxy: Stab exercises the sampler probability path because there is no standalone probability-util public API yet",
         ),
         _ => None,
     }
