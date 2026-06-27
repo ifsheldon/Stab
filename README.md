@@ -34,7 +34,7 @@ just oracle::run --case smoke/tiny-circuit
 ```
 
 The tiny-circuit smoke case now runs through the public `stab sample` command.
-M8 sampling compatibility has started with deterministic `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` output for the parser-backed local single-qubit Clifford subset plus seeded local noise sampling for `X_ERROR`, `Y_ERROR`, `Z_ERROR`, `I_ERROR`, `II_ERROR`, `DEPOLARIZE1`, `DEPOLARIZE2`, `PAULI_CHANNEL_1`, and `PAULI_CHANNEL_2`; entangling tableau simulation and reference-sample behavior still belong to later M8 work.
+M8 sampling compatibility has started with deterministic `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` output for the parser-backed local single-qubit Clifford subset, X/Y/Z-basis measurement and reset, plus seeded local noise sampling for `X_ERROR`, `Y_ERROR`, `Z_ERROR`, `I_ERROR`, `II_ERROR`, `DEPOLARIZE1`, `DEPOLARIZE2`, `PAULI_CHANNEL_1`, and `PAULI_CHANNEL_2`; entangling tableau simulation and reference-sample behavior still belong to later M8 work.
 
 Inspect and check the M2 fixture corpus with:
 

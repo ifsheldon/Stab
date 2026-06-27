@@ -98,9 +98,11 @@ enum SampleOperation {
     },
     Reset {
         qubit: usize,
+        basis: PauliBasis,
     },
     Measure {
         qubit: usize,
+        basis: PauliBasis,
         inverted: bool,
         reset: bool,
     },
@@ -224,12 +226,17 @@ impl LocalQubitState {
         }
     }
 
-    fn measure_z(&mut self, inverted: bool, rng: &mut impl Rng) -> bool {
+    fn reset(&mut self, basis: PauliBasis) {
+        self.basis = basis;
+        self.negative = false;
+    }
+
+    fn measure(&mut self, basis: PauliBasis, inverted: bool, rng: &mut impl Rng) -> bool {
         let raw_result = match self.basis {
-            PauliBasis::Z => self.negative,
-            PauliBasis::I | PauliBasis::X | PauliBasis::Y => {
+            state_basis if state_basis == basis => self.negative,
+            PauliBasis::I | PauliBasis::X | PauliBasis::Y | PauliBasis::Z => {
                 let sampled = rng.random_bool(0.5);
-                self.basis = PauliBasis::Z;
+                self.basis = basis;
                 self.negative = sampled;
                 sampled
             }
@@ -262,16 +269,22 @@ impl LocalFrame {
         }
     }
 
-    fn reset(&mut self, qubit: usize) {
+    fn reset(&mut self, qubit: usize, basis: PauliBasis) {
         if let Some(state) = self.states.get_mut(qubit) {
-            *state = LocalQubitState::plus_z();
+            state.reset(basis);
         }
     }
 
-    fn measure_z(&mut self, qubit: usize, inverted: bool, rng: &mut impl Rng) -> bool {
+    fn measure(
+        &mut self,
+        qubit: usize,
+        basis: PauliBasis,
+        inverted: bool,
+        rng: &mut impl Rng,
+    ) -> bool {
         self.states
             .get_mut(qubit)
-            .map(|state| state.measure_z(inverted, rng))
+            .map(|state| state.measure(basis, inverted, rng))
             .unwrap_or(inverted)
     }
 }
@@ -396,15 +409,8 @@ fn compile_instruction(
     let gate = instruction.gate();
     match instruction.gate().canonical_name() {
         "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" | "DETECTOR" | "OBSERVABLE_INCLUDE" => Ok(()),
-        "R" => {
-            for target in instruction.targets() {
-                operations.push(SampleOperation::Reset {
-                    qubit: qubit_index(instruction, target)?,
-                });
-            }
-            Ok(())
-        }
-        "M" | "MR" => compile_z_measurement(instruction, operations),
+        "R" | "RX" | "RY" => compile_reset(instruction, operations),
+        "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => compile_measurement(instruction, operations),
         "MPAD" => compile_measurement_pads(instruction, operations),
         _ if SingleQubitClifford::from_gate(gate).is_ok() => {
             compile_single_qubit_clifford(instruction, operations)
@@ -475,20 +481,45 @@ fn compile_instruction(
     }
 }
 
-fn compile_z_measurement(
+fn compile_reset(
     instruction: &CircuitInstruction,
     operations: &mut Vec<SampleOperation>,
 ) -> CircuitResult<()> {
+    let basis = measurement_basis(instruction)?;
+    for target in instruction.targets() {
+        operations.push(SampleOperation::Reset {
+            qubit: qubit_index(instruction, target)?,
+            basis,
+        });
+    }
+    Ok(())
+}
+
+fn compile_measurement(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+) -> CircuitResult<()> {
+    let basis = measurement_basis(instruction)?;
     let flip = deterministic_measurement_flip(instruction)?;
-    let reset = instruction.gate().canonical_name() == "MR";
+    let reset = matches!(instruction.gate().canonical_name(), "MR" | "MRX" | "MRY");
     for target in instruction.targets() {
         operations.push(SampleOperation::Measure {
             qubit: qubit_index(instruction, target)?,
+            basis,
             inverted: target.is_inverted_result_target() ^ flip,
             reset,
         });
     }
     Ok(())
+}
+
+fn measurement_basis(instruction: &CircuitInstruction) -> CircuitResult<PauliBasis> {
+    match instruction.gate().canonical_name() {
+        "MX" | "MRX" | "RX" => Ok(PauliBasis::X),
+        "MY" | "MRY" | "RY" => Ok(PauliBasis::Y),
+        "M" | "MR" | "R" => Ok(PauliBasis::Z),
+        _ => Err(unsupported_sampler_instruction(instruction)),
+    }
 }
 
 fn compile_measurement_pads(
@@ -614,15 +645,16 @@ fn execute_operations(
             SampleOperation::ApplyClifford { qubit, transform } => {
                 frame.apply_clifford(*qubit, *transform);
             }
-            SampleOperation::Reset { qubit } => frame.reset(*qubit),
+            SampleOperation::Reset { qubit, basis } => frame.reset(*qubit, *basis),
             SampleOperation::Measure {
                 qubit,
+                basis,
                 inverted,
                 reset,
             } => {
-                measurements.push(frame.measure_z(*qubit, *inverted, rng));
+                measurements.push(frame.measure(*qubit, *basis, *inverted, rng));
                 if *reset {
-                    frame.reset(*qubit);
+                    frame.reset(*qubit, *basis);
                 }
             }
             SampleOperation::Pad { value } => measurements.push(*value),
@@ -760,6 +792,48 @@ mod tests {
             (400..=600).contains(&hits),
             "expected roughly 500 H-basis measurement hits, got {hits}"
         );
+    }
+
+    #[test]
+    fn samples_x_and_y_basis_measurements_deterministically() {
+        assert_eq!(samples("H 0\nMX 0\n", 1), vec![vec![false]]);
+        assert_eq!(samples("X 0\nH 0\nMX 0\n", 1), vec![vec![true]]);
+        assert_eq!(samples("H 0\nS 0\nMY 0\n", 1), vec![vec![false]]);
+        assert_eq!(samples("H 0\nZ 0\nS 0\nMY 0\n", 1), vec![vec![true]]);
+    }
+
+    #[test]
+    fn random_basis_measurement_collapses_to_the_measured_basis() {
+        let circuit = Circuit::from_stim_str("MX 0\nMX 0\nMY 1\nMY 1\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+        for shot in sampler.sample_zero_one_with_seed(100, Some(5)) {
+            assert_eq!(shot.first(), shot.get(1));
+            assert_eq!(shot.get(2), shot.get(3));
+        }
+    }
+
+    #[test]
+    fn reset_and_measure_reset_use_their_measurement_basis() {
+        assert_eq!(
+            samples("RX 0\nMX 0\nRY 1\nMY 1\n", 1),
+            vec![vec![false, false]]
+        );
+
+        let circuit = Circuit::from_stim_str("MRX 0\nMX 0\nMRY 1\nMY 1\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+        for shot in sampler.sample_zero_one_with_seed(100, Some(5)) {
+            assert_eq!(
+                shot.get(1),
+                Some(&false),
+                "MRX should reset to +X after reporting"
+            );
+            assert_eq!(
+                shot.get(3),
+                Some(&false),
+                "MRY should reset to +Y after reporting"
+            );
+        }
     }
 
     #[test]
