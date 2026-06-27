@@ -4,12 +4,14 @@ use std::str::FromStr;
 mod analyze;
 mod graphlike;
 mod hyper;
+mod sat;
 
 pub use analyze::{
     DisjointPauliProbabilities, ErrorAnalyzerOptions, IndependentPauliProbabilities,
     circuit_to_detector_error_model, independent_to_disjoint_xyz_errors,
     try_disjoint_to_independent_xyz_errors,
 };
+pub use sat::{likeliest_error_sat_problem, shortest_error_sat_problem};
 
 use crate::{CircuitError, CircuitResult, Probability, RepeatCount};
 
