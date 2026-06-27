@@ -19,6 +19,7 @@ mod mbqc_decomposition;
 mod reference_sample_tree;
 pub mod result_formats;
 mod sampling;
+mod sparse_rev_frame_tracker;
 pub mod stabilizers;
 mod target;
 
