@@ -81,6 +81,10 @@ enum Command {
         #[arg(long = "only")]
         only: Vec<String>,
 
+        /// Record only the frozen M12 primary matrix.
+        #[arg(long)]
+        primary: bool,
+
         /// Force reconfiguration and rebuild of the pinned Stim benchmark binaries.
         #[arg(long)]
         rebuild_stim: bool,
@@ -169,6 +173,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             target_seconds,
             cli_iterations,
             only,
+            primary,
             rebuild_stim,
         } => {
             run_baseline(
@@ -180,6 +185,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     target_seconds,
                     cli_iterations,
                     only,
+                    primary,
                     rebuild_stim,
                 },
             )?;

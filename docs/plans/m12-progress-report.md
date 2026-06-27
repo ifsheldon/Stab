@@ -7,17 +7,19 @@ M12: Performance Hardening
 ## Status
 
 Partial progress, not milestone-complete.
-This work starts the M12 measurement gate by making the primary benchmark matrix explicit, adding release-profile compare report generation, recording row-level timing, variance, relative-ratio, pass/fail status, and allocation metadata, adding beta-gate enforcement, adding profiler-note enforcement for rows slower than the hot-path threshold, adding regression-threshold enforcement infrastructure, adding beta memory-gate enforcement infrastructure, and optimizing the first sampler output and frame-reset hot paths.
+This work starts the M12 measurement gate by making the primary benchmark matrix explicit, adding primary-baseline generation, adding release-profile compare report generation, recording row-level timing, variance, relative-ratio, pass/fail status, and allocation metadata, adding beta-gate enforcement, adding profiler-note enforcement for rows slower than the hot-path threshold, adding regression-threshold enforcement infrastructure, adding beta memory-gate enforcement infrastructure, and optimizing the first sampler output and frame-reset hot paths.
 
 ## Contract
 
 M12 requires a frozen primary benchmark matrix, a release-profile Stab-vs-pinned-Stim compare command, a report artifact with machine, compiler, Stim, Stab, benchmark-parameter, timing, variance, ratio, and status metadata, profiler notes for slow workloads, targeted optimizations behind existing abstractions, allocation tracking, regression thresholds, and all implemented oracle suites passing before and after performance changes.
-This work covers only the matrix selection, compare-reporting infrastructure, beta-gate enforcement, profiler-note gate infrastructure, allocation-tracking report plumbing, regression-threshold file enforcement, memory-gate compare-report enforcement, and focused `CompiledSampler::sample_bytes` allocation, output-buffer, and frame-reset optimizations.
+This work covers only the matrix selection, primary-baseline selection, compare-reporting infrastructure, beta-gate enforcement, profiler-note gate infrastructure, allocation-tracking report plumbing, regression-threshold file enforcement, memory-gate compare-report enforcement, and focused `CompiledSampler::sample_bytes` allocation, output-buffer, and frame-reset optimizations.
 Broader profiler captures, optimization work across parser, sampler, detector, analyzer, and DEM hot paths, complete allocation reports for the primary matrix, source-owned per-row regression threshold values, beta performance gates, and a source-owned first complete memory baseline remain pending M12 work.
 
 ## Tests Ported Or Created
 
 - `cargo test -p stab-bench primary_compare_rows_freeze_m4_through_m11_without_metadata_or_m12_placeholders` checks that the M12 primary matrix selects real M4 through M11 workloads and excludes metadata anchors plus the M12 placeholder.
+- `cargo test -p stab-bench primary_baseline_selection_excludes_metadata_and_m12_placeholder_rows` checks that `stab-bench baseline --primary` uses the same primary row predicate as compare.
+- `cargo test -p stab-bench primary_baseline_selection_rejects_empty_filtered_primary_rows` checks that filtered primary-baseline runs fail instead of writing an empty accidental report.
 - `cargo test -p stab-bench compare_row_result_records_ratio_and_beta_gate_status` checks that compare rows record medians, relative ratios, notes, and pass status for rows within the 2.0x beta gate.
 - `cargo test -p stab-bench beta_gate_requires_every_selected_row_to_prove_a_pass` checks that completion-style beta-gate enforcement rejects rows that are missing comparable evidence or exceed 2.0x.
 - `cargo test -p stab-bench compare_row_result_distinguishes_missing_baseline_from_uncomparable_contracts` checks that missing baselines and contract-only rows are not collapsed into the same status.
@@ -37,6 +39,8 @@ Broader profiler captures, optimization work across parser, sampler, detector, a
 ## Implementation Areas
 
 - Added `BenchmarkManifest::compare_rows` and `BenchmarkRow::is_primary` in `ops/bench/src/manifest.rs` so primary-matrix selection is explicit and test-covered.
+- Added `--primary` to `stab-bench baseline` so pinned-Stim baseline reports can be generated for the same frozen M12 primary matrix selected by `stab-bench compare --primary`.
+- Added primary-mode command metadata and command details to generated baseline JSON and Markdown reports.
 - Added `--profile`, `--primary`, and `--report` to `stab-bench compare`.
 - Added `--require-beta-gate` so completion-style compare runs fail unless every selected row proves the 2.0x pinned-Stim beta performance gate.
 - Added `--require-profiler-notes` to enforce profiler notes for rows slower than 1.5x pinned Stim when a compare report is written.
@@ -63,9 +67,9 @@ Broader profiler captures, optimization work across parser, sampler, detector, a
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
-| Freeze primary benchmark matrix from earlier milestones | Partially satisfied | `BenchmarkRow::is_primary`, `BenchmarkManifest::compare_rows`, and `cargo test -p stab-bench primary_compare_rows_freeze_m4_through_m11_without_metadata_or_m12_placeholders`; final workload acceptance remains pending M12 audit after baseline/report runs. |
+| Freeze primary benchmark matrix from earlier milestones | Partially satisfied | `BenchmarkRow::is_primary`, `BenchmarkManifest::compare_rows`, `stab-bench baseline --primary`, `cargo test -p stab-bench primary_compare_rows_freeze_m4_through_m11_without_metadata_or_m12_placeholders`, `cargo test -p stab-bench primary_baseline_selection_excludes_metadata_and_m12_placeholder_rows`, and the M4 primary-baseline smoke at `target/benchmarks/m12-primary-baseline-m4-smoke/baseline.json`; final workload acceptance remains pending M12 audit after full baseline/report runs. |
 | Add `just bench::compare --profile release --report target/benchmarks/latest` | Partially satisfied | `justfiles/bench.just` now builds `stab-bench` with Cargo's release profile, and `stab-bench compare` accepts `--profile`, `--primary`, and `--report`; a durable full primary report against a complete pinned-Stim baseline remains pending. |
-| Report machine, compiler, Stim, Stab, benchmark parameters, median timing, variance, ratio, and status | Partially satisfied | `CompareReport` records machine metadata, Stim metadata, Stab commit and local-modification state, compare command metadata, per-row measurements, medians, optional variance, optional allocation data, relative ratio, pass/fail status, beta-gate status, memory-gate status, and profiler-note status; complete primary allocation reports remain pending. |
+| Report machine, compiler, Stim, Stab, benchmark parameters, median timing, variance, ratio, and status | Partially satisfied | `BaselineReport` records primary-mode command metadata, filters, target seconds, and CLI iterations, and `CompareReport` records machine metadata, Stim metadata, Stab commit and local-modification state, compare command metadata, per-row measurements, medians, optional variance, optional allocation data, relative ratio, pass/fail status, beta-gate status, memory-gate status, and profiler-note status; complete primary allocation reports remain pending. |
 | Profile slower-than-gate workloads before optimizing | Partially satisfied | `--require-profiler-notes`, `profiler_notes_are_required_only_for_rows_slower_than_hot_path_ratio`, and `profiler_notes_must_name_dominant_cost_and_next_owner_action` enforce durable note files for rows slower than 1.5x once a complete report exists; actual profiler captures and notes for current slow rows remain pending. |
 | Optimize hot paths behind existing abstractions | Partially satisfied | `CompiledSampler::sample_bytes` now reuses per-shot buffers, reserves `01` and `b8` output capacity, and resets reusable frame state in place; `cargo test -p stab-core sampling seeded_sample_bytes_match_seeded_record_samples` preserves output semantics. The local M8 probe improved `m8-sample-throughput-1000000` from 0.116693855s in `target/benchmarks/m12-primary-probe/compare.json` to 0.101886795s in `target/benchmarks/m12-sampler-buffer-reuse/compare.json` and then to 0.082798783s in `target/benchmarks/m12-sampler-frame-reuse-final/compare.json`; many other primary hot paths remain unoptimized. |
 | Add allocation tracking for primary hot paths | Partially satisfied | `--track-allocations`, `just bench::compare-allocations`, optional `count-allocations`, `compare_row_result_records_stab_allocation_maxima`, `--require-memory-gate`, and `memory_gate_marks_pass_fail_and_missing_allocation_rows` provide Stab-side allocation-count plumbing and memory-regression comparison; a full primary allocation report and source-owned baseline remain pending. |
@@ -91,6 +95,7 @@ Broader profiler captures, optimization work across parser, sampler, detector, a
 - `cargo clippy -p stab-core --all-targets -- -D warnings`
 - `cargo clippy -p stab-cli --all-targets -- -D warnings`
 - `just bench::smoke`
+- `just bench::baseline --primary --only M4 --out target/benchmarks/m12-primary-baseline-m4-smoke`
 - `just oracle::run --milestone M8`
 - `just bench::compare --help`
 - `just bench::compare --primary --report target/benchmarks/m12-primary-probe`
@@ -104,6 +109,7 @@ Broader profiler captures, optimization work across parser, sampler, detector, a
 - `just bench::compare-allocations --milestone M4 --report target/benchmarks/m12-alloc-smoke`
 
 The M4 compare-report smoke wrote `compare.json` and `report.md` successfully.
+The M4 primary-baseline smoke wrote `target/benchmarks/m12-primary-baseline-m4-smoke/baseline.json` and `report.md` with `command.primary=true` and selected only M4 primary rows.
 The local baseline at `target/benchmarks/baseline/latest/baseline.json` did not include M4 rows, so the smoke report correctly marked those rows as `missing-baseline`; a complete primary baseline remains required before M12 can satisfy the beta performance gate.
 Because those rows had no Stim baseline measurements, the smoke report had no relative ratios and correctly marked profiler notes as `not-required`.
 The beta-gate smoke command failed as expected because the local baseline has missing M4 rows, proving the enforcement path rejects unproven rows.

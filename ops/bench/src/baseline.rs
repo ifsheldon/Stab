@@ -61,6 +61,7 @@ pub(crate) struct BaselineOptions {
     pub(crate) target_seconds: f64,
     pub(crate) cli_iterations: u32,
     pub(crate) only: Vec<String>,
+    pub(crate) primary: bool,
     pub(crate) rebuild_stim: bool,
 }
 
@@ -77,7 +78,7 @@ pub(crate) fn run_baseline(
     }
     let stim_source = root.resolve_relative(&options.stim);
     let version = validate_stim_source(&stim_source)?;
-    let rows = manifest.filtered(&options.only)?;
+    let rows = selected_baseline_rows(manifest, &options.only, options.primary)?;
     let needs_stim_perf = rows.iter().any(|row| row.runner == Runner::StimPerf);
     let needs_stim_cli = rows.iter().any(|row| row.runner == Runner::StimCli);
     if needs_stim_perf || needs_stim_cli {
@@ -116,6 +117,7 @@ pub(crate) fn run_baseline(
             target_seconds: options.target_seconds,
             cli_iterations: options.cli_iterations,
             filters: options.only.clone(),
+            primary: options.primary,
         },
         rows: results,
     };
@@ -135,6 +137,21 @@ pub(crate) fn run_baseline(
     println!("[{PREFIX}] wrote {}", json_path.display());
     println!("[{PREFIX}] wrote {}", report_path.display());
     Ok(())
+}
+
+fn selected_baseline_rows<'a>(
+    manifest: &'a BenchmarkManifest,
+    only: &[String],
+    primary: bool,
+) -> Result<Vec<&'a BenchmarkRow>, BenchError> {
+    let mut rows = manifest.filtered(only)?;
+    if primary {
+        rows.retain(|row| row.is_primary());
+        if rows.is_empty() {
+            return Err(BenchError::UnmatchedFilter("primary".to_string()));
+        }
+    }
+    Ok(rows)
 }
 
 pub(crate) fn read_baseline_report(path: &Path) -> Result<BaselineReport, BenchError> {

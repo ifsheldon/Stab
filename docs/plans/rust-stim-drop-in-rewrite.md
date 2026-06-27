@@ -409,6 +409,7 @@ Objective: close the first public beta performance gate with measured, reviewabl
 Tasks:
 
 - Freeze the primary benchmark matrix from M3, M7, M8, M9, M10, and M11 so benchmark names and inputs are stable.
+- Add `just bench::baseline --primary --out target/benchmarks/baseline/latest` to record a pinned Stim v1.16.0 baseline for the same full primary matrix used by compare.
 - Add `just bench::compare --profile release --report target/benchmarks/latest` to compare Stab against pinned Stim v1.16.0 for the full primary matrix.
 - Add a benchmark dashboard or report artifact that records machine metadata, compiler/toolchain metadata, Stim commit, Stab commit, benchmark parameters, median timing, variance, relative ratio, and pass/fail status.
 - Profile every benchmark that is slower than the beta gate before optimizing it, and store a short profiler note beside the benchmark report.

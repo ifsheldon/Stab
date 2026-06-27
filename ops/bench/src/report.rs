@@ -50,6 +50,8 @@ pub(crate) struct BaselineCommandMetadata {
     pub(crate) target_seconds: f64,
     pub(crate) cli_iterations: u32,
     pub(crate) filters: Vec<String>,
+    #[serde(default)]
+    pub(crate) primary: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -204,6 +206,23 @@ pub(crate) fn render_markdown_report(report: &BaselineReport) -> String {
         "- Stim: {} ({})\n",
         report.stim.actual_tag, report.stim.actual_commit
     ));
+    out.push_str(&format!(
+        "- Target seconds: {:.6}\n",
+        report.command.target_seconds
+    ));
+    out.push_str(&format!(
+        "- CLI iterations: {}\n",
+        report.command.cli_iterations
+    ));
+    out.push_str(&format!(
+        "- Filters: {}\n",
+        if report.command.filters.is_empty() {
+            "none".to_string()
+        } else {
+            report.command.filters.join(", ")
+        }
+    ));
+    out.push_str(&format!("- Primary matrix: {}\n", report.command.primary));
     out.push_str(&format!(
         "- Machine: {} {} with {} worker(s)\n\n",
         report.machine.os, report.machine.arch, report.machine.available_parallelism

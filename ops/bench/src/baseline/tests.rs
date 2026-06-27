@@ -1,12 +1,12 @@
 use super::{
     compare_note, measurement_work, parse_stim_perf_line, run_stab_compare_row,
-    validate_baseline_metadata,
+    selected_baseline_rows, validate_baseline_metadata,
 };
 use crate::compare::{
     BaselineCompareStatus, BaselineSummary, CompareRowBuild, build_compare_row_result,
     compare_incomplete_details, summarize_baseline_row,
 };
-use crate::manifest::{BenchmarkRow, Milestone, Runner};
+use crate::manifest::{BenchmarkManifest, BenchmarkRow, Milestone, Runner};
 use crate::report::{BaselineReport, Measurement};
 
 #[test]
@@ -206,6 +206,38 @@ fn rejects_baseline_metadata_from_wrong_stim_revision() {
 
     assert!(error.to_string().contains("actual_tag=v1.17.0"));
     assert!(error.to_string().contains("actual_commit=wrong"));
+}
+
+#[test]
+fn primary_baseline_selection_excludes_metadata_and_m12_placeholder_rows() {
+    let m4_row = benchmark_row("m4-circuit-parse", Runner::StimPerf);
+    let mut metadata_row = benchmark_row("m7-perf-harness", Runner::ContractOnly);
+    metadata_row.milestone = Milestone::M7;
+    metadata_row.threshold_class = "baseline-metadata".to_string();
+    let mut m12_row = benchmark_row("m12-primary-performance-matrix", Runner::ContractOnly);
+    m12_row.milestone = Milestone::M12;
+    let manifest = BenchmarkManifest {
+        rows: vec![m4_row, metadata_row, m12_row],
+    };
+
+    let rows = selected_baseline_rows(&manifest, &[], true).expect("primary rows");
+    let ids = rows.iter().map(|row| row.id.as_str()).collect::<Vec<_>>();
+
+    assert_eq!(ids, ["m4-circuit-parse"]);
+}
+
+#[test]
+fn primary_baseline_selection_rejects_empty_filtered_primary_rows() {
+    let mut m12_row = benchmark_row("m12-primary-performance-matrix", Runner::ContractOnly);
+    m12_row.milestone = Milestone::M12;
+    let manifest = BenchmarkManifest {
+        rows: vec![m12_row],
+    };
+
+    let error = selected_baseline_rows(&manifest, &["M12".to_string()], true)
+        .expect_err("reject empty primary selection");
+
+    assert!(error.to_string().contains("primary"));
 }
 
 #[test]

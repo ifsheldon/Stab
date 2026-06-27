@@ -77,13 +77,14 @@ Any explicit `--out` path must be repository-relative and under `target/benchmar
 ```sh
 just bench::list
 just bench::smoke
-just bench::baseline --stim vendor/stim
+just bench::baseline --stim vendor/stim --primary
 just bench::compare --milestone M4
 just bench::compare --profile release --primary --report target/benchmarks/latest --require-beta-gate --require-profiler-notes
 just bench::compare-allocations --primary --report target/benchmarks/latest-allocations
 ```
 
 `just bench::baseline` writes `baseline.json` and `report.md` to `target/benchmarks/baseline/latest` by default.
+Use `--primary` when recording the M12 baseline consumed by `just bench::compare --primary`.
 Use a small `--target-seconds` value for quick local smoke runs, and increase it when recording durable baseline artifacts.
 `just bench::compare` runs the benchmark ops binary with Cargo's release profile, reads `target/benchmarks/baseline/latest/baseline.json` by default, and can write `compare.json` plus `report.md` to a repository-relative directory under `target/benchmarks/`.
 Use `--require-beta-gate` for completion-style runs where every selected row must prove a Stab median no slower than 2.0x pinned Stim.
