@@ -19,6 +19,7 @@ mod process;
 mod report;
 mod root;
 mod stim;
+mod thresholds;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -114,6 +115,10 @@ enum Command {
         #[arg(long)]
         require_beta_gate: bool,
 
+        /// JSON regression threshold file checked against selected benchmark rows.
+        #[arg(long)]
+        thresholds: Option<PathBuf>,
+
         /// Measure Stab-side allocation counts using the count-allocations feature.
         #[arg(long)]
         track_allocations: bool,
@@ -178,6 +183,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             report,
             require_profiler_notes,
             require_beta_gate,
+            thresholds,
             track_allocations,
             strict,
         } => {
@@ -192,6 +198,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     report,
                     require_profiler_notes,
                     require_beta_gate,
+                    thresholds,
                     track_allocations,
                     strict,
                 },

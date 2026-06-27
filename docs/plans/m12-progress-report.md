@@ -7,13 +7,13 @@ M12: Performance Hardening
 ## Status
 
 Partial progress, not milestone-complete.
-This slice starts the M12 measurement gate by making the primary benchmark matrix explicit, adding release-profile compare report generation, recording row-level timing, variance, relative-ratio, pass/fail status, and allocation metadata, adding beta-gate enforcement, and adding profiler-note enforcement for rows slower than the hot-path threshold.
+This slice starts the M12 measurement gate by making the primary benchmark matrix explicit, adding release-profile compare report generation, recording row-level timing, variance, relative-ratio, pass/fail status, and allocation metadata, adding beta-gate enforcement, adding profiler-note enforcement for rows slower than the hot-path threshold, and adding regression-threshold enforcement infrastructure.
 
 ## Contract
 
 M12 requires a frozen primary benchmark matrix, a release-profile Stab-vs-pinned-Stim compare command, a report artifact with machine, compiler, Stim, Stab, benchmark-parameter, timing, variance, ratio, and status metadata, profiler notes for slow workloads, targeted optimizations behind existing abstractions, allocation tracking, regression thresholds, and all implemented oracle suites passing before and after performance changes.
-This slice covers only the matrix selection, compare-reporting infrastructure, beta-gate enforcement, profiler-note gate infrastructure, and allocation-tracking report plumbing.
-Actual profiler captures, optimization work, complete allocation reports for the primary matrix, regression thresholds, beta performance gates, and beta memory gates remain pending M12 work.
+This slice covers only the matrix selection, compare-reporting infrastructure, beta-gate enforcement, profiler-note gate infrastructure, allocation-tracking report plumbing, and regression-threshold file enforcement.
+Actual profiler captures, optimization work, complete allocation reports for the primary matrix, source-owned per-row regression threshold values, beta performance gates, and beta memory gates remain pending M12 work.
 
 ## Tests Ported Or Created
 
@@ -23,6 +23,8 @@ Actual profiler captures, optimization work, complete allocation reports for the
 - `cargo test -p stab-bench compare_row_result_distinguishes_missing_baseline_from_uncomparable_contracts` checks that missing baselines and contract-only rows are not collapsed into the same status.
 - `cargo test -p stab-bench profiler_notes_are_required_only_for_rows_slower_than_hot_path_ratio` checks that rows above 1.5x require note files and rows at or below the threshold do not.
 - `cargo test -p stab-bench profiler_notes_must_name_dominant_cost_and_next_owner_action` checks the minimum required profiler-note fields.
+- `cargo test -p stab-bench regression_thresholds_mark_pass_fail_and_uncomparable_rows` checks that configured threshold rows pass, fail, or become blocking not-comparable rows based on their relative ratio.
+- `cargo test -p stab-bench regression_thresholds_validate_schema_ids_and_ratios` checks that threshold files reject unsupported schema versions, unsafe benchmark ids, duplicate ids, and invalid ratio values.
 - `cargo test -p stab-bench benchmark_ids_are_filename_safe_for_report_artifacts` checks that benchmark ids are safe to map into profiler-note filenames.
 - `cargo test -p stab-bench compare_row_result_records_stab_allocation_maxima` checks that per-measurement allocation data is promoted to row-level compare report fields.
 - `cargo test -p stab-bench allocation_tracking_guard_requires_count_allocations_feature` checks that `--track-allocations` is only available in the allocation-enabled build.
@@ -35,11 +37,13 @@ Actual profiler captures, optimization work, complete allocation reports for the
 - Added `--profile`, `--primary`, and `--report` to `stab-bench compare`.
 - Added `--require-beta-gate` so completion-style compare runs fail unless every selected row proves the 2.0x pinned-Stim beta performance gate.
 - Added `--require-profiler-notes` to enforce profiler notes for rows slower than 1.5x pinned Stim when a compare report is written.
+- Added `--thresholds` to enforce JSON schema version 1 regression thresholds against selected benchmark rows and report threshold status per row.
 - Updated `just bench::compare` to run `stab-bench` through Cargo's release profile before invoking the compare subcommand.
 - Moved compare orchestration into `ops/bench/src/compare.rs` so `ops/bench/src/baseline.rs` remains below the repository's 1200-line source threshold.
 - Added `CompareReport`, `CompareRowResult`, `CompareCommandMetadata`, and `StabMetadata` in `ops/bench/src/report.rs`, including the Stab commit and whether local modifications were present when the report was generated.
 - Added compare artifact writing to `target/benchmarks/.../compare.json` and `target/benchmarks/.../report.md` through the existing benchmark output directory guard.
 - Added profiler-note status, path, and error fields to each compare row; notes live under `<report>/profiler-notes/<benchmark-id>.md` and must include non-empty `Dominant cost:` and `Next owner action:` lines.
+- Added regression-threshold status, maximum ratio, and error fields to each compare row so reports explain threshold failures without requiring console logs.
 - Added the optional `count-allocations` feature using the existing `allocation-counter` crate rather than introducing a hand-written allocator in this workspace.
 - Added `--track-allocations` and `just bench::compare-allocations` so Stab-side allocation counts can be recorded separately from timing-gate runs.
 - Extended `Measurement` with optional allocation totals and compare rows with Stab allocation max fields.
@@ -57,7 +61,7 @@ Actual profiler captures, optimization work, complete allocation reports for the
 | Profile slower-than-gate workloads before optimizing | Partially satisfied | `--require-profiler-notes`, `profiler_notes_are_required_only_for_rows_slower_than_hot_path_ratio`, and `profiler_notes_must_name_dominant_cost_and_next_owner_action` enforce durable note files for rows slower than 1.5x once a complete report exists; actual profiler captures and notes for current slow rows remain pending. |
 | Optimize hot paths behind existing abstractions | Missing | No hot-path optimization is performed in this slice. |
 | Add allocation tracking for primary hot paths | Partially satisfied | `--track-allocations`, `just bench::compare-allocations`, optional `count-allocations`, and `compare_row_result_records_stab_allocation_maxima` provide Stab-side allocation-count plumbing; a full primary allocation report and memory-regression comparison remain pending. |
-| Add regression thresholds for workloads that pass the beta gate | Missing | Threshold enforcement remains pending complete baseline and compare reports. |
+| Add regression thresholds for workloads that pass the beta gate | Partially satisfied | `--thresholds`, `regression_thresholds_mark_pass_fail_and_uncomparable_rows`, and `regression_thresholds_validate_schema_ids_and_ratios` provide the gate and schema validation; source-owned threshold rows remain pending a complete primary report with passing workloads. |
 | `just oracle::run --implemented-only` passes before and after performance changes | Not applicable | This slice changes benchmark ops and docs only; no performance implementation changed, but the oracle gate remains required before M12 completion. |
 | `just bench::compare --profile release --primary` has no missing primary workloads | Missing | `--require-beta-gate` now enforces comparable passing rows, but a full primary compare requires a complete pinned-Stim baseline and remains pending. |
 
@@ -78,10 +82,12 @@ Actual profiler captures, optimization work, complete allocation reports for the
 - `just bench::compare --help`
 - `just bench::compare --milestone M4 --report target/benchmarks/m12-compare-smoke --require-profiler-notes`
 - `cargo run -q -p stab-bench -- compare --milestone M4 --require-beta-gate; rc=$?; echo rc=$rc; test $rc -ne 0`
+- `cargo run -q -p stab-bench -- compare --milestone M4 --thresholds target/benchmarks/m12-threshold-smoke/thresholds.json; rc=$?; echo rc=$rc; test $rc -ne 0`
 - `just bench::compare-allocations --milestone M4 --report target/benchmarks/m12-alloc-smoke`
 
 The M4 compare-report smoke wrote `compare.json` and `report.md` successfully.
 The local baseline at `target/benchmarks/baseline/latest/baseline.json` did not include M4 rows, so the smoke report correctly marked those rows as `missing-baseline`; a complete primary baseline remains required before M12 can satisfy the beta performance gate.
 Because those rows had no Stim baseline measurements, the smoke report had no relative ratios and correctly marked profiler notes as `not-required`.
 The beta-gate smoke command failed as expected because the local baseline has missing M4 rows, proving the enforcement path rejects unproven rows.
+The regression-threshold smoke command failed as expected because the selected threshold row lacked a comparable ratio, proving the threshold gate rejects unproven configured rows.
 The allocation smoke wrote allocation counts and maximum live allocated bytes for the M4 Stab-side measurements.

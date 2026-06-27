@@ -13,6 +13,7 @@ use crate::report::{
     machine_metadata, render_compare_markdown_report, stab_metadata, unix_epoch_seconds,
 };
 use crate::root::RepoRoot;
+use crate::thresholds::{apply_regression_thresholds, read_thresholds};
 
 #[derive(Clone, Debug)]
 pub(crate) struct CompareOptions {
@@ -23,6 +24,7 @@ pub(crate) struct CompareOptions {
     pub(crate) report: Option<PathBuf>,
     pub(crate) require_profiler_notes: bool,
     pub(crate) require_beta_gate: bool,
+    pub(crate) thresholds: Option<PathBuf>,
     pub(crate) track_allocations: bool,
     pub(crate) strict: bool,
 }
@@ -39,6 +41,11 @@ pub(crate) fn run_compare(
     let baseline_path = root.resolve_relative(&options.baseline);
     let baseline_report = read_baseline_report(&baseline_path)?;
     validate_baseline_metadata(&baseline_report)?;
+    let threshold_path = options
+        .thresholds
+        .as_ref()
+        .map(|path| root.resolve_relative(path));
+    let thresholds = threshold_path.as_deref().map(read_thresholds).transpose()?;
     let rows = manifest.compare_rows(options.milestone.as_deref(), options.primary)?;
     println!(
         "[{PREFIX}] comparing {} row(s) against {}",
@@ -135,12 +142,18 @@ pub(crate) fn run_compare(
             }
         }
     }
+    let regression_threshold_findings = thresholds
+        .as_ref()
+        .map_or_else(Default::default, |thresholds| {
+            apply_regression_thresholds(&mut report_rows, thresholds)
+        });
     let beta_gate_findings = find_beta_gate_failures(&report_rows);
     let profiler_note_findings = if let Some(report_dir) = &options.report {
         write_compare_report(
             root,
             &baseline_report,
             &baseline_path,
+            threshold_path.as_deref(),
             report_dir,
             options,
             report_rows,
@@ -156,6 +169,14 @@ pub(crate) fn run_compare(
     if options.require_beta_gate && !beta_gate_findings.blockers.is_empty() {
         return Err(BenchError::BetaGateFailed {
             details: beta_gate_findings.blockers.join("\n").into_boxed_str(),
+        });
+    }
+    if !regression_threshold_findings.blockers.is_empty() {
+        return Err(BenchError::RegressionThresholdFailed {
+            details: regression_threshold_findings
+                .blockers
+                .join("\n")
+                .into_boxed_str(),
         });
     }
     if options.strict
@@ -182,6 +203,7 @@ fn write_compare_report(
     root: &RepoRoot,
     baseline_report: &BaselineReport,
     baseline_path: &Path,
+    threshold_path: Option<&Path>,
     report_dir: &Path,
     options: &CompareOptions,
     mut rows: Vec<CompareRowResult>,
@@ -201,6 +223,7 @@ fn write_compare_report(
             primary: options.primary,
             require_profiler_notes: options.require_profiler_notes,
             require_beta_gate: options.require_beta_gate,
+            thresholds_path: threshold_path.map(|path| path.display().to_string()),
             track_allocations: options.track_allocations,
             strict: options.strict,
         },
@@ -366,6 +389,9 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         stab_allocation_count_max,
         stab_allocation_bytes_max,
         pass_fail_status: compare_pass_fail_status(status, baseline_status, relative_ratio),
+        regression_threshold_status: "not-configured".to_string(),
+        regression_threshold_max_ratio: None,
+        regression_threshold_error: None,
         profiler_note_status: "not-required".to_string(),
         profiler_note_path: None,
         profiler_note_error: None,

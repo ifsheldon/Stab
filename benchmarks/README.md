@@ -23,6 +23,23 @@ Pass `--report target/benchmarks/latest` or another repository-relative director
 Pass `--require-beta-gate` to fail when any selected row does not prove a pass against the 2.0x pinned-Stim beta performance gate.
 Pass `--require-profiler-notes` with `--report` to fail when a row slower than 1.5x pinned Stim lacks a valid note at `<report>/profiler-notes/<benchmark-id>.md`.
 Profiler notes must include non-empty `Dominant cost:` and `Next owner action:` lines.
+Pass `--thresholds <path>` to fail when a selected row with a configured regression threshold exceeds its maximum relative ratio or lacks a comparable Stab-vs-Stim ratio.
+Threshold files are JSON with schema version 1:
+
+```json
+{
+  "schema_version": 1,
+  "rows": [
+    {
+      "id": "m4-circuit-parse",
+      "max_relative_ratio": 1.25
+    }
+  ]
+}
+```
+
+Only selected benchmark ids present in the threshold file are checked.
+Threshold ids must be benchmark-id safe because they are matched against report rows and may also be used by generated benchmark tooling.
 Use `just bench::compare-allocations` to build `stab-bench` with the optional `count-allocations` feature and pass `--track-allocations` automatically.
 Allocation tracking runs an extra Stab-side measurement pass per reported measurement and records allocation counts and maximum live allocated bytes in `compare.json`; use plain `just bench::compare` for timing-gate evidence.
 Compare prints Stab-side timings for rows whose implementation milestone has a runner and prints pending rows explicitly for future milestones.

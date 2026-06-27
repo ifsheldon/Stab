@@ -422,6 +422,7 @@ The M12 `performance-gate` placeholder row documents the gate and is not itself 
 Completion-style performance runs should pass `--require-beta-gate`, which fails when any selected row lacks a proven Stab-vs-Stim ratio or exceeds the 2.0x beta performance gate.
 Profiler notes for compare reports live beside the report under `<report>/profiler-notes/<benchmark-id>.md`.
 When `--require-profiler-notes` is passed, every row slower than 1.5x pinned Stim must have a note with non-empty `Dominant cost:` and `Next owner action:` lines.
+Regression thresholds use JSON schema version 1 with benchmark ids and `max_relative_ratio` values, and `just bench::compare --thresholds <path>` fails configured selected rows that exceed their threshold or cannot produce a comparable ratio.
 Allocation tracking is recorded through `just bench::compare-allocations`, which builds `stab-bench` with the optional `count-allocations` feature and records Stab-side allocation counts and maximum live allocated bytes in `compare.json`.
 Timing-gate evidence should use plain `just bench::compare`, because allocation instrumentation changes allocator behavior.
 

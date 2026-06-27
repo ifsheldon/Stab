@@ -88,4 +88,5 @@ Use a small `--target-seconds` value for quick local smoke runs, and increase it
 `just bench::compare` runs the benchmark ops binary with Cargo's release profile, reads `target/benchmarks/baseline/latest/baseline.json` by default, and can write `compare.json` plus `report.md` to a repository-relative directory under `target/benchmarks/`.
 Use `--require-beta-gate` for completion-style runs where every selected row must prove a Stab median no slower than 2.0x pinned Stim.
 Profiler notes for rows slower than 1.5x pinned Stim live under the report directory's `profiler-notes/` folder and must include `Dominant cost:` and `Next owner action:` lines when `--require-profiler-notes` is used.
+Use `--thresholds <path>` once regression thresholds exist to fail selected rows that exceed their configured maximum relative ratio or cannot produce a comparable ratio.
 `just bench::compare-allocations` builds `stab-bench` with the optional `count-allocations` feature and adds Stab-side allocation counts to the compare report; keep timing-gate runs on plain `just bench::compare` so allocation instrumentation does not affect timing evidence.

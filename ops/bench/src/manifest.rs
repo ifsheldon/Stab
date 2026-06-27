@@ -437,7 +437,7 @@ fn unsafe_component(component: Component<'_>) -> bool {
     )
 }
 
-fn is_safe_benchmark_id(id: &str) -> bool {
+pub(crate) fn is_safe_benchmark_id(id: &str) -> bool {
     id.bytes()
         .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
