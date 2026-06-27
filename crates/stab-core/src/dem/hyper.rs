@@ -3,7 +3,7 @@
     reason = "M10 hypergraph search internals are being landed in parity-tested slices before the full search algorithm consumes them"
 )]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::{Display, Formatter};
 
 use super::{
@@ -261,6 +261,23 @@ impl SearchState {
         }
     }
 
+    fn is_undetected(&self) -> bool {
+        self.detectors.is_empty()
+    }
+
+    fn after_crossing_edge(&self, edge: &Edge) -> Self {
+        let mut detectors = self.detectors.clone();
+        for detector in &edge.detectors {
+            if !detectors.insert(*detector) {
+                detectors.remove(detector);
+            }
+        }
+        Self {
+            detectors,
+            observables: self.observables.symmetric_difference(&edge.observables),
+        }
+    }
+
     fn append_transition_as_error_instruction_to(
         &self,
         next: &Self,
@@ -302,6 +319,199 @@ impl Display for SearchState {
         }
         f.write_str(&text)
     }
+}
+
+pub(super) fn find_undetectable_logical_error(
+    model: &DetectorErrorModel,
+    dont_explore_detection_event_sets_with_size_above: usize,
+    dont_explore_edges_with_degree_above: usize,
+    dont_explore_edges_increasing_symptom_degree: bool,
+) -> CircuitResult<DetectorErrorModel> {
+    if dont_explore_edges_with_degree_above == 2
+        && dont_explore_detection_event_sets_with_size_above == 2
+    {
+        return super::shortest_graphlike_undetectable_logical_error(model, true);
+    }
+
+    let graph = Graph::from_dem(model, dont_explore_edges_with_degree_above)?;
+    let empty = SearchState::new(BTreeSet::new(), ObservableMask::new());
+    if !graph.distance_1_error_mask.is_empty() {
+        let mut out = DetectorErrorModel::new();
+        SearchState::new(BTreeSet::new(), graph.distance_1_error_mask)
+            .append_transition_as_error_instruction_to(&empty, &mut out)?;
+        return Ok(out);
+    }
+
+    let mut queue = VecDeque::new();
+    let mut back_map = BTreeMap::new();
+    back_map.insert(empty.clone(), empty.clone());
+
+    for (node_index, node) in graph.nodes.iter().enumerate() {
+        let source = detector_for_node_index(node_index)?;
+        for edge in &node.edges {
+            if edge.observables.is_empty() || edge.detectors.iter().next() != Some(&source) {
+                continue;
+            }
+            let start = SearchState::new(edge.detectors.clone(), edge.observables.clone());
+            if start.detectors.len() <= dont_explore_detection_event_sets_with_size_above {
+                queue.push_back(start.clone());
+            }
+            back_map.entry(start).or_insert_with(|| empty.clone());
+        }
+    }
+
+    while let Some(current) = queue.pop_front() {
+        let Some(active) = current.detectors.iter().next().copied() else {
+            return Err(CircuitError::invalid_detector_error_model(
+                "hypergraph search reached a state without an active detector",
+            ));
+        };
+        let active_index = usize::try_from(active.get()).map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "hypergraph active detector does not fit usize",
+            )
+        })?;
+        let Some(node) = graph.nodes.get(active_index) else {
+            return Err(CircuitError::invalid_detector_error_model(
+                "hypergraph active detector is outside the graph",
+            ));
+        };
+        for edge in &node.edges {
+            let next = current.after_crossing_edge(edge);
+            if next.detectors.len() > dont_explore_detection_event_sets_with_size_above {
+                continue;
+            }
+            if dont_explore_edges_increasing_symptom_degree
+                && next.detectors.len() > current.detectors.len()
+            {
+                continue;
+            }
+            if back_map.contains_key(&next) {
+                continue;
+            }
+            back_map.insert(next.clone(), current.clone());
+            if next.is_undetected() {
+                if next.observables.is_empty() {
+                    return Err(CircuitError::invalid_detector_error_model(
+                        "hypergraph search reached an empty logical state unexpectedly",
+                    ));
+                }
+                return backtrack_path(&back_map, &next);
+            }
+            queue.push_back(next);
+        }
+    }
+
+    Err(CircuitError::invalid_detector_error_model(
+        no_hypergraph_logical_error_message(model, &graph)?,
+    ))
+}
+
+fn backtrack_path(
+    back_map: &BTreeMap<SearchState, SearchState>,
+    final_state: &SearchState,
+) -> CircuitResult<DetectorErrorModel> {
+    let mut out = DetectorErrorModel::new();
+    let mut current = final_state.clone();
+    loop {
+        let Some(previous) = back_map.get(&current) else {
+            return Err(CircuitError::invalid_detector_error_model(
+                "hypergraph search backtracking reached an unknown state",
+            ));
+        };
+        current.append_transition_as_error_instruction_to(previous, &mut out)?;
+        if previous.is_undetected() {
+            break;
+        }
+        current = previous.clone();
+    }
+    sorted_error_model_with_cancelled_pairs(out)
+}
+
+fn sorted_error_model_with_cancelled_pairs(
+    model: DetectorErrorModel,
+) -> CircuitResult<DetectorErrorModel> {
+    let mut instructions = Vec::new();
+    for item in model.items() {
+        let DemItem::Instruction(instruction) = item else {
+            return Err(CircuitError::invalid_detector_error_model(
+                "hypergraph search produced a repeat block unexpectedly",
+            ));
+        };
+        instructions.push(instruction.clone());
+    }
+    instructions.sort_by(|left, right| left.targets().cmp(right.targets()));
+
+    let mut kept: Vec<DemInstruction> = Vec::new();
+    for instruction in instructions {
+        if kept
+            .last()
+            .is_some_and(|previous| previous.targets() == instruction.targets())
+        {
+            kept.pop();
+        } else {
+            kept.push(instruction);
+        }
+    }
+
+    let mut sorted = DetectorErrorModel::new();
+    for instruction in kept {
+        sorted.push_instruction(instruction);
+    }
+    Ok(sorted)
+}
+
+fn no_hypergraph_logical_error_message(
+    model: &DetectorErrorModel,
+    graph: &Graph,
+) -> CircuitResult<String> {
+    let mut message = String::from("Failed to find any logical errors.");
+    if graph.num_observables == 0 {
+        message.push_str(
+            "\n    WARNING: NO OBSERVABLES. The circuit or detector error model didn't define any observables, making it vacuously impossible to find a logical error.",
+        );
+    }
+    if graph.nodes.is_empty() {
+        message.push_str(
+            "\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors.",
+        );
+    }
+    if count_nonzero_error_instructions(model)? == 0 {
+        message.push_str(
+            "\n    WARNING: NO ERRORS. The circuit or detector error model didn't include any errors, making it vacuously impossible to find a logical error.",
+        );
+    }
+    Ok(message)
+}
+
+fn count_nonzero_error_instructions(model: &DetectorErrorModel) -> CircuitResult<usize> {
+    let mut total = 0usize;
+    for item in model.items() {
+        let count = match item {
+            DemItem::Instruction(instruction) => usize::from(
+                instruction.kind() == DemInstructionKind::Error
+                    && instruction.args().first().copied().unwrap_or(0.0) != 0.0,
+            ),
+            DemItem::RepeatBlock(repeat) => {
+                let repeat_count = usize::try_from(repeat.repeat_count().get()).map_err(|_| {
+                    CircuitError::invalid_detector_error_model(
+                        "repeat count does not fit usize while counting hypergraph errors",
+                    )
+                })?;
+                repeat_count
+                    .checked_mul(count_nonzero_error_instructions(repeat.body())?)
+                    .ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "hypergraph error count overflowed",
+                        )
+                    })?
+            }
+        };
+        total = total.checked_add(count).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model("hypergraph error count overflowed")
+        })?;
+    }
+    Ok(total)
 }
 
 fn toggled_dem_targets(
@@ -356,6 +566,13 @@ fn format_observable(observable: DemObservableId) -> String {
     format!("L{}", observable.get())
 }
 
+fn detector_for_node_index(index: usize) -> CircuitResult<DemDetectorId> {
+    let index = u64::try_from(index).map_err(|_| {
+        CircuitError::invalid_detector_error_model("hypergraph node index does not fit detector id")
+    })?;
+    DemDetectorId::try_new(index)
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(
@@ -402,6 +619,22 @@ mod tests {
             })
             .unwrap();
         instruction.targets().to_vec()
+    }
+
+    fn find(
+        dem: &str,
+        dont_explore_detection_event_sets_with_size_above: usize,
+        dont_explore_edges_with_degree_above: usize,
+        dont_explore_edges_increasing_symptom_degree: bool,
+    ) -> CircuitResult<String> {
+        let model = DetectorErrorModel::from_dem_str(dem)?;
+        find_undetectable_logical_error(
+            &model,
+            dont_explore_detection_event_sets_with_size_above,
+            dont_explore_edges_with_degree_above,
+            dont_explore_edges_increasing_symptom_degree,
+        )
+        .map(|error| error.to_dem_string())
     }
 
     #[test]
@@ -615,6 +848,131 @@ mod tests {
                 8,
                 obs_mask(0),
             )
+        );
+    }
+
+    #[test]
+    fn hyper_algo_no_error_matches_upstream() {
+        assert!(find("", usize::MAX, usize::MAX, false).is_err());
+        assert!(find("error(0.1) D0 L0\n", usize::MAX, usize::MAX, false).is_err());
+        assert!(
+            find(
+                "error(0.1) D0\nerror(0.1) D0 D1\nerror(0.1) D1\n",
+                usize::MAX,
+                usize::MAX,
+                false
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn hyper_algo_distance_1_matches_upstream() {
+        assert_eq!(
+            find("error(0.1) L0\n", usize::MAX, usize::MAX, false).unwrap(),
+            "error(1) L0\n"
+        );
+    }
+
+    #[test]
+    fn hyper_algo_distance_2_matches_upstream() {
+        assert_eq!(
+            find(
+                "error(0.1) D0\nerror(0.1) D0 L0\n",
+                usize::MAX,
+                usize::MAX,
+                false
+            )
+            .unwrap(),
+            "error(1) D0\nerror(1) D0 L0\n"
+        );
+
+        assert_eq!(
+            find(
+                "error(0.1) D0 L0\nerror(0.1) D0 L1\n",
+                usize::MAX,
+                usize::MAX,
+                false
+            )
+            .unwrap(),
+            "error(1) D0 L0\nerror(1) D0 L1\n"
+        );
+
+        assert_eq!(
+            find(
+                "error(0.1) D0 D1 L0\nerror(0.1) D0 D1 L1\n",
+                usize::MAX,
+                usize::MAX,
+                false
+            )
+            .unwrap(),
+            "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n"
+        );
+
+        assert_eq!(
+            find(
+                "error(0.1) D0 D1 L1\nerror(0.1) D0 D1 L0\n",
+                usize::MAX,
+                usize::MAX,
+                false
+            )
+            .unwrap(),
+            "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n"
+        );
+    }
+
+    #[test]
+    fn hyper_algo_distance_3_matches_upstream() {
+        assert_eq!(
+            find(
+                "error(0.1) D0\nerror(0.1) D0 D1 L0\nerror(0.1) D1\n",
+                usize::MAX,
+                usize::MAX,
+                false
+            )
+            .unwrap(),
+            "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n"
+        );
+
+        assert_eq!(
+            find(
+                "error(0.1) D1\nerror(0.1) D1 D0 L0\nerror(0.1) D0\n",
+                usize::MAX,
+                usize::MAX,
+                false
+            )
+            .unwrap(),
+            "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n"
+        );
+    }
+
+    #[test]
+    fn hyper_algo_hyper_error_matches_upstream() {
+        assert_eq!(
+            find(
+                "\
+error(0.1) D0 D1
+error(0.1) D0 D1 D2 D3
+error(0.1) D2 D3 D4 D5 L0
+error(0.1) D4 D5 D6 D7
+error(0.1) D6 D7 D8 D9
+error(0.1) D8
+error(0.1) D9
+",
+                4,
+                4,
+                true
+            )
+            .unwrap(),
+            "\
+error(1) D0 D1
+error(1) D0 D1 D2 D3
+error(1) D2 D3 D4 D5 L0
+error(1) D4 D5 D6 D7
+error(1) D6 D7 D8 D9
+error(1) D8
+error(1) D9
+"
         );
     }
 }

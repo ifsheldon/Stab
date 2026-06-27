@@ -36,7 +36,8 @@ pub use dem::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemRepeatBlock,
     DemTarget, DetectorErrorModel, DisjointPauliProbabilities, ErrorAnalyzerOptions,
     IndependentPauliProbabilities, circuit_to_detector_error_model,
-    independent_to_disjoint_xyz_errors, likeliest_error_sat_problem, shortest_error_sat_problem,
+    find_undetectable_logical_error, independent_to_disjoint_xyz_errors,
+    likeliest_error_sat_problem, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error, try_disjoint_to_independent_xyz_errors,
 };
 pub use detection::{

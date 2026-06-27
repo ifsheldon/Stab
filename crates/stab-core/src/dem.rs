@@ -919,5 +919,19 @@ pub fn shortest_graphlike_undetectable_logical_error(
     graphlike::shortest_graphlike_undetectable_logical_error(model, ignore_ungraphlike_errors)
 }
 
+pub fn find_undetectable_logical_error(
+    model: &DetectorErrorModel,
+    dont_explore_detection_event_sets_with_size_above: usize,
+    dont_explore_edges_with_degree_above: usize,
+    dont_explore_edges_increasing_symptom_degree: bool,
+) -> CircuitResult<DetectorErrorModel> {
+    hyper::find_undetectable_logical_error(
+        model,
+        dont_explore_detection_event_sets_with_size_above,
+        dont_explore_edges_with_degree_above,
+        dont_explore_edges_increasing_symptom_degree,
+    )
+}
+
 #[cfg(test)]
 mod tests;
