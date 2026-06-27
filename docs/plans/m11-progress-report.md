@@ -67,6 +67,7 @@ This milestone implements the deterministic and noisy statistical `sample_dem` c
 - This slice fixes follow-up milestone-audit and full-code-review findings by adding explicit `r8` stream proof, observable-width rejection proof, Stim-compatible CRLF text replay parsing, bounded blank `dets` replay prefix scanning, and zero-shot declared-path validation.
 - This slice fixes follow-up full-code-review resource findings by adding byte-aware materialization checks, DEM parser line and nesting limits, sampler compile nesting validation for programmatic DEMs, and a checked-only public `ptb64` writer surface.
 - Follow-up milestone-audit and full-code-review rechecks found no remaining M11 implementation, parity, resource-limit, benchmark, or review blockers after the fixes above; true streaming and stricter performance thresholds remain M12 work under the roadmap.
+- 2026-06-28 GOAL gate recheck: GPT-5.5/xhigh milestone-audit and full-code-review subagents found no blocking M11 findings. The audit accepted M11 as complete against the current bounded-materialized `sample_dem` contract, with strict pinned-Stim benchmark baseline completeness, true streaming output, folded repeat sampling without bounded unrolling, and performance thresholds deferred to M12 as documented.
 
 ## Verification Commands
 
@@ -84,3 +85,22 @@ This milestone implements the deterministic and noisy statistical `sample_dem` c
 - `cargo test -p stab-bench m11_benchmark_rows_have_stab_compare_runners --quiet`
 - `just bench::compare --milestone M11`
 - `just maintenance::pre-commit`
+
+Latest GOAL gate recheck commands run on 2026-06-28:
+
+- `cargo fmt --all --check`
+- `cargo clippy -p stab-core --all-targets -- -D warnings`
+- `cargo clippy -p stab-cli --all-targets -- -D warnings`
+- `cargo clippy -p stab-bench --all-targets -- -D warnings`
+- `cargo test -p stab-cli sample_dem`
+- `cargo test -p stab-core --test dem_sampler`
+- `cargo test -p stab-core dem_parser_rejects_hostile_line_count_and_repeat_depth`
+- `cargo test -p stab-core result_formats`
+- `cargo test -p stab-core detection_record_writers_cover_text_and_bit_packed_formats`
+- `cargo test -p stab-bench m11_benchmark_rows_have_stab_compare_runners`
+- `just oracle::matrix --check`
+- `just oracle::run --milestone M11`
+- `just oracle::run --milestone M11 --exact`
+- `just oracle::run --milestone M11 --statistical`
+- `just oracle::run --milestone M11 --structural`
+- `just bench::compare --milestone M11`
