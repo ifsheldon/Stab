@@ -113,12 +113,12 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md`, `oracle/compatibility-mat
 
 ## 2026-06-27 - M8: Benchmark Strictness And Baseline Completeness
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of `just bench::compare --milestone M8`.
 Current text: M8 requires `just bench::compare --milestone M8` to report compile/analysis time, single-shot latency, and batch throughput for `1`, `1024`, and `1_000_000` shots.
 Gap: non-strict benchmark comparison can exit successfully while M8 benchmark rows have missing pinned Stim baselines, and the milestone does not define which report-only rows are acceptable before completion. Pending Stab runners are no longer part of this gap because every M8 benchmark manifest row now has either a Stab comparison runner or an explicit contract-only runner.
 Proposed amendment: require `just bench::compare --milestone M8 --strict` for milestone completion, or explicitly list report-only exceptions with their owning follow-up milestone; every required M8 benchmark row should have a Stab runner and selected pinned Stim baseline before completion.
-Resolution: partially mitigated by Stab runners for `m8-measure-reader`, `m8-frame-simulator`, `m8-tableau-simulator`, and `m8-reference-sample-tree`. Strict comparison still fails until `target/benchmarks/baseline/latest/baseline.json` is regenerated with M8 pinned Stim rows or the plan names baseline exceptions.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now requires `just bench::compare --milestone M8 --strict` for M8 completion. The M8 benchmark manifest rows have Stab runners or explicit contract-only runners, and regenerating `target/benchmarks/baseline/latest/baseline.json` with `just bench::baseline --only M8` produced selected pinned Stim rows accepted by the strict comparison.
 
 ## 2026-06-27 - M8: Multi-Outcome Statistical Evidence
 

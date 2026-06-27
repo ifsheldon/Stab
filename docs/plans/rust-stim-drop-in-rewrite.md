@@ -294,7 +294,7 @@ Done criteria:
 - `just oracle::run --milestone M8 --exact` passes deterministic sampling cases.
 - `just oracle::run --milestone M8 --statistical` passes noisy sampling statistical cases with documented sample counts and confidence bounds.
 - `cargo test -p stab-core sampling` covers repeat blocks, feedback, reset/measurement edge cases, and output-format padding.
-- `just bench::compare --milestone M8` reports compile/analysis time, single-shot latency, and batch throughput for `1`, `1024`, and `1_000_000` shots.
+- `just bench::compare --milestone M8 --strict` reports compile/analysis time, single-shot latency, and batch throughput for `1`, `1024`, and `1_000_000` shots with no missing M8 Stab runners or selected pinned Stim baseline rows.
 
 ### M9: Detection Event Workflows
 
