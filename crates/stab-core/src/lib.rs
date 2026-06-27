@@ -13,6 +13,7 @@ mod error;
 mod gate;
 mod ids;
 mod mbqc_decomposition;
+mod reference_sample_tree;
 pub mod result_formats;
 mod sampling;
 pub mod stabilizers;
@@ -33,6 +34,7 @@ pub use error::{CircuitError, CircuitResult};
 pub use gate::{Gate, GateCategory};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};
 pub use mbqc_decomposition::mbqc_decomposition;
+pub use reference_sample_tree::ReferenceSampleTree;
 pub use result_formats::SampleFormat;
 pub use sampling::{CompiledSampler, count_determined_measurements};
 pub use stabilizers::{

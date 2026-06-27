@@ -136,7 +136,7 @@ impl CompiledSampler {
         shot
     }
 
-    fn reference_sample(&self) -> Vec<bool> {
+    pub fn reference_sample(&self) -> Vec<bool> {
         let mut rng = SmallRng::seed_from_u64(0);
         self.sample_shot_in_mode(&mut rng, ExecutionMode::ReferenceSample)
     }
