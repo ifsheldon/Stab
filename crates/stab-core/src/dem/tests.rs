@@ -301,6 +301,23 @@ fn dem_analyzer_approximates_pauli_channel1_by_measurement_basis() {
 }
 
 #[test]
+fn dem_analyzer_allows_exact_solved_pauli_channel1_without_approximation() {
+    let circuit = Circuit::from_stim_str(
+        "R 0\n\
+         PAULI_CHANNEL_1(0.1, 0.2, 0.15) 0\n\
+         M 0\n\
+         DETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.2999999999999999888977697537484346) D0\n");
+}
+
+#[test]
 fn dem_analyzer_reset_clears_pending_pauli_channel1() {
     let circuit = Circuit::from_stim_str(
         "PAULI_CHANNEL_1(0.125, 0.25, 0.375) 0\nR 0\nM 0\nDETECTOR rec[-1]\n",

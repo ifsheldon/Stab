@@ -1,0 +1,4 @@
+R 0
+PAULI_CHANNEL_1(0.1, 0.2, 0.15) 0
+M 0
+DETECTOR rec[-1]
