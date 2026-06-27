@@ -162,6 +162,20 @@ fn dem_analyzer_ignores_identity_noise_channels() {
 }
 
 #[test]
+fn dem_analyzer_maps_correlated_error_to_joint_detector_error() {
+    let circuit = Circuit::from_stim_str(
+        "CORRELATED_ERROR(0.25) X0 X1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.25) D0 D1\n");
+}
+
+#[test]
 fn dem_analyzer_merges_identical_error_symptoms() {
     let circuit =
         Circuit::from_stim_str("X_ERROR(0.125) 0\nX_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n")
