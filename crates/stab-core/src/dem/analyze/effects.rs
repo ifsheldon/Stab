@@ -137,6 +137,14 @@ impl PendingError {
         self.effects = effects_from_masks(masks);
     }
 
+    pub(super) fn toggle_effect(&mut self, effect: NoiseEffect) {
+        let mut masks = self.effect_masks();
+        let existing_mask = masks.remove(&effect.qubit).unwrap_or(0);
+        let output_mask = existing_mask ^ pauli_mask(effect.pauli.into());
+        insert_effect_mask(&mut masks, effect.qubit, output_mask);
+        self.effects = effects_from_masks(masks);
+    }
+
     fn effect_masks(&self) -> BTreeMap<QubitId, u8> {
         let mut masks = BTreeMap::new();
         for effect in &self.effects {
@@ -173,6 +181,26 @@ impl PendingError {
             }
         }
         flips
+    }
+
+    pub(super) fn flips_measurement_record(&self, measurement: usize) -> bool {
+        let mut flips = false;
+        for recorded in &self.measurements {
+            if *recorded == measurement {
+                flips ^= true;
+            }
+        }
+        flips
+    }
+
+    pub(super) fn toggle_observables(&mut self, observables: &[u64]) {
+        let mut current = self.observables.iter().copied().collect::<BTreeSet<_>>();
+        for observable in observables {
+            if !current.insert(*observable) {
+                current.remove(observable);
+            }
+        }
+        self.observables = current.into_iter().collect();
     }
 }
 

@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 mod decompose;
 mod effects;
 mod error_decomp;
+mod feedback;
 mod folded;
 mod gauge;
 mod instructions;
@@ -186,7 +187,7 @@ impl Analyzer {
             "R" | "RX" | "RY" => self.record_resets(instruction),
             "HERALDED_ERASE" => self.record_heralded_erase(instruction),
             "HERALDED_PAULI_CHANNEL_1" => self.record_heralded_pauli_channel1(instruction),
-            "CX" => self.apply_cx(instruction),
+            "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => self.apply_controlled_pauli(instruction),
             "MPAD" => self.record_measurement_pads(instruction),
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
@@ -870,32 +871,12 @@ impl Analyzer {
         Ok(())
     }
 
-    fn apply_cx(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        for group in instruction.target_groups() {
-            let [control, target] = group else {
-                return Err(CircuitError::invalid_detector_error_model(
-                    "CX expected paired qubit targets during error analysis",
-                ));
-            };
-            if control.sweep_bit_id().is_some() {
-                continue;
-            }
-            let Some(control) = control.qubit_id() else {
-                return Err(CircuitError::invalid_detector_error_model(format!(
-                    "CX control target {control} is not a qubit"
-                )));
-            };
-            let Some(target) = target.qubit_id() else {
-                return Err(CircuitError::invalid_detector_error_model(format!(
-                    "CX target {target} is not a qubit"
-                )));
-            };
-            self.reject_pending_single_qubit_channels_through_cx(control, target)?;
-            for pending in &mut self.pending_errors {
-                pending.apply_cx(control, target);
-            }
-            self.observable_sensitivity.apply_cx(control, target);
+    fn apply_quantum_cx(&mut self, control: QubitId, target: QubitId) -> CircuitResult<()> {
+        self.reject_pending_single_qubit_channels_through_cx(control, target)?;
+        for pending in &mut self.pending_errors {
+            pending.apply_cx(control, target);
         }
+        self.observable_sensitivity.apply_cx(control, target);
         Ok(())
     }
 

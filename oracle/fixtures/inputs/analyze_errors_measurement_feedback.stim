@@ -1,0 +1,39 @@
+X_ERROR(0.125) 0
+M 0
+CNOT rec[-1] 1
+M 1
+DETECTOR rec[-1]
+
+X_ERROR(0.125) 2
+M 2
+H 3
+CZ rec[-1] 3
+H 3
+M 3
+DETECTOR rec[-1]
+
+X_ERROR(0.125) 4
+M 4
+H 5
+CZ 5 rec[-1]
+H 5
+M 5
+DETECTOR rec[-1]
+
+X_ERROR(0.125) 6
+M 6
+CY rec[-1] 7
+M 7
+DETECTOR rec[-1]
+
+X_ERROR(0.125) 8
+M 8
+XCZ 9 rec[-1]
+M 9
+DETECTOR rec[-1]
+
+X_ERROR(0.125) 10
+M 10
+YCZ 11 rec[-1]
+M 11
+DETECTOR rec[-1]

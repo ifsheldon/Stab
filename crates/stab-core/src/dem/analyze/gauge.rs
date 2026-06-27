@@ -2,8 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, QubitId};
 
+use super::feedback::{ControlledPauliAction, controlled_pauli_action};
 use super::mpp::pauli_product_terms;
-use super::{AnalyzerBasis, DemTarget};
+use super::{AnalyzerBasis, AnalyzerPauli, DemTarget};
 
 pub(super) fn find_gauge_errors(
     circuit: &Circuit,
@@ -106,7 +107,7 @@ impl GaugeTracker {
             "RY" => self.undo_resets(instruction, AnalyzerBasis::Y),
             "H" => self.undo_h(instruction),
             "H_XY" => self.undo_h_xy(instruction),
-            "CX" => self.undo_cx(instruction),
+            "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => self.undo_controlled_pauli(instruction),
             "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
             _ => Ok(()),
         }
@@ -154,8 +155,8 @@ impl GaugeTracker {
         instruction: &CircuitInstruction,
         basis: AnalyzerBasis,
     ) -> CircuitResult<()> {
-        for group in instruction.target_groups().iter().rev() {
-            let [left, right] = *group else {
+        for group in instruction.target_groups().into_iter().rev() {
+            let [left, right] = group else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
                     "{} expected paired qubit targets during gauge analysis",
                     instruction.gate().canonical_name()
@@ -185,7 +186,7 @@ impl GaugeTracker {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> CircuitResult<()> {
-        for group in instruction.target_groups().iter().rev() {
+        for group in instruction.target_groups().into_iter().rev() {
             let terms = pauli_product_terms(instruction.gate().canonical_name(), group)?;
             let sensitivity = self.pop_record_sensitivity()?;
             self.toggle_product_sensitivity(&terms, &sensitivity)?;
@@ -427,30 +428,59 @@ impl GaugeTracker {
         Ok(())
     }
 
-    fn undo_cx(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        for group in instruction.target_groups().iter().rev() {
-            let [control, target] = *group else {
-                return Err(CircuitError::invalid_detector_error_model(
-                    "CX expected paired qubit targets during gauge analysis",
-                ));
+    fn undo_controlled_pauli(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let gate_name = instruction.gate().canonical_name();
+        for group in instruction.target_groups().into_iter().rev() {
+            let [first, second] = group else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} expected paired targets during gauge analysis"
+                )));
             };
-            if control.sweep_bit_id().is_some() {
-                continue;
+            match controlled_pauli_action(gate_name, first, second)? {
+                ControlledPauliAction::QuantumCx { control, target } => {
+                    self.undo_quantum_cx(control, target)?;
+                }
+                ControlledPauliAction::MeasurementFeedback {
+                    record_offset,
+                    qubit,
+                    pauli,
+                } => self.undo_measurement_feedback(record_offset, qubit, pauli)?,
+                ControlledPauliAction::NoEffect => {}
             }
-            let control = control.qubit_id().ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
-                    "CX control target {control} is not a qubit"
-                ))
-            })?;
-            let target = target.qubit_id().ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
-                    "CX target {target} is not a qubit"
-                ))
-            })?;
-            let target_zs = self.zs_for(target)?.clone();
-            self.toggle_zs(control, &target_zs)?;
-            let control_xs = self.xs_for(control)?.clone();
-            self.toggle_xs(target, &control_xs)?;
+        }
+        Ok(())
+    }
+
+    fn undo_quantum_cx(&mut self, control: QubitId, target: QubitId) -> CircuitResult<()> {
+        let target_zs = self.zs_for(target)?.clone();
+        self.toggle_zs(control, &target_zs)?;
+        let control_xs = self.xs_for(control)?.clone();
+        self.toggle_xs(target, &control_xs)?;
+        Ok(())
+    }
+
+    fn undo_measurement_feedback(
+        &mut self,
+        record_offset: i32,
+        qubit: QubitId,
+        pauli: AnalyzerPauli,
+    ) -> CircuitResult<()> {
+        let sensitivity = match pauli {
+            AnalyzerPauli::X => self.zs_for(qubit)?.clone(),
+            AnalyzerPauli::Y => xor_sets(self.xs_for(qubit)?, self.zs_for(qubit)?),
+            AnalyzerPauli::Z => self.xs_for(qubit)?.clone(),
+        };
+        let measurement = self.measurement_index_from_offset(record_offset)?;
+        toggle_targets(
+            self.rec_bits.entry(measurement).or_default(),
+            sensitivity.iter().copied(),
+        );
+        if self
+            .rec_bits
+            .get(&measurement)
+            .is_some_and(BTreeSet::is_empty)
+        {
+            self.rec_bits.remove(&measurement);
         }
         Ok(())
     }
@@ -530,6 +560,31 @@ impl GaugeTracker {
         };
         toggle_targets(zs, targets.iter().copied());
         Ok(())
+    }
+
+    fn measurement_index_from_offset(&self, offset: i32) -> CircuitResult<usize> {
+        let measurement_count = i64::try_from(self.measurement_count).map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "measurement count does not fit i64 during gauge analysis",
+            )
+        })?;
+        let index = measurement_count
+            .checked_add(i64::from(offset))
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "measurement offset overflowed during gauge analysis",
+                )
+            })?;
+        if index < 0 || index >= measurement_count {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "measurement record offset rec[{offset}] is out of range during gauge analysis"
+            )));
+        }
+        usize::try_from(index).map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "measurement index does not fit usize during gauge analysis",
+            )
+        })
     }
 }
 

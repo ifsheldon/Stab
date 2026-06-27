@@ -1,0 +1,204 @@
+use crate::{CircuitError, CircuitInstruction, CircuitResult, QubitId, Target};
+
+use super::{Analyzer, AnalyzerPauli, NoiseEffect, PendingError};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum ControlledPauliAction {
+    QuantumCx {
+        control: QubitId,
+        target: QubitId,
+    },
+    MeasurementFeedback {
+        record_offset: i32,
+        qubit: QubitId,
+        pauli: AnalyzerPauli,
+    },
+    NoEffect,
+}
+
+impl Analyzer {
+    pub(super) fn apply_controlled_pauli(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<()> {
+        let gate_name = instruction.gate().canonical_name();
+        for group in instruction.target_groups() {
+            let [first, second] = group else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} expected paired targets during error analysis"
+                )));
+            };
+            match controlled_pauli_action(gate_name, first, second)? {
+                ControlledPauliAction::QuantumCx { control, target } => {
+                    self.apply_quantum_cx(control, target)?;
+                }
+                ControlledPauliAction::MeasurementFeedback {
+                    record_offset,
+                    qubit,
+                    pauli,
+                } => self.apply_measurement_feedback(record_offset, qubit, pauli)?,
+                ControlledPauliAction::NoEffect => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_measurement_feedback(
+        &mut self,
+        record_offset: i32,
+        qubit: QubitId,
+        pauli: AnalyzerPauli,
+    ) -> CircuitResult<()> {
+        let measurement = self.measurement_index_from_offset(record_offset)?;
+        let effect = NoiseEffect { qubit, pauli };
+        let observables = self
+            .observable_sensitivity
+            .flipped_observables(std::slice::from_ref(&effect));
+
+        let mut pending_errors = Vec::new();
+        let mut completed_errors = Vec::new();
+        for mut pending in self.pending_errors.drain(..) {
+            if pending.flips_measurement_record(measurement) {
+                apply_feedback_effect(&mut pending, effect.clone(), &observables);
+            }
+            if pending.effects.is_empty() {
+                completed_errors.push(pending);
+            } else {
+                pending_errors.push(pending);
+            }
+        }
+        for mut completed in self.completed_errors.drain(..) {
+            if completed.flips_measurement_record(measurement) {
+                apply_feedback_effect(&mut completed, effect.clone(), &observables);
+            }
+            if completed.effects.is_empty() {
+                completed_errors.push(completed);
+            } else {
+                pending_errors.push(completed);
+            }
+        }
+        self.pending_errors = pending_errors;
+        self.completed_errors = completed_errors;
+        Ok(())
+    }
+}
+
+pub(super) fn controlled_pauli_action(
+    gate_name: &str,
+    first: &Target,
+    second: &Target,
+) -> CircuitResult<ControlledPauliAction> {
+    match gate_name {
+        "CX" => z_controlled_action(gate_name, first, second, AnalyzerPauli::X, true),
+        "CY" => z_controlled_action(gate_name, first, second, AnalyzerPauli::Y, false),
+        "CZ" => symmetric_z_controlled_action(gate_name, first, second),
+        "XCZ" => reversed_z_controlled_action(gate_name, first, second, AnalyzerPauli::X),
+        "YCZ" => reversed_z_controlled_action(gate_name, first, second, AnalyzerPauli::Y),
+        name => Err(CircuitError::invalid_detector_error_model(format!(
+            "{name} is not a supported controlled Pauli analyzer gate"
+        ))),
+    }
+}
+
+fn z_controlled_action(
+    gate_name: &str,
+    control: &Target,
+    target: &Target,
+    pauli: AnalyzerPauli,
+    supports_quantum_cx: bool,
+) -> CircuitResult<ControlledPauliAction> {
+    if control.sweep_bit_id().is_some() {
+        require_qubit(gate_name, "target", target)?;
+        return Ok(ControlledPauliAction::NoEffect);
+    }
+    if let Some(record_offset) = control.measurement_record_offset() {
+        let qubit = require_qubit(gate_name, "target", target)?;
+        return Ok(ControlledPauliAction::MeasurementFeedback {
+            record_offset: record_offset.get(),
+            qubit,
+            pauli,
+        });
+    }
+    if supports_quantum_cx {
+        let control = require_qubit(gate_name, "control target", control)?;
+        let target = require_qubit(gate_name, "target", target)?;
+        return Ok(ControlledPauliAction::QuantumCx { control, target });
+    }
+    Ok(ControlledPauliAction::NoEffect)
+}
+
+fn reversed_z_controlled_action(
+    gate_name: &str,
+    target: &Target,
+    control: &Target,
+    pauli: AnalyzerPauli,
+) -> CircuitResult<ControlledPauliAction> {
+    if control.sweep_bit_id().is_some() {
+        require_qubit(gate_name, "target", target)?;
+        return Ok(ControlledPauliAction::NoEffect);
+    }
+    if let Some(record_offset) = control.measurement_record_offset() {
+        let qubit = require_qubit(gate_name, "target", target)?;
+        return Ok(ControlledPauliAction::MeasurementFeedback {
+            record_offset: record_offset.get(),
+            qubit,
+            pauli,
+        });
+    }
+    Ok(ControlledPauliAction::NoEffect)
+}
+
+fn symmetric_z_controlled_action(
+    gate_name: &str,
+    first: &Target,
+    second: &Target,
+) -> CircuitResult<ControlledPauliAction> {
+    match (
+        first.measurement_record_offset(),
+        second.measurement_record_offset(),
+        first.sweep_bit_id(),
+        second.sweep_bit_id(),
+    ) {
+        (Some(record_offset), None, None, None) => {
+            let qubit = require_qubit(gate_name, "target", second)?;
+            Ok(ControlledPauliAction::MeasurementFeedback {
+                record_offset: record_offset.get(),
+                qubit,
+                pauli: AnalyzerPauli::Z,
+            })
+        }
+        (None, Some(record_offset), None, None) => {
+            let qubit = require_qubit(gate_name, "target", first)?;
+            Ok(ControlledPauliAction::MeasurementFeedback {
+                record_offset: record_offset.get(),
+                qubit,
+                pauli: AnalyzerPauli::Z,
+            })
+        }
+        (None, None, Some(_), None) => {
+            require_qubit(gate_name, "target", second)?;
+            Ok(ControlledPauliAction::NoEffect)
+        }
+        (None, None, None, Some(_)) => {
+            require_qubit(gate_name, "target", first)?;
+            Ok(ControlledPauliAction::NoEffect)
+        }
+        (Some(_), Some(_), _, _) | (None, None, Some(_), Some(_)) => {
+            Ok(ControlledPauliAction::NoEffect)
+        }
+        _ => Ok(ControlledPauliAction::NoEffect),
+    }
+}
+
+fn apply_feedback_effect(pending: &mut PendingError, effect: NoiseEffect, observables: &[u64]) {
+    pending.toggle_effect(effect);
+    pending.toggle_observables(observables);
+}
+
+fn require_qubit(gate_name: &str, role: &str, target: &Target) -> CircuitResult<QubitId> {
+    target.qubit_id().ok_or_else(|| {
+        CircuitError::invalid_detector_error_model(format!(
+            "{gate_name} {role} {target} is not a qubit"
+        ))
+    })
+}
