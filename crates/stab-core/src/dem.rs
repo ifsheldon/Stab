@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 mod analyze;
 mod graphlike;
+mod hyper;
 
 pub use analyze::{
     DisjointPauliProbabilities, ErrorAnalyzerOptions, IndependentPauliProbabilities,
