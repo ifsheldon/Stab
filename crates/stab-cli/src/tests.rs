@@ -143,6 +143,59 @@ fn gen_accepts_stim_compatible_ignored_input_path() {
 }
 
 #[test]
+fn m7_gen_writes_output_path_and_maps_noise_flags() {
+    let temp_dir = tempdir().expect("temp dir");
+    let output_path = temp_dir.path().join("generated.stim");
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "gen",
+            "--code",
+            "repetition_code",
+            "--task",
+            "memory",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--after_clifford_depolarization",
+            "0.01",
+            "--after_reset_flip_probability",
+            "0.02",
+            "--before_measure_flip_probability",
+            "0.03",
+            "--before_round_data_depolarization",
+            "0.04",
+            "--out",
+            output_path.to_str().expect("utf-8 path"),
+        ],
+        "".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+    let generated = std::fs::read_to_string(output_path).expect("read generated circuit");
+    for expected in [
+        "# before_round_data_depolarization: 0.04",
+        "# before_measure_flip_probability: 0.03",
+        "# after_reset_flip_probability: 0.02",
+        "# after_clifford_depolarization: 0.01",
+        "R 0 1 2 3 4\nX_ERROR(0.02) 0 1 2 3 4\n",
+        "TICK\nDEPOLARIZE1(0.04) 0 2 4\nCX 0 1 2 3\n",
+        "CX 0 1 2 3\nDEPOLARIZE2(0.01) 0 1 2 3\n",
+        "TICK\nX_ERROR(0.03) 1 3\nMR 1 3\nX_ERROR(0.02) 1 3\n",
+        "X_ERROR(0.03) 0 2 4\nM 0 2 4\n",
+    ] {
+        assert!(generated.contains(expected), "missing {expected}");
+    }
+}
+
+#[test]
 fn gen_surface_rotated_code_matches_m7_oracle_golden() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();

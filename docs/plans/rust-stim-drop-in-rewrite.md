@@ -267,8 +267,8 @@ Tasks:
 - Add `stab-cli` with a binary name or compatibility wrapper that can be invoked as `stab` during development and compared against `stim`.
 - Implement `stim gen` compatibility for repetition code, rotated surface code, unrotated surface code, and color code tasks supported by v1.16.0.
 - Implement all supported `gen` flags with typed parsing, probability validation, distance/round validation, and helpful errors.
-- Implement `stim convert` for `.stim` parse and canonical print workflows.
-- Store the generated-circuit acceptance matrix in source-owned oracle, direct-test, and benchmark manifests instead of checking in every generated circuit body. M7 exact CLI goldens cover the public command shape for each supported family and task, direct Rust structural tests cover larger noisy family/task/distance/round/probability cases, and benchmark rows cover generated-on-demand primary matrix circuits reused by M8 through M12.
+- Implement staged `stim convert` evidence in two tracks: a Stab-specific `convert --in_format=stim --out_format=stim` canonical parse/print workflow backed by M4 parser/printer behavior, and pinned-Stim-compatible result-data conversion rows backed by the M7-owned `01`/`dets` subset from `command_convert.test.cc`.
+- Store the generated-circuit acceptance matrix in source-owned oracle, direct-test, and benchmark manifests instead of checking in every generated circuit body. M7 exact CLI goldens cover the public command shape for each supported family and task, direct Rust structural tests cover representative larger noisy family/task/distance/round/probability cases, and benchmark rows cover generated-on-demand primary matrix circuits reused by M8 through M12.
 
 Linked tests and benchmarks:
 
@@ -279,7 +279,7 @@ Linked tests and benchmarks:
 Done criteria:
 
 - `just oracle::run --milestone M7` passes exact-output `gen` and `convert` golden cases.
-- `stab-cli gen` output matches Stim v1.16.0 for the M7 source-owned acceptance matrix: exact CLI goldens for every supported family and task, Stim-compatible flag-boundary behavior for implemented `gen` arguments, and direct Rust structural tests for larger noisy family/task/distance/round/probability cases.
+- `stab-cli gen` output matches Stim v1.16.0 for the M7 source-owned acceptance matrix: exact CLI goldens for every supported family and task, Stim-compatible flag-boundary behavior for implemented `gen` arguments, and direct Rust structural tests for representative larger noisy family/task/distance/round/probability cases.
 - `stab-cli convert` reads stdin and files and emits canonical `.stim` output for supported circuits.
 - `just bench::compare --milestone M7` reports Stab-side generator throughput for all primary generated-circuit families and convert throughput for supported `.stim` conversion workflows. M7 benchmark evidence is report-only: direct Rust generator construction, in-process CLI dispatch, and canonical conversion timings are accepted for this milestone, while strict external CLI-vs-CLI thresholds and process-startup comparability are deferred to M12 performance hardening.
 
