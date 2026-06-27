@@ -1,0 +1,2 @@
+Dominant cost: the row is a sub-microsecond all-gate lookup microbenchmark, so the residual cost is dominated by benchmark dispatch noise plus the remaining alias and case-normalization checks after the canonical exact-name fast path.
+Next owner action: profile the lookup row with a larger repeated in-process workload before tightening it below 1.25x, and consider a generated perfect lookup table only if the profile still points at gate-name dispatch instead of measurement noise.

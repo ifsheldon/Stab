@@ -24,6 +24,7 @@ Pass `--report target/benchmarks/latest` or another repository-relative director
 Pass `--require-beta-gate` to fail when any selected row does not prove a pass against the 2.0x pinned-Stim beta performance gate.
 Pass `--require-profiler-notes` with `--report` to fail when a row slower than 1.5x pinned Stim lacks a valid note at `<report>/profiler-notes/<benchmark-id>.md`.
 Profiler notes must include non-empty `Dominant cost:` and `Next owner action:` lines.
+Pass `--profiler-notes-dir benchmarks/profiler-notes/m12` to validate source-owned notes instead of report-local notes.
 Pass `--thresholds <path>` to fail when a selected row with a configured regression threshold exceeds its maximum relative ratio or lacks a comparable Stab-vs-Stim ratio.
 `m12-primary-thresholds.json` is the source-owned M12 timing-regression threshold file for primary rows that have reached the 1.25x pinned-Stim regression gate with enough local headroom to make an initial stable threshold useful.
 Run `just bench::primary-regression --baseline <primary-baseline.json> --report target/benchmarks/<name>` to check those source-owned thresholds for the frozen primary matrix.

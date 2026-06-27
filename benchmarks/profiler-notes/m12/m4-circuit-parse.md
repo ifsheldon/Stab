@@ -1,0 +1,2 @@
+Dominant cost: the sparse parser workload is still dominated by building instruction and target structures for repeated plain numeric target lists, especially the sparse `circuit_parse_sparse` measurement that determines the row median against pinned Stim.
+Next owner action: profile parser allocation and target-list construction on the primary sparse fixture, then either add a lower-allocation instruction assembly path or keep the row outside the 1.25x threshold file until the remaining sparse parser cost is understood.

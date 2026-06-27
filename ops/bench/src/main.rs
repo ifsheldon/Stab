@@ -116,6 +116,10 @@ enum Command {
         #[arg(long)]
         require_profiler_notes: bool,
 
+        /// Directory containing profiler notes, defaulting to <report>/profiler-notes.
+        #[arg(long)]
+        profiler_notes_dir: Option<PathBuf>,
+
         /// Fail when selected rows do not prove the 2.0x beta performance gate.
         #[arg(long)]
         require_beta_gate: bool,
@@ -197,6 +201,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             baseline,
             report,
             require_profiler_notes,
+            profiler_notes_dir,
             require_beta_gate,
             require_memory_gate,
             memory_baseline,
@@ -214,6 +219,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     primary,
                     report,
                     require_profiler_notes,
+                    profiler_notes_dir,
                     require_beta_gate,
                     require_memory_gate,
                     memory_baseline,

@@ -24,6 +24,7 @@ pub(crate) struct CompareOptions {
     pub(crate) primary: bool,
     pub(crate) report: Option<PathBuf>,
     pub(crate) require_profiler_notes: bool,
+    pub(crate) profiler_notes_dir: Option<PathBuf>,
     pub(crate) require_beta_gate: bool,
     pub(crate) require_memory_gate: bool,
     pub(crate) memory_baseline: Option<PathBuf>,
@@ -253,7 +254,19 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
         mut rows,
     } = input;
     let out_dir = root.create_benchmark_output_dir(report_dir)?;
-    let profiler_note_findings = apply_profiler_notes(&mut rows, &out_dir.join("profiler-notes"));
+    let profiler_notes_read_dir = options.profiler_notes_dir.as_ref().map_or_else(
+        || out_dir.join("profiler-notes"),
+        |path| root.resolve_relative(path),
+    );
+    let profiler_notes_report_dir = options
+        .profiler_notes_dir
+        .as_deref()
+        .unwrap_or_else(|| Path::new("profiler-notes"));
+    let profiler_note_findings = apply_profiler_notes(
+        &mut rows,
+        &profiler_notes_read_dir,
+        profiler_notes_report_dir,
+    );
     let report = CompareReport {
         schema_version: 1,
         generated_unix_epoch_seconds: unix_epoch_seconds(),
@@ -270,6 +283,10 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
             require_memory_gate: options.require_memory_gate,
             memory_baseline_path: memory_baseline_path.map(|path| path.display().to_string()),
             thresholds_path: threshold_path.map(|path| path.display().to_string()),
+            profiler_notes_path: options
+                .profiler_notes_dir
+                .as_ref()
+                .map(|path| path.display().to_string()),
             track_allocations: options.track_allocations,
             strict: options.strict,
         },
@@ -561,7 +578,11 @@ fn find_beta_gate_failures(rows: &[CompareRowResult]) -> BetaGateFindings {
     findings
 }
 
-fn apply_profiler_notes(rows: &mut [CompareRowResult], notes_dir: &Path) -> ProfilerNoteFindings {
+fn apply_profiler_notes(
+    rows: &mut [CompareRowResult],
+    notes_dir: &Path,
+    report_notes_dir: &Path,
+) -> ProfilerNoteFindings {
     let mut findings = ProfilerNoteFindings::default();
     for row in rows {
         if !row
@@ -571,7 +592,10 @@ fn apply_profiler_notes(rows: &mut [CompareRowResult], notes_dir: &Path) -> Prof
             row.profiler_note_status = "not-required".to_string();
             continue;
         }
-        let relative_path = format!("profiler-notes/{}.md", row.id);
+        let relative_path = report_notes_dir
+            .join(format!("{}.md", row.id))
+            .display()
+            .to_string();
         let note_path = notes_dir.join(format!("{}.md", row.id));
         row.profiler_note_path = Some(relative_path);
         match read_and_validate_profiler_note(&note_path) {
@@ -652,6 +676,8 @@ fn has_named_nonempty_field(content: &str, field: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use tempfile::tempdir;
 
     use super::{
@@ -674,7 +700,11 @@ mod tests {
         .expect("write note");
         let mut rows = vec![fast_row, slow_row.clone()];
 
-        let findings = apply_profiler_notes(&mut rows, notes.path());
+        let findings = apply_profiler_notes(
+            &mut rows,
+            notes.path(),
+            Path::new("benchmarks/profiler-notes/m12"),
+        );
 
         assert!(findings.blockers.is_empty());
         let fast = rows.first().expect("fast row");
@@ -683,13 +713,14 @@ mod tests {
         assert_eq!(slow.profiler_note_status, "present");
         assert_eq!(
             slow.profiler_note_path.as_deref(),
-            Some("profiler-notes/slow-row.md")
+            Some("benchmarks/profiler-notes/m12/slow-row.md")
         );
 
         slow_row.relative_ratio = Some(HOT_PATH_PROFILER_NOTE_RATIO + 0.2);
         let missing_notes = tempdir().expect("missing note dir");
         let mut rows = vec![slow_row];
-        let findings = apply_profiler_notes(&mut rows, missing_notes.path());
+        let findings =
+            apply_profiler_notes(&mut rows, missing_notes.path(), Path::new("profiler-notes"));
 
         let slow = rows.first().expect("slow row");
         assert_eq!(slow.profiler_note_status, "missing");

@@ -118,6 +118,8 @@ pub(crate) struct CompareCommandMetadata {
     pub(crate) require_memory_gate: bool,
     pub(crate) memory_baseline_path: Option<String>,
     pub(crate) thresholds_path: Option<String>,
+    #[serde(default)]
+    pub(crate) profiler_notes_path: Option<String>,
     pub(crate) track_allocations: bool,
     pub(crate) strict: bool,
 }
@@ -274,6 +276,9 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
     }
     if let Some(thresholds_path) = &report.command.thresholds_path {
         out.push_str(&format!("- Thresholds: {thresholds_path}\n"));
+    }
+    if let Some(profiler_notes_path) = &report.command.profiler_notes_path {
+        out.push_str(&format!("- Profiler notes: {profiler_notes_path}\n"));
     }
     out.push_str(&format!(
         "- Machine: {} {} with {} worker(s)\n\n",

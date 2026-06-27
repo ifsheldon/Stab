@@ -1,0 +1,2 @@
+Dominant cost: the M5 bit-vector row mixes direct upstream-sized XOR and not-zero checks with Stab contract extras such as masked, range, and copy workloads, so the row median can move when the tiny upstream-compatible measurements sit near timer resolution.
+Next owner action: split threshold policy by direct-match bit operations versus contract extras, then profile the direct XOR and not-zero kernels with larger repeated batches before adding this row to the 1.25x threshold file.

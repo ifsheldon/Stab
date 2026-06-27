@@ -1,0 +1,2 @@
+Dominant cost: the sparse XOR row still includes a very small `xor_item` microbenchmark alongside the larger table row-XOR workload, and the small-item measurement is sensitive to timer resolution even after the in-place row merge optimization.
+Next owner action: profile row-XOR and item-XOR separately, keep normalized rates in the report, and add a threshold only after the direct row-XOR path remains below 1.25x with stable repeated evidence.
