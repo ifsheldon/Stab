@@ -30,7 +30,7 @@ pub(super) fn pair_measurement_basis(name: &str) -> Option<AnalyzerBasis> {
 pub(super) fn is_measurement_instruction(name: &str) -> bool {
     matches!(
         name,
-        "MXX" | "MYY" | "MZZ" | "MPP" | "HERALDED_PAULI_CHANNEL_1"
+        "MXX" | "MYY" | "MZZ" | "MPP" | "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
     )
 }
 

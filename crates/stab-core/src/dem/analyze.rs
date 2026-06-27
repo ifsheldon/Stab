@@ -174,6 +174,7 @@ impl Analyzer {
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => self.record_measurements(instruction),
             "MXX" | "MYY" | "MZZ" => self.record_pair_measurements(instruction),
             "R" | "RX" | "RY" => self.record_resets(instruction),
+            "HERALDED_ERASE" => self.record_heralded_erase(instruction),
             "HERALDED_PAULI_CHANNEL_1" => self.record_heralded_pauli_channel1(instruction),
             "CX" => self.apply_cx(instruction),
             "MPAD" => self.record_measurement_pads(instruction),
@@ -585,27 +586,75 @@ impl Analyzer {
             None
         };
 
+        self.record_heralded_pauli_components(
+            instruction,
+            [
+                (*i_probability, None),
+                (*x_probability, Some(AnalyzerPauli::X)),
+                (*y_probability, Some(AnalyzerPauli::Y)),
+                (*z_probability, Some(AnalyzerPauli::Z)),
+            ],
+            threshold.is_some(),
+        )
+    }
+
+    fn record_heralded_erase(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let Some(probability) = instruction.probability_argument()? else {
+            return Ok(());
+        };
+        let use_disjoint_group = if probability.get() > 0.0 {
+            let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "HERALDED_ERASE requires approximate_disjoint_errors during error analysis",
+                ));
+            };
+            if probability.get() > threshold.get() {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "HERALDED_ERASE has a probability argument ({}) larger than the approximate_disjoint_errors threshold ({})",
+                    probability.get(),
+                    threshold.get()
+                )));
+            }
+            true
+        } else {
+            false
+        };
+        let component_probability = Probability::try_new(probability.get() / 4.0)?;
+        self.record_heralded_pauli_components(
+            instruction,
+            [
+                (component_probability, None),
+                (component_probability, Some(AnalyzerPauli::X)),
+                (component_probability, Some(AnalyzerPauli::Y)),
+                (component_probability, Some(AnalyzerPauli::Z)),
+            ],
+            use_disjoint_group,
+        )
+    }
+
+    fn record_heralded_pauli_components(
+        &mut self,
+        instruction: &CircuitInstruction,
+        components: [(Probability, Option<AnalyzerPauli>); 4],
+        use_disjoint_group: bool,
+    ) -> CircuitResult<()> {
         for target in instruction.targets() {
             let Some(qubit) = target.qubit_id() else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
-                    "HERALDED_PAULI_CHANNEL_1 target {target} is not a qubit"
+                    "{} target {target} is not a qubit",
+                    instruction.gate().canonical_name()
                 )));
             };
             let measurement_index = self.measurement_count;
             self.measurement_count = self.measurement_count.checked_add(1).ok_or_else(|| {
                 CircuitError::invalid_detector_error_model("measurement count overflowed")
             })?;
-            let disjoint_group = if threshold.is_some() {
+            let disjoint_group = if use_disjoint_group {
                 Some(self.allocate_disjoint_group_id()?)
             } else {
                 None
             };
-            for (probability, pauli) in [
-                (*i_probability, None),
-                (*x_probability, Some(AnalyzerPauli::X)),
-                (*y_probability, Some(AnalyzerPauli::Y)),
-                (*z_probability, Some(AnalyzerPauli::Z)),
-            ] {
+            for (probability, pauli) in components {
                 if probability.get() == 0.0 {
                     continue;
                 }

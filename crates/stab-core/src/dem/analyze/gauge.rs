@@ -96,7 +96,9 @@ impl GaugeTracker {
             "MRX" => self.undo_measure_resets(instruction, AnalyzerBasis::X),
             "MRY" => self.undo_measure_resets(instruction, AnalyzerBasis::Y),
             "MPAD" => self.undo_measurement_pads(instruction),
-            "HERALDED_PAULI_CHANNEL_1" => self.undo_heralded_measurements(instruction),
+            "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
+                self.undo_heralded_measurements(instruction)
+            }
             "R" => self.undo_resets(instruction, AnalyzerBasis::Z),
             "RX" => self.undo_resets(instruction, AnalyzerBasis::X),
             "RY" => self.undo_resets(instruction, AnalyzerBasis::Y),

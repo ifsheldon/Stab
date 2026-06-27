@@ -304,6 +304,54 @@ fn circuit_to_dem_heralded_noise_basis_matches_upstream() {
     assert!(result.is_err());
 }
 
+#[test]
+fn circuit_to_dem_heralded_erase_matches_upstream() {
+    let allowed = Circuit::from_stim_str("HERALDED_ERASE(0.25) 0\n").unwrap();
+    assert!(
+        circuit_to_detector_error_model(&allowed, threshold_options(0.3)).is_ok(),
+        "HERALDED_ERASE is accepted when the erasure probability is under the approximation threshold"
+    );
+    assert!(
+        circuit_to_detector_error_model(&allowed, threshold_options(0.2)).is_err(),
+        "HERALDED_ERASE rejects erasure probabilities above the approximation threshold"
+    );
+
+    let circuit = Circuit::from_stim_str(
+        "MZZ 0 1\n\
+         MXX 0 1\n\
+         HERALDED_ERASE(0.25) 0\n\
+         MZZ 0 1\n\
+         MXX 0 1\n\
+         DETECTOR rec[-1] rec[-4]\n\
+         DETECTOR rec[-2] rec[-5]\n\
+         DETECTOR rec[-3]\n",
+    )
+    .unwrap();
+    let dem = circuit_to_detector_error_model(&circuit, approximate_options())
+        .unwrap()
+        .to_dem_string();
+    assert_eq!(
+        dem,
+        "error(0.0625) D0 D1 D2\n\
+         error(0.0625) D0 D2\n\
+         error(0.0625) D1 D2\n\
+         error(0.0625) D2\n"
+    );
+
+    let repeated_targets = Circuit::from_stim_str(
+        "M 0\n\
+         HERALDED_ERASE(0.25) 9 0 9 9 9\n\
+         M 0\n\
+         DETECTOR rec[-1] rec[-7]\n\
+         DETECTOR rec[-5]\n",
+    )
+    .unwrap();
+    let dem = circuit_to_detector_error_model(&repeated_targets, approximate_options())
+        .unwrap()
+        .to_dem_string();
+    assert_eq!(dem, "error(0.125) D0 D1\nerror(0.125) D1\n");
+}
+
 fn heralded_basis_circuit(noise_instruction: &str) -> String {
     format!(
         "MXX 0 1\n\
