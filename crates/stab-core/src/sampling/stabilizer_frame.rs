@@ -56,6 +56,7 @@ struct LocalTableauOutput {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct StabilizerFrame {
+    qubit_count: usize,
     generators: Vec<StabilizerGenerator>,
 }
 
@@ -70,7 +71,17 @@ impl StabilizerFrame {
         let generators = (0..qubit_count)
             .map(|qubit| StabilizerGenerator::single(qubit_count, qubit, PauliBasis::Z, false))
             .collect();
-        Self { generators }
+        Self {
+            qubit_count,
+            generators,
+        }
+    }
+
+    pub(super) fn new_unknown(qubit_count: usize) -> Self {
+        Self {
+            qubit_count,
+            generators: Vec::new(),
+        }
     }
 
     pub(super) fn apply_tableau(&mut self, targets: &[usize], transform: &LocalTableauTransform) {
@@ -113,6 +124,11 @@ impl StabilizerFrame {
         self.measure_observable(&observable, rng, randomness) ^ inverted
     }
 
+    pub(super) fn measure_is_deterministic(&self, qubit: usize, basis: PauliBasis) -> bool {
+        let observable = StabilizerGenerator::single(self.len(), qubit, basis, false);
+        self.deterministic_measurement_bit(&observable).is_some()
+    }
+
     pub(super) fn measure_pauli_product(
         &mut self,
         terms: &[(usize, PauliBasis)],
@@ -120,16 +136,16 @@ impl StabilizerFrame {
         rng: &mut impl Rng,
         randomness: MeasurementRandomness,
     ) -> bool {
-        let mut observable = StabilizerGenerator::identity(self.len());
-        for (qubit, basis) in terms {
-            observable.multiply_assign(&StabilizerGenerator::single(
-                self.len(),
-                *qubit,
-                *basis,
-                false,
-            ));
-        }
+        let observable = self.pauli_product_observable(terms);
         self.measure_observable(&observable, rng, randomness) ^ inverted
+    }
+
+    pub(super) fn pauli_product_measurement_is_deterministic(
+        &self,
+        terms: &[(usize, PauliBasis)],
+    ) -> bool {
+        let observable = self.pauli_product_observable(terms);
+        self.deterministic_measurement_bit(&observable).is_some()
     }
 
     fn measure_observable(
@@ -141,31 +157,42 @@ impl StabilizerFrame {
         if let Some(bit) = self.deterministic_measurement_bit(observable) {
             return bit;
         }
-        let Some(pivot_index) = self
+        let pivot_index = self
             .generators
             .iter()
-            .position(|generator| !generator.commutes_with(observable))
-        else {
-            return observable.negative;
-        };
-        let sampled = match randomness {
-            MeasurementRandomness::Random => rng.random_bool(0.5),
-            MeasurementRandomness::DeterministicFalse => false,
-        };
-        let Some(pivot) = self.generators.get(pivot_index).cloned() else {
-            return sampled;
-        };
-        for (index, generator) in self.generators.iter_mut().enumerate() {
-            if index != pivot_index && !generator.commutes_with(observable) {
-                generator.multiply_assign(&pivot);
-            }
-        }
+            .position(|generator| !generator.commutes_with(observable));
+        let sampled = random_measurement_bit(rng, randomness);
         let mut collapsed = observable.clone();
         collapsed.negative ^= sampled;
-        if let Some(generator) = self.generators.get_mut(pivot_index) {
-            *generator = collapsed;
+        if let Some(pivot_index) = pivot_index {
+            let Some(pivot) = self.generators.get(pivot_index).cloned() else {
+                return sampled;
+            };
+            for (index, generator) in self.generators.iter_mut().enumerate() {
+                if index != pivot_index && !generator.commutes_with(observable) {
+                    generator.multiply_assign(&pivot);
+                }
+            }
+            if let Some(generator) = self.generators.get_mut(pivot_index) {
+                *generator = collapsed;
+            }
+        } else {
+            self.generators.push(collapsed);
         }
         sampled
+    }
+
+    fn pauli_product_observable(&self, terms: &[(usize, PauliBasis)]) -> StabilizerGenerator {
+        let mut observable = StabilizerGenerator::identity(self.len());
+        for (qubit, basis) in terms {
+            observable.multiply_assign(&StabilizerGenerator::single(
+                self.len(),
+                *qubit,
+                *basis,
+                false,
+            ));
+        }
+        observable
     }
 
     fn deterministic_measurement_bit(&self, observable: &StabilizerGenerator) -> Option<bool> {
@@ -212,7 +239,14 @@ impl StabilizerFrame {
     }
 
     fn len(&self) -> usize {
-        self.generators.len()
+        self.qubit_count
+    }
+}
+
+fn random_measurement_bit(rng: &mut impl Rng, randomness: MeasurementRandomness) -> bool {
+    match randomness {
+        MeasurementRandomness::Random => rng.random_bool(0.5),
+        MeasurementRandomness::DeterministicFalse => false,
     }
 }
 
@@ -408,7 +442,7 @@ fn anticommutes(left: PauliBasis, right: PauliBasis) -> bool {
     (left.x_bit() && right.z_bit()) ^ (left.z_bit() && right.x_bit())
 }
 
-fn reset_correction(basis: PauliBasis) -> PauliBasis {
+pub(super) fn reset_correction(basis: PauliBasis) -> PauliBasis {
     match basis {
         PauliBasis::I | PauliBasis::Z => PauliBasis::X,
         PauliBasis::X | PauliBasis::Y => PauliBasis::Z,

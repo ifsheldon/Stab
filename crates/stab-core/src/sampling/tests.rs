@@ -12,6 +12,11 @@ fn samples(input: &str, shots: usize) -> Vec<Vec<bool>> {
         .sample_zero_one(shots)
 }
 
+fn count_determined(input: &str, unknown_input: bool) -> u64 {
+    let circuit = Circuit::from_stim_str(input).expect("parse circuit");
+    count_determined_measurements(&circuit, unknown_input).expect("count determined measurements")
+}
+
 #[test]
 fn samples_m8_basic_measurements_as_zeroes() {
     assert_eq!(
@@ -482,4 +487,102 @@ fn pauli_channel2_uses_stim_probability_order_for_z_basis_toggles() {
             .sample_zero_one_with_seed(5, Some(5)),
         vec![vec![true, false]; 5]
     );
+}
+
+#[test]
+fn count_determined_measurements_matches_unknown_input_subset() {
+    assert_eq!(count_determined("MZZ 0 1", false), 1);
+    assert_eq!(count_determined("MZZ 0 1", true), 0);
+    assert_eq!(count_determined("MPP Z0*Z1 X2*X3", false), 1);
+    assert_eq!(count_determined("MPP Z0*Z1 X2*X3", true), 0);
+    assert_eq!(
+        count_determined(
+            "
+            MPP Z0*Z1 X2*X3
+            TICK
+            MPP Z0*Z1 X2*X3
+            ",
+            true,
+        ),
+        2
+    );
+    assert_eq!(
+        count_determined(
+            "
+            MPP Z0*Z1 X2*X3
+            TICK
+            MPP Z0*Z1 X2*X3
+            ",
+            false,
+        ),
+        3
+    );
+}
+
+#[test]
+fn count_determined_measurements_matches_basis_measurement_subset() {
+    for (input, expected) in [
+        ("", 0),
+        ("RX 0\nMX 0", 1),
+        ("RX 0\nMRX 0", 1),
+        ("RZ 0\nMX 0", 0),
+        ("RZ 0\nMRX 0", 0),
+        ("RY 0\nMY 0", 1),
+        ("RY 0\nMRY 0", 1),
+        ("RX 0\nMY 0", 0),
+        ("RX 0\nMRY 0", 0),
+        ("RZ 0\nMZ 0", 1),
+        ("RZ 0\nMRZ 0", 1),
+        ("RX 0\nMZ 0", 0),
+        ("RX 0\nMRZ 0", 0),
+    ] {
+        assert_eq!(count_determined(input, false), expected, "{input}");
+    }
+}
+
+#[test]
+fn count_determined_measurements_matches_pair_and_mpp_subset() {
+    for (input, expected) in [
+        ("RX 0 1\nMXX 0 1", 1),
+        ("RY 0 1\nMXX 0 1", 0),
+        ("RY 0 1\nMYY 0 1", 1),
+        ("RX 0 1\nMYY 0 1", 0),
+        ("RZ 0 1\nMZZ 0 1", 1),
+        ("RY 0 1\nMZZ 0 1", 0),
+        ("RX 0\nMPP X0", 1),
+        ("RY 0\nMPP X0", 0),
+        ("RY 0\nMPP Y0", 1),
+        ("RX 0\nMPP Y0", 0),
+        ("RZ 0\nMPP Z0", 1),
+        ("RX 0\nMPP Z0", 0),
+        ("RX 0\nRY 1\nRZ 2\nMPP X0*Y1*Z2", 1),
+        ("RX 0\nRX 1\nRZ 2\nMPP X0*Y1*Z2", 0),
+    ] {
+        assert_eq!(count_determined(input, false), expected, "{input}");
+    }
+}
+
+#[test]
+fn count_determined_measurements_matches_convergence_subset() {
+    for (input, expected) in [
+        ("MX 0 0", 1),
+        ("MY 0 0", 1),
+        ("RX 0\nMZ 0 0", 1),
+        ("MRX 0 0", 1),
+        ("MRY 0 0", 1),
+        ("RX 0\nMRZ 0 0", 1),
+        ("MXX 0 1 0 1", 1),
+        ("MYY 0 1 0 1", 1),
+        ("RX 0 1\nMZZ 0 1 0 1", 1),
+        ("MXX 0 1\nMYY 0 1", 1),
+        ("MPP X0*X1 Y0*Y1", 1),
+        ("MPP X0*X1 X1*X2 !X0*X2", 1),
+        ("REPEAT 3 {\nMPP X0*X1\n}", 2),
+        ("MXX 0 1\nMX 0 1", 1),
+        ("MYY 0 1\nMY 0 1", 1),
+        ("RX 0 1\nMZZ 0 1\nMZ 0 1", 1),
+        ("MPAD 1 0 1 0", 4),
+    ] {
+        assert_eq!(count_determined(input, false), expected, "{input}");
+    }
 }

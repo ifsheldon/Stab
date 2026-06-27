@@ -1,7 +1,9 @@
 use rand::rngs::SmallRng;
 use rand::{Rng, RngExt as _, SeedableRng as _};
 
-use self::stabilizer_frame::{LocalTableauTransform, MeasurementRandomness, StabilizerFrame};
+use self::stabilizer_frame::{
+    LocalTableauTransform, MeasurementRandomness, StabilizerFrame, reset_correction,
+};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
     MeasureRecordOffset, Pauli, PauliBasis, SampleFormat, SingleQubitClifford,
@@ -110,6 +112,17 @@ impl CompiledSampler {
         Ok(write_ptb64_records(&samples))
     }
 
+    pub fn count_determined_measurements(&self, unknown_input: bool) -> u64 {
+        let mut rng = SmallRng::seed_from_u64(0);
+        let mut frame = if unknown_input {
+            StabilizerFrame::new_unknown(self.qubit_count)
+        } else {
+            StabilizerFrame::new(self.qubit_count)
+        };
+        let mut record = Vec::new();
+        count_determined_operations(&self.operations, &mut frame, &mut record, &mut rng)
+    }
+
     fn sample_shot_with_reference<R>(&self, rng: &mut R, reference: Option<&[bool]>) -> Vec<bool>
     where
         R: Rng,
@@ -152,6 +165,10 @@ impl CompiledSampler {
         );
         output
     }
+}
+
+pub fn count_determined_measurements(circuit: &Circuit, unknown_input: bool) -> CircuitResult<u64> {
+    Ok(CompiledSampler::compile(circuit)?.count_determined_measurements(unknown_input))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -243,6 +260,99 @@ const TWO_QUBIT_PAULI_CHANNEL_BASES: [(Option<PauliBasis>, Option<PauliBasis>); 
 
 fn sampler_rng(seed: Option<u64>) -> SmallRng {
     SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random))
+}
+
+fn count_determined_operations<R>(
+    operations: &[SampleOperation],
+    frame: &mut StabilizerFrame,
+    record: &mut Vec<bool>,
+    rng: &mut R,
+) -> u64
+where
+    R: Rng,
+{
+    let mut count = 0;
+    for operation in operations {
+        match operation {
+            SampleOperation::ApplyTableau { targets, transform } => {
+                frame.apply_tableau(targets, transform);
+            }
+            SampleOperation::Reset { qubit, basis } => {
+                frame.reset(
+                    *qubit,
+                    *basis,
+                    rng,
+                    MeasurementRandomness::DeterministicFalse,
+                );
+            }
+            SampleOperation::Measure {
+                qubit,
+                basis,
+                inverted,
+                reset,
+            } => {
+                if frame.measure_is_deterministic(*qubit, *basis) {
+                    count += 1;
+                }
+                let measured = frame.measure(
+                    *qubit,
+                    *basis,
+                    *inverted,
+                    rng,
+                    MeasurementRandomness::DeterministicFalse,
+                );
+                record.push(measured);
+                if *reset && measured {
+                    frame.apply_pauli(*qubit, reset_correction(*basis));
+                }
+            }
+            SampleOperation::MeasureProduct { terms, inverted } => {
+                if frame.pauli_product_measurement_is_deterministic(terms) {
+                    count += 1;
+                }
+                let measured = frame.measure_pauli_product(
+                    terms,
+                    *inverted,
+                    rng,
+                    MeasurementRandomness::DeterministicFalse,
+                );
+                record.push(measured);
+            }
+            SampleOperation::Pad { value } => {
+                count += 1;
+                record.push(*value);
+            }
+            SampleOperation::FeedbackPauli {
+                offset,
+                qubit,
+                basis,
+            } => {
+                if record_lookback(record, *offset) {
+                    frame.apply_pauli(*qubit, *basis);
+                }
+            }
+            SampleOperation::Repeat { count: reps, body } => {
+                for _ in 0..*reps {
+                    count += count_determined_operations(body, frame, record, rng);
+                }
+            }
+            SampleOperation::SingleQubitPauliChannel { .. }
+            | SampleOperation::TwoQubitPauliChannel { .. }
+            | SampleOperation::HeraldedPauliChannel { .. } => {}
+        }
+    }
+    count
+}
+
+fn record_lookback(record: &[bool], offset: MeasureRecordOffset) -> bool {
+    let index = i64::try_from(record.len())
+        .ok()
+        .and_then(|len| len.checked_add(i64::from(offset.get())))
+        .and_then(|index| usize::try_from(index).ok());
+    index
+        .and_then(|index| record.get(index))
+        .copied()
+        .unwrap_or(false)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

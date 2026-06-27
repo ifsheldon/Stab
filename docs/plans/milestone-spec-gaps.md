@@ -107,7 +107,7 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now makes comparator imple
 Status: Open
 Revealed by: milestone audit of M8 oracle coverage.
 Current text: M8 links the C++ Simulators group for frame, tableau, vector, and graph simulation cases that apply to sampling, and links the C++ Input And Output Formats group for measurement record formats and sparse shots.
-Gap: the milestone does not enumerate which upstream subcases are required for the public sampler milestone, which are direct Rust API compatibility tests, and which are later simulator or IO-library work. The first M8-owned result-format subset is now runnable, but the simulator utility, graph/vector simulator, sparse reverse frame tracking, determined-measurement counting, and reference sample tree rows remain ambiguous blockers.
+Gap: the milestone does not enumerate which upstream subcases are required for the public sampler milestone, which are direct Rust API compatibility tests, and which are later simulator or IO-library work. The first M8-owned result-format and count-determined-measurement subsets are now runnable, but the simulator utility, graph/vector simulator, sparse reverse frame tracking, and reference sample tree rows remain ambiguous blockers.
 Proposed amendment: split M8 acceptance into explicit subcase groups for public `stim sample` CLI parity, result writer byte layouts, result reader/parser APIs, frame/tableau sampling semantics, reference-sample behavior, and simulator-only structural utilities; require every M8-owned group to have runnable fixtures or a named deferred owner before milestone completion.
 Resolution: pending plan update.
 

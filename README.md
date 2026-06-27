@@ -34,7 +34,7 @@ just oracle::run --case smoke/tiny-circuit
 ```
 
 The tiny-circuit smoke case now runs through the public `stab sample` command.
-M8 sampling compatibility has started with deterministic `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` output for the parser-backed Clifford subset, typed result-format reader/writer helpers, X/Y/Z-basis measurement and reset, pair and Pauli-product measurement, measurement-record Pauli feedback, Bell-state entangling Clifford sampling, `--skip_reference_sample`/`--frame0`/`--skip_loop_folding`, plus seeded local noise sampling for `X_ERROR`, `Y_ERROR`, `Z_ERROR`, `I_ERROR`, `II_ERROR`, `DEPOLARIZE1`, `DEPOLARIZE2`, `PAULI_CHANNEL_1`, `PAULI_CHANNEL_2`, `HERALDED_ERASE`, and `HERALDED_PAULI_CHANNEL_1`; optimized reference-sample-tree behavior still belongs to later M8 work.
+M8 sampling compatibility has started with deterministic `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` output for the parser-backed Clifford subset, typed result-format reader/writer helpers, count-determined measurement helpers, X/Y/Z-basis measurement and reset, pair and Pauli-product measurement, measurement-record Pauli feedback, Bell-state entangling Clifford sampling, `--skip_reference_sample`/`--frame0`/`--skip_loop_folding`, plus seeded local noise sampling for `X_ERROR`, `Y_ERROR`, `Z_ERROR`, `I_ERROR`, `II_ERROR`, `DEPOLARIZE1`, `DEPOLARIZE2`, `PAULI_CHANNEL_1`, `PAULI_CHANNEL_2`, `HERALDED_ERASE`, and `HERALDED_PAULI_CHANNEL_1`; optimized reference-sample-tree behavior still belongs to later M8 work.
 
 Inspect and check the M2 fixture corpus with:
 

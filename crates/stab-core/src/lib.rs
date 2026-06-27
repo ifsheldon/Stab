@@ -34,7 +34,7 @@ pub use gate::{Gate, GateCategory};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};
 pub use mbqc_decomposition::mbqc_decomposition;
 pub use result_formats::SampleFormat;
-pub use sampling::CompiledSampler;
+pub use sampling::{CompiledSampler, count_determined_measurements};
 pub use stabilizers::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, PauliBasis, PauliPhase,
     PauliSign, PauliString, PauliStringIterator, SingleQubitClifford, StabilizerError,
