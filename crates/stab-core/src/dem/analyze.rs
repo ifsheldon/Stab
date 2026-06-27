@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod decompose;
 mod error_decomp;
+mod gauge;
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Pauli, Probability,
@@ -14,6 +15,7 @@ use error_decomp::{
     depolarize2_independent_channel_probability, pauli_channel2_components,
     try_disjoint_to_independent_xyz_errors,
 };
+use gauge::find_gauge_errors;
 
 const MAX_ANALYZER_REPEAT_UNROLL: u64 = 100_000;
 
@@ -102,6 +104,7 @@ struct Analyzer {
     else_correlated_error_remainder: Option<Probability>,
     next_disjoint_group_id: u64,
     completed_errors: Vec<PendingError>,
+    gauge_errors: Vec<Vec<DemTarget>>,
     detector_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
     observable_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
     detector_declarations: Vec<DetectorDeclaration>,
@@ -119,6 +122,7 @@ impl Analyzer {
             else_correlated_error_remainder: None,
             next_disjoint_group_id: 0,
             completed_errors: Vec::new(),
+            gauge_errors: Vec::new(),
             detector_terms_by_measurement: BTreeMap::new(),
             observable_terms_by_measurement: BTreeMap::new(),
             detector_declarations: Vec::new(),
@@ -131,6 +135,14 @@ impl Analyzer {
 
     fn analyze_with_stats(mut self, circuit: &Circuit) -> CircuitResult<AnalyzerResult> {
         self.visit_circuit(circuit)?;
+        self.gauge_errors = find_gauge_errors(
+            circuit,
+            &self.detector_terms_by_measurement,
+            &self.observable_terms_by_measurement,
+            self.measurement_count,
+            circuit.count_qubits(),
+            self.options.allow_gauge_detectors,
+        )?;
         let detector_count = self.detector_count;
         let dem = self.into_dem()?;
         Ok(AnalyzerResult {
@@ -797,6 +809,13 @@ impl Analyzer {
 
         for ((_group_id, targets), probability) in disjoint_error_probabilities {
             merge_independent_probability(&mut merged_error_probabilities, targets, probability)?;
+        }
+        for targets in self.gauge_errors {
+            merge_independent_probability(
+                &mut merged_error_probabilities,
+                targets,
+                Probability::try_new(0.5)?,
+            )?;
         }
 
         if self.options.decompose_errors {

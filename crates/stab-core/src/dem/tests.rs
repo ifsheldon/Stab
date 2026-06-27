@@ -42,6 +42,13 @@ fn ignored_blocked_decompose_options() -> ErrorAnalyzerOptions {
     }
 }
 
+fn allow_gauge_options() -> ErrorAnalyzerOptions {
+    ErrorAnalyzerOptions {
+        allow_gauge_detectors: true,
+        ..ErrorAnalyzerOptions::default()
+    }
+}
+
 #[test]
 fn dem_targets_parse_stim_limits() {
     assert_eq!(
@@ -125,6 +132,46 @@ fn dem_analyzer_outputs_detector_declaration_for_deterministic_detector() {
         .to_dem_string();
 
     assert_eq!(dem, "detector D0\n");
+}
+
+#[test]
+fn dem_analyzer_rejects_gauge_detectors_by_default() {
+    let circuit = Circuit::from_stim_str(
+        "R 0\n\
+         H 0\n\
+         CNOT 0 1\n\
+         M 0 1\n\
+         DETECTOR rec[-1]\n\
+         DETECTOR rec[-2]\n",
+    )
+    .unwrap();
+
+    let error = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap_err()
+        .to_string();
+
+    assert!(error.contains("non-deterministic detectors"));
+    assert!(error.contains("D0"));
+    assert!(error.contains("D1"));
+}
+
+#[test]
+fn dem_analyzer_allows_gauge_detectors_as_half_probability_errors() {
+    let circuit = Circuit::from_stim_str(
+        "R 0\n\
+         H 0\n\
+         CNOT 0 1\n\
+         M 0 1\n\
+         DETECTOR rec[-1]\n\
+         DETECTOR rec[-2]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, allow_gauge_options())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.5) D0 D1\n");
 }
 
 #[test]
@@ -411,7 +458,9 @@ fn dem_analyzer_approximates_disjoint_pauli_channel1_when_enabled() {
 #[test]
 fn dem_analyzer_approximates_pauli_channel1_by_measurement_basis() {
     let circuit = Circuit::from_stim_str(
-        "R 0 1 2\n\
+        "RX 0\n\
+         RY 1\n\
+         R 2\n\
          PAULI_CHANNEL_1(0.125, 0.25, 0.375) 0\n\
          PAULI_CHANNEL_1(0.125, 0.25, 0.375) 1\n\
          PAULI_CHANNEL_1(0.125, 0.25, 0.375) 2\n\
@@ -545,7 +594,9 @@ fn dem_analyzer_rejects_else_correlated_error_above_threshold() {
 #[test]
 fn dem_analyzer_maps_depolarize1_to_basis_flip_probability() {
     let circuit = Circuit::from_stim_str(
-        "DEPOLARIZE1(0.25) 0 1\n\
+        "R 0\n\
+         RX 1\n\
+         DEPOLARIZE1(0.25) 0 1\n\
          M 0\n\
          MX 1\n\
          DETECTOR rec[-2]\n\

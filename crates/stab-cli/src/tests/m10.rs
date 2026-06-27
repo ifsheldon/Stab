@@ -349,6 +349,52 @@ fn analyze_errors_decompose_known_components_matches_m10_oracle_golden() {
 }
 
 #[test]
+fn analyze_errors_allow_gauge_detectors_matches_m10_oracle_golden() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "analyze_errors", "--allow_gauge_detectors"],
+        include_bytes!(
+            "../../../../oracle/fixtures/inputs/analyze_errors_allow_gauge_detectors.stim"
+        )
+        .as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!(
+            "../../../../oracle/fixtures/expected/m10_analyze_errors_allow_gauge_detectors.stdout"
+        )
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn analyze_errors_rejects_gauge_detectors_by_default() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "analyze_errors"],
+        include_bytes!(
+            "../../../../oracle/fixtures/inputs/analyze_errors_allow_gauge_detectors.stim"
+        )
+        .as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    let stderr = String::from_utf8(stderr).unwrap();
+    assert!(stderr.contains("non-deterministic detectors"));
+    assert!(stderr.contains("D0"));
+    assert!(stderr.contains("D1"));
+}
+
+#[test]
 fn analyze_errors_block_decompose_rejects_remnant_edges() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
