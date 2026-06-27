@@ -186,6 +186,7 @@ impl Analyzer {
             "CX" | "CY" | "CZ" | "XCX" | "XCY" | "XCZ" | "YCX" | "YCY" | "YCZ" => {
                 self.apply_controlled_pauli(instruction)
             }
+            "SWAP" => self.apply_swap(instruction),
             "MPAD" => self.record_measurement_pads(instruction),
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
@@ -821,6 +822,35 @@ impl Analyzer {
             self.cut_pending_errors_at_qubit(qubit);
             self.pending_pauli_channels
                 .retain(|pending| pending.qubit != qubit);
+        }
+        Ok(())
+    }
+
+    fn apply_swap(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let gate_name = instruction.gate().canonical_name();
+        for group in instruction.target_groups() {
+            let [left, right] = group else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} expected paired qubit targets"
+                )));
+            };
+            let left = left.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} target {left} is not a qubit"
+                ))
+            })?;
+            let right = right.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} target {right} is not a qubit"
+                ))
+            })?;
+            for pending in &mut self.pending_errors {
+                pending.apply_swap(left, right);
+            }
+            for pending in &mut self.pending_pauli_channels {
+                pending.apply_swap(left, right);
+            }
+            self.observable_sensitivity.apply_swap(left, right);
         }
         Ok(())
     }

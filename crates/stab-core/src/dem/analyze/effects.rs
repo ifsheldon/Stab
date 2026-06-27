@@ -60,6 +60,14 @@ pub(super) struct PendingSingleQubitPauliChannel {
 }
 
 impl PendingSingleQubitPauliChannel {
+    pub(super) fn apply_swap(&mut self, left: QubitId, right: QubitId) {
+        if self.qubit == left {
+            self.qubit = right;
+        } else if self.qubit == right {
+            self.qubit = left;
+        }
+    }
+
     pub(super) fn apply_single_qubit_clifford(
         &mut self,
         clifford: SingleQubitClifford,
@@ -99,6 +107,16 @@ impl PendingSingleQubitPauliChannel {
 }
 
 impl PendingError {
+    pub(super) fn apply_swap(&mut self, left: QubitId, right: QubitId) {
+        for effect in &mut self.effects {
+            if effect.qubit == left {
+                effect.qubit = right;
+            } else if effect.qubit == right {
+                effect.qubit = left;
+            }
+        }
+    }
+
     pub(super) fn apply_single_qubit_clifford(
         &mut self,
         qubit: QubitId,
@@ -225,6 +243,11 @@ impl PendingError {
 }
 
 impl ObservableSensitivity {
+    pub(super) fn apply_swap(&mut self, left: QubitId, right: QubitId) {
+        swap_entries(&mut self.xs, left, right);
+        swap_entries(&mut self.zs, left, right);
+    }
+
     pub(super) fn toggle(&mut self, qubit: QubitId, basis: AnalyzerBasis, observable: u64) {
         let values = BTreeSet::from([observable]);
         match basis {
@@ -385,6 +408,20 @@ impl ObservableSensitivity {
         if self.zs.get(&qubit).is_some_and(BTreeSet::is_empty) {
             self.zs.remove(&qubit);
         }
+    }
+}
+
+fn swap_entries<T>(map: &mut BTreeMap<QubitId, T>, left: QubitId, right: QubitId) {
+    if left == right {
+        return;
+    }
+    let left_value = map.remove(&left);
+    let right_value = map.remove(&right);
+    if let Some(value) = left_value {
+        map.insert(right, value);
+    }
+    if let Some(value) = right_value {
+        map.insert(left, value);
     }
 }
 

@@ -109,6 +109,7 @@ impl GaugeTracker {
             "R" => self.undo_resets(instruction, AnalyzerBasis::Z),
             "RX" => self.undo_resets(instruction, AnalyzerBasis::X),
             "RY" => self.undo_resets(instruction, AnalyzerBasis::Y),
+            "SWAP" => self.undo_swap(instruction),
             "CX" | "CY" | "CZ" | "XCX" | "XCY" | "XCZ" | "YCX" | "YCY" | "YCZ" => {
                 self.undo_controlled_pauli(instruction)
             }
@@ -121,6 +122,30 @@ impl GaugeTracker {
                 }
             }
         }
+    }
+
+    fn undo_swap(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let gate_name = instruction.gate().canonical_name();
+        for group in instruction.target_groups().into_iter().rev() {
+            let [left, right] = group else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} expected paired targets during gauge analysis"
+                )));
+            };
+            let left = left.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} target {left} is not a qubit"
+                ))
+            })?;
+            let right = right.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} target {right} is not a qubit"
+                ))
+            })?;
+            self.xs.swap(qubit_index(left)?, qubit_index(right)?);
+            self.zs.swap(qubit_index(left)?, qubit_index(right)?);
+        }
+        Ok(())
     }
 
     fn undo_measure_resets(
