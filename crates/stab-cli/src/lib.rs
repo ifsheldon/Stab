@@ -132,19 +132,6 @@ enum SampleOutFormatArg {
     Dets,
 }
 
-impl SampleOutFormatArg {
-    fn sample_format(self) -> Result<SampleFormat, CliError> {
-        match self {
-            Self::ZeroOne => Ok(SampleFormat::ZeroOne),
-            Self::B8 => Ok(SampleFormat::B8),
-            Self::R8 => Ok(SampleFormat::R8),
-            Self::Hits => Ok(SampleFormat::Hits),
-            Self::Dets => Ok(SampleFormat::Dets),
-            Self::Ptb64 => Err(CliError::UnsupportedSampleOutputFormat),
-        }
-    }
-}
-
 #[derive(Debug, Args)]
 struct ConvertArgs {
     /// Input record format.
@@ -253,11 +240,6 @@ enum CliError {
         "unsupported conversion; this M7 slice supports 01 input to 01 or dets output, and stim input to stim output"
     )]
     UnsupportedConversion,
-
-    #[error(
-        "unsupported sample output format; this M8 slice supports --out_format=01, b8, r8, hits, or dets"
-    )]
-    UnsupportedSampleOutputFormat,
 
     #[error(
         "sample flag {flag} requires noisy or reference-sample support that is not in this M8 slice"
@@ -754,7 +736,6 @@ where
     R: Read,
     W: Write,
 {
-    let out_format = args.out_format.sample_format()?;
     if args.skip_reference_sample || args.frame0 {
         return Err(CliError::UnsupportedSampleFlag {
             flag: "--skip_reference_sample",
@@ -770,7 +751,24 @@ where
     let circuit_text = std::str::from_utf8(&input_bytes).map_err(|_| CliError::InvalidUtf8Input)?;
     let circuit = Circuit::from_stim_str(circuit_text)?;
     let sampler = CompiledSampler::compile(&circuit)?;
-    let output = sampler.sample_bytes_with_seed(args.shots, out_format, args.seed);
+    let output = match args.out_format {
+        SampleOutFormatArg::ZeroOne => {
+            sampler.sample_bytes_with_seed(args.shots, SampleFormat::ZeroOne, args.seed)
+        }
+        SampleOutFormatArg::B8 => {
+            sampler.sample_bytes_with_seed(args.shots, SampleFormat::B8, args.seed)
+        }
+        SampleOutFormatArg::R8 => {
+            sampler.sample_bytes_with_seed(args.shots, SampleFormat::R8, args.seed)
+        }
+        SampleOutFormatArg::Ptb64 => sampler.sample_ptb64_bytes_with_seed(args.shots, args.seed)?,
+        SampleOutFormatArg::Hits => {
+            sampler.sample_bytes_with_seed(args.shots, SampleFormat::Hits, args.seed)
+        }
+        SampleOutFormatArg::Dets => {
+            sampler.sample_bytes_with_seed(args.shots, SampleFormat::Dets, args.seed)
+        }
+    };
     write_output(args.output.as_ref(), stdout, &output)
 }
 

@@ -596,7 +596,28 @@ fn sample_writes_r8_format_like_stim() {
 }
 
 #[test]
-fn sample_rejects_ptb64_until_fallible_batch_writer_lands() {
+fn sample_writes_ptb64_format_like_stim() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample", "--shots=64", "--out_format=ptb64"],
+        "X 1\nM 0 1\n".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        stdout,
+        vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+        ]
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_rejects_ptb64_shots_that_are_not_multiple_of_64() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(
@@ -611,7 +632,7 @@ fn sample_rejects_ptb64_until_fallible_batch_writer_lands() {
     assert!(
         String::from_utf8(stderr)
             .unwrap()
-            .contains("unsupported sample output format")
+            .contains("shots must be a multiple of 64 to use ptb64 format")
     );
 }
 

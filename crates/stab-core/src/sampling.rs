@@ -59,6 +59,23 @@ impl CompiledSampler {
         output
     }
 
+    pub fn sample_ptb64_bytes_with_seed(
+        &self,
+        shots: usize,
+        seed: Option<u64>,
+    ) -> CircuitResult<Vec<u8>> {
+        if !shots.is_multiple_of(64) {
+            return Err(CircuitError::invalid_sampler_compilation(
+                "shots must be a multiple of 64 to use ptb64 format",
+            ));
+        }
+        let mut rng = sampler_rng(seed);
+        let samples = (0..shots)
+            .map(|_| self.sample_shot(&mut rng))
+            .collect::<Vec<_>>();
+        Ok(ptb64_samples(&samples))
+    }
+
     fn sample_shot<R>(&self, rng: &mut R) -> Vec<bool>
     where
         R: Rng,
@@ -179,6 +196,23 @@ fn append_b8_sample(sample: &[bool], output: &mut Vec<u8>) {
         }
         output.push(byte);
     }
+}
+
+fn ptb64_samples(samples: &[Vec<bool>]) -> Vec<u8> {
+    let mut output = Vec::new();
+    for shot_group in samples.chunks_exact(64) {
+        let bits_per_shot = shot_group.first().map_or(0, Vec::len);
+        for measurement_index in 0..bits_per_shot {
+            let mut word = 0u64;
+            for (shot_index, shot) in shot_group.iter().enumerate() {
+                if shot.get(measurement_index).copied().unwrap_or(false) {
+                    word |= 1u64 << shot_index;
+                }
+            }
+            output.extend_from_slice(&word.to_le_bytes());
+        }
+    }
+    output
 }
 
 fn append_r8_sample(sample: &[bool], output: &mut Vec<u8>) {
@@ -587,6 +621,34 @@ mod tests {
         assert_eq!(
             long_zero_sampler.sample_bytes(1, SampleFormat::R8),
             &[0xff, 0x05]
+        );
+    }
+
+    #[test]
+    fn writes_ptb64_samples_in_measurement_major_shot_groups() {
+        let circuit = Circuit::from_stim_str("X 1\nM 0 1\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+        assert_eq!(
+            sampler
+                .sample_ptb64_bytes_with_seed(64, Some(5))
+                .expect("sample ptb64"),
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_ptb64_shot_counts_that_are_not_multiple_of_64() {
+        let circuit = Circuit::from_stim_str("M 0\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+        assert_eq!(
+            sampler.sample_ptb64_bytes_with_seed(63, Some(5)),
+            Err(CircuitError::invalid_sampler_compilation(
+                "shots must be a multiple of 64 to use ptb64 format"
+            ))
         );
     }
 
