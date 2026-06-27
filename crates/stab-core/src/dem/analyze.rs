@@ -156,6 +156,7 @@ impl Analyzer {
     fn visit_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         match instruction.gate().canonical_name() {
             "X_ERROR" | "Y_ERROR" | "Z_ERROR" => self.record_single_pauli_error(instruction),
+            "I_ERROR" | "II_ERROR" => Ok(()),
             "PAULI_CHANNEL_1" => self.record_pauli_channel1(instruction),
             "DEPOLARIZE1" => self.record_depolarize1(instruction),
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => self.record_measurements(instruction),

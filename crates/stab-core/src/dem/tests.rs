@@ -144,6 +144,24 @@ fn dem_analyzer_resets_clear_pending_single_qubit_errors() {
 }
 
 #[test]
+fn dem_analyzer_ignores_identity_noise_channels() {
+    let circuit = Circuit::from_stim_str(
+        "I_ERROR(0.25) 0\n\
+         II_ERROR(0.25) 0 1\n\
+         M 0 1\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "detector D0\ndetector D1\n");
+}
+
+#[test]
 fn dem_analyzer_merges_identical_error_symptoms() {
     let circuit =
         Circuit::from_stim_str("X_ERROR(0.125) 0\nX_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n")
