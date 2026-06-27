@@ -8,6 +8,7 @@ pub use analyze::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
 use crate::{CircuitError, CircuitResult, Probability, RepeatCount};
 
 const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
+const DEM_FLOAT_PRECISION: i32 = 34;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DetectorErrorModel {
@@ -843,18 +844,23 @@ fn format_float(value: f64) -> String {
         return integer.to_string();
     }
 
-    let scientific = format!("{value:.5e}");
-    let Some((mantissa, exponent)) = scientific.split_once('e') else {
-        return value.to_string();
-    };
-    let Ok(exponent) = exponent.parse::<i32>() else {
-        return value.to_string();
-    };
-
-    if (-4..6).contains(&exponent) {
-        let decimal_places = usize::try_from(5 - exponent).unwrap_or(0);
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "finite f64 base-10 exponents fit i32 and are only used for formatting"
+    )]
+    let exponent = value.abs().log10().floor() as i32;
+    if (-4..DEM_FLOAT_PRECISION).contains(&exponent) {
+        let decimal_places = usize::try_from(DEM_FLOAT_PRECISION - 1 - exponent).unwrap_or(0);
         trim_decimal_float(format!("{value:.decimal_places$}"))
     } else {
+        let digits_after_decimal = usize::try_from(DEM_FLOAT_PRECISION - 1).unwrap_or(0);
+        let scientific = format!("{value:.digits_after_decimal$e}");
+        let Some((mantissa, exponent)) = scientific.split_once('e') else {
+            return value.to_string();
+        };
+        let Ok(exponent) = exponent.parse::<i32>() else {
+            return value.to_string();
+        };
         format!(
             "{}e{}",
             trim_decimal_float(mantissa.to_string()),

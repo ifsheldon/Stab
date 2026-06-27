@@ -88,7 +88,7 @@ struct Analyzer {
     detector_count: u64,
     coord_offset: Vec<f64>,
     pending_errors: Vec<PendingError>,
-    pending_pauli_channels: Vec<PendingPauliChannel1>,
+    pending_pauli_channels: Vec<PendingSingleQubitPauliChannel>,
     completed_errors: Vec<PendingError>,
     detector_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
     observable_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
@@ -157,6 +157,7 @@ impl Analyzer {
         match instruction.gate().canonical_name() {
             "X_ERROR" | "Y_ERROR" | "Z_ERROR" => self.record_single_pauli_error(instruction),
             "PAULI_CHANNEL_1" => self.record_pauli_channel1(instruction),
+            "DEPOLARIZE1" => self.record_depolarize1(instruction),
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => self.record_measurements(instruction),
             "MPAD" => self.record_measurement_pads(instruction),
             "DETECTOR" => self.record_detector(instruction),
@@ -224,12 +225,43 @@ impl Analyzer {
                     "PAULI_CHANNEL_1 target {target} is not a qubit"
                 )));
             };
-            self.pending_pauli_channels.push(PendingPauliChannel1 {
-                qubit,
-                x_probability: *x_probability,
-                y_probability: *y_probability,
-                z_probability: *z_probability,
-            });
+            self.pending_pauli_channels
+                .push(PendingSingleQubitPauliChannel {
+                    qubit,
+                    x_probability: *x_probability,
+                    y_probability: *y_probability,
+                    z_probability: *z_probability,
+                });
+        }
+        Ok(())
+    }
+
+    fn record_depolarize1(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let Some(probability) = instruction.probability_argument()? else {
+            return Ok(());
+        };
+        if probability.get() == 0.0 {
+            return Ok(());
+        }
+        if probability.get() > 0.75 {
+            return Err(CircuitError::invalid_detector_error_model(
+                "cannot analyze over-mixing DEPOLARIZE1 probability above 3/4",
+            ));
+        }
+        let axis_probability = Probability::try_new(probability.get() / 3.0)?;
+        for target in instruction.targets() {
+            let Some(qubit) = target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "DEPOLARIZE1 target {target} is not a qubit"
+                )));
+            };
+            self.pending_pauli_channels
+                .push(PendingSingleQubitPauliChannel {
+                    qubit,
+                    x_probability: axis_probability,
+                    y_probability: axis_probability,
+                    z_probability: axis_probability,
+                });
         }
         Ok(())
     }
@@ -458,14 +490,14 @@ struct PendingError {
 }
 
 #[derive(Clone, Debug)]
-struct PendingPauliChannel1 {
+struct PendingSingleQubitPauliChannel {
     qubit: QubitId,
     x_probability: Probability,
     y_probability: Probability,
     z_probability: Probability,
 }
 
-impl PendingPauliChannel1 {
+impl PendingSingleQubitPauliChannel {
     fn flip_probability(&self, basis: AnalyzerBasis) -> CircuitResult<Probability> {
         let probability = match basis {
             AnalyzerBasis::X => self.y_probability.get() + self.z_probability.get(),

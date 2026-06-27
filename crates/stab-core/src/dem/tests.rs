@@ -41,6 +41,24 @@ fn dem_parse_print_round_trip_includes_repeats_shifts_coordinates_and_tags() {
 }
 
 #[test]
+fn dem_print_uses_stim_high_precision_float_style() {
+    let mut dem = DetectorErrorModel::new();
+    dem.push_instruction(
+        DemInstruction::error(
+            Probability::try_new(0.25 * 2.0 / 3.0).unwrap(),
+            vec![DemTarget::relative_detector(0).unwrap()],
+            None,
+        )
+        .unwrap(),
+    );
+
+    assert_eq!(
+        dem.to_dem_string(),
+        "error(0.1666666666666666574148081281236955) D0\n"
+    );
+}
+
+#[test]
 fn dem_rejects_invalid_probabilities_and_separators() {
     assert!(DetectorErrorModel::from_dem_str("error(1.5) D0\n").is_err());
     assert!(DetectorErrorModel::from_dem_str("error(0.25) ^ D0\n").is_err());
@@ -143,6 +161,36 @@ fn dem_analyzer_rejects_disjoint_pauli_channel1_without_approximation() {
         "R 0\nPAULI_CHANNEL_1(0.125, 0.25, 0.375) 0\nM 0\nDETECTOR rec[-1]\n",
     )
     .unwrap();
+
+    let result = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default());
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn dem_analyzer_maps_depolarize1_to_basis_flip_probability() {
+    let circuit = Circuit::from_stim_str(
+        "DEPOLARIZE1(0.25) 0 1\n\
+         M 0\n\
+         MX 1\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(
+        dem,
+        "error(0.1666666666666666574148081281236955) D0\nerror(0.1666666666666666574148081281236955) D1\n"
+    );
+}
+
+#[test]
+fn dem_analyzer_rejects_overmixing_depolarize1() {
+    let circuit = Circuit::from_stim_str("DEPOLARIZE1(1) 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
 
     let result = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default());
 
