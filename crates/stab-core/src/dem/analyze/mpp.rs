@@ -14,10 +14,7 @@ impl Analyzer {
                 .iter()
                 .map(|(qubit, _basis)| *qubit)
                 .collect::<Vec<_>>();
-            self.reject_pending_single_qubit_channels_through_product_measurement(
-                instruction,
-                &qubits,
-            )?;
+            self.expand_pending_single_qubit_channels_touching(&qubits)?;
             let measurement_index = self.measurement_count;
             self.measurement_count = self.measurement_count.checked_add(1).ok_or_else(|| {
                 CircuitError::invalid_detector_error_model("measurement count overflowed")

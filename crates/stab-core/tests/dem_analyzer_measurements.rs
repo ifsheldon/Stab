@@ -4,11 +4,18 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_core::{Circuit, ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_core::{Circuit, ErrorAnalyzerOptions, Probability, circuit_to_detector_error_model};
 
 fn analyze(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
     circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .expect("analyze")
+        .to_dem_string()
+}
+
+fn analyze_with_options(text: &str, options: ErrorAnalyzerOptions) -> String {
+    let circuit = Circuit::from_stim_str(text).expect("circuit");
+    circuit_to_detector_error_model(&circuit, options)
         .expect("analyze")
         .to_dem_string()
 }
@@ -48,6 +55,24 @@ fn dem_analyzer_duplicate_detector_records_match_upstream_parity() {
     assert_eq!(single, duplicate_odd);
     assert_eq!(empty, "detector D0\n");
     assert_eq!(single, "error(0.25) D0\n");
+}
+
+#[test]
+fn dem_analyzer_pauli_channel1_crosses_product_measurements_like_stim() {
+    let dem = analyze_with_options(
+        include_str!(
+            "../../../oracle/fixtures/inputs/analyze_errors_pauli_channel1_product_measurements.stim"
+        ),
+        ErrorAnalyzerOptions {
+            approximate_disjoint_errors_threshold: Some(Probability::try_new(1.0).unwrap()),
+            ..ErrorAnalyzerOptions::default()
+        },
+    );
+
+    assert_eq!(
+        dem,
+        "error(0.625) D0\nerror(0.5) D1\nerror(0.375) D2\nerror(0.625) D3\n"
+    );
 }
 
 #[test]

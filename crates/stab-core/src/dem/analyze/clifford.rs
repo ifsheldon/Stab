@@ -1,4 +1,6 @@
-use crate::{CircuitError, CircuitInstruction, CircuitResult, circuit_tableau::gate_tableau};
+use crate::{
+    CircuitError, CircuitInstruction, CircuitResult, QubitId, circuit_tableau::gate_tableau,
+};
 
 use super::{Analyzer, AnalyzerPauli, NoiseEffect};
 
@@ -29,7 +31,7 @@ impl Analyzer {
                     "{gate_name} target {right} is not a qubit"
                 ))
             })?;
-            self.expand_pending_single_qubit_channels_touching(left, right)?;
+            self.expand_pending_single_qubit_channels_touching(&[left, right])?;
             for pending in &mut self.pending_errors {
                 pending.apply_two_qubit_tableau(gate_name, left, right, &tableau)?;
             }
@@ -41,12 +43,11 @@ impl Analyzer {
 
     pub(super) fn expand_pending_single_qubit_channels_touching(
         &mut self,
-        left: crate::QubitId,
-        right: crate::QubitId,
+        qubits: &[QubitId],
     ) -> CircuitResult<()> {
         let pending_channels = std::mem::take(&mut self.pending_pauli_channels);
         for pending in pending_channels {
-            if pending.qubit != left && pending.qubit != right {
+            if !qubits.contains(&pending.qubit) {
                 self.pending_pauli_channels.push(pending);
                 continue;
             }

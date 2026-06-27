@@ -758,10 +758,7 @@ impl Analyzer {
                     instruction.gate().canonical_name()
                 )));
             };
-            self.reject_pending_single_qubit_channels_through_product_measurement(
-                instruction,
-                &[left, right],
-            )?;
+            self.expand_pending_single_qubit_channels_touching(&[left, right])?;
             let measurement_index = self.measurement_count;
             self.measurement_count = self.measurement_count.checked_add(1).ok_or_else(|| {
                 CircuitError::invalid_detector_error_model("measurement count overflowed")
@@ -784,24 +781,6 @@ impl Analyzer {
                     tag: instruction.tag().map(str::to_owned),
                 });
             }
-        }
-        Ok(())
-    }
-
-    fn reject_pending_single_qubit_channels_through_product_measurement(
-        &self,
-        instruction: &CircuitInstruction,
-        qubits: &[QubitId],
-    ) -> CircuitResult<()> {
-        if self
-            .pending_pauli_channels
-            .iter()
-            .any(|pending| qubits.contains(&pending.qubit))
-        {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "analyze_errors does not yet support propagating pending single-qubit Pauli channels through {}",
-                instruction.gate().canonical_name()
-            )));
         }
         Ok(())
     }
@@ -893,7 +872,7 @@ impl Analyzer {
         left_basis: AnalyzerPauli,
         right_basis: AnalyzerPauli,
     ) -> CircuitResult<()> {
-        self.expand_pending_single_qubit_channels_touching(left, right)?;
+        self.expand_pending_single_qubit_channels_touching(&[left, right])?;
         for pending in &mut self.pending_errors {
             pending.apply_controlled_pauli(left, right, left_basis, right_basis);
         }
