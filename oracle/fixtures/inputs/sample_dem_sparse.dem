@@ -1,0 +1,3 @@
+detector D5
+logical_observable L2
+error(1) D0 D5 L2

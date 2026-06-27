@@ -154,7 +154,7 @@ Revealed by: milestone audit of the M11 oracle manifest, direct Rust tests, and 
 Current text: M11 says to add sparse, dense, repeated, and high-detector-count DEM fixture groups, and the done criteria require exact, statistical, structural, and benchmark checks.
 Gap: the milestone does not define which fixture groups must be oracle rows, which can be direct Rust tests, which can be benchmark-only representatives, what comparator each group uses, or what sample counts and statistical bounds prove noisy sparse, dense, repeated, high-detector, observable-only, and correlated-error behavior.
 Proposed amendment: define an M11 fixture matrix with rows for deterministic exact output, statistical noisy sampling, sparse detector ids, dense detector targets, repeated detector shifts, high detector ids, observable-only errors, detector-observable correlation, and correlated detector combinations. Each row should name its upstream source, comparator mode, sample count or structural assertion, output format, and whether it is acceptance evidence or benchmark-only evidence.
-Resolution: pending plan update.
+Resolution: partially addressed by adding implemented exact oracle rows for deterministic sparse detector ids, dense detector targets, repeated detector shifts, high detector ids with `b8` output, and correlated detector combinations. The remaining matrix decision is whether noisy sparse, dense, repeated, high-detector, observable-only, and detector-observable correlation cases must be runnable oracle rows or can remain covered by direct Rust statistical and structural tests plus benchmark representatives.
 
 ## 2026-06-27 - M11: DEM Sampler Streaming And Scale Limits
 
