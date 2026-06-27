@@ -9,6 +9,7 @@ use crate::{
 const MAX_DEM_SAMPLER_REPEAT_UNROLL: u64 = 100_000;
 const MAX_DEM_SAMPLER_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
 const MAX_DEM_SAMPLER_REPEAT_ITERATIONS: u64 = 1_000_000;
+const MAX_DEM_SAMPLER_BUFFER_UNITS: usize = 64_000_000;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledDemSampler {
@@ -43,6 +44,7 @@ impl CompiledDemSampler {
         shots: usize,
         seed: Option<u64>,
     ) -> CircuitResult<DetectionConversionOutput> {
+        self.validate_sample_buffer_units(shots, false)?;
         let mut rng = dem_sampler_rng(seed);
         let records = (0..shots)
             .map(|_| self.sample_record(&mut rng))
@@ -58,11 +60,44 @@ impl CompiledDemSampler {
         self.operations.len()
     }
 
+    pub fn validate_sample_buffer_units(
+        &self,
+        shots: usize,
+        include_error_records: bool,
+    ) -> CircuitResult<()> {
+        let mut units_per_shot = self
+            .detector_count
+            .checked_add(self.observable_count)
+            .ok_or_else(|| {
+                CircuitError::invalid_sampler_compilation(
+                    "DEM sampler output width overflowed while validating buffer size",
+                )
+            })?;
+        if include_error_records {
+            units_per_shot = units_per_shot.checked_add(self.operations.len()).ok_or_else(|| {
+                CircuitError::invalid_sampler_compilation(
+                    "DEM sampler output and error width overflowed while validating buffer size",
+                )
+            })?;
+        }
+        let units_per_shot = units_per_shot.max(1);
+        let total_units = shots.checked_mul(units_per_shot).ok_or_else(|| {
+            CircuitError::invalid_sampler_compilation("DEM sampler buffer size overflowed")
+        })?;
+        if total_units > MAX_DEM_SAMPLER_BUFFER_UNITS {
+            return Err(CircuitError::invalid_sampler_compilation(format!(
+                "DEM sampler would require {total_units} buffered units; current limit is {MAX_DEM_SAMPLER_BUFFER_UNITS}"
+            )));
+        }
+        Ok(())
+    }
+
     pub fn sample_detection_events_and_errors_with_seed(
         &self,
         shots: usize,
         seed: Option<u64>,
     ) -> CircuitResult<(DetectionConversionOutput, Vec<Vec<bool>>)> {
+        self.validate_sample_buffer_units(shots, true)?;
         let mut rng = dem_sampler_rng(seed);
         let mut records = Vec::with_capacity(shots);
         let mut error_records = Vec::with_capacity(shots);
@@ -85,6 +120,8 @@ impl CompiledDemSampler {
         &self,
         error_records: &[Vec<bool>],
     ) -> CircuitResult<DetectionConversionOutput> {
+        self.validate_sample_buffer_units(error_records.len(), true)?;
+        self.validate_error_record_widths(error_records)?;
         let records = error_records
             .iter()
             .map(|error_record| self.detection_record_from_error_record(error_record))
@@ -112,6 +149,19 @@ impl CompiledDemSampler {
             .iter()
             .map(|operation| operation.sample_occurs(rng))
             .collect()
+    }
+
+    fn validate_error_record_widths(&self, error_records: &[Vec<bool>]) -> CircuitResult<()> {
+        for (shot_index, error_record) in error_records.iter().enumerate() {
+            if error_record.len() != self.operations.len() {
+                return Err(CircuitError::invalid_result_format(format!(
+                    "DEM error record {shot_index} expected {} bits, got {}",
+                    self.operations.len(),
+                    error_record.len()
+                )));
+            }
+        }
+        Ok(())
     }
 
     fn detection_record_from_error_record(

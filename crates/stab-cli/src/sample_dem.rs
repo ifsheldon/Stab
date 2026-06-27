@@ -1,9 +1,10 @@
-use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::path::{Path, PathBuf};
 
 use clap::{Args, ValueEnum};
 use stab_core::{
-    CompiledDemSampler, DetectionObservableOutputMode, DetectorErrorModel, SampleFormat,
+    CircuitError, CompiledDemSampler, DetectionObservableOutputMode, DetectorErrorModel,
+    SampleFormat,
     result_formats::{
         read_measurement_records, read_ptb64_records, validate_ptb64_shot_count,
         write_ptb64_records_checked, write_records,
@@ -13,6 +14,8 @@ use stab_core::{
 };
 
 use super::{CliError, SampleOutFormatArg, read_input, write_empty_observables, write_output};
+
+const MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES: usize = 1_048_576;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum SampleDemRecordFormatArg {
@@ -117,6 +120,10 @@ where
     let input_bytes = read_input(args.input.as_ref(), input)?;
     let dem = parse_dem_bytes(&input_bytes)?;
     let sampler = CompiledDemSampler::compile(&dem)?;
+    sampler.validate_sample_buffer_units(
+        args.shots,
+        args.error_output.is_some() || args.replay_error_input.is_some(),
+    )?;
     let mut error_records = None;
     let output = if let Some(replay_path) = args.replay_error_input.as_ref() {
         let replayed_errors = read_replay_error_records(
@@ -181,27 +188,242 @@ fn validate_ptb64_routing(args: &SampleDemArgs) -> Result<(), CliError> {
 }
 
 fn read_replay_error_records(
-    path: &PathBuf,
+    path: &Path,
     format: SampleDemRecordFormatArg,
     error_count: usize,
     expected_shots: usize,
 ) -> Result<Vec<Vec<bool>>, CliError> {
-    let input = std::fs::read(path).map_err(|source| CliError::ReadPath {
-        path: path.clone(),
+    match format {
+        SampleDemRecordFormatArg::Ptb64 => {
+            let byte_count = ptb64_replay_byte_count(error_count, expected_shots)?;
+            let input = read_replay_prefix(path, byte_count)?;
+            read_ptb64_records(&input, error_count, expected_shots).map_err(CliError::from)
+        }
+        SampleDemRecordFormatArg::B8 => {
+            read_b8_replay_error_records(path, error_count, expected_shots)
+        }
+        SampleDemRecordFormatArg::R8 => {
+            read_r8_replay_error_records(path, error_count, expected_shots)
+        }
+        SampleDemRecordFormatArg::ZeroOne
+        | SampleDemRecordFormatArg::Hits
+        | SampleDemRecordFormatArg::Dets => {
+            read_line_replay_error_records(path, format, error_count, expected_shots)
+        }
+    }
+}
+
+fn ptb64_replay_byte_count(error_count: usize, expected_shots: usize) -> Result<usize, CliError> {
+    let shot_groups = expected_shots / 64;
+    error_count
+        .checked_mul(8)
+        .and_then(|bytes_per_group| shot_groups.checked_mul(bytes_per_group))
+        .ok_or(CliError::MeasurementCountOverflow)
+}
+
+fn read_b8_replay_error_records(
+    path: &Path,
+    error_count: usize,
+    expected_shots: usize,
+) -> Result<Vec<Vec<bool>>, CliError> {
+    let bytes_per_record = error_count.div_ceil(8);
+    let byte_count = expected_shots
+        .checked_mul(bytes_per_record)
+        .ok_or(CliError::MeasurementCountOverflow)?;
+    let input = read_replay_prefix(path, byte_count)?;
+    let records = read_measurement_records(&input, SampleFormat::B8, error_count)?;
+    require_expected_replay_records(records, expected_shots)
+}
+
+fn read_replay_prefix(path: &Path, byte_count: usize) -> Result<Vec<u8>, CliError> {
+    let file = std::fs::File::open(path).map_err(|source| CliError::ReadPath {
+        path: path.to_path_buf(),
         source,
     })?;
-    let mut records = if format == SampleDemRecordFormatArg::Ptb64 {
-        read_ptb64_records(&input, error_count, expected_shots)?
-    } else {
-        read_measurement_records(&input, format.sample_format()?, error_count)?
-    };
+    let mut input = Vec::new();
+    file.take(u64::try_from(byte_count).unwrap_or(u64::MAX))
+        .read_to_end(&mut input)
+        .map_err(|source| CliError::ReadPath {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    Ok(input)
+}
+
+fn read_line_replay_error_records(
+    path: &Path,
+    format: SampleDemRecordFormatArg,
+    error_count: usize,
+    expected_shots: usize,
+) -> Result<Vec<Vec<bool>>, CliError> {
+    let sample_format = format.sample_format()?;
+    let file = std::fs::File::open(path).map_err(|source| CliError::ReadPath {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let mut reader = BufReader::new(file);
+    let mut records = Vec::with_capacity(expected_shots);
+    for _ in 0..expected_shots {
+        let Some(line) = read_replay_line(path, &mut reader)? else {
+            return Err(CliError::ReplayErrorRecordCountMismatch {
+                expected: expected_shots,
+                actual: records.len(),
+            });
+        };
+        let parsed = read_measurement_records(&line, sample_format, error_count)?;
+        let [record] = <[Vec<bool>; 1]>::try_from(parsed).map_err(|records| {
+            CircuitError::InvalidResultFormat {
+                message: format!("replay record decoded into {} records", records.len()),
+            }
+        })?;
+        records.push(record);
+    }
+    Ok(records)
+}
+
+fn read_replay_line(path: &Path, reader: &mut impl BufRead) -> Result<Option<Vec<u8>>, CliError> {
+    let mut line = Vec::new();
+    loop {
+        let (consumed, found_newline) = {
+            let available = reader.fill_buf().map_err(|source| CliError::ReadPath {
+                path: path.to_path_buf(),
+                source,
+            })?;
+            if available.is_empty() {
+                return if line.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(line))
+                };
+            }
+            let consumed = available
+                .iter()
+                .position(|byte| *byte == b'\n')
+                .map_or(available.len(), |index| index + 1);
+            if line.len().saturating_add(consumed) > MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES {
+                return Err(CliError::InputTooLarge {
+                    kind: "sample_dem replay text record",
+                    limit: u64::try_from(MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES)
+                        .unwrap_or(u64::MAX),
+                });
+            }
+            let chunk = available.get(..consumed).ok_or_else(|| {
+                CliError::from(CircuitError::InvalidResultFormat {
+                    message: "replay line byte range was out of bounds".to_string(),
+                })
+            })?;
+            line.extend_from_slice(chunk);
+            (
+                consumed,
+                consumed
+                    .checked_sub(1)
+                    .and_then(|index| available.get(index))
+                    .is_some_and(|byte| *byte == b'\n'),
+            )
+        };
+        reader.consume(consumed);
+        if found_newline {
+            return Ok(Some(line));
+        }
+    }
+}
+
+fn read_r8_replay_error_records(
+    path: &Path,
+    error_count: usize,
+    expected_shots: usize,
+) -> Result<Vec<Vec<bool>>, CliError> {
+    let mut file = std::fs::File::open(path).map_err(|source| CliError::ReadPath {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let mut records = Vec::with_capacity(expected_shots);
+    for _ in 0..expected_shots {
+        let Some(record) = read_r8_replay_record(path, &mut file, error_count)? else {
+            return Err(CliError::ReplayErrorRecordCountMismatch {
+                expected: expected_shots,
+                actual: records.len(),
+            });
+        };
+        records.push(record);
+    }
+    Ok(records)
+}
+
+fn read_r8_replay_record(
+    path: &Path,
+    reader: &mut impl Read,
+    bits_per_record: usize,
+) -> Result<Option<Vec<bool>>, CliError> {
+    let mut record = vec![false; bits_per_record];
+    let mut bit_index = 0usize;
+    let mut read_any = false;
+    loop {
+        let mut byte = [0u8; 1];
+        match reader.read(&mut byte) {
+            Ok(0) if !read_any => return Ok(None),
+            Ok(0) => {
+                return Err(CliError::from(CircuitError::InvalidResultFormat {
+                    message: "r8 input ended before record completed".to_string(),
+                }));
+            }
+            Ok(_) => {
+                read_any = true;
+            }
+            Err(source) => {
+                return Err(CliError::ReadPath {
+                    path: path.to_path_buf(),
+                    source,
+                });
+            }
+        }
+
+        if byte[0] == u8::MAX {
+            bit_index = bit_index.checked_add(usize::from(u8::MAX)).ok_or_else(|| {
+                CliError::from(CircuitError::InvalidResultFormat {
+                    message: "r8 run-length offset overflowed".to_string(),
+                })
+            })?;
+            if bit_index > bits_per_record {
+                return Err(CliError::from(CircuitError::InvalidResultFormat {
+                    message: "r8 run-length overshot record width".to_string(),
+                }));
+            }
+            continue;
+        }
+        bit_index = bit_index.checked_add(usize::from(byte[0])).ok_or_else(|| {
+            CliError::from(CircuitError::InvalidResultFormat {
+                message: "r8 run-length offset overflowed".to_string(),
+            })
+        })?;
+        if bit_index > bits_per_record {
+            return Err(CliError::from(CircuitError::InvalidResultFormat {
+                message: "r8 run-length overshot record width".to_string(),
+            }));
+        }
+        if bit_index == bits_per_record {
+            return Ok(Some(record));
+        }
+        let Some(bit) = record.get_mut(bit_index) else {
+            return Err(CliError::from(CircuitError::InvalidResultFormat {
+                message: format!("r8 hit index {bit_index} exceeds record width {bits_per_record}"),
+            }));
+        };
+        *bit = true;
+        bit_index += 1;
+    }
+}
+
+fn require_expected_replay_records(
+    records: Vec<Vec<bool>>,
+    expected_shots: usize,
+) -> Result<Vec<Vec<bool>>, CliError> {
     if records.len() < expected_shots {
         return Err(CliError::ReplayErrorRecordCountMismatch {
             expected: expected_shots,
             actual: records.len(),
         });
     }
-    records.truncate(expected_shots);
     Ok(records)
 }
 

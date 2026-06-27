@@ -373,3 +373,98 @@ fn sample_dem_rejects_replay_record_count_mismatch() {
             .contains("replay error input has 1 records but --shots requested 2")
     );
 }
+
+#[test]
+fn sample_dem_replay_ignores_malformed_extra_text_records_after_requested_shots() {
+    let dir = tempdir().expect("tempdir");
+    let replay_path = dir.path().join("errors.01");
+    std::fs::write(&replay_path, "1\nnot-a-record\n").expect("write replay input");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--replay_err_in"),
+        replay_path.into_os_string(),
+        OsString::from("--shots"),
+        OsString::from("1"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(args, b"error(1) D0\n".as_slice(), &mut stdout, &mut stderr);
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "1\n");
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_dem_replay_ignores_partial_extra_b8_records_after_requested_shots() {
+    let dir = tempdir().expect("tempdir");
+    let replay_path = dir.path().join("errors.b8");
+    std::fs::write(&replay_path, [0b0000_0001, 0, 0b0000_0001]).expect("write replay input");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--replay_err_in"),
+        replay_path.into_os_string(),
+        OsString::from("--replay_err_in_format"),
+        OsString::from("b8"),
+        OsString::from("--shots"),
+        OsString::from("1"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        args,
+        b"error(1) D0\nerror(1) D1\nerror(1) D2\nerror(1) D3\nerror(1) D4\nerror(1) D5\nerror(1) D6\nerror(1) D7\nerror(1) D8\n"
+            .as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "100000000\n");
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn sample_dem_rejects_excessive_buffered_output_before_sampling() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "sample_dem", "--shots", "64000001"],
+        b"".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("DEM sampler would require 64000001 buffered units")
+    );
+}
+
+#[test]
+fn sample_dem_rejects_excessive_replay_buffers_before_reading_replay_path() {
+    let dir = tempdir().expect("tempdir");
+    let missing_replay_path = dir.path().join("missing.01");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--replay_err_in"),
+        missing_replay_path.into_os_string(),
+        OsString::from("--shots"),
+        OsString::from("64000001"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(args, b"".as_slice(), &mut stdout, &mut stderr);
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    let stderr = String::from_utf8(stderr).unwrap();
+    assert!(stderr.contains("DEM sampler would require 64000001 buffered units"));
+    assert!(!stderr.contains("missing.01"));
+}

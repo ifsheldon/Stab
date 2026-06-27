@@ -332,3 +332,57 @@ fn dem_sampler_rejects_repeat_expansion_before_counting_detectors() {
         "{error}"
     );
 }
+
+#[test]
+fn dem_sampler_rejects_excessive_buffered_outputs_before_sampling() {
+    let empty = compile_dem("");
+    let error = empty
+        .sample_detection_events_with_seed(64_000_001, Some(5))
+        .expect_err("reject excessive empty records");
+    assert!(
+        error
+            .to_string()
+            .contains("would require 64000001 buffered units"),
+        "{error}"
+    );
+
+    let high_detector = compile_dem("detector D64000000\n");
+    let error = high_detector
+        .sample_detection_events_with_seed(1, Some(5))
+        .expect_err("reject excessive detector width");
+    assert!(
+        error
+            .to_string()
+            .contains("would require 64000001 buffered units"),
+        "{error}"
+    );
+
+    let sampler_with_error_records = compile_dem("error(1) D0\n");
+    let error = sampler_with_error_records
+        .sample_detection_events_and_errors_with_seed(32_000_001, Some(5))
+        .expect_err("reject excessive detector plus error records");
+    assert!(
+        error
+            .to_string()
+            .contains("would require 64000002 buffered units"),
+        "{error}"
+    );
+
+    let wide_replay_sampler = compile_dem(
+        "
+        repeat 100000 {
+            error(1) D0
+        }
+        ",
+    );
+    let replay_records = vec![vec![false; wide_replay_sampler.error_count()]; 641];
+    let error = wide_replay_sampler
+        .sample_detection_events_from_error_records(&replay_records)
+        .expect_err("reject excessive replayed error records");
+    assert!(
+        error
+            .to_string()
+            .contains("would require 64100641 buffered units"),
+        "{error}"
+    );
+}
