@@ -20,6 +20,14 @@ pub(crate) struct AnalyzeErrorsArgs {
     #[arg(long = "decompose_errors")]
     decompose_errors: bool,
 
+    /// Keep decomposition from introducing graphlike remnant edges.
+    #[arg(long = "block_decompose_from_introducing_remnant_edges")]
+    block_decompose_from_introducing_remnant_edges: bool,
+
+    /// Leave undecomposed errors in the output instead of failing decomposition.
+    #[arg(long = "ignore_decomposition_failures")]
+    ignore_decomposition_failures: bool,
+
     /// Preserve repeated circuit structure where possible.
     #[arg(long = "fold_loops")]
     fold_loops: bool,
@@ -55,6 +63,9 @@ where
             fold_loops: args.fold_loops,
             decompose_errors: args.decompose_errors,
             allow_gauge_detectors: args.allow_gauge_detectors,
+            ignore_decomposition_failures: args.ignore_decomposition_failures,
+            block_decomposition_from_introducing_remnant_edges: args
+                .block_decompose_from_introducing_remnant_edges,
             approximate_disjoint_errors_threshold: args.approximate_disjoint_errors,
         },
     )?;

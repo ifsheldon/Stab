@@ -22,6 +22,8 @@ pub struct ErrorAnalyzerOptions {
     pub fold_loops: bool,
     pub decompose_errors: bool,
     pub allow_gauge_detectors: bool,
+    pub ignore_decomposition_failures: bool,
+    pub block_decomposition_from_introducing_remnant_edges: bool,
     pub approximate_disjoint_errors_threshold: Option<Probability>,
 }
 
@@ -798,7 +800,12 @@ impl Analyzer {
         }
 
         if self.options.decompose_errors {
-            merged_error_probabilities = decompose_error_probabilities(merged_error_probabilities)?;
+            merged_error_probabilities = decompose_error_probabilities(
+                merged_error_probabilities,
+                self.options
+                    .block_decomposition_from_introducing_remnant_edges,
+                self.options.ignore_decomposition_failures,
+            )?;
         }
 
         for (targets, probability) in merged_error_probabilities {

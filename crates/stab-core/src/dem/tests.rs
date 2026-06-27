@@ -25,6 +25,23 @@ fn decompose_options() -> ErrorAnalyzerOptions {
     }
 }
 
+fn blocked_decompose_options() -> ErrorAnalyzerOptions {
+    ErrorAnalyzerOptions {
+        decompose_errors: true,
+        block_decomposition_from_introducing_remnant_edges: true,
+        ..ErrorAnalyzerOptions::default()
+    }
+}
+
+fn ignored_blocked_decompose_options() -> ErrorAnalyzerOptions {
+    ErrorAnalyzerOptions {
+        decompose_errors: true,
+        block_decomposition_from_introducing_remnant_edges: true,
+        ignore_decomposition_failures: true,
+        ..ErrorAnalyzerOptions::default()
+    }
+}
+
 #[test]
 fn dem_targets_parse_stim_limits() {
     assert_eq!(
@@ -217,6 +234,68 @@ fn dem_analyzer_decomposes_errors_using_known_graphlike_components() {
         dem,
         "error(0.25) D2 D3 L6\nerror(0.125) D2 D3 L6 ^ D0 D1 L5 L6\n"
     );
+}
+
+#[test]
+fn dem_analyzer_decomposes_errors_without_remnants_when_all_components_are_known() {
+    let circuit = Circuit::from_stim_str(
+        "X_ERROR(0.125) 0\n\
+         X_ERROR(0.25) 1\n\
+         X_ERROR(0.375) 2\n\
+         M 0 1 2\n\
+         DETECTOR rec[-3] rec[-1]\n\
+         DETECTOR rec[-2] rec[-1]\n\
+         DETECTOR rec[-3] rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, blocked_decompose_options())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(
+        dem,
+        "error(0.125) D0 D2\nerror(0.375) D0 D2 ^ D1\nerror(0.25) D1\n"
+    );
+}
+
+#[test]
+fn dem_analyzer_blocks_remnant_edges_when_requested() {
+    let circuit = Circuit::from_stim_str(
+        "X_ERROR(0.125) 0\n\
+         X_ERROR(0.375) 2\n\
+         M 0 1 2\n\
+         DETECTOR rec[-3] rec[-1]\n\
+         DETECTOR rec[-2] rec[-1]\n\
+         DETECTOR rec[-3] rec[-1]\n",
+    )
+    .unwrap();
+
+    let error = circuit_to_detector_error_model(&circuit, blocked_decompose_options())
+        .unwrap_err()
+        .to_string();
+
+    assert!(error.contains("Failed to decompose errors into graphlike components"));
+    assert!(error.contains("block_decomposition_from_introducing_remnant_edges"));
+}
+
+#[test]
+fn dem_analyzer_can_ignore_blocked_decomposition_failures() {
+    let circuit = Circuit::from_stim_str(
+        "X_ERROR(0.125) 0\n\
+         X_ERROR(0.375) 2\n\
+         M 0 1 2\n\
+         DETECTOR rec[-3] rec[-1]\n\
+         DETECTOR rec[-2] rec[-1]\n\
+         DETECTOR rec[-3] rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ignored_blocked_decompose_options())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.375) D0 D1 D2\nerror(0.125) D0 D2\n");
 }
 
 #[test]

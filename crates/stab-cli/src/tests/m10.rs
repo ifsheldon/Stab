@@ -320,6 +320,83 @@ fn analyze_errors_decompose_fallback_matches_m10_oracle_golden() {
 }
 
 #[test]
+fn analyze_errors_decompose_known_components_matches_m10_oracle_golden() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "analyze_errors",
+            "--decompose_errors",
+            "--block_decompose_from_introducing_remnant_edges",
+        ],
+        include_bytes!(
+            "../../../../oracle/fixtures/inputs/analyze_errors_decompose_known_components.stim"
+        )
+        .as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!(
+            "../../../../oracle/fixtures/expected/m10_analyze_errors_decompose_known_components.stdout"
+        )
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn analyze_errors_block_decompose_rejects_remnant_edges() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "analyze_errors",
+            "--decompose_errors",
+            "--block_decompose_from_introducing_remnant_edges",
+        ],
+        b"X_ERROR(0.125) 0\nX_ERROR(0.375) 2\nM 0 1 2\nDETECTOR rec[-3] rec[-1]\nDETECTOR rec[-2] rec[-1]\nDETECTOR rec[-3] rec[-1]\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    let stderr = String::from_utf8(stderr).unwrap();
+    assert!(stderr.contains("Failed to decompose errors into graphlike components"));
+    assert!(stderr.contains("block_decomposition_from_introducing_remnant_edges"));
+}
+
+#[test]
+fn analyze_errors_ignore_decomposition_failures_emits_hyperedges() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "analyze_errors",
+            "--decompose_errors",
+            "--block_decompose_from_introducing_remnant_edges",
+            "--ignore_decomposition_failures",
+        ],
+        b"X_ERROR(0.125) 0\nX_ERROR(0.375) 2\nM 0 1 2\nDETECTOR rec[-3] rec[-1]\nDETECTOR rec[-2] rec[-1]\nDETECTOR rec[-3] rec[-1]\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        "error(0.375) D0 D1 D2\nerror(0.125) D0 D2\n"
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
 fn analyze_errors_else_correlated_error_matches_m10_oracle_golden() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();

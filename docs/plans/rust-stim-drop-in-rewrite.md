@@ -330,7 +330,7 @@ Tasks:
 
 - Implement `.dem` parser and canonical printer.
 - Implement `DetectorErrorModel`, `DemInstruction`, DEM targets, repeat blocks, coordinate handling, detector shifts, observables, separators, and probability validation.
-- Implement `stim analyze_errors` with a staged flag plan: first default behavior, then `--decompose_errors`, `--fold_loops`, `--allow_gauge_detectors`, and approximation behavior.
+- Implement `stim analyze_errors` with a staged flag plan: first default behavior, then `--decompose_errors` with `--block_decompose_from_introducing_remnant_edges` and `--ignore_decomposition_failures`, then `--fold_loops`, `--allow_gauge_detectors`, and approximation behavior.
 - Implement loop folding without accidentally flattening high-repeat circuits when Stim would preserve structure.
 - Add structural DEM comparators that account for equivalent detector shifts, repeats, and graphlike decomposition where byte-for-byte output is too strict.
 

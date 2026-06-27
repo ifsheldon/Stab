@@ -1,0 +1,7 @@
+X_ERROR(0.125) 0
+X_ERROR(0.25) 1
+X_ERROR(0.375) 2
+M 0 1 2
+DETECTOR rec[-3] rec[-1]
+DETECTOR rec[-2] rec[-1]
+DETECTOR rec[-3] rec[-1]
