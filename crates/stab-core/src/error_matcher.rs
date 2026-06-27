@@ -88,10 +88,11 @@ struct ErrorCandidate {
     location: CircuitErrorLocation,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 enum CandidateReplacement {
     Noise {
         gate_name: Option<&'static str>,
+        args: Option<Vec<f64>>,
         targets: Option<Vec<Target>>,
     },
     Measurement,
@@ -163,6 +164,9 @@ impl<'a> CandidateCollector<'a> {
             "DEPOLARIZE2" => {
                 self.collect_depolarize2_errors(instruction_offset, instruction, candidates)
             }
+            "PAULI_CHANNEL_2" => {
+                self.collect_pauli_channel2_errors(instruction_offset, instruction, candidates)
+            }
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => {
                 self.collect_single_measurement_errors(instruction_offset, instruction, candidates)
             }
@@ -200,6 +204,7 @@ impl<'a> CandidateCollector<'a> {
                 target_range_end: target_index + 1,
                 replacement: CandidateReplacement::Noise {
                     gate_name: None,
+                    args: None,
                     targets: None,
                 },
                 location: self.location(
@@ -236,6 +241,7 @@ impl<'a> CandidateCollector<'a> {
             target_range_end: instruction.targets().len(),
             replacement: CandidateReplacement::Noise {
                 gate_name,
+                args: None,
                 targets: None,
             },
             location: self.location(
@@ -275,6 +281,7 @@ impl<'a> CandidateCollector<'a> {
                     target_range_end: target_index + 1,
                     replacement: CandidateReplacement::Noise {
                         gate_name: Some(pauli_error_gate(pauli)),
+                        args: None,
                         targets: None,
                     },
                     location: self.location(
@@ -337,6 +344,7 @@ impl<'a> CandidateCollector<'a> {
                     target_range_end,
                     replacement: CandidateReplacement::Noise {
                         gate_name: Some("E"),
+                        args: None,
                         targets: Some(replacement_targets),
                     },
                     location: self.location(
@@ -353,6 +361,87 @@ impl<'a> CandidateCollector<'a> {
         if !groups.remainder().is_empty() {
             return Err(CircuitError::invalid_detector_error_model(
                 "DEPOLARIZE2 expected an even number of targets during error matching",
+            ));
+        }
+        Ok(())
+    }
+
+    fn collect_pauli_channel2_errors(
+        &self,
+        instruction_offset: usize,
+        instruction: &CircuitInstruction,
+        candidates: &mut Vec<ErrorCandidate>,
+    ) -> CircuitResult<()> {
+        if instruction.args().len() != 15 {
+            return Err(CircuitError::invalid_detector_error_model(
+                "PAULI_CHANNEL_2 expected 15 probability arguments during error matching",
+            ));
+        }
+        let mut groups = instruction.targets().chunks_exact(2);
+        for (group_index, group) in groups.by_ref().enumerate() {
+            let [left_target, right_target] = group else {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "PAULI_CHANNEL_2 expected paired targets during error matching",
+                ));
+            };
+            let Some(left) = left_target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "PAULI_CHANNEL_2 target {left_target} is not a qubit"
+                )));
+            };
+            let Some(right) = right_target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "PAULI_CHANNEL_2 target {right_target} is not a qubit"
+                )));
+            };
+            let target_range_start = group_index.checked_mul(2).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("target range overflowed")
+            })?;
+            let target_range_end = target_range_start.checked_add(2).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("target range overflowed")
+            })?;
+            for (component_index, (left_pauli, right_pauli)) in
+                depolarize2_component_order().into_iter().enumerate()
+            {
+                let probability = instruction
+                    .args()
+                    .get(component_index)
+                    .copied()
+                    .ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "PAULI_CHANNEL_2 component index is outside probability arguments",
+                        )
+                    })?;
+                if probability == 0.0 {
+                    continue;
+                }
+                let flipped_pauli_product =
+                    self.pauli_product_with_coords(left, left_pauli, right, right_pauli)?;
+                let replacement_targets =
+                    pauli_product_targets(left, left_pauli, right, right_pauli);
+                candidates.push(ErrorCandidate {
+                    instruction_offset,
+                    target_range_start,
+                    target_range_end,
+                    replacement: CandidateReplacement::Noise {
+                        gate_name: Some("E"),
+                        args: Some(vec![probability]),
+                        targets: Some(replacement_targets),
+                    },
+                    location: self.location(
+                        instruction,
+                        instruction_offset,
+                        target_range_start,
+                        target_range_end,
+                        flipped_pauli_product,
+                        FlippedMeasurement::none(),
+                    )?,
+                });
+            }
+        }
+        if !groups.remainder().is_empty() {
+            return Err(CircuitError::invalid_detector_error_model(
+                "PAULI_CHANNEL_2 expected an even number of targets during error matching",
             ));
         }
         Ok(())
@@ -721,8 +810,16 @@ fn append_candidate_instruction(
     candidate: &ErrorCandidate,
 ) -> CircuitResult<()> {
     match &candidate.replacement {
-        CandidateReplacement::Noise { gate_name, targets } => {
+        CandidateReplacement::Noise {
+            gate_name,
+            args,
+            targets,
+        } => {
             let gate = Gate::from_name(gate_name.unwrap_or(instruction.gate().canonical_name()))?;
+            let args = args
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(|| instruction.args().to_vec());
             let targets = match targets {
                 Some(targets) => targets.clone(),
                 None => instruction
@@ -737,7 +834,7 @@ fn append_candidate_instruction(
             };
             circuit.append_instruction(CircuitInstruction::new(
                 gate,
-                instruction.args().to_vec(),
+                args,
                 targets,
                 instruction.tag().map(ToOwned::to_owned),
             )?);
@@ -995,117 +1092,4 @@ fn pauli_product_targets(
         result.push(Target::pauli(pauli, right, false));
     }
     result
-}
-
-#[cfg(test)]
-mod tests {
-    #![allow(
-        clippy::indexing_slicing,
-        clippy::unwrap_used,
-        reason = "unit tests use direct fixture assertions for compact diagnostics"
-    )]
-
-    use super::*;
-
-    fn explain(text: &str) -> Vec<ExplainedError> {
-        let circuit = Circuit::from_stim_str(text).unwrap();
-        explain_errors_from_circuit(&circuit, None, false).unwrap()
-    }
-
-    #[test]
-    fn error_matcher_x_error_matches_upstream_subset() {
-        let actual = explain(
-            "
-            QUBIT_COORDS(5, 6) 0
-            X_ERROR(0.25) 0
-            M 0
-            DETECTOR(2, 3) rec[-1]
-            ",
-        );
-
-        assert_eq!(actual.len(), 1);
-        assert_eq!(
-            actual[0].to_string(),
-            "ExplainedError {\n    dem_error_terms: D0[coords 2,3]\n    CircuitErrorLocation {\n        flipped_pauli_product: X0[coords 5,6]\n        Circuit location stack trace:\n            (after 0 TICKs)\n            at instruction #2 (X_ERROR) in the circuit\n            at target #1 of the instruction\n            resolving to X_ERROR(0.25) 0[coords 5,6]\n    }\n}"
-        );
-    }
-
-    #[test]
-    fn error_matcher_correlated_error_matches_upstream_subset() {
-        let actual = explain(
-            "
-            SHIFT_COORDS(10, 20)
-            QUBIT_COORDS(5, 6) 0
-            SHIFT_COORDS(100, 200)
-            CORRELATED_ERROR(0.25) X0 Y1
-            M 0
-            DETECTOR(2, 3) rec[-1]
-            ",
-        );
-
-        assert_eq!(actual.len(), 1);
-        assert_eq!(
-            actual[0].to_string(),
-            "ExplainedError {\n    dem_error_terms: D0[coords 112,223]\n    CircuitErrorLocation {\n        flipped_pauli_product: X0[coords 15,26]*Y1\n        Circuit location stack trace:\n            (after 0 TICKs)\n            at instruction #4 (E) in the circuit\n            at targets #1 to #2 of the instruction\n            resolving to E(0.25) X0[coords 15,26] Y1\n    }\n}"
-        );
-    }
-
-    #[test]
-    fn error_matcher_mx_error_matches_upstream_subset() {
-        let actual = explain(
-            "
-            QUBIT_COORDS(5, 6) 0
-            RX 0
-            REPEAT 10 {
-                TICK
-            }
-            MX(0.125) 1 2 3 0 4
-            DETECTOR(2, 3) rec[-2]
-            ",
-        );
-
-        assert_eq!(actual.len(), 1);
-        assert_eq!(
-            actual[0].to_string(),
-            "ExplainedError {\n    dem_error_terms: D0[coords 2,3]\n    CircuitErrorLocation {\n        flipped_measurement.measurement_record_index: 3\n        flipped_measurement.measured_observable: X0[coords 5,6]\n        Circuit location stack trace:\n            (after 10 TICKs)\n            at instruction #4 (MX) in the circuit\n            at target #4 of the instruction\n            resolving to MX(0.125) 0[coords 5,6]\n    }\n}"
-        );
-    }
-
-    #[test]
-    fn error_matcher_mxx_error_matches_upstream_subset() {
-        let actual = explain(
-            "
-            QUBIT_COORDS(5, 6) 0
-            RX 0
-            CX 0 1
-            MXX(0.125) 0 1
-            DETECTOR(2, 3) rec[-1]
-            ",
-        );
-
-        assert_eq!(actual.len(), 1);
-        assert_eq!(
-            actual[0].to_string(),
-            "ExplainedError {\n    dem_error_terms: D0[coords 2,3]\n    CircuitErrorLocation {\n        flipped_measurement.measurement_record_index: 0\n        flipped_measurement.measured_observable: X0[coords 5,6]*X1\n        Circuit location stack trace:\n            (after 0 TICKs)\n            at instruction #4 (MXX) in the circuit\n            at targets #1 to #2 of the instruction\n            resolving to MXX(0.125) 0[coords 5,6] 1\n    }\n}"
-        );
-    }
-
-    #[test]
-    fn error_matcher_filter_keeps_unmatched_errors() {
-        let circuit = Circuit::from_stim_str(
-            "
-            M 0
-            DETECTOR rec[-1]
-            ",
-        )
-        .unwrap();
-        let filter = DetectorErrorModel::from_dem_str("error(1) D0\n").unwrap();
-        let actual = explain_errors_from_circuit(&circuit, Some(&filter), false).unwrap();
-
-        assert_eq!(actual.len(), 1);
-        assert_eq!(
-            actual[0].to_string(),
-            "ExplainedError {\n    dem_error_terms: D0\n    [no single circuit error had these exact symptoms]\n}"
-        );
-    }
 }

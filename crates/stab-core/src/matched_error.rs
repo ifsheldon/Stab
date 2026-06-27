@@ -167,11 +167,8 @@ pub struct CircuitErrorLocation {
 
 impl CircuitErrorLocation {
     pub fn canonicalize(&mut self) {
-        self.flipped_pauli_product
-            .sort_by(compare_gate_targets_with_coords);
-        self.flipped_measurement
-            .measured_observable
-            .sort_by(compare_gate_targets_with_coords);
+        // Stim preserves Pauli-product order in explanations. Keep this hook for callers that
+        // canonicalize entire explained errors without reordering the products themselves.
     }
 
     pub fn is_simpler_than(&self, other: &Self) -> bool {
