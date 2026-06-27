@@ -1,0 +1,5 @@
+repeat 128 {
+    error(0.001) D0
+    shift_detectors 1
+}
+error(0.25) D0 L0

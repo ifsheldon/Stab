@@ -570,6 +570,26 @@ mod tests {
                 "analyze_errors|--fold_loops",
                 "oracle/fixtures/inputs/analyze_errors_fold_repeat.stim",
             ),
+            (
+                "m11-sample-dem-sparse-contract",
+                "sample_dem|--shots|64|--out_format=b8|--seed|5",
+                "benchmarks/fixtures/m11_sample_dem_sparse_contract.dem",
+            ),
+            (
+                "m11-sample-dem-dense-contract",
+                "sample_dem|--shots|64|--out_format=b8|--seed|5",
+                "benchmarks/fixtures/m11_sample_dem_dense_contract.dem",
+            ),
+            (
+                "m11-sample-dem-repeated-contract",
+                "sample_dem|--shots|64|--out_format=b8|--seed|5",
+                "benchmarks/fixtures/m11_sample_dem_repeated_contract.dem",
+            ),
+            (
+                "m11-sample-dem-high-detector-contract",
+                "sample_dem|--shots|64|--out_format=b8|--seed|5",
+                "benchmarks/fixtures/m11_sample_dem_high_detector_contract.dem",
+            ),
         ] {
             let row = rows
                 .iter()

@@ -13,6 +13,14 @@ use super::{measure_stab_iterations, stab_runner_error};
 
 const SAMPLE_DEM_NOISY_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/sample_dem_noisy.dem");
+const SPARSE_CONTRACT_FIXTURE: &str =
+    include_str!("../../../../benchmarks/fixtures/m11_sample_dem_sparse_contract.dem");
+const DENSE_CONTRACT_FIXTURE: &str =
+    include_str!("../../../../benchmarks/fixtures/m11_sample_dem_dense_contract.dem");
+const REPEATED_CONTRACT_FIXTURE: &str =
+    include_str!("../../../../benchmarks/fixtures/m11_sample_dem_repeated_contract.dem");
+const HIGH_DETECTOR_CONTRACT_FIXTURE: &str =
+    include_str!("../../../../benchmarks/fixtures/m11_sample_dem_high_detector_contract.dem");
 #[cfg(not(test))]
 const M11_SAMPLE_DEM_SHOTS: usize = 1024;
 #[cfg(test)]
@@ -29,14 +37,7 @@ const M11_CONTRACT_ITERATIONS: usize = 1;
 const DENSE_DETECTOR_COUNT: usize = 128;
 #[cfg(test)]
 const DENSE_DETECTOR_COUNT: usize = 16;
-#[cfg(not(test))]
-const REPEATED_DEM_REPS: usize = 128;
-#[cfg(test)]
-const REPEATED_DEM_REPS: usize = 4;
-#[cfg(not(test))]
 const HIGH_DETECTOR_COUNT: usize = 4096;
-#[cfg(test)]
-const HIGH_DETECTOR_COUNT: usize = 128;
 
 pub(super) fn run_dem_sampling_compare_row(
     row: &BenchmarkRow,
@@ -47,28 +48,28 @@ pub(super) fn run_dem_sampling_compare_row(
         "m11-sample-dem-sparse-contract" => run_contract_row(
             row,
             "stab_sample_dem_sparse_b8",
-            sparse_dem_fixture(),
+            SPARSE_CONTRACT_FIXTURE,
             SampleFormat::B8,
         )
         .map(Some),
         "m11-sample-dem-dense-contract" => run_contract_row(
             row,
             "stab_sample_dem_dense_b8",
-            dense_dem_fixture(),
+            DENSE_CONTRACT_FIXTURE,
             SampleFormat::B8,
         )
         .map(Some),
         "m11-sample-dem-repeated-contract" => run_contract_row(
             row,
             "stab_sample_dem_repeated_b8",
-            repeated_dem_fixture(),
+            REPEATED_CONTRACT_FIXTURE,
             SampleFormat::B8,
         )
         .map(Some),
         "m11-sample-dem-high-detector-contract" => run_contract_row(
             row,
             "stab_sample_dem_high_detector_b8",
-            high_detector_dem_fixture(),
+            HIGH_DETECTOR_CONTRACT_FIXTURE,
             SampleFormat::B8,
         )
         .map(Some),
@@ -106,16 +107,16 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures in-process sample_dem parse, compile, sample, and 01 output writing; pinned Stim baseline includes CLI process costs",
         ),
         "m11-sample-dem-sparse-contract" => Some(
-            "contract-representative: Stab measures sparse detector ids with observable output routed through the DEM sampler writer",
+            "cli-baseline: Stab measures sparse detector ids with detector-only b8 output against pinned Stim sample_dem on the same fixture",
         ),
         "m11-sample-dem-dense-contract" => Some(
-            "contract-representative: Stab measures dense detector targets and bit-packed output",
+            "cli-baseline: Stab measures dense detector targets with detector-only b8 output against pinned Stim sample_dem on the same fixture",
         ),
         "m11-sample-dem-repeated-contract" => Some(
-            "contract-representative: Stab measures repeat and detector-shift DEM sampling after the current bounded unroll compilation",
+            "cli-baseline: Stab measures repeat and detector-shift DEM sampling with detector-only b8 output against pinned Stim sample_dem on the same fixture",
         ),
         "m11-sample-dem-high-detector-contract" => Some(
-            "contract-representative: Stab measures high detector index output width with bit-packed output",
+            "cli-baseline: Stab measures high detector index output width with detector-only b8 output against pinned Stim sample_dem on the same fixture",
         ),
         _ => None,
     }
@@ -164,10 +165,10 @@ fn run_sample_dem_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchE
 fn run_contract_row(
     row: &BenchmarkRow,
     measurement_name: &'static str,
-    fixture: String,
+    fixture: &str,
     format: SampleFormat,
 ) -> Result<Vec<Measurement>, BenchError> {
-    let model = parse_dem(&row.id, &fixture)?;
+    let model = parse_dem(&row.id, fixture)?;
     let sampler =
         CompiledDemSampler::compile(&model).map_err(|error| stab_runner_error(&row.id, error))?;
     Ok(vec![measure_stab_iterations(
@@ -177,9 +178,12 @@ fn run_contract_row(
             let output = sampler
                 .sample_detection_events_with_seed(M11_CONTRACT_SHOTS, Some(5))
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-            let bytes =
-                write_detection_records(&output, DetectionObservableOutputMode::Append, format)
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
+            let bytes = write_detection_records(
+                &output,
+                DetectionObservableOutputMode::DetectorsOnly,
+                format,
+            )
+            .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(bytes.len());
             Ok(())
         },
@@ -188,36 +192,6 @@ fn run_contract_row(
 
 fn parse_dem(row_id: &str, fixture: &str) -> Result<DetectorErrorModel, BenchError> {
     DetectorErrorModel::from_dem_str(fixture).map_err(|error| stab_runner_error(row_id, error))
-}
-
-fn sparse_dem_fixture() -> String {
-    format!(
-        "detector D{}\nlogical_observable L1\nerror(0.01) D0\nerror(0.02) D{} L1\n",
-        HIGH_DETECTOR_COUNT / 2,
-        HIGH_DETECTOR_COUNT / 2
-    )
-}
-
-fn dense_dem_fixture() -> String {
-    let mut text = String::new();
-    text.push_str("error(0.001)");
-    for detector in 0..DENSE_DETECTOR_COUNT {
-        text.push_str(" D");
-        text.push_str(&detector.to_string());
-    }
-    text.push_str(" L0\n");
-    text
-}
-
-fn repeated_dem_fixture() -> String {
-    format!(
-        "repeat {REPEATED_DEM_REPS} {{\n    error(0.001) D0\n    shift_detectors 1\n}}\nerror(0.25) D0 L0\n"
-    )
-}
-
-fn high_detector_dem_fixture() -> String {
-    let high_detector_id = HIGH_DETECTOR_COUNT - 1;
-    format!("detector D{high_detector_id}\nerror(0.001) D0\nerror(0.001) D{high_detector_id} L0\n")
 }
 
 fn surface_like_dem_fixture() -> String {
@@ -261,22 +235,22 @@ mod tests {
             ),
             (
                 "m11-sample-dem-sparse-contract",
-                Runner::ContractOnly,
+                Runner::StimCli,
                 &["stab_sample_dem_sparse_b8"][..],
             ),
             (
                 "m11-sample-dem-dense-contract",
-                Runner::ContractOnly,
+                Runner::StimCli,
                 &["stab_sample_dem_dense_b8"][..],
             ),
             (
                 "m11-sample-dem-repeated-contract",
-                Runner::ContractOnly,
+                Runner::StimCli,
                 &["stab_sample_dem_repeated_b8"][..],
             ),
             (
                 "m11-sample-dem-high-detector-contract",
-                Runner::ContractOnly,
+                Runner::StimCli,
                 &["stab_sample_dem_high_detector_b8"][..],
             ),
         ] {
