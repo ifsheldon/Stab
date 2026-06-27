@@ -16,8 +16,8 @@ use crate::{
 use super::{DemInstruction, DemRepeatBlock, DemTarget, DetectorErrorModel};
 use decompose::decompose_error_probabilities;
 use effects::{
-    AnalyzerBasis, AnalyzerPauli, NoiseEffect, PendingError, PendingSingleQubitPauliChannel,
-    analyzer_pauli_from_mask, pauli_mask,
+    AnalyzerBasis, AnalyzerPauli, NoiseEffect, ObservableSensitivity, PendingError,
+    PendingSingleQubitPauliChannel, analyzer_pauli_from_mask, pauli_mask,
 };
 pub use error_decomp::{
     DisjointPauliProbabilities, IndependentPauliProbabilities, independent_to_disjoint_xyz_errors,
@@ -80,6 +80,8 @@ struct Analyzer {
     gauge_errors: Vec<Vec<DemTarget>>,
     detector_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
     observable_terms_by_measurement: BTreeMap<usize, Vec<u64>>,
+    observable_sensitivity: ObservableSensitivity,
+    pauli_observable_declarations: Vec<u64>,
     detector_declarations: Vec<DetectorDeclaration>,
 }
 
@@ -98,6 +100,8 @@ impl Analyzer {
             gauge_errors: Vec::new(),
             detector_terms_by_measurement: BTreeMap::new(),
             observable_terms_by_measurement: BTreeMap::new(),
+            observable_sensitivity: ObservableSensitivity::default(),
+            pauli_observable_declarations: Vec::new(),
             detector_declarations: Vec::new(),
         }
     }
@@ -303,18 +307,14 @@ impl Analyzer {
         if effects_by_qubit.is_empty() {
             return Ok(());
         }
-        self.pending_errors.push(PendingError {
-            probability,
-            effects: effects_by_qubit
-                .into_iter()
-                .map(|(qubit, mask)| NoiseEffect {
-                    qubit,
-                    pauli: analyzer_pauli_from_mask(mask),
-                })
-                .collect(),
-            measurements: Vec::new(),
-            disjoint_group: None,
-        });
+        let effects = effects_by_qubit
+            .into_iter()
+            .map(|(qubit, mask)| NoiseEffect {
+                qubit,
+                pauli: analyzer_pauli_from_mask(mask),
+            })
+            .collect();
+        self.push_pending_error(probability, effects, Vec::new(), None);
         Ok(())
     }
 
@@ -382,12 +382,12 @@ impl Analyzer {
         if probability.get() == 0.0 {
             return;
         }
-        self.pending_errors.push(PendingError {
+        self.push_pending_error(
             probability,
-            effects: vec![NoiseEffect { qubit, pauli }],
-            measurements: Vec::new(),
-            disjoint_group: None,
-        });
+            vec![NoiseEffect { qubit, pauli }],
+            Vec::new(),
+            None,
+        );
     }
 
     fn record_pauli_channel2(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
@@ -524,10 +524,22 @@ impl Analyzer {
                 pauli,
             });
         }
+        self.push_pending_error(probability, effects, Vec::new(), disjoint_group);
+    }
+
+    fn push_pending_error(
+        &mut self,
+        probability: Probability,
+        effects: Vec<NoiseEffect>,
+        measurements: Vec<usize>,
+        disjoint_group: Option<u64>,
+    ) {
+        let observables = self.observable_sensitivity.flipped_observables(&effects);
         self.pending_errors.push(PendingError {
             probability,
             effects,
-            measurements: Vec::new(),
+            measurements,
+            observables,
             disjoint_group,
         });
     }
@@ -666,12 +678,12 @@ impl Analyzer {
                     .map(|pauli| NoiseEffect { qubit, pauli })
                     .into_iter()
                     .collect();
-                self.pending_errors.push(PendingError {
+                self.push_pending_error(
                     probability,
                     effects,
-                    measurements: vec![measurement_index],
+                    vec![measurement_index],
                     disjoint_group,
-                });
+                );
             }
         }
         Ok(())
@@ -707,6 +719,7 @@ impl Analyzer {
                     probability,
                     effects: Vec::new(),
                     measurements: vec![measurement_index],
+                    observables: Vec::new(),
                     disjoint_group: None,
                 });
             }
@@ -719,6 +732,7 @@ impl Analyzer {
                             probability,
                             effects: Vec::new(),
                             measurements: vec![measurement_index],
+                            observables: Vec::new(),
                             disjoint_group: None,
                         });
                     }
@@ -777,6 +791,7 @@ impl Analyzer {
                     probability,
                     effects: Vec::new(),
                     measurements: vec![measurement_index],
+                    observables: Vec::new(),
                     disjoint_group: None,
                 });
             }
@@ -847,6 +862,8 @@ impl Analyzer {
                     pending.apply_single_qubit_clifford(clifford)?;
                 }
             }
+            self.observable_sensitivity
+                .apply_single_qubit_clifford(qubit, clifford)?;
         }
         Ok(())
     }
@@ -872,6 +889,7 @@ impl Analyzer {
             for pending in &mut self.pending_errors {
                 pending.apply_cx(control, target);
             }
+            self.observable_sensitivity.apply_cx(control, target);
         }
         Ok(())
     }
@@ -939,6 +957,7 @@ impl Analyzer {
         let observable = instruction.observable_id_argument()?.ok_or_else(|| {
             CircuitError::invalid_detector_error_model("OBSERVABLE_INCLUDE missing observable id")
         })?;
+        let mut has_pauli_target = false;
         for target in instruction.targets() {
             if let Some(offset) = target.measurement_record_offset() {
                 let measurement = self.measurement_index_from_offset(offset.get())?;
@@ -946,11 +965,26 @@ impl Analyzer {
                     .entry(measurement)
                     .or_default()
                     .push(observable.get());
+            } else if let Some(pauli) = target.pauli_type() {
+                has_pauli_target = true;
+                let qubit = target.qubit_id().ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(format!(
+                        "OBSERVABLE_INCLUDE target {target} does not identify a qubit"
+                    ))
+                })?;
+                self.observable_sensitivity.toggle(
+                    qubit,
+                    AnalyzerBasis::from_pauli(pauli),
+                    observable.get(),
+                );
             } else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
                     "analyze_errors does not yet support OBSERVABLE_INCLUDE target {target}"
                 )));
             }
+        }
+        if has_pauli_target {
+            self.pauli_observable_declarations.push(observable.get());
         }
         Ok(())
     }
@@ -990,14 +1024,16 @@ impl Analyzer {
         let mut merged_error_probabilities = BTreeMap::new();
         let mut disjoint_error_probabilities = BTreeMap::new();
         let mut touched_detectors = BTreeSet::new();
+        let mut touched_logical_observables = BTreeSet::new();
         for pending in self
             .completed_errors
             .into_iter()
             .chain(self.pending_errors)
-            .filter(|pending| !pending.measurements.is_empty())
+            .filter(|pending| !pending.measurements.is_empty() || !pending.observables.is_empty())
         {
             let mut detectors = BTreeSet::new();
             let mut observables = BTreeSet::new();
+            toggle_all(&mut observables, pending.observables.into_iter());
             for measurement in pending.measurements {
                 toggle_all(
                     &mut detectors,
@@ -1069,7 +1105,23 @@ impl Analyzer {
                 DemTarget::RelativeDetector(id) => Some(id.get()),
                 _ => None,
             }));
+            let touched_observables = targets.iter().filter_map(|target| match target {
+                DemTarget::LogicalObservable(id) => Some(id.get()),
+                _ => None,
+            });
+            for observable in touched_observables {
+                touched_logical_observables.insert(observable);
+            }
             dem.push_instruction(DemInstruction::error(probability, targets, None)?);
+        }
+
+        for observable in self.pauli_observable_declarations {
+            if !touched_logical_observables.contains(&observable) {
+                dem.push_instruction(DemInstruction::logical_observable(
+                    DemTarget::logical_observable(observable)?,
+                    None,
+                )?);
+            }
         }
 
         for declaration in self.detector_declarations {

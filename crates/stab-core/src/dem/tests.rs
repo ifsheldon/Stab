@@ -411,6 +411,124 @@ fn dem_analyzer_allow_gauge_detectors_still_rejects_gauge_observables() {
 }
 
 #[test]
+fn dem_analyzer_obs_include_pauli_targets_match_upstream() {
+    let circuit = Circuit::from_stim_str(
+        "OBSERVABLE_INCLUDE(0) X0\n\
+         OBSERVABLE_INCLUDE(1) Y0\n\
+         OBSERVABLE_INCLUDE(2) Z0\n\
+         X_ERROR(0.125) 0\n\
+         Y_ERROR(0.25) 0\n\
+         Z_ERROR(0.375) 0\n\
+         OBSERVABLE_INCLUDE(0) X0\n\
+         OBSERVABLE_INCLUDE(1) Y0\n\
+         OBSERVABLE_INCLUDE(2) Z0\n",
+    )
+    .unwrap();
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+    assert_eq!(
+        dem,
+        "error(0.375) L0 L1\n\
+         error(0.25) L0 L2\n\
+         error(0.125) L1 L2\n"
+    );
+
+    let commuting = Circuit::from_stim_str(
+        "OBSERVABLE_INCLUDE(0) X0\n\
+         OBSERVABLE_INCLUDE(1) Y0\n\
+         OBSERVABLE_INCLUDE(2) Z0\n\
+         X_ERROR(0.125) 0\n\
+         OBSERVABLE_INCLUDE(0) X0\n\
+         OBSERVABLE_INCLUDE(1) Y0\n\
+         OBSERVABLE_INCLUDE(2) Z0\n",
+    )
+    .unwrap();
+    let dem = circuit_to_detector_error_model(&commuting, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+    assert_eq!(
+        dem,
+        "error(0.125) L1 L2\n\
+         logical_observable L0\n\
+         logical_observable L0\n"
+    );
+
+    let depolarizing_outside_boundary = Circuit::from_stim_str(
+        "DEPOLARIZE1(0.125) 0\n\
+         OBSERVABLE_INCLUDE(0) X0\n\
+         OBSERVABLE_INCLUDE(1) Y0\n\
+         OBSERVABLE_INCLUDE(2) Z0\n\
+         X_ERROR(0.25) 0\n\
+         OBSERVABLE_INCLUDE(0) X0\n\
+         OBSERVABLE_INCLUDE(1) Y0\n\
+         OBSERVABLE_INCLUDE(2) Z0\n\
+         DEPOLARIZE1(0.125) 0\n",
+    )
+    .unwrap();
+    let dem = circuit_to_detector_error_model(
+        &depolarizing_outside_boundary,
+        ErrorAnalyzerOptions::default(),
+    )
+    .unwrap()
+    .to_dem_string();
+    assert_eq!(
+        dem,
+        "error(0.25) L1 L2\n\
+         logical_observable L0\n\
+         logical_observable L0\n"
+    );
+
+    let multi_target = Circuit::from_stim_str(
+        "OBSERVABLE_INCLUDE(0) X0 Y1\n\
+         Z_ERROR(0.125) 0\n\
+         OBSERVABLE_INCLUDE(0) X0 Y1\n",
+    )
+    .unwrap();
+    let dem = circuit_to_detector_error_model(&multi_target, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+    assert_eq!(dem, "error(0.125) L0\n");
+
+    let multi_target_commuting = Circuit::from_stim_str(
+        "OBSERVABLE_INCLUDE(0) X0 Y1\n\
+         X_ERROR(0.125) 0\n\
+         OBSERVABLE_INCLUDE(0) X0 Y1\n",
+    )
+    .unwrap();
+    let dem =
+        circuit_to_detector_error_model(&multi_target_commuting, ErrorAnalyzerOptions::default())
+            .unwrap()
+            .to_dem_string();
+    assert_eq!(dem, "logical_observable L0\nlogical_observable L0\n");
+
+    let propagated = Circuit::from_stim_str(
+        "OBSERVABLE_INCLUDE(0) X0\n\
+         H 0\n\
+         Z_ERROR(0.125) 0\n\
+         H 0\n\
+         OBSERVABLE_INCLUDE(0) X0\n",
+    )
+    .unwrap();
+    let dem = circuit_to_detector_error_model(&propagated, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+    assert_eq!(dem, "logical_observable L0\nlogical_observable L0\n");
+}
+
+#[test]
+fn dem_analyzer_rejects_unpaired_obs_include_pauli_targets() {
+    let circuit = Circuit::from_stim_str("OBSERVABLE_INCLUDE(0) X0\n").unwrap();
+
+    let error = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap_err()
+        .to_string();
+
+    assert!(error.contains("non-deterministic observables"));
+    assert!(error.contains("L0"));
+}
+
+#[test]
 fn dem_analyzer_maps_simple_pauli_noise_to_detector_and_observable() {
     let circuit = Circuit::from_stim_str(
         "X_ERROR(0.25) 0\nX_ERROR(0.125) 1\nM 0 1\nOBSERVABLE_INCLUDE(3) rec[-1]\nDETECTOR rec[-2]\n",

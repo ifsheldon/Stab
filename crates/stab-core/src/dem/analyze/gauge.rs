@@ -105,6 +105,7 @@ impl GaugeTracker {
             "H" => self.undo_h(instruction),
             "H_XY" => self.undo_h_xy(instruction),
             "CX" => self.undo_cx(instruction),
+            "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
             _ => Ok(()),
         }
     }
@@ -208,6 +209,33 @@ impl GaugeTracker {
     fn undo_measurement_pads(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         for _ in instruction.targets().iter().rev() {
             self.pop_record_sensitivity()?;
+        }
+        Ok(())
+    }
+
+    fn undo_observable_include(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let observable = instruction.observable_id_argument()?.ok_or_else(|| {
+            CircuitError::invalid_detector_error_model("OBSERVABLE_INCLUDE missing observable id")
+        })?;
+        let target = DemTarget::logical_observable(observable.get())?;
+        let sensitivity = BTreeSet::from([target]);
+        for target in instruction.targets().iter().rev() {
+            let Some(pauli) = target.pauli_type() else {
+                continue;
+            };
+            let qubit = target.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "OBSERVABLE_INCLUDE target {target} does not identify a qubit"
+                ))
+            })?;
+            match AnalyzerBasis::from_pauli(pauli) {
+                AnalyzerBasis::X => self.toggle_xs(qubit, &sensitivity)?,
+                AnalyzerBasis::Y => {
+                    self.toggle_xs(qubit, &sensitivity)?;
+                    self.toggle_zs(qubit, &sensitivity)?;
+                }
+                AnalyzerBasis::Z => self.toggle_zs(qubit, &sensitivity)?,
+            }
         }
         Ok(())
     }

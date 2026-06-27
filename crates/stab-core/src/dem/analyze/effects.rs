@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     CircuitError, CircuitResult, Pauli, PauliBasis, Probability, QubitId, SingleQubitClifford,
@@ -18,6 +18,16 @@ pub(super) enum AnalyzerBasis {
     Z,
 }
 
+impl AnalyzerBasis {
+    pub(super) fn from_pauli(pauli: Pauli) -> Self {
+        match pauli {
+            Pauli::X => Self::X,
+            Pauli::Y => Self::Y,
+            Pauli::Z => Self::Z,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(super) struct NoiseEffect {
     pub(super) qubit: QubitId,
@@ -29,7 +39,14 @@ pub(super) struct PendingError {
     pub(super) probability: Probability,
     pub(super) effects: Vec<NoiseEffect>,
     pub(super) measurements: Vec<usize>,
+    pub(super) observables: Vec<u64>,
     pub(super) disjoint_group: Option<u64>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(super) struct ObservableSensitivity {
+    xs: BTreeMap<QubitId, BTreeSet<u64>>,
+    zs: BTreeMap<QubitId, BTreeSet<u64>>,
 }
 
 #[derive(Clone, Debug)]
@@ -159,6 +176,121 @@ impl PendingError {
     }
 }
 
+impl ObservableSensitivity {
+    pub(super) fn toggle(&mut self, qubit: QubitId, basis: AnalyzerBasis, observable: u64) {
+        let values = BTreeSet::from([observable]);
+        match basis {
+            AnalyzerBasis::X => toggle_all(self.xs.entry(qubit).or_default(), &values),
+            AnalyzerBasis::Y => {
+                toggle_all(self.xs.entry(qubit).or_default(), &values);
+                toggle_all(self.zs.entry(qubit).or_default(), &values);
+            }
+            AnalyzerBasis::Z => toggle_all(self.zs.entry(qubit).or_default(), &values),
+        }
+        self.remove_empty(qubit);
+    }
+
+    pub(super) fn flipped_observables(&self, effects: &[NoiseEffect]) -> Vec<u64> {
+        let mut observables = BTreeSet::new();
+        for effect in effects {
+            match effect.pauli {
+                AnalyzerPauli::X => {
+                    if let Some(zs) = self.zs.get(&effect.qubit) {
+                        toggle_all(&mut observables, zs);
+                    }
+                }
+                AnalyzerPauli::Y => {
+                    if let Some(xs) = self.xs.get(&effect.qubit) {
+                        toggle_all(&mut observables, xs);
+                    }
+                    if let Some(zs) = self.zs.get(&effect.qubit) {
+                        toggle_all(&mut observables, zs);
+                    }
+                }
+                AnalyzerPauli::Z => {
+                    if let Some(xs) = self.xs.get(&effect.qubit) {
+                        toggle_all(&mut observables, xs);
+                    }
+                }
+            }
+        }
+        observables.into_iter().collect()
+    }
+
+    pub(super) fn apply_single_qubit_clifford(
+        &mut self,
+        qubit: QubitId,
+        clifford: SingleQubitClifford,
+    ) -> CircuitResult<()> {
+        let input_xs = self.xs.remove(&qubit).unwrap_or_default();
+        let input_zs = self.zs.remove(&qubit).unwrap_or_default();
+        self.apply_basis_set(
+            qubit,
+            apply_clifford_basis(clifford, PauliBasis::X)?,
+            &input_xs,
+        )?;
+        self.apply_basis_set(
+            qubit,
+            apply_clifford_basis(clifford, PauliBasis::Z)?,
+            &input_zs,
+        )?;
+        self.remove_empty(qubit);
+        Ok(())
+    }
+
+    pub(super) fn apply_cx(&mut self, control: QubitId, target: QubitId) {
+        let control_xs = self.xs.remove(&control).unwrap_or_default();
+        let control_zs = self.zs.remove(&control).unwrap_or_default();
+        let target_xs = self.xs.remove(&target).unwrap_or_default();
+        let target_zs = self.zs.remove(&target).unwrap_or_default();
+
+        toggle_all(self.xs.entry(control).or_default(), &control_xs);
+        toggle_all(self.xs.entry(target).or_default(), &control_xs);
+        toggle_all(self.zs.entry(control).or_default(), &control_zs);
+        toggle_all(self.xs.entry(target).or_default(), &target_xs);
+        toggle_all(self.zs.entry(control).or_default(), &target_zs);
+        toggle_all(self.zs.entry(target).or_default(), &target_zs);
+
+        self.remove_empty(control);
+        self.remove_empty(target);
+    }
+
+    fn apply_basis_set(
+        &mut self,
+        qubit: QubitId,
+        basis: PauliBasis,
+        observables: &BTreeSet<u64>,
+    ) -> CircuitResult<()> {
+        match basis {
+            PauliBasis::I => Err(CircuitError::invalid_detector_error_model(
+                "logical observable sensitivity mapped to identity",
+            )),
+            PauliBasis::X => {
+                toggle_all(self.xs.entry(qubit).or_default(), observables);
+                Ok(())
+            }
+            PauliBasis::Y => {
+                toggle_all(self.xs.entry(qubit).or_default(), observables);
+                toggle_all(self.zs.entry(qubit).or_default(), observables);
+                Ok(())
+            }
+            PauliBasis::Z => {
+                toggle_all(self.zs.entry(qubit).or_default(), observables);
+                Ok(())
+            }
+        }
+    }
+
+    fn remove_empty(&mut self, qubit: QubitId) {
+        if self.xs.get(&qubit).is_some_and(BTreeSet::is_empty) {
+            self.xs.remove(&qubit);
+        }
+        if self.zs.get(&qubit).is_some_and(BTreeSet::is_empty) {
+            self.zs.remove(&qubit);
+        }
+    }
+}
+
 const ANALYZER_X_MASK: u8 = 0b01;
 const ANALYZER_Z_MASK: u8 = 0b10;
 
@@ -258,6 +390,14 @@ fn pauli_flips_basis_measurement(pauli: AnalyzerPauli, basis: AnalyzerBasis) -> 
             | (AnalyzerPauli::Y, AnalyzerBasis::X | AnalyzerBasis::Z)
             | (AnalyzerPauli::Z, AnalyzerBasis::X | AnalyzerBasis::Y)
     )
+}
+
+fn toggle_all(target: &mut BTreeSet<u64>, values: &BTreeSet<u64>) {
+    for value in values {
+        if !target.insert(*value) {
+            target.remove(value);
+        }
+    }
 }
 
 fn insert_effect_mask(masks: &mut BTreeMap<QubitId, u8>, qubit: QubitId, mask: u8) {
