@@ -129,4 +129,7 @@ pub(crate) enum BenchError {
 
     #[error("required profiler notes are missing or invalid:\n{details}")]
     ProfilerNotesMissing { details: Box<str> },
+
+    #[error("--track-allocations requires building stab-bench with --features count-allocations")]
+    AllocationTrackingUnavailable,
 }

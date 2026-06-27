@@ -9,6 +9,7 @@
     )
 )]
 
+mod allocations;
 mod baseline;
 mod compare;
 mod config;
@@ -109,6 +110,10 @@ enum Command {
         #[arg(long)]
         require_profiler_notes: bool,
 
+        /// Measure Stab-side allocation counts using the count-allocations feature.
+        #[arg(long)]
+        track_allocations: bool,
+
         /// Exit with an error while Stab benchmark comparison runners are pending.
         #[arg(long)]
         strict: bool,
@@ -168,6 +173,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             baseline,
             report,
             require_profiler_notes,
+            track_allocations,
             strict,
         } => {
             run_compare(
@@ -180,6 +186,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     primary,
                     report,
                     require_profiler_notes,
+                    track_allocations,
                     strict,
                 },
             )?;

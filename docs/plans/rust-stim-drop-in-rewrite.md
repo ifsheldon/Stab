@@ -421,6 +421,8 @@ For M12 benchmark operations, the frozen primary matrix is every benchmark contr
 The M12 `performance-gate` placeholder row documents the gate and is not itself part of `just bench::compare --primary`.
 Profiler notes for compare reports live beside the report under `<report>/profiler-notes/<benchmark-id>.md`.
 When `--require-profiler-notes` is passed, every row slower than 1.5x pinned Stim must have a note with non-empty `Dominant cost:` and `Next owner action:` lines.
+Allocation tracking is recorded through `just bench::compare-allocations`, which builds `stab-bench` with the optional `count-allocations` feature and records Stab-side allocation counts and maximum live allocated bytes in `compare.json`.
+Timing-gate evidence should use plain `just bench::compare`, because allocation instrumentation changes allocator behavior.
 
 Linked tests and benchmarks:
 

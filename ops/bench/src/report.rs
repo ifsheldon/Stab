@@ -79,7 +79,19 @@ pub(crate) struct Measurement {
     pub(crate) seconds: f64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) variance_seconds: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) allocation: Option<AllocationMeasurement>,
     pub(crate) iterations: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) struct AllocationMeasurement {
+    pub(crate) count_total: u64,
+    pub(crate) count_current: i64,
+    pub(crate) count_max: u64,
+    pub(crate) bytes_total: u64,
+    pub(crate) bytes_current: i64,
+    pub(crate) bytes_max: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -100,6 +112,7 @@ pub(crate) struct CompareCommandMetadata {
     pub(crate) milestone: Option<String>,
     pub(crate) primary: bool,
     pub(crate) require_profiler_notes: bool,
+    pub(crate) track_allocations: bool,
     pub(crate) strict: bool,
 }
 
@@ -125,6 +138,10 @@ pub(crate) struct CompareRowResult {
     pub(crate) stab_median_seconds: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) relative_ratio: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) stab_allocation_count_max: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) stab_allocation_bytes_max: Option<u64>,
     pub(crate) pass_fail_status: String,
     pub(crate) profiler_note_status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -221,11 +238,11 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
         "- Machine: {} {} with {} worker(s)\n\n",
         report.machine.os, report.machine.arch, report.machine.available_parallelism
     ));
-    out.push_str("| Benchmark | Milestone | Status | Pass/Fail | Stim Median | Stab Median | Ratio | Profiler Note | Note |\n");
-    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+    out.push_str("| Benchmark | Milestone | Status | Pass/Fail | Stim Median | Stab Median | Ratio | Stab Alloc Max | Profiler Note | Note |\n");
+    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
     for row in &report.rows {
         out.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
             row.id,
             row.milestone.as_str(),
             row.status,
@@ -233,6 +250,7 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
             format_optional_seconds(row.stim_median_seconds),
             format_optional_seconds(row.stab_median_seconds),
             format_optional_ratio(row.relative_ratio),
+            format_optional_bytes(row.stab_allocation_bytes_max),
             format_profiler_note(row),
             row.note.as_deref().unwrap_or("")
         ));
@@ -246,6 +264,10 @@ fn format_optional_seconds(seconds: Option<f64>) -> String {
 
 fn format_optional_ratio(ratio: Option<f64>) -> String {
     ratio.map_or_else(String::new, |ratio| format!("{ratio:.3}x"))
+}
+
+fn format_optional_bytes(bytes: Option<u64>) -> String {
+    bytes.map_or_else(String::new, |bytes| bytes.to_string())
 }
 
 fn format_profiler_note(row: &CompareRowResult) -> String {

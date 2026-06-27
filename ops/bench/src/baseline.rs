@@ -9,6 +9,7 @@ use stab_core::{
     stabilizers_to_tableau,
 };
 
+use crate::allocations::measure_allocations;
 use crate::config::{PREFIX, STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
 use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner};
@@ -667,6 +668,7 @@ fn measure_stab_iterations(
         name: name.to_string(),
         seconds,
         variance_seconds,
+        allocation: measure_allocations(operation)?,
         iterations: Some(iterations),
     })
 }
@@ -942,6 +944,7 @@ fn run_stim_cli_row(
             name: row.id.clone(),
             seconds: median,
             variance_seconds,
+            allocation: None,
             iterations: Some(iterations),
         }],
     })
@@ -965,6 +968,7 @@ fn parse_stim_perf_line(line: &str) -> Option<Measurement> {
         name,
         seconds,
         variance_seconds: None,
+        allocation: None,
         iterations: None,
     })
 }

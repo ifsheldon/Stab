@@ -17,3 +17,8 @@ baseline *args:
 [working-directory: '..']
 compare *args:
     cargo run -q -p stab-bench --profile release -- compare {{args}}
+
+# Report Stab-vs-Stim comparisons with Stab-side allocation tracking enabled.
+[working-directory: '..']
+compare-allocations *args:
+    cargo run -q -p stab-bench --features count-allocations --profile release -- compare --track-allocations {{args}}

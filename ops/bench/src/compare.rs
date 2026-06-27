@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use crate::allocations::AllocationTrackingGuard;
 use crate::baseline::{
     compare_note, read_baseline_report, run_stab_compare_row, summarize_measurements,
     summarize_stab_measurements, validate_baseline_metadata,
@@ -21,6 +22,7 @@ pub(crate) struct CompareOptions {
     pub(crate) primary: bool,
     pub(crate) report: Option<PathBuf>,
     pub(crate) require_profiler_notes: bool,
+    pub(crate) track_allocations: bool,
     pub(crate) strict: bool,
 }
 
@@ -32,6 +34,7 @@ pub(crate) fn run_compare(
     if options.require_profiler_notes && options.report.is_none() {
         return Err(BenchError::ProfilerNotesRequireReport);
     }
+    let _allocation_tracking = AllocationTrackingGuard::set(options.track_allocations)?;
     let baseline_path = root.resolve_relative(&options.baseline);
     let baseline_report = read_baseline_report(&baseline_path)?;
     validate_baseline_metadata(&baseline_report)?;
@@ -190,6 +193,7 @@ fn write_compare_report(
             milestone: options.milestone.clone(),
             primary: options.primary,
             require_profiler_notes: options.require_profiler_notes,
+            track_allocations: options.track_allocations,
             strict: options.strict,
         },
         rows,
@@ -327,6 +331,8 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         }
         _ => None,
     };
+    let stab_allocation_count_max = max_stab_allocation_count(&stab_measurements);
+    let stab_allocation_bytes_max = max_stab_allocation_bytes(&stab_measurements);
     CompareRowResult {
         id: row.id.clone(),
         milestone: row.milestone,
@@ -344,11 +350,37 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         stim_median_seconds,
         stab_median_seconds,
         relative_ratio,
+        stab_allocation_count_max,
+        stab_allocation_bytes_max,
         pass_fail_status: compare_pass_fail_status(status, baseline_status, relative_ratio),
         profiler_note_status: "not-required".to_string(),
         profiler_note_path: None,
         profiler_note_error: None,
     }
+}
+
+fn max_stab_allocation_count(measurements: &[Measurement]) -> Option<u64> {
+    measurements
+        .iter()
+        .filter_map(|measurement| {
+            measurement
+                .allocation
+                .as_ref()
+                .map(|allocation| allocation.count_max)
+        })
+        .max()
+}
+
+fn max_stab_allocation_bytes(measurements: &[Measurement]) -> Option<u64> {
+    measurements
+        .iter()
+        .filter_map(|measurement| {
+            measurement
+                .allocation
+                .as_ref()
+                .map(|allocation| allocation.bytes_max)
+        })
+        .max()
 }
 
 fn median_seconds(measurements: &[Measurement]) -> Option<f64> {
@@ -518,7 +550,7 @@ mod tests {
         build_compare_row_result, validate_profiler_note_content,
     };
     use crate::manifest::{BenchmarkRow, Milestone, Runner};
-    use crate::report::Measurement;
+    use crate::report::{AllocationMeasurement, Measurement};
 
     #[test]
     fn profiler_notes_are_required_only_for_rows_slower_than_hot_path_ratio() {
@@ -573,6 +605,50 @@ mod tests {
         );
     }
 
+    #[test]
+    fn compare_row_result_records_stab_allocation_maxima() {
+        let row = BenchmarkRow {
+            id: "allocation-row".to_string(),
+            milestone: Milestone::M12,
+            threshold_class: "performance-gate".to_string(),
+            runner: Runner::StimPerf,
+            upstream_source: "future/performance-primary-matrix".to_string(),
+            stim_perf_filter: "test".to_string(),
+            argv: String::new(),
+            stdin_path: String::new(),
+            phase: "performance-hardening".to_string(),
+            measurement: "primary-matrix".to_string(),
+            description: "test row".to_string(),
+        };
+
+        let result = build_compare_row_result(CompareRowBuild {
+            row: &row,
+            status: "measured",
+            baseline_summary: "stim",
+            stab_summary: "stab",
+            note: None,
+            stim_measurements: Vec::new(),
+            stab_measurements: vec![Measurement {
+                name: "stab".to_string(),
+                seconds: 1.0,
+                variance_seconds: Some(0.0),
+                allocation: Some(AllocationMeasurement {
+                    count_total: 7,
+                    count_current: 0,
+                    count_max: 3,
+                    bytes_total: 4096,
+                    bytes_current: 0,
+                    bytes_max: 2048,
+                }),
+                iterations: Some(1),
+            }],
+            baseline_status: BaselineCompareStatus::Comparable,
+        });
+
+        assert_eq!(result.stab_allocation_count_max, Some(3));
+        assert_eq!(result.stab_allocation_bytes_max, Some(2048));
+    }
+
     fn compare_row(id: &str, ratio: Option<f64>) -> crate::report::CompareRowResult {
         let row = BenchmarkRow {
             id: id.to_string(),
@@ -592,6 +668,7 @@ mod tests {
                 name: "stim".to_string(),
                 seconds: 1.0,
                 variance_seconds: None,
+                allocation: None,
                 iterations: None,
             }]
         });
@@ -600,6 +677,7 @@ mod tests {
                 name: "stab".to_string(),
                 seconds: ratio,
                 variance_seconds: Some(0.0),
+                allocation: None,
                 iterations: Some(1),
             }]
         });

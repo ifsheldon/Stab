@@ -8,10 +8,14 @@ repository.workspace = true
 homepage.workspace = true
 publish = false
 
+[features]
+count-allocations = ["dep:allocation-counter"]
+
 [lints]
 workspace = true
 
 [dependencies]
+allocation-counter = { workspace = true, optional = true }
 clap = { workspace = true }
 csv = { workspace = true }
 serde = { workspace = true }
