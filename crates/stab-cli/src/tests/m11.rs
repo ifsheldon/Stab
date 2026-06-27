@@ -447,6 +447,32 @@ fn sample_dem_rejects_excessive_buffered_output_before_sampling() {
 }
 
 #[test]
+fn sample_dem_rejects_oversized_input_file_before_reading() {
+    let dir = tempdir().expect("tempdir");
+    let input_path = dir.path().join("oversized.dem");
+    let file = std::fs::File::create(&input_path).expect("create oversized DEM input");
+    file.set_len(64 * 1024 * 1024 + 1)
+        .expect("mark oversized DEM input");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--in"),
+        input_path.into_os_string(),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(args, b"".as_slice(), &mut stdout, &mut stderr);
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("sample_dem input is too large; limit is 67108864 bytes")
+    );
+}
+
+#[test]
 fn sample_dem_rejects_excessive_replay_buffers_before_reading_replay_path() {
     let dir = tempdir().expect("tempdir");
     let missing_replay_path = dir.path().join("missing.01");

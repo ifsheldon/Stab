@@ -14,11 +14,13 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 mod analyze_errors;
+mod input;
 mod sample_dem;
 
 use analyze_errors::{AnalyzeErrorsArgs, run_analyze_errors};
 use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
+pub(crate) use input::read_limited_input;
 use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_core::{
     Circuit, CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask, CompiledSampler,
@@ -1149,40 +1151,6 @@ where
     };
     let output = write_observable_records(detection_output, format.sample_format()?)?;
     write_output(Some(output_path), stdout, &output)
-}
-
-fn read_limited_input<R>(
-    path: Option<&PathBuf>,
-    stdin: &mut R,
-    limit: u64,
-    kind: &'static str,
-) -> Result<Vec<u8>, CliError>
-where
-    R: Read,
-{
-    if let Some(path) = path {
-        let metadata = std::fs::metadata(path).map_err(|source| CliError::ReadPath {
-            path: path.clone(),
-            source,
-        })?;
-        if metadata.len() > limit {
-            return Err(CliError::InputTooLarge { kind, limit });
-        }
-        return std::fs::read(path).map_err(|source| CliError::ReadPath {
-            path: path.clone(),
-            source,
-        });
-    }
-
-    let mut input = Vec::new();
-    stdin
-        .take(limit.saturating_add(1))
-        .read_to_end(&mut input)
-        .map_err(CliError::ReadInput)?;
-    if u64::try_from(input.len()).unwrap_or(u64::MAX) > limit {
-        return Err(CliError::InputTooLarge { kind, limit });
-    }
-    Ok(input)
 }
 
 #[cfg(test)]

@@ -5,6 +5,24 @@ mod m10;
 mod m11;
 mod m9;
 
+#[cfg(unix)]
+#[test]
+fn read_limited_input_rejects_special_file_after_limit() {
+    let path = std::path::PathBuf::from("/dev/zero");
+    if !path.exists() {
+        return;
+    }
+    let mut stdin = std::io::empty();
+    let error = crate::read_limited_input(Some(&path), &mut stdin, 1024, "test input")
+        .expect_err("special file should be limited while reading");
+
+    assert!(
+        error
+            .to_string()
+            .contains("test input is too large; limit is 1024 bytes")
+    );
+}
+
 #[test]
 fn gen_repetition_code_matches_m7_oracle_golden() {
     let mut stdout = Vec::new();

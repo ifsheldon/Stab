@@ -361,18 +361,45 @@ Tasks:
 - Add exact tests for deterministic DEMs and statistical tests for noisy DEMs.
 - Add sparse, dense, repeated, and high-detector-count DEM fixture groups.
 
+M11 accepts a bounded materialized sampler for the initial Rust core and CLI surface.
+Completion requires explicit rejection tests for oversized DEM input, bounded repeat expansion, excessive detector or observable output width, excessive sampled-error materialization, replay buffers that would exceed the current materialized limit, truncated `ptb64` replay, and invalid replay shot counts.
+The accepted M11 limits are a 64 MiB `sample_dem` DEM input cap, a 64,000,000 buffered-unit materialization cap, the existing DEM sampler repeat and expanded-instruction caps, and a 1,048,576 byte cap per requested text replay record.
+True streaming output, folded repeat sampling without bounded unrolling, exact output-byte budgeting, and performance thresholds are deferred to M12 performance hardening.
+
+The required M11 `sample_dem` CLI surface is the pinned Stim v1.16.0 flag set `--shots`, `--in`, `--out`, `--out_format`, `--seed`, `--obs_out`, `--obs_out_format`, `--err_out`, `--err_out_format`, `--replay_err_in`, and `--replay_err_in_format`.
+Detector output, observable side output, sampled-error output, and replay input must support `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` where Stim accepts those formats.
+M11 acceptance is based on independent detector, observable, and error streams, including replayed error streams.
+Stab-only observable routing aliases such as `--append_observables` and hidden `--prepend_observables` are not Stim parity evidence for M11; if retained, they must reject conflicts with each other and with `--obs_out`.
+
+M11 fixture acceptance matrix:
+
+| Fixture group | Required evidence |
+| --- | --- |
+| Basic deterministic DEM sampling | Exact CLI oracle row and CLI regression test. |
+| One-bit noisy DEM sampling | Statistical CLI oracle row with fixed seed, sample count, tolerance, and false-positive budget. |
+| Sparse detector ids | Deterministic exact oracle row and bucketed noisy statistical oracle row. |
+| Dense detector targets | Deterministic exact oracle row and bucketed noisy statistical oracle row. |
+| Repeated detector shifts | Deterministic exact oracle row and bucketed noisy statistical oracle row. |
+| High detector ids | Deterministic bit-packed exact oracle row and bucketed noisy statistical oracle row. |
+| Observable-only errors | Deterministic side-output exact oracle row and noisy side-output statistical oracle row. |
+| Detector-observable correlation and correlated detector combinations | Deterministic exact oracle rows plus bucketed noisy statistical oracle rows where randomness affects the correlation. |
+| Observable, error, and replay side streams | Exact side-output oracle rows comparing pinned Stim and Stab side files in addition to stdout. |
+| M11-owned simulator internals | Direct Rust structural row for the scoped `dem_sampler` tests. |
+
 Linked tests and benchmarks:
 
 - Direct tests: `src/stim/simulators/dem_sampler.test.cc` and `src/stim/simulators/matched_error.test.cc` where applicable.
 - CLI tests: `src/stim/cmd/command_sample_dem.test.cc`.
 - Semantic-mining tests: Python DEM sampler and compiled detector sampler tests.
 - Benchmarks: `src/stim/simulators/dem_sampler.perf.cc` plus sparse, dense, repeated, and high-detector-count DEM workloads.
+- M11 benchmark acceptance is report-only Stab-side throughput from `just bench::compare --milestone M11`; strict pinned-Stim baseline completeness, external CLI-vs-CLI process timing comparability, performance thresholds, and normalized primary-matrix reporting are M12 responsibilities.
 
 Done criteria:
 
 - `just oracle::run --milestone M11 --exact` passes deterministic DEM sampling cases.
 - `just oracle::run --milestone M11 --statistical` passes noisy DEM sampling cases with documented confidence bounds.
 - `cargo test -p stab-core dem_sampler` covers empty DEMs, observables-only DEMs, repeated DEMs, dense detector cases, and bit-packed output.
+- `cargo test -p stab-cli sample_dem` covers the required CLI flag, format, side-output, replay, and resource-limit behavior.
 - `just bench::compare --milestone M11` reports sparse, dense, repeated, and high-detector-count DEM sampling throughput.
 
 ### M12: Performance Hardening

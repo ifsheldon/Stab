@@ -136,43 +136,43 @@ Gap: the milestone does not specify which multi-outcome channels require multino
 Proposed amendment: require binomial evidence for one-bit marginal fixtures and chi-square or equivalent multi-bucket evidence for multi-outcome noise fixtures, with fixture-specific bucket definitions, sample counts, fixed seeds, and confidence bounds recorded in the oracle manifest.
 Resolution: M8 now includes a bucketed statistical oracle comparator and fixture-specific bucketed rows for `PAULI_CHANNEL_2`, correlated errors, independent X/Y/Z errors, depolarizing basis variants, multi-target `X_ERROR`, and measurement-result flip probabilities. Each row records bucket definitions, sample counts, fixed seed 5, and a 5-sigma tolerance in `oracle/fixtures/manifest.csv`; the oracle harness validates that the declared false-positive budget is not tighter than the tolerance can support.
 
-## Open Entries
-
 ## 2026-06-27 - M11: Sample Dem CLI Flag And Format Scope
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit and full code review against pinned Stim `command_sample_dem.cc` and `dem_sampler.inl`.
 Current text: M11 requires `stim sample_dem` with supported flags, detector output, observable output, bit-packed formats, seed handling, and deterministic behavior where applicable.
 Gap: the milestone does not enumerate the exact Stim v1.16.0 `sample_dem` flag set, and therefore does not say whether `--err_out`, `--err_out_format`, `--replay_err_in`, `--replay_err_in_format`, `ptb64` detector/observable/error streams, or Stab-only observable append/prepend flags are in scope for the initial M11 completion bar.
 Proposed amendment: list the required M11 public `sample_dem` flags and formats explicitly. If full Stim parity is required in M11, require independent detector, observable, and error streams; error recording and replay; `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` where upstream accepts them; and oracle rows for each stream route. If the initial milestone intentionally excludes some of these surfaces, add explicit deferrals with compatibility-matrix rows and require unsupported flags to fail with clear errors.
-Resolution: partially addressed by implementing `--err_out`, `--err_out_format`, `--replay_err_in`, and `--replay_err_in_format` for `01`, `b8`, `r8`, `hits`, and `dets`, adding detector, observable, error, and replay stream support for `ptb64`, and adding exact oracle rows for observable side output, detector-only `dets` stdout with observable side output, sampled-error side output, and replayed error detector, observable, and error-copy streams. The exact M11 acceptance matrix and Stab-only observable append/prepend compatibility policy remain pending plan update.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now lists the required M11 `sample_dem` flags as `--shots`, `--in`, `--out`, `--out_format`, `--seed`, `--obs_out`, `--obs_out_format`, `--err_out`, `--err_out_format`, `--replay_err_in`, and `--replay_err_in_format`; it requires `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` for detector, observable, error, and replay streams where Stim accepts those formats. Stab-only `--append_observables` and hidden `--prepend_observables` are explicitly excluded from M11 Stim parity evidence and must reject conflicts if retained.
 
 ## 2026-06-27 - M11: DEM Sampler Fixture Group Acceptance
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of the M11 oracle manifest, direct Rust tests, and benchmark rows.
 Current text: M11 says to add sparse, dense, repeated, and high-detector-count DEM fixture groups, and the done criteria require exact, statistical, structural, and benchmark checks.
 Gap: the milestone does not define which fixture groups must be oracle rows, which can be direct Rust tests, which can be benchmark-only representatives, what comparator each group uses, or what sample counts and statistical bounds prove noisy sparse, dense, repeated, high-detector, observable-only, and correlated-error behavior.
 Proposed amendment: define an M11 fixture matrix with rows for deterministic exact output, statistical noisy sampling, sparse detector ids, dense detector targets, repeated detector shifts, high detector ids, observable-only errors, detector-observable correlation, and correlated detector combinations. Each row should name its upstream source, comparator mode, sample count or structural assertion, output format, and whether it is acceptance evidence or benchmark-only evidence.
-Resolution: partially addressed by adding implemented exact oracle rows for deterministic sparse detector ids, dense detector targets, repeated detector shifts, high detector ids with `b8` output, correlated detector combinations, observable side output, observable-only side output, and detector-observable correlation through deterministic side-output fixtures. Further addressed by adding bucketed statistical oracle rows for noisy sparse detector ids, dense detector targets, repeated detector shifts, high detector ids, correlated detector combinations, and observable-only side output. The oracle evidence now covers the listed fixture groups, but the formal M11 fixture matrix amendment remains pending plan work.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines the M11 fixture acceptance matrix. The matrix requires exact and statistical evidence for basic, sparse, dense, repeated, high-detector, observable-only, detector-observable correlation, and correlated detector-combination groups, exact side-output oracle rows for observable, error, and replay side streams, and a direct Rust structural row for the M11-owned `dem_sampler` subset.
 
 ## 2026-06-27 - M11: DEM Sampler Streaming And Scale Limits
 
-Status: Open
+Status: Resolved
 Revealed by: full code review of `CompiledDemSampler` and `stab sample_dem` resource behavior.
 Current text: M11's objective says to implement fast DEM-based sampling, and the tasks require reusable analysis state, per-shot sampling, repeated DEM fixtures, high-detector fixtures, and bit-packed formats.
 Gap: the milestone does not specify whether M11 must stream shots like Stim's striped sampler, what maximum supported `--shots`, detector count, observable count, error count, DEM input size, or output byte count is acceptable during the initial implementation, or whether bounded repeat unrolling is an accepted temporary design.
 Proposed amendment: require a compiled or streaming DEM sampler API that can write output in bounded chunks without materializing all shots, or explicitly document initial resource limits and add rejection tests for excessive shots, excessive detector/observable widths, excessive error counts, oversized DEM input, and nested repeat expansion. State whether folded repeat sampling is an M11 requirement or an M12 performance-hardening task.
-Resolution: partially addressed by adding `CompiledDemSampler::validate_sample_buffer_units` and core plus CLI rejection tests for excessive shot counts, high detector widths, and optional generated or replayed error-record buffers. The current materialized sampler rejects requests above 64,000,000 buffered units, where units are detector bits, observable bits, compiled DEM error-operation bits when error records are materialized or replayed, and one unit per zero-width shot. Replay input now reads only the requested `ptb64`, `b8`, and `r8` record prefix, text replay records are capped at 1,048,576 bytes per requested record, and extra replay records after `--shots` are ignored. True streaming output, explicit DEM input-size limits, exact output-byte limits, full text replay scale policy, and folded-repeat sampling policy remain pending plan update.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now accepts a bounded materialized M11 sampler and names the required limits. The implementation adds `CompiledDemSampler::validate_sample_buffer_units`, a 64 MiB `sample_dem` DEM input cap, core plus CLI rejection tests for excessive shot counts, high detector widths, optional generated or replayed error-record buffers, and bounded repeat expansion. Replay input reads only the requested `ptb64`, `b8`, and `r8` record prefix, text replay records are capped at 1,048,576 bytes per requested record, and extra replay records after `--shots` are ignored. True streaming output, folded repeat sampling without bounded unrolling, exact output-byte budgeting, and performance thresholds are deferred to M12.
 
 ## 2026-06-27 - M11: Benchmark Baseline And Comparability
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit and full code review of `just bench::compare --milestone M11`.
 Current text: M11 requires `just bench::compare --milestone M11` to report sparse, dense, repeated, and high-detector-count DEM sampling throughput.
 Gap: the milestone does not say whether M11 completion requires a selected pinned-Stim baseline artifact, strict comparison, external `stab-cli sample_dem` process timings, in-process Stab core timings, or report-only representative workloads. The current Stab runners print useful in-process rates, but the latest local baseline artifact can omit M11 pinned-Stim rows and the `stim-cli` row is not an external CLI-vs-CLI comparison.
 Proposed amendment: define M11 benchmark acceptance as either `just bench::compare --milestone M11 --strict` against a baseline that includes `m11-dem-sampler` and `m11-sample-dem-cli`, or explicitly label the M11 benchmark rows as report-only until M12. If CLI comparability is required, add a Stab subprocess runner using the same argv and stdin path as the Stim CLI baseline, and normalize rates by shots, detector bits, error operations, and output bytes where appropriate.
-Resolution: pending plan update.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines M11 benchmark acceptance as report-only Stab-side throughput from `just bench::compare --milestone M11`. Strict pinned-Stim baseline completeness, external CLI-vs-CLI process timing comparability, performance thresholds, and normalized primary-matrix reporting are M12 responsibilities.
+
+## Open Entries
 
 ## 2026-06-27 - M9: Feedback-Removal Conversion Scope
 

@@ -13,9 +13,12 @@ use stab_core::{
     write_ptb64_observable_records,
 };
 
-use super::{CliError, SampleOutFormatArg, read_input, write_empty_observables, write_output};
+use super::{
+    CliError, SampleOutFormatArg, read_limited_input, write_empty_observables, write_output,
+};
 
 const MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES: usize = 1_048_576;
+const MAX_SAMPLE_DEM_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum SampleDemRecordFormatArg {
@@ -117,7 +120,12 @@ where
         write_empty_observables(args.obs_output.as_ref(), stdout)?;
         return write_empty_errors(args.error_output.as_ref(), stdout);
     }
-    let input_bytes = read_input(args.input.as_ref(), input)?;
+    let input_bytes = read_limited_input(
+        args.input.as_ref(),
+        input,
+        MAX_SAMPLE_DEM_INPUT_BYTES,
+        "sample_dem input",
+    )?;
     let dem = parse_dem_bytes(&input_bytes)?;
     let sampler = CompiledDemSampler::compile(&dem)?;
     sampler.validate_sample_buffer_units(
