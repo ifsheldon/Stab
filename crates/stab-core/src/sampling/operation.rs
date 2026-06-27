@@ -4,6 +4,13 @@ use super::stabilizer_frame::LocalTableauTransform;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum SampleOperation {
+    ApplyHadamard {
+        qubit: usize,
+    },
+    ApplyControlledX {
+        control: usize,
+        target: usize,
+    },
     ApplyTableau {
         targets: Vec<usize>,
         transform: LocalTableauTransform,
@@ -31,11 +38,13 @@ pub(super) enum SampleOperation {
     SingleQubitPauliChannel {
         qubit: usize,
         probabilities: [f64; 3],
+        total_probability: f64,
     },
     TwoQubitPauliChannel {
         left: usize,
         right: usize,
         probabilities: [f64; 15],
+        total_probability: f64,
     },
     CorrelatedError {
         else_branch: bool,

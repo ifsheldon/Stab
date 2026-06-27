@@ -1,9 +1,7 @@
 use rand::rngs::SmallRng;
-use rand::{Rng, RngExt as _, SeedableRng as _};
+use rand::{Rng, SeedableRng as _};
 
-use self::operation::{
-    SINGLE_QUBIT_PAULI_CHANNEL_BASES, SampleOperation, TWO_QUBIT_PAULI_CHANNEL_BASES,
-};
+use self::operation::SampleOperation;
 use self::stabilizer_frame::{
     LocalTableauTransform, MeasurementRandomness, StabilizerFrame, reset_correction,
 };
@@ -15,6 +13,7 @@ use crate::{
 
 mod direct_z_measurement;
 mod measurement_flip;
+mod noise;
 mod operation;
 pub(crate) mod pauli_product;
 mod stabilizer_frame;
@@ -279,6 +278,12 @@ where
     let mut count = 0;
     for operation in operations {
         match operation {
+            SampleOperation::ApplyHadamard { qubit } => {
+                frame.apply_hadamard(*qubit);
+            }
+            SampleOperation::ApplyControlledX { control, target } => {
+                frame.apply_controlled_x(*control, *target);
+            }
             SampleOperation::ApplyTableau { targets, transform } => {
                 frame.apply_tableau(targets, transform);
             }
@@ -440,6 +445,7 @@ fn compile_circuit(
 ) -> CircuitResult<usize> {
     let mut state = CompileState::new();
     compile_circuit_with_state(circuit, operations, &mut state)?;
+    elide_leading_z_resets(operations);
     usize::try_from(state.measurement_count).map_err(|_| {
         CircuitError::invalid_sampler_compilation(
             "measurement record count cannot fit in usize during sampler compilation",
@@ -472,6 +478,24 @@ fn compile_circuit_with_state(
         }
     }
     Ok(())
+}
+
+fn elide_leading_z_resets(operations: &mut Vec<SampleOperation>) {
+    let leading_z_resets = operations
+        .iter()
+        .take_while(|operation| {
+            matches!(
+                operation,
+                SampleOperation::Reset {
+                    basis: PauliBasis::Z,
+                    ..
+                }
+            )
+        })
+        .count();
+    if leading_z_resets > 0 {
+        operations.drain(..leading_z_resets);
+    }
 }
 
 fn compile_instruction(
@@ -786,6 +810,15 @@ fn compile_single_qubit_clifford(
     instruction: &CircuitInstruction,
     operations: &mut Vec<SampleOperation>,
 ) -> CircuitResult<()> {
+    if instruction.gate().canonical_name() == "H" {
+        for target in instruction.targets() {
+            operations.push(SampleOperation::ApplyHadamard {
+                qubit: qubit_index(instruction, target)?,
+            });
+        }
+        return Ok(());
+    }
+
     let clifford = SingleQubitClifford::from_gate(instruction.gate())
         .map_err(|error| CircuitError::invalid_sampler_compilation(error.to_string()))?;
     let transform = LocalTableauTransform::from_tableau(&clifford.tableau())?;
@@ -813,12 +846,22 @@ fn compile_unitary_tableau_group(
     operations: &mut Vec<SampleOperation>,
     target_group: &[crate::Target],
 ) -> CircuitResult<()> {
-    let tableau = crate::circuit_tableau::gate_tableau(instruction.gate().canonical_name())?;
-    let transform = LocalTableauTransform::from_tableau(&tableau)?;
     let targets = target_group
         .iter()
         .map(|target| qubit_index(instruction, target))
         .collect::<CircuitResult<Vec<_>>>()?;
+    if instruction.gate().canonical_name() == "CX"
+        && let [control, target] = targets.as_slice()
+    {
+        operations.push(SampleOperation::ApplyControlledX {
+            control: *control,
+            target: *target,
+        });
+        return Ok(());
+    }
+
+    let tableau = crate::circuit_tableau::gate_tableau(instruction.gate().canonical_name())?;
+    let transform = LocalTableauTransform::from_tableau(&tableau)?;
     if targets.len() != transform.target_count() {
         return Err(unsupported_sampler_instruction(instruction));
     }
@@ -831,10 +874,12 @@ fn compile_single_qubit_pauli_channel(
     operations: &mut Vec<SampleOperation>,
     probabilities: [f64; 3],
 ) -> CircuitResult<()> {
+    let total_probability = probabilities.iter().sum();
     for target in instruction.targets() {
         operations.push(SampleOperation::SingleQubitPauliChannel {
             qubit: qubit_index(instruction, target)?,
             probabilities,
+            total_probability,
         });
     }
     Ok(())
@@ -845,6 +890,7 @@ fn compile_two_qubit_pauli_channel(
     operations: &mut Vec<SampleOperation>,
     probabilities: [f64; 15],
 ) -> CircuitResult<()> {
+    let total_probability = probabilities.iter().sum();
     for target_pair in instruction.target_groups() {
         let [left, right] = target_pair else {
             return Err(unsupported_sampler_instruction(instruction));
@@ -853,6 +899,7 @@ fn compile_two_qubit_pauli_channel(
             left: qubit_index(instruction, left)?,
             right: qubit_index(instruction, right)?,
             probabilities,
+            total_probability,
         });
     }
     Ok(())
@@ -955,6 +1002,12 @@ fn execute_operations(
 ) {
     for operation in operations {
         match operation {
+            SampleOperation::ApplyHadamard { qubit } => {
+                frame.apply_hadamard(*qubit);
+            }
+            SampleOperation::ApplyControlledX { control, target } => {
+                frame.apply_controlled_x(*control, *target);
+            }
             SampleOperation::ApplyTableau { targets, transform } => {
                 frame.apply_tableau(targets, transform);
             }
@@ -1008,18 +1061,33 @@ fn execute_operations(
             SampleOperation::SingleQubitPauliChannel {
                 qubit,
                 probabilities,
+                total_probability,
             } => {
                 if mode.includes_noise() {
-                    apply_single_qubit_pauli_channel(frame, *qubit, probabilities, rng);
+                    noise::apply_single_qubit_pauli_channel(
+                        frame,
+                        *qubit,
+                        probabilities,
+                        *total_probability,
+                        rng,
+                    );
                 }
             }
             SampleOperation::TwoQubitPauliChannel {
                 left,
                 right,
                 probabilities,
+                total_probability,
             } => {
                 if mode.includes_noise() {
-                    apply_two_qubit_pauli_channel(frame, *left, *right, probabilities, rng);
+                    noise::apply_two_qubit_pauli_channel(
+                        frame,
+                        *left,
+                        *right,
+                        probabilities,
+                        *total_probability,
+                        rng,
+                    );
                 }
             }
             SampleOperation::CorrelatedError {
@@ -1028,7 +1096,7 @@ fn execute_operations(
                 terms,
             } => {
                 if mode.includes_noise() {
-                    apply_correlated_error(
+                    noise::apply_correlated_error(
                         frame,
                         terms,
                         *probability,
@@ -1045,7 +1113,7 @@ fn execute_operations(
                 probabilities,
             } => {
                 if mode.includes_noise() {
-                    apply_heralded_pauli_channel(frame, *qubit, probabilities, record, rng);
+                    noise::apply_heralded_pauli_channel(frame, *qubit, probabilities, record, rng);
                 } else {
                     record.push(false);
                 }
@@ -1085,100 +1153,6 @@ fn measurement_record_bit(measurements: &[bool], offset: MeasureRecordOffset) ->
         return false;
     };
     measurements.get(index).copied().unwrap_or(false)
-}
-
-fn apply_heralded_pauli_channel(
-    frame: &mut StabilizerFrame,
-    qubit: usize,
-    probabilities: &[f64; 4],
-    measurements: &mut Vec<bool>,
-    rng: &mut impl Rng,
-) {
-    let [i_probability, x_probability, y_probability, z_probability] = *probabilities;
-    let mut sampled_probability = rng.random::<f64>();
-    if sampled_probability < i_probability {
-        measurements.push(true);
-        return;
-    }
-    sampled_probability -= i_probability;
-    for (basis, probability) in [
-        (PauliBasis::X, x_probability),
-        (PauliBasis::Y, y_probability),
-        (PauliBasis::Z, z_probability),
-    ] {
-        if sampled_probability < probability {
-            measurements.push(true);
-            frame.apply_pauli(qubit, basis);
-            return;
-        }
-        sampled_probability -= probability;
-    }
-    measurements.push(false);
-}
-
-fn apply_single_qubit_pauli_channel(
-    frame: &mut StabilizerFrame,
-    qubit: usize,
-    probabilities: &[f64; 3],
-    rng: &mut impl Rng,
-) {
-    let mut sampled_probability = rng.random::<f64>();
-    for (basis, probability) in SINGLE_QUBIT_PAULI_CHANNEL_BASES
-        .into_iter()
-        .zip(probabilities.iter().copied())
-    {
-        if sampled_probability < probability {
-            frame.apply_pauli(qubit, basis);
-            return;
-        }
-        sampled_probability -= probability;
-    }
-}
-
-fn apply_correlated_error(
-    frame: &mut StabilizerFrame,
-    terms: &[(usize, PauliBasis)],
-    probability: f64,
-    else_branch: bool,
-    correlated_error_occurred: &mut bool,
-    rng: &mut impl Rng,
-) {
-    if else_branch && *correlated_error_occurred {
-        return;
-    }
-    if rng.random::<f64>() < probability {
-        for (qubit, basis) in terms {
-            frame.apply_pauli(*qubit, *basis);
-        }
-        *correlated_error_occurred = true;
-    } else if !else_branch {
-        *correlated_error_occurred = false;
-    }
-}
-
-fn apply_two_qubit_pauli_channel(
-    frame: &mut StabilizerFrame,
-    left: usize,
-    right: usize,
-    probabilities: &[f64; 15],
-    rng: &mut impl Rng,
-) {
-    let mut sampled_probability = rng.random::<f64>();
-    for ((left_basis, right_basis), probability) in TWO_QUBIT_PAULI_CHANNEL_BASES
-        .into_iter()
-        .zip(probabilities.iter().copied())
-    {
-        if sampled_probability < probability {
-            if let Some(basis) = left_basis {
-                frame.apply_pauli(left, basis);
-            }
-            if let Some(basis) = right_basis {
-                frame.apply_pauli(right, basis);
-            }
-            return;
-        }
-        sampled_probability -= probability;
-    }
 }
 
 fn unsupported_sampler_instruction(instruction: &CircuitInstruction) -> CircuitError {

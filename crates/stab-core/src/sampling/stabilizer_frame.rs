@@ -66,6 +66,12 @@ pub(super) enum MeasurementRandomness {
     DeterministicFalse,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MeasurementOutcome {
+    Deterministic(bool),
+    Random { pivot_index: Option<usize> },
+}
+
 impl StabilizerFrame {
     pub(super) fn new(qubit_count: usize) -> Self {
         let generators = (0..qubit_count)
@@ -98,8 +104,35 @@ impl StabilizerFrame {
         if targets.len() != transform.target_count() {
             return;
         }
+        match targets {
+            [target] => {
+                for generator in &mut self.generators {
+                    generator.apply_single_qubit_tableau(*target, transform);
+                }
+                return;
+            }
+            [left, right] => {
+                for generator in &mut self.generators {
+                    generator.apply_two_qubit_tableau(*left, *right, transform);
+                }
+                return;
+            }
+            _ => {}
+        }
         for generator in &mut self.generators {
             generator.apply_tableau(targets, transform);
+        }
+    }
+
+    pub(super) fn apply_hadamard(&mut self, qubit: usize) {
+        for generator in &mut self.generators {
+            generator.apply_hadamard(qubit);
+        }
+    }
+
+    pub(super) fn apply_controlled_x(&mut self, control: usize, target: usize) {
+        for generator in &mut self.generators {
+            generator.apply_controlled_x(control, target);
         }
     }
 
@@ -164,13 +197,10 @@ impl StabilizerFrame {
         rng: &mut impl Rng,
         randomness: MeasurementRandomness,
     ) -> bool {
-        if let Some(bit) = self.deterministic_measurement_bit(observable) {
-            return bit;
-        }
-        let pivot_index = self
-            .generators
-            .iter()
-            .position(|generator| !generator.commutes_with(observable));
+        let pivot_index = match self.measurement_outcome(observable) {
+            MeasurementOutcome::Deterministic(bit) => return bit,
+            MeasurementOutcome::Random { pivot_index } => pivot_index,
+        };
         let sampled = random_measurement_bit(rng, randomness);
         let mut collapsed = observable.clone();
         collapsed.negative ^= sampled;
@@ -206,14 +236,41 @@ impl StabilizerFrame {
     }
 
     fn deterministic_measurement_bit(&self, observable: &StabilizerGenerator) -> Option<bool> {
-        let solution = self.solve_span(observable)?;
+        let MeasurementOutcome::Deterministic(bit) = self.measurement_outcome(observable) else {
+            return None;
+        };
+        Some(bit)
+    }
+
+    fn measurement_outcome(&self, observable: &StabilizerGenerator) -> MeasurementOutcome {
+        if let Some(generator) = self
+            .generators
+            .iter()
+            .find(|generator| generator.same_bases_as(observable))
+        {
+            return MeasurementOutcome::Deterministic(generator.negative ^ observable.negative);
+        }
+
+        if let Some(pivot_index) = self
+            .generators
+            .iter()
+            .position(|generator| !generator.commutes_with(observable))
+        {
+            return MeasurementOutcome::Random {
+                pivot_index: Some(pivot_index),
+            };
+        }
+
+        let Some(solution) = self.solve_span(observable) else {
+            return MeasurementOutcome::Random { pivot_index: None };
+        };
         let mut product = StabilizerGenerator::identity(self.len());
         for (include, generator) in solution.into_iter().zip(&self.generators) {
             if include {
                 product.multiply_assign(generator);
             }
         }
-        Some(product.negative ^ observable.negative)
+        MeasurementOutcome::Deterministic(product.negative ^ observable.negative)
     }
 
     fn solve_span(&self, observable: &StabilizerGenerator) -> Option<Vec<bool>> {
@@ -276,9 +333,7 @@ impl StabilizerGenerator {
 
     fn single(qubit_count: usize, qubit: usize, basis: PauliBasis, negative: bool) -> Self {
         let mut generator = Self::identity(qubit_count);
-        if let Some(slot) = generator.bases.get_mut(qubit) {
-            *slot = basis;
-        }
+        generator.set_basis(qubit, basis);
         generator.negative = negative;
         generator
     }
@@ -293,9 +348,7 @@ impl StabilizerGenerator {
         self.negative = negative;
         self.bases.resize(qubit_count, PauliBasis::I);
         self.bases.fill(PauliBasis::I);
-        if let Some(slot) = self.bases.get_mut(qubit) {
-            *slot = basis;
-        }
+        self.set_basis(qubit, basis);
     }
 
     fn basis(&self, qubit: usize) -> PauliBasis {
@@ -319,6 +372,62 @@ impl StabilizerGenerator {
         }
     }
 
+    fn apply_single_qubit_tableau(&mut self, target: usize, transform: &LocalTableauTransform) {
+        let input_index = basis_digit(self.basis(target));
+        let Some(output) = transform.output(input_index) else {
+            return;
+        };
+        self.negative ^= output.negative;
+        if let Some(basis) = output.bases.first().copied() {
+            self.set_basis(target, basis);
+        }
+    }
+
+    fn apply_two_qubit_tableau(
+        &mut self,
+        left: usize,
+        right: usize,
+        transform: &LocalTableauTransform,
+    ) {
+        let input_index = basis_digit(self.basis(left))
+            .saturating_add(basis_digit(self.basis(right)).saturating_mul(4));
+        let Some(output) = transform.output(input_index) else {
+            return;
+        };
+        self.negative ^= output.negative;
+        if let Some(basis) = output.bases.first().copied() {
+            self.set_basis(left, basis);
+        }
+        if let Some(basis) = output.bases.get(1).copied() {
+            self.set_basis(right, basis);
+        }
+    }
+
+    fn apply_hadamard(&mut self, qubit: usize) {
+        let basis = self.basis(qubit);
+        if basis == PauliBasis::Y {
+            self.negative = !self.negative;
+        }
+        self.set_basis(qubit, PauliBasis::from_xz(basis.z_bit(), basis.x_bit()));
+    }
+
+    fn apply_controlled_x(&mut self, control: usize, target: usize) {
+        let control_basis = self.basis(control);
+        let target_basis = self.basis(target);
+        let control_x = control_basis.x_bit();
+        let control_z = control_basis.z_bit();
+        let target_x = target_basis.x_bit();
+        let target_z = target_basis.z_bit();
+        if control_x && target_z && !(target_x ^ control_z) {
+            self.negative = !self.negative;
+        }
+        self.set_basis(
+            control,
+            PauliBasis::from_xz(control_x, control_z ^ target_z),
+        );
+        self.set_basis(target, PauliBasis::from_xz(target_x ^ control_x, target_z));
+    }
+
     fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) {
         if anticommutes(self.basis(qubit), basis) {
             self.negative = !self.negative;
@@ -333,6 +442,10 @@ impl StabilizerGenerator {
             .filter(|(left, right)| anticommutes(*left, *right))
             .count()
             .is_multiple_of(2)
+    }
+
+    fn same_bases_as(&self, rhs: &Self) -> bool {
+        self.bases == rhs.bases
     }
 
     fn multiply_assign(&mut self, rhs: &Self) {

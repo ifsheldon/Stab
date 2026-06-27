@@ -46,6 +46,7 @@ fn direct_z_measurement_plan(
             SampleOperation::SingleQubitPauliChannel {
                 qubit,
                 probabilities,
+                ..
             },
             SampleOperation::Measure {
                 qubit: measure_qubit,
