@@ -64,6 +64,14 @@ impl FoldedAnalyzer {
     }
 
     fn analyze_repeat(&self, repeat: &RepeatBlock) -> CircuitResult<DemRepeatBlock> {
+        if repeat_body_contains_only_repeats(repeat.body()) {
+            return Ok(DemRepeatBlock::new(
+                repeat.repeat_count(),
+                self.analyze(repeat.body())?,
+                repeat.tag().map(ToOwned::to_owned),
+            ));
+        }
+
         let mut body_options = self.options;
         body_options.fold_loops = false;
         let mut result = Analyzer::new(body_options).analyze_with_stats(repeat.body())?;
@@ -92,6 +100,14 @@ fn prefixed_single_repeat(circuit: &Circuit) -> Option<(Vec<CircuitInstruction>,
         instructions.push(instruction.clone());
     }
     Some((instructions, repeat))
+}
+
+fn repeat_body_contains_only_repeats(body: &Circuit) -> bool {
+    !body.items().is_empty()
+        && body
+            .items()
+            .iter()
+            .all(|item| matches!(item, CircuitItem::RepeatBlock(_)))
 }
 
 fn prefixed_body_circuit(prefix: &[CircuitInstruction], body: &Circuit) -> Circuit {

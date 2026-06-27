@@ -1,0 +1,8 @@
+REPEAT 3 {
+    REPEAT 2 {
+        R 0
+        X_ERROR(0.25) 0
+        M 0
+        DETECTOR rec[-1]
+    }
+}
