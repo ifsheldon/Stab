@@ -13,6 +13,7 @@ use crate::{
     result_formats::{MeasureRecordWriter, write_ptb64_records_checked},
 };
 
+mod direct_z_measurement;
 mod measurement_flip;
 mod operation;
 mod pauli_product;
@@ -82,6 +83,17 @@ impl CompiledSampler {
         skip_reference_sample: bool,
     ) -> Vec<u8> {
         let mut rng = sampler_rng(seed);
+        if !skip_reference_sample
+            && format == SampleFormat::ZeroOne
+            && let Some(bytes) = direct_z_measurement::sample_zero_one_bytes(
+                &self.operations,
+                self.measurement_count,
+                shots,
+                &mut rng,
+            )
+        {
+            return bytes;
+        }
         let reference_sample = skip_reference_sample.then(|| self.reference_sample());
         let mut writer = MeasureRecordWriter::with_capacity(
             format,

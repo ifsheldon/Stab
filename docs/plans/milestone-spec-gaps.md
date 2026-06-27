@@ -174,6 +174,15 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines M11 benchmark 
 
 ## Open Entries
 
+## 2026-06-28 - M12: Probability Utility Benchmark Gate Comparability
+
+Status: Open
+Revealed by: M12 primary compare evidence after optimizing the direct noisy Z-measurement sample path.
+Current text: M12 says the beta performance gate applies to every primary parser, generator, sampling, detection, DEM parsing, DEM sampling, and analyzer workload, and the primary matrix includes `m8-probability-util` from `src/stim/util_bot/probability_util.perf.cc`.
+Gap: `m8-probability-util` compares Stim's internal `biased_random_1024_*` utility benchmark against a Stab sampler-path contract proxy because Stab does not currently expose a standalone probability utility API; the milestone does not say whether such a proxy row can block the beta gate, whether Stab must add a matching utility API, or whether this row should remain report-only until the benchmark surface is made comparable.
+Proposed amendment: either introduce a Stab probability-draw utility API and a direct benchmark matching Stim's `biased_random_1024_*` filters, or explicitly exclude `m8-probability-util` from beta-gate blocking until such an API exists while keeping the public sampler probability paths covered by `m8-sample-throughput-*` and statistical oracle rows.
+Resolution: pending plan update.
+
 ## 2026-06-27 - M9: Feedback-Removal Conversion Scope
 
 Status: Open

@@ -471,6 +471,18 @@ fn seeded_sample_bytes_match_seeded_record_samples() {
 }
 
 #[test]
+fn direct_noisy_z_measurement_bytes_match_seeded_record_samples() {
+    let circuit = Circuit::from_stim_str("X_ERROR(0.25) 0\nM 0\n").expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+    let records = sampler.sample_zero_one_with_seed(128, Some(5));
+
+    assert_eq!(
+        sampler.sample_bytes_with_seed(128, SampleFormat::ZeroOne, Some(5)),
+        crate::result_formats::write_records(&records, SampleFormat::ZeroOne)
+    );
+}
+
+#[test]
 fn writes_r8_samples_with_long_false_runs() {
     let circuit = Circuit::from_stim_str("X 1\nM 0 0 0 0 0 0 0 0 0 1\n").expect("parse circuit");
     let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
