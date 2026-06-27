@@ -4,7 +4,11 @@ use std::str::FromStr;
 mod analyze;
 mod graphlike;
 
-pub use analyze::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+pub use analyze::{
+    DisjointPauliProbabilities, ErrorAnalyzerOptions, IndependentPauliProbabilities,
+    circuit_to_detector_error_model, independent_to_disjoint_xyz_errors,
+    try_disjoint_to_independent_xyz_errors,
+};
 
 use crate::{CircuitError, CircuitResult, Probability, RepeatCount};
 

@@ -3,7 +3,8 @@ use std::hint::black_box;
 use stab_core::{
     Circuit, CodeDistance, DetectorErrorModel, ErrorAnalyzerOptions, Probability, RoundCount,
     SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
-    generate_surface_code_circuit, shortest_graphlike_undetectable_logical_error,
+    generate_surface_code_circuit, independent_to_disjoint_xyz_errors,
+    shortest_graphlike_undetectable_logical_error, try_disjoint_to_independent_xyz_errors,
 };
 
 use crate::error::BenchError;
@@ -21,6 +22,7 @@ const ANALYZE_FOLD_REPEAT_FIXTURE: &str =
 const ERROR_ANALYZER_COMPARE_ITERATIONS: usize = 16;
 const ERROR_ANALYZER_ROUNDS: u32 = 3;
 const ERROR_ANALYZER_DISTANCE: u32 = 3;
+const ERROR_DECOMP_CASES: f64 = 4.0;
 const GRAPHLIKE_SEARCH_DETECTORS: u64 = 128;
 const GRAPHLIKE_SEARCH_GRAPH_EDGES: f64 = (GRAPHLIKE_SEARCH_DETECTORS * 2) as f64;
 
@@ -30,6 +32,7 @@ pub(super) fn run_dem_compare_row(
     match row.id.as_str() {
         "m10-graphlike-search" => run_graphlike_search_row(row).map(Some),
         "m10-error-analyzer" => run_error_analyzer_row(row).map(Some),
+        "m10-error-decomp" => run_error_decomp_row(row).map(Some),
         "m10-dem-parse-contract" => run_dem_parse_row(row).map(Some),
         "m10-dem-print-contract" => run_dem_print_row(row).map(Some),
         "m10-analyze-errors-decompose-cli" => run_analyze_decompose_row(row).map(Some),
@@ -57,6 +60,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("m10-error-analyzer", "stab_error_analyzer_surface_code") => {
             Some((error_analyzer_detector_count(), "detectors/s"))
         }
+        ("m10-error-decomp", "stab_error_decomp_xyz") => {
+            Some((ERROR_DECOMP_CASES, "conversions/s"))
+        }
         ("m10-graphlike-search", "stab_graphlike_search_chain") => {
             Some((GRAPHLIKE_SEARCH_GRAPH_EDGES, "graphlike-edges/s"))
         }
@@ -77,6 +83,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m10-error-analyzer" => Some(
             "contract-representative: Stab measures in-process generated rotated-memory-z surface-code analysis at d3/r3; the upstream Stim perf row uses d11/r100 and remains the eventual scale target",
+        ),
+        "m10-error-decomp" => Some(
+            "direct-match: Stab measures independent/disjoint XYZ probability conversion cases matching the pinned Stim util_bot error_decomp perf filters",
         ),
         "m10-graphlike-search" => Some(
             "contract-representative: Stab measures in-process shortest graphlike logical-error search on a deterministic chain DEM",
@@ -177,6 +186,31 @@ fn run_graphlike_search_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Benc
             let shortest = shortest_graphlike_undetectable_logical_error(&model, false)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(shortest.items().len());
+            Ok(())
+        },
+    )?])
+}
+
+fn run_error_decomp_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let p01 = Probability::try_new(0.01).map_err(|error| stab_runner_error(&row.id, error))?;
+    let p02 = Probability::try_new(0.02).map_err(|error| stab_runner_error(&row.id, error))?;
+    let p10 = Probability::try_new(0.1).map_err(|error| stab_runner_error(&row.id, error))?;
+    let p15 = Probability::try_new(0.15).map_err(|error| stab_runner_error(&row.id, error))?;
+    let p20 = Probability::try_new(0.2).map_err(|error| stab_runner_error(&row.id, error))?;
+    let p30 = Probability::try_new(0.3).map_err(|error| stab_runner_error(&row.id, error))?;
+    let zero = Probability::try_new(0.0).map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(vec![measure_stab_iterations(
+        "stab_error_decomp_xyz",
+        STAB_COMPARE_ITERATIONS,
+        || {
+            black_box(independent_to_disjoint_xyz_errors(p10, p20, p30))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(try_disjoint_to_independent_xyz_errors(p10, p20, p15))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(try_disjoint_to_independent_xyz_errors(p10, p20, zero))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(try_disjoint_to_independent_xyz_errors(p01, p02, zero))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
             Ok(())
         },
     )?])

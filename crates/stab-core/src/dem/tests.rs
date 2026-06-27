@@ -182,6 +182,30 @@ fn dem_shortest_graphlike_logical_error_api_matches_direct_dem() {
 }
 
 #[test]
+fn dem_error_decomposition_api_returns_typed_probability_triples() {
+    let disjoint = independent_to_disjoint_xyz_errors(
+        Probability::try_new(0.1).unwrap(),
+        Probability::try_new(0.2).unwrap(),
+        Probability::try_new(0.3).unwrap(),
+    )
+    .unwrap();
+    assert!((disjoint.x().get() - 0.11).abs() <= 1e-12);
+    assert!((disjoint.y().get() - 0.15).abs() <= 1e-12);
+    assert!((disjoint.z().get() - 0.23).abs() <= 1e-12);
+
+    let independent = try_disjoint_to_independent_xyz_errors(
+        Probability::try_new(0.09).unwrap(),
+        Probability::try_new(0.09).unwrap(),
+        Probability::try_new(0.01).unwrap(),
+    )
+    .unwrap()
+    .unwrap();
+    assert!((independent.x().get() - 0.1).abs() <= 1e-6);
+    assert!((independent.y().get() - 0.1).abs() <= 1e-6);
+    assert!(independent.z().get().abs() <= 1e-6);
+}
+
+#[test]
 fn dem_analyzer_outputs_detector_declaration_for_deterministic_detector() {
     let circuit = Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n").unwrap();
 

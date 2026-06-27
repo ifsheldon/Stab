@@ -2,23 +2,49 @@ use crate::{CircuitError, CircuitResult, Probability};
 
 use super::AnalyzerPauli;
 
-#[derive(Clone, Copy, Debug)]
-pub(super) struct IndependentPauliProbabilities {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct IndependentPauliProbabilities {
     pub(super) x: Probability,
     pub(super) y: Probability,
     pub(super) z: Probability,
 }
 
-#[cfg(test)]
-#[derive(Clone, Copy, Debug)]
-struct DisjointPauliProbabilities {
+impl IndependentPauliProbabilities {
+    pub fn x(self) -> Probability {
+        self.x
+    }
+
+    pub fn y(self) -> Probability {
+        self.y
+    }
+
+    pub fn z(self) -> Probability {
+        self.z
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DisjointPauliProbabilities {
     x: Probability,
     y: Probability,
     z: Probability,
 }
 
-#[cfg(test)]
-fn independent_to_disjoint_xyz_errors(
+impl DisjointPauliProbabilities {
+    pub fn x(self) -> Probability {
+        self.x
+    }
+
+    pub fn y(self) -> Probability {
+        self.y
+    }
+
+    pub fn z(self) -> Probability {
+        self.z
+    }
+}
+
+pub fn independent_to_disjoint_xyz_errors(
     x: Probability,
     y: Probability,
     z: Probability,
@@ -31,7 +57,7 @@ fn independent_to_disjoint_xyz_errors(
     })
 }
 
-pub(super) fn try_disjoint_to_independent_xyz_errors(
+pub fn try_disjoint_to_independent_xyz_errors(
     x: Probability,
     y: Probability,
     z: Probability,

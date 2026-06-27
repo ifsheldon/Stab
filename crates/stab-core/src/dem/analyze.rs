@@ -19,9 +19,13 @@ use effects::{
     AnalyzerBasis, AnalyzerPauli, NoiseEffect, PendingError, PendingSingleQubitPauliChannel,
     analyzer_pauli_from_mask, pauli_mask,
 };
+pub use error_decomp::{
+    DisjointPauliProbabilities, IndependentPauliProbabilities, independent_to_disjoint_xyz_errors,
+    try_disjoint_to_independent_xyz_errors,
+};
 use error_decomp::{
     depolarize1_independent_channel_probability, depolarize2_independent_channel_probability,
-    pauli_channel2_components, try_disjoint_to_independent_xyz_errors,
+    pauli_channel2_components,
 };
 use folded::FoldedAnalyzer;
 use gauge::find_gauge_errors;

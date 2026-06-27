@@ -388,6 +388,11 @@ fn m10_dem_benchmark_rows_have_stab_compare_runners() {
             &["stab_error_analyzer_surface_code"][..],
         ),
         (
+            "m10-error-decomp",
+            Runner::StimPerf,
+            &["stab_error_decomp_xyz"][..],
+        ),
+        (
             "m10-analyze-errors-decompose-cli",
             Runner::StimCli,
             &["stab_analyze_errors_decompose_basic"][..],
