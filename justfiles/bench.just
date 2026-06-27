@@ -27,3 +27,8 @@ compare-allocations *args:
 [working-directory: '..']
 primary-regression *args:
     cargo run -q -p stab-bench --profile release -- compare --primary --thresholds benchmarks/m12-primary-thresholds.json {{args}}
+
+# Check source-owned M12 primary memory-regression baseline.
+[working-directory: '..']
+primary-memory-regression *args:
+    cargo run -q -p stab-bench --features count-allocations --profile release -- compare --track-allocations --primary --require-memory-gate --memory-baseline benchmarks/m12-primary-memory-baseline.json --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/m12 --report target/benchmarks/m12-primary-memory-regression {{args}}

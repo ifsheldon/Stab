@@ -1,8 +1,10 @@
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use serde::Deserialize;
 
 use crate::error::BenchError;
+use crate::manifest::is_safe_benchmark_id;
 use crate::report::CompareRowResult;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -47,11 +49,25 @@ pub(crate) struct MemoryBaseline {
 
 impl MemoryBaseline {
     fn from_report(report: MemoryBaselineReport) -> Result<Self, String> {
+        let mut violations = Vec::new();
         if report.schema_version != 1 {
-            return Err(format!(
+            violations.push(format!(
                 "memory baseline schema_version={} expected 1",
                 report.schema_version
             ));
+        }
+        let mut ids = BTreeSet::new();
+        for row in &report.rows {
+            if row.id.is_empty() {
+                violations.push("row with empty id".to_string());
+            } else if !is_safe_benchmark_id(&row.id) {
+                violations.push(format!("{} has unsafe id", row.id));
+            } else if !ids.insert(row.id.clone()) {
+                violations.push(format!("duplicate memory baseline row {}", row.id));
+            }
+        }
+        if !violations.is_empty() {
+            return Err(violations.join("\n"));
         }
         Ok(Self { rows: report.rows })
     }
@@ -111,6 +127,8 @@ fn allowed_memory_bytes(baseline_bytes: u64) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::{MemoryBaseline, MemoryBaselineReport, apply_memory_gate};
     use crate::manifest::{Milestone, Runner};
     use crate::report::CompareRowResult;
@@ -178,6 +196,67 @@ mod tests {
             error
                 .to_string()
                 .contains("memory baseline schema_version=2 expected 1")
+        );
+    }
+
+    #[test]
+    fn memory_baseline_validates_ids() {
+        let error = MemoryBaseline::from_report(MemoryBaselineReport {
+            schema_version: 1,
+            rows: vec![
+                baseline_row("../bad", Some(100)),
+                baseline_row("duplicate-row", Some(100)),
+                baseline_row("duplicate-row", Some(200)),
+            ],
+        })
+        .expect_err("reject invalid ids");
+
+        let text = error.to_string();
+        assert!(text.contains("../bad has unsafe id"));
+        assert!(text.contains("duplicate memory baseline row duplicate-row"));
+    }
+
+    #[test]
+    fn memory_baseline_accepts_full_compare_report_shape() {
+        let report = serde_json::from_str::<MemoryBaselineReport>(
+            r#"{
+                "schema_version": 1,
+                "command": {"primary": true},
+                "rows": [
+                    {
+                        "id": "m8-sample-throughput-1024",
+                        "status": "measured",
+                        "stab_allocation_bytes_max": 2048,
+                        "memory_gate_status": "not-required"
+                    }
+                ]
+            }"#,
+        )
+        .expect("parse full compare report subset");
+        let baseline = MemoryBaseline::from_report(report).expect("accept full compare report");
+
+        assert_eq!(baseline.rows.len(), 1);
+        assert_eq!(
+            baseline
+                .row("m8-sample-throughput-1024")
+                .expect("row")
+                .stab_allocation_bytes_max,
+            Some(2048)
+        );
+    }
+
+    #[test]
+    fn m12_primary_memory_baseline_validates_source_file() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../benchmarks/m12-primary-memory-baseline.json");
+        let baseline = super::read_memory_baseline(&path).expect("read M12 memory baseline");
+
+        assert_eq!(baseline.rows.len(), 71);
+        assert!(
+            baseline
+                .rows
+                .iter()
+                .all(|row| row.stab_allocation_bytes_max.is_some())
         );
     }
 
