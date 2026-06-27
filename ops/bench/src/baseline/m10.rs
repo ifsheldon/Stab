@@ -22,7 +22,6 @@ const ANALYZE_FOLD_REPEAT_FIXTURE: &str =
 const ERROR_ANALYZER_COMPARE_ITERATIONS: usize = 16;
 const ERROR_ANALYZER_ROUNDS: u32 = 3;
 const ERROR_ANALYZER_DISTANCE: u32 = 3;
-const ERROR_DECOMP_CASES: f64 = 4.0;
 const GRAPHLIKE_SEARCH_DETECTORS: u64 = 128;
 const GRAPHLIKE_SEARCH_GRAPH_EDGES: f64 = (GRAPHLIKE_SEARCH_DETECTORS * 2) as f64;
 
@@ -60,8 +59,11 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("m10-error-analyzer", "stab_error_analyzer_surface_code") => {
             Some((error_analyzer_detector_count(), "detectors/s"))
         }
-        ("m10-error-decomp", "stab_error_decomp_xyz") => {
-            Some((ERROR_DECOMP_CASES, "conversions/s"))
+        ("m10-error-decomp", "stab_independent_to_disjoint_xyz_errors")
+        | ("m10-error-decomp", "stab_disjoint_to_independent_xyz_errors_approx_exact")
+        | ("m10-error-decomp", "stab_disjoint_to_independent_xyz_errors_approx_p10")
+        | ("m10-error-decomp", "stab_disjoint_to_independent_xyz_errors_approx_p100") => {
+            Some((1.0, "conversions/s"))
         }
         ("m10-graphlike-search", "stab_graphlike_search_chain") => {
             Some((GRAPHLIKE_SEARCH_GRAPH_EDGES, "graphlike-edges/s"))
@@ -199,21 +201,44 @@ fn run_error_decomp_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErr
     let p20 = Probability::try_new(0.2).map_err(|error| stab_runner_error(&row.id, error))?;
     let p30 = Probability::try_new(0.3).map_err(|error| stab_runner_error(&row.id, error))?;
     let zero = Probability::try_new(0.0).map_err(|error| stab_runner_error(&row.id, error))?;
-    Ok(vec![measure_stab_iterations(
-        "stab_error_decomp_xyz",
-        STAB_COMPARE_ITERATIONS,
-        || {
-            black_box(independent_to_disjoint_xyz_errors(p10, p20, p30))
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(try_disjoint_to_independent_xyz_errors(p10, p20, p15))
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(try_disjoint_to_independent_xyz_errors(p10, p20, zero))
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(try_disjoint_to_independent_xyz_errors(p01, p02, zero))
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            Ok(())
-        },
-    )?])
+    Ok(vec![
+        measure_stab_iterations(
+            "stab_independent_to_disjoint_xyz_errors",
+            STAB_COMPARE_ITERATIONS,
+            || {
+                black_box(independent_to_disjoint_xyz_errors(p10, p20, p30))
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                Ok(())
+            },
+        )?,
+        measure_stab_iterations(
+            "stab_disjoint_to_independent_xyz_errors_approx_exact",
+            STAB_COMPARE_ITERATIONS,
+            || {
+                black_box(try_disjoint_to_independent_xyz_errors(p10, p20, p15))
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                Ok(())
+            },
+        )?,
+        measure_stab_iterations(
+            "stab_disjoint_to_independent_xyz_errors_approx_p10",
+            STAB_COMPARE_ITERATIONS,
+            || {
+                black_box(try_disjoint_to_independent_xyz_errors(p10, p20, zero))
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                Ok(())
+            },
+        )?,
+        measure_stab_iterations(
+            "stab_disjoint_to_independent_xyz_errors_approx_p100",
+            STAB_COMPARE_ITERATIONS,
+            || {
+                black_box(try_disjoint_to_independent_xyz_errors(p01, p02, zero))
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                Ok(())
+            },
+        )?,
+    ])
 }
 
 fn error_analyzer_surface_code(row_id: &str) -> Result<Circuit, BenchError> {

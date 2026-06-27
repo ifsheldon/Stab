@@ -495,7 +495,12 @@ fn m10_dem_benchmark_rows_have_stab_compare_runners() {
         (
             "m10-error-decomp",
             Runner::StimPerf,
-            &["stab_error_decomp_xyz"][..],
+            &[
+                "stab_independent_to_disjoint_xyz_errors",
+                "stab_disjoint_to_independent_xyz_errors_approx_exact",
+                "stab_disjoint_to_independent_xyz_errors_approx_p10",
+                "stab_disjoint_to_independent_xyz_errors_approx_p100",
+            ][..],
         ),
         (
             "m10-analyze-errors-decompose-cli",
