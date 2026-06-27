@@ -18,6 +18,15 @@ pub(super) fn measurement_basis(name: &str) -> Option<AnalyzerBasis> {
     }
 }
 
+pub(super) fn pair_measurement_basis(name: &str) -> Option<AnalyzerBasis> {
+    match name {
+        "MXX" => Some(AnalyzerBasis::X),
+        "MYY" => Some(AnalyzerBasis::Y),
+        "MZZ" => Some(AnalyzerBasis::Z),
+        _ => None,
+    }
+}
+
 pub(super) fn is_measurement_instruction(name: &str) -> bool {
     matches!(
         name,

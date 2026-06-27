@@ -89,10 +89,14 @@ impl GaugeTracker {
             "M" => self.undo_measurements(instruction, AnalyzerBasis::Z),
             "MX" => self.undo_measurements(instruction, AnalyzerBasis::X),
             "MY" => self.undo_measurements(instruction, AnalyzerBasis::Y),
+            "MXX" => self.undo_pair_measurements(instruction, AnalyzerBasis::X),
+            "MYY" => self.undo_pair_measurements(instruction, AnalyzerBasis::Y),
+            "MZZ" => self.undo_pair_measurements(instruction, AnalyzerBasis::Z),
             "MR" => self.undo_measure_resets(instruction, AnalyzerBasis::Z),
             "MRX" => self.undo_measure_resets(instruction, AnalyzerBasis::X),
             "MRY" => self.undo_measure_resets(instruction, AnalyzerBasis::Y),
             "MPAD" => self.undo_measurement_pads(instruction),
+            "HERALDED_PAULI_CHANNEL_1" => self.undo_heralded_measurements(instruction),
             "R" => self.undo_resets(instruction, AnalyzerBasis::Z),
             "RX" => self.undo_resets(instruction, AnalyzerBasis::X),
             "RY" => self.undo_resets(instruction, AnalyzerBasis::Y),
@@ -136,6 +140,48 @@ impl GaugeTracker {
             })?;
             self.undo_measurement_target(qubit, basis)?;
             self.check_measurement_gauge(qubit, basis)?;
+        }
+        Ok(())
+    }
+
+    fn undo_pair_measurements(
+        &mut self,
+        instruction: &CircuitInstruction,
+        basis: AnalyzerBasis,
+    ) -> CircuitResult<()> {
+        for group in instruction.target_groups().iter().rev() {
+            let [left, right] = *group else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{} expected paired qubit targets during gauge analysis",
+                    instruction.gate().canonical_name()
+                )));
+            };
+            let left = left.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{} target {left} is not a qubit",
+                    instruction.gate().canonical_name()
+                ))
+            })?;
+            let right = right.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{} target {right} is not a qubit",
+                    instruction.gate().canonical_name()
+                ))
+            })?;
+            let sensitivity = self.pop_record_sensitivity()?;
+            let terms = [(left, basis), (right, basis)];
+            self.toggle_product_sensitivity(&terms, &sensitivity)?;
+            self.check_product_measurement_gauge(&terms)?;
+        }
+        Ok(())
+    }
+
+    fn undo_heralded_measurements(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<()> {
+        for _ in instruction.targets().iter().rev() {
+            self.pop_record_sensitivity()?;
         }
         Ok(())
     }
@@ -206,6 +252,28 @@ impl GaugeTracker {
             }
             AnalyzerBasis::Z => self.check_gauge(self.xs_for(qubit)?.clone()),
         }
+    }
+
+    fn check_product_measurement_gauge(
+        &mut self,
+        terms: &[(QubitId, AnalyzerBasis)],
+    ) -> CircuitResult<()> {
+        let mut gauge = BTreeSet::new();
+        for (qubit, basis) in terms {
+            match basis {
+                AnalyzerBasis::X => {
+                    toggle_targets(&mut gauge, self.zs_for(*qubit)?.iter().copied())
+                }
+                AnalyzerBasis::Y => {
+                    toggle_targets(&mut gauge, self.xs_for(*qubit)?.iter().copied());
+                    toggle_targets(&mut gauge, self.zs_for(*qubit)?.iter().copied());
+                }
+                AnalyzerBasis::Z => {
+                    toggle_targets(&mut gauge, self.xs_for(*qubit)?.iter().copied())
+                }
+            }
+        }
+        self.check_gauge(gauge)
     }
 
     fn check_reset_gauge(&mut self, qubit: QubitId, basis: AnalyzerBasis) -> CircuitResult<()> {
@@ -335,6 +403,24 @@ impl GaugeTracker {
             self.toggle_zs(control, &target_zs)?;
             let control_xs = self.xs_for(control)?.clone();
             self.toggle_xs(target, &control_xs)?;
+        }
+        Ok(())
+    }
+
+    fn toggle_product_sensitivity(
+        &mut self,
+        terms: &[(QubitId, AnalyzerBasis)],
+        sensitivity: &BTreeSet<DemTarget>,
+    ) -> CircuitResult<()> {
+        for (qubit, basis) in terms {
+            match basis {
+                AnalyzerBasis::X => self.toggle_xs(*qubit, sensitivity)?,
+                AnalyzerBasis::Y => {
+                    self.toggle_xs(*qubit, sensitivity)?;
+                    self.toggle_zs(*qubit, sensitivity)?;
+                }
+                AnalyzerBasis::Z => self.toggle_zs(*qubit, sensitivity)?,
+            }
         }
         Ok(())
     }

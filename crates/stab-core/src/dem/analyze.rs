@@ -26,7 +26,8 @@ use error_decomp::{
 use folded::FoldedAnalyzer;
 use gauge::find_gauge_errors;
 use instructions::{
-    is_measurement_instruction, is_noise_instruction, measurement_basis, shifted_coordinates,
+    is_measurement_instruction, is_noise_instruction, measurement_basis, pair_measurement_basis,
+    shifted_coordinates,
 };
 use probabilities::{merge_disjoint_probability, merge_independent_probability, toggle_all};
 
@@ -171,7 +172,9 @@ impl Analyzer {
             "DEPOLARIZE1" => self.record_depolarize1(instruction),
             "DEPOLARIZE2" => self.record_depolarize2(instruction),
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => self.record_measurements(instruction),
+            "MXX" | "MYY" | "MZZ" => self.record_pair_measurements(instruction),
             "R" | "RX" | "RY" => self.record_resets(instruction),
+            "HERALDED_PAULI_CHANNEL_1" => self.record_heralded_pauli_channel1(instruction),
             "CX" => self.apply_cx(instruction),
             "MPAD" => self.record_measurement_pads(instruction),
             "DETECTOR" => self.record_detector(instruction),
@@ -545,6 +548,82 @@ impl Analyzer {
         Ok(())
     }
 
+    fn record_heralded_pauli_channel1(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<()> {
+        let Some(probabilities) = instruction.probability_arguments()? else {
+            return Ok(());
+        };
+        let [i_probability, x_probability, y_probability, z_probability] = probabilities.as_slice()
+        else {
+            return Err(CircuitError::invalid_detector_error_model(
+                "HERALDED_PAULI_CHANNEL_1 expected four probabilities",
+            ));
+        };
+        let non_zero_count = probabilities
+            .iter()
+            .filter(|probability| probability.get() > 0.0)
+            .count();
+        let threshold = if non_zero_count > 1 {
+            let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "HERALDED_PAULI_CHANNEL_1 with multiple non-zero components requires approximate_disjoint_errors during error analysis",
+                ));
+            };
+            for probability in &probabilities {
+                if probability.get() > threshold.get() {
+                    return Err(CircuitError::invalid_detector_error_model(format!(
+                        "HERALDED_PAULI_CHANNEL_1 has a probability argument ({}) larger than the approximate_disjoint_errors threshold ({})",
+                        probability.get(),
+                        threshold.get()
+                    )));
+                }
+            }
+            Some(threshold)
+        } else {
+            None
+        };
+
+        for target in instruction.targets() {
+            let Some(qubit) = target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "HERALDED_PAULI_CHANNEL_1 target {target} is not a qubit"
+                )));
+            };
+            let measurement_index = self.measurement_count;
+            self.measurement_count = self.measurement_count.checked_add(1).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("measurement count overflowed")
+            })?;
+            let disjoint_group = if threshold.is_some() {
+                Some(self.allocate_disjoint_group_id()?)
+            } else {
+                None
+            };
+            for (probability, pauli) in [
+                (*i_probability, None),
+                (*x_probability, Some(AnalyzerPauli::X)),
+                (*y_probability, Some(AnalyzerPauli::Y)),
+                (*z_probability, Some(AnalyzerPauli::Z)),
+            ] {
+                if probability.get() == 0.0 {
+                    continue;
+                }
+                let effects = pauli
+                    .map(|pauli| NoiseEffect { qubit, pauli })
+                    .into_iter()
+                    .collect();
+                self.pending_errors.push(PendingError {
+                    probability,
+                    effects,
+                    measurements: vec![measurement_index],
+                    disjoint_group,
+                });
+            }
+        }
+        Ok(())
+    }
+
     fn record_measurements(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         let basis = measurement_basis(instruction.gate().canonical_name()).ok_or_else(|| {
             CircuitError::invalid_detector_error_model("unknown measurement basis")
@@ -596,6 +675,76 @@ impl Analyzer {
             }
             self.pending_pauli_channels = still_pending_channels;
             self.cut_pending_errors_at_qubit(qubit);
+        }
+        Ok(())
+    }
+
+    fn record_pair_measurements(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let basis =
+            pair_measurement_basis(instruction.gate().canonical_name()).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("unknown pair measurement basis")
+            })?;
+        for group in instruction.target_groups() {
+            let [left, right] = group else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{} expected paired qubit targets",
+                    instruction.gate().canonical_name()
+                )));
+            };
+            let Some(left) = left.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{} target {left} is not a qubit",
+                    instruction.gate().canonical_name()
+                )));
+            };
+            let Some(right) = right.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{} target {right} is not a qubit",
+                    instruction.gate().canonical_name()
+                )));
+            };
+            self.reject_pending_single_qubit_channels_through_product_measurement(
+                instruction,
+                &[left, right],
+            )?;
+            let measurement_index = self.measurement_count;
+            self.measurement_count = self.measurement_count.checked_add(1).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("measurement count overflowed")
+            })?;
+            let terms = [(left, basis), (right, basis)];
+            for pending in &mut self.pending_errors {
+                if pending.flips_product_measurement(&terms) {
+                    pending.measurements.push(measurement_index);
+                }
+            }
+            if let Some(probability) = instruction.probability_argument()?
+                && probability.get() > 0.0
+            {
+                self.completed_errors.push(PendingError {
+                    probability,
+                    effects: Vec::new(),
+                    measurements: vec![measurement_index],
+                    disjoint_group: None,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn reject_pending_single_qubit_channels_through_product_measurement(
+        &self,
+        instruction: &CircuitInstruction,
+        qubits: &[QubitId],
+    ) -> CircuitResult<()> {
+        if self
+            .pending_pauli_channels
+            .iter()
+            .any(|pending| qubits.contains(&pending.qubit))
+        {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "analyze_errors does not yet support propagating pending single-qubit Pauli channels through {}",
+                instruction.gate().canonical_name()
+            )));
         }
         Ok(())
     }

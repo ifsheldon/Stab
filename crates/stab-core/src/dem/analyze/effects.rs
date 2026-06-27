@@ -142,14 +142,20 @@ impl PendingError {
 
     pub(super) fn flips_measurement(&self, qubit: QubitId, basis: AnalyzerBasis) -> bool {
         self.effects.iter().any(|effect| {
-            effect.qubit == qubit
-                && matches!(
-                    (effect.pauli, basis),
-                    (AnalyzerPauli::X, AnalyzerBasis::Y | AnalyzerBasis::Z)
-                        | (AnalyzerPauli::Y, AnalyzerBasis::X | AnalyzerBasis::Z)
-                        | (AnalyzerPauli::Z, AnalyzerBasis::X | AnalyzerBasis::Y)
-                )
+            effect.qubit == qubit && pauli_flips_basis_measurement(effect.pauli, basis)
         })
+    }
+
+    pub(super) fn flips_product_measurement(&self, terms: &[(QubitId, AnalyzerBasis)]) -> bool {
+        let mut flips = false;
+        for effect in &self.effects {
+            for (qubit, basis) in terms {
+                if effect.qubit == *qubit && pauli_flips_basis_measurement(effect.pauli, *basis) {
+                    flips ^= true;
+                }
+            }
+        }
+        flips
     }
 }
 
@@ -243,6 +249,15 @@ fn non_identity_mapped_to_identity(clifford: SingleQubitClifford) -> CircuitErro
         "{} mapped a non-identity Pauli to identity",
         clifford.canonical_name()
     ))
+}
+
+fn pauli_flips_basis_measurement(pauli: AnalyzerPauli, basis: AnalyzerBasis) -> bool {
+    matches!(
+        (pauli, basis),
+        (AnalyzerPauli::X, AnalyzerBasis::Y | AnalyzerBasis::Z)
+            | (AnalyzerPauli::Y, AnalyzerBasis::X | AnalyzerBasis::Z)
+            | (AnalyzerPauli::Z, AnalyzerBasis::X | AnalyzerBasis::Y)
+    )
 }
 
 fn insert_effect_mask(masks: &mut BTreeMap<QubitId, u8>, qubit: QubitId, mask: u8) {

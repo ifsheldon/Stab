@@ -243,6 +243,81 @@ fn dem_analyzer_allows_gauge_detectors_through_hxy_basis_change() {
 }
 
 #[test]
+fn circuit_to_dem_heralded_noise_basis_matches_upstream() {
+    let cases = [
+        (
+            "HERALDED_PAULI_CHANNEL_1(0.25, 0, 0, 0) 0",
+            "error(0.25) D0\n\
+             detector(2) D0\n\
+             detector(3) D1\n\
+             detector(5) D2\n",
+        ),
+        (
+            "HERALDED_PAULI_CHANNEL_1(0, 0.25, 0, 0) 0",
+            "error(0.25) D0 D2\n\
+             detector(2) D0\n\
+             detector(3) D1\n\
+             detector(5) D2\n",
+        ),
+        (
+            "HERALDED_PAULI_CHANNEL_1(0, 0, 0.25, 0) 0",
+            "error(0.25) D0 D1 D2\n\
+             detector(2) D0\n\
+             detector(3) D1\n\
+             detector(5) D2\n",
+        ),
+        (
+            "HERALDED_PAULI_CHANNEL_1(0, 0, 0, 0.25) 0",
+            "error(0.25) D0 D1\n\
+             detector(2) D0\n\
+             detector(3) D1\n\
+             detector(5) D2\n",
+        ),
+    ];
+
+    for (noise_instruction, expected) in cases {
+        let circuit = Circuit::from_stim_str(&heralded_basis_circuit(noise_instruction)).unwrap();
+        let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+            .unwrap()
+            .to_dem_string();
+        assert_eq!(dem, expected);
+    }
+
+    let mixed = Circuit::from_stim_str(&heralded_basis_circuit(
+        "HERALDED_PAULI_CHANNEL_1(0.125, 0, 0.25, 0) 0",
+    ))
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&mixed, approximate_options())
+        .unwrap()
+        .to_dem_string();
+    assert_eq!(
+        dem,
+        "error(0.125) D0\n\
+         error(0.25) D0 D1 D2\n\
+         detector(2) D0\n\
+         detector(3) D1\n\
+         detector(5) D2\n"
+    );
+
+    let result = circuit_to_detector_error_model(&mixed, ErrorAnalyzerOptions::default());
+    assert!(result.is_err());
+}
+
+fn heralded_basis_circuit(noise_instruction: &str) -> String {
+    format!(
+        "MXX 0 1\n\
+         MZZ 0 1\n\
+         {noise_instruction}\n\
+         MXX 0 1\n\
+         MZZ 0 1\n\
+         DETECTOR(2) rec[-3]\n\
+         DETECTOR(3) rec[-2] rec[-5]\n\
+         DETECTOR(5) rec[-1] rec[-4]\n"
+    )
+}
+
+#[test]
 fn dem_analyzer_allow_gauge_detectors_still_rejects_gauge_observables() {
     let circuit = Circuit::from_stim_str("R 0\nH 0\nM 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n").unwrap();
 
