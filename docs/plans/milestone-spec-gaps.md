@@ -138,6 +138,42 @@ Resolution: M8 now includes a bucketed statistical oracle comparator and fixture
 
 ## Open Entries
 
+## 2026-06-27 - M11: Sample Dem CLI Flag And Format Scope
+
+Status: Open
+Revealed by: milestone audit and full code review against pinned Stim `command_sample_dem.cc` and `dem_sampler.inl`.
+Current text: M11 requires `stim sample_dem` with supported flags, detector output, observable output, bit-packed formats, seed handling, and deterministic behavior where applicable.
+Gap: the milestone does not enumerate the exact Stim v1.16.0 `sample_dem` flag set, and therefore does not say whether `--err_out`, `--err_out_format`, `--replay_err_in`, `--replay_err_in_format`, `ptb64` detector/observable/error streams, or Stab-only observable append/prepend flags are in scope for the initial M11 completion bar.
+Proposed amendment: list the required M11 public `sample_dem` flags and formats explicitly. If full Stim parity is required in M11, require independent detector, observable, and error streams; error recording and replay; `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` where upstream accepts them; and oracle rows for each stream route. If the initial milestone intentionally excludes some of these surfaces, add explicit deferrals with compatibility-matrix rows and require unsupported flags to fail with clear errors.
+Resolution: pending plan update.
+
+## 2026-06-27 - M11: DEM Sampler Fixture Group Acceptance
+
+Status: Open
+Revealed by: milestone audit of the M11 oracle manifest, direct Rust tests, and benchmark rows.
+Current text: M11 says to add sparse, dense, repeated, and high-detector-count DEM fixture groups, and the done criteria require exact, statistical, structural, and benchmark checks.
+Gap: the milestone does not define which fixture groups must be oracle rows, which can be direct Rust tests, which can be benchmark-only representatives, what comparator each group uses, or what sample counts and statistical bounds prove noisy sparse, dense, repeated, high-detector, observable-only, and correlated-error behavior.
+Proposed amendment: define an M11 fixture matrix with rows for deterministic exact output, statistical noisy sampling, sparse detector ids, dense detector targets, repeated detector shifts, high detector ids, observable-only errors, detector-observable correlation, and correlated detector combinations. Each row should name its upstream source, comparator mode, sample count or structural assertion, output format, and whether it is acceptance evidence or benchmark-only evidence.
+Resolution: pending plan update.
+
+## 2026-06-27 - M11: DEM Sampler Streaming And Scale Limits
+
+Status: Open
+Revealed by: full code review of `CompiledDemSampler` and `stab sample_dem` resource behavior.
+Current text: M11's objective says to implement fast DEM-based sampling, and the tasks require reusable analysis state, per-shot sampling, repeated DEM fixtures, high-detector fixtures, and bit-packed formats.
+Gap: the milestone does not specify whether M11 must stream shots like Stim's striped sampler, what maximum supported `--shots`, detector count, observable count, error count, DEM input size, or output byte count is acceptable during the initial implementation, or whether bounded repeat unrolling is an accepted temporary design.
+Proposed amendment: require a compiled or streaming DEM sampler API that can write output in bounded chunks without materializing all shots, or explicitly document initial resource limits and add rejection tests for excessive shots, excessive detector/observable widths, excessive error counts, oversized DEM input, and nested repeat expansion. State whether folded repeat sampling is an M11 requirement or an M12 performance-hardening task.
+Resolution: pending plan update.
+
+## 2026-06-27 - M11: Benchmark Baseline And Comparability
+
+Status: Open
+Revealed by: milestone audit and full code review of `just bench::compare --milestone M11`.
+Current text: M11 requires `just bench::compare --milestone M11` to report sparse, dense, repeated, and high-detector-count DEM sampling throughput.
+Gap: the milestone does not say whether M11 completion requires a selected pinned-Stim baseline artifact, strict comparison, external `stab-cli sample_dem` process timings, in-process Stab core timings, or report-only representative workloads. The current Stab runners print useful in-process rates, but the latest local baseline artifact can omit M11 pinned-Stim rows and the `stim-cli` row is not an external CLI-vs-CLI comparison.
+Proposed amendment: define M11 benchmark acceptance as either `just bench::compare --milestone M11 --strict` against a baseline that includes `m11-dem-sampler` and `m11-sample-dem-cli`, or explicitly label the M11 benchmark rows as report-only until M12. If CLI comparability is required, add a Stab subprocess runner using the same argv and stdin path as the Stim CLI baseline, and normalize rates by shots, detector bits, error operations, and output bytes where appropriate.
+Resolution: pending plan update.
+
 ## 2026-06-27 - M9: Feedback-Removal Conversion Scope
 
 Status: Open

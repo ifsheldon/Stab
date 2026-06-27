@@ -86,9 +86,7 @@ fn parse_dem_bytes(input: &[u8]) -> Result<DetectorErrorModel, CliError> {
 }
 
 fn validate_observable_routing(args: &SampleDemArgs) -> Result<(), CliError> {
-    let effective_prepend = args.prepend_observables
-        || (args.out_format == SampleOutFormatArg::Dets && !args.append_observables);
-    let selected_routes = usize::from(effective_prepend)
+    let selected_routes = usize::from(args.prepend_observables)
         + usize::from(args.append_observables)
         + usize::from(args.obs_output.is_some());
     if selected_routes > 1 {
@@ -100,7 +98,7 @@ fn validate_observable_routing(args: &SampleDemArgs) -> Result<(), CliError> {
 fn observable_output_mode(args: &SampleDemArgs) -> DetectionObservableOutputMode {
     if args.append_observables {
         DetectionObservableOutputMode::Append
-    } else if args.prepend_observables || args.out_format == SampleOutFormatArg::Dets {
+    } else if args.prepend_observables {
         DetectionObservableOutputMode::Prepend
     } else {
         DetectionObservableOutputMode::DetectorsOnly

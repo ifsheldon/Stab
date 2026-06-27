@@ -7,6 +7,8 @@ use crate::{
 };
 
 const MAX_DEM_SAMPLER_REPEAT_UNROLL: u64 = 100_000;
+const MAX_DEM_SAMPLER_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
+const MAX_DEM_SAMPLER_REPEAT_ITERATIONS: u64 = 1_000_000;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledDemSampler {
@@ -17,6 +19,7 @@ pub struct CompiledDemSampler {
 
 impl CompiledDemSampler {
     pub fn compile(model: &DetectorErrorModel) -> CircuitResult<Self> {
+        validate_compile_budget(model.items())?;
         let detector_count = usize_from_u64(model.count_detectors()?, "detector count")?;
         let observable_count = usize_from_u64(model.count_observables()?, "observable count")?;
         let mut operations = Vec::new();
@@ -75,6 +78,47 @@ impl CompiledDemSampler {
     }
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct DemSamplerCompileBudget {
+    expanded_instructions: u64,
+    repeat_iterations: u64,
+}
+
+impl DemSamplerCompileBudget {
+    fn add_expanded_instructions(&mut self, count: u64) -> CircuitResult<()> {
+        self.expanded_instructions =
+            self.expanded_instructions
+                .checked_add(count)
+                .ok_or_else(|| {
+                    CircuitError::invalid_sampler_compilation(
+                        "DEM sampler expanded instruction count overflowed",
+                    )
+                })?;
+        if self.expanded_instructions > MAX_DEM_SAMPLER_EXPANDED_INSTRUCTIONS {
+            return Err(CircuitError::invalid_sampler_compilation(format!(
+                "DEM sampler currently supports at most {MAX_DEM_SAMPLER_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
+                self.expanded_instructions
+            )));
+        }
+        Ok(())
+    }
+
+    fn add_repeat_iterations(&mut self, count: u64) -> CircuitResult<()> {
+        self.repeat_iterations = self.repeat_iterations.checked_add(count).ok_or_else(|| {
+            CircuitError::invalid_sampler_compilation(
+                "DEM sampler repeat iteration count overflowed",
+            )
+        })?;
+        if self.repeat_iterations > MAX_DEM_SAMPLER_REPEAT_ITERATIONS {
+            return Err(CircuitError::invalid_sampler_compilation(format!(
+                "DEM sampler currently supports at most {MAX_DEM_SAMPLER_REPEAT_ITERATIONS} expanded repeat iterations, got at least {}",
+                self.repeat_iterations
+            )));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 struct DemSampleOperation {
     probability: f64,
@@ -95,6 +139,40 @@ impl DemSampleOperation {
         }
         rng.random::<f64>() < self.probability
     }
+}
+
+fn validate_compile_budget(items: &[DemItem]) -> CircuitResult<()> {
+    let mut budget = DemSamplerCompileBudget::default();
+    validate_compile_budget_items(items, 1, &mut budget)
+}
+
+fn validate_compile_budget_items(
+    items: &[DemItem],
+    multiplier: u64,
+    budget: &mut DemSamplerCompileBudget,
+) -> CircuitResult<()> {
+    for item in items {
+        match item {
+            DemItem::Instruction(_) => budget.add_expanded_instructions(multiplier)?,
+            DemItem::RepeatBlock(repeat) => {
+                let repeat_count = repeat.repeat_count().get();
+                if repeat_count > MAX_DEM_SAMPLER_REPEAT_UNROLL {
+                    return Err(CircuitError::invalid_sampler_compilation(format!(
+                        "DEM sampler currently supports repeat counts up to {MAX_DEM_SAMPLER_REPEAT_UNROLL}, got {repeat_count}"
+                    )));
+                }
+                let repeated_multiplier =
+                    multiplier.checked_mul(repeat_count).ok_or_else(|| {
+                        CircuitError::invalid_sampler_compilation(
+                            "DEM sampler repeat expansion count overflowed",
+                        )
+                    })?;
+                budget.add_repeat_iterations(repeated_multiplier)?;
+                validate_compile_budget_items(repeat.body().items(), repeated_multiplier, budget)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn compile_items(

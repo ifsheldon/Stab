@@ -98,6 +98,23 @@ fn dem_sampler_samples_deterministic_detector_error_each_shot() {
 }
 
 #[test]
+fn dem_sampler_samples_observables_only_errors() {
+    let sampler = compile_dem("error(1) L0\n");
+    let output = sampler
+        .sample_detection_events_with_seed(2, Some(5))
+        .expect("sample");
+
+    assert_eq!(output.detector_count, 0);
+    assert_eq!(output.observable_count, 1);
+    assert!(
+        output
+            .records
+            .iter()
+            .all(|record| { record.detectors.is_empty() && record.observables == [true] })
+    );
+}
+
+#[test]
 fn dem_sampler_writes_dense_bit_packed_detector_and_observable_output() {
     let sampler = compile_dem("error(1) D0 D1 D2 D3 D4 D5 D6 D7 D8 L0\n");
     let output = sampler
@@ -221,5 +238,41 @@ fn dem_sampler_seeded_noisy_error_is_reproducible_and_statistical() {
     assert!(
         (180..=320).contains(&hits),
         "expected noisy DEM hits near p=0.25, got {hits}"
+    );
+}
+
+#[test]
+fn dem_sampler_rejects_repeat_expansion_before_counting_detectors() {
+    let too_large_repeat = DetectorErrorModel::from_dem_str(
+        "
+        repeat 100001 {
+            error(1) D0
+        }
+        ",
+    )
+    .expect("parse oversized repeat");
+    let error = CompiledDemSampler::compile(&too_large_repeat).expect_err("reject repeat count");
+    assert!(
+        error
+            .to_string()
+            .contains("supports repeat counts up to 100000"),
+        "{error}"
+    );
+
+    let nested_explosion = DetectorErrorModel::from_dem_str(
+        "
+        repeat 100000 {
+            repeat 100000 {
+                error(1) D0
+            }
+        }
+        ",
+    )
+    .expect("parse nested repeat");
+    let error =
+        CompiledDemSampler::compile(&nested_explosion).expect_err("reject nested expansion");
+    assert!(
+        error.to_string().contains("expanded repeat iterations"),
+        "{error}"
     );
 }

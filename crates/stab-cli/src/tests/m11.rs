@@ -81,3 +81,37 @@ fn sample_dem_writes_observables_to_obs_out_like_upstream() {
         "001\n001\n001\n001\n001\n"
     );
 }
+
+#[test]
+fn sample_dem_dets_output_keeps_observables_separate_like_upstream() {
+    let dir = tempdir().expect("tempdir");
+    let obs_path = dir.path().join("obs.dets");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("sample_dem"),
+        OsString::from("--out_format"),
+        OsString::from("dets"),
+        OsString::from("--obs_out"),
+        obs_path.clone().into_os_string(),
+        OsString::from("--obs_out_format"),
+        OsString::from("dets"),
+        OsString::from("--shots"),
+        OsString::from("2"),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        args,
+        b"error(1) D0 L0\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "shot D0\nshot D0\n");
+    assert_eq!(
+        std::fs::read_to_string(obs_path).expect("obs output"),
+        "shot L0\nshot L0\n"
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
