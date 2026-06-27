@@ -84,6 +84,16 @@ impl StabilizerFrame {
         }
     }
 
+    pub(super) fn reset_to_z_basis(&mut self) {
+        if self.generators.len() != self.qubit_count {
+            *self = Self::new(self.qubit_count);
+            return;
+        }
+        for (qubit, generator) in self.generators.iter_mut().enumerate() {
+            generator.reset_to_single(self.qubit_count, qubit, PauliBasis::Z, false);
+        }
+    }
+
     pub(super) fn apply_tableau(&mut self, targets: &[usize], transform: &LocalTableauTransform) {
         if targets.len() != transform.target_count() {
             return;
@@ -271,6 +281,21 @@ impl StabilizerGenerator {
         }
         generator.negative = negative;
         generator
+    }
+
+    fn reset_to_single(
+        &mut self,
+        qubit_count: usize,
+        qubit: usize,
+        basis: PauliBasis,
+        negative: bool,
+    ) {
+        self.negative = negative;
+        self.bases.resize(qubit_count, PauliBasis::I);
+        self.bases.fill(PauliBasis::I);
+        if let Some(slot) = self.bases.get_mut(qubit) {
+            *slot = basis;
+        }
     }
 
     fn basis(&self, qubit: usize) -> PauliBasis {

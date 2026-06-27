@@ -456,8 +456,7 @@ fn writes_stim_text_sample_formats() {
 
 #[test]
 fn seeded_sample_bytes_match_seeded_record_samples() {
-    let circuit =
-        Circuit::from_stim_str("X_ERROR(0.25) 0\nM 0\nMPAD 0 1\n").expect("parse circuit");
+    let circuit = Circuit::from_stim_str("H 0\nM 0\nM 0\nMPAD 0 1\n").expect("parse circuit");
     let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
     let records = sampler.sample_zero_one_with_seed(32, Some(5));
 

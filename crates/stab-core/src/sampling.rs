@@ -87,12 +87,14 @@ impl CompiledSampler {
             format,
             estimated_sample_bytes_capacity(format, shots, self.measurement_count),
         );
+        let mut frame = StabilizerFrame::new(self.qubit_count);
         let mut record = Vec::with_capacity(self.measurement_count);
         let mut output = Vec::with_capacity(self.measurement_count);
         for _ in 0..shots {
             self.sample_shot_with_reference_into(
                 &mut rng,
                 reference_sample.as_deref(),
+                &mut frame,
                 &mut record,
                 &mut output,
             );
@@ -144,9 +146,10 @@ impl CompiledSampler {
     where
         R: Rng,
     {
+        let mut frame = StabilizerFrame::new(self.qubit_count);
         let mut record = Vec::with_capacity(self.measurement_count);
         let mut output = Vec::with_capacity(self.measurement_count);
-        self.sample_shot_with_reference_into(rng, reference, &mut record, &mut output);
+        self.sample_shot_with_reference_into(rng, reference, &mut frame, &mut record, &mut output);
         output
     }
 
@@ -154,12 +157,13 @@ impl CompiledSampler {
         &self,
         rng: &mut R,
         reference: Option<&[bool]>,
+        frame: &mut StabilizerFrame,
         record: &mut Vec<bool>,
         output: &mut Vec<bool>,
     ) where
         R: Rng,
     {
-        self.sample_shot_in_mode_into(rng, ExecutionMode::Sample, record, output);
+        self.sample_shot_in_mode_into(rng, ExecutionMode::Sample, frame, record, output);
         if let Some(reference) = reference {
             for (bit, reference_bit) in output.iter_mut().zip(reference) {
                 *bit ^= *reference_bit;
@@ -176,9 +180,10 @@ impl CompiledSampler {
     where
         R: Rng,
     {
+        let mut frame = StabilizerFrame::new(self.qubit_count);
         let mut record = Vec::with_capacity(self.measurement_count);
         let mut output = Vec::with_capacity(self.measurement_count);
-        self.sample_shot_in_mode_into(rng, mode, &mut record, &mut output);
+        self.sample_shot_in_mode_into(rng, mode, &mut frame, &mut record, &mut output);
         output
     }
 
@@ -186,18 +191,19 @@ impl CompiledSampler {
         &self,
         rng: &mut R,
         mode: ExecutionMode,
+        frame: &mut StabilizerFrame,
         record: &mut Vec<bool>,
         output: &mut Vec<bool>,
     ) where
         R: Rng,
     {
-        let mut frame = StabilizerFrame::new(self.qubit_count);
+        frame.reset_to_z_basis();
         record.clear();
         output.clear();
         let mut correlated_error_occurred = false;
         execute_operations(
             &self.operations,
-            &mut frame,
+            frame,
             record,
             output,
             &mut correlated_error_occurred,
