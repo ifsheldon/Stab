@@ -2,6 +2,7 @@ use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 mod analyze;
+mod graphlike;
 
 pub use analyze::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
 
@@ -364,7 +365,7 @@ impl DemInstruction {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DemDetectorId(u64);
 
 impl DemDetectorId {
@@ -382,7 +383,7 @@ impl DemDetectorId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DemObservableId(u32);
 
 impl DemObservableId {
