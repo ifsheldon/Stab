@@ -12,6 +12,21 @@ Future Plan items are out of scope until they are promoted into explicit milesto
 ## Milestone Completion Loop
 
 A milestone is not complete until each gate below is completed in order.
+Use this loop for every milestone from M0 through M12, even when a milestone is mostly documentation, infrastructure, tests, benchmarks, or review hardening.
+If a gate genuinely does not apply, record why it is not applicable instead of skipping it silently.
+
+## Per-Milestone Checklist
+
+Each milestone implementation report, pull request, or durable tracking artifact should include this checklist:
+
+- Milestone: `Mx: Title` from `docs/plans/rust-stim-drop-in-rewrite.md`.
+- Contract: objective, tasks, linked tests and benchmarks, done criteria, explicit deferrals, and open spec-gap entries considered before implementation.
+- Test-first work: upstream Stim tests ported, Stab-specific tests created, oracle fixtures added, statistical checks defined, benchmark workloads added or updated, and any planned tests that remain red or manifest-only.
+- Implementation work: crates, modules, CLI commands, file formats, operational commands, docs, and generated artifacts changed for the milestone.
+- Done-criteria matrix: every task and done criterion marked `Satisfied`, `Partially satisfied`, `Missing`, `Not applicable`, or `Blocked`, with evidence for every satisfied item.
+- Milestone audit: command or workflow used, findings fixed, under-specification findings logged in `docs/plans/milestone-spec-gaps.md`, and the final milestone status.
+- Full code review: command or workflow used, findings fixed, intentionally deferred findings with rationale, and checks re-run after fixes.
+- Verification: exact commands run, benchmark report paths, oracle report paths, checks not run, and the reason any required check was skipped.
 
 ### Gate 1: Port Or Create Tests
 
