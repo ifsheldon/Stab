@@ -1141,9 +1141,14 @@ fn compare_fixture(
     let reason = match row.comparator {
         FixtureComparator::ExactOutput => compare_exact(stim, stab),
         FixtureComparator::HelpHealth => compare_help_health(stim, stab),
-        FixtureComparator::Statistical => {
-            statistical::compare_statistical_plan(&row.statistical_plan, &stab.stdout.bytes)
-        }
+        FixtureComparator::Statistical => match statistical::source_for_plan(&row.statistical_plan)
+        {
+            Ok(statistical::StatisticalSource::Stdout) => {
+                statistical::compare_statistical_plan(&row.statistical_plan, &stab.stdout.bytes)
+            }
+            Ok(statistical::StatisticalSource::FixtureOutput) => compare_exact(stim, stab),
+            Err(reason) => Some(reason),
+        },
         FixtureComparator::Property | FixtureComparator::Structural => Some(format!(
             "{} comparator is not runnable until the milestone implementation defines it",
             row.comparator.as_str()

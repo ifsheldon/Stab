@@ -1,12 +1,33 @@
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement, Milestone,
-    RunFilter, RunMode, is_recordable,
+    RunFilter, RunMode, compare_fixture, is_recordable,
     outputs::{self, FixtureArgToken},
     run_core_fixture, run_direct_rust_fixture, statistical, validate_fixture_path,
 };
 
 const MANIFEST_CSV: &str = include_str!("../../../../oracle/fixtures/manifest.csv");
 const HEADER: &str = "id,milestone,upstream_source,parity_mode,comparator,command_shape,argv,stdin_path,expected_stdout_path,expected_status,expected_stderr_class,status,statistical_plan,source_license_note\n";
+
+fn process_output(status: Option<i32>, stdout: &[u8], stderr: &[u8]) -> crate::ProcessOutput {
+    crate::ProcessOutput {
+        status,
+        stdout: crate::CapturedOutput {
+            bytes: stdout.to_vec(),
+            truncated: false,
+        },
+        stderr: crate::CapturedOutput {
+            bytes: stderr.to_vec(),
+            truncated: false,
+        },
+    }
+}
+
+fn observable_only_distribution_bytes() -> Vec<u8> {
+    let mut bytes = Vec::new();
+    bytes.extend(std::iter::repeat_n(b"000\n", 750).flatten());
+    bytes.extend(std::iter::repeat_n(b"001\n", 250).flatten());
+    bytes
+}
 
 #[test]
 fn repository_fixture_manifest_passes_validation() {
@@ -230,7 +251,15 @@ fn repository_fixture_placeholder_files_exist() {
             match outputs::parse_fixture_arg_token(&row.id, &token)
                 .expect("parse fixture placeholder token")
             {
-                Some(FixtureArgToken::Input(relative) | FixtureArgToken::Output(relative)) => {
+                Some(FixtureArgToken::Input(relative)) => {
+                    let path = super::fixture_file(&root, relative).unwrap();
+                    assert!(path.is_file(), "{} {}", row.id, relative);
+                }
+                Some(FixtureArgToken::Output(_relative))
+                    if row.comparator == FixtureComparator::Statistical
+                        && statistical::source_for_plan(&row.statistical_plan).unwrap()
+                            == statistical::StatisticalSource::FixtureOutput => {}
+                Some(FixtureArgToken::Output(relative)) => {
                     let path = super::fixture_file(&root, relative).unwrap();
                     assert!(path.is_file(), "{} {}", row.id, relative);
                 }
@@ -346,6 +375,150 @@ fn validation_rejects_statistical_row_without_plan() {
             .to_string()
             .contains("comparator needs structural or statistical plan text")
     );
+}
+
+#[test]
+fn statistical_plan_source_defaults_to_stdout() {
+    let plan = "sample_count=1000; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
+
+    assert_eq!(
+        statistical::source_for_plan(plan).unwrap(),
+        statistical::StatisticalSource::Stdout
+    );
+}
+
+#[test]
+fn statistical_plan_source_accepts_fixture_output() {
+    let plan = "sample_count=1000; fixed_seed=5; source=fixture_output; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
+
+    assert_eq!(
+        statistical::source_for_plan(plan).unwrap(),
+        statistical::StatisticalSource::FixtureOutput
+    );
+}
+
+#[test]
+fn statistical_plan_source_rejects_unknown_values() {
+    let plan = "sample_count=1000; fixed_seed=5; source=sidecar; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
+
+    assert!(
+        statistical::source_for_plan(plan)
+            .expect_err("unknown source should fail")
+            .contains("unknown statistical source")
+    );
+}
+
+#[test]
+fn statistical_fixture_output_placeholders_do_not_need_committed_expected_files() {
+    let csv = format!(
+        "{HEADER}good,M11,src/stim/simulators/dem_sampler.test.cc,statistical,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let fixture_root = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir(fixture_root.path().join("expected")).expect("create expected dir");
+    let row = manifest.rows.first().expect("one row");
+    let mut violations = Vec::new();
+
+    outputs::validate_row_tokens(
+        row,
+        fixture_root.path(),
+        ExpectedStdoutPolicy::RequireExisting,
+        &mut violations,
+    );
+
+    assert_eq!(violations, Vec::<String>::new());
+}
+
+#[test]
+fn statistical_fixture_output_source_requires_one_output_placeholder() {
+    let csv = format!(
+        "{HEADER}bad,M11,src/stim/simulators/dem_sampler.test.cc,statistical,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5,inputs/sample_dem_observable_only_noisy.dem,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let fixture_root = tempfile::tempdir().expect("tempdir");
+    let row = manifest.rows.first().expect("one row");
+    let mut violations = Vec::new();
+
+    outputs::validate_row_tokens(
+        row,
+        fixture_root.path(),
+        ExpectedStdoutPolicy::RequireExisting,
+        &mut violations,
+    );
+
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("requires exactly one fixture output placeholder"))
+    );
+}
+
+#[test]
+fn statistical_fixture_output_comparator_checks_stab_side_output() {
+    let csv = format!(
+        "{HEADER}good,M11,src/stim/simulators/dem_sampler.test.cc,statistical,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let row = manifest.rows.first().expect("one row");
+    let temp = tempfile::tempdir().expect("tempdir");
+    let stim_path = temp.path().join("stim-side-output.stdout");
+    let stab_path = temp.path().join("stab-side-output.stdout");
+    std::fs::write(&stim_path, observable_only_distribution_bytes())
+        .expect("write stim side output");
+    std::fs::write(&stab_path, observable_only_distribution_bytes())
+        .expect("write stab side output");
+    let stim_output = outputs::FixtureOutput {
+        expected_relative: "expected/missing-statistical.stdout".to_string(),
+        actual_path: stim_path,
+    };
+    let stab_output = outputs::FixtureOutput {
+        expected_relative: "expected/missing-statistical.stdout".to_string(),
+        actual_path: stab_path,
+    };
+
+    outputs::compare_outputs(row, &[stim_output], &[stab_output]).expect("statistical side output");
+}
+
+#[test]
+fn statistical_fixture_output_comparator_checks_stim_side_output() {
+    let csv = format!(
+        "{HEADER}good,M11,src/stim/simulators/dem_sampler.test.cc,statistical,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let row = manifest.rows.first().expect("one row");
+    let temp = tempfile::tempdir().expect("tempdir");
+    let stim_path = temp.path().join("stim-side-output.stdout");
+    let stab_path = temp.path().join("stab-side-output.stdout");
+    std::fs::write(&stim_path, b"created by Stim\n").expect("write stim side output");
+    std::fs::write(&stab_path, observable_only_distribution_bytes())
+        .expect("write stab side output");
+    let stim_output = outputs::FixtureOutput {
+        expected_relative: "expected/missing-statistical.stdout".to_string(),
+        actual_path: stim_path,
+    };
+    let stab_output = outputs::FixtureOutput {
+        expected_relative: "expected/missing-statistical.stdout".to_string(),
+        actual_path: stab_path,
+    };
+    let error = outputs::compare_outputs(row, &[stim_output], &[stab_output])
+        .expect_err("invalid Stim statistical side output should fail");
+
+    assert!(error.to_string().contains("Stim fixture output"));
+}
+
+#[test]
+fn statistical_fixture_output_source_exact_compares_stdout() {
+    let csv = format!(
+        "{HEADER}good,M11,src/stim/simulators/dem_sampler.test.cc,statistical,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let row = manifest.rows.first().expect("one row");
+    let stim = process_output(Some(0), b"\n\n", b"");
+    let stab = process_output(Some(0), b"00\n11\n", b"");
+    let error = compare_fixture(row, &stim, &stab)
+        .expect_err("statistical fixture-output row should still compare stdout");
+
+    assert!(error.to_string().contains("stdout mismatch"));
 }
 
 #[test]

@@ -4,6 +4,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::paths::{fixture_file, prepare_fixture_output_file, validate_fixture_path};
+use super::statistical::{self, StatisticalSource};
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureError, FixturePathRequirement, FixtureRow,
     RepoRoot, is_core_fixture, is_direct_rust_fixture,
@@ -43,6 +44,13 @@ pub(super) fn validate_row_tokens(
 ) {
     let mut has_placeholder = false;
     let mut fixture_outputs = BTreeSet::new();
+    let statistical_source = if row.comparator == FixtureComparator::Statistical {
+        statistical::source_for_plan(&row.statistical_plan).ok()
+    } else {
+        None
+    };
+    let uses_statistical_fixture_output =
+        statistical_source == Some(StatisticalSource::FixtureOutput);
     for token in row.argv_tokens() {
         let parsed = match parse_fixture_arg_token(&row.id, &token) {
             Ok(Some(parsed)) => parsed,
@@ -65,9 +73,11 @@ pub(super) fn validate_row_tokens(
                 .unwrap_or_else(|violation| violations.push(violation));
             }
             FixtureArgToken::Output(relative) => {
-                if row.comparator != FixtureComparator::ExactOutput {
+                if row.comparator != FixtureComparator::ExactOutput
+                    && !uses_statistical_fixture_output
+                {
                     violations.push(format!(
-                        "{} fixture output placeholders require exact-output comparator",
+                        "{} fixture output placeholders require exact-output comparator or statistical source=fixture_output",
                         row.id
                     ));
                 }
@@ -77,10 +87,16 @@ pub(super) fn validate_row_tokens(
                         row.id
                     ));
                 }
-                let requirement = match expected_stdout_policy {
-                    ExpectedStdoutPolicy::RequireExisting => FixturePathRequirement::MustExistFile,
-                    ExpectedStdoutPolicy::AllowMissing => {
-                        FixturePathRequirement::ExistingFileIfPresent
+                let requirement = if uses_statistical_fixture_output {
+                    FixturePathRequirement::ExistingFileIfPresent
+                } else {
+                    match expected_stdout_policy {
+                        ExpectedStdoutPolicy::RequireExisting => {
+                            FixturePathRequirement::MustExistFile
+                        }
+                        ExpectedStdoutPolicy::AllowMissing => {
+                            FixturePathRequirement::ExistingFileIfPresent
+                        }
                     }
                 };
                 validate_fixture_path(
@@ -97,6 +113,12 @@ pub(super) fn validate_row_tokens(
     if has_placeholder && (is_core_fixture(row) || is_direct_rust_fixture(row)) {
         violations.push(format!(
             "{} fixture placeholders are only supported for CLI fixture rows",
+            row.id
+        ));
+    }
+    if uses_statistical_fixture_output && fixture_outputs.len() != 1 {
+        violations.push(format!(
+            "{} statistical source=fixture_output requires exactly one fixture output placeholder",
             row.id
         ));
     }
@@ -329,6 +351,19 @@ pub(super) fn compare_outputs(
     stim_outputs: &[FixtureOutput],
     stab_outputs: &[FixtureOutput],
 ) -> Result<(), FixtureError> {
+    if row.comparator == FixtureComparator::Statistical {
+        return match statistical::source_for_plan(&row.statistical_plan) {
+            Ok(StatisticalSource::Stdout) => Ok(()),
+            Ok(StatisticalSource::FixtureOutput) => {
+                compare_statistical_fixture_output(row, stim_outputs, stab_outputs)
+            }
+            Err(reason) => Err(FixtureError::ComparatorMismatch {
+                id: row.id.clone(),
+                comparator: row.comparator.as_str(),
+                reason,
+            }),
+        };
+    }
     if stim_outputs.len() != stab_outputs.len() {
         return Err(FixtureError::ComparatorMismatch {
             id: row.id.clone(),
@@ -360,6 +395,53 @@ pub(super) fn compare_outputs(
                 reason: format!("fixture output {} differs", stim.expected_relative),
             });
         }
+    }
+    Ok(())
+}
+
+fn compare_statistical_fixture_output(
+    row: &FixtureRow,
+    stim_outputs: &[FixtureOutput],
+    stab_outputs: &[FixtureOutput],
+) -> Result<(), FixtureError> {
+    let ([stim], [stab]) = (stim_outputs, stab_outputs) else {
+        return Err(FixtureError::ComparatorMismatch {
+            id: row.id.clone(),
+            comparator: row.comparator.as_str(),
+            reason: format!(
+                "statistical source=fixture_output requires one fixture output, got Stim {} and Stab {}",
+                stim_outputs.len(),
+                stab_outputs.len()
+            ),
+        });
+    };
+    if stim.expected_relative != stab.expected_relative {
+        return Err(FixtureError::ComparatorMismatch {
+            id: row.id.clone(),
+            comparator: row.comparator.as_str(),
+            reason: format!(
+                "fixture output path mismatch: Stim expected {}, Stab expected {}",
+                stim.expected_relative, stab.expected_relative
+            ),
+        });
+    }
+    let stim_bytes = read_actual_fixture_output(row, stim)?;
+    let stab_bytes = read_actual_fixture_output(row, stab)?;
+    if let Some(reason) = statistical::compare_statistical_plan(&row.statistical_plan, &stim_bytes)
+    {
+        return Err(FixtureError::ComparatorMismatch {
+            id: row.id.clone(),
+            comparator: row.comparator.as_str(),
+            reason: format!("Stim fixture output {}: {reason}", stim.expected_relative),
+        });
+    }
+    if let Some(reason) = statistical::compare_statistical_plan(&row.statistical_plan, &stab_bytes)
+    {
+        return Err(FixtureError::ComparatorMismatch {
+            id: row.id.clone(),
+            comparator: row.comparator.as_str(),
+            reason: format!("Stab fixture output {}: {reason}", stab.expected_relative),
+        });
     }
     Ok(())
 }

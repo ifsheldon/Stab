@@ -2,14 +2,24 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const PROBABILITY_SUM_TOLERANCE: f64 = 1e-9;
 
-pub(super) fn compare_statistical_plan(plan: &str, stdout: &[u8]) -> Option<String> {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum StatisticalSource {
+    Stdout,
+    FixtureOutput,
+}
+
+pub(super) fn source_for_plan(plan: &str) -> Result<StatisticalSource, String> {
+    parse_statistical_plan(plan).map(|plan| plan.source)
+}
+
+pub(super) fn compare_statistical_plan(plan: &str, bytes: &[u8]) -> Option<String> {
     let plan = match parse_statistical_plan(plan) {
         Ok(plan) => plan,
         Err(reason) => return Some(reason),
     };
-    let text = match std::str::from_utf8(stdout) {
+    let text = match std::str::from_utf8(bytes) {
         Ok(text) => text,
-        Err(error) => return Some(format!("statistical stdout is not UTF-8: {error}")),
+        Err(error) => return Some(format!("statistical output is not UTF-8: {error}")),
     };
     match plan.tolerance {
         StatisticalTolerance::Binomial {
@@ -150,6 +160,7 @@ fn binomial_standard_deviation(probability: f64, sample_count: usize) -> f64 {
 struct StatisticalPlan {
     sample_count: usize,
     fixed_seed: u64,
+    source: StatisticalSource,
     tolerance: StatisticalTolerance,
 }
 
@@ -169,6 +180,7 @@ fn parse_statistical_plan(plan: &str) -> Result<StatisticalPlan, String> {
     let mut sample_count = None;
     let mut fixed_seed = None;
     let mut false_positive_rate = None;
+    let mut source = None;
     let mut tolerance = None;
     for token in plan.split(';').map(str::trim) {
         if token.is_empty() {
@@ -204,6 +216,17 @@ fn parse_statistical_plan(plan: &str) -> Result<StatisticalPlan, String> {
             false_positive_rate = Some(parsed);
             continue;
         }
+        if let Some(value) = token.strip_prefix("source=") {
+            let parsed = match value {
+                "stdout" => StatisticalSource::Stdout,
+                "fixture_output" => StatisticalSource::FixtureOutput,
+                _ => return Err(format!("unknown statistical source {value:?}")),
+            };
+            if source.replace(parsed).is_some() {
+                return Err("statistical plan declares source more than once".to_string());
+            }
+            continue;
+        }
         if let Some(rest) = token.strip_prefix("tolerate binomial p=") {
             let (probability, sigma) = parse_probability_and_sigma(token, rest, "binomial")?;
             tolerance = Some(StatisticalTolerance::Binomial {
@@ -232,6 +255,7 @@ fn parse_statistical_plan(plan: &str) -> Result<StatisticalPlan, String> {
             .ok_or_else(|| "statistical plan does not contain sample_count".to_string())?,
         fixed_seed: fixed_seed
             .ok_or_else(|| "statistical plan does not contain fixed_seed".to_string())?,
+        source: source.unwrap_or(StatisticalSource::Stdout),
         tolerance,
     })
 }
