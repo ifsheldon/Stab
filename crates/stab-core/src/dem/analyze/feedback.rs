@@ -37,13 +37,7 @@ impl Analyzer {
                     left_basis,
                     right_basis,
                 } => {
-                    self.apply_quantum_controlled_pauli(
-                        gate_name,
-                        left,
-                        right,
-                        left_basis,
-                        right_basis,
-                    )?;
+                    self.apply_quantum_controlled_pauli(left, right, left_basis, right_basis)?;
                 }
                 ControlledPauliAction::MeasurementFeedback {
                     record_offset,

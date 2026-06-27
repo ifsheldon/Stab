@@ -29,7 +29,7 @@ impl Analyzer {
                     "{gate_name} target {right} is not a qubit"
                 ))
             })?;
-            self.expand_pending_single_qubit_channels_through_two_qubit_clifford(left, right)?;
+            self.expand_pending_single_qubit_channels_touching(left, right)?;
             for pending in &mut self.pending_errors {
                 pending.apply_two_qubit_tableau(gate_name, left, right, &tableau)?;
             }
@@ -39,7 +39,7 @@ impl Analyzer {
         Ok(())
     }
 
-    fn expand_pending_single_qubit_channels_through_two_qubit_clifford(
+    pub(super) fn expand_pending_single_qubit_channels_touching(
         &mut self,
         left: crate::QubitId,
         right: crate::QubitId,

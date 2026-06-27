@@ -888,36 +888,17 @@ impl Analyzer {
 
     fn apply_quantum_controlled_pauli(
         &mut self,
-        gate_name: &str,
         left: QubitId,
         right: QubitId,
         left_basis: AnalyzerPauli,
         right_basis: AnalyzerPauli,
     ) -> CircuitResult<()> {
-        self.reject_pending_single_qubit_channels_through_controlled_pauli(gate_name, left, right)?;
+        self.expand_pending_single_qubit_channels_touching(left, right)?;
         for pending in &mut self.pending_errors {
             pending.apply_controlled_pauli(left, right, left_basis, right_basis);
         }
         self.observable_sensitivity
             .apply_controlled_pauli(left, right, left_basis, right_basis)
-    }
-
-    fn reject_pending_single_qubit_channels_through_controlled_pauli(
-        &self,
-        gate_name: &str,
-        left: QubitId,
-        right: QubitId,
-    ) -> CircuitResult<()> {
-        if self
-            .pending_pauli_channels
-            .iter()
-            .any(|pending| pending.qubit == left || pending.qubit == right)
-        {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "analyze_errors does not yet support propagating pending single-qubit Pauli channels through {gate_name}"
-            )));
-        }
-        Ok(())
     }
 
     fn cut_pending_errors_at_qubit(&mut self, qubit: QubitId) {
