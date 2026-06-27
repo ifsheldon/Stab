@@ -154,6 +154,9 @@ impl<'a> CandidateCollector<'a> {
             "E" | "CORRELATED_ERROR" | "ELSE_CORRELATED_ERROR" => {
                 self.collect_correlated_error(instruction_offset, instruction, candidates)
             }
+            "DEPOLARIZE1" => {
+                self.collect_depolarize1_errors(instruction_offset, instruction, candidates)
+            }
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => {
                 self.collect_single_measurement_errors(instruction_offset, instruction, candidates)
             }
@@ -232,6 +235,46 @@ impl<'a> CandidateCollector<'a> {
                 FlippedMeasurement::none(),
             )?,
         });
+        Ok(())
+    }
+
+    fn collect_depolarize1_errors(
+        &self,
+        instruction_offset: usize,
+        instruction: &CircuitInstruction,
+        candidates: &mut Vec<ErrorCandidate>,
+    ) -> CircuitResult<()> {
+        if instruction
+            .probability_argument()?
+            .is_none_or(|probability| probability.get() == 0.0)
+        {
+            return Ok(());
+        }
+        for (target_index, target) in instruction.targets().iter().enumerate() {
+            let Some(qubit) = target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "DEPOLARIZE1 target {target} is not a qubit"
+                )));
+            };
+            for pauli in [Pauli::X, Pauli::Y, Pauli::Z] {
+                candidates.push(ErrorCandidate {
+                    instruction_offset,
+                    target_range_start: target_index,
+                    target_range_end: target_index + 1,
+                    replacement: CandidateReplacement::Noise {
+                        gate_name: Some(pauli_error_gate(pauli)),
+                    },
+                    location: self.location(
+                        instruction,
+                        instruction_offset,
+                        target_index,
+                        target_index + 1,
+                        vec![self.pauli_with_coords(pauli, qubit)?],
+                        FlippedMeasurement::none(),
+                    )?,
+                });
+            }
+        }
         Ok(())
     }
 
@@ -807,6 +850,14 @@ fn pair_measurement_basis(name: &str) -> Option<Pauli> {
         "MYY" => Some(Pauli::Y),
         "MZZ" => Some(Pauli::Z),
         _ => None,
+    }
+}
+
+fn pauli_error_gate(pauli: Pauli) -> &'static str {
+    match pauli {
+        Pauli::X => "X_ERROR",
+        Pauli::Y => "Y_ERROR",
+        Pauli::Z => "Z_ERROR",
     }
 }
 
