@@ -90,7 +90,10 @@ struct ErrorCandidate {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum CandidateReplacement {
-    Noise { gate_name: Option<&'static str> },
+    Noise {
+        gate_name: Option<&'static str>,
+        targets: Option<Vec<Target>>,
+    },
     Measurement,
 }
 
@@ -157,6 +160,9 @@ impl<'a> CandidateCollector<'a> {
             "DEPOLARIZE1" => {
                 self.collect_depolarize1_errors(instruction_offset, instruction, candidates)
             }
+            "DEPOLARIZE2" => {
+                self.collect_depolarize2_errors(instruction_offset, instruction, candidates)
+            }
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => {
                 self.collect_single_measurement_errors(instruction_offset, instruction, candidates)
             }
@@ -192,7 +198,10 @@ impl<'a> CandidateCollector<'a> {
                 instruction_offset,
                 target_range_start: target_index,
                 target_range_end: target_index + 1,
-                replacement: CandidateReplacement::Noise { gate_name: None },
+                replacement: CandidateReplacement::Noise {
+                    gate_name: None,
+                    targets: None,
+                },
                 location: self.location(
                     instruction,
                     instruction_offset,
@@ -225,7 +234,10 @@ impl<'a> CandidateCollector<'a> {
             instruction_offset,
             target_range_start: 0,
             target_range_end: instruction.targets().len(),
-            replacement: CandidateReplacement::Noise { gate_name },
+            replacement: CandidateReplacement::Noise {
+                gate_name,
+                targets: None,
+            },
             location: self.location(
                 instruction,
                 instruction_offset,
@@ -263,6 +275,7 @@ impl<'a> CandidateCollector<'a> {
                     target_range_end: target_index + 1,
                     replacement: CandidateReplacement::Noise {
                         gate_name: Some(pauli_error_gate(pauli)),
+                        targets: None,
                     },
                     location: self.location(
                         instruction,
@@ -274,6 +287,73 @@ impl<'a> CandidateCollector<'a> {
                     )?,
                 });
             }
+        }
+        Ok(())
+    }
+
+    fn collect_depolarize2_errors(
+        &self,
+        instruction_offset: usize,
+        instruction: &CircuitInstruction,
+        candidates: &mut Vec<ErrorCandidate>,
+    ) -> CircuitResult<()> {
+        if instruction
+            .probability_argument()?
+            .is_none_or(|probability| probability.get() == 0.0)
+        {
+            return Ok(());
+        }
+        let mut groups = instruction.targets().chunks_exact(2);
+        for (group_index, group) in groups.by_ref().enumerate() {
+            let [left_target, right_target] = group else {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "DEPOLARIZE2 expected paired targets during error matching",
+                ));
+            };
+            let Some(left) = left_target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "DEPOLARIZE2 target {left_target} is not a qubit"
+                )));
+            };
+            let Some(right) = right_target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "DEPOLARIZE2 target {right_target} is not a qubit"
+                )));
+            };
+            let target_range_start = group_index.checked_mul(2).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("target range overflowed")
+            })?;
+            let target_range_end = target_range_start.checked_add(2).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("target range overflowed")
+            })?;
+            for (left_pauli, right_pauli) in depolarize2_component_order() {
+                let flipped_pauli_product =
+                    self.pauli_product_with_coords(left, left_pauli, right, right_pauli)?;
+                let replacement_targets =
+                    pauli_product_targets(left, left_pauli, right, right_pauli);
+                candidates.push(ErrorCandidate {
+                    instruction_offset,
+                    target_range_start,
+                    target_range_end,
+                    replacement: CandidateReplacement::Noise {
+                        gate_name: Some("E"),
+                        targets: Some(replacement_targets),
+                    },
+                    location: self.location(
+                        instruction,
+                        instruction_offset,
+                        target_range_start,
+                        target_range_end,
+                        flipped_pauli_product,
+                        FlippedMeasurement::none(),
+                    )?,
+                });
+            }
+        }
+        if !groups.remainder().is_empty() {
+            return Err(CircuitError::invalid_detector_error_model(
+                "DEPOLARIZE2 expected an even number of targets during error matching",
+            ));
         }
         Ok(())
     }
@@ -465,6 +545,23 @@ impl<'a> CandidateCollector<'a> {
         })
     }
 
+    fn pauli_product_with_coords(
+        &self,
+        left: QubitId,
+        left_pauli: Option<Pauli>,
+        right: QubitId,
+        right_pauli: Option<Pauli>,
+    ) -> CircuitResult<Vec<GateTargetWithCoords>> {
+        let mut result = Vec::new();
+        if let Some(pauli) = left_pauli {
+            result.push(self.pauli_with_coords(pauli, left)?);
+        }
+        if let Some(pauli) = right_pauli {
+            result.push(self.pauli_with_coords(pauli, right)?);
+        }
+        Ok(result)
+    }
+
     fn resolve_targets_with_coords(
         &self,
         targets: &[Target],
@@ -623,18 +720,21 @@ fn append_candidate_instruction(
     instruction: &CircuitInstruction,
     candidate: &ErrorCandidate,
 ) -> CircuitResult<()> {
-    match candidate.replacement {
-        CandidateReplacement::Noise { gate_name } => {
+    match &candidate.replacement {
+        CandidateReplacement::Noise { gate_name, targets } => {
             let gate = Gate::from_name(gate_name.unwrap_or(instruction.gate().canonical_name()))?;
-            let targets = instruction
-                .targets()
-                .get(candidate.target_range_start..candidate.target_range_end)
-                .ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
-                        "candidate target range is outside instruction targets",
-                    )
-                })?
-                .to_vec();
+            let targets = match targets {
+                Some(targets) => targets.clone(),
+                None => instruction
+                    .targets()
+                    .get(candidate.target_range_start..candidate.target_range_end)
+                    .ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "candidate target range is outside instruction targets",
+                        )
+                    })?
+                    .to_vec(),
+            };
             circuit.append_instruction(CircuitInstruction::new(
                 gate,
                 instruction.args().to_vec(),
@@ -859,6 +959,42 @@ fn pauli_error_gate(pauli: Pauli) -> &'static str {
         Pauli::Y => "Y_ERROR",
         Pauli::Z => "Z_ERROR",
     }
+}
+
+fn depolarize2_component_order() -> [(Option<Pauli>, Option<Pauli>); 15] {
+    [
+        (None, Some(Pauli::X)),
+        (None, Some(Pauli::Y)),
+        (None, Some(Pauli::Z)),
+        (Some(Pauli::X), None),
+        (Some(Pauli::X), Some(Pauli::X)),
+        (Some(Pauli::X), Some(Pauli::Y)),
+        (Some(Pauli::X), Some(Pauli::Z)),
+        (Some(Pauli::Y), None),
+        (Some(Pauli::Y), Some(Pauli::X)),
+        (Some(Pauli::Y), Some(Pauli::Y)),
+        (Some(Pauli::Y), Some(Pauli::Z)),
+        (Some(Pauli::Z), None),
+        (Some(Pauli::Z), Some(Pauli::X)),
+        (Some(Pauli::Z), Some(Pauli::Y)),
+        (Some(Pauli::Z), Some(Pauli::Z)),
+    ]
+}
+
+fn pauli_product_targets(
+    left: QubitId,
+    left_pauli: Option<Pauli>,
+    right: QubitId,
+    right_pauli: Option<Pauli>,
+) -> Vec<Target> {
+    let mut result = Vec::new();
+    if let Some(pauli) = left_pauli {
+        result.push(Target::pauli(pauli, left, false));
+    }
+    if let Some(pauli) = right_pauli {
+        result.push(Target::pauli(pauli, right, false));
+    }
+    result
 }
 
 #[cfg(test)]

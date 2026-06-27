@@ -5,8 +5,9 @@
 )]
 
 use stab_core::{
-    CodeDistance, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    explain_errors_from_circuit, generate_repetition_code_circuit,
+    CodeDistance, DetectorErrorModel, Probability, RepetitionCodeParams, RepetitionCodeTask,
+    RoundCount, SurfaceCodeParams, SurfaceCodeTask, explain_errors_from_circuit,
+    generate_repetition_code_circuit, generate_surface_code_circuit,
 };
 
 #[test]
@@ -217,6 +218,46 @@ ExplainedError {
     );
 }
 
+#[test]
+fn generated_surface_code_clifford_depolarization_filter_matches_stim_error_matcher() {
+    let params = SurfaceCodeParams::new(
+        RoundCount::try_new(2).expect("rounds"),
+        CodeDistance::try_new(2).expect("distance"),
+        SurfaceCodeTask::RotatedMemoryZ,
+    )
+    .expect("params")
+    .with_after_clifford_depolarization(Probability::try_new(0.001).expect("probability"));
+    let generated = generate_surface_code_circuit(&params).expect("generate surface code circuit");
+    let filter = DetectorErrorModel::from_dem_str("error(1) D0 D1\n").expect("filter DEM");
+    let actual = explain_errors_from_circuit(generated.circuit(), Some(&filter), false)
+        .expect("explain errors");
+
+    assert_eq!(
+        format_explanations(actual),
+        r"
+ExplainedError {
+    dem_error_terms: D0[coords 2,2,0] D1[coords 2,0,1]
+    CircuitErrorLocation {
+        flipped_pauli_product: X6[coords 1,3]*Y7[coords 2,2]
+        Circuit location stack trace:
+            (after 4 TICKs)
+            at instruction #20 (DEPOLARIZE2) in the circuit
+            at targets #3 to #4 of the instruction
+            resolving to DEPOLARIZE2(0.001) 6[coords 1,3] 7[coords 2,2]
+    }
+    CircuitErrorLocation {
+        flipped_pauli_product: Y6[coords 1,3]*Y7[coords 2,2]
+        Circuit location stack trace:
+            (after 4 TICKs)
+            at instruction #20 (DEPOLARIZE2) in the circuit
+            at targets #3 to #4 of the instruction
+            resolving to DEPOLARIZE2(0.001) 6[coords 1,3] 7[coords 2,2]
+    }
+}
+"
+    );
+}
+
 fn explain_generated_repetition_code(reduce_to_one_representative_error: bool) -> String {
     let params = RepetitionCodeParams::new(
         RoundCount::try_new(2).expect("rounds"),
@@ -234,6 +275,10 @@ fn explain_generated_repetition_code(reduce_to_one_representative_error: bool) -
     )
     .expect("explain errors");
 
+    format_explanations(actual)
+}
+
+fn format_explanations(actual: Vec<stab_core::ExplainedError>) -> String {
     let mut out = String::new();
     for matched_error in actual {
         out.push('\n');
