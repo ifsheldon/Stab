@@ -10,6 +10,7 @@ mod circuit_inverse;
 mod circuit_simplify;
 mod circuit_tableau;
 mod dem;
+mod dem_sampler;
 mod detection;
 mod error;
 mod error_matcher;
@@ -43,6 +44,7 @@ pub use dem::{
     likeliest_error_sat_problem, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error, try_disjoint_to_independent_xyz_errors,
 };
+pub use dem_sampler::CompiledDemSampler;
 pub use detection::{
     DetectionConversionOptions, DetectionConversionOutput, DetectionEventRecord,
     DetectionObservableOutputMode, convert_measurements_to_detection_events,

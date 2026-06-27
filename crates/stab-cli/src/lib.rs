@@ -14,10 +14,12 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 mod analyze_errors;
+mod sample_dem;
 
 use analyze_errors::{AnalyzeErrorsArgs, run_analyze_errors};
 use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
+use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_core::{
     Circuit, CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask, CompiledSampler,
     DetectionConversionOptions, DetectionConversionOutput, DetectionObservableOutputMode,
@@ -63,6 +65,10 @@ enum Command {
     /// Converts a circuit into a detector error model.
     #[command(name = "analyze_errors")]
     AnalyzeErrors(AnalyzeErrorsArgs),
+
+    /// Samples detection events from a detector error model.
+    #[command(name = "sample_dem")]
+    SampleDem(SampleDemArgs),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -450,6 +456,7 @@ where
         Some(Command::Detect(args)) => run_detect(args, &mut input, &mut stdout, &mut stderr),
         Some(Command::M2d(args)) => run_m2d(args, &mut input, &mut stdout),
         Some(Command::AnalyzeErrors(args)) => run_analyze_errors(args, &mut input, &mut stdout),
+        Some(Command::SampleDem(args)) => run_sample_dem(args, &mut input, &mut stdout),
         None => {
             let error = Cli::command().error(
                 ErrorKind::MissingSubcommand,
