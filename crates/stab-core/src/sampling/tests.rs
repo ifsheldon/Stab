@@ -471,6 +471,40 @@ fn seeded_sample_bytes_match_seeded_record_samples() {
 }
 
 #[test]
+fn packed_sample_bytes_match_seeded_record_samples_for_surface_like_ops() {
+    let circuit = Circuit::from_stim_str(
+        "
+        R 0 1 2 3
+        H 0 2
+        DEPOLARIZE1(0.001) 0 2
+        CX 0 1 2 3
+        DEPOLARIZE2(0.001) 0 1 2 3
+        MR 0 2
+        REPEAT 2 {
+            H 0 2
+            CX 0 1 2 3
+            DEPOLARIZE2(0.001) 0 1 2 3
+            H 0 2
+            MR 0 2
+        }
+        M 1 3
+        ",
+    )
+    .expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+    let records = sampler.sample_zero_one_with_seed(64, Some(5));
+
+    assert_eq!(
+        sampler.sample_bytes_with_seed(64, SampleFormat::ZeroOne, Some(5)),
+        crate::result_formats::write_records(&records, SampleFormat::ZeroOne)
+    );
+    assert_eq!(
+        sampler.sample_bytes_with_seed(64, SampleFormat::B8, Some(5)),
+        crate::result_formats::write_records(&records, SampleFormat::B8)
+    );
+}
+
+#[test]
 fn direct_noisy_z_measurement_bytes_match_seeded_record_samples() {
     let circuit = Circuit::from_stim_str("X_ERROR(0.25) 0\nM 0\n").expect("parse circuit");
     let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");

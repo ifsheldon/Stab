@@ -191,7 +191,7 @@ mod tests {
         let thresholds = read_thresholds(&path).expect("read source-owned M12 thresholds");
 
         assert_eq!(thresholds.schema_version, 1);
-        assert_eq!(thresholds.rows.len(), 49);
+        assert_eq!(thresholds.rows.len(), 53);
         assert!(
             thresholds
                 .rows

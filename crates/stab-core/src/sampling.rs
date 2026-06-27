@@ -16,6 +16,7 @@ mod measurement_flip;
 mod noise;
 mod operation;
 pub(crate) mod pauli_product;
+mod small_frame;
 mod stabilizer_frame;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -94,6 +95,17 @@ impl CompiledSampler {
             return bytes;
         }
         let reference_sample = skip_reference_sample.then(|| self.reference_sample());
+        if let Some(bytes) = small_frame::sample_bytes(
+            self.qubit_count,
+            self.measurement_count,
+            &self.operations,
+            shots,
+            format,
+            reference_sample.as_deref(),
+            &mut rng,
+        ) {
+            return bytes;
+        }
         let mut writer = MeasureRecordWriter::with_capacity(
             format,
             estimated_sample_bytes_capacity(format, shots, self.measurement_count),
