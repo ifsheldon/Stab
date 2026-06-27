@@ -20,5 +20,6 @@ Pass `--baseline <path>` to compare against a different generated baseline repor
 Compare prints Stab-side timings for rows whose implementation milestone has a runner and prints pending rows explicitly for future milestones.
 When a comparison runner reports workload-specific rates or comparability notes, treat those notes as part of the benchmark evidence.
 For example, M5 labels Stab-only contract-smoke bit-kernel workloads separately from upstream Stim perf rows until M12 introduces optimized parity thresholds.
+M8 sample compare rows split Stab core sampler compilation, one-shot latency, and batch throughput in-process; those report-only rows are not a strict CLI-vs-CLI performance gate, and the probability-util row currently exercises the sampler probability path until Stab has a standalone biased-random utility API.
 When a row is contract-only, compare may report Stab-side timing with `stim=contract-only`; that is not a Stab-vs-Stim performance comparison for the row.
 Pass `--strict` to fail when any selected row is still pending or missing from the selected baseline report.

@@ -21,6 +21,7 @@ use crate::root::RepoRoot;
 use crate::stim::{ensure_stim_binaries, validate_stim_source};
 
 mod m7;
+mod m8;
 
 #[cfg(not(test))]
 const STAB_COMPARE_ITERATIONS: usize = 128;
@@ -485,7 +486,13 @@ fn run_stab_compare_row(row: &BenchmarkRow) -> Result<Option<Vec<Measurement>>, 
             ]))
         }
         _ if row.runner == Runner::ContractOnly => Ok(Some(Vec::new())),
-        _ => m7::run_generator_compare_row(row),
+        _ => {
+            if let Some(measurements) = m8::run_sample_compare_row(row)? {
+                Ok(Some(measurements))
+            } else {
+                m7::run_generator_compare_row(row)
+            }
+        }
     }
 }
 
@@ -651,8 +658,16 @@ fn measure_stab(
     name: &str,
     mut operation: impl FnMut() -> Result<(), BenchError>,
 ) -> Result<Measurement, BenchError> {
-    let mut timings = Vec::with_capacity(STAB_COMPARE_ITERATIONS);
-    for _ in 0..STAB_COMPARE_ITERATIONS {
+    measure_stab_iterations(name, STAB_COMPARE_ITERATIONS, &mut operation)
+}
+
+fn measure_stab_iterations(
+    name: &str,
+    iterations: usize,
+    mut operation: impl FnMut() -> Result<(), BenchError>,
+) -> Result<Measurement, BenchError> {
+    let mut timings = Vec::with_capacity(iterations);
+    for _ in 0..iterations {
         let start = Instant::now();
         operation()?;
         timings.push(start.elapsed());
@@ -665,7 +680,7 @@ fn measure_stab(
     Ok(Measurement {
         name: name.to_string(),
         seconds,
-        iterations: Some(STAB_COMPARE_ITERATIONS),
+        iterations: Some(iterations),
     })
 }
 
@@ -787,6 +802,17 @@ fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
         | ("m6-stabilizers-to-tableau", "stab_stabilizers_to_inverse_tableau_16q") => {
             Some((M6_STABILIZER_QUBITS as f64, "stabilizers/s"))
         }
+        ("m8-sample-analysis-1shot", "stab_sample_compile_noisy_1q") => {
+            Some((1.0, "compilations/s"))
+        }
+        ("m8-sample-analysis-1shot", "stab_sample_1shot_zero_one") => Some((1.0, "shots/s")),
+        ("m8-sample-throughput-1024", "stab_sample_1024_zero_one") => Some((1024.0, "shots/s")),
+        ("m8-sample-throughput-1000000", "stab_sample_1000000_zero_one") => {
+            Some((1_000_000.0, "shots/s"))
+        }
+        ("m8-probability-util", "stab_sample_biased_probability_1024") => {
+            Some((1024.0, "probability-draws/s"))
+        }
         _ => None,
     }
 }
@@ -828,6 +854,15 @@ fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m6-stabilizers-to-tableau" => Some(
             "report-only: deterministic 16q conversion workload; upstream random/fuzz distribution remains M6 spec-follow-up input",
+        ),
+        "m8-sample-analysis-1shot" => Some(
+            "report-only: Stab splits core sampler compilation and one-shot sampling; pinned Stim baseline is end-to-end CLI sample",
+        ),
+        "m8-sample-throughput-1024" | "m8-sample-throughput-1000000" => Some(
+            "report-only: Stab measures in-process core sampler throughput with default 01 output; pinned Stim baseline includes CLI process, parse, and output costs",
+        ),
+        "m8-probability-util" => Some(
+            "contract-proxy: Stab exercises the sampler probability path because there is no standalone probability-util public API yet",
         ),
         _ => None,
     }
