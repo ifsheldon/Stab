@@ -51,6 +51,106 @@ fn dem_analyzer_duplicate_detector_records_match_upstream_parity() {
 }
 
 #[test]
+fn dem_analyzer_rejects_measurement_record_before_beginning_like_upstream() {
+    for circuit in [
+        "
+        DETECTOR rec[-1]
+        ",
+        "
+        OBSERVABLE_INCLUDE(0) rec[-1]
+        ",
+    ] {
+        let parsed = Circuit::from_stim_str(circuit).expect("circuit");
+        let error = circuit_to_detector_error_model(&parsed, ErrorAnalyzerOptions::default())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("out of range"));
+    }
+}
+
+#[test]
+fn dem_analyzer_mpad_matches_upstream_subset() {
+    let dem = analyze(
+        "
+        M(0.125) 5
+        MPAD 0 1
+        DETECTOR rec[-1] rec[-2]
+        DETECTOR rec[-3]
+        ",
+    );
+
+    assert_eq!(dem, "error(0.125) D1\ndetector D0\n");
+}
+
+#[test]
+fn dem_analyzer_pair_measurements_match_upstream_subset() {
+    for (circuit, expected) in [
+        (
+            "
+            RX 0 1
+            MXX(0.125) 0 1
+            DETECTOR rec[-1]
+            ",
+            "error(0.125) D0\n",
+        ),
+        (
+            "
+            RX 0 1 2 3
+            X_ERROR(0.125) 0
+            Y_ERROR(0.25) 1
+            Z_ERROR(0.375) 2
+            MXX 0 1 !2 !3
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D0\nerror(0.375) D1\n",
+        ),
+        (
+            "
+            RY 0 1
+            MYY(0.125) 0 1
+            DETECTOR rec[-1]
+            ",
+            "error(0.125) D0\n",
+        ),
+        (
+            "
+            RY 0 1 2 3
+            Y_ERROR(0.125) 0
+            X_ERROR(0.25) 1
+            Z_ERROR(0.375) 2
+            MYY 0 1 !2 !3
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D0\nerror(0.375) D1\n",
+        ),
+        (
+            "
+            RZ 0 1
+            MZZ(0.125) 0 1
+            DETECTOR rec[-1]
+            ",
+            "error(0.125) D0\n",
+        ),
+        (
+            "
+            RZ 0 1 2 3
+            Z_ERROR(0.125) 0
+            Y_ERROR(0.25) 1
+            X_ERROR(0.375) 2
+            MZZ 0 1 !2 !3
+            DETECTOR rec[-2]
+            DETECTOR rec[-1]
+            ",
+            "error(0.25) D0\nerror(0.375) D1\n",
+        ),
+    ] {
+        assert_eq!(analyze(circuit), expected);
+    }
+}
+
+#[test]
 fn dem_analyzer_noisy_basis_measurements_match_upstream_subset() {
     for (circuit, expected) in [
         (
