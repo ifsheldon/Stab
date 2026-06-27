@@ -77,8 +77,11 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "m10-dem-parse-contract" | "m10-dem-print-contract" => Some(
             "contract-representative: Stab measures in-process .dem parse/print on the current M10 deterministic fixture",
         ),
-        "m10-analyze-errors-fold-cli" | "m10-analyze-errors-high-repeat-contract" => Some(
+        "m10-analyze-errors-fold-cli" => Some(
             "contract-representative: Stab measures in-process analyze_errors --fold_loops on the current high-repeat fixture",
+        ),
+        "m10-analyze-errors-high-repeat-contract" => Some(
+            "cli-baseline: Stab measures in-process analyze_errors --fold_loops against pinned Stim analyze_errors on the same high-repeat fixture",
         ),
         "m10-analyze-errors-decompose-cli" => Some(
             "contract-representative: Stab measures in-process analyze_errors --decompose_errors on the pinned basic CLI fixture; deeper decomposition stress remains covered by the m10-error-decomp contract",

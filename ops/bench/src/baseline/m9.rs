@@ -82,8 +82,11 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "m9-detect-text-cli" | "m9-detect-bitpacked-cli" => Some(
             "report-only: Stab measures in-process detector sampling plus result writing for the public detect contract",
         ),
-        "m9-m2d-text-cli" | "m9-m2d-bitpacked-contract" => Some(
+        "m9-m2d-text-cli" => Some(
             "report-only: Stab measures in-process measurement-to-detection conversion plus result writing",
+        ),
+        "m9-m2d-bitpacked-contract" => Some(
+            "cli-baseline: Stab measures in-process measurement-to-detection conversion with b8 output against pinned Stim m2d on the same fixture",
         ),
         "m9-detect-primary-matrix-contract" | "m9-m2d-primary-matrix-contract" => Some(
             "contract-representative: Stab uses a generated repetition-code d3/r3 circuit for the M9 primary detection matrix",
@@ -145,7 +148,7 @@ fn run_m2d_fixture_row(
 
 fn run_m2d_bitpacked_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let circuit = parse_circuit(&row.id, M2D_BASIC_CIRCUIT)?;
-    let measurements = m2d_measurements(&row.id, &circuit, SampleFormat::B8)?;
+    let measurements = m2d_measurements(&row.id, &circuit, SampleFormat::ZeroOne)?;
     Ok(vec![measure_stab_iterations(
         "stab_m2d_b8",
         super::STAB_COMPARE_ITERATIONS,

@@ -496,7 +496,7 @@ const REQUIRED_BENCHMARK_IDS: &[&str] = &[
 
 #[cfg(test)]
 mod tests {
-    use super::BenchmarkManifest;
+    use super::{BenchmarkManifest, Runner};
 
     const MANIFEST_CSV: &str = include_str!("../../../benchmarks/manifest.csv");
 
@@ -547,6 +547,43 @@ mod tests {
                 .iter()
                 .all(|row| row.id != "m7-perf-harness" && row.milestone != super::Milestone::M12)
         );
+    }
+
+    #[test]
+    fn legacy_contract_named_rows_can_use_public_stim_cli_baselines() {
+        let mut reader = csv::ReaderBuilder::new()
+            .trim(csv::Trim::All)
+            .from_reader(MANIFEST_CSV.as_bytes());
+        let rows = reader
+            .deserialize()
+            .collect::<Result<Vec<super::BenchmarkRow>, _>>()
+            .expect("parse manifest");
+
+        for (id, expected_argv, expected_stdin) in [
+            (
+                "m9-m2d-bitpacked-contract",
+                "m2d|--in_format=01|--out_format=b8|--circuit=oracle/fixtures/inputs/m2d_basic.stim",
+                "oracle/fixtures/inputs/m2d_basic_measurements.01",
+            ),
+            (
+                "m10-analyze-errors-high-repeat-contract",
+                "analyze_errors|--fold_loops",
+                "oracle/fixtures/inputs/analyze_errors_fold_repeat.stim",
+            ),
+        ] {
+            let row = rows
+                .iter()
+                .find(|row| row.id == id)
+                .expect("benchmark row should exist");
+
+            assert_eq!(
+                row.runner,
+                Runner::StimCli,
+                "{id} should use pinned Stim CLI"
+            );
+            assert_eq!(row.argv, expected_argv);
+            assert_eq!(row.stdin_path, expected_stdin);
+        }
     }
 
     #[test]

@@ -428,7 +428,7 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
         ("m9-m2d-text-cli", Runner::StimCli, &["stab_m2d_dets"][..]),
         (
             "m9-m2d-bitpacked-contract",
-            Runner::ContractOnly,
+            Runner::StimCli,
             &["stab_m2d_b8"][..],
         ),
         (
@@ -486,7 +486,7 @@ fn m10_dem_benchmark_rows_have_stab_compare_runners() {
         ),
         (
             "m10-analyze-errors-high-repeat-contract",
-            Runner::ContractOnly,
+            Runner::StimCli,
             &["stab_analyze_errors_fold_repeat"][..],
         ),
         (

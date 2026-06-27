@@ -10,6 +10,9 @@ Runner meanings:
 - `stim-cli`: run pinned C++ Stim's `stim` binary with the row's pipe-delimited `argv` and optional `stdin_path`.
 - `contract-only`: reserve a benchmark contract that has no direct pinned C++ executable baseline yet.
 
+Some legacy benchmark ids still contain `contract` after they gain a faithful public CLI baseline.
+The `runner` column is authoritative for whether a row is contract-only, not the id suffix.
+
 Generated benchmark artifacts belong under `target/benchmarks/` and are not source files.
 The default baseline command writes `target/benchmarks/baseline/latest/baseline.json` and `target/benchmarks/baseline/latest/report.md`.
 Any explicit `--out` value must be a repository-relative path under `target/benchmarks/`.

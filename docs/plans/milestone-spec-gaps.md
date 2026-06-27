@@ -17,6 +17,17 @@ Proposed amendment: concrete replacement text or additional done criterion
 Resolution: link or note for the plan update that resolved the gap
 ```
 
+## Open Entries
+
+## 2026-06-28 - M12: Beta Gate Scope For Contract-Only Primary Rows
+
+Status: Open
+Revealed by: M12 primary compare evidence after reclassifying `m9-m2d-bitpacked-contract` and `m10-analyze-errors-high-repeat-contract` from `contract-only` to faithful public `stim-cli` baselines.
+Current text: M12 says the frozen primary matrix is every benchmark contract row from M4 through M11 except baseline metadata anchors, and completion-style performance runs should pass `--require-beta-gate`, which fails when any selected row lacks a proven Stab-vs-Stim ratio or exceeds the 2.0x beta performance gate.
+Gap: the primary matrix still includes rows whose best current evidence is Stab-only contract timing because pinned Stim v1.16.0 has no matching public CLI or `stim_perf` baseline for the exact workload, so the strict beta gate cannot pass the full primary matrix without either converting those rows to comparable baselines, excluding explicitly contract-only rows from beta-gate selection, or replacing them with faithful comparable benchmark rows.
+Proposed amendment: define an M12 beta-gate selection rule that separates comparable primary rows from source-owned contract-representative rows, then require `--require-beta-gate` for every comparable primary row and require each remaining contract-representative row to have either a promoted faithful Stim baseline or an explicit follow-up entry explaining why no ratio can be proven before beta.
+Resolution: Pending.
+
 ## Resolved Entries
 
 ## 2026-06-28 - M12: Probability Utility Benchmark Gate Comparability
