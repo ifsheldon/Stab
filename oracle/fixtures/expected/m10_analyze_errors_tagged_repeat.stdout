@@ -1,0 +1,10 @@
+error[test-tag-0](0.25) D0 L0
+repeat[test-tag-1] 99 {
+    error[test-tag-2](0.125) D0 L0
+    detector[test-tag-3] D0
+    logical_observable[test-tag-4] L0
+    shift_detectors 1
+}
+error[test-tag-2](0.125) D0 L0
+detector[test-tag-3] D0
+logical_observable[test-tag-4] L0
