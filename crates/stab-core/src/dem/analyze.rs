@@ -159,11 +159,12 @@ impl Analyzer {
             "PAULI_CHANNEL_1" => self.record_pauli_channel1(instruction),
             "DEPOLARIZE1" => self.record_depolarize1(instruction),
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => self.record_measurements(instruction),
+            "R" | "RX" | "RY" => self.record_resets(instruction),
             "MPAD" => self.record_measurement_pads(instruction),
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
             "SHIFT_COORDS" => self.shift_coordinates(instruction),
-            "TICK" | "QUBIT_COORDS" | "R" | "RX" | "RY" => Ok(()),
+            "TICK" | "QUBIT_COORDS" => Ok(()),
             name if is_noise_instruction(name) => Err(CircuitError::invalid_detector_error_model(
                 format!("analyze_errors does not yet support {name}"),
             )),
@@ -334,6 +335,22 @@ impl Analyzer {
             .ok_or_else(|| {
                 CircuitError::invalid_detector_error_model("measurement count overflowed")
             })?;
+        Ok(())
+    }
+
+    fn record_resets(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        for target in instruction.targets() {
+            let Some(qubit) = target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{} target {target} is not a qubit",
+                    instruction.gate().canonical_name()
+                )));
+            };
+            self.pending_errors
+                .retain(|pending| !pending.touches_qubit(qubit));
+            self.pending_pauli_channels
+                .retain(|pending| pending.qubit != qubit);
+        }
         Ok(())
     }
 
