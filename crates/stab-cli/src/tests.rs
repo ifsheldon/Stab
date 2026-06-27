@@ -725,6 +725,49 @@ fn sample_supports_z_basis_single_qubit_noise_channels() {
 }
 
 #[test]
+fn sample_supports_single_qubit_clifford_measurements() {
+    let mut deterministic_stdout = Vec::new();
+    let mut deterministic_stderr = Vec::new();
+    let deterministic_status = run_from(
+        ["stab", "sample", "--shots=3"],
+        "H 0\nS 0\nS 0\nH 0\nM 0\n".as_bytes(),
+        &mut deterministic_stdout,
+        &mut deterministic_stderr,
+    );
+
+    assert_eq!(deterministic_status, 0);
+    assert_eq!(
+        String::from_utf8(deterministic_stdout).unwrap(),
+        "1\n1\n1\n"
+    );
+    assert_eq!(String::from_utf8(deterministic_stderr).unwrap(), "");
+
+    let mut first_stdout = Vec::new();
+    let mut first_stderr = Vec::new();
+    let first_status = run_from(
+        ["stab", "sample", "--shots=1000", "--seed=5"],
+        "H 0\nM 0\n".as_bytes(),
+        &mut first_stdout,
+        &mut first_stderr,
+    );
+
+    let mut second_stdout = Vec::new();
+    let mut second_stderr = Vec::new();
+    let second_status = run_from(
+        ["stab", "sample", "--shots=1000", "--seed=5"],
+        "H 0\nM 0\n".as_bytes(),
+        &mut second_stdout,
+        &mut second_stderr,
+    );
+
+    assert_eq!(first_status, 0);
+    assert_eq!(second_status, 0);
+    assert_eq!(first_stdout, second_stdout);
+    assert_eq!(String::from_utf8(first_stderr).unwrap(), "");
+    assert_eq!(String::from_utf8(second_stderr).unwrap(), "");
+}
+
+#[test]
 fn sample_reads_and_writes_paths() {
     let temp_dir = tempdir().expect("temp dir");
     let input_path = temp_dir.path().join("input.stim");
@@ -763,7 +806,7 @@ fn sample_rejects_unsupported_tableau_semantics() {
     let mut stderr = Vec::new();
     let status = run_from(
         ["stab", "sample"],
-        "H 0\nM 0\n".as_bytes(),
+        "CX 0 1\nM 0 1\n".as_bytes(),
         &mut stdout,
         &mut stderr,
     );
@@ -773,7 +816,7 @@ fn sample_rejects_unsupported_tableau_semantics() {
     assert!(
         String::from_utf8(stderr)
             .unwrap()
-            .contains("deterministic M8 sampler subset does not support H")
+            .contains("local M8 sampler subset does not support CX")
     );
 }
 

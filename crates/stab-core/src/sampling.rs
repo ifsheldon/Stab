@@ -1,7 +1,10 @@
 use rand::rngs::SmallRng;
 use rand::{Rng, RngExt as _, SeedableRng as _};
 
-use crate::{Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory};
+use crate::{
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
+    PauliBasis, PauliSign, PauliString, SingleQubitClifford,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledSampler {
@@ -80,7 +83,7 @@ impl CompiledSampler {
     where
         R: Rng,
     {
-        let mut frame = DeterministicFrame::new(self.qubit_count);
+        let mut frame = LocalFrame::new(self.qubit_count);
         let mut measurements = Vec::new();
         execute_operations(&self.operations, &mut frame, &mut measurements, rng);
         measurements
@@ -89,8 +92,9 @@ impl CompiledSampler {
 
 #[derive(Clone, Debug, PartialEq)]
 enum SampleOperation {
-    Toggle {
+    ApplyClifford {
         qubit: usize,
+        transform: LocalCliffordTransform,
     },
     Reset {
         qubit: usize,
@@ -103,9 +107,9 @@ enum SampleOperation {
     Pad {
         value: bool,
     },
-    ProbabilisticToggle {
+    SingleQubitPauliChannel {
         qubit: usize,
-        probability: f64,
+        probabilities: [f64; 3],
     },
     TwoQubitPauliChannel {
         left: usize,
@@ -118,50 +122,157 @@ enum SampleOperation {
     },
 }
 
-const TWO_QUBIT_PAULI_Z_BASIS_TOGGLES: [(bool, bool); 15] = [
-    (false, true),
-    (false, true),
-    (false, false),
-    (true, false),
-    (true, true),
-    (true, true),
-    (true, false),
-    (true, false),
-    (true, true),
-    (true, true),
-    (true, false),
-    (false, false),
-    (false, true),
-    (false, true),
-    (false, false),
+const SINGLE_QUBIT_PAULI_CHANNEL_BASES: [PauliBasis; 3] =
+    [PauliBasis::X, PauliBasis::Y, PauliBasis::Z];
+
+const TWO_QUBIT_PAULI_CHANNEL_BASES: [(Option<PauliBasis>, Option<PauliBasis>); 15] = [
+    (None, Some(PauliBasis::X)),
+    (None, Some(PauliBasis::Y)),
+    (None, Some(PauliBasis::Z)),
+    (Some(PauliBasis::X), None),
+    (Some(PauliBasis::X), Some(PauliBasis::X)),
+    (Some(PauliBasis::X), Some(PauliBasis::Y)),
+    (Some(PauliBasis::X), Some(PauliBasis::Z)),
+    (Some(PauliBasis::Y), None),
+    (Some(PauliBasis::Y), Some(PauliBasis::X)),
+    (Some(PauliBasis::Y), Some(PauliBasis::Y)),
+    (Some(PauliBasis::Y), Some(PauliBasis::Z)),
+    (Some(PauliBasis::Z), None),
+    (Some(PauliBasis::Z), Some(PauliBasis::X)),
+    (Some(PauliBasis::Z), Some(PauliBasis::Y)),
+    (Some(PauliBasis::Z), Some(PauliBasis::Z)),
 ];
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct DeterministicFrame {
-    z_values: Vec<bool>,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct SignedBasis {
+    negative: bool,
+    basis: PauliBasis,
 }
 
-impl DeterministicFrame {
-    fn new(qubit_count: usize) -> Self {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct LocalCliffordTransform {
+    x: SignedBasis,
+    y: SignedBasis,
+    z: SignedBasis,
+}
+
+impl LocalCliffordTransform {
+    fn from_clifford(clifford: SingleQubitClifford) -> CircuitResult<Self> {
+        let tableau = clifford.tableau();
+        Ok(Self {
+            x: transform_signed_basis(&tableau, PauliBasis::X)?,
+            y: transform_signed_basis(&tableau, PauliBasis::Y)?,
+            z: transform_signed_basis(&tableau, PauliBasis::Z)?,
+        })
+    }
+
+    fn output_for(self, basis: PauliBasis) -> SignedBasis {
+        match basis {
+            PauliBasis::X => self.x,
+            PauliBasis::Y => self.y,
+            PauliBasis::Z => self.z,
+            PauliBasis::I => SignedBasis {
+                negative: false,
+                basis: PauliBasis::I,
+            },
+        }
+    }
+}
+
+fn transform_signed_basis(
+    tableau: &crate::Tableau,
+    basis: PauliBasis,
+) -> CircuitResult<SignedBasis> {
+    let input = PauliString::from_bases(PauliSign::Plus, [basis]);
+    let output = tableau
+        .apply(&input)
+        .map_err(|error| CircuitError::invalid_sampler_compilation(error.to_string()))?;
+    let Some(output_basis) = output.get(0) else {
+        return Err(CircuitError::invalid_sampler_compilation(
+            "single-qubit Clifford output is missing its Pauli basis",
+        ));
+    };
+    Ok(SignedBasis {
+        negative: output.sign().is_negative(),
+        basis: output_basis,
+    })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct LocalQubitState {
+    negative: bool,
+    basis: PauliBasis,
+}
+
+impl LocalQubitState {
+    fn plus_z() -> Self {
         Self {
-            z_values: vec![false; qubit_count],
+            negative: false,
+            basis: PauliBasis::Z,
         }
     }
 
-    fn toggle(&mut self, qubit: usize) {
-        if let Some(value) = self.z_values.get_mut(qubit) {
-            *value = !*value;
+    fn apply_clifford(&mut self, transform: LocalCliffordTransform) {
+        let output = transform.output_for(self.basis);
+        self.negative ^= output.negative;
+        self.basis = output.basis;
+    }
+
+    fn apply_pauli(&mut self, pauli: PauliBasis) {
+        if pauli != self.basis && self.basis != PauliBasis::I {
+            self.negative = !self.negative;
+        }
+    }
+
+    fn measure_z(&mut self, inverted: bool, rng: &mut impl Rng) -> bool {
+        let raw_result = match self.basis {
+            PauliBasis::Z => self.negative,
+            PauliBasis::I | PauliBasis::X | PauliBasis::Y => {
+                let sampled = rng.random_bool(0.5);
+                self.basis = PauliBasis::Z;
+                self.negative = sampled;
+                sampled
+            }
+        };
+        raw_result ^ inverted
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct LocalFrame {
+    states: Vec<LocalQubitState>,
+}
+
+impl LocalFrame {
+    fn new(qubit_count: usize) -> Self {
+        Self {
+            states: vec![LocalQubitState::plus_z(); qubit_count],
+        }
+    }
+
+    fn apply_clifford(&mut self, qubit: usize, transform: LocalCliffordTransform) {
+        if let Some(state) = self.states.get_mut(qubit) {
+            state.apply_clifford(transform);
+        }
+    }
+
+    fn apply_pauli(&mut self, qubit: usize, basis: PauliBasis) {
+        if let Some(state) = self.states.get_mut(qubit) {
+            state.apply_pauli(basis);
         }
     }
 
     fn reset(&mut self, qubit: usize) {
-        if let Some(value) = self.z_values.get_mut(qubit) {
-            *value = false;
+        if let Some(state) = self.states.get_mut(qubit) {
+            *state = LocalQubitState::plus_z();
         }
     }
 
-    fn measure(&self, qubit: usize, inverted: bool) -> bool {
-        self.z_values.get(qubit).copied().unwrap_or(false) ^ inverted
+    fn measure_z(&mut self, qubit: usize, inverted: bool, rng: &mut impl Rng) -> bool {
+        self.states
+            .get_mut(qubit)
+            .map(|state| state.measure_z(inverted, rng))
+            .unwrap_or(inverted)
     }
 }
 
@@ -282,17 +393,9 @@ fn compile_instruction(
     instruction: &CircuitInstruction,
     operations: &mut Vec<SampleOperation>,
 ) -> CircuitResult<()> {
+    let gate = instruction.gate();
     match instruction.gate().canonical_name() {
         "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" | "DETECTOR" | "OBSERVABLE_INCLUDE" => Ok(()),
-        "I" | "Z" => Ok(()),
-        "X" | "Y" => {
-            for target in instruction.targets() {
-                operations.push(SampleOperation::Toggle {
-                    qubit: qubit_index(instruction, target)?,
-                });
-            }
-            Ok(())
-        }
         "R" => {
             for target in instruction.targets() {
                 operations.push(SampleOperation::Reset {
@@ -303,17 +406,33 @@ fn compile_instruction(
         }
         "M" | "MR" => compile_z_measurement(instruction, operations),
         "MPAD" => compile_measurement_pads(instruction, operations),
-        "X_ERROR" | "Y_ERROR" => compile_single_qubit_probabilistic_toggle(
+        _ if SingleQubitClifford::from_gate(gate).is_ok() => {
+            compile_single_qubit_clifford(instruction, operations)
+        }
+        "X_ERROR" => compile_single_qubit_pauli_channel(
             instruction,
             operations,
-            single_probability_argument(instruction)?.get(),
+            [single_probability_argument(instruction)?.get(), 0.0, 0.0],
         ),
-        "Z_ERROR" | "I_ERROR" => Ok(()),
-        "DEPOLARIZE1" => compile_single_qubit_probabilistic_toggle(
+        "Y_ERROR" => compile_single_qubit_pauli_channel(
             instruction,
             operations,
-            single_probability_argument(instruction)?.get() * (2.0 / 3.0),
+            [0.0, single_probability_argument(instruction)?.get(), 0.0],
         ),
+        "Z_ERROR" => compile_single_qubit_pauli_channel(
+            instruction,
+            operations,
+            [0.0, 0.0, single_probability_argument(instruction)?.get()],
+        ),
+        "I_ERROR" => Ok(()),
+        "DEPOLARIZE1" => {
+            let probability = single_probability_argument(instruction)?.get() / 3.0;
+            compile_single_qubit_pauli_channel(
+                instruction,
+                operations,
+                [probability, probability, probability],
+            )
+        }
         "DEPOLARIZE2" => {
             let probability = single_probability_argument(instruction)?.get();
             compile_two_qubit_pauli_channel(instruction, operations, [probability / 15.0; 15])
@@ -326,10 +445,14 @@ fn compile_instruction(
             let [x_probability, y_probability, _z_probability] = probabilities.as_slice() else {
                 return Err(unsupported_sampler_instruction(instruction));
             };
-            compile_single_qubit_probabilistic_toggle(
+            compile_single_qubit_pauli_channel(
                 instruction,
                 operations,
-                x_probability.get() + y_probability.get(),
+                [
+                    x_probability.get(),
+                    y_probability.get(),
+                    _z_probability.get(),
+                ],
             )
         }
         "PAULI_CHANNEL_2" => {
@@ -384,15 +507,31 @@ fn compile_measurement_pads(
     Ok(())
 }
 
-fn compile_single_qubit_probabilistic_toggle(
+fn compile_single_qubit_clifford(
     instruction: &CircuitInstruction,
     operations: &mut Vec<SampleOperation>,
-    probability: f64,
+) -> CircuitResult<()> {
+    let clifford = SingleQubitClifford::from_gate(instruction.gate())
+        .map_err(|error| CircuitError::invalid_sampler_compilation(error.to_string()))?;
+    let transform = LocalCliffordTransform::from_clifford(clifford)?;
+    for target in instruction.targets() {
+        operations.push(SampleOperation::ApplyClifford {
+            qubit: qubit_index(instruction, target)?,
+            transform,
+        });
+    }
+    Ok(())
+}
+
+fn compile_single_qubit_pauli_channel(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    probabilities: [f64; 3],
 ) -> CircuitResult<()> {
     for target in instruction.targets() {
-        operations.push(SampleOperation::ProbabilisticToggle {
+        operations.push(SampleOperation::SingleQubitPauliChannel {
             qubit: qubit_index(instruction, target)?,
-            probability,
+            probabilities,
         });
     }
     Ok(())
@@ -466,29 +605,32 @@ fn qubit_index(instruction: &CircuitInstruction, target: &crate::Target) -> Circ
 
 fn execute_operations(
     operations: &[SampleOperation],
-    frame: &mut DeterministicFrame,
+    frame: &mut LocalFrame,
     measurements: &mut Vec<bool>,
     rng: &mut impl Rng,
 ) {
     for operation in operations {
         match operation {
-            SampleOperation::Toggle { qubit } => frame.toggle(*qubit),
+            SampleOperation::ApplyClifford { qubit, transform } => {
+                frame.apply_clifford(*qubit, *transform);
+            }
             SampleOperation::Reset { qubit } => frame.reset(*qubit),
             SampleOperation::Measure {
                 qubit,
                 inverted,
                 reset,
             } => {
-                measurements.push(frame.measure(*qubit, *inverted));
+                measurements.push(frame.measure_z(*qubit, *inverted, rng));
                 if *reset {
                     frame.reset(*qubit);
                 }
             }
             SampleOperation::Pad { value } => measurements.push(*value),
-            SampleOperation::ProbabilisticToggle { qubit, probability } => {
-                if rng.random_bool(*probability) {
-                    frame.toggle(*qubit);
-                }
+            SampleOperation::SingleQubitPauliChannel {
+                qubit,
+                probabilities,
+            } => {
+                apply_single_qubit_pauli_channel(frame, *qubit, probabilities, rng);
             }
             SampleOperation::TwoQubitPauliChannel {
                 left,
@@ -506,24 +648,43 @@ fn execute_operations(
     }
 }
 
+fn apply_single_qubit_pauli_channel(
+    frame: &mut LocalFrame,
+    qubit: usize,
+    probabilities: &[f64; 3],
+    rng: &mut impl Rng,
+) {
+    let mut sampled_probability = rng.random::<f64>();
+    for (basis, probability) in SINGLE_QUBIT_PAULI_CHANNEL_BASES
+        .into_iter()
+        .zip(probabilities.iter().copied())
+    {
+        if sampled_probability < probability {
+            frame.apply_pauli(qubit, basis);
+            return;
+        }
+        sampled_probability -= probability;
+    }
+}
+
 fn apply_two_qubit_pauli_channel(
-    frame: &mut DeterministicFrame,
+    frame: &mut LocalFrame,
     left: usize,
     right: usize,
     probabilities: &[f64; 15],
     rng: &mut impl Rng,
 ) {
     let mut sampled_probability = rng.random::<f64>();
-    for ((toggle_left, toggle_right), probability) in TWO_QUBIT_PAULI_Z_BASIS_TOGGLES
+    for ((left_basis, right_basis), probability) in TWO_QUBIT_PAULI_CHANNEL_BASES
         .into_iter()
         .zip(probabilities.iter().copied())
     {
         if sampled_probability < probability {
-            if toggle_left {
-                frame.toggle(left);
+            if let Some(basis) = left_basis {
+                frame.apply_pauli(left, basis);
             }
-            if toggle_right {
-                frame.toggle(right);
+            if let Some(basis) = right_basis {
+                frame.apply_pauli(right, basis);
             }
             return;
         }
@@ -533,7 +694,7 @@ fn apply_two_qubit_pauli_channel(
 
 fn unsupported_sampler_instruction(instruction: &CircuitInstruction) -> CircuitError {
     CircuitError::invalid_sampler_compilation(format!(
-        "deterministic M8 sampler subset does not support {}",
+        "local M8 sampler subset does not support {}",
         instruction.gate().canonical_name()
     ))
 }
@@ -581,6 +742,37 @@ mod tests {
         assert_eq!(
             samples("REPEAT 2 {\n    X 0\n    M 0\n}\n", 1),
             vec![vec![true, false]]
+        );
+    }
+
+    #[test]
+    fn samples_single_qubit_clifford_measurements() {
+        assert_eq!(samples("H 0\nS 0\nS 0\nH 0\nM 0\n", 3), vec![vec![true]; 3]);
+
+        let circuit = Circuit::from_stim_str("H 0\nM 0\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+        let first = sampler.sample_zero_one_with_seed(1000, Some(5));
+        let second = sampler.sample_zero_one_with_seed(1000, Some(5));
+        assert_eq!(first, second);
+
+        let hits = first.iter().filter(|shot| shot == &&vec![true]).count();
+        assert!(
+            (400..=600).contains(&hits),
+            "expected roughly 500 H-basis measurement hits, got {hits}"
+        );
+    }
+
+    #[test]
+    fn z_error_flips_x_basis_measurements_after_hadamards() {
+        let circuit =
+            Circuit::from_stim_str("H 0\nZ_ERROR(0.25) 0\nH 0\nM 0\n").expect("parse circuit");
+        let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+
+        let samples = sampler.sample_zero_one_with_seed(1000, Some(5));
+        let hits = samples.iter().filter(|shot| shot == &&vec![true]).count();
+        assert!(
+            (175..=325).contains(&hits),
+            "expected roughly 250 Z-error X-basis hits, got {hits}"
         );
     }
 
@@ -744,12 +936,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_hadamard_until_tableau_sampling_lands() {
-        let circuit = Circuit::from_stim_str("H 0\nM 0\n").expect("parse circuit");
+    fn rejects_entangling_gates_until_tableau_sampling_lands() {
+        let circuit = Circuit::from_stim_str("CX 0 1\nM 0 1\n").expect("parse circuit");
         assert_eq!(
             CompiledSampler::compile(&circuit),
             Err(CircuitError::invalid_sampler_compilation(
-                "deterministic M8 sampler subset does not support H"
+                "local M8 sampler subset does not support CX"
             ))
         );
     }
