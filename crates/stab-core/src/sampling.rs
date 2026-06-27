@@ -4,7 +4,7 @@ use rand::{Rng, RngExt as _, SeedableRng as _};
 use self::stabilizer_frame::{LocalTableauTransform, StabilizerFrame};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
-    MeasureRecordOffset, PauliBasis, SingleQubitClifford,
+    MeasureRecordOffset, Pauli, PauliBasis, SingleQubitClifford,
 };
 
 mod stabilizer_frame;
@@ -109,6 +109,10 @@ enum SampleOperation {
         basis: PauliBasis,
         inverted: bool,
         reset: bool,
+    },
+    MeasureProduct {
+        terms: Vec<(usize, PauliBasis)>,
+        inverted: bool,
     },
     Pad {
         value: bool,
@@ -353,6 +357,8 @@ fn compile_instruction(
         "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => {
             compile_measurement(instruction, operations, state)
         }
+        "MXX" | "MYY" | "MZZ" => compile_pair_measurement(instruction, operations, state),
+        "MPP" => compile_pauli_product_measurement(instruction, operations, state),
         "MPAD" => compile_measurement_pads(instruction, operations, state),
         "CX" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::X),
         "CY" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Y),
@@ -493,12 +499,79 @@ fn compile_measurement(
     Ok(())
 }
 
+fn compile_pair_measurement(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    state: &mut CompileState,
+) -> CircuitResult<()> {
+    let basis = pair_measurement_basis(instruction)?;
+    let flip = deterministic_measurement_flip(instruction)?;
+    let groups = instruction.target_groups();
+    for target_pair in &groups {
+        let [left, right] = *target_pair else {
+            return Err(unsupported_sampler_instruction(instruction));
+        };
+        operations.push(SampleOperation::MeasureProduct {
+            terms: vec![
+                (qubit_index(instruction, left)?, basis),
+                (qubit_index(instruction, right)?, basis),
+            ],
+            inverted: left.is_inverted_result_target() ^ right.is_inverted_result_target() ^ flip,
+        });
+    }
+    state.add_measurements(groups.len())?;
+    Ok(())
+}
+
+fn compile_pauli_product_measurement(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    state: &mut CompileState,
+) -> CircuitResult<()> {
+    let flip = deterministic_measurement_flip(instruction)?;
+    let groups = instruction.target_groups();
+    for target_group in &groups {
+        let mut terms = Vec::new();
+        let mut inverted = flip;
+        for target in *target_group {
+            if target.is_combiner() {
+                continue;
+            }
+            let Some(pauli) = target.pauli_type() else {
+                return Err(unsupported_sampler_instruction(instruction));
+            };
+            terms.push((qubit_index(instruction, target)?, pauli_basis(pauli)));
+            inverted ^= target.is_inverted_result_target();
+        }
+        operations.push(SampleOperation::MeasureProduct { terms, inverted });
+    }
+    state.add_measurements(groups.len())?;
+    Ok(())
+}
+
 fn measurement_basis(instruction: &CircuitInstruction) -> CircuitResult<PauliBasis> {
     match instruction.gate().canonical_name() {
         "MX" | "MRX" | "RX" => Ok(PauliBasis::X),
         "MY" | "MRY" | "RY" => Ok(PauliBasis::Y),
         "M" | "MR" | "R" => Ok(PauliBasis::Z),
         _ => Err(unsupported_sampler_instruction(instruction)),
+    }
+}
+
+fn pair_measurement_basis(instruction: &CircuitInstruction) -> CircuitResult<PauliBasis> {
+    match instruction.gate().canonical_name() {
+        "MXX" => Ok(PauliBasis::X),
+        "MYY" => Ok(PauliBasis::Y),
+        "MZZ" => Ok(PauliBasis::Z),
+        _ => Err(unsupported_sampler_instruction(instruction)),
+    }
+}
+
+fn pauli_basis(pauli: Pauli) -> PauliBasis {
+    match pauli {
+        Pauli::X => PauliBasis::X,
+        Pauli::Y => PauliBasis::Y,
+        Pauli::Z => PauliBasis::Z,
     }
 }
 
@@ -733,6 +806,11 @@ fn execute_operations(
                 if *reset {
                     frame.reset(*qubit, *basis, rng);
                 }
+            }
+            SampleOperation::MeasureProduct { terms, inverted } => {
+                let result = frame.measure_pauli_product(terms, *inverted, rng);
+                record.push(result);
+                output.push(result);
             }
             SampleOperation::Pad { value } => {
                 record.push(*value);

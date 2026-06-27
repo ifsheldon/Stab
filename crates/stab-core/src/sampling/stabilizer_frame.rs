@@ -100,6 +100,24 @@ impl StabilizerFrame {
         self.measure_observable(&observable, rng) ^ inverted
     }
 
+    pub(super) fn measure_pauli_product(
+        &mut self,
+        terms: &[(usize, PauliBasis)],
+        inverted: bool,
+        rng: &mut impl Rng,
+    ) -> bool {
+        let mut observable = StabilizerGenerator::identity(self.len());
+        for (qubit, basis) in terms {
+            observable.multiply_assign(&StabilizerGenerator::single(
+                self.len(),
+                *qubit,
+                *basis,
+                false,
+            ));
+        }
+        self.measure_observable(&observable, rng) ^ inverted
+    }
+
     fn measure_observable(&mut self, observable: &StabilizerGenerator, rng: &mut impl Rng) -> bool {
         if let Some(bit) = self.deterministic_measurement_bit(observable) {
             return bit;

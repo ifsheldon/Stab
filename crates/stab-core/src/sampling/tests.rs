@@ -185,6 +185,30 @@ fn two_qubit_tableau_gates_act_on_stabilizer_frame() {
 }
 
 #[test]
+fn pair_measurements_use_requested_product_basis() {
+    assert_eq!(
+        samples("RX 0 1\nMXX 0 1\nRY 0 1\nMYY 0 1\nR 0 1\nMZZ 0 1\n", 1),
+        vec![vec![false, false, false]]
+    );
+}
+
+#[test]
+fn pair_measurement_inversions_flip_product_results() {
+    for shot in samples("MXX 0 1 0 !1 !0 1 !0 !1\n", 100) {
+        let first = shot.first().copied().expect("first MXX result");
+        assert_eq!(shot, vec![first, !first, !first, first]);
+    }
+}
+
+#[test]
+fn mpp_measures_pauli_products_with_inversions() {
+    assert_eq!(
+        samples("H 0\nCX 0 1\nMPP X0*X1 Z0*Z1 !Y0*Y1\n", 1),
+        vec![vec![false, false, false]]
+    );
+}
+
+#[test]
 fn heralded_pauli_channel_records_and_applies_local_paulis() {
     assert_eq!(
         samples("HERALDED_PAULI_CHANNEL_1(0, 0, 0, 0) 0\n", 1),
@@ -442,16 +466,5 @@ fn pauli_channel2_uses_stim_probability_order_for_z_basis_toggles() {
             .expect("compile sampler")
             .sample_zero_one_with_seed(5, Some(5)),
         vec![vec![true, false]; 5]
-    );
-}
-
-#[test]
-fn rejects_pauli_product_measurements_until_mpp_sampling_lands() {
-    let circuit = Circuit::from_stim_str("MPP X0*X1\n").expect("parse circuit");
-    assert_eq!(
-        CompiledSampler::compile(&circuit),
-        Err(CircuitError::invalid_sampler_compilation(
-            "M8 sampler subset does not support MPP"
-        ))
     );
 }
