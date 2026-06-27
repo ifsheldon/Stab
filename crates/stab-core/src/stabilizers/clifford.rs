@@ -195,6 +195,15 @@ impl SingleQubitClifford {
             .ok_or(StabilizerError::InvalidSingleQubitCliffordProduct)
     }
 
+    pub(crate) fn inverse(self) -> StabilizerResult<Self> {
+        for candidate in Self::all() {
+            if self.multiply(candidate)? == Self::I && candidate.multiply(self)? == Self::I {
+                return Ok(candidate);
+            }
+        }
+        Err(StabilizerError::InvalidSingleQubitCliffordProduct)
+    }
+
     pub(crate) fn tableau(self) -> Tableau {
         Tableau::from_output_columns_unchecked(
             vec![signed_pauli_string(self.x_output())],

@@ -1,6 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, QubitId};
+use crate::{
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, PauliBasis, QubitId,
+    SingleQubitClifford,
+};
 
 use super::effects::analyzer_paulis_anticommute;
 use super::feedback::{ControlledPauliAction, controlled_pauli_action};
@@ -106,13 +109,17 @@ impl GaugeTracker {
             "R" => self.undo_resets(instruction, AnalyzerBasis::Z),
             "RX" => self.undo_resets(instruction, AnalyzerBasis::X),
             "RY" => self.undo_resets(instruction, AnalyzerBasis::Y),
-            "H" => self.undo_h(instruction),
-            "H_XY" => self.undo_h_xy(instruction),
             "CX" | "CY" | "CZ" | "XCX" | "XCY" | "XCZ" | "YCX" | "YCY" | "YCZ" => {
                 self.undo_controlled_pauli(instruction)
             }
             "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
-            _ => Ok(()),
+            _ => {
+                if let Ok(clifford) = SingleQubitClifford::from_gate(instruction.gate()) {
+                    self.undo_single_qubit_clifford(instruction, clifford)
+                } else {
+                    Ok(())
+                }
+            }
         }
     }
 
@@ -393,42 +400,68 @@ impl GaugeTracker {
         }
     }
 
-    fn undo_h(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn undo_single_qubit_clifford(
+        &mut self,
+        instruction: &CircuitInstruction,
+        clifford: SingleQubitClifford,
+    ) -> CircuitResult<()> {
+        let inverse = clifford.inverse().map_err(|error| {
+            CircuitError::invalid_detector_error_model(format!(
+                "failed to invert {} during gauge analysis: {error}",
+                clifford.canonical_name()
+            ))
+        })?;
         for target in instruction.targets().iter().rev() {
             let qubit = target.qubit_id().ok_or_else(|| {
                 CircuitError::invalid_detector_error_model(format!(
-                    "H target {target} is not a qubit"
+                    "{} target {target} is not a qubit",
+                    instruction.gate().canonical_name()
                 ))
             })?;
-            let index = qubit_index(qubit)?;
-            let xs = self.xs.get_mut(index).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
-                    "H target qubit {} is outside the gauge tracker",
-                    qubit.get()
-                ))
-            })?;
-            let zs = self.zs.get_mut(index).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
-                    "H target qubit {} is outside the gauge tracker",
-                    qubit.get()
-                ))
-            })?;
-            std::mem::swap(xs, zs);
+            let xs = self.xs_for(qubit)?.clone();
+            let zs = self.zs_for(qubit)?.clone();
+            self.clear_qubit(qubit)?;
+            self.toggle_clifford_basis_sensitivity(
+                qubit,
+                inverse.apply_basis(PauliBasis::X).map_err(|error| {
+                    CircuitError::invalid_detector_error_model(format!(
+                        "failed to undo {} X sensitivity during gauge analysis: {error}",
+                        clifford.canonical_name()
+                    ))
+                })?,
+                &xs,
+            )?;
+            self.toggle_clifford_basis_sensitivity(
+                qubit,
+                inverse.apply_basis(PauliBasis::Z).map_err(|error| {
+                    CircuitError::invalid_detector_error_model(format!(
+                        "failed to undo {} Z sensitivity during gauge analysis: {error}",
+                        clifford.canonical_name()
+                    ))
+                })?,
+                &zs,
+            )?;
         }
         Ok(())
     }
 
-    fn undo_h_xy(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        for target in instruction.targets().iter().rev() {
-            let qubit = target.qubit_id().ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
-                    "H_XY target {target} is not a qubit"
-                ))
-            })?;
-            let xs = self.xs_for(qubit)?.clone();
-            self.toggle_zs(qubit, &xs)?;
+    fn toggle_clifford_basis_sensitivity(
+        &mut self,
+        qubit: QubitId,
+        basis: PauliBasis,
+        sensitivity: &BTreeSet<DemTarget>,
+    ) -> CircuitResult<()> {
+        match basis {
+            PauliBasis::I => Err(CircuitError::invalid_detector_error_model(
+                "single-qubit Clifford sensitivity mapped to identity during gauge analysis",
+            )),
+            PauliBasis::X => self.toggle_xs(qubit, sensitivity),
+            PauliBasis::Y => {
+                self.toggle_xs(qubit, sensitivity)?;
+                self.toggle_zs(qubit, sensitivity)
+            }
+            PauliBasis::Z => self.toggle_zs(qubit, sensitivity),
         }
-        Ok(())
     }
 
     fn undo_controlled_pauli(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
