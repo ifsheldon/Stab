@@ -7,30 +7,36 @@ M12: Performance Hardening
 ## Status
 
 Partial progress, not milestone-complete.
-This slice starts the M12 measurement gate by making the primary benchmark matrix explicit, adding release-profile compare report generation, and recording row-level timing, variance, relative-ratio, and pass/fail status metadata for future optimization work.
+This slice starts the M12 measurement gate by making the primary benchmark matrix explicit, adding release-profile compare report generation, recording row-level timing, variance, relative-ratio, and pass/fail status metadata, and adding profiler-note enforcement for rows slower than the hot-path threshold.
 
 ## Contract
 
 M12 requires a frozen primary benchmark matrix, a release-profile Stab-vs-pinned-Stim compare command, a report artifact with machine, compiler, Stim, Stab, benchmark-parameter, timing, variance, ratio, and status metadata, profiler notes for slow workloads, targeted optimizations behind existing abstractions, allocation tracking, regression thresholds, and all implemented oracle suites passing before and after performance changes.
-This slice covers only the matrix selection and compare-reporting infrastructure.
-Profiler notes, optimization work, allocation tracking, regression thresholds, beta performance gates, and beta memory gates remain pending M12 work.
+This slice covers only the matrix selection, compare-reporting infrastructure, and profiler-note gate infrastructure.
+Actual profiler captures, optimization work, allocation tracking, regression thresholds, beta performance gates, and beta memory gates remain pending M12 work.
 
 ## Tests Ported Or Created
 
 - `cargo test -p stab-bench primary_compare_rows_freeze_m4_through_m11_without_metadata_or_m12_placeholders` checks that the M12 primary matrix selects real M4 through M11 workloads and excludes metadata anchors plus the M12 placeholder.
 - `cargo test -p stab-bench compare_row_result_records_ratio_and_beta_gate_status` checks that compare rows record medians, relative ratios, notes, and pass status for rows within the 2.0x beta gate.
 - `cargo test -p stab-bench compare_row_result_distinguishes_missing_baseline_from_uncomparable_contracts` checks that missing baselines and contract-only rows are not collapsed into the same status.
+- `cargo test -p stab-bench profiler_notes_are_required_only_for_rows_slower_than_hot_path_ratio` checks that rows above 1.5x require note files and rows at or below the threshold do not.
+- `cargo test -p stab-bench profiler_notes_must_name_dominant_cost_and_next_owner_action` checks the minimum required profiler-note fields.
+- `cargo test -p stab-bench benchmark_ids_are_filename_safe_for_report_artifacts` checks that benchmark ids are safe to map into profiler-note filenames.
 - Existing `cargo test -p stab-bench` coverage still validates benchmark manifest structure, baseline metadata validation, Stab comparison runner coverage, and benchmark output path guards.
 
 ## Implementation Areas
 
 - Added `BenchmarkManifest::compare_rows` and `BenchmarkRow::is_primary` in `ops/bench/src/manifest.rs` so primary-matrix selection is explicit and test-covered.
 - Added `--profile`, `--primary`, and `--report` to `stab-bench compare`.
+- Added `--require-profiler-notes` to enforce profiler notes for rows slower than 1.5x pinned Stim when a compare report is written.
 - Updated `just bench::compare` to run `stab-bench` through Cargo's release profile before invoking the compare subcommand.
 - Moved compare orchestration into `ops/bench/src/compare.rs` so `ops/bench/src/baseline.rs` remains below the repository's 1200-line source threshold.
 - Added `CompareReport`, `CompareRowResult`, `CompareCommandMetadata`, and `StabMetadata` in `ops/bench/src/report.rs`, including the Stab commit and whether local modifications were present when the report was generated.
 - Added compare artifact writing to `target/benchmarks/.../compare.json` and `target/benchmarks/.../report.md` through the existing benchmark output directory guard.
+- Added profiler-note status, path, and error fields to each compare row; notes live under `<report>/profiler-notes/<benchmark-id>.md` and must include non-empty `Dominant cost:` and `Next owner action:` lines.
 - Extended `Measurement` with optional `variance_seconds`; existing baseline JSON remains readable because the new field defaults when absent.
+- Tightened benchmark manifest validation so benchmark ids are safe for generated report artifact filenames.
 - Updated root and benchmark documentation for the new compare command and artifact behavior.
 
 ## Done-Criteria Matrix
@@ -39,8 +45,8 @@ Profiler notes, optimization work, allocation tracking, regression thresholds, b
 | --- | --- | --- |
 | Freeze primary benchmark matrix from earlier milestones | Partially satisfied | `BenchmarkRow::is_primary`, `BenchmarkManifest::compare_rows`, and `cargo test -p stab-bench primary_compare_rows_freeze_m4_through_m11_without_metadata_or_m12_placeholders`; final workload acceptance remains pending M12 audit after baseline/report runs. |
 | Add `just bench::compare --profile release --report target/benchmarks/latest` | Partially satisfied | `justfiles/bench.just` now builds `stab-bench` with Cargo's release profile, and `stab-bench compare` accepts `--profile`, `--primary`, and `--report`; a durable full primary report against a complete pinned-Stim baseline remains pending. |
-| Report machine, compiler, Stim, Stab, benchmark parameters, median timing, variance, ratio, and status | Partially satisfied | `CompareReport` records machine metadata, Stim metadata, Stab commit and local-modification state, compare command metadata, per-row measurements, medians, optional variance, relative ratio, and pass/fail status; memory metadata and profiler-note integration remain pending. |
-| Profile slower-than-gate workloads before optimizing | Missing | No profiler notes are added in this slice. |
+| Report machine, compiler, Stim, Stab, benchmark parameters, median timing, variance, ratio, and status | Partially satisfied | `CompareReport` records machine metadata, Stim metadata, Stab commit and local-modification state, compare command metadata, per-row measurements, medians, optional variance, relative ratio, pass/fail status, and profiler-note status; memory metadata remains pending. |
+| Profile slower-than-gate workloads before optimizing | Partially satisfied | `--require-profiler-notes`, `profiler_notes_are_required_only_for_rows_slower_than_hot_path_ratio`, and `profiler_notes_must_name_dominant_cost_and_next_owner_action` enforce durable note files for rows slower than 1.5x once a complete report exists; actual profiler captures and notes for current slow rows remain pending. |
 | Optimize hot paths behind existing abstractions | Missing | No hot-path optimization is performed in this slice. |
 | Add allocation tracking for primary hot paths | Missing | Allocation tracking remains pending. |
 | Add regression thresholds for workloads that pass the beta gate | Missing | Threshold enforcement remains pending complete baseline and compare reports. |
@@ -59,7 +65,9 @@ Profiler notes, optimization work, allocation tracking, regression thresholds, b
 - `cargo test -p stab-bench --quiet`
 - `cargo clippy -p stab-bench --all-targets -- -D warnings`
 - `just bench::smoke`
-- `just bench::compare --milestone M4 --report target/benchmarks/m12-compare-smoke`
+- `just bench::compare --help`
+- `just bench::compare --milestone M4 --report target/benchmarks/m12-compare-smoke --require-profiler-notes`
 
 The M4 compare-report smoke wrote `compare.json` and `report.md` successfully.
 The local baseline at `target/benchmarks/baseline/latest/baseline.json` did not include M4 rows, so the smoke report correctly marked those rows as `missing-baseline`; a complete primary baseline remains required before M12 can satisfy the beta performance gate.
+Because those rows had no Stim baseline measurements, the smoke report had no relative ratios and correctly marked profiler notes as `not-required`.

@@ -163,6 +163,11 @@ impl BenchmarkManifest {
                 violations.push("row with empty id".to_string());
             } else if !ids.insert(row.id.clone()) {
                 violations.push(format!("duplicate benchmark id {}", row.id));
+            } else if !is_safe_benchmark_id(&row.id) {
+                violations.push(format!(
+                    "{} has unsafe id; ids may only contain ASCII letters, digits, hyphen, and underscore",
+                    row.id
+                ));
             }
             for (field, value) in [
                 ("threshold_class", &row.threshold_class),
@@ -432,6 +437,11 @@ fn unsafe_component(component: Component<'_>) -> bool {
     )
 }
 
+fn is_safe_benchmark_id(id: &str) -> bool {
+    id.bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+}
+
 const REQUIRED_BENCHMARK_IDS: &[&str] = &[
     "m4-circuit-parse",
     "m4-circuit-canonical-print",
@@ -537,5 +547,12 @@ mod tests {
                 .iter()
                 .all(|row| row.id != "m7-perf-harness" && row.milestone != super::Milestone::M12)
         );
+    }
+
+    #[test]
+    fn benchmark_ids_are_filename_safe_for_report_artifacts() {
+        assert!(super::is_safe_benchmark_id("m11-sample_dem"));
+        assert!(!super::is_safe_benchmark_id("m11/sample-dem"));
+        assert!(!super::is_safe_benchmark_id("../m11-sample-dem"));
     }
 }

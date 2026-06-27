@@ -419,6 +419,8 @@ Tasks:
 
 For M12 benchmark operations, the frozen primary matrix is every benchmark contract row from M4 through M11 except baseline metadata anchors.
 The M12 `performance-gate` placeholder row documents the gate and is not itself part of `just bench::compare --primary`.
+Profiler notes for compare reports live beside the report under `<report>/profiler-notes/<benchmark-id>.md`.
+When `--require-profiler-notes` is passed, every row slower than 1.5x pinned Stim must have a note with non-empty `Dominant cost:` and `Next owner action:` lines.
 
 Linked tests and benchmarks:
 

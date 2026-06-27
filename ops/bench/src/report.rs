@@ -99,6 +99,7 @@ pub(crate) struct CompareCommandMetadata {
     pub(crate) profile: String,
     pub(crate) milestone: Option<String>,
     pub(crate) primary: bool,
+    pub(crate) require_profiler_notes: bool,
     pub(crate) strict: bool,
 }
 
@@ -125,6 +126,11 @@ pub(crate) struct CompareRowResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) relative_ratio: Option<f64>,
     pub(crate) pass_fail_status: String,
+    pub(crate) profiler_note_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) profiler_note_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) profiler_note_error: Option<String>,
 }
 
 pub(crate) fn machine_metadata(root: &RepoRoot) -> Result<MachineMetadata, BenchError> {
@@ -215,11 +221,11 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
         "- Machine: {} {} with {} worker(s)\n\n",
         report.machine.os, report.machine.arch, report.machine.available_parallelism
     ));
-    out.push_str("| Benchmark | Milestone | Status | Pass/Fail | Stim Median | Stab Median | Ratio | Note |\n");
-    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- |\n");
+    out.push_str("| Benchmark | Milestone | Status | Pass/Fail | Stim Median | Stab Median | Ratio | Profiler Note | Note |\n");
+    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
     for row in &report.rows {
         out.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} | {} | {} |\n",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
             row.id,
             row.milestone.as_str(),
             row.status,
@@ -227,6 +233,7 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
             format_optional_seconds(row.stim_median_seconds),
             format_optional_seconds(row.stab_median_seconds),
             format_optional_ratio(row.relative_ratio),
+            format_profiler_note(row),
             row.note.as_deref().unwrap_or("")
         ));
     }
@@ -239,6 +246,15 @@ fn format_optional_seconds(seconds: Option<f64>) -> String {
 
 fn format_optional_ratio(ratio: Option<f64>) -> String {
     ratio.map_or_else(String::new, |ratio| format!("{ratio:.3}x"))
+}
+
+fn format_profiler_note(row: &CompareRowResult) -> String {
+    match (&row.profiler_note_path, &row.profiler_note_error) {
+        (Some(path), None) => format!("{} ({path})", row.profiler_note_status),
+        (Some(path), Some(error)) => format!("{} ({path}: {error})", row.profiler_note_status),
+        (None, Some(error)) => format!("{} ({error})", row.profiler_note_status),
+        (None, None) => row.profiler_note_status.clone(),
+    }
 }
 
 fn command_first_line<I, S>(

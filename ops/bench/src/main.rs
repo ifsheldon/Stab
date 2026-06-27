@@ -105,6 +105,10 @@ enum Command {
         #[arg(long)]
         report: Option<PathBuf>,
 
+        /// Fail when rows slower than the hot-path threshold do not have valid profiler notes beside the report.
+        #[arg(long)]
+        require_profiler_notes: bool,
+
         /// Exit with an error while Stab benchmark comparison runners are pending.
         #[arg(long)]
         strict: bool,
@@ -163,6 +167,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             primary,
             baseline,
             report,
+            require_profiler_notes,
             strict,
         } => {
             run_compare(
@@ -174,6 +179,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     profile,
                     primary,
                     report,
+                    require_profiler_notes,
                     strict,
                 },
             )?;

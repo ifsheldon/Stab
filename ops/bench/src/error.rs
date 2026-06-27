@@ -121,4 +121,12 @@ pub(crate) enum BenchError {
 
     #[error("benchmark baseline metadata does not match pinned Stim v1.16.0:\n{details}")]
     BaselineMetadataMismatch { details: Box<str> },
+
+    #[error(
+        "--require-profiler-notes requires --report so profiler notes can be read beside the report"
+    )]
+    ProfilerNotesRequireReport,
+
+    #[error("required profiler notes are missing or invalid:\n{details}")]
+    ProfilerNotesMissing { details: Box<str> },
 }
