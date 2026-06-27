@@ -1,9 +1,11 @@
 use std::hint::black_box;
 
+use rand::SeedableRng as _;
+use rand::rngs::SmallRng;
 use stab_core::{
     Circuit, CodeDistance, CompiledSampler, Probability, ReferenceSampleTree, RepetitionCodeParams,
     RepetitionCodeTask, RoundCount, SampleFormat, SurfaceCodeParams, SurfaceCodeTask,
-    generate_repetition_code_circuit, generate_surface_code_circuit,
+    biased_randomize_bits, generate_repetition_code_circuit, generate_surface_code_circuit,
     result_formats::{read_records, write_records},
 };
 
@@ -15,8 +17,18 @@ use super::{measure_stab, measure_stab_iterations, stab_runner_error};
 
 const SAMPLE_NOISY_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/sample_noisy.stim");
-const SAMPLE_BIASED_PROBABILITY_FIXTURE: &str = "X_ERROR(0.125) 0\nM 0\n";
 const MEASURE_READER_BITS: usize = 10_000;
+const PROBABILITY_UTIL_BITS: usize = 1024;
+const PROBABILITY_UTIL_WORDS: usize = PROBABILITY_UTIL_BITS / u64::BITS as usize;
+const PROBABILITY_UTIL_CASES: [(&str, f64); 7] = [
+    ("stab_biased_random_1024_0point1percent", 0.001),
+    ("stab_biased_random_1024_0point01percent", 0.0001),
+    ("stab_biased_random_1024_1percent", 0.01),
+    ("stab_biased_random_1024_40percent", 0.4),
+    ("stab_biased_random_1024_50percent", 0.5),
+    ("stab_biased_random_1024_90percent", 0.9),
+    ("stab_biased_random_1024_99percent", 0.99),
+];
 const FRAME_SIMULATOR_QUBITS: usize = 32;
 #[cfg(not(test))]
 const FRAME_SIMULATOR_SHOTS: usize = 4;
@@ -75,14 +87,7 @@ pub(super) fn run_sample_compare_row(
             MILLION_SHOT_COMPARE_ITERATIONS,
         )
         .map(Some),
-        "m8-probability-util" => run_sample_throughput_row(
-            row,
-            "stab_sample_biased_probability_1024",
-            SAMPLE_BIASED_PROBABILITY_FIXTURE,
-            1024,
-            super::STAB_COMPARE_ITERATIONS,
-        )
-        .map(Some),
+        "m8-probability-util" => run_probability_util_row(row).map(Some),
         "m8-sample-primary-repetition-contract" => run_primary_repetition_row(row).map(Some),
         "m8-sample-primary-rotated-surface-contract" => run_primary_surface_row(
             row,
@@ -122,7 +127,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("m8-sample-throughput-1000000", "stab_sample_1000000_zero_one") => {
             Some((1_000_000.0, "shots/s"))
         }
-        ("m8-probability-util", "stab_sample_biased_probability_1024") => {
+        ("m8-probability-util", name) if name.starts_with("stab_biased_random_1024_") => {
             Some((1024.0, "probability-draws/s"))
         }
         ("m8-sample-primary-repetition-contract", "stab_sample_primary_repetition_d3_r3") => {
@@ -164,7 +169,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures in-process core sampler throughput with default 01 output; pinned Stim baseline includes CLI process, parse, and output costs",
         ),
         "m8-probability-util" => Some(
-            "contract-proxy: Stab exercises the sampler probability path because there is no standalone probability-util public API yet",
+            "direct-match: Stab measures the biased random bit utility against the pinned Stim probability_util perf filters",
         ),
         "m8-sample-primary-repetition-contract" => Some(
             "contract-representative: Stab samples a generated repetition-code d3/r3 circuit; full primary matrix thresholds remain M12 work",
@@ -218,6 +223,23 @@ fn run_measure_reader_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchE
                 let records = read_records(input, *format, MEASURE_READER_BITS)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(records.iter().flatten().filter(|bit| **bit).count());
+                Ok(())
+            })
+        })
+        .collect()
+}
+
+fn run_probability_util_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    PROBABILITY_UTIL_CASES
+        .iter()
+        .map(|(name, probability)| {
+            let probability = Probability::try_new(*probability)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let mut rng = SmallRng::seed_from_u64(0);
+            let mut words = [0u64; PROBABILITY_UTIL_WORDS];
+            measure_stab_iterations(name, super::STAB_COMPARE_ITERATIONS, || {
+                biased_randomize_bits(probability, &mut words, &mut rng);
+                black_box(&words);
                 Ok(())
             })
         })
@@ -502,7 +524,15 @@ mod tests {
             ),
             (
                 "m8-probability-util",
-                &["stab_sample_biased_probability_1024"][..],
+                &[
+                    "stab_biased_random_1024_0point1percent",
+                    "stab_biased_random_1024_0point01percent",
+                    "stab_biased_random_1024_1percent",
+                    "stab_biased_random_1024_40percent",
+                    "stab_biased_random_1024_50percent",
+                    "stab_biased_random_1024_90percent",
+                    "stab_biased_random_1024_99percent",
+                ][..],
             ),
             (
                 "m8-sample-primary-repetition-contract",

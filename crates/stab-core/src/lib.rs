@@ -18,6 +18,7 @@ mod gate;
 mod ids;
 mod matched_error;
 mod mbqc_decomposition;
+mod probability_util;
 mod reference_sample_tree;
 pub mod result_formats;
 mod sampling;
@@ -61,6 +62,7 @@ pub use matched_error::{
     DemTargetWithCoords, ExplainedError, FlippedMeasurement, GateTargetWithCoords,
 };
 pub use mbqc_decomposition::mbqc_decomposition;
+pub use probability_util::biased_randomize_bits;
 pub use reference_sample_tree::ReferenceSampleTree;
 pub use result_formats::SampleFormat;
 pub use sampling::{CompiledSampler, count_determined_measurements};

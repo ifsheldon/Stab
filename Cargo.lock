@@ -2022,6 +2022,7 @@ dependencies = [
  "allocation-counter",
  "clap",
  "csv",
+ "rand 0.10.1",
  "serde",
  "serde_json",
  "stab-cli",
