@@ -289,6 +289,15 @@ impl Analyzer {
                     pending.measurements.push(measurement_index);
                 }
             }
+            if let Some(probability) = instruction.probability_argument()?
+                && probability.get() > 0.0
+            {
+                self.completed_errors.push(PendingError {
+                    probability,
+                    effects: Vec::new(),
+                    measurements: vec![measurement_index],
+                });
+            }
             let mut still_pending_channels = Vec::new();
             for pending in self.pending_pauli_channels.drain(..) {
                 if pending.qubit == qubit {
@@ -405,6 +414,8 @@ impl Analyzer {
 
     fn into_dem(self) -> CircuitResult<DetectorErrorModel> {
         let mut dem = DetectorErrorModel::new();
+        let mut merged_error_probabilities = BTreeMap::new();
+        let mut merged_error_order = Vec::new();
         let mut touched_detectors = BTreeSet::new();
         for pending in self
             .completed_errors
@@ -435,7 +446,6 @@ impl Analyzer {
             if detectors.is_empty() && observables.is_empty() {
                 continue;
             }
-            touched_detectors.extend(detectors.iter().copied());
             let mut targets = Vec::with_capacity(detectors.len() + observables.len());
             for detector in detectors {
                 targets.push(DemTarget::relative_detector(detector)?);
@@ -443,7 +453,26 @@ impl Analyzer {
             for observable in observables {
                 targets.push(DemTarget::logical_observable(observable)?);
             }
-            dem.push_instruction(DemInstruction::error(pending.probability, targets, None)?);
+            if let Some(probability) = merged_error_probabilities.get_mut(&targets) {
+                *probability = xor_probability(*probability, pending.probability)?;
+            } else {
+                merged_error_order.push(targets.clone());
+                merged_error_probabilities.insert(targets, pending.probability);
+            }
+        }
+
+        for targets in merged_error_order {
+            let Some(probability) = merged_error_probabilities.remove(&targets) else {
+                continue;
+            };
+            if probability.get() == 0.0 {
+                continue;
+            }
+            touched_detectors.extend(targets.iter().filter_map(|target| match target {
+                DemTarget::RelativeDetector(id) => Some(id.get()),
+                _ => None,
+            }));
+            dem.push_instruction(DemInstruction::error(probability, targets, None)?);
         }
 
         for declaration in self.detector_declarations {
@@ -577,4 +606,8 @@ fn toggle_all(target: &mut BTreeSet<u64>, values: impl Iterator<Item = u64>) {
             target.remove(&value);
         }
     }
+}
+
+fn xor_probability(left: Probability, right: Probability) -> CircuitResult<Probability> {
+    Probability::try_new(left.get() + right.get() - 2.0 * left.get() * right.get())
 }

@@ -107,6 +107,55 @@ fn dem_analyzer_maps_simple_pauli_noise_to_detector_and_observable() {
 }
 
 #[test]
+fn dem_analyzer_maps_measurement_flip_probability_to_error() {
+    let circuit =
+        Circuit::from_stim_str("M(0.25) 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n").unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.25) D0\nerror(0.25) D1\n");
+}
+
+#[test]
+fn dem_analyzer_merges_identical_error_symptoms() {
+    let circuit =
+        Circuit::from_stim_str("X_ERROR(0.125) 0\nX_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n")
+            .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.3125) D0\n");
+}
+
+#[test]
+fn dem_analyzer_merges_measurement_flip_with_prior_matching_error() {
+    let circuit =
+        Circuit::from_stim_str("X_ERROR(0.125) 0\nM(0.25) 0\nDETECTOR rec[-1]\n").unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.3125) D0\n");
+}
+
+#[test]
+fn dem_analyzer_declares_detector_when_certain_duplicate_errors_cancel() {
+    let circuit =
+        Circuit::from_stim_str("X_ERROR(1) 0\nX_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "detector D0\n");
+}
+
+#[test]
 fn dem_analyzer_approximates_disjoint_pauli_channel1_when_enabled() {
     let circuit = Circuit::from_stim_str(
         "R 0\nPAULI_CHANNEL_1(0.125, 0.25, 0.375) 0\nM 0\nDETECTOR rec[-1]\n",
