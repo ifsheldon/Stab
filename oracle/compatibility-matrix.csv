@@ -81,7 +81,7 @@ cpp-flex-pauli-string,src/stim/stabilizers/flex_pauli_string.test.cc,cxx-test,pa
 cpp-flow,src/stim/stabilizers/flow.test.cc,cxx-test,tableau,stab-core,M6,P0,structural,direct-rust,planned,,,M6 flow and stabilizer relation tests
 cpp-pauli-string,src/stim/stabilizers/pauli_string.test.cc,cxx-test,pauli-string,stab-core,M6,P0,property,direct-rust,planned,,,M6 Pauli string algebra tests
 cpp-pauli-string-iter,src/stim/stabilizers/pauli_string_iter.test.cc,cxx-test,pauli-string,stab-core,M6,P0,property,direct-rust,planned,,,M6 Pauli string iterator tests
-cpp-pauli-string-ref,src/stim/stabilizers/pauli_string_ref.test.cc,cxx-test,pauli-string,stab-core,M6,P0,property,direct-rust,planned,,,M6 Pauli string reference view tests
+cpp-pauli-string-ref,src/stim/stabilizers/pauli_string_ref.test.cc,cxx-test,pauli-string,stab-core,M6,P0,property,direct-rust,planned,,,M6 Pauli string reference-derived owned API behavior tests
 cpp-tableau,src/stim/stabilizers/tableau.test.cc,cxx-test,tableau,stab-core,M6,P0,property,direct-rust,planned,,,M6 tableau algebra tests
 cpp-tableau-iter,src/stim/stabilizers/tableau_iter.test.cc,cxx-test,tableau,stab-core,M6,P0,property,direct-rust,planned,,,M6 tableau iterator tests
 cpp-arg-parse,src/stim/util_bot/arg_parse.test.cc,cxx-test,cli-args,stab-cli,M7,P1,structural,direct-rust,planned,,,M7 typed CLI argument boundary tests

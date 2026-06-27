@@ -277,7 +277,7 @@ src/stim/stabilizers/tableau_iter.test.cc
 
 Small features:
 
-- Pauli strings, Clifford strings, flows, tableaus, iterators, references/views, signs, commutation, products, inverses, random generation, text round trips, and conjugation behavior.
+- Pauli strings, Clifford strings, flows, tableaus, iterators, reference-derived owned-API behavior, signs, commutation, products, inverses, random generation, text round trips, and conjugation behavior.
 
 ### Low-Level Utilities
 

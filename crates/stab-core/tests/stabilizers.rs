@@ -33,7 +33,11 @@ fn stabilizers_pauli_string_dense_text_round_trips_follow_stim() {
         PauliString::from_str("").expect("parse"),
         PauliString::from_str("-").expect("parse")
     );
+    assert!(PauliString::from_str("iX").is_err());
+    assert!(PauliString::from_str("+iX").is_err());
+    assert!(PauliString::from_str("-iX").is_err());
     assert!(PauliString::from_str("x").is_err());
+    assert!(PauliString::from_str("X8").is_err());
 }
 
 #[test]
@@ -346,6 +350,7 @@ fn stabilizers_flex_pauli_dense_and_sparse_text_follow_stim() {
     assert_eq!(f.phase(), PauliPhase::MinusI);
     assert_eq!(f.value().x_bits()[0], 0b01100110);
     assert_eq!(f.value().z_bits()[0], 0b11001100);
+    assert_eq!(f.to_string(), "-i_XYZ_XYZ");
 
     assert_eq!(flex("iX").phase(), PauliPhase::PlusI);
     assert_eq!(flex("iX").to_string(), "+iX");
@@ -358,7 +363,9 @@ fn stabilizers_flex_pauli_dense_and_sparse_text_follow_stim() {
     assert_eq!(flex("X8*Y2").value().z_bits()[0], 0b000000100);
     assert_eq!(flex("X8*Y2*X8").to_string(), "+__Y______");
     assert_eq!(flex("X8*Y2*Y8").phase(), PauliPhase::PlusI);
+    assert_eq!(flex("X8*Y2*Y8").to_string(), "+i__Y_____Z");
     assert_eq!(flex("Y8*Y2*X8").phase(), PauliPhase::MinusI);
+    assert_eq!(flex("Y8*Y2*X8").to_string(), "-i__Y_____Z");
     assert_eq!(flex("X1"), flex("_X"));
     assert_eq!(flex("X20*I21"), flex("____________________X_"));
 }

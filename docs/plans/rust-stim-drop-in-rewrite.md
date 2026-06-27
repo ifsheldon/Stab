@@ -229,6 +229,10 @@ Tasks:
 - Implement conversion helpers needed by later `Circuit::to_tableau`, inverse-circuit, flow, and stabilizer-to-tableau operations.
 - Add property tests for inverse, identity, associativity where applicable, commutation, conjugation, text round trips, and scalar/reference equivalence.
 
+M6 public Rust API starts with owned `PauliString`, `FlexPauliString`, `CliffordString`, and `Tableau` values.
+A public `PauliStringRef` equivalent is not required for M6; borrowed packed views may remain internal unless a later M6 task proves that a public view is necessary for parity or measured performance.
+Text parity is split by type: `PauliString` covers real-phase dense syntax and sparse display, while `FlexPauliString` covers phase-general dense syntax with lowercase axis acceptance and sparse indexed syntax.
+Python-only phase and binding behavior remains semantic-mining input until the Python API milestone; M6 should not expose Python-hostile borrowed APIs just to mirror pybind-specific behavior early.
 M6 random-generation hooks use caller-owned `rand::Rng` values: `PauliString::random`, `PauliString::randomize`, `SingleQubitClifford::random`, `CliffordString::random`, `CliffordString::randomize`, and `Tableau::random`.
 Passing a seeded Rust RNG gives reproducible Stab output, but M6 does not require exact Stim C++ random-stream parity.
 `PauliString` samples the sign uniformly and each basis independently uniformly over `I`, `X`, `Y`, and `Z`, including sign sampling for zero-length strings.
@@ -241,6 +245,7 @@ The current M6 fixture covers the upstream known-unitary gate-data loop for 24 c
 Linked tests and benchmarks:
 
 - Direct tests: C++ Stabilizers And Algebra group.
+- Direct Pauli text rows: `coverage-stabilizers-pauli-string`, `coverage-stabilizers-flex-pauli-string`, and `coverage-stabilizers-pauli-string-ref` distinguish real dense text, phase-general dense and sparse text, and the owned-API subset replacing public borrowed views.
 - Related util-top tests: `circuit_vs_tableau`, `stabilizers_to_tableau`, the M6-owned `unitary_to_tableau` subset of `stabilizers_vs_amplitudes`, and `circuit_inverse_unitary` when their dependencies are in scope.
 - Semantic-mining tests: Python `pauli_string_pybind`, `clifford_string_pybind`, `tableau_pybind`, `flow_pybind`, and `tableau_simulator_pybind` cases that express core algebra semantics.
 - Benchmarks: `src/stim/stabilizers/*.perf.cc` and `src/stim/util_top/stabilizers_to_tableau.perf.cc`.
