@@ -257,6 +257,37 @@ fn dem_analyzer_resets_clear_pending_single_qubit_errors() {
 }
 
 #[test]
+fn dem_analyzer_propagates_pauli_errors_through_h() {
+    let circuit =
+        Circuit::from_stim_str("RX 0\nZ_ERROR(0.25) 0\nH 0\nM 0\nDETECTOR rec[-1]\n").unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.25) D0\n");
+}
+
+#[test]
+fn dem_analyzer_propagates_pauli_errors_through_cnot_order() {
+    let circuit = Circuit::from_stim_str(
+        "X_ERROR(0.25) 0\n\
+         CNOT 0 1\n\
+         CNOT 1 0\n\
+         M 0 1\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-1]\n",
+    )
+    .unwrap();
+
+    let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .unwrap()
+        .to_dem_string();
+
+    assert_eq!(dem, "error(0.25) D1\ndetector D0\n");
+}
+
+#[test]
 fn dem_analyzer_ignores_identity_noise_channels() {
     let circuit = Circuit::from_stim_str(
         "I_ERROR(0.25) 0\n\

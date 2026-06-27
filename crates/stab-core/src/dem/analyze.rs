@@ -204,6 +204,8 @@ impl Analyzer {
             "DEPOLARIZE2" => self.record_depolarize2(instruction),
             "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => self.record_measurements(instruction),
             "R" | "RX" | "RY" => self.record_resets(instruction),
+            "H" => self.apply_h(instruction),
+            "CX" => self.apply_cx(instruction),
             "MPAD" => self.record_measurement_pads(instruction),
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
@@ -659,6 +661,67 @@ impl Analyzer {
         Ok(())
     }
 
+    fn apply_h(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        for target in instruction.targets() {
+            let Some(qubit) = target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "H target {target} is not a qubit"
+                )));
+            };
+            for pending in &mut self.pending_errors {
+                pending.apply_h(qubit);
+            }
+            for pending in &mut self.pending_pauli_channels {
+                if pending.qubit == qubit {
+                    pending.swap_xz();
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_cx(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        for group in instruction.target_groups() {
+            let [control, target] = group else {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "CX expected paired qubit targets during error analysis",
+                ));
+            };
+            let Some(control) = control.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "CX control target {control} is not a qubit"
+                )));
+            };
+            let Some(target) = target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "CX target {target} is not a qubit"
+                )));
+            };
+            self.reject_pending_single_qubit_channels_through_cx(control, target)?;
+            for pending in &mut self.pending_errors {
+                pending.apply_cx(control, target);
+            }
+        }
+        Ok(())
+    }
+
+    fn reject_pending_single_qubit_channels_through_cx(
+        &self,
+        control: QubitId,
+        target: QubitId,
+    ) -> CircuitResult<()> {
+        if self
+            .pending_pauli_channels
+            .iter()
+            .any(|pending| pending.qubit == control || pending.qubit == target)
+        {
+            return Err(CircuitError::invalid_detector_error_model(
+                "analyze_errors does not yet support propagating pending single-qubit Pauli channels through CX",
+            ));
+        }
+        Ok(())
+    }
+
     fn cut_pending_errors_at_qubit(&mut self, qubit: QubitId) {
         let mut still_pending = Vec::new();
         for mut pending in self.pending_errors.drain(..) {
@@ -891,6 +954,10 @@ struct PendingSingleQubitPauliChannel {
 }
 
 impl PendingSingleQubitPauliChannel {
+    fn swap_xz(&mut self) {
+        std::mem::swap(&mut self.x_probability, &mut self.z_probability);
+    }
+
     fn flip_probability(&self, basis: AnalyzerBasis) -> CircuitResult<Probability> {
         let probability = match basis {
             AnalyzerBasis::X => self.y_probability.get() + self.z_probability.get(),
@@ -902,6 +969,57 @@ impl PendingSingleQubitPauliChannel {
 }
 
 impl PendingError {
+    fn apply_h(&mut self, qubit: QubitId) {
+        for effect in &mut self.effects {
+            if effect.qubit == qubit {
+                effect.pauli = match effect.pauli {
+                    AnalyzerPauli::X => AnalyzerPauli::Z,
+                    AnalyzerPauli::Y => AnalyzerPauli::Y,
+                    AnalyzerPauli::Z => AnalyzerPauli::X,
+                };
+            }
+        }
+    }
+
+    fn apply_cx(&mut self, control: QubitId, target: QubitId) {
+        let mut masks = self.effect_masks();
+        let control_mask = masks.remove(&control).unwrap_or(0);
+        let target_mask = masks.remove(&target).unwrap_or(0);
+        let mut output_control = 0;
+        let mut output_target = 0;
+
+        if control_mask & ANALYZER_X_MASK != 0 {
+            output_control ^= ANALYZER_X_MASK;
+            output_target ^= ANALYZER_X_MASK;
+        }
+        if control_mask & ANALYZER_Z_MASK != 0 {
+            output_control ^= ANALYZER_Z_MASK;
+        }
+        if target_mask & ANALYZER_X_MASK != 0 {
+            output_target ^= ANALYZER_X_MASK;
+        }
+        if target_mask & ANALYZER_Z_MASK != 0 {
+            output_control ^= ANALYZER_Z_MASK;
+            output_target ^= ANALYZER_Z_MASK;
+        }
+
+        insert_effect_mask(&mut masks, control, output_control);
+        insert_effect_mask(&mut masks, target, output_target);
+        self.effects = effects_from_masks(masks);
+    }
+
+    fn effect_masks(&self) -> BTreeMap<QubitId, u8> {
+        let mut masks = BTreeMap::new();
+        for effect in &self.effects {
+            let entry = masks.entry(effect.qubit).or_insert(0);
+            *entry ^= pauli_mask(effect.pauli.into());
+            if *entry == 0 {
+                masks.remove(&effect.qubit);
+            }
+        }
+        masks
+    }
+
     fn touches_qubit(&self, qubit: QubitId) -> bool {
         self.effects.iter().any(|effect| effect.qubit == qubit)
     }
@@ -968,6 +1086,9 @@ fn is_noise_instruction(name: &str) -> bool {
     )
 }
 
+const ANALYZER_X_MASK: u8 = 0b01;
+const ANALYZER_Z_MASK: u8 = 0b10;
+
 fn toggle_all(target: &mut BTreeSet<u64>, values: impl Iterator<Item = u64>) {
     for value in values {
         if !target.insert(value) {
@@ -1008,9 +1129,9 @@ pub(super) fn xor_probability(left: Probability, right: Probability) -> CircuitR
 
 fn pauli_mask(pauli: Pauli) -> u8 {
     match pauli {
-        Pauli::X => 0b01,
+        Pauli::X => ANALYZER_X_MASK,
         Pauli::Y => 0b11,
-        Pauli::Z => 0b10,
+        Pauli::Z => ANALYZER_Z_MASK,
     }
 }
 
@@ -1021,4 +1142,31 @@ fn analyzer_pauli_from_mask(mask: u8) -> AnalyzerPauli {
         0b11 => AnalyzerPauli::Y,
         _ => unreachable!("pauli masks are maintained by xor of X/Z bits"),
     }
+}
+
+impl From<AnalyzerPauli> for Pauli {
+    fn from(value: AnalyzerPauli) -> Self {
+        match value {
+            AnalyzerPauli::X => Self::X,
+            AnalyzerPauli::Y => Self::Y,
+            AnalyzerPauli::Z => Self::Z,
+        }
+    }
+}
+
+fn insert_effect_mask(masks: &mut BTreeMap<QubitId, u8>, qubit: QubitId, mask: u8) {
+    if mask == 0 {
+        return;
+    }
+    masks.insert(qubit, mask);
+}
+
+fn effects_from_masks(masks: BTreeMap<QubitId, u8>) -> Vec<NoiseEffect> {
+    masks
+        .into_iter()
+        .map(|(qubit, mask)| NoiseEffect {
+            qubit,
+            pauli: analyzer_pauli_from_mask(mask),
+        })
+        .collect()
 }

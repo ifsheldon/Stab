@@ -1,0 +1,6 @@
+X_ERROR(0.25) 0
+CNOT 0 1
+CNOT 1 0
+M 0 1
+DETECTOR rec[-2]
+DETECTOR rec[-1]
