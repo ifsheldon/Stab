@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use crate::gate::{ArgRule, TargetGroupKind};
-use crate::target::parse_target_token;
+use crate::target::parse_target_token_into;
 use crate::{CircuitError, CircuitResult, Gate, ObservableId, Probability, RepeatCount, Target};
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -622,7 +622,7 @@ fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(Vec<f64
 fn parse_targets(rest: &str) -> CircuitResult<Vec<Target>> {
     let mut targets = Vec::new();
     for token in rest.split_whitespace() {
-        targets.extend(parse_target_token(token)?);
+        parse_target_token_into(token, &mut targets)?;
     }
     Ok(targets)
 }

@@ -287,14 +287,24 @@ impl Display for Target {
     }
 }
 
-pub(crate) fn parse_target_token(token: &str) -> CircuitResult<Vec<Target>> {
+pub(crate) fn parse_target_token_into(token: &str, targets: &mut Vec<Target>) -> CircuitResult<()> {
     if token == "*" {
-        return Ok(vec![Target::combiner()]);
+        targets.push(Target::combiner());
+        return Ok(());
     }
     if !token.contains('*') {
-        return Ok(vec![Target::from_str(token)?]);
+        if token
+            .as_bytes()
+            .first()
+            .is_some_and(|byte| byte.is_ascii_digit())
+        {
+            let id = parse_u24(token, "qubit target")?;
+            targets.push(Target::qubit(QubitId::new(id)?, false));
+        } else {
+            targets.push(Target::from_str(token)?);
+        }
+        return Ok(());
     }
-    let mut targets = Vec::new();
     for (index, part) in token.split('*').enumerate() {
         if part.is_empty() {
             return Err(CircuitError::invalid_domain_value("target combiner", token));
@@ -304,18 +314,26 @@ pub(crate) fn parse_target_token(token: &str) -> CircuitResult<Vec<Target>> {
         }
         targets.push(Target::from_str(part)?);
     }
-    Ok(targets)
+    Ok(())
 }
 
 fn parse_u24(text: &str, kind: &'static str) -> CircuitResult<u32> {
-    if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
+    if text.is_empty() {
         return Err(CircuitError::invalid_domain_value(kind, text));
     }
-    let value = text
-        .parse::<u32>()
-        .map_err(|_| CircuitError::invalid_domain_value(kind, text))?;
-    if value >= STIM_TARGET_VALUE_LIMIT {
-        return Err(CircuitError::invalid_domain_value(kind, text));
+    let mut value = 0u32;
+    for byte in text.bytes() {
+        if !byte.is_ascii_digit() {
+            return Err(CircuitError::invalid_domain_value(kind, text));
+        }
+        let digit = u32::from(byte - b'0');
+        value = value
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(digit))
+            .ok_or_else(|| CircuitError::invalid_domain_value(kind, text))?;
+        if value >= STIM_TARGET_VALUE_LIMIT {
+            return Err(CircuitError::invalid_domain_value(kind, text));
+        }
     }
     Ok(value)
 }
