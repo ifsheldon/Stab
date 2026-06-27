@@ -111,6 +111,38 @@ fn legacy_gen_space_separated_code_matches_m7_oracle_golden() {
 }
 
 #[test]
+fn gen_accepts_stim_compatible_ignored_input_path() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "gen",
+            "--code",
+            "repetition_code",
+            "--task",
+            "memory",
+            "--distance",
+            "3",
+            "--rounds",
+            "2",
+            "--in",
+            "ignored.stim",
+        ],
+        "".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        include_str!("../../../oracle/fixtures/expected/m7_gen_repetition_code.stdout")
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
 fn gen_surface_rotated_code_matches_m7_oracle_golden() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -286,6 +318,32 @@ fn convert_01_to_dets_matches_m7_oracle_golden() {
 }
 
 #[test]
+fn convert_bits_per_shot_to_dets_requires_typed_width_like_stim() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "convert",
+            "--in_format=01",
+            "--out_format=dets",
+            "--bits_per_shot=2",
+        ],
+        "10\n".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("not enough information given to parse input file to write to dets")
+    );
+}
+
+#[test]
 fn convert_stim_from_stdin_to_canonical_output() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -359,7 +417,7 @@ fn cli_rejects_unknown_arguments_like_arg_parse_test() {
         &mut stderr,
     );
 
-    assert_eq!(status, 2);
+    assert_eq!(status, 1);
     assert_eq!(String::from_utf8(stdout).unwrap(), "");
     assert!(String::from_utf8(stderr).unwrap().contains("--unknown"));
 }
@@ -384,7 +442,7 @@ fn cli_requires_mandatory_arguments_like_arg_parse_test() {
         &mut stderr,
     );
 
-    assert_eq!(status, 2);
+    assert_eq!(status, 1);
     assert_eq!(String::from_utf8(stdout).unwrap(), "");
     assert!(String::from_utf8(stderr).unwrap().contains("--code"));
 }
@@ -411,7 +469,7 @@ fn cli_rejects_invalid_integer_arguments_like_arg_parse_test() {
         &mut stderr,
     );
 
-    assert_eq!(status, 2);
+    assert_eq!(status, 1);
     assert_eq!(String::from_utf8(stdout).unwrap(), "");
     assert!(String::from_utf8(stderr).unwrap().contains("invalid value"));
 }
@@ -438,7 +496,7 @@ fn cli_rejects_invalid_enum_arguments_like_arg_parse_test() {
         &mut stderr,
     );
 
-    assert_eq!(status, 2);
+    assert_eq!(status, 1);
     assert_eq!(String::from_utf8(stdout).unwrap(), "");
     assert!(String::from_utf8(stderr).unwrap().contains("unknown_code"));
 }
@@ -470,6 +528,37 @@ fn cli_rejects_out_of_range_probability_arguments_like_arg_parse_test() {
     assert_eq!(status, 1);
     assert_eq!(String::from_utf8(stdout).unwrap(), "");
     assert!(String::from_utf8(stderr).unwrap().contains("probability"));
+}
+
+#[test]
+fn cli_rejects_rounds_past_stim_i64_cli_bound() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "gen",
+            "--code",
+            "repetition_code",
+            "--task",
+            "memory",
+            "--distance",
+            "3",
+            "--rounds",
+            "9223372036854775808",
+        ],
+        "".as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("greater than Stim's i64 maximum")
+    );
 }
 
 #[test]
@@ -804,7 +893,7 @@ fn sample_rejects_values_past_stim_i64_cli_bound() {
             &mut stderr,
         );
 
-        assert_eq!(status, 2, "{flag}");
+        assert_eq!(status, 1, "{flag}");
         assert_eq!(String::from_utf8(stdout).unwrap(), "", "{flag}");
         assert!(
             String::from_utf8(stderr)

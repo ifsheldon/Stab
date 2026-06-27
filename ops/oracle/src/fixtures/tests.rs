@@ -201,7 +201,7 @@ fn core_exact_output_rows_are_not_recorded_from_stim_cli() {
 }
 
 #[test]
-fn exact_output_rows_have_expected_stdout_paths() {
+fn successful_exact_output_rows_have_expected_stdout_paths() {
     let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
 
     for row in manifest
@@ -209,6 +209,7 @@ fn exact_output_rows_have_expected_stdout_paths() {
         .iter()
         .filter(|row| row.comparator == FixtureComparator::ExactOutput)
         .filter(|row| row.status != super::FixtureStatus::ManifestOnly)
+        .filter(|row| row.expected_status == 0)
     {
         assert!(!row.expected_stdout_path.is_empty(), "{}", row.id);
     }
@@ -830,6 +831,28 @@ fn validation_requires_declared_expected_stdout_by_default() {
             .to_string()
             .contains("bad expected_stdout_path does not exist: expected/missing-golden.stdout")
     );
+}
+
+#[test]
+fn validation_allows_failure_exact_rows_without_expected_stdout() {
+    let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
+    let row = manifest
+        .rows
+        .iter()
+        .find(|row| row.id == "m7-convert-bits-to-dets-reject")
+        .expect("M7 rejection row");
+    assert_eq!(row.expected_status, 1);
+    assert!(row.expected_stdout_path.is_empty());
+
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+
+    manifest
+        .check(&root)
+        .expect("nonzero exact rows can rely on status and stderr class");
 }
 
 #[cfg(unix)]

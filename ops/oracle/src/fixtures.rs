@@ -544,6 +544,7 @@ impl FixtureManifest {
             }
             if row.comparator == FixtureComparator::ExactOutput
                 && row.status != FixtureStatus::ManifestOnly
+                && row.expected_status == 0
                 && row.expected_stdout_path.is_empty()
             {
                 violations.push(format!("{} exact fixture has no expected stdout", row.id));

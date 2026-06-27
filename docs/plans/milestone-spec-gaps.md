@@ -266,21 +266,21 @@ Resolution: pending plan update.
 
 ## 2026-06-27 - M7: Generated Fixture Matrix Scope
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of M7 generator oracle rows and structural generator tests.
 Current text: M7 says to store generated circuit fixture matrices by family, task, distance, rounds, and noise settings for later M8 through M12 reuse, and says `stab-cli gen` output must match Stim v1.16.0 for the compatibility matrix of families, tasks, distances, rounds, and noise settings.
 Gap: the milestone does not define the concrete matrix dimensions, required noise settings, fixture artifact format, acceptable storage size, whether every matrix point needs exact CLI golden output or direct Rust structural parity, or how the matrix is reused by later milestones without checking in very large circuit outputs.
 Proposed amendment: define a primary M7 generator matrix with explicit family, task, distance, round, and noise tuples; require exact CLI goldens only for a small public-command subset and direct Rust structural or generated-on-demand oracle checks for the larger matrix; name the fixture artifact location and the later milestones that consume each fixture group.
-Resolution: pending plan update.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines the M7 generated-circuit acceptance matrix as source-owned oracle, direct-test, and benchmark manifests instead of checked-in generated circuit bodies. Exact CLI goldens cover the public command shape for supported families and tasks, direct Rust structural tests cover larger noisy family/task/distance/round/probability cases, and benchmark rows cover generated-on-demand primary matrix circuits reused by M8 through M12.
 
 ## 2026-06-27 - M7: Convert Command Circuit Versus Result-Format Scope
 
-Status: Open
+Status: Resolved
 Revealed by: implementation and upstream test inspection of `src/stim/cmd/command_convert.test.cc`.
 Current text: M7 requires `stim convert` for `.stim` parse and canonical print workflows and links `command_convert.test.cc` as a direct CLI command test source.
 Gap: pinned Stim v1.16.0 `command_convert.test.cc` primarily tests measurement, detector, and observable result-format conversion among formats such as `01`, `b8`, `hits`, `r8`, and `dets`, often with `--circuit`, `--dem`, `--types`, and observable-output routing, while `.stim` canonical circuit parse-print behavior is already owned by the M4 core parser/printer fixtures and is not an exact upstream `stim convert` command surface.
 Proposed amendment: split M7 convert acceptance into two explicit tracks: a Stab-specific `convert --in_format=stim --out_format=stim` canonical circuit workflow backed by M4 parser/printer tests, and pinned-Stim-compatible result-data conversion rows backed by `command_convert.test.cc`; defer full `b8`, `hits`, `r8`, `--circuit`, `--dem`, `--types`, and `--obs_out` support to the first milestone that owns the corresponding measurement-record and detector-error-model APIs if M7 does not introduce those APIs.
-Resolution: pending plan update.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now splits M7 convert acceptance into `convert --in_format=stim --out_format=stim` canonical circuit workflows backed by M4 parser/printer behavior and pinned-Stim result-data conversion rows backed by `command_convert.test.cc`. `oracle/fixtures/manifest.csv` includes a Stim-compatible rejection row for `--bits_per_shot` to `dets`, and `README.md` documents supported and deferred conversion behavior.
 
 ## 2026-06-27 - M6: Random Generation Hook Ownership
 
@@ -302,12 +302,12 @@ Resolution: pending plan update.
 
 ## 2026-06-27 - M7: Generator Benchmark Comparability
 
-Status: Open
+Status: Resolved
 Revealed by: implementation of Stab-side M7 benchmark runners for `just bench::compare --milestone M7 --strict`.
 Current text: M7 requires generator throughput for repetition, rotated surface, unrotated surface, and color code circuits, and the benchmark manifest uses pinned Stim CLI rows for `stim gen` plus a `main_sample*` CLI dispatch perf row.
 Gap: the plan does not specify whether Stab-side generator benchmark evidence must measure direct Rust generator construction, `stab-cli gen` end-to-end execution, canonical `.stim` printing cost, process startup cost, or all of these separately.
 Proposed amendment: split M7 benchmark acceptance into explicit rows for direct Rust generator construction, `stab-cli gen` in-process dispatch, and external process startup or canonical text emission if those are required; keep the current Stab direct generator rows report-only until an exact CLI-vs-CLI threshold is specified.
-Resolution: pending plan update.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines M7 benchmark acceptance as report-only direct Rust generator construction, in-process CLI dispatch, and canonical conversion timings. Strict external CLI-vs-CLI thresholds and process-startup comparability are deferred to M12 performance hardening.
 
 ## 2026-06-27 - M6: Stabilizers Versus Amplitudes Dependency
 

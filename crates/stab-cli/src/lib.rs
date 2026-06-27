@@ -108,7 +108,7 @@ struct GenArgs {
     distance: u32,
 
     /// Measurement rounds.
-    #[arg(long)]
+    #[arg(long, value_parser = parse_stim_u64)]
     rounds: u64,
 
     /// Depolarizing noise after Clifford gates.
@@ -130,6 +130,10 @@ struct GenArgs {
     /// Output path. Defaults to stdout.
     #[arg(long = "out")]
     output: Option<PathBuf>,
+
+    /// Accepted for Stim compatibility and ignored by `stim gen`.
+    #[arg(long = "in", hide = true)]
+    _input: Option<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -400,6 +404,11 @@ pub(crate) enum CliError {
 
     #[error("not enough information given to parse input file")]
     MissingRecordWidth,
+
+    #[error(
+        "not enough information given to parse input file to write to dets; provide explicit measurement, detector, or observable counts"
+    )]
+    MissingRecordTypesForDets,
 
     #[error("input is not valid UTF-8 text")]
     InvalidUtf8Input,
@@ -769,6 +778,9 @@ where
     R: Read,
     W: Write,
 {
+    if args.out_format == RecordFormatArg::Dets && typed_record_width(&args)? == 0 {
+        return Err(CliError::MissingRecordTypesForDets);
+    }
     let width = convert_record_width(&args)?;
     let input = read_input(args.input.as_ref(), stdin)?;
     let records = parse_zero_one_records(&input, width)?;
@@ -798,11 +810,7 @@ where
 }
 
 fn convert_record_width(args: &ConvertArgs) -> Result<usize, CliError> {
-    let typed_width = args
-        .num_measurements
-        .checked_add(args.num_detectors)
-        .and_then(|value| value.checked_add(args.num_observables))
-        .ok_or(CliError::MeasurementCountOverflow)?;
+    let typed_width = typed_record_width(args)?;
     if typed_width > 0 {
         Ok(typed_width)
     } else if args.bits_per_shot > 0 {
@@ -810,6 +818,13 @@ fn convert_record_width(args: &ConvertArgs) -> Result<usize, CliError> {
     } else {
         Err(CliError::MissingRecordWidth)
     }
+}
+
+fn typed_record_width(args: &ConvertArgs) -> Result<usize, CliError> {
+    args.num_measurements
+        .checked_add(args.num_detectors)
+        .and_then(|value| value.checked_add(args.num_observables))
+        .ok_or(CliError::MeasurementCountOverflow)
 }
 
 pub(crate) fn read_input<R>(path: Option<&PathBuf>, stdin: &mut R) -> Result<Vec<u8>, CliError>
@@ -938,7 +953,7 @@ where
             if write!(stderr, "{message}").is_err() {
                 return 1;
             }
-            2
+            1
         }
     }
 }
