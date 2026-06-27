@@ -43,6 +43,7 @@ impl Analyzer {
                     measurements: vec![measurement_index],
                     observables: Vec::new(),
                     disjoint_group: None,
+                    tag: instruction.tag().map(str::to_owned),
                 });
             }
             self.project_pending_pauli_channels_through_measurement(
@@ -103,6 +104,7 @@ impl Analyzer {
                             measurements,
                             observables: Vec::new(),
                             disjoint_group: None,
+                            tag: pending.tag,
                         });
                     } else {
                         self.push_pending_error(
@@ -113,6 +115,7 @@ impl Analyzer {
                             }],
                             measurements,
                             None,
+                            pending.tag,
                         );
                     }
                 }

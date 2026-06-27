@@ -1,0 +1,6 @@
+R[test-tag-0] 0
+X_ERROR[test-tag-1](0.25) 0
+M[test-tag-2] 0
+DETECTOR[test-tag-3] rec[-1]
+OBSERVABLE_INCLUDE[test-tag-4](0) rec[-1]
+SHIFT_COORDS[test-tag-5](1)

@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{CircuitResult, DemTarget, Probability};
+use crate::{CircuitResult, Probability};
 
 pub(super) fn toggle_all(target: &mut BTreeSet<u64>, values: impl Iterator<Item = u64>) {
     for value in values {
@@ -10,9 +10,9 @@ pub(super) fn toggle_all(target: &mut BTreeSet<u64>, values: impl Iterator<Item 
     }
 }
 
-pub(super) fn merge_independent_probability(
-    probabilities: &mut BTreeMap<Vec<DemTarget>, Probability>,
-    targets: Vec<DemTarget>,
+pub(super) fn merge_independent_probability<K: Ord>(
+    probabilities: &mut BTreeMap<K, Probability>,
+    targets: K,
     probability: Probability,
 ) -> CircuitResult<()> {
     if let Some(existing) = probabilities.get_mut(&targets) {
@@ -23,9 +23,9 @@ pub(super) fn merge_independent_probability(
     Ok(())
 }
 
-pub(super) fn merge_disjoint_probability(
-    probabilities: &mut BTreeMap<(u64, Vec<DemTarget>), Probability>,
-    key: (u64, Vec<DemTarget>),
+pub(super) fn merge_disjoint_probability<K: Ord>(
+    probabilities: &mut BTreeMap<K, Probability>,
+    key: K,
     probability: Probability,
 ) -> CircuitResult<()> {
     if let Some(existing) = probabilities.get_mut(&key) {

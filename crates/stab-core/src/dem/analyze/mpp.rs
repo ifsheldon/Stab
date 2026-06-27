@@ -36,6 +36,7 @@ impl Analyzer {
                     measurements: vec![measurement_index],
                     observables: Vec::new(),
                     disjoint_group: None,
+                    tag: instruction.tag().map(str::to_owned),
                 });
             }
         }

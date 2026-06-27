@@ -5,25 +5,28 @@ use crate::{CircuitError, CircuitResult, DemTarget, Probability};
 use super::probabilities::xor_probability;
 
 type KnownGraphlikeComponents = BTreeMap<Vec<DemTarget>, Vec<DemTarget>>;
+type TaggedErrorKey = (Vec<DemTarget>, Option<String>);
 
-pub(super) fn decompose_error_probabilities(
-    probabilities: BTreeMap<Vec<DemTarget>, Probability>,
+pub(super) fn decompose_tagged_error_probabilities(
+    probabilities: BTreeMap<TaggedErrorKey, Probability>,
     block_remnant_edges: bool,
     ignore_failures: bool,
-) -> CircuitResult<BTreeMap<Vec<DemTarget>, Probability>> {
-    let known_graphlike = known_graphlike_components(probabilities.keys());
+) -> CircuitResult<BTreeMap<TaggedErrorKey, Probability>> {
+    let known_graphlike =
+        known_graphlike_components(probabilities.keys().map(|(targets, _tag)| targets));
     let mut decomposed = BTreeMap::new();
-    for (targets, probability) in probabilities {
+    for ((targets, tag), probability) in probabilities {
         let targets = decompose_targets(
             &targets,
             &known_graphlike,
             block_remnant_edges,
             ignore_failures,
         )?;
-        if let Some(existing) = decomposed.get_mut(&targets) {
+        let key = (targets, tag);
+        if let Some(existing) = decomposed.get_mut(&key) {
             *existing = xor_probability(*existing, probability)?;
         } else {
-            decomposed.insert(targets, probability);
+            decomposed.insert(key, probability);
         }
     }
     Ok(decomposed)

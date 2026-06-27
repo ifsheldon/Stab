@@ -1,0 +1,4 @@
+error[test-tag-1](0.25) D0 L0
+detector[test-tag-3] D0
+logical_observable[test-tag-4] L0
+shift_detectors[test-tag-5](1) 0

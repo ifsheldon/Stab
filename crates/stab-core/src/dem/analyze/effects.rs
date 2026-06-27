@@ -41,6 +41,7 @@ pub(super) struct PendingError {
     pub(super) measurements: Vec<usize>,
     pub(super) observables: Vec<u64>,
     pub(super) disjoint_group: Option<u64>,
+    pub(super) tag: Option<String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -55,6 +56,7 @@ pub(super) struct PendingSingleQubitPauliChannel {
     pub(super) x_probability: Probability,
     pub(super) y_probability: Probability,
     pub(super) z_probability: Probability,
+    pub(super) tag: Option<String>,
 }
 
 impl PendingSingleQubitPauliChannel {
