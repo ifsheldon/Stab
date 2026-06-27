@@ -1,0 +1,17 @@
+X 0
+M 0
+CX rec[-1] 1
+M 1
+H 2
+M 3
+CX rec[-1] 2
+MX 2
+X 4
+M 4
+CY rec[-1] 5
+M 5
+H 6
+X 7
+M 7
+CZ rec[-1] 6
+MX 6

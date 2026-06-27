@@ -3,7 +3,7 @@ use rand::{Rng, RngExt as _, SeedableRng as _};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
-    PauliBasis, PauliSign, PauliString, SingleQubitClifford,
+    MeasureRecordOffset, PauliBasis, PauliSign, PauliString, SingleQubitClifford,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -117,6 +117,11 @@ enum SampleOperation {
         left: usize,
         right: usize,
         probabilities: [f64; 15],
+    },
+    FeedbackPauli {
+        offset: MeasureRecordOffset,
+        qubit: usize,
+        basis: PauliBasis,
     },
     Repeat {
         count: u64,
@@ -383,15 +388,85 @@ fn append_dets_sample(sample: &[bool], output: &mut Vec<u8>) {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct CompileState {
+    measurement_count: u64,
+}
+
+impl CompileState {
+    fn new() -> Self {
+        Self {
+            measurement_count: 0,
+        }
+    }
+
+    fn add_measurements(&mut self, count: usize) -> CircuitResult<()> {
+        let count = u64::try_from(count).map_err(|_| {
+            CircuitError::invalid_sampler_compilation(
+                "measurement record count cannot fit in u64 during sampler compilation",
+            )
+        })?;
+        self.measurement_count = self.measurement_count.checked_add(count).ok_or_else(|| {
+            CircuitError::invalid_sampler_compilation(
+                "measurement record count overflows during sampler compilation",
+            )
+        })?;
+        Ok(())
+    }
+
+    fn add_repeated_measurements(&mut self, per_body: u64, repeat_count: u64) -> CircuitResult<()> {
+        let total = per_body.checked_mul(repeat_count).ok_or_else(|| {
+            CircuitError::invalid_sampler_compilation(
+                "repeated measurement record count overflows during sampler compilation",
+            )
+        })?;
+        self.measurement_count = self.measurement_count.checked_add(total).ok_or_else(|| {
+            CircuitError::invalid_sampler_compilation(
+                "measurement record count overflows during sampler compilation",
+            )
+        })?;
+        Ok(())
+    }
+
+    fn validate_record_offset(
+        self,
+        instruction: &CircuitInstruction,
+        offset: MeasureRecordOffset,
+    ) -> CircuitResult<()> {
+        let required = u64::from(offset.get().unsigned_abs());
+        if required <= self.measurement_count {
+            return Ok(());
+        }
+        Err(CircuitError::invalid_sampler_compilation(format!(
+            "measurement record target rec[{}] is not available while compiling {} feedback",
+            offset.get(),
+            instruction.gate().canonical_name()
+        )))
+    }
+}
+
 fn compile_circuit(circuit: &Circuit, operations: &mut Vec<SampleOperation>) -> CircuitResult<()> {
+    let mut state = CompileState::new();
+    compile_circuit_with_state(circuit, operations, &mut state)
+}
+
+fn compile_circuit_with_state(
+    circuit: &Circuit,
+    operations: &mut Vec<SampleOperation>,
+    state: &mut CompileState,
+) -> CircuitResult<()> {
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
-                compile_instruction(instruction, operations)?;
+                compile_instruction(instruction, operations, state)?;
             }
             CircuitItem::RepeatBlock(repeat) => {
                 let mut body = Vec::new();
-                compile_circuit(repeat.body(), &mut body)?;
+                let before_body = state.measurement_count;
+                let mut body_state = *state;
+                compile_circuit_with_state(repeat.body(), &mut body, &mut body_state)?;
+                let body_measurements = body_state.measurement_count - before_body;
+                state.add_repeated_measurements(body_measurements, repeat.repeat_count().get())?;
                 operations.push(SampleOperation::Repeat {
                     count: repeat.repeat_count().get(),
                     body,
@@ -405,13 +480,19 @@ fn compile_circuit(circuit: &Circuit, operations: &mut Vec<SampleOperation>) -> 
 fn compile_instruction(
     instruction: &CircuitInstruction,
     operations: &mut Vec<SampleOperation>,
+    state: &mut CompileState,
 ) -> CircuitResult<()> {
     let gate = instruction.gate();
     match instruction.gate().canonical_name() {
         "TICK" | "QUBIT_COORDS" | "SHIFT_COORDS" | "DETECTOR" | "OBSERVABLE_INCLUDE" => Ok(()),
         "R" | "RX" | "RY" => compile_reset(instruction, operations),
-        "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => compile_measurement(instruction, operations),
-        "MPAD" => compile_measurement_pads(instruction, operations),
+        "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => {
+            compile_measurement(instruction, operations, state)
+        }
+        "MPAD" => compile_measurement_pads(instruction, operations, state),
+        "CX" => compile_feedback_pauli(instruction, operations, state, PauliBasis::X),
+        "CY" => compile_feedback_pauli(instruction, operations, state, PauliBasis::Y),
+        "CZ" => compile_feedback_pauli(instruction, operations, state, PauliBasis::Z),
         _ if SingleQubitClifford::from_gate(gate).is_ok() => {
             compile_single_qubit_clifford(instruction, operations)
         }
@@ -498,6 +579,7 @@ fn compile_reset(
 fn compile_measurement(
     instruction: &CircuitInstruction,
     operations: &mut Vec<SampleOperation>,
+    state: &mut CompileState,
 ) -> CircuitResult<()> {
     let basis = measurement_basis(instruction)?;
     let flip = deterministic_measurement_flip(instruction)?;
@@ -510,6 +592,7 @@ fn compile_measurement(
             reset,
         });
     }
+    state.add_measurements(instruction.targets().len())?;
     Ok(())
 }
 
@@ -525,6 +608,7 @@ fn measurement_basis(instruction: &CircuitInstruction) -> CircuitResult<PauliBas
 fn compile_measurement_pads(
     instruction: &CircuitInstruction,
     operations: &mut Vec<SampleOperation>,
+    state: &mut CompileState,
 ) -> CircuitResult<()> {
     let flip = deterministic_measurement_flip(instruction)?;
     for target in instruction.targets() {
@@ -533,6 +617,30 @@ fn compile_measurement_pads(
         };
         operations.push(SampleOperation::Pad {
             value: (qubit.get() == 1) ^ flip,
+        });
+    }
+    state.add_measurements(instruction.targets().len())?;
+    Ok(())
+}
+
+fn compile_feedback_pauli(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    state: &CompileState,
+    basis: PauliBasis,
+) -> CircuitResult<()> {
+    for target_pair in instruction.target_groups() {
+        let [record, target] = target_pair else {
+            return Err(unsupported_sampler_instruction(instruction));
+        };
+        let Some(offset) = record.measurement_record_offset() else {
+            return Err(unsupported_sampler_instruction(instruction));
+        };
+        state.validate_record_offset(instruction, offset)?;
+        operations.push(SampleOperation::FeedbackPauli {
+            offset,
+            qubit: qubit_index(instruction, target)?,
+            basis,
         });
     }
     Ok(())
@@ -671,6 +779,15 @@ fn execute_operations(
             } => {
                 apply_two_qubit_pauli_channel(frame, *left, *right, probabilities, rng);
             }
+            SampleOperation::FeedbackPauli {
+                offset,
+                qubit,
+                basis,
+            } => {
+                if measurement_record_bit(measurements, *offset) {
+                    frame.apply_pauli(*qubit, *basis);
+                }
+            }
             SampleOperation::Repeat { count, body } => {
                 for _ in 0..*count {
                     execute_operations(body, frame, measurements, rng);
@@ -678,6 +795,17 @@ fn execute_operations(
             }
         }
     }
+}
+
+fn measurement_record_bit(measurements: &[bool], offset: MeasureRecordOffset) -> bool {
+    let Ok(len) = i64::try_from(measurements.len()) else {
+        return false;
+    };
+    let index = len + i64::from(offset.get());
+    let Ok(index) = usize::try_from(index) else {
+        return false;
+    };
+    measurements.get(index).copied().unwrap_or(false)
 }
 
 fn apply_single_qubit_pauli_channel(
@@ -834,6 +962,38 @@ mod tests {
                 "MRY should reset to +Y after reporting"
             );
         }
+    }
+
+    #[test]
+    fn measurement_record_feedback_applies_local_paulis() {
+        assert_eq!(
+            samples("X 0\nM 0\nCX rec[-1] 1\nM 1\n", 1),
+            vec![vec![true, true]]
+        );
+        assert_eq!(
+            samples("M 0\nCX rec[-1] 1\nM 1\n", 1),
+            vec![vec![false, false]]
+        );
+        assert_eq!(
+            samples("X 0\nM 0\nCY rec[-1] 1\nM 1\n", 1),
+            vec![vec![true, true]]
+        );
+        assert_eq!(
+            samples("H 1\nX 0\nM 0\nCZ rec[-1] 1\nMX 1\n", 1),
+            vec![vec![true, true]]
+        );
+    }
+
+    #[test]
+    fn rejects_feedback_that_reads_missing_measurements() {
+        let circuit = Circuit::from_stim_str("CX rec[-1] 0\n").expect("parse circuit");
+
+        assert_eq!(
+            CompiledSampler::compile(&circuit),
+            Err(CircuitError::invalid_sampler_compilation(
+                "measurement record target rec[-1] is not available while compiling CX feedback"
+            ))
+        );
     }
 
     #[test]
