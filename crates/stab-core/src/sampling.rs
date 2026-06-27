@@ -1,6 +1,9 @@
 use rand::rngs::SmallRng;
 use rand::{Rng, RngExt as _, SeedableRng as _};
 
+use self::operation::{
+    SINGLE_QUBIT_PAULI_CHANNEL_BASES, SampleOperation, TWO_QUBIT_PAULI_CHANNEL_BASES,
+};
 use self::stabilizer_frame::{
     LocalTableauTransform, MeasurementRandomness, StabilizerFrame, reset_correction,
 };
@@ -11,21 +14,24 @@ use crate::{
 };
 
 mod measurement_flip;
+mod operation;
 mod pauli_product;
 mod stabilizer_frame;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledSampler {
     qubit_count: usize,
+    measurement_count: usize,
     operations: Vec<SampleOperation>,
 }
 
 impl CompiledSampler {
     pub fn compile(circuit: &Circuit) -> CircuitResult<Self> {
         let mut operations = Vec::new();
-        compile_circuit(circuit, &mut operations)?;
+        let measurement_count = compile_circuit(circuit, &mut operations)?;
         Ok(Self {
             qubit_count: circuit.count_qubits(),
+            measurement_count,
             operations,
         })
     }
@@ -77,11 +83,20 @@ impl CompiledSampler {
     ) -> Vec<u8> {
         let mut rng = sampler_rng(seed);
         let reference_sample = skip_reference_sample.then(|| self.reference_sample());
-        let mut writer = MeasureRecordWriter::new(format);
+        let mut writer = MeasureRecordWriter::with_capacity(
+            format,
+            estimated_sample_bytes_capacity(format, shots, self.measurement_count),
+        );
+        let mut record = Vec::with_capacity(self.measurement_count);
+        let mut output = Vec::with_capacity(self.measurement_count);
         for _ in 0..shots {
-            writer.write_bits(
-                &self.sample_shot_with_reference(&mut rng, reference_sample.as_deref()),
+            self.sample_shot_with_reference_into(
+                &mut rng,
+                reference_sample.as_deref(),
+                &mut record,
+                &mut output,
             );
+            writer.write_bits(&output);
             writer.write_end();
         }
         writer.into_bytes()
@@ -129,13 +144,27 @@ impl CompiledSampler {
     where
         R: Rng,
     {
-        let mut shot = self.sample_shot(rng);
+        let mut record = Vec::with_capacity(self.measurement_count);
+        let mut output = Vec::with_capacity(self.measurement_count);
+        self.sample_shot_with_reference_into(rng, reference, &mut record, &mut output);
+        output
+    }
+
+    fn sample_shot_with_reference_into<R>(
+        &self,
+        rng: &mut R,
+        reference: Option<&[bool]>,
+        record: &mut Vec<bool>,
+        output: &mut Vec<bool>,
+    ) where
+        R: Rng,
+    {
+        self.sample_shot_in_mode_into(rng, ExecutionMode::Sample, record, output);
         if let Some(reference) = reference {
-            for (bit, reference_bit) in shot.iter_mut().zip(reference) {
+            for (bit, reference_bit) in output.iter_mut().zip(reference) {
                 *bit ^= *reference_bit;
             }
         }
-        shot
     }
 
     pub fn reference_sample(&self) -> Vec<bool> {
@@ -143,31 +172,38 @@ impl CompiledSampler {
         self.sample_shot_in_mode(&mut rng, ExecutionMode::ReferenceSample)
     }
 
-    fn sample_shot<R>(&self, rng: &mut R) -> Vec<bool>
-    where
-        R: Rng,
-    {
-        self.sample_shot_in_mode(rng, ExecutionMode::Sample)
-    }
-
     fn sample_shot_in_mode<R>(&self, rng: &mut R, mode: ExecutionMode) -> Vec<bool>
     where
         R: Rng,
     {
+        let mut record = Vec::with_capacity(self.measurement_count);
+        let mut output = Vec::with_capacity(self.measurement_count);
+        self.sample_shot_in_mode_into(rng, mode, &mut record, &mut output);
+        output
+    }
+
+    fn sample_shot_in_mode_into<R>(
+        &self,
+        rng: &mut R,
+        mode: ExecutionMode,
+        record: &mut Vec<bool>,
+        output: &mut Vec<bool>,
+    ) where
+        R: Rng,
+    {
         let mut frame = StabilizerFrame::new(self.qubit_count);
-        let mut record = Vec::new();
-        let mut output = Vec::new();
+        record.clear();
+        output.clear();
         let mut correlated_error_occurred = false;
         execute_operations(
             &self.operations,
             &mut frame,
-            &mut record,
-            &mut output,
+            record,
+            output,
             &mut correlated_error_occurred,
             rng,
             mode,
         );
-        output
     }
 }
 
@@ -194,84 +230,23 @@ impl ExecutionMode {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-enum SampleOperation {
-    ApplyTableau {
-        targets: Vec<usize>,
-        transform: LocalTableauTransform,
-    },
-    Reset {
-        qubit: usize,
-        basis: PauliBasis,
-    },
-    Measure {
-        qubit: usize,
-        basis: PauliBasis,
-        inverted: bool,
-        flip_probability: f64,
-        reset: bool,
-    },
-    MeasureProduct {
-        terms: Vec<(usize, PauliBasis)>,
-        inverted: bool,
-        flip_probability: f64,
-    },
-    Pad {
-        value: bool,
-        flip_probability: f64,
-    },
-    SingleQubitPauliChannel {
-        qubit: usize,
-        probabilities: [f64; 3],
-    },
-    TwoQubitPauliChannel {
-        left: usize,
-        right: usize,
-        probabilities: [f64; 15],
-    },
-    CorrelatedError {
-        else_branch: bool,
-        probability: f64,
-        terms: Vec<(usize, PauliBasis)>,
-    },
-    HeraldedPauliChannel {
-        qubit: usize,
-        probabilities: [f64; 4],
-    },
-    FeedbackPauli {
-        offset: MeasureRecordOffset,
-        qubit: usize,
-        basis: PauliBasis,
-    },
-    Repeat {
-        count: u64,
-        body: Vec<SampleOperation>,
-    },
-}
-
-const SINGLE_QUBIT_PAULI_CHANNEL_BASES: [PauliBasis; 3] =
-    [PauliBasis::X, PauliBasis::Y, PauliBasis::Z];
-
-const TWO_QUBIT_PAULI_CHANNEL_BASES: [(Option<PauliBasis>, Option<PauliBasis>); 15] = [
-    (None, Some(PauliBasis::X)),
-    (None, Some(PauliBasis::Y)),
-    (None, Some(PauliBasis::Z)),
-    (Some(PauliBasis::X), None),
-    (Some(PauliBasis::X), Some(PauliBasis::X)),
-    (Some(PauliBasis::X), Some(PauliBasis::Y)),
-    (Some(PauliBasis::X), Some(PauliBasis::Z)),
-    (Some(PauliBasis::Y), None),
-    (Some(PauliBasis::Y), Some(PauliBasis::X)),
-    (Some(PauliBasis::Y), Some(PauliBasis::Y)),
-    (Some(PauliBasis::Y), Some(PauliBasis::Z)),
-    (Some(PauliBasis::Z), None),
-    (Some(PauliBasis::Z), Some(PauliBasis::X)),
-    (Some(PauliBasis::Z), Some(PauliBasis::Y)),
-    (Some(PauliBasis::Z), Some(PauliBasis::Z)),
-];
-
 fn sampler_rng(seed: Option<u64>) -> SmallRng {
     SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random))
+}
+
+fn estimated_sample_bytes_capacity(
+    format: SampleFormat,
+    shots: usize,
+    bits_per_shot: usize,
+) -> usize {
+    let bytes_per_shot = match format {
+        SampleFormat::ZeroOne => bits_per_shot.checked_add(1),
+        SampleFormat::B8 => Some(bits_per_shot.div_ceil(8)),
+        SampleFormat::R8 | SampleFormat::Hits | SampleFormat::Dets => None,
+    };
+    bytes_per_shot
+        .and_then(|bytes_per_shot| shots.checked_mul(bytes_per_shot))
+        .unwrap_or(0)
 }
 
 fn count_determined_operations<R>(
@@ -441,9 +416,17 @@ impl CompileState {
     }
 }
 
-fn compile_circuit(circuit: &Circuit, operations: &mut Vec<SampleOperation>) -> CircuitResult<()> {
+fn compile_circuit(
+    circuit: &Circuit,
+    operations: &mut Vec<SampleOperation>,
+) -> CircuitResult<usize> {
     let mut state = CompileState::new();
-    compile_circuit_with_state(circuit, operations, &mut state)
+    compile_circuit_with_state(circuit, operations, &mut state)?;
+    usize::try_from(state.measurement_count).map_err(|_| {
+        CircuitError::invalid_sampler_compilation(
+            "measurement record count cannot fit in usize during sampler compilation",
+        )
+    })
 }
 
 fn compile_circuit_with_state(

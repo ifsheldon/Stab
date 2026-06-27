@@ -7,13 +7,13 @@ M12: Performance Hardening
 ## Status
 
 Partial progress, not milestone-complete.
-This slice starts the M12 measurement gate by making the primary benchmark matrix explicit, adding release-profile compare report generation, recording row-level timing, variance, relative-ratio, pass/fail status, and allocation metadata, adding beta-gate enforcement, adding profiler-note enforcement for rows slower than the hot-path threshold, adding regression-threshold enforcement infrastructure, and adding beta memory-gate enforcement infrastructure.
+This work starts the M12 measurement gate by making the primary benchmark matrix explicit, adding release-profile compare report generation, recording row-level timing, variance, relative-ratio, pass/fail status, and allocation metadata, adding beta-gate enforcement, adding profiler-note enforcement for rows slower than the hot-path threshold, adding regression-threshold enforcement infrastructure, adding beta memory-gate enforcement infrastructure, and optimizing the first sampler output hot path.
 
 ## Contract
 
 M12 requires a frozen primary benchmark matrix, a release-profile Stab-vs-pinned-Stim compare command, a report artifact with machine, compiler, Stim, Stab, benchmark-parameter, timing, variance, ratio, and status metadata, profiler notes for slow workloads, targeted optimizations behind existing abstractions, allocation tracking, regression thresholds, and all implemented oracle suites passing before and after performance changes.
-This slice covers only the matrix selection, compare-reporting infrastructure, beta-gate enforcement, profiler-note gate infrastructure, allocation-tracking report plumbing, regression-threshold file enforcement, and memory-gate compare-report enforcement.
-Actual profiler captures, optimization work, complete allocation reports for the primary matrix, source-owned per-row regression threshold values, beta performance gates, and a source-owned first complete memory baseline remain pending M12 work.
+This work covers only the matrix selection, compare-reporting infrastructure, beta-gate enforcement, profiler-note gate infrastructure, allocation-tracking report plumbing, regression-threshold file enforcement, memory-gate compare-report enforcement, and a focused `CompiledSampler::sample_bytes` allocation/output-buffer optimization.
+Broader profiler captures, optimization work across parser, sampler, detector, analyzer, and DEM hot paths, complete allocation reports for the primary matrix, source-owned per-row regression threshold values, beta performance gates, and a source-owned first complete memory baseline remain pending M12 work.
 
 ## Tests Ported Or Created
 
@@ -30,6 +30,7 @@ Actual profiler captures, optimization work, complete allocation reports for the
 - `cargo test -p stab-bench allocation_tracking_guard_requires_count_allocations_feature` checks that `--track-allocations` is only available in the allocation-enabled build.
 - `cargo test -p stab-bench memory_gate_marks_pass_fail_and_missing_allocation_rows` checks that the memory gate passes rows within 25 percent, fails rows over budget, and blocks missing baseline or current allocation evidence.
 - `cargo test -p stab-bench memory_gate_rejects_unsupported_baseline_schema` checks that memory baselines must use compare-report schema version 1.
+- `cargo test -p stab-core sampling seeded_sample_bytes_match_seeded_record_samples` checks that the optimized streaming-byte sampler path still matches the seeded record-sample path for `01` and `b8` outputs.
 - `cargo test -p stab-bench --features count-allocations` checks that the optional allocation-counting build compiles and runs the benchmark ops tests.
 - Existing `cargo test -p stab-bench` coverage still validates benchmark manifest structure, baseline metadata validation, Stab comparison runner coverage, and benchmark output path guards.
 
@@ -52,6 +53,8 @@ Actual profiler captures, optimization work, complete allocation reports for the
 - Extended `Measurement` with optional allocation totals and compare rows with Stab allocation max fields.
 - Added memory-gate status, baseline bytes, allowed bytes, and error fields to compare rows so memory-gate failures are preserved in generated reports.
 - Extended `Measurement` with optional `variance_seconds`; existing baseline JSON remains readable because the new field defaults when absent.
+- Added `CompiledSampler` measurement-count tracking, output-capacity reservation, and reusable per-shot record/output buffers for `sample_bytes`, reducing allocation churn in high-shot `01` and `b8` sampling.
+- Added `MeasureRecordWriter::with_capacity` so hot sampling and future writers can reserve output storage without changing the existing writer behavior.
 - Tightened benchmark manifest validation so benchmark ids are safe for generated report artifact filenames.
 - Updated root and benchmark documentation for the new compare command and artifact behavior.
 
@@ -63,7 +66,7 @@ Actual profiler captures, optimization work, complete allocation reports for the
 | Add `just bench::compare --profile release --report target/benchmarks/latest` | Partially satisfied | `justfiles/bench.just` now builds `stab-bench` with Cargo's release profile, and `stab-bench compare` accepts `--profile`, `--primary`, and `--report`; a durable full primary report against a complete pinned-Stim baseline remains pending. |
 | Report machine, compiler, Stim, Stab, benchmark parameters, median timing, variance, ratio, and status | Partially satisfied | `CompareReport` records machine metadata, Stim metadata, Stab commit and local-modification state, compare command metadata, per-row measurements, medians, optional variance, optional allocation data, relative ratio, pass/fail status, beta-gate status, memory-gate status, and profiler-note status; complete primary allocation reports remain pending. |
 | Profile slower-than-gate workloads before optimizing | Partially satisfied | `--require-profiler-notes`, `profiler_notes_are_required_only_for_rows_slower_than_hot_path_ratio`, and `profiler_notes_must_name_dominant_cost_and_next_owner_action` enforce durable note files for rows slower than 1.5x once a complete report exists; actual profiler captures and notes for current slow rows remain pending. |
-| Optimize hot paths behind existing abstractions | Missing | No hot-path optimization is performed in this slice. |
+| Optimize hot paths behind existing abstractions | Partially satisfied | `CompiledSampler::sample_bytes` now reuses per-shot buffers and reserves `01` and `b8` output capacity; `cargo test -p stab-core sampling seeded_sample_bytes_match_seeded_record_samples` preserves output semantics. The local M8 probe improved `m8-sample-throughput-1000000` from 0.116693855s in `target/benchmarks/m12-primary-probe/compare.json` to 0.101886795s in `target/benchmarks/m12-sampler-buffer-reuse/compare.json`; many other primary hot paths remain unoptimized. |
 | Add allocation tracking for primary hot paths | Partially satisfied | `--track-allocations`, `just bench::compare-allocations`, optional `count-allocations`, `compare_row_result_records_stab_allocation_maxima`, `--require-memory-gate`, and `memory_gate_marks_pass_fail_and_missing_allocation_rows` provide Stab-side allocation-count plumbing and memory-regression comparison; a full primary allocation report and source-owned baseline remain pending. |
 | Add regression thresholds for workloads that pass the beta gate | Partially satisfied | `--thresholds`, `regression_thresholds_mark_pass_fail_and_uncomparable_rows`, and `regression_thresholds_validate_schema_ids_and_ratios` provide the gate and schema validation; source-owned threshold rows remain pending a complete primary report with passing workloads. |
 | `just oracle::run --implemented-only` passes before and after performance changes | Not applicable | This slice changes benchmark ops and docs only; no performance implementation changed, but the oracle gate remains required before M12 completion. |
@@ -80,10 +83,18 @@ Actual profiler captures, optimization work, complete allocation reports for the
 - `cargo fmt --all`
 - `cargo test -p stab-bench --quiet`
 - `cargo test -p stab-bench --features count-allocations --quiet`
+- `cargo test -p stab-core sampling --quiet`
+- `cargo test -p stab-cli sample --quiet`
 - `cargo clippy -p stab-bench --all-targets -- -D warnings`
 - `cargo clippy -p stab-bench --features count-allocations --all-targets -- -D warnings`
+- `cargo clippy -p stab-core --all-targets -- -D warnings`
+- `cargo clippy -p stab-cli --all-targets -- -D warnings`
 - `just bench::smoke`
+- `just oracle::run --milestone M8`
 - `just bench::compare --help`
+- `just bench::compare --primary --report target/benchmarks/m12-primary-probe`
+- `just bench::compare --milestone M8 --report target/benchmarks/m12-sampler-buffer-reuse --require-profiler-notes`
+- `just bench::compare-allocations --milestone M8 --report target/benchmarks/m12-sampler-buffer-reuse-alloc`
 - `just bench::compare --milestone M4 --report target/benchmarks/m12-compare-smoke --require-profiler-notes`
 - `cargo run -q -p stab-bench -- compare --milestone M4 --require-beta-gate; rc=$?; echo rc=$rc; test $rc -ne 0`
 - `cargo run -q -p stab-bench -- compare --milestone M4 --thresholds target/benchmarks/m12-threshold-smoke/thresholds.json; rc=$?; echo rc=$rc; test $rc -ne 0`
@@ -97,3 +108,6 @@ The beta-gate smoke command failed as expected because the local baseline has mi
 The regression-threshold smoke command failed as expected because the selected threshold row lacked a comparable ratio, proving the threshold gate rejects unproven configured rows.
 The memory-gate smoke command failed as expected because the generated memory baseline either lacked selected rows or set a stricter allocation budget than the current run, proving the memory gate rejects missing or over-budget allocation evidence.
 The allocation smoke wrote allocation counts and maximum live allocated bytes for the M4 Stab-side measurements.
+The sampler-buffer-reuse report wrote `target/benchmarks/m12-sampler-buffer-reuse/compare.json` with profiler notes present for every M8 row still slower than 1.5x on the local M8 baseline.
+The measured `m8-sample-throughput-1000000` row improved from 0.116693855s in the pre-optimization primary probe to 0.101886795s after reusing sampler output buffers, but it remains slower than the pinned Stim baseline and needs follow-up frame reuse or batched sampling work before it can satisfy the beta performance gate.
+The allocation-enabled sampler report wrote `target/benchmarks/m12-sampler-buffer-reuse-alloc/compare.json`; it records `stab_allocation_bytes_max=2000138` for the million-shot `01` output row, dominated by the intentionally materialized output bytes rather than per-shot record allocations.

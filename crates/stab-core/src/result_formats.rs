@@ -272,9 +272,13 @@ pub struct MeasureRecordWriter {
 
 impl MeasureRecordWriter {
     pub fn new(format: SampleFormat) -> Self {
+        Self::with_capacity(format, 0)
+    }
+
+    pub fn with_capacity(format: SampleFormat, capacity: usize) -> Self {
         Self {
             format,
-            output: Vec::new(),
+            output: Vec::with_capacity(capacity),
             index: 0,
             b8_byte: 0,
             b8_bit_index: 0,
