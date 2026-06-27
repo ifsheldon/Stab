@@ -72,3 +72,25 @@ fn dem_sampler_respects_detector_shifts_repeats_and_observables() {
         }]
     );
 }
+
+#[test]
+fn dem_sampler_seeded_noisy_error_is_reproducible_and_statistical() {
+    let sampler = compile_dem("error(0.25) D0\n");
+    let first = sampler
+        .sample_detection_events_with_seed(1000, Some(5))
+        .expect("sample");
+    let second = sampler
+        .sample_detection_events_with_seed(1000, Some(5))
+        .expect("sample again");
+
+    assert_eq!(first, second);
+    let hits = first
+        .records
+        .iter()
+        .filter(|record| record.detectors == [true])
+        .count();
+    assert!(
+        (180..=320).contains(&hits),
+        "expected noisy DEM hits near p=0.25, got {hits}"
+    );
+}
