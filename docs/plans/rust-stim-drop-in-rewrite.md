@@ -241,12 +241,21 @@ Exact uniform tableau sampling or random-workload performance parity belongs to 
 M6 owns the algebra-only `unitary_to_tableau` subset from Stim's `stabilizers_vs_amplitudes` tests: square power-of-two matrices are validated as unitary Clifford operations, interpreted with Stim's little-endian or big-endian amplitude order, snapped with Stim's stabilizer-state phase-smoothing threshold, and converted into tableaus up to global phase.
 The current M6 fixture covers the upstream known-unitary gate-data loop for 24 canonical single-qubit Clifford matrices and 22 canonical paired-gate matrices, the upstream controlled-gate endian cases for `XCY`, `XCZ`, `ZCX`, and `YCX`, malformed or non-Clifford rejection cases, and Stim-style phase smoothing.
 `tableau_to_unitary`, random tableau/unitary roundtrips, and amplitude-simulator cross-checks stay deferred because they require state-vector or matrix-synthesis scope beyond this stabilizer algebra slice.
+M6 util-top ownership is limited to deterministic unitary and tableau-backed subsets unless another line below says otherwise.
+`coverage-util-top-circuit-flow-generators` owns unitary circuit flow-generator cases and explicit measurement rejection; measurement-record, reset, pair-measurement, and noise-derived flows stay deferred.
+`coverage-util-top-has-flow` owns deterministic unsigned unitary-flow checks; sampled checks, measurement-index flows, and observable-rich flows stay deferred.
+`coverage-util-top-circuit-inverse-qec` owns the unitary QEC inverse case and explicit measurement-rewrite rejection; reset, measurement, detector, noise, feedback, and detecting-region rewrites stay deferred.
+`coverage-util-top-circuit-vs-tableau` owns unitary `Circuit::to_tableau` composition, repeats, annotations, non-unitary ignore or rejection behavior, and basic Stim examples; tableau-to-circuit synthesis stays deferred.
+`coverage-util-top-simplified-circuit` owns H/S/CX base decomposition of single-qubit Clifford gates, CZ/CY/SWAP decomposition, recursive repeat simplification, tableau equivalence, and preservation of unsupported gates; all-gate and measurement-rich simplification stay deferred.
+`coverage-util-top-mbqc-decomposition` owns the static-table subset for none cases, measurement and reset aliases, H_XY, S, Pauli identity, CX decomposition parsing, and explicit unsupported behavior; full table coverage and sampled-flow verification stay deferred.
+`coverage-util-top-stabilizers-to-tableau` owns deterministic stabilizer conversion cases, including redundancy, inconsistent signs, anticommutation, underconstrained systems, inverse-tableau output, signed valid-tableau samples, random-tableau Z-output preservation, and past-iterator-limit conversion.
+Implemented util-top rows must keep their manifest notes synchronized with these owned and deferred subcases, and public helper APIs must reject unsupported semantics clearly instead of silently approximating full Stim behavior.
 
 Linked tests and benchmarks:
 
 - Direct tests: C++ Stabilizers And Algebra group.
 - Direct Pauli text rows: `coverage-stabilizers-pauli-string`, `coverage-stabilizers-flex-pauli-string`, and `coverage-stabilizers-pauli-string-ref` distinguish real dense text, phase-general dense and sparse text, and the owned-API subset replacing public borrowed views.
-- Related util-top tests: `circuit_vs_tableau`, `stabilizers_to_tableau`, the M6-owned `unitary_to_tableau` subset of `stabilizers_vs_amplitudes`, and `circuit_inverse_unitary` when their dependencies are in scope.
+- Related util-top tests: `coverage-util-top-circuit-flow-generators`, `coverage-util-top-has-flow`, `coverage-util-top-circuit-inverse-qec`, `coverage-util-top-circuit-inverse-unitary`, `coverage-util-top-circuit-vs-tableau`, `coverage-util-top-simplified-circuit`, `coverage-util-top-mbqc-decomposition`, `coverage-util-top-stabilizers-to-tableau`, and `coverage-util-top-stabilizers-vs-amplitudes`.
 - Semantic-mining tests: Python `pauli_string_pybind`, `clifford_string_pybind`, `tableau_pybind`, `flow_pybind`, and `tableau_simulator_pybind` cases that express core algebra semantics.
 - Benchmarks: `src/stim/stabilizers/*.perf.cc` and `src/stim/util_top/stabilizers_to_tableau.perf.cc`.
 
@@ -258,6 +267,7 @@ Done criteria:
 - `cargo test -p stab-core stabilizers` passes direct and property tests.
 - `cargo test -p stab-core --test stabilizers_vs_amplitudes` passes the M6-owned unitary-to-tableau parity subset.
 - `just oracle::run --milestone M6` passes selected C++ Stim algebra comparisons.
+- `just oracle::list --milestone M6` shows implemented M6 util-top rows with manifest notes that name owned subcases and deferred subcases.
 - `just bench::compare --milestone M6` reports Pauli, Clifford, tableau, tableau-iterator, and stabilizers-to-tableau workloads with normalized rates and compare notes that label direct matches versus report-only deterministic substitutes.
 - Public algebra APIs avoid Python-hostile lifetime or generic shapes unless documented.
 

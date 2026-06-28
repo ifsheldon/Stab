@@ -304,12 +304,12 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines caller-owned `
 
 ## 2026-06-27 - M6: Util-Top Algorithm Subset Boundaries
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of M6 `circuit_flow_generators`, `has_flow`, `circuit_inverse_qec`, `simplified_circuit`, `mbqc_decomposition`, `circuit_vs_tableau`, and `stabilizers_to_tableau` rows.
 Current text: M6 links related util-top tests when their dependencies are in scope, but the oracle manifest records several rows as implemented with notes that defer measurement-rich, detector, noise, sampled-flow, full-gate, tableau-to-circuit, and fuzz variants.
 Gap: the milestone does not split deterministic unitary/tableau subset parity from full upstream util-top parity, so an implemented row can be misread as full Stim parity for the entire upstream file.
 Proposed amendment: split each related util-top row into explicit subcases owned by M6 and deferred subcases owned by the simulator, detector, or performance-hardening milestones; require public APIs for subset helpers to document unsupported semantics until the deferred rows are implemented.
-Resolution: pending plan update.
+Resolution: M6 now splits util-top ownership by manifest row. The roadmap names the deterministic unitary and tableau-backed subcases owned by `coverage-util-top-circuit-flow-generators`, `coverage-util-top-has-flow`, `coverage-util-top-circuit-inverse-qec`, `coverage-util-top-circuit-vs-tableau`, `coverage-util-top-simplified-circuit`, `coverage-util-top-mbqc-decomposition`, and `coverage-util-top-stabilizers-to-tableau`, and it names deferred measurement-rich, detector, noise, sampled-flow, full-gate, tableau-to-circuit, and unsupported-semantics variants. Evidence is `just oracle::list --milestone M6`, `just oracle::run --milestone M6 --structural`, and the implemented `coverage-util-top-*` manifest notes.
 
 ## 2026-06-27 - M7: Generator Benchmark Comparability
 
