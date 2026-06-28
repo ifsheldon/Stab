@@ -31,7 +31,7 @@ The dirty-worktree primary beta probe at `target/benchmarks/m12-primary-beta/com
 It recorded 72 comparable `pass` rows and 4 checked `waived-not-comparable` rows.
 The worst comparable row was `m10-error-decomp` at `1.1891891891891893x`, with paired ratios `1.1764705882352942x` for exact disjoint-to-independent, `1.1891891891891893x` for p10, `1.1891891891891893x` for p100, and `1.1111111111111112x` for independent-to-disjoint.
 The prior headroom and watch rows passed in that dirty probe: `m8-measure-reader-dets` at `0.9818181818181818x`, `m5-simd-bits` at `0.7032967032967034x`, `m4-circuit-parse` at `0.62401875x`, `m5-sparse-xor` at `0.7869545454545454x`, `m4-gate-lookup` at `0.40714285714285714x`, and `m8-sample-primary-unrotated-surface-contract` at `0.49057704653770245x`.
-This is not final acceptance evidence because the worktree was dirty; B7 still requires regenerated clean reports from committed code with `local_modifications=false`.
+This was not final acceptance evidence because the worktree was dirty; B7 required regenerated clean reports from committed code with `local_modifications=false`, which are recorded below.
 
 The final clean beta-125 reports were regenerated from committed Stab commit `c9c96f80844dc2b4c952ec137d191ce369b2f233` with `local_modifications=false`.
 The clean beta report at `target/benchmarks/m12-primary-beta/compare.json` used `command.warmup=true` and `command.measurement_runs=3`, measured 76 primary rows, passed 72 comparable rows, had 4 checked `not-comparable` no-ratio rows, and had 0 comparable failures.

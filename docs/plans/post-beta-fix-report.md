@@ -3,7 +3,7 @@
 ## Summary
 
 This report records the implemented post-beta hardening work for already implemented Stab surfaces.
-The current worktree adds source-owned schema-version-2 threshold support, checked timing-regression waivers, mixed-row timing thresholds with submeasurement guards, streaming `sample_dem`, streaming implemented `detect` and `m2d` conversion paths, and the threshold-completion fixes from `docs/plans/post-beta-threshold-completion-plan.md`.
+The implemented work adds source-owned schema-version-2 threshold support, checked timing-regression waivers, mixed-row timing thresholds with submeasurement guards, streaming `sample_dem`, streaming implemented `detect` and `m2d` conversion paths, and the threshold-completion fixes from `docs/plans/post-beta-threshold-completion-plan.md`.
 The intentionally deferred Stim parity and ecosystem surfaces remain Python, JS/WASM, diagrams, `explain_errors`, `repl`, QASM/Quirk, GPU, sweep-conditioned conversion, `m2d --ran_without_feedback`, full ErrorMatcher provenance, and new public graph/vector simulator APIs.
 
 ## Rows Fixed Or Reconciled
@@ -79,11 +79,12 @@ Final archival acceptance is proven by rerunning the final primary benchmark com
 - Full-code-review of the threshold-completion commits found no confirmed Rust correctness, Stim compatibility, file-format, SIMD isolation, hostile-input, benchmark-policy, or documentation blocker.
 - Final audit and review closure uses the clean committed-code benchmark reports named below.
 
-## Clean Evidence Commands
+## Clean Evidence
 
-The authoritative clean primary baseline, primary compare, beta, timing-regression, and memory-regression reports use the same report paths as the dirty pre-commit evidence.
-They must be regenerated from the final committed tree and must report `local_modifications=false`.
-The commands are:
+The post-beta clean primary compare and timing-regression reports were regenerated at `target/benchmarks/post-beta-primary-compare/compare.json` and `target/benchmarks/post-beta-primary-regression/compare.json` from committed code with `local_modifications=false`.
+The active beta-125 completion evidence supersedes those paths for the stricter gate: `target/benchmarks/beta-125-primary-compare/compare.json`, `target/benchmarks/m12-primary-beta/compare.json`, `target/benchmarks/beta-125-primary-regression/compare.json`, and `target/benchmarks/m12-primary-memory-regression/compare.json` were regenerated from committed Stab commit `c9c96f80844dc2b4c952ec137d191ce369b2f233` with `local_modifications=false`.
+The active beta report passed 72 comparable rows and 4 checked no-ratio rows, the timing-regression report passed 72 configured threshold rows with 4 checked no-ratio waivers and zero ambiguous `not-configured` rows, and the memory-regression report passed all 76 primary rows.
+The reproducible post-beta evidence commands are:
 
 ```sh
 just bench::baseline --primary --out target/benchmarks/post-beta-primary-baseline

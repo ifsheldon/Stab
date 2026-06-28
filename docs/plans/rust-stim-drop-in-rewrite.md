@@ -552,7 +552,7 @@ Done criteria:
 - Hot-path gate passes: every workload still slower than 1.5x Stim has a profiler note naming the dominant cost and the next owner action, and every M12-optimized row has an optimization-log entry naming before and after reports, machine-checkable before and after ratios, gate status, hot-path status, dominant-cost evidence, semantic checks, and follow-up policy.
 - Regression gate passes: workloads already at or below 1.25x Stim have benchmark thresholds checked by `.github/workflows/m12-benchmarks.yml` scheduled benchmark automation or an equivalent manually dispatched run, and any selected measured `contract-only` primary workload without a faithful threshold ratio has a checked source-owned timing-regression waiver.
 - Any workload that misses the beta gate has a dedicated follow-up issue or milestone entry with profiler evidence, suspected cause, and a proposed implementation path.
-- Post-beta beta-hardening follow-up: `docs/plans/beta-125-performance-plan.md` owns the stricter `1.25x` beta target and must update this section from historical wording to active wording when the implementation and clean evidence land.
+- Post-beta beta-hardening status: `docs/plans/beta-125-performance-plan.md` owns the stricter `1.25x` beta target; the clean beta-125 evidence passes the active gate with 72 comparable rows and 4 checked no-ratio waivers, the timing-regression gate has zero ambiguous `not-configured` rows, and memory regression passes all 76 primary rows.
 
 ## Future Plan
 

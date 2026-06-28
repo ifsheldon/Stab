@@ -72,7 +72,7 @@
         "cargo test -p stab-core gates",
         "cargo test -p stab-core target"
       ],
-      "follow_up": "Keep the row outside the 1.25x threshold file until fresh evidence proves whether remaining sparse-parser cost is dispatch, item allocation, or target parsing."
+      "follow_up": "Keep the stable direct parse pair in the 1.25x threshold file, keep the sparse pair covered by clean beta evidence while it remains comfortably below 1.25x, and add a separate sparse-pair threshold only after repeated clean reports prove enough stability."
     },
     {
       "id": "m5-sparse-xor",
