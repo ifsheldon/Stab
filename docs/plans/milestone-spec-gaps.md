@@ -196,21 +196,21 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines M11 benchmark 
 
 ## 2026-06-27 - M9: Feedback-Removal Conversion Scope
 
-Status: Open
+Status: Resolved
 Revealed by: implementing `stab m2d` and inspecting pinned Stim `command_m2d.test.cc` plus `transform_without_feedback.test.cc`.
 Current text: M9 requires `stim m2d` with measurement input parsing, detector conversion, observable output, and inconsistent-input errors, and the compatibility matrix assigns `transform_without_feedback.test.cc` to M9.
 Gap: the milestone does not explicitly say whether `m2d --ran_without_feedback` and circuit feedback inlining are required for the initial M9 CLI surface, even though pinned Stim tests exercise that path and Stab currently rejects the flag instead of silently returning incorrect output.
 Proposed amendment: add an explicit M9 task and fixture group for `--ran_without_feedback` if feedback-removal parity is required now, or defer it to a named later detector-conversion submilestone while requiring the CLI to reject the flag with a clear error.
-Resolution: pending plan update.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now states that M9 does not implement feedback-removal conversion for `m2d --ran_without_feedback`; the M9 CLI must reject the flag with a clear error instead of silently treating skipped-feedback measurement records as ordinary records. Evidence is `cargo test -p stab-cli m2d_rejects_ran_without_feedback_until_feedback_removal_is_implemented --quiet`, and `coverage-util-top-transform-without-feedback` remains a manifest-only follow-up for a later detector-analysis milestone.
 
 ## 2026-06-27 - M9: Detector Analysis Utility Row Ownership
 
-Status: Open
+Status: Resolved
 Revealed by: M9 oracle manifest after implementing detector sampling, measurement-to-detection conversion, observable output, and M9 benchmark runners.
 Current text: M9 links detector-conversion workflows and the compatibility matrix assigns `circuit_to_detecting_regions.test.cc`, `missing_detectors.test.cc`, and `transform_without_feedback.test.cc` to M9.
 Gap: the milestone objective and tasks describe public `detect` and `m2d` workflows, but they do not define public Rust APIs, fixture subsets, or done criteria for detecting regions, missing-detector analysis, or feedback-removal transforms; those rows remain manifest-only while the public CLI/core conversion rows are implemented.
 Proposed amendment: split M9 into explicit public workflow acceptance and detector-analysis utility acceptance, naming the APIs and upstream subcases required for each utility row, or move the utility rows to the DEM/analyzer milestone that introduces the required analysis structures.
-Resolution: pending plan update.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now splits M9 public workflow acceptance from detector-analysis utilities. M9 completion evidence is limited to public `detect` and `m2d` workflows plus the implemented M9 core conversion subsets, while `coverage-util-top-circuit-to-detecting-regions`, `coverage-util-top-missing-detectors`, and `coverage-util-top-transform-without-feedback` remain manifest-only follow-up rows until a later detector-analysis milestone promotes explicit Rust APIs and acceptance fixtures.
 
 ## 2026-06-27 - M9: Sweep-Conditioned Detection Conversion Scope
 

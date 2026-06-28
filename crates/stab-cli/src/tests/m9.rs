@@ -364,6 +364,36 @@ fn legacy_m2d_flag_matches_m9_oracle_golden() {
 }
 
 #[test]
+fn m2d_rejects_ran_without_feedback_until_feedback_removal_is_implemented() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    std::fs::write(&circuit_path, "M 0\nDETECTOR rec[-1]\n").expect("write circuit");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=01",
+            "--out_format=dets",
+            "--ran_without_feedback",
+            "--circuit",
+            circuit_path.to_str().expect("utf-8 path"),
+        ],
+        b"0\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert!(String::from_utf8(stderr).unwrap().contains(
+        "--ran_without_feedback is not supported until feedback-removal conversion is implemented"
+    ));
+}
+
+#[test]
 fn m2d_supports_reference_skip_observables_and_b8_input() {
     let temp_dir = tempdir().expect("temp dir");
     let circuit_path = temp_dir.path().join("input.stim");
