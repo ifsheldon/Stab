@@ -268,12 +268,12 @@ Resolution: pending plan update.
 
 ## 2026-06-27 - M8: Skip Loop Folding Scope
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of M8 `--skip_loop_folding` evidence.
 Current text: M8 requires repeat handling, reference sample behavior, and `stim sample` core flags, but does not say whether `--skip_loop_folding` must change the Rust sampler implementation or only be accepted with output-compatible behavior.
 Gap: Stab currently accepts `--skip_loop_folding` and proves output parity on a repeat circuit, while optimized loop-folded reference-sample construction remains deferred by the `coverage-util-top-reference-sample-tree` manifest row. The milestone text does not state whether that is sufficient for M8 completion.
 Proposed amendment: state that M8 requires `--skip_loop_folding` to be accepted and output-compatible for repeat circuits, while optimized loop-folded reference-sample construction and performance parity are deferred to M12 unless promoted earlier.
-Resolution: pending plan update.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines `--skip_loop_folding` acceptance as output-compatible repeat-circuit behavior for M8 and defers optimized loop-folded reference-sample construction plus performance parity to M12. Evidence is the implemented oracle fixture `m8-sample-skip-loop-folding` and the structural row `coverage-util-top-reference-sample-tree`, whose manifest note records the optimized construction deferral.
 
 ## 2026-06-27 - M7: Generated Fixture Matrix Scope
 

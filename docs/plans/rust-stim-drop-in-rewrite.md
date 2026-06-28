@@ -295,6 +295,9 @@ Tasks:
 - Add statistical tests for noisy sampling that do not require C++ random-stream compatibility.
 - Add regression tests for result-format padding, endian conventions, text output, and bit-packed output.
 
+For M8, `--skip_loop_folding` is required to be accepted and output-compatible on repeat circuits, but it is not required to force an alternate optimized reference-sample-tree implementation.
+Optimized loop-folded reference-sample construction and performance parity stay in M12 unless a later plan amendment promotes them earlier.
+
 Linked tests and benchmarks:
 
 - Direct tests: M8-owned frame and tableau sampling semantics from the C++ Simulators group.
@@ -309,6 +312,7 @@ Done criteria:
 - `just oracle::run --milestone M8 --exact` passes deterministic sampling cases.
 - `just oracle::run --milestone M8 --statistical` passes noisy sampling statistical cases with documented sample counts and confidence bounds.
 - `cargo test -p stab-core sampling` covers repeat blocks, feedback, reset/measurement edge cases, and output-format padding.
+- `m8-sample-skip-loop-folding` proves `stim sample --skip_loop_folding` repeat-circuit output compatibility, while `coverage-util-top-reference-sample-tree` covers the M8-owned reference-sample-tree subset and records optimized loop-folded construction as deferred.
 - `just bench::compare --milestone M8 --strict` reports compile/analysis time, single-shot latency, batch throughput for `1`, `1024`, and `1_000_000` shots, and representative primary-matrix contract rows with no missing M8 Stab runners, invalid placeholder baselines, empty contract-only placeholders, selected pinned Stim baseline rows, or baseline metadata mismatches.
 
 ### M9: Detection Event Workflows
