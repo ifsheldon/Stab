@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::error::BenchError;
 use crate::manifest::is_safe_benchmark_id;
-use crate::report::CompareRowResult;
+use crate::report::{CompareRowResult, MeasurementRatio};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -68,6 +68,21 @@ pub(crate) fn apply_regression_thresholds(
         let mut row_errors = Vec::new();
         row.regression_threshold_status = "configured".to_string();
         row.regression_threshold_max_ratio = threshold.max_relative_ratio;
+        let mut threshold_measurement_ratios = Vec::new();
+        for measurement_threshold in &threshold.measurement_thresholds {
+            match find_or_record_measurement_ratio(row, measurement_threshold) {
+                Some(measurement_ratio) => {
+                    threshold_measurement_ratios.push((measurement_threshold, measurement_ratio));
+                }
+                None => {
+                    row_errors.push(format!(
+                        "measurement threshold {} -> {} has no paired measurement ratio",
+                        measurement_threshold.stim_name, measurement_threshold.stab_name
+                    ));
+                }
+            }
+        }
+        row.refresh_measured_ratio_status_from_measurement_ratios();
         if let Some(max_relative_ratio) = threshold.max_relative_ratio {
             match row.relative_ratio {
                 Some(ratio) if ratio <= max_relative_ratio => {}
@@ -82,17 +97,7 @@ pub(crate) fn apply_regression_thresholds(
                 }
             }
         }
-        for measurement_threshold in &threshold.measurement_thresholds {
-            let Some(measurement_ratio) = row.measurement_ratios.iter().find(|ratio| {
-                ratio.stim_name == measurement_threshold.stim_name
-                    && ratio.stab_name == measurement_threshold.stab_name
-            }) else {
-                row_errors.push(format!(
-                    "measurement threshold {} -> {} has no paired measurement ratio",
-                    measurement_threshold.stim_name, measurement_threshold.stab_name
-                ));
-                continue;
-            };
+        for (measurement_threshold, measurement_ratio) in threshold_measurement_ratios {
             if measurement_ratio.relative_ratio > measurement_threshold.max_relative_ratio {
                 row_errors.push(format!(
                     "measurement {} -> {} ratio {:.3}x exceeds threshold {:.3}x",
@@ -118,6 +123,37 @@ pub(crate) fn apply_regression_thresholds(
         }
     }
     findings
+}
+
+fn find_or_record_measurement_ratio(
+    row: &mut CompareRowResult,
+    threshold: &BenchmarkMeasurementThreshold,
+) -> Option<MeasurementRatio> {
+    if let Some(ratio) = row.measurement_ratios.iter().find(|ratio| {
+        ratio.stim_name == threshold.stim_name && ratio.stab_name == threshold.stab_name
+    }) {
+        return Some(ratio.clone());
+    }
+    let stim = row
+        .stim_measurements
+        .iter()
+        .find(|measurement| measurement.name == threshold.stim_name)?;
+    let stab = row
+        .stab_measurements
+        .iter()
+        .find(|measurement| measurement.name == threshold.stab_name)?;
+    if stim.seconds <= 0.0 {
+        return None;
+    }
+    let ratio = MeasurementRatio {
+        stim_name: stim.name.clone(),
+        stab_name: stab.name.clone(),
+        stim_seconds: stim.seconds,
+        stab_seconds: stab.seconds,
+        relative_ratio: stab.seconds / stim.seconds,
+    };
+    row.measurement_ratios.push(ratio.clone());
+    Some(ratio)
 }
 
 impl BenchmarkThresholds {
@@ -211,7 +247,7 @@ mod tests {
     use super::{BenchmarkThresholds, apply_regression_thresholds, read_thresholds};
     use crate::comparability::ComparabilityClass;
     use crate::manifest::{Milestone, Runner};
-    use crate::report::CompareRowResult;
+    use crate::report::{CompareRowResult, Measurement};
 
     #[test]
     fn regression_thresholds_mark_pass_fail_and_uncomparable_rows() {
@@ -355,6 +391,78 @@ mod tests {
     }
 
     #[test]
+    fn regression_thresholds_record_schema2_explicit_measurement_pairs() {
+        let thresholds = serde_json::from_str::<BenchmarkThresholds>(
+            r#"{
+                "schema_version": 2,
+                "rows": [
+                    {
+                        "id": "explicit-pair-row",
+                        "measurement_thresholds": [
+                            {
+                                "stim_name": "stim_mislabeled_100K",
+                                "stab_name": "stab_honest_10K",
+                                "max_relative_ratio": 1.25
+                            }
+                        ]
+                    }
+                ]
+            }"#,
+        )
+        .expect("parse thresholds");
+        let mut row = row("explicit-pair-row", Some(2.0));
+        row.stim_measurements = vec![measurement("stim_mislabeled_100K", 4.0)];
+        row.stab_measurements = vec![measurement("stab_honest_10K", 2.0)];
+        let mut rows = vec![row];
+
+        let findings = apply_regression_thresholds(&mut rows, &thresholds);
+
+        assert!(findings.blockers.is_empty());
+        let row = rows.first().expect("row");
+        assert_eq!(row.regression_threshold_status, "pass");
+        assert_eq!(row.measurement_ratios.len(), 1);
+        let ratio = row.measurement_ratios.first().expect("recorded ratio");
+        assert_eq!(ratio.stim_name, "stim_mislabeled_100K");
+        assert_eq!(ratio.stab_name, "stab_honest_10K");
+        assert_eq!(ratio.relative_ratio, 0.5);
+    }
+
+    #[test]
+    fn regression_thresholds_refresh_row_status_from_explicit_measurement_pairs() {
+        let thresholds = serde_json::from_str::<BenchmarkThresholds>(
+            r#"{
+                "schema_version": 2,
+                "rows": [
+                    {
+                        "id": "explicit-slow-pair-row",
+                        "measurement_thresholds": [
+                            {
+                                "stim_name": "stim_explicit",
+                                "stab_name": "stab_explicit",
+                                "max_relative_ratio": 3.0
+                            }
+                        ]
+                    }
+                ]
+            }"#,
+        )
+        .expect("parse thresholds");
+        let mut row = row("explicit-slow-pair-row", Some(1.0));
+        row.pass_fail_status = "pass".to_string();
+        row.stim_measurements = vec![measurement("stim_explicit", 1.0)];
+        row.stab_measurements = vec![measurement("stab_explicit", 2.5)];
+        let mut rows = vec![row];
+
+        let findings = apply_regression_thresholds(&mut rows, &thresholds);
+
+        assert!(findings.blockers.is_empty());
+        let row = rows.first().expect("row");
+        assert_eq!(row.regression_threshold_status, "pass");
+        assert_eq!(row.relative_ratio, Some(2.5));
+        assert_eq!(row.pass_fail_status, "fail");
+    }
+
+    #[test]
     fn regression_thresholds_validate_schema_ids_and_ratios() {
         let thresholds = serde_json::from_str::<BenchmarkThresholds>(
             r#"{
@@ -405,7 +513,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(thresholds.schema_version, 2);
-        assert_eq!(thresholds.rows.len(), 64);
+        assert_eq!(thresholds.rows.len(), 65);
         assert!(thresholds.rows.iter().all(|row| {
             row.max_relative_ratio == Some(1.25)
                 || row
@@ -481,5 +589,16 @@ mod tests {
                 relative_ratio,
             });
         row
+    }
+
+    fn measurement(name: &str, seconds: f64) -> Measurement {
+        Measurement {
+            name: name.to_string(),
+            seconds,
+            variance_seconds: None,
+            allocation: None,
+            resident_bytes: None,
+            iterations: None,
+        }
     }
 }

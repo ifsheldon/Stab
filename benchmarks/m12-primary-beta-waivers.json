@@ -12,6 +12,11 @@
       "follow_up": "Replace this waiver with a faithful public Stim circuit-convert baseline if one becomes available, or keep the row as a source-owned CLI contract for Stab's .stim canonical conversion."
     },
     {
+      "id": "m8-measure-reader-ptb64-contract",
+      "reason": "Pinned Stim v1.16.0 has ptb64 reader correctness tests but no `measure_record_reader.perf.cc` filter or public CLI timing surface that isolates ptb64 reader throughput.",
+      "follow_up": "Replace this waiver with a faithful ptb64 reader perf baseline if pinned Stim exposes one, or keep the Stab-only contract row plus ptb64 reader parity tests as the evidence."
+    },
+    {
       "id": "m10-dem-print-contract",
       "reason": "Pinned Stim v1.16.0 exposes DEM parsing through commands such as `convert --dem` and `sample_dem`, but it has no public CLI or stim_perf row that canonical-prints an existing .dem file.",
       "follow_up": "Replace this waiver with a faithful comparable DEM print baseline if Stim exposes one, or keep `.dem` parse and print covered by M10 oracle parity plus Stab-only throughput evidence."

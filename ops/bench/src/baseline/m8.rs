@@ -5,7 +5,8 @@ use rand::rngs::SmallRng;
 use stab_core::{
     Circuit, CompiledSampler, Probability, ReferenceSampleTree, SampleFormat,
     biased_randomize_bits,
-    result_formats::{read_records, write_records},
+    result_formats::{write_ptb64_records_checked, write_records},
+    result_streaming::{for_each_ptb64_record_all, for_each_record},
 };
 
 use crate::error::BenchError;
@@ -71,7 +72,27 @@ pub(super) fn run_sample_compare_row(
     row: &BenchmarkRow,
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
-        "m8-measure-reader" => run_measure_reader_row(row).map(Some),
+        "m8-measure-reader-01" => {
+            run_measure_reader_format_row(row, "stab_measure_reader_01_10k", SampleFormat::ZeroOne)
+                .map(Some)
+        }
+        "m8-measure-reader-b8" => {
+            run_measure_reader_format_row(row, "stab_measure_reader_b8_10k", SampleFormat::B8)
+                .map(Some)
+        }
+        "m8-measure-reader-r8" => {
+            run_measure_reader_format_row(row, "stab_measure_reader_r8_10k", SampleFormat::R8)
+                .map(Some)
+        }
+        "m8-measure-reader-hits" => {
+            run_measure_reader_format_row(row, "stab_measure_reader_hits_10k", SampleFormat::Hits)
+                .map(Some)
+        }
+        "m8-measure-reader-dets" => {
+            run_measure_reader_format_row(row, "stab_measure_reader_dets_10k", SampleFormat::Dets)
+                .map(Some)
+        }
+        "m8-measure-reader-ptb64-contract" => run_measure_reader_ptb64_row(row).map(Some),
         "m8-frame-simulator" => run_frame_simulator_row(row).map(Some),
         "m8-tableau-simulator" => run_tableau_simulator_row(row).map(Some),
         "m8-reference-sample-tree" => run_reference_sample_tree_row(row).map(Some),
@@ -113,7 +134,19 @@ pub(super) fn run_sample_compare_row(
 
 pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     match (row_id, name) {
-        ("m8-measure-reader", name) if name.starts_with("stab_measure_reader_") => {
+        ("m8-measure-reader-ptb64-contract", "stab_measure_reader_ptb64_64x10k_contract") => {
+            Some((64.0 * 10_000.0, "bits/s"))
+        }
+        (row_id, name)
+            if matches!(
+                row_id,
+                "m8-measure-reader-01"
+                    | "m8-measure-reader-b8"
+                    | "m8-measure-reader-r8"
+                    | "m8-measure-reader-hits"
+                    | "m8-measure-reader-dets"
+            ) && name.starts_with("stab_measure_reader_") =>
+        {
             Some((10_000.0, "bits/s"))
         }
         ("m8-frame-simulator", "stab_frame_compile_depolarize1") => Some((32.0, "qubits/s")),
@@ -155,8 +188,23 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
-        "m8-measure-reader" => Some(
-            "partial-match: Stab reports supported 01/b8/r8/hits/dets readers; ptb64 reader parity is not implemented yet",
+        "m8-measure-reader-01" => Some(
+            "partial-match: Stab measures the public 01 reusable-record reader against pinned Stim read_01 dense and sparse reader filters",
+        ),
+        "m8-measure-reader-b8" => Some(
+            "partial-match: Stab measures the public b8 reusable-record reader against pinned Stim read_b8 dense and sparse reader filters",
+        ),
+        "m8-measure-reader-r8" => Some(
+            "partial-match: Stab measures the public r8 reusable-record reader against pinned Stim read_r8 dense and sparse reader filters",
+        ),
+        "m8-measure-reader-hits" => Some(
+            "partial-match: Stab measures the public hits reusable-record reader against pinned Stim read_hits dense and sparse reader filters",
+        ),
+        "m8-measure-reader-dets" => Some(
+            "partial-match: Stab measures the public dets reusable-record reader against pinned Stim read_dets dense and sparse reader filters",
+        ),
+        "m8-measure-reader-ptb64-contract" => Some(
+            "contract-only: Stab measures ptb64 reader throughput against upstream ptb64 reader tests because pinned Stim has no ptb64 reader perf filter",
         ),
         "m8-frame-simulator" => Some(
             "report-only: Stab measures the current public sampler frame path for a bounded depolarizing workload; upstream baseline is an internal bit-parallel frame simulator",
@@ -192,46 +240,43 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     }
 }
 
-fn run_measure_reader_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+fn run_measure_reader_format_row(
+    row: &BenchmarkRow,
+    name: &'static str,
+    format: SampleFormat,
+) -> Result<Vec<Measurement>, BenchError> {
     let source_record = deterministic_measure_reader_record();
-    let encoded = [
-        (
-            "stab_measure_reader_01_10k",
-            SampleFormat::ZeroOne,
-            write_records(std::slice::from_ref(&source_record), SampleFormat::ZeroOne),
-        ),
-        (
-            "stab_measure_reader_b8_10k",
-            SampleFormat::B8,
-            write_records(std::slice::from_ref(&source_record), SampleFormat::B8),
-        ),
-        (
-            "stab_measure_reader_r8_10k",
-            SampleFormat::R8,
-            write_records(std::slice::from_ref(&source_record), SampleFormat::R8),
-        ),
-        (
-            "stab_measure_reader_hits_10k",
-            SampleFormat::Hits,
-            write_records(std::slice::from_ref(&source_record), SampleFormat::Hits),
-        ),
-        (
-            "stab_measure_reader_dets_10k",
-            SampleFormat::Dets,
-            write_records(std::slice::from_ref(&source_record), SampleFormat::Dets),
-        ),
-    ];
-    encoded
-        .iter()
-        .map(|(name, format, input)| {
-            measure_stab(name, || {
-                let records = read_records(input, *format, MEASURE_READER_BITS)
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-                black_box(records.iter().flatten().filter(|bit| **bit).count());
+    let input = write_records(std::slice::from_ref(&source_record), format);
+    Ok(vec![measure_stab(name, || {
+        let mut set_bits = 0usize;
+        for_each_record(&input, format, MEASURE_READER_BITS, |record| {
+            set_bits += record.iter().filter(|bit| **bit).count();
+            Ok(())
+        })
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+        black_box(set_bits);
+        Ok(())
+    })?])
+}
+
+fn run_measure_reader_ptb64_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let source_record = deterministic_measure_reader_record();
+    let ptb64_records = (0..64).map(|_| source_record.clone()).collect::<Vec<_>>();
+    let ptb64_input = write_ptb64_records_checked(&ptb64_records)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(vec![measure_stab(
+        "stab_measure_reader_ptb64_64x10k_contract",
+        || {
+            let mut set_bits = 0usize;
+            for_each_ptb64_record_all(&ptb64_input, MEASURE_READER_BITS, |record| {
+                set_bits += record.iter().filter(|bit| **bit).count();
                 Ok(())
             })
-        })
-        .collect()
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(set_bits);
+            Ok(())
+        },
+    )?])
 }
 
 fn run_probability_util_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
@@ -460,15 +505,20 @@ mod tests {
     #[test]
     fn m8_benchmark_rows_have_stab_compare_runners() {
         for (id, expected_measurements) in [
+            ("m8-measure-reader-01", &["stab_measure_reader_01_10k"][..]),
+            ("m8-measure-reader-b8", &["stab_measure_reader_b8_10k"][..]),
+            ("m8-measure-reader-r8", &["stab_measure_reader_r8_10k"][..]),
             (
-                "m8-measure-reader",
-                &[
-                    "stab_measure_reader_01_10k",
-                    "stab_measure_reader_b8_10k",
-                    "stab_measure_reader_r8_10k",
-                    "stab_measure_reader_hits_10k",
-                    "stab_measure_reader_dets_10k",
-                ][..],
+                "m8-measure-reader-hits",
+                &["stab_measure_reader_hits_10k"][..],
+            ),
+            (
+                "m8-measure-reader-dets",
+                &["stab_measure_reader_dets_10k"][..],
+            ),
+            (
+                "m8-measure-reader-ptb64-contract",
+                &["stab_measure_reader_ptb64_64x10k_contract"][..],
             ),
             (
                 "m8-frame-simulator",

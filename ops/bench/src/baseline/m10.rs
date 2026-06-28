@@ -1,4 +1,5 @@
 use std::hint::black_box;
+use std::time::{Duration, Instant};
 
 use stab_core::{
     Circuit, CodeDistance, DetectorErrorModel, ErrorAnalyzerOptions, Probability, RoundCount,
@@ -7,12 +8,13 @@ use stab_core::{
     shortest_graphlike_undetectable_logical_error, try_disjoint_to_independent_xyz_errors,
 };
 
+use crate::allocations::measure_tracked_memory;
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
 
 use super::{
-    STAB_COMPARE_ITERATIONS, TINY_DIRECT_COMPARE_REPETITIONS, measure_stab_batched,
+    STAB_COMPARE_ITERATIONS, TINY_DIRECT_COMPARE_REPETITIONS, duration_variance_seconds,
     measure_stab_iterations, stab_runner_error,
 };
 
@@ -77,8 +79,11 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
-        "m10-dem-parse-contract" | "m10-dem-print-contract" => Some(
+        "m10-dem-parse-contract" => Some(
             "contract-representative: Stab measures in-process .dem parse/print on the current M10 deterministic fixture",
+        ),
+        "m10-dem-print-contract" => Some(
+            "contract-only: Stab measures in-process .dem printing on the current M10 deterministic fixture; pinned Stim has no matching DEM canonical-print CLI or stim_perf row",
         ),
         "m10-analyze-errors-fold-cli" => Some(
             "contract-representative: Stab measures in-process analyze_errors --fold_loops on the current high-repeat fixture",
@@ -93,7 +98,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-representative: Stab measures in-process generated rotated-memory-z surface-code analysis at d3/r3; the upstream Stim perf row uses d11/r100 and remains the eventual scale target",
         ),
         "m10-error-decomp" => Some(
-            "direct-match: Stab measures independent/disjoint XYZ probability conversion cases matching the pinned Stim util_bot error_decomp perf filters",
+            "direct-match: Stab measures independent/disjoint XYZ probability conversion families against pinned Stim util_bot error_decomp perf filters; exact and independent paths use case-diverse in-process batches to reduce timer noise",
         ),
         "m10-graphlike-search" => Some(
             "contract-representative: Stab measures in-process shortest graphlike logical-error search on a deterministic chain DEM",
@@ -200,67 +205,135 @@ fn run_graphlike_search_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Benc
 }
 
 fn run_error_decomp_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let p01 = Probability::try_new(0.01).map_err(|error| stab_runner_error(&row.id, error))?;
-    let p02 = Probability::try_new(0.02).map_err(|error| stab_runner_error(&row.id, error))?;
-    let p10 = Probability::try_new(0.1).map_err(|error| stab_runner_error(&row.id, error))?;
-    let p15 = Probability::try_new(0.15).map_err(|error| stab_runner_error(&row.id, error))?;
-    let p20 = Probability::try_new(0.2).map_err(|error| stab_runner_error(&row.id, error))?;
-    let p30 = Probability::try_new(0.3).map_err(|error| stab_runner_error(&row.id, error))?;
-    let zero = Probability::try_new(0.0).map_err(|error| stab_runner_error(&row.id, error))?;
+    let p01 = benchmark_probability(&row.id, 0.01)?;
+    let p02 = benchmark_probability(&row.id, 0.02)?;
+    let p10 = benchmark_probability(&row.id, 0.1)?;
+    let p15 = benchmark_probability(&row.id, 0.15)?;
+    let p20 = benchmark_probability(&row.id, 0.2)?;
+    let p30 = benchmark_probability(&row.id, 0.3)?;
+    let zero = benchmark_probability(&row.id, 0.0)?;
+    let independent_cases = [
+        [p10, p20, p30],
+        [p10, p30, p20],
+        [p20, p10, p30],
+        [p20, p30, p10],
+        [p30, p10, p20],
+        [p30, p20, p10],
+    ];
+    let exact_cases = [
+        [p10, p20, p15],
+        [p10, p15, p20],
+        [p20, p10, p15],
+        [p20, p15, p10],
+        [p15, p10, p20],
+        [p15, p20, p10],
+    ];
     Ok(vec![
-        measure_stab_batched(
+        measure_error_decomp_cases(
             "stab_independent_to_disjoint_xyz_errors",
-            TINY_DIRECT_COMPARE_REPETITIONS,
-            || {
+            &independent_cases,
+            |[x, y, z]| {
                 black_box(independent_to_disjoint_xyz_errors(
-                    black_box(p10),
-                    black_box(p20),
-                    black_box(p30),
+                    black_box(x),
+                    black_box(y),
+                    black_box(z),
                 ))
                 .map_err(|error| stab_runner_error(&row.id, error))?;
                 Ok(())
             },
         )?,
-        measure_stab_batched(
+        measure_error_decomp_cases(
             "stab_disjoint_to_independent_xyz_errors_approx_exact",
-            TINY_DIRECT_COMPARE_REPETITIONS,
-            || {
+            &exact_cases,
+            |[x, y, z]| {
                 black_box(try_disjoint_to_independent_xyz_errors(
-                    black_box(p10),
-                    black_box(p20),
-                    black_box(p15),
+                    black_box(x),
+                    black_box(y),
+                    black_box(z),
                 ))
                 .map_err(|error| stab_runner_error(&row.id, error))?;
                 Ok(())
             },
         )?,
-        measure_stab_batched(
+        measure_error_decomp_cases(
             "stab_disjoint_to_independent_xyz_errors_approx_p10",
-            TINY_DIRECT_COMPARE_REPETITIONS,
-            || {
+            &[[p10, p20, zero]],
+            |[x, y, z]| {
                 black_box(try_disjoint_to_independent_xyz_errors(
-                    black_box(p10),
-                    black_box(p20),
-                    black_box(zero),
+                    black_box(x),
+                    black_box(y),
+                    black_box(z),
                 ))
                 .map_err(|error| stab_runner_error(&row.id, error))?;
                 Ok(())
             },
         )?,
-        measure_stab_batched(
+        measure_error_decomp_cases(
             "stab_disjoint_to_independent_xyz_errors_approx_p100",
-            TINY_DIRECT_COMPARE_REPETITIONS,
-            || {
+            &[[p01, p02, zero]],
+            |[x, y, z]| {
                 black_box(try_disjoint_to_independent_xyz_errors(
-                    black_box(p01),
-                    black_box(p02),
-                    black_box(zero),
+                    black_box(x),
+                    black_box(y),
+                    black_box(z),
                 ))
                 .map_err(|error| stab_runner_error(&row.id, error))?;
                 Ok(())
             },
         )?,
     ])
+}
+
+fn benchmark_probability(row_id: &str, value: f64) -> Result<Probability, BenchError> {
+    Probability::try_new(value).map_err(|error| stab_runner_error(row_id, error))
+}
+
+fn measure_error_decomp_cases(
+    name: &str,
+    cases: &[[Probability; 3]],
+    mut operation: impl FnMut([Probability; 3]) -> Result<(), BenchError>,
+) -> Result<Measurement, BenchError> {
+    let operation_count = TINY_DIRECT_COMPARE_REPETITIONS
+        .checked_mul(cases.len())
+        .filter(|count| *count > 0)
+        .ok_or_else(|| BenchError::StabRunner {
+            row_id: "m10-error-decomp".to_string(),
+            message: "error-decomposition benchmark requires at least one case".to_string(),
+        })?;
+    let mut timings = Vec::with_capacity(STAB_COMPARE_ITERATIONS);
+    for _ in 0..STAB_COMPARE_ITERATIONS {
+        let start = Instant::now();
+        run_error_decomp_case_batch(cases, &mut operation)?;
+        timings.push(start.elapsed().div_f64(operation_count as f64));
+    }
+    let variance_seconds = duration_variance_seconds(&timings);
+    timings.sort();
+    let seconds = timings
+        .get(timings.len() / 2)
+        .map(Duration::as_secs_f64)
+        .unwrap_or_default();
+    let tracked_memory =
+        measure_tracked_memory(|| run_error_decomp_case_batch(cases, &mut operation))?;
+    Ok(Measurement {
+        name: name.to_string(),
+        seconds,
+        variance_seconds,
+        allocation: tracked_memory.allocation,
+        resident_bytes: tracked_memory.resident_bytes_max,
+        iterations: Some(STAB_COMPARE_ITERATIONS),
+    })
+}
+
+fn run_error_decomp_case_batch(
+    cases: &[[Probability; 3]],
+    operation: &mut impl FnMut([Probability; 3]) -> Result<(), BenchError>,
+) -> Result<(), BenchError> {
+    for _ in 0..TINY_DIRECT_COMPARE_REPETITIONS {
+        for case in cases {
+            operation(black_box(*case))?;
+        }
+    }
+    Ok(())
 }
 
 fn error_analyzer_surface_code(row_id: &str) -> Result<Circuit, BenchError> {

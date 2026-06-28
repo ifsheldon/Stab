@@ -228,6 +228,48 @@ fn primary_baseline_selection_excludes_metadata_and_m12_placeholder_rows() {
 }
 
 #[test]
+fn m4_gate_lookup_benchmark_splits_lookup_surfaces() {
+    let row = BenchmarkRow {
+        id: "m4-gate-lookup".to_string(),
+        milestone: Milestone::M4,
+        threshold_class: "report-only".to_string(),
+        runner: Runner::StimPerf,
+        upstream_source: "src/stim/gates/gates.perf.cc".to_string(),
+        stim_perf_filter: "gate_data_hash_all_gate_names".to_string(),
+        argv: String::new(),
+        stdin_path: String::new(),
+        phase: "analysis".to_string(),
+        measurement: "gate-lookup".to_string(),
+        description: "test row".to_string(),
+    };
+
+    let measurements = run_stab_compare_row(&row)
+        .expect("run compare row")
+        .expect("Stab runner");
+    let names = measurements
+        .iter()
+        .map(|measurement| measurement.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        names,
+        [
+            "stab_gate_data_hash_all_gate_names",
+            "stab_gate_lookup_aliases_contract",
+            "stab_gate_lookup_lowercase_contract",
+            "stab_gate_lookup_invalid_contract",
+        ]
+    );
+    assert!(compare_note("m4-gate-lookup").is_some());
+    for name in names {
+        assert!(
+            measurement_work("m4-gate-lookup", name).is_some(),
+            "m4-gate-lookup/{name} should report normalized work"
+        );
+    }
+}
+
+#[test]
 fn primary_baseline_selection_rejects_empty_filtered_primary_rows() {
     let mut m12_row = benchmark_row("m12-primary-performance-matrix", Runner::ContractOnly);
     m12_row.milestone = Milestone::M12;

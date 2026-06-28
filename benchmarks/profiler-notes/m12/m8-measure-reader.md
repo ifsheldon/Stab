@@ -1,2 +1,2 @@
-Dominant cost: supported text and sparse result readers are compared against several upstream internal reader variants, including very small bit-packed records, and Stab still lacks ptb64 reader parity in this row.
-Next owner action: add ptb64 reader parity and split reader thresholds by format before using this mixed reader row for strict M12 regression gating.
+Dominant cost: supported `01`, `b8`, `r8`, `hits`, and `dets` readers are now split into format-specific primary rows, but each format still compares Stab's public dense reusable-record visitor against pinned Stim dense and sparse internal reader filters.
+Next owner action: keep the split reader rows outside strict 1.25x thresholds until the benchmark matrix has true dense and sparse Stab reader submeasurements paired with the pinned Stim filters; `ptb64` parity is covered by `m8-measure-reader-ptb64-contract` because pinned Stim v1.16.0 has ptb64 reader tests but no ptb64 reader perf filter.

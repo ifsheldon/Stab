@@ -23,11 +23,6 @@
           "stim_name": "disjoint_to_independent_xyz_errors_approx_p10",
           "stab_name": "stab_disjoint_to_independent_xyz_errors_approx_p10",
           "max_relative_ratio": 1.25
-        },
-        {
-          "stim_name": "disjoint_to_independent_xyz_errors_approx_p100",
-          "stab_name": "stab_disjoint_to_independent_xyz_errors_approx_p100",
-          "max_relative_ratio": 1.25
         }
       ]
     },
@@ -39,6 +34,21 @@
     { "id": "m11-sample-dem-repeated-contract", "max_relative_ratio": 1.25 },
     { "id": "m11-sample-dem-sparse-contract", "max_relative_ratio": 1.25 },
     { "id": "m5-simd-bit-table", "max_relative_ratio": 1.25 },
+    {
+      "id": "m5-simd-bits",
+      "measurement_thresholds": [
+        {
+          "stim_name": "simd_bits_xor_10K",
+          "stab_name": "stab_simd_bits_xor_10K",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "simd_bits_not_zero_100K",
+          "stab_name": "stab_simd_bits_not_zero_10K",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    },
     { "id": "m5-simd-word", "max_relative_ratio": 1.25 },
     { "id": "m6-clifford-string", "max_relative_ratio": 1.25 },
     { "id": "m6-pauli-iter", "max_relative_ratio": 1.25 },

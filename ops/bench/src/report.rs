@@ -11,6 +11,8 @@ use crate::manifest::{Milestone, Runner};
 use crate::process::{check_success, run_process};
 use crate::root::RepoRoot;
 
+pub(crate) const BETA_GATE_MAX_RELATIVE_RATIO: f64 = 2.0;
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct BaselineReport {
     pub(crate) schema_version: u32,
@@ -204,6 +206,36 @@ pub(crate) struct CompareRowResult {
     pub(crate) profiler_note_path: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) profiler_note_error: Option<String>,
+}
+
+impl CompareRowResult {
+    pub(crate) fn refresh_measured_ratio_status_from_measurement_ratios(&mut self) {
+        let worst_measurement_ratio = self
+            .measurement_ratios
+            .iter()
+            .map(|ratio| ratio.relative_ratio)
+            .max_by(f64::total_cmp);
+        if let Some(worst_measurement_ratio) = worst_measurement_ratio {
+            self.relative_ratio = Some(
+                self.relative_ratio
+                    .map_or(worst_measurement_ratio, |ratio| {
+                        ratio.max(worst_measurement_ratio)
+                    }),
+            );
+        }
+        if self.status == "measured"
+            && matches!(
+                self.pass_fail_status.as_str(),
+                "pass" | "fail" | "not-comparable"
+            )
+        {
+            self.pass_fail_status = match self.relative_ratio {
+                Some(ratio) if ratio <= BETA_GATE_MAX_RELATIVE_RATIO => "pass".to_string(),
+                Some(_) => "fail".to_string(),
+                None => "not-comparable".to_string(),
+            };
+        }
+    }
 }
 
 pub(crate) fn machine_metadata(root: &RepoRoot) -> Result<MachineMetadata, BenchError> {

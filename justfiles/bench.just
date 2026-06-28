@@ -26,7 +26,7 @@ compare-allocations *args:
 # Check source-owned M12 primary timing-regression thresholds.
 [working-directory: '..']
 primary-regression *args:
-    cargo run -q -p stab-bench --profile release -- compare --primary --warmup --measurement-runs 3 --thresholds benchmarks/m12-primary-thresholds.json {{args}}
+    cargo run -q -p stab-bench --profile release -- compare --primary --warmup --measurement-runs 3 --thresholds benchmarks/m12-primary-thresholds.json --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/m12 {{args}}
 
 # Check the M12 primary beta timing gate with source-owned contract-only waivers.
 [working-directory: '..']

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use stab_core::{
-    BitMatrix, BitVec, Circuit, CliffordString, Gate, PauliBasis, PauliSign, PauliString,
+    BitMatrix, BitVec, Circuit, CliffordString, PauliBasis, PauliSign, PauliString,
     PauliStringIterator, SparseXorVec, TableauIterator, stabilizers_to_tableau,
 };
 
@@ -22,6 +22,7 @@ use crate::stim::{ensure_stim_binaries, validate_stim_source};
 
 mod m10;
 mod m11;
+mod m4;
 mod m7;
 mod m8;
 mod m9;
@@ -35,6 +36,9 @@ const STAB_COMPARE_ITERATIONS: usize = 1;
 const WORD_BITS: usize = u64::BITS as usize;
 const M5_BIT_TABLE_BITS: usize = 128;
 const M5_BITVEC_BITS: usize = 10_000;
+// Pinned Stim v1.16.0 labels this perf filter "100K" but sets n = 10 * 1000.
+const M5_BITVEC_NOT_ZERO_BITS: usize = 10_000;
+const M5_BITVEC_NOT_ZERO_SET_INDEX: usize = 600;
 const M5_POPCOUNT_BITS: usize = 1024 * 256;
 const M5_SPARSE_ROWS_USIZE: usize = 1000;
 const M5_SPARSE_ROWS_U32: u32 = 1000;
@@ -252,24 +256,7 @@ pub(crate) fn run_stab_compare_row(
                 Ok(())
             })?]))
         }
-        "m4-gate-lookup" => {
-            let names = Gate::all().map(Gate::canonical_name).collect::<Vec<_>>();
-            Ok(Some(vec![measure_stab_batched(
-                "stab_gate_lookup_all",
-                TINY_DIRECT_COMPARE_REPETITIONS,
-                || {
-                    for name in &names {
-                        let gate =
-                            Gate::from_name(name).map_err(|error| BenchError::StabRunner {
-                                row_id: row.id.clone(),
-                                message: error.to_string(),
-                            })?;
-                        black_box(gate);
-                    }
-                    Ok(())
-                },
-            )?]))
-        }
+        "m4-gate-lookup" => Ok(Some(m4::run_gate_lookup_row(row)?)),
         "m5-simd-bit-table" => {
             let matrix = m5_bit_matrix(&row.id)?;
             Ok(Some(vec![
@@ -299,19 +286,28 @@ pub(crate) fn run_stab_compare_row(
             let left = m5_bitvec(M5_BITVEC_BITS, 0x6eed_5eed);
             let right = m5_bitvec(M5_BITVEC_BITS, 0x51ab_51ab);
             let mask = m5_bitvec(M5_BITVEC_BITS, 0xf00d_f00d);
+            let not_zero = m5_not_zero_bitvec(&row.id)?;
             let mut xor_target = right.clone();
             Ok(Some(vec![
-                measure_stab("stab_bitvec_xor_10k", || {
-                    xor_target
-                        .xor_assign(&left.as_bitslice())
-                        .map_err(|error| stab_runner_error(&row.id, error))?;
-                    black_box(xor_target.words());
-                    Ok(())
-                })?,
-                measure_stab("stab_bitvec_not_zero_10k", || {
-                    black_box(left.not_zero());
-                    Ok(())
-                })?,
+                measure_stab_batched(
+                    "stab_simd_bits_xor_10K",
+                    TINY_DIRECT_COMPARE_REPETITIONS,
+                    || {
+                        xor_target
+                            .xor_assign(&left.as_bitslice())
+                            .map_err(|error| stab_runner_error(&row.id, error))?;
+                        black_box(xor_target.words());
+                        Ok(())
+                    },
+                )?,
+                measure_stab_batched(
+                    "stab_simd_bits_not_zero_10K",
+                    TINY_DIRECT_COMPARE_REPETITIONS,
+                    || {
+                        black_box(black_box(&not_zero).not_zero());
+                        Ok(())
+                    },
+                )?,
                 measure_stab("stab_bitvec_masked_xor_10k_contract", || {
                     let mut out = left.clone();
                     out.masked_xor_assign(&right.as_bitslice(), &mask.as_bitslice())
@@ -364,17 +360,7 @@ pub(crate) fn run_stab_compare_row(
                     );
                     Ok(())
                 })?,
-                measure_stab_batched(
-                    "stab_sparse_xor_item_7",
-                    TINY_DIRECT_COMPARE_REPETITIONS,
-                    || {
-                        for item in xor_items {
-                            buf.xor_item(item);
-                        }
-                        black_box(buf.items().len());
-                        Ok(())
-                    },
-                )?,
+                measure_sparse_xor_items("stab_sparse_xor_item_7", &mut buf, &xor_items)?,
             ]))
         }
         "m6-clifford-string" => {
@@ -510,6 +496,13 @@ fn m5_bitvec(bit_len: usize, seed: u64) -> BitVec {
     BitVec::from_words_truncated(bit_len, deterministic_words(words_for_bits(bit_len), seed))
 }
 
+fn m5_not_zero_bitvec(row_id: &str) -> Result<BitVec, BenchError> {
+    let mut bits = BitVec::zeros(M5_BITVEC_NOT_ZERO_BITS);
+    bits.set(M5_BITVEC_NOT_ZERO_SET_INDEX, true)
+        .map_err(|error| stab_runner_error(row_id, error))?;
+    Ok(bits)
+}
+
 fn m5_bit_matrix(row_id: &str) -> Result<BitMatrix, BenchError> {
     let mut matrix = BitMatrix::zeros(M5_BIT_TABLE_BITS, M5_BIT_TABLE_BITS)
         .map_err(|error| stab_runner_error(row_id, error))?;
@@ -550,6 +543,50 @@ fn sparse_table_row_xor(table: &mut [SparseXorVec]) {
             target.xor_assign(source);
         }
     }
+}
+
+fn measure_sparse_xor_items(
+    name: &str,
+    buf: &mut SparseXorVec,
+    xor_items: &[u32],
+) -> Result<Measurement, BenchError> {
+    let mut timings = Vec::with_capacity(STAB_COMPARE_ITERATIONS);
+    for _ in 0..STAB_COMPARE_ITERATIONS {
+        let start = Instant::now();
+        run_sparse_xor_item_batch(buf, xor_items);
+        timings.push(
+            start
+                .elapsed()
+                .div_f64(TINY_DIRECT_COMPARE_REPETITIONS as f64),
+        );
+    }
+    let variance_seconds = duration_variance_seconds(&timings);
+    timings.sort();
+    let seconds = timings
+        .get(timings.len() / 2)
+        .map(Duration::as_secs_f64)
+        .unwrap_or_default();
+    let tracked_memory = measure_tracked_memory(|| {
+        run_sparse_xor_item_batch(buf, xor_items);
+        Ok(())
+    })?;
+    Ok(Measurement {
+        name: name.to_string(),
+        seconds,
+        variance_seconds,
+        allocation: tracked_memory.allocation,
+        resident_bytes: tracked_memory.resident_bytes_max,
+        iterations: Some(STAB_COMPARE_ITERATIONS),
+    })
+}
+
+fn run_sparse_xor_item_batch(buf: &mut SparseXorVec, xor_items: &[u32]) {
+    for _ in 0..TINY_DIRECT_COMPARE_REPETITIONS {
+        for item in xor_items {
+            buf.xor_item(black_box(*item));
+        }
+    }
+    black_box(buf.items().len());
 }
 
 fn m6_pauli_string(num_qubits: usize, seed: u64) -> PauliString {
@@ -762,6 +799,9 @@ fn summarize_measurement_rates(row_id: &str, measurements: &[Measurement]) -> St
 }
 
 pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
+    if let Some(work) = m4::measurement_work(row_id, name) {
+        return Some(work);
+    }
     if let Some(work) = m8::measurement_work(row_id, name) {
         return Some(work);
     }
@@ -790,11 +830,13 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("m5-simd-bit-table", "stab_bit_matrix_transpose_128x128_contract") => {
             Some(((M5_BIT_TABLE_BITS * M5_BIT_TABLE_BITS) as f64, "bits/s"))
         }
-        ("m5-simd-bits", "stab_bitvec_xor_10k")
-        | ("m5-simd-bits", "stab_bitvec_not_zero_10k")
+        ("m5-simd-bits", "stab_simd_bits_xor_10K")
         | ("m5-simd-bits", "stab_bitvec_masked_xor_10k_contract")
         | ("m5-simd-bits", "stab_bitvec_copy_10k_contract") => {
             Some((M5_BITVEC_BITS as f64, "bits/s"))
+        }
+        ("m5-simd-bits", "stab_simd_bits_not_zero_10K") => {
+            Some((M5_BITVEC_NOT_ZERO_BITS as f64, "bits/s"))
         }
         ("m5-simd-bits", "stab_bitvec_range_xor_4096_contract") => Some((4096.0, "bits/s")),
         ("m5-simd-word", "stab_bitvec_popcount_262144") => {
@@ -836,6 +878,9 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 }
 
 pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
+    if let Some(note) = m4::compare_note(row_id) {
+        return Some(note);
+    }
     if let Some(note) = m8::compare_note(row_id) {
         return Some(note);
     }
@@ -851,9 +896,6 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "m4-circuit-parse" => Some(
             "direct-match: Stab measures dense and sparse .stim parser cases against the pinned Stim circuit_parse perf filters",
-        ),
-        "m4-gate-lookup" => Some(
-            "direct-match: Stab measures all canonical gate-name lookups against the pinned Stim gate lookup perf filter",
         ),
         "m7-perf-harness" => Some(
             "contract-only: verifies baseline metadata coverage; no Stab runtime workload is expected",
@@ -871,7 +913,7 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-smoke: Stab transpose/row-xor uses 128x128 until optimized 10k transpose parity is introduced",
         ),
         "m5-simd-bits" => Some(
-            "partial-match: xor/not_zero use upstream 10k size; masked/range/copy are Stab M5 contract extras; randomize is not implemented in M5",
+            "partial-match: direct XOR and not-zero submeasurements pair with pinned Stim simd_bits filters using repeated in-process timing; masked/range/copy are Stab M5 contract extras and randomize is not implemented in M5",
         ),
         "m5-simd-word" => Some(
             "direct-match: Stab measures popcount-like bit-vector work against the pinned Stim simd_compat_popcnt perf filter",

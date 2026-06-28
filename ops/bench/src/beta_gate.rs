@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::error::BenchError;
 use crate::manifest::{Runner, is_safe_benchmark_id};
-use crate::report::CompareRowResult;
+use crate::report::{BETA_GATE_MAX_RELATIVE_RATIO, CompareRowResult};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -57,9 +57,10 @@ pub(crate) fn apply_beta_gate(
             }
             "fail" => {
                 let message = format!(
-                    "ratio {} exceeds 2.000x beta gate",
+                    "ratio {} exceeds {:.3}x beta gate",
                     row.relative_ratio
-                        .map_or_else(|| "unknown".to_string(), |ratio| format!("{ratio:.3}x"))
+                        .map_or_else(|| "unknown".to_string(), |ratio| format!("{ratio:.3}x"),),
+                    BETA_GATE_MAX_RELATIVE_RATIO
                 );
                 row.beta_gate_status = "fail".to_string();
                 row.beta_gate_error = Some(message.clone());
@@ -96,7 +97,7 @@ pub(crate) fn apply_beta_gate(
     for id in waiver_rows.keys() {
         if !used_waivers.contains(*id) {
             findings.blockers.push(format!(
-                "{id}: beta waiver did not match a selected measured contract-only not-comparable row"
+                "{id}: beta waiver did not match a selected measured contract-only-runner not-comparable row"
             ));
         }
     }
@@ -160,7 +161,7 @@ mod tests {
     use crate::report::CompareRowResult;
 
     #[test]
-    fn beta_gate_allows_only_measured_contract_rows_with_explicit_waivers() {
+    fn beta_gate_allows_only_measured_contract_only_runner_rows_with_explicit_waivers() {
         let waivers = serde_json::from_str::<BetaWaivers>(
             r#"{
                 "schema_version": 1,
@@ -285,8 +286,8 @@ mod tests {
             findings.blockers,
             vec![
                 "missing-row: beta waiver cannot apply because status is not-comparable, runner is stim-cli, comparability is direct-match, and row status is measured",
-                "missing-row: beta waiver did not match a selected measured contract-only not-comparable row",
-                "passing-row: beta waiver did not match a selected measured contract-only not-comparable row",
+                "missing-row: beta waiver did not match a selected measured contract-only-runner not-comparable row",
+                "passing-row: beta waiver did not match a selected measured contract-only-runner not-comparable row",
             ]
         );
     }
@@ -324,7 +325,7 @@ mod tests {
         let waivers = read_beta_waivers(&path).expect("read source-owned M12 beta waivers");
 
         assert_eq!(waivers.schema_version, 1);
-        assert_eq!(waivers.rows.len(), 3);
+        assert_eq!(waivers.rows.len(), 4);
     }
 
     fn row(

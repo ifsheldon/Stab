@@ -37,7 +37,7 @@ When paired ratios exist, beta and regression gates use the worse of the row med
 The JSON report records paired evidence in `measurement_ratios`, and the Markdown report prints the worst pair in the `Ratio Source` column.
 Tiny direct-match Stab measurements may use batched timing to reduce clock-noise dominance, but they still report seconds per operation.
 Pass `--require-beta-gate` to fail when any selected row does not prove a pass against the 2.0x pinned-Stim beta performance gate.
-Pass `--beta-waivers <path>` with `--require-beta-gate` to accept only measured `contract-only` rows whose lack of a comparable pinned-Stim ratio is explained by a source-owned waiver.
+Pass `--beta-waivers <path>` with `--require-beta-gate` to accept only measured no-ratio rows whose manifest `runner` is `contract-only` and whose lack of a comparable pinned-Stim ratio is explained by a source-owned waiver.
 Waivers do not apply to missing baselines, pending runners, invalid baselines, or rows with measured ratios above the beta gate.
 Unused waivers fail the gate so the file stays in sync when a row becomes comparable or leaves the selected matrix.
 `m12-primary-beta-waivers.json` is the source-owned M12 waiver file for the remaining primary rows that have Stab-side timing evidence but no faithful public Stim baseline.
@@ -50,7 +50,7 @@ Optimization-log rows use schema version 2 and record before and after reports, 
 Pass `--thresholds <path>` to fail when a selected row with a configured regression threshold exceeds its maximum relative ratio or lacks a comparable Stab-vs-Stim ratio.
 Threshold files must not contain stale ids: every configured threshold id must be selected by the compare run so row renames and matrix changes cannot silently drop a regression guard.
 `m12-primary-thresholds.json` is the source-owned M12 timing-regression threshold file for primary rows that have reached the 1.25x pinned-Stim regression gate with enough local headroom to make an initial stable threshold useful.
-Run `just bench::primary-regression --baseline <primary-baseline.json> --report target/benchmarks/<name>` to check those source-owned thresholds for the frozen primary matrix after a Stab-side warmup pass and three recorded measurement runs.
+Run `just bench::primary-regression --baseline <primary-baseline.json> --report target/benchmarks/<name>` to check those source-owned thresholds for the frozen primary matrix after a Stab-side warmup pass, three recorded measurement runs, and source-owned profiler-note validation.
 The recipe defaults to the latest generated baseline path when no explicit `--baseline` is passed.
 The scheduled `.github/workflows/m12-benchmarks.yml` workflow records a fresh primary pinned-Stim baseline on a GitHub runner, runs this source-owned threshold gate, and uploads the generated baseline and compare reports.
 Threshold files are JSON with schema version 1 or 2.
@@ -90,6 +90,7 @@ Schema version 2 is backward compatible with row-level thresholds and additional
 ```
 
 Submeasurement thresholds fail when the selected compare report lacks the named paired evidence or when the paired ratio exceeds the configured ratio.
+The timing-regression report is the authoritative completion evidence for configured schema-version-2 threshold pairs because threshold application materializes any configured explicit pair that was not already produced by automatic exact-name or positional pairing.
 Threshold ids must be benchmark-id safe because they are matched against report rows and may also be used by generated benchmark tooling.
 Beta waiver files are JSON with schema version 1:
 

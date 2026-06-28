@@ -13,8 +13,9 @@ use crate::error::BenchError;
 use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner};
 use crate::memory_gate::{apply_memory_gate, read_memory_baseline};
 use crate::report::{
-    BaselineReport, CompareCommandMetadata, CompareReport, CompareRowResult, Measurement,
-    machine_metadata, render_compare_markdown_report, stab_metadata, unix_epoch_seconds,
+    BETA_GATE_MAX_RELATIVE_RATIO, BaselineReport, CompareCommandMetadata, CompareReport,
+    CompareRowResult, Measurement, machine_metadata, render_compare_markdown_report, stab_metadata,
+    unix_epoch_seconds,
 };
 use crate::root::RepoRoot;
 use crate::thresholds::{apply_regression_thresholds, read_thresholds};
@@ -600,7 +601,7 @@ fn compare_pass_fail_status(
         return "not-comparable".to_string();
     }
     match relative_ratio {
-        Some(ratio) if ratio <= 2.0 => "pass".to_string(),
+        Some(ratio) if ratio <= BETA_GATE_MAX_RELATIVE_RATIO => "pass".to_string(),
         Some(_) => "fail".to_string(),
         None => "not-comparable".to_string(),
     }

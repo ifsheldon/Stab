@@ -40,7 +40,12 @@ m7-gen-unrotated-surface-d5-r50,M7,report-only,stim-cli,src/stim/cmd/command_gen
 m7-gen-unrotated-surface-d9-r9,M7,report-only,stim-cli,src/stim/cmd/command_gen.test.cc,,gen|--code|surface_code|--task|unrotated_memory_z|--distance|9|--rounds|9,,generation,gen-unrotated-surface,unrotated surface code d9 r9 generation workload
 m7-gen-unrotated-surface-d9-r90,M7,report-only,stim-cli,src/stim/cmd/command_gen.test.cc,,gen|--code|surface_code|--task|unrotated_memory_z|--distance|9|--rounds|90,,generation,gen-unrotated-surface,unrotated surface code d9 r90 generation workload
 m7-gen-color-d5-r5,M7,report-only,stim-cli,src/stim/cmd/command_gen.test.cc,,gen|--code|color_code|--task|memory_xyz|--distance|5|--rounds|5,,generation,gen-color,color code d5 r5 generation workload
-m8-measure-reader,M8,report-only,stim-perf,src/stim/io/measure_record_reader.perf.cc,read_*,,,throughput,result-reader,result format reader throughput across dense sparse text and bit-packed formats
+m8-measure-reader-01,M8,report-only,stim-perf,src/stim/io/measure_record_reader.perf.cc,read_01_*,,,throughput,result-reader-01,01 text result reader throughput across dense and sparse Stim filters
+m8-measure-reader-b8,M8,report-only,stim-perf,src/stim/io/measure_record_reader.perf.cc,read_b8_*,,,throughput,result-reader-b8,b8 bit-packed result reader throughput across dense and sparse Stim filters
+m8-measure-reader-r8,M8,report-only,stim-perf,src/stim/io/measure_record_reader.perf.cc,read_r8_*,,,throughput,result-reader-r8,r8 byte-packed result reader throughput across dense and sparse Stim filters
+m8-measure-reader-hits,M8,report-only,stim-perf,src/stim/io/measure_record_reader.perf.cc,read_hits_*,,,throughput,result-reader-hits,hits text result reader throughput across dense and sparse Stim filters
+m8-measure-reader-dets,M8,report-only,stim-perf,src/stim/io/measure_record_reader.perf.cc,read_dets_*,,,throughput,result-reader-dets,dets text result reader throughput across dense and sparse Stim filters
+m8-measure-reader-ptb64-contract,M8,report-only,contract-only,src/stim/io/measure_record_reader.test.cc,,,,throughput,result-reader-ptb64,ptb64 result reader throughput contract without a pinned Stim perf filter
 m8-frame-simulator,M8,report-only,stim-perf,src/stim/simulators/frame_simulator.perf.cc,FrameSimulator_*,,,throughput,sampling-frame,frame simulator analysis and batch sampling workloads
 m8-tableau-simulator,M8,report-only,stim-perf,src/stim/simulators/tableau_simulator.perf.cc,TableauSimulator_*,,,latency,sampling-tableau,tableau simulator single-shot latency workload
 m8-reference-sample-tree,M8,report-only,stim-perf,src/stim/util_top/reference_sample_tree.perf.cc,reference_sample_tree_*,,,analysis,reference-sample,reference sample tree workloads

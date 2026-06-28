@@ -35,20 +35,20 @@
         "hot_path_status": "above-profiler-threshold",
         "evidence_note": "The before report measured gate lookup far above both the beta gate and the profiler-note threshold."
       },
-      "after_report": "target/benchmarks/m12-primary-beta-after-m4-fast-paths/compare.json",
+      "after_report": "target/benchmarks/post-beta-primary-regression/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 1.6400000000000001,
+        "relative_ratio": 1.7,
         "hot_path_status": "covered-by-source-profiler-note",
-        "evidence_note": "The after report measured the row under the 2.0x beta gate but still above the 1.5x profiler-note threshold, so the source-owned profiler note remains required.",
+        "evidence_note": "The refreshed post-beta regression report measured the canonical all-gate lookup pair under the 2.0x beta gate but above the 1.25x timing threshold after the pinned Stim baseline landed near 100 ns, so the source-owned profiler note keeps the tiny lookup surface unthresholded.",
         "source_profiler_note": "benchmarks/profiler-notes/m12/m4-gate-lookup.md"
       },
-      "dominant_cost": "Gate lookup spent avoidable time in allocation-heavy canonicalization and broader lookup scans for canonical uppercase names.",
-      "optimization_summary": "Added an inline exact-name fast path for canonical names and aliases while preserving case-insensitive public lookup behavior.",
+      "dominant_cost": "Canonical all-gate lookup was separated from alias, lowercase, and invalid-name contracts, but the remaining direct pair is a timer-dominated sub-microsecond lookup surface where small pinned Stim baseline shifts can cross the strict 1.25x gate.",
+      "optimization_summary": "Added an inline exact-name fast path for canonical names and aliases, split canonical lookup from Stab-only public lookup contracts, and left the canonical pair outside the strict threshold file until larger repeated evidence is stable.",
       "semantic_checks": [
         "cargo test -p stab-core gates"
       ],
-      "follow_up": "Keep the row outside the 1.25x threshold file until larger repeated evidence separates lookup-table value from timer noise."
+      "follow_up": "Increase repeated canonical lookup work or otherwise reduce timer-noise dominance before adding a schema-version-2 threshold; keep alias, lowercase, and invalid lookup contract measurements outside strict Stim-relative thresholds unless pinned Stim adds matching filters."
     },
     {
       "id": "m4-circuit-parse",
@@ -107,20 +107,22 @@
         "hot_path_status": "above-profiler-threshold",
         "evidence_note": "The before report measured the 01 measurement-record reader above the beta gate and above the profiler-note threshold."
       },
-      "after_report": "target/benchmarks/m12-primary-compare-after-zero-one-reader-checked-scan/compare.json",
+      "after_report": "target/benchmarks/post-beta-primary-regression/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 1.914516129032258,
-        "hot_path_status": "covered-by-source-profiler-note",
-        "evidence_note": "The after report measured the row under the 2.0x beta gate but still above the 1.5x profiler-note threshold, so the source-owned profiler note remains required.",
-        "source_profiler_note": "benchmarks/profiler-notes/m12/m8-measure-reader.md"
+        "relative_ratio": 0.8592592592592592,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The post-beta regression report measures the split 01, b8, r8, hits, and dets reader rows below the beta gate, with b8 as the slowest comparable split row; ptb64 moved to an explicit contract-only row with a beta waiver."
       },
-      "dominant_cost": "The supported 01 measurement-record reader still paid generic text-record parsing overhead on dense bit lines.",
-      "optimization_summary": "Added a direct byte scan for 01 measurement-record lines while preserving final-record-without-newline acceptance and invalid-byte rejection.",
+      "dominant_cost": "The old unsplit reader row mixed result formats and obscured whether each public reader format was comparable, while the 01 reader also paid generic text-record parsing overhead on dense bit lines.",
+      "optimization_summary": "Added a direct byte scan for 01 measurement-record lines, split reader evidence into 01, b8, r8, hits, dets, and ptb64 contract rows, and kept strict thresholds out of split rows that still compare Stab public dense visitors against mixed pinned Stim dense and sparse filters.",
       "semantic_checks": [
-        "cargo test -p stab-core result_formats"
+        "cargo test -p stab-core result_formats",
+        "cargo test -p stab-core result_streaming",
+        "cargo test -p stab-core ptb64_reader_round_trips_writer_output",
+        "cargo test -p stab-bench m8_benchmark_rows_have_stab_compare_runners"
       ],
-      "follow_up": "Add ptb64 reader parity and split reader thresholds by format before using this mixed row for strict regression gating."
+      "follow_up": "Keep split reader rows outside strict 1.25x thresholds until dense and sparse Stab reader submeasurements can be paired directly with the pinned Stim filters; keep ptb64 as contract-only until pinned Stim exposes a ptb64 perf filter."
     },
     {
       "id": "m8-probability-util",
@@ -277,22 +279,23 @@
         "hot_path_status": "above-profiler-threshold",
         "evidence_note": "The before report measured error decomposition above the beta gate and above the profiler-note threshold before paired submeasurement evidence exposed the tiny-filter bottleneck."
       },
-      "after_report": "target/benchmarks/m12-primary-regression-after-submeasurement-fixes-current/compare.json",
+      "after_report": "target/benchmarks/m12-primary-beta/compare.json",
       "after_evidence": {
         "gate_status": "pass",
         "relative_ratio": 1.875,
         "hot_path_status": "covered-by-source-profiler-note",
-        "evidence_note": "The after report measured the row under the 2.0x beta gate but still above the 1.5x profiler-note threshold under paired submeasurement evidence, so the source-owned profiler note remains required.",
+        "evidence_note": "The post-beta beta report keeps the row under the 2.0x beta gate, while the separate post-beta regression report guards the stable approx_p10 pair with a schema-version-2 threshold and leaves exact, p100, and independent-to-disjoint filters documented in the source-owned profiler note.",
         "source_profiler_note": "benchmarks/profiler-notes/m12/m10-error-decomp.md"
       },
-      "dominant_cost": "The row median hid tiny independent/disjoint XYZ conversion filters where pinned Stim submeasurements were sub-nanosecond and timing overhead could dominate the arithmetic.",
-      "optimization_summary": "Split the Stab-side direct-match measurements to match the pinned filters, added paired submeasurement ratio evidence, batched tiny direct-match timing, and removed this row from the 1.25x threshold file until the tiny filters stabilize.",
+      "dominant_cost": "The row median hid tiny independent/disjoint XYZ conversion filters where pinned Stim submeasurements were sub-nanosecond and timing overhead could dominate the arithmetic, while approx_p10 is stable enough to guard directly.",
+      "optimization_summary": "Split the Stab-side direct-match measurements to match the pinned filters, added paired submeasurement ratio evidence, batched tiny direct-match timing, and guarded only the stable approx_p10 pair in the 1.25x threshold file.",
       "semantic_checks": [
         "cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners",
         "cargo test -p stab-bench compare_row_result_uses_worst_exact_submeasurement_ratio",
-        "cargo test -p stab-bench direct_match_rows_use_positional_submeasurement_ratios_when_names_differ"
+        "cargo test -p stab-bench direct_match_rows_use_positional_submeasurement_ratios_when_names_differ",
+        "cargo test -p stab-core error_decomp"
       ],
-      "follow_up": "Profile independent/disjoint conversion arithmetic separately before adding the row back to the 1.25x regression threshold file."
+      "follow_up": "Keep exact, p100, and independent-to-disjoint filters outside the 1.25x gate until a future source-owned benchmark can compare larger paired case arrays or profiling proves a real arithmetic optimization."
     }
   ]
 }
