@@ -71,13 +71,13 @@ The generated reports were useful verification evidence, but final archival acce
 
 The threshold-completion implementation was checked before commit with `just bench::primary-regression --baseline target/benchmarks/timing-finish-baseline/baseline.json --report target/benchmarks/timing-finish-regression-thresholded-2`.
 That dirty report recorded `local_modifications=true`, passed all 72 configured threshold rows, marked the 4 checked no-ratio rows as `waived-not-thresholdable`, and left zero ambiguous `not-configured` rows.
-Final archival acceptance still requires rerunning the final primary benchmark commands from the committed tree with `local_modifications=false`.
+Final archival acceptance is proven by rerunning the final primary benchmark commands from the committed tree with `local_modifications=false`.
 
 ## Audit And Review Status
 
 - Milestone-audit for `docs/plans/post-beta-threshold-completion-plan.md` found no source-shape blocker after clarifying that waiver entries carry row id, reason, and follow-up while the timing-regression gate supplies measured no-ratio evidence at report time.
 - Full-code-review of the threshold-completion commits found no confirmed Rust correctness, Stim compatibility, file-format, SIMD isolation, hostile-input, benchmark-policy, or documentation blocker.
-- Final audit and review closure still requires the clean committed-code benchmark reports named below.
+- Final audit and review closure uses the clean committed-code benchmark reports named below.
 
 ## Clean Evidence Commands
 
