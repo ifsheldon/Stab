@@ -241,12 +241,12 @@ Resolution: M9 now requires `b8` parity for public `detect` and `m2d` detector a
 
 ## 2026-06-27 - M9: Generated Fixture Round-Trip Coverage
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit comparing the M9 task list to current oracle and benchmark evidence.
 Current text: M9 says to add round-trip tests for bit-packed input/output and text input/output across circuit fixtures generated in M7.
 Gap: current M9 exact oracle rows use hand-authored circuits and measurement records, while generated repetition-code coverage exists in benchmark runners instead of runnable oracle or test acceptance rows; the plan does not define the generated fixture matrix, output formats, round-trip direction, or whether benchmark primary-matrix representatives count as acceptance evidence.
 Proposed amendment: add explicit generated-fixture M9 oracle or Rust tests for selected M7 repetition, rotated surface, unrotated surface, and color-code circuits across `01`, `dets`, and `b8` conversion paths, or narrow the task to say generated-fixture coverage is benchmark evidence only until the primary matrix is frozen.
-Resolution: pending plan update.
+Resolution: M9 now treats generated-fixture acceptance as `sample -> m2d` public-workflow round trips compared with `detect` for M7 repetition, rotated-surface, unrotated-surface, and color-code circuits in `01` text and `b8` bit-packed output with appended observables. Evidence is `cargo test -p stab-cli m2d_round_trips_generated_m7_circuits_in_text_and_bitpacked_formats --quiet` and the oracle manifest row `coverage-simulators-measurements-to-detection-events-generated`. Existing hand-authored M9 oracle rows continue to cover `dets` label formatting.
 
 ## 2026-06-27 - M9: Pauli-Target Observable Detection Scope
 

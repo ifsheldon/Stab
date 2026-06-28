@@ -342,7 +342,7 @@ Done criteria:
 - `just oracle::run --milestone M9 --structural` passes gauge-detector structural equivalence cases.
 - `cargo test -p stab-core detection` covers coordinate shifts, repeats, measurement-record observables, Pauli-target observable flips, empty-detector circuits, and invalid measurement references.
 - `cargo test -p stab-core detection_sampling` covers frame-simulator Pauli-target observable parity for basis resets and product measurements.
-- `cargo test -p stab-cli m9` covers public `detect` and `m2d` CLI behavior, including `b8`, `detect` `ptb64` outputs, `m2d` `ptb64` input, `m2d` `ptb64` output rejection, `dets`, observable side outputs, route conflicts, zero-shot `detect`, zero-width and oversized `ptb64` input rejection, and Pauli-target observable behavior.
+- `cargo test -p stab-cli m9` covers public `detect` and `m2d` CLI behavior, including `b8`, `detect` `ptb64` outputs, `m2d` `ptb64` input, `m2d` `ptb64` output rejection, `dets`, observable side outputs, route conflicts, zero-shot `detect`, zero-width and oversized `ptb64` input rejection, Pauli-target observable behavior, and generated M7 repetition, rotated-surface, unrotated-surface, and color-code `sample -> m2d` round trips against `detect` for `01` and `b8`.
 - `just bench::compare --milestone M9` reports `detect` and `m2d` throughput separately for text and bit-packed formats.
 
 ### M10: Detector Error Model Core

@@ -1,3 +1,6 @@
+use std::ffi::OsString;
+use std::path::Path;
+
 use super::run_from;
 use tempfile::tempdir;
 
@@ -430,6 +433,83 @@ fn m2d_ignores_pauli_target_observables_like_stim_conversion() {
 }
 
 #[test]
+fn m2d_round_trips_generated_m7_circuits_in_text_and_bitpacked_formats() {
+    let cases = [
+        (
+            "repetition",
+            [
+                "--code",
+                "repetition_code",
+                "--task",
+                "memory",
+                "--distance",
+                "3",
+                "--rounds",
+                "2",
+                "--before_measure_flip_probability",
+                "0.125",
+            ]
+            .as_slice(),
+        ),
+        (
+            "rotated_surface",
+            [
+                "--code",
+                "surface_code",
+                "--task",
+                "rotated_memory_z",
+                "--distance",
+                "3",
+                "--rounds",
+                "3",
+                "--before_measure_flip_probability",
+                "0.125",
+            ]
+            .as_slice(),
+        ),
+        (
+            "unrotated_surface",
+            [
+                "--code",
+                "surface_code",
+                "--task",
+                "unrotated_memory_z",
+                "--distance",
+                "3",
+                "--rounds",
+                "3",
+                "--before_measure_flip_probability",
+                "0.125",
+            ]
+            .as_slice(),
+        ),
+        (
+            "color",
+            [
+                "--code",
+                "color_code",
+                "--task",
+                "memory_xyz",
+                "--distance",
+                "3",
+                "--rounds",
+                "2",
+                "--before_measure_flip_probability",
+                "0.125",
+            ]
+            .as_slice(),
+        ),
+    ];
+    let temp_dir = tempdir().expect("temp dir");
+
+    for (case, gen_args) in cases {
+        let circuit = generate_circuit(gen_args);
+        assert_generated_detection_round_trip(case, &circuit, temp_dir.path(), "01");
+        assert_generated_detection_round_trip(case, &circuit, temp_dir.path(), "b8");
+    }
+}
+
+#[test]
 fn m2d_reads_ptb64_records_and_writes_supported_formats() {
     let temp_dir = tempdir().expect("temp dir");
     let circuit_path = temp_dir.path().join("input.stim");
@@ -467,6 +547,108 @@ fn m2d_reads_ptb64_records_and_writes_supported_formats() {
         .collect();
     assert_eq!(std::fs::read(obs_path).expect("read obs"), expected_obs);
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+fn generate_circuit(gen_args: &[&str]) -> Vec<u8> {
+    let mut args = vec![OsString::from("stab"), OsString::from("gen")];
+    args.extend(gen_args.iter().map(OsString::from));
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(args, std::io::empty(), &mut stdout, &mut stderr);
+
+    assert_eq!(
+        status,
+        0,
+        "gen stderr: {}",
+        String::from_utf8_lossy(&stderr)
+    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+    stdout
+}
+
+fn assert_generated_detection_round_trip(
+    case: &str,
+    circuit: &[u8],
+    temp_dir: &Path,
+    format: &str,
+) {
+    let circuit_path = temp_dir.join(format!("{case}_{format}.stim"));
+    std::fs::write(&circuit_path, circuit).expect("write generated circuit");
+
+    let mut sample_stdout = Vec::new();
+    let mut sample_stderr = Vec::new();
+    let sample_status = run_from(
+        [
+            "stab",
+            "sample",
+            "--shots=64",
+            "--seed=5",
+            "--out_format",
+            format,
+        ],
+        circuit,
+        &mut sample_stdout,
+        &mut sample_stderr,
+    );
+    assert_eq!(
+        sample_status,
+        0,
+        "{case} sample {format} stderr: {}",
+        String::from_utf8_lossy(&sample_stderr)
+    );
+    assert_eq!(String::from_utf8(sample_stderr).unwrap(), "");
+
+    let m2d_args = vec![
+        OsString::from("stab"),
+        OsString::from("m2d"),
+        OsString::from("--in_format"),
+        OsString::from(format),
+        OsString::from("--out_format"),
+        OsString::from(format),
+        OsString::from("--append_observables"),
+        OsString::from("--circuit"),
+        circuit_path.as_os_str().to_os_string(),
+    ];
+    let mut m2d_stdout = Vec::new();
+    let mut m2d_stderr = Vec::new();
+    let m2d_status = run_from(
+        m2d_args,
+        sample_stdout.as_slice(),
+        &mut m2d_stdout,
+        &mut m2d_stderr,
+    );
+    assert_eq!(
+        m2d_status,
+        0,
+        "{case} m2d {format} stderr: {}",
+        String::from_utf8_lossy(&m2d_stderr)
+    );
+    assert_eq!(String::from_utf8(m2d_stderr).unwrap(), "");
+
+    let mut detect_stdout = Vec::new();
+    let mut detect_stderr = Vec::new();
+    let detect_status = run_from(
+        [
+            "stab",
+            "detect",
+            "--shots=64",
+            "--seed=5",
+            "--out_format",
+            format,
+            "--append_observables",
+        ],
+        circuit,
+        &mut detect_stdout,
+        &mut detect_stderr,
+    );
+    assert_eq!(
+        detect_status,
+        0,
+        "{case} detect {format} stderr: {}",
+        String::from_utf8_lossy(&detect_stderr)
+    );
+    assert_eq!(String::from_utf8(detect_stderr).unwrap(), "");
+    assert_eq!(m2d_stdout, detect_stdout, "{case} {format} round trip");
 }
 
 #[test]
