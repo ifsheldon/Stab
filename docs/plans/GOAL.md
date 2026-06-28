@@ -48,12 +48,12 @@ The original hard blocker for a `1.25x` beta gate was:
 
 1. `m10-error-decomp`
 
-The current dirty-worktree beta-125 probe in `docs/plans/beta-125-performance-plan.md` shows no remaining comparable row above `1.25x`.
-Treat final clean committed-code evidence as the active blocker unless a clean rerun changes the row set.
+The final clean beta-125 report in `docs/plans/beta-125-performance-plan.md` shows no remaining comparable row above `1.25x`.
+Treat a future clean committed-code rerun as the active blocker source if it changes the row set.
 
-The headroom rows to recheck in clean final evidence are:
+The clean final comparable slowdowns that still deserve headroom monitoring are:
 
-1. `m8-measure-reader-dets`
+1. `m5-sparse-xor`
 2. `m10-error-decomp`
 
 The historical watch rows from the older clean report are:

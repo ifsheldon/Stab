@@ -61,9 +61,9 @@
       "after_report": "target/benchmarks/m12-primary-beta/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 0.62401875,
+        "relative_ratio": 0.61,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The beta-125 primary beta probe measured the row below the active 1.25x beta gate and below the profiler-note threshold after target-storage and simple-instruction parser fast paths."
+        "evidence_note": "The final clean beta-125 primary beta report measured the row below the active 1.25x beta gate and below the profiler-note threshold after target-storage and simple-instruction parser fast paths."
       },
       "dominant_cost": "Sparse .stim parsing was dominated by temporary target vectors, repeated integer scans, and generic dispatch for simple no-argument instructions.",
       "optimization_summary": "Moved target storage to SmallVec-backed instruction buffers, parsed plain numeric targets in one checked pass, and added simple no-argument parser fast paths for common H, M, MZ, CX, and CNOT instructions.",
@@ -281,9 +281,9 @@
       "after_report": "target/benchmarks/m12-primary-beta/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 1.1891891891891893,
+        "relative_ratio": 1.1111111111111112,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The beta-125 primary beta probe measured every paired error-decomposition filter below the active 1.25x beta gate after inlining the tiny conversion helpers and avoiding redundant output validation for formulas with proven probability bounds."
+        "evidence_note": "The final clean beta-125 primary beta report measured every paired error-decomposition filter below the active 1.25x beta gate after inlining the tiny conversion helpers and avoiding redundant output validation for formulas with proven probability bounds."
       },
       "dominant_cost": "The row median hid tiny independent/disjoint XYZ conversion filters where cross-crate call overhead and redundant Probability output validation dominated the closed-form arithmetic, while the longer Newton p10 and p100 filters were already close to the 1.25x gate.",
       "optimization_summary": "Split the Stab-side direct-match measurements to match the pinned filters, added paired submeasurement ratio evidence, batched tiny direct-match timing, marked the tiny conversion helpers and probability accessors inline, and used a crate-private Probability constructor only for formulas whose output bounds are proven locally.",
