@@ -1,154 +1,161 @@
-# Post-Beta Threshold Completion Goal
+# 1.25x Beta Performance Goal
 
 ## Position
 
-The active goal is to finish `docs/plans/post-beta-threshold-completion-plan.md`.
-The previous `GOAL.md` was useful for the broader post-beta timing hardening pass, but it is now too broad for the remaining work.
-This file is the execution checklist for closing the two current items: remove ambiguous timing-regression `not-configured` rows, and finish the real timing work for `m4-gate-lookup`, `m5-sparse-xor`, and the `m8-measure-reader-*` family.
+The active goal is to finish `docs/plans/beta-125-performance-plan.md`.
+The previous `GOAL.md` closed the post-beta threshold-completion work and is no longer the active execution contract.
+This file gives agents the operating instructions for tightening the primary beta gate from `2.0x` to `1.25x` and doing the necessary performance, benchmark-shape, documentation, audit, and review work correctly.
 
-Do not reopen the completed parts of the previous timing-hardening pass unless evidence shows they regressed.
+Do not reopen completed threshold-completion work unless current evidence proves it regressed.
 Do not reopen intentionally deferred Stim parity or ecosystem surfaces such as Python, JS/WASM, Crumble, diagrams, `explain_errors`, `repl`, QASM/Quirk, GPU, sweep-conditioned conversion, `m2d --ran_without_feedback`, full ErrorMatcher provenance, or new public graph/vector simulator APIs.
 
 ## Sources Of Truth
 
-- Active plan: `docs/plans/post-beta-threshold-completion-plan.md`
+- Active plan: `docs/plans/beta-125-performance-plan.md`
 - Lessons for avoiding repeated planning failures: `docs/plans/lessons-learned.md`
-- Prior timing plan: `docs/plans/post-beta-timing-hardening-plan.md`
-- Current post-beta status report: `docs/plans/post-beta-fix-report.md`
+- Current roadmap: `docs/plans/rust-stim-drop-in-rewrite.md`
 - Historical M12 report: `docs/plans/m12-progress-report.md`
+- Current post-beta status report: `docs/plans/post-beta-fix-report.md`
+- Prior timing-hardening plan: `docs/plans/post-beta-timing-hardening-plan.md`
+- Prior threshold-completion plan: `docs/plans/post-beta-threshold-completion-plan.md`
 - Under-specification log: `docs/plans/milestone-spec-gaps.md`
-- Threshold source: `benchmarks/m12-primary-thresholds.json`
-- Beta waiver source: `benchmarks/m12-primary-beta-waivers.json`
-- Timing-regression waiver source: `benchmarks/m12-primary-regression-waivers.json`, once added by the active plan
 - Benchmark manifest: `benchmarks/manifest.csv`
-- Profiler notes: `benchmarks/profiler-notes/m12/`
+- Beta waiver source: `benchmarks/m12-primary-beta-waivers.json`
+- Timing threshold source: `benchmarks/m12-primary-thresholds.json`
+- Timing-regression waiver source: `benchmarks/m12-primary-regression-waivers.json`
+- Memory baseline source: `benchmarks/m12-primary-memory-baseline.json`
+- Profiler notes and optimization log: `benchmarks/profiler-notes/m12/`
 
 If these sources disagree, fix the stale source in the same change set.
-Do not leave contradictory row counts, waiver counts, threshold counts, report paths, commit ids, or status labels for the next agent.
+Do not leave contradictory beta ratios, row counts, waiver counts, threshold counts, report paths, commit ids, or status labels for the next agent.
 
 ## Objective
 
-Finish the remaining post-beta threshold work so the final timing-regression report has no ambiguous `not-configured` rows.
+Make `just bench::primary-beta` enforce a `1.25x` pinned-Stim beta performance gate and make the implemented primary matrix pass that stricter gate without dishonest benchmark comparisons.
 
-The expected final states are:
+The expected final state is:
 
-- `pass` for comparable implemented rows whose row-level or schema-version-2 submeasurement thresholds pass at `1.25x`.
-- `waived-not-thresholdable` or an equivalent explicit status for true no-ratio contract-only rows whose regression waivers are source-owned and machine-checked.
-- zero rows left as plain `not-configured`.
+- every comparable primary row passes beta at `<=1.25x` using the worse of row median and paired submeasurement ratios;
+- no comparable row receives a beta waiver;
+- measured no-ratio `contract-only` rows remain accepted only through checked source-owned beta waivers;
+- timing-regression still has zero ambiguous `not-configured` rows;
+- memory regression still passes;
+- all docs and machine-readable sources describe the same active gate.
 
-The active rows are:
+## Active Row Groups
+
+The current hard blockers for a `1.25x` beta gate are:
+
+1. `m10-error-decomp`
+2. `m5-simd-bits`
+3. `m4-circuit-parse`
+
+The current headroom rows are:
+
+1. `m5-sparse-xor`
+2. `m4-gate-lookup`
+3. `m8-sample-primary-unrotated-surface-contract`
+
+The current no-ratio beta-waiver rows are:
 
 1. `m4-circuit-canonical-print`
-2. `m4-gate-lookup`
-3. `m5-sparse-xor`
-4. `m7-convert-stim-canonical`
-5. `m8-measure-reader-01`
-6. `m8-measure-reader-b8`
-7. `m8-measure-reader-r8`
-8. `m8-measure-reader-hits`
-9. `m8-measure-reader-dets`
-10. `m8-measure-reader-ptb64-contract`
-11. `m10-dem-print-contract`
+2. `m7-convert-stim-canonical`
+3. `m8-measure-reader-ptb64-contract`
+4. `m10-dem-print-contract`
+
+If fresh clean evidence changes these sets, update `docs/plans/beta-125-performance-plan.md` before optimizing.
 
 ## Non-Negotiable Rules
 
-- Do not weaken a threshold to make a row pass.
-- Do not add a waiver for a row that can be made comparable with better benchmark shape.
-- Do not add fake thresholds to contract-only rows with no faithful pinned-Stim ratio.
+- Do not weaken benchmark semantics to make a row pass.
+- Do not add beta waivers for comparable rows.
 - Do not hide slow direct submeasurements behind a passing row median.
-- Do not add strict thresholds for tiny or noisy evidence until warmup and repeated clean runs prove the measurement is stable.
+- Do not let Stab-only contract extras decide strict Stim-relative beta status.
+- Do not treat a dirty-worktree report as final acceptance evidence.
 - Do not optimize before benchmark evidence identifies the slow comparable surface.
-- Do not cite dirty-worktree benchmark reports as final acceptance evidence.
+- Do not add or keep tiny strict-gate evidence if timer overhead dominates and a larger faithful benchmark is needed.
 - Do not mark a row complete while tests, thresholds, waivers, profiler notes, reports, and plan docs disagree.
 - Preserve Stim v1.16.0 compatibility for implemented public behavior.
 - Keep public API changes additive unless the plan is explicitly amended.
 
 ## Work Loop
 
-Complete one row group at a time.
-Each row group must finish tests, benchmark shape, implementation, threshold or waiver decision, documentation, milestone-audit, full-code-review, and final evidence.
+Work one milestone or row group at a time.
+Each group must finish tests, benchmark shape, implementation, docs, source-owned evidence, milestone-audit, full-code-review, and final clean reports before the goal is closed.
 
-### 1. Establish Current Evidence
+### 1. Establish Clean Starting Evidence
 
-Run the Milestone 0 commands from `docs/plans/post-beta-threshold-completion-plan.md`.
-Record the starting row statuses and confirm whether the run was dirty or clean.
-Use exploratory dirty reports only for iteration, never for final acceptance.
+Run the B0 commands from `docs/plans/beta-125-performance-plan.md`.
+Confirm the current failure set and headroom rows.
+If the fresh evidence differs from the plan, update the plan first and explain why.
 
-### 2. Fix Contract-Only Waiver Handling
+### 2. Change The Gate Deliberately
 
-Implement timing-regression waiver support before touching performance code.
-The contract-only rows are measured evidence rows that cannot produce a faithful Stim-relative ratio.
-They should be checked and explicit, not hidden under `not-configured`.
+Implement the `1.25x` beta gate as an expected-failing change before optimizing rows.
+Update code, CLI help, tests, docs, and any report text that defines the active beta gate.
+Historical `2.0x` evidence may remain only when it is explicitly labeled historical.
 
-Required rows:
+### 3. Fix Benchmark Shape Before Performance Code
 
-- `m4-circuit-canonical-print`
-- `m7-convert-stim-canonical`
-- `m8-measure-reader-ptb64-contract`
-- `m10-dem-print-contract`
+Start with `m5-simd-bits`.
+Make faithful direct pairs and Stab-only contract extras impossible to confuse.
+Prefer splitting rows over adding special-case prose when a split makes the evidence clearer.
+Do not optimize SIMD code until the benchmark proves a faithful direct pair is slow.
 
-Done means the timing-regression command rejects stale or misapplied waivers and reports these rows with an explicit no-ratio waiver status.
+### 4. Optimize Real Hot Paths
 
-### 3. Finish Reader Threshold Ownership
+For `m4-circuit-parse`, use focused evidence to identify the remaining sparse-parser cost before changing parser internals.
+For `m10-error-decomp`, decide whether the current tiny filters are meaningful before optimizing arithmetic.
+If a larger faithful case-array benchmark is needed, add it and document why it replaces tiny-filter gate evidence.
 
-Complete `m8-measure-reader-01`, `m8-measure-reader-b8`, `m8-measure-reader-r8`, `m8-measure-reader-hits`, and `m8-measure-reader-dets`.
-Split dense and sparse submeasurements so each faithful pinned-Stim reader filter has matching Stab evidence.
-Guard stable direct pairs below `1.25x` with schema-version-2 thresholds.
-Document any pair that remains outside strict threshold ownership with a source-owned reason in `benchmarks/profiler-notes/m12/m8-measure-reader.md`.
+### 5. Add Headroom
 
-### 4. Finish Sparse XOR Threshold Ownership
-
-Complete `m5-sparse-xor`.
-Keep table row-XOR and item-XOR separate.
-Make the item-XOR workload large and faithful enough to escape timer noise, profile the real cost, optimize only the measured bottleneck, and preserve sorted-unique invariants.
-Guard both direct pairs only after repeated clean evidence is stable below `1.25x`.
-
-### 5. Finish Gate Lookup Threshold Ownership
-
-Complete `m4-gate-lookup`.
-Stabilize the benchmark by using larger repeated canonical lookup sets before changing lookup implementation.
-Pair faithful canonical lookup evidence with pinned Stim `gate_data_hash_all_gate_names`.
-Keep alias, lowercase, and invalid lookup measurements as Stab-only contract extras unless faithful Stim pairs exist.
-If optimization is needed, derive any table-driven path from canonical gate metadata instead of hand-maintaining duplicate definitions.
+Recheck `m5-sparse-xor`, `m4-gate-lookup`, and `m8-sample-primary-unrotated-surface-contract` after the hard blockers are fixed.
+Optimize only where focused evidence shows real risk or repeated clean runs drift toward `1.25x`.
+Do not overfit nanosecond-scale rows.
 
 ### 6. Synchronize Documentation
 
-Update every source that would otherwise mislead a future agent.
+Update all docs and machine-readable sources affected by the gate or benchmark-shape change.
 At minimum, check:
 
-- `docs/plans/post-beta-threshold-completion-plan.md`
-- `docs/plans/post-beta-timing-hardening-plan.md`
-- `docs/plans/post-beta-fix-report.md`
+- `docs/plans/beta-125-performance-plan.md`
+- `docs/plans/GOAL.md`
+- `docs/plans/rust-stim-drop-in-rewrite.md`
 - `docs/plans/m12-progress-report.md`
+- `docs/plans/post-beta-fix-report.md`
 - `docs/plans/milestone-spec-gaps.md`
 - `benchmarks/README.md`
+- `benchmarks/m12-primary-beta-waivers.json`
 - `benchmarks/m12-primary-thresholds.json`
 - `benchmarks/m12-primary-regression-waivers.json`
-- `benchmarks/m12-primary-beta-waivers.json`
-- `benchmarks/profiler-notes/m12/m4-gate-lookup.md`
-- `benchmarks/profiler-notes/m12/m5-sparse-xor.md`
-- `benchmarks/profiler-notes/m12/m8-measure-reader.md`
+- `benchmarks/profiler-notes/m12/optimization-log.json`
+- relevant `benchmarks/profiler-notes/m12/*.md` files
 
 Only log a new entry in `docs/plans/milestone-spec-gaps.md` for a true under-specification discovered during implementation.
 Implementation defects, missing tests, stale docs, and benchmark failures should be fixed in the active work.
 
 ### 7. Run Audit And Review
 
-Run milestone-audit after each row group or after a coherent batch, using names from the active plan.
+Run milestone-audit after the row groups are implemented and docs are synchronized.
 Run full-code-review after milestone-audit is clean or has only accepted under-specification follow-ups.
 Fix all findings unless the issue is a true future-scope specification gap and is logged in `docs/plans/milestone-spec-gaps.md`.
 
-## Test And Benchmark Requirements
+## Required Focused Tests And Evidence
 
 Add or update focused tests before or alongside implementation changes.
-Tests must protect meaningful contracts, not just labels or constants.
+Tests must protect meaningful behavior, benchmark contracts, compatibility, or regression risk.
 
-Required focused areas:
+Required areas:
 
-- threshold parsing, regression waiver parsing, stale waiver rejection, stale submeasurement rejection, missing evidence rejection, and failing ratio rejection;
-- reader exact round trips, dense and sparse fixture decoding, malformed input rejection, and benchmark submeasurement presence;
-- sparse XOR sorted-unique invariants, symmetric-difference behavior, repeated item toggling, duplicate input handling, and reference-model equivalence;
-- gate lookup canonical names, aliases, lowercase variants, invalid names, metadata single-sourcing, and benchmark submeasurement presence.
+- beta gate parsing and failure messages at `1.25x`;
+- beta waiver rejection for stale, misapplied, comparable, pending, invalid-baseline, or above-gate rows;
+- paired submeasurement worst-ratio beta behavior;
+- benchmark runner tests for any split M5 SIMD rows or changed M10 error-decomposition rows;
+- parser tests for any changed `.stim` parse fast path;
+- arithmetic tests for any changed probability or error-decomposition fast path;
+- sparse XOR invariant tests if the headroom work changes sparse XOR code;
+- sampler or oracle tests if the M8 unrotated-surface row requires code changes.
 
 Use targeted tests during iteration.
 Run the full required verification before declaring completion.
@@ -157,14 +164,17 @@ Run the full required verification before declaring completion.
 
 The goal is complete only when all of the following are true:
 
-- `docs/plans/post-beta-threshold-completion-plan.md` has been implemented.
-- Every active comparable row owns a strict row-level or schema-version-2 submeasurement threshold.
-- Every active no-ratio contract-only row has a source-owned checked regression waiver.
-- The final timing-regression report has zero ambiguous `not-configured` rows.
+- `docs/plans/beta-125-performance-plan.md` has been implemented.
+- `--require-beta-gate` enforces `1.25x`.
+- Every comparable primary row passes the `1.25x` beta gate.
+- Every measured no-ratio `contract-only` beta waiver is source-owned and machine-checked.
+- No comparable beta row is waived.
+- Timing-regression still has zero ambiguous `not-configured` rows.
+- Memory regression passes all primary rows.
 - Every behavior changed for performance has meaningful tests.
-- Every benchmark shape change has benchmark-runner tests.
-- Profiler notes explain the final threshold or waiver decision for each active row group.
-- Documentation and machine-readable sources agree on final row counts, threshold counts, waiver counts, commands, and report paths.
+- Every benchmark-shape change has benchmark-runner tests.
+- Profiler notes and optimization-log entries explain final decisions for changed or close rows.
+- Documentation and machine-readable sources agree on final gate ratio, row counts, threshold counts, waiver counts, commands, and report paths.
 - Milestone-audit and full-code-review have been run, and their findings are fixed or logged as accepted specification follow-ups.
 - Final benchmark evidence was regenerated from committed code with `local_modifications=false`.
 - The worktree is clean unless the user explicitly accepts uncommitted follow-up work.
@@ -178,12 +188,12 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --quiet
 just oracle::run --implemented-only
-just bench::baseline --primary --out target/benchmarks/post-beta-primary-baseline
-just bench::compare --primary --warmup --measurement-runs 3 --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/m12 --baseline target/benchmarks/post-beta-primary-baseline/baseline.json --report target/benchmarks/post-beta-primary-compare
-just bench::primary-beta --baseline target/benchmarks/post-beta-primary-baseline/baseline.json
-just bench::primary-regression --baseline target/benchmarks/post-beta-primary-baseline/baseline.json --report target/benchmarks/post-beta-primary-regression
-just bench::primary-memory-regression --baseline target/benchmarks/post-beta-primary-baseline/baseline.json
+just bench::baseline --primary --out target/benchmarks/beta-125-primary-baseline
+just bench::compare --primary --warmup --measurement-runs 3 --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/m12 --baseline target/benchmarks/beta-125-primary-baseline/baseline.json --report target/benchmarks/beta-125-primary-compare
+just bench::primary-beta --baseline target/benchmarks/beta-125-primary-baseline/baseline.json
+just bench::primary-regression --baseline target/benchmarks/beta-125-primary-baseline/baseline.json --report target/benchmarks/beta-125-primary-regression
+just bench::primary-memory-regression --baseline target/benchmarks/beta-125-primary-baseline/baseline.json
 just maintenance::pre-commit
 ```
 
-If any command is skipped, blocked, or replaced by a narrower check, record the reason in the durable completion evidence and do not mark the goal complete until the gap is resolved or explicitly accepted as follow-up scope.
+If any command is skipped, blocked, or replaced by a narrower check, record the reason in durable completion evidence and do not mark the goal complete until the gap is resolved or explicitly accepted as follow-up scope.

@@ -507,6 +507,7 @@ For M12 benchmark operations, the frozen primary matrix is every benchmark contr
 The M12 `performance-gate` placeholder row documents the gate and is not itself part of `just bench::compare --primary`.
 Completion-style performance runs should pass `--require-beta-gate`.
 Rows with faithful pinned-Stim baselines must prove a ratio no slower than the 2.0x beta performance gate.
+The completed first beta gate used `2.0x`; the active post-beta plan in `docs/plans/beta-125-performance-plan.md` tightens this to `1.25x` after fixing benchmark-shape and performance blockers.
 Compare reports must record a machine-readable comparability class for every row, using the classes `direct-match`, `cli-baseline`, `contract-representative`, `contract-proxy`, `contract-smoke`, `partial-match`, `report-only`, and `contract-only`.
 `direct-match` and `cli-baseline` rows are the strongest beta evidence classes because they match either pinned Stim internal operation shape or the same public CLI command and input.
 `contract-representative`, `contract-proxy`, `contract-smoke`, `partial-match`, and `report-only` rows may count only as scoped M12 beta evidence when their compare note explains the representative surface, proxy, smoke scope, missing subcases, or non-exact workload.
@@ -550,6 +551,7 @@ Done criteria:
 - Hot-path gate passes: every workload still slower than 1.5x Stim has a profiler note naming the dominant cost and the next owner action, and every M12-optimized row has an optimization-log entry naming before and after reports, machine-checkable before and after ratios, gate status, hot-path status, dominant-cost evidence, semantic checks, and follow-up policy.
 - Regression gate passes: workloads already at or below 1.25x Stim have benchmark thresholds checked by `.github/workflows/m12-benchmarks.yml` scheduled benchmark automation or an equivalent manually dispatched run, and any selected measured `contract-only` primary workload without a faithful threshold ratio has a checked source-owned timing-regression waiver.
 - Any workload that misses the beta gate has a dedicated follow-up issue or milestone entry with profiler evidence, suspected cause, and a proposed implementation path.
+- Post-beta beta-hardening follow-up: `docs/plans/beta-125-performance-plan.md` owns the stricter `1.25x` beta target and must update this section from historical wording to active wording when the implementation and clean evidence land.
 
 ## Future Plan
 
