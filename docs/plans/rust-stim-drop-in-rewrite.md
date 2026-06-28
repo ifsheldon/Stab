@@ -175,9 +175,16 @@ Tasks:
 - Implement clear domain errors for invalid gates, invalid arguments, invalid target separators, invalid repeat counts, and invalid measurement references.
 - Add a minimal parse-print-parse invariant suite and fuzz target for `.stim` input.
 
+M4 decomposition scope is structural only.
+`coverage-circuit-gate-decomposition` owns target grouping and disjoint segmentation prerequisites used by later decomposition code.
+Full semantic `decomposed` behavior for MPP, SPP, pair measurements, base-gate lowering, and tableau or simulator equivalence belongs to the first milestone that implements the required algebra, flow, simulator, or analyzer semantics, such as the M6 util-top rows and later detector/analyzer milestones.
+M4 probability-utility scope is closed-unit probability validation and disjoint probability-list validation used by gate argument rules.
+Random hit-index sampling and biased random bit generation from `src/stim/util_bot/probability_util.test.cc` are not M4 acceptance criteria; they belong to the first bit or sampler milestone that consumes equivalent APIs and to M12 performance hardening when they become benchmark targets.
+
 Linked tests and benchmarks:
 
 - Direct or oracle tests: C++ Circuit Model, Parser, Targets, And Decomposition; Gates And Gate Metadata; Input And Output Formats where result-format parsing touches circuit commands.
+- Structural utility rows: `coverage-circuit-gate-decomposition` and `coverage-util-bot-probability-util`.
 - CLI oracle tests: `src/stim/cmd/command_convert.test.cc` for parse/canonical-print behavior.
 - Semantic-mining tests: `src/stim/circuit/*_pybind_test.py`, `src/stim/gates/gates_test.py`, and selected parser examples from Cirq tests only when they expose core `.stim` behavior.
 - Benchmarks: `.stim` parse throughput, canonical print throughput, and gate lookup.
@@ -187,6 +194,8 @@ Done criteria:
 
 - `just oracle::run --milestone M4` passes for all M4 exact-output and structural cases.
 - `cargo test -p stab-core parser` and `cargo test -p stab-core gates` pass.
+- `cargo test -p stab-core gate_decomposition` covers M4 structural target grouping and disjoint segmentation without claiming full Stim `decomposed` parity.
+- `cargo test -p stab-core probability` covers M4 closed-unit probability validation and disjoint probability-list validation.
 - Parser fuzz smoke runs in CI or is documented as a local long-running target; the current local target is `just rust::parser-fuzz`.
 - `just bench::compare --milestone M4` reports parser throughput and gate lookup against the M3 C++ baseline, plus Stab-only canonical printer throughput against the explicit contract-only printer row, even if performance is not yet gated.
 

@@ -358,21 +358,21 @@ Resolution: M6 now states that the public Rust API starts with owned `PauliStrin
 
 ## 2026-06-27 - M4: Gate Decomposition Utility Scope
 
-Status: Open
+Status: Resolved
 Revealed by: implementation of `coverage-circuit-gate-decomposition` as a direct Rust oracle row.
 Current text: M4 links `src/stim/circuit/gate_decomposition.test.cc` under Circuit Model, Parser, Targets, And Decomposition, but M4's objective is the public `.stim` data model, gate metadata, parser, validator, and canonical printer.
 Gap: the upstream file mixes pure circuit-structure helpers, such as target grouping and disjoint segmentation, with semantic MPP/SPP decomposition behavior that later depends on base-gate decomposition, flows, tableaus, and simulator correctness.
 Proposed amendment: state that M4 owns structural decomposition prerequisites only, including Pauli-product grouping and disjoint target segmentation; full `decomposed` behavior for MPP, SPP, pair measurements, and base-gate lowering should move to the first milestone that implements the required tableau/simulator semantics or receive its own explicit milestone task.
-Resolution: pending plan update.
+Resolution: M4 now explicitly owns only structural decomposition prerequisites through `coverage-circuit-gate-decomposition`: target grouping and disjoint segmentation. Full semantic `decomposed` behavior for MPP, SPP, pair measurements, base-gate lowering, and tableau or simulator equivalence is assigned to the first milestone with the required algebra, flow, simulator, or analyzer semantics, including the M6 util-top rows and later detector/analyzer milestones. Evidence is `cargo test -p stab-core gate_decomposition --quiet` and the implemented manifest row.
 
 ## 2026-06-27 - M4: Probability Utility Fixture Scope
 
-Status: Open
+Status: Resolved
 Revealed by: implementation of `coverage-util-bot-probability-util` as a direct Rust oracle row.
 Current text: M4 requires gate argument rules and probability validation, while the test-porting plan points at `src/stim/util_bot/probability_util.test.cc` for probability validation.
 Gap: the referenced upstream file also tests `sample_hit_indices` and biased random bit generation, which require RNG and bit-storage behavior that M4 does not otherwise define.
 Proposed amendment: state that M4 owns only closed-unit probability validation and disjoint probability-list validation from this file; random hit-index sampling and biased bit generation should move to the first milestone that introduces equivalent RNG and bit/sampler APIs.
-Resolution: pending plan update.
+Resolution: M4 now owns only closed-unit probability validation and disjoint probability-list validation from `src/stim/util_bot/probability_util.test.cc`. Random hit-index sampling and biased random bit generation are excluded from M4 acceptance and are assigned to the first bit or sampler milestone that consumes equivalent APIs, plus M12 performance hardening when those utilities become benchmark targets. Evidence is `cargo test -p stab-core probability --quiet` and the implemented `coverage-util-bot-probability-util` manifest row.
 
 ## 2026-06-27 - M2: Manifest-Only Subcase Granularity
 
