@@ -486,7 +486,7 @@ Tasks:
 - Implement compiled or streaming detection conversion for large decoder workloads when profiler and benchmark evidence show the M9 materialized converter is the bottleneck, processing records in bounded batches, preserving folded repeat structure where possible, avoiding duplicate sampler analysis, and documenting any remaining temporary limits.
 - Add allocation tracking for parser, sampler compilation, detector conversion, analyzer, and DEM sampler hot paths.
 - Add or promote large generated-code `detect` and `m2d` benchmark rows when streaming detection conversion is implemented, including at least one folded-repeat detector workload and one primary-matrix generated-code workload.
-- Add regression thresholds for all workloads that pass the beta gate so future work cannot accidentally erase performance wins.
+- Add 1.25x regression thresholds for all workloads that meet the regression gate so future work cannot accidentally erase performance wins.
 
 For M12 benchmark operations, the frozen primary matrix is every benchmark contract row from M4 through M11 except baseline metadata anchors.
 The M12 `performance-gate` placeholder row documents the gate and is not itself part of `just bench::compare --primary`.
