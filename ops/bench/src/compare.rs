@@ -33,6 +33,8 @@ pub(crate) struct CompareOptions {
     pub(crate) memory_baseline: Option<PathBuf>,
     pub(crate) thresholds: Option<PathBuf>,
     pub(crate) track_allocations: bool,
+    pub(crate) warmup: bool,
+    pub(crate) measurement_runs: usize,
     pub(crate) strict: bool,
 }
 
@@ -55,6 +57,9 @@ pub(crate) fn run_compare(
     }
     if options.require_memory_gate && options.memory_baseline.is_none() {
         return Err(BenchError::MemoryGateRequiresBaseline);
+    }
+    if options.measurement_runs == 0 {
+        return Err(BenchError::InvalidMeasurementRuns);
     }
     let _allocation_tracking = AllocationTrackingGuard::set(options.track_allocations)?;
     let baseline_path = root.resolve_relative(&options.baseline);
@@ -87,6 +92,9 @@ pub(crate) fn run_compare(
         rows.len(),
         baseline_path.display()
     );
+    if options.warmup {
+        run_warmup_rows(&rows)?;
+    }
     let mut pending = Vec::new();
     let mut missing_baselines = Vec::new();
     let mut invalid_baselines = Vec::new();
@@ -109,7 +117,7 @@ pub(crate) fn run_compare(
         };
         let stim_measurements = baseline_measurements(&baseline_report, row);
         let note = compare_note(&row.id).map(str::to_string);
-        match run_stab_compare_row(row)? {
+        match run_recorded_stab_compare_row(row, options.measurement_runs)? {
             Some(measurements) => {
                 let printed_note = note
                     .as_deref()
@@ -306,6 +314,8 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
                 .as_ref()
                 .map(|path| path.display().to_string()),
             track_allocations: options.track_allocations,
+            warmup: options.warmup,
+            measurement_runs: options.measurement_runs,
             strict: options.strict,
         },
         rows,
@@ -326,6 +336,136 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
     println!("[{PREFIX}] wrote {}", json_path.display());
     println!("[{PREFIX}] wrote {}", report_path.display());
     Ok(profiler_note_findings)
+}
+
+fn run_warmup_rows(rows: &[&BenchmarkRow]) -> Result<(), BenchError> {
+    println!(
+        "[{PREFIX}] warming {} Stab compare row(s) before recording measurements",
+        rows.len()
+    );
+    for row in rows {
+        drop(run_stab_compare_row(row)?);
+    }
+    Ok(())
+}
+
+fn run_recorded_stab_compare_row(
+    row: &BenchmarkRow,
+    measurement_runs: usize,
+) -> Result<Option<Vec<Measurement>>, BenchError> {
+    if measurement_runs == 1 {
+        return run_stab_compare_row(row);
+    }
+    let mut runs = Vec::with_capacity(measurement_runs);
+    for _ in 0..measurement_runs {
+        let Some(measurements) = run_stab_compare_row(row)? else {
+            return Ok(None);
+        };
+        runs.push(measurements);
+    }
+    aggregate_measurement_runs(&row.id, runs).map(Some)
+}
+
+fn aggregate_measurement_runs(
+    row_id: &str,
+    runs: Vec<Vec<Measurement>>,
+) -> Result<Vec<Measurement>, BenchError> {
+    let Some(first) = runs.first() else {
+        return Ok(Vec::new());
+    };
+    let measurement_count = first.len();
+    for run in &runs {
+        if run.len() != measurement_count {
+            return Err(inconsistent_measurement_runs(row_id));
+        }
+    }
+    let mut measurements = Vec::with_capacity(measurement_count);
+    for index in 0..measurement_count {
+        let first_measurement = first
+            .get(index)
+            .ok_or_else(|| inconsistent_measurement_runs(row_id))?;
+        let name = &first_measurement.name;
+        if runs.iter().any(|run| {
+            run.get(index)
+                .is_none_or(|measurement| measurement.name != *name)
+        }) {
+            return Err(inconsistent_measurement_runs(row_id));
+        }
+        let mut seconds = runs
+            .iter()
+            .map(|run| {
+                run.get(index)
+                    .map(|measurement| measurement.seconds)
+                    .ok_or_else(|| inconsistent_measurement_runs(row_id))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let variance_seconds = variance_seconds(&seconds);
+        seconds.sort_by(f64::total_cmp);
+        measurements.push(Measurement {
+            name: name.clone(),
+            seconds: seconds
+                .get(seconds.len() / 2)
+                .copied()
+                .unwrap_or(first_measurement.seconds),
+            variance_seconds,
+            allocation: aggregate_allocations(&runs, index),
+            iterations: aggregate_iterations(&runs, index),
+        });
+    }
+    Ok(measurements)
+}
+
+fn aggregate_allocations(
+    runs: &[Vec<Measurement>],
+    measurement_index: usize,
+) -> Option<crate::report::AllocationMeasurement> {
+    let mut allocations = runs
+        .iter()
+        .filter_map(|run| run.get(measurement_index))
+        .filter_map(|measurement| measurement.allocation.as_ref());
+    let first = allocations.next()?.clone();
+    Some(allocations.fold(first, |mut aggregate, allocation| {
+        aggregate.count_total = aggregate.count_total.max(allocation.count_total);
+        aggregate.count_current = aggregate.count_current.max(allocation.count_current);
+        aggregate.count_max = aggregate.count_max.max(allocation.count_max);
+        aggregate.bytes_total = aggregate.bytes_total.max(allocation.bytes_total);
+        aggregate.bytes_current = aggregate.bytes_current.max(allocation.bytes_current);
+        aggregate.bytes_max = aggregate.bytes_max.max(allocation.bytes_max);
+        aggregate
+    }))
+}
+
+fn aggregate_iterations(runs: &[Vec<Measurement>], measurement_index: usize) -> Option<usize> {
+    runs.iter()
+        .filter_map(|run| run.get(measurement_index))
+        .map(|measurement| measurement.iterations)
+        .try_fold(0usize, |total, iterations| {
+            iterations.and_then(|iterations| total.checked_add(iterations))
+        })
+}
+
+fn variance_seconds(seconds: &[f64]) -> Option<f64> {
+    if seconds.len() < 2 {
+        return None;
+    }
+    let mean = seconds.iter().sum::<f64>() / seconds.len() as f64;
+    let variance = seconds
+        .iter()
+        .map(|seconds| {
+            let delta = seconds - mean;
+            delta * delta
+        })
+        .sum::<f64>()
+        / seconds.len() as f64;
+    Some(variance)
+}
+
+fn inconsistent_measurement_runs(row_id: &str) -> BenchError {
+    BenchError::StabRunner {
+        row_id: row_id.to_string(),
+        message: "repeated Stab measurement runs produced inconsistent measurement shapes"
+            .to_string(),
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -758,8 +898,9 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        BaselineCompareStatus, CompareRowBuild, HOT_PATH_PROFILER_NOTE_RATIO, apply_profiler_notes,
-        build_compare_row_result, validate_profiler_note_content,
+        BaselineCompareStatus, CompareRowBuild, HOT_PATH_PROFILER_NOTE_RATIO,
+        aggregate_measurement_runs, apply_profiler_notes, build_compare_row_result,
+        run_warmup_rows, validate_profiler_note_content,
     };
     use crate::manifest::{BenchmarkRow, Milestone, Runner};
     use crate::report::{AllocationMeasurement, Measurement};
@@ -951,6 +1092,44 @@ mod tests {
         assert_eq!(result.pass_fail_status, "pass");
     }
 
+    #[test]
+    fn warmup_rows_run_selected_stab_compare_workloads() {
+        let mut row = benchmark_row("m4-circuit-parse");
+        row.milestone = Milestone::M4;
+
+        run_warmup_rows(&[&row]).expect("warm up M4 parser row");
+    }
+
+    #[test]
+    fn repeated_measurement_runs_use_median_seconds_and_validate_shape() {
+        let runs = vec![
+            vec![measurement_with_iterations("stab_case", 3.0, Some(2))],
+            vec![measurement_with_iterations("stab_case", 1.0, Some(2))],
+            vec![measurement_with_iterations("stab_case", 2.0, Some(2))],
+        ];
+
+        let aggregate = aggregate_measurement_runs("row", runs).expect("aggregate measurements");
+
+        let aggregate_measurement = aggregate.first().expect("measurement");
+        assert_eq!(aggregate_measurement.seconds, 2.0);
+        assert_eq!(aggregate_measurement.iterations, Some(6));
+        assert!(aggregate_measurement.variance_seconds.is_some());
+
+        let error = aggregate_measurement_runs(
+            "row",
+            vec![
+                vec![measurement("first_name", 1.0)],
+                vec![measurement("second_name", 1.0)],
+            ],
+        )
+        .expect_err("reject mismatched measurement names");
+        assert!(
+            error
+                .to_string()
+                .contains("inconsistent measurement shapes")
+        );
+    }
+
     fn compare_row(id: &str, ratio: Option<f64>) -> crate::report::CompareRowResult {
         let row = benchmark_row(id);
         let stim_measurements = ratio.map_or_else(Vec::new, |_| {
@@ -1000,12 +1179,20 @@ mod tests {
     }
 
     fn measurement(name: &str, seconds: f64) -> Measurement {
+        measurement_with_iterations(name, seconds, None)
+    }
+
+    fn measurement_with_iterations(
+        name: &str,
+        seconds: f64,
+        iterations: Option<usize>,
+    ) -> Measurement {
         Measurement {
             name: name.to_string(),
             seconds,
             variance_seconds: None,
             allocation: None,
-            iterations: None,
+            iterations,
         }
     }
 }

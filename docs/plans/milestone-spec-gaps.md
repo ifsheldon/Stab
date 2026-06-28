@@ -55,16 +55,16 @@ Gap: the repository has source-owned threshold files and local `just bench::prim
 Proposed amendment: add a CI or scheduled benchmark workflow for the full threshold gate, or revise the done criterion to accept archived local reports plus a lighter CI smoke command.
 Resolution: unresolved.
 
+## Resolved Entries
+
 ## 2026-06-28 - M12: Microbenchmark Warmup And Repeated-Run Evidence
 
-Status: Open
+Status: Resolved
 Revealed by: repeated M12 primary beta runs after adding the M4 sparse parser fast path.
 Current text: M12 requires completion-style performance runs to pass the source-owned beta gate, but it does not define warmup, retry, repeated-run, or median-of-runs evidence for sub-microsecond and first-row benchmark cases.
 Gap: the focused M4 parser row repeatedly measured around 1.31x pinned Stim and the next full primary beta run passed, but one intervening full primary beta run transiently measured `m4-circuit-parse` above the 2.0x gate at the beginning of the report.
 Proposed amendment: define a completion evidence policy for tiny benchmark rows, such as one warmup compare pass before gated measurement, a fixed number of repeated compare runs with median or worst-run acceptance, or an explicit instability note and threshold exclusion rule for rows below a configured absolute-duration floor.
-Resolution: unresolved.
-
-## Resolved Entries
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now requires completion-style primary beta runs to include `--warmup --measurement-runs 3`, `stab-bench compare --warmup` runs selected Stab-side workloads once before recording report measurements, repeated recorded measurement runs are aggregated by median, compare reports record `command.warmup` and `command.measurement_runs`, and `just bench::primary-beta` includes `--warmup --measurement-runs 3`.
 
 ## 2026-06-28 - M12: Beta Gate Scope For Contract-Only Primary Rows
 

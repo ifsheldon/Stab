@@ -494,6 +494,8 @@ Completion-style performance runs should pass `--require-beta-gate`.
 Rows with faithful pinned-Stim baselines must prove a ratio no slower than the 2.0x beta performance gate.
 When a row has comparable submeasurements, compare reports pair Stim and Stab measurements by normalized name or by direct-match position and use the worse of the row median ratio and the worst paired submeasurement ratio for beta and regression gates.
 Rows without paired submeasurement evidence keep using the row median ratio.
+Completion-style primary beta runs must include `--warmup --measurement-runs 3`, which runs the selected Stab-side workloads once before recording report measurements and then records the median of three Stab-side measurement runs.
+The warmup pass is not written into row measurements, but compare reports must record `command.warmup=true` and `command.measurement_runs >= 3`.
 Tiny direct-match Stab measurements may batch repeated operations to reduce clock noise, but reported timing must remain normalized to seconds per operation.
 Measured `contract-only` rows that cannot have a faithful pinned-Stim ratio may pass the gate only when `--beta-waivers <path>` names a source-owned JSON waiver with a non-empty reason and follow-up; waiver files must reject stale entries, missing baselines, pending runners, invalid baselines, and rows with measured ratios above the beta gate.
 Profiler notes for compare reports live beside the report under `<report>/profiler-notes/<benchmark-id>.md`.
@@ -514,7 +516,7 @@ Done criteria:
 
 - `just oracle::run --implemented-only` passes before and after performance changes.
 - `just bench::compare --profile release --primary` produces a committed or archived report with no missing primary workloads.
-- Beta performance gate passes: every comparable primary parser, generator, sampling, detection, DEM parsing, DEM sampling, and analyzer workload is no slower than 2.0x the pinned C++ Stim v1.16.0 median on the same machine, and every remaining measured `contract-only` primary workload has a checked source-owned waiver explaining why no faithful ratio can be proven before beta.
+- Beta performance gate passes: every comparable primary parser, generator, sampling, detection, DEM parsing, DEM sampling, and analyzer workload is no slower than 2.0x the pinned C++ Stim v1.16.0 median on the same machine after a Stab-side warmup pass and three recorded measurement runs, every completion-style beta report records `command.warmup=true` and `command.measurement_runs >= 3`, and every remaining measured `contract-only` primary workload has a checked source-owned waiver explaining why no faithful ratio can be proven before beta.
 - Beta memory gate passes: no primary workload regresses peak allocations or resident memory by more than 25 percent relative to the first complete Stab benchmark report unless the report documents an accepted tradeoff.
 - Hot-path gate passes: every workload slower than 1.5x Stim has a profiler note naming the dominant cost and the next owner action.
 - Regression gate passes: workloads already at or below 1.25x Stim have benchmark thresholds checked by CI smoke or scheduled benchmark automation.

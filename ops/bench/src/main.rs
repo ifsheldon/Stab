@@ -145,6 +145,14 @@ enum Command {
         #[arg(long)]
         track_allocations: bool,
 
+        /// Run selected Stab-side compare workloads once before recording report measurements.
+        #[arg(long)]
+        warmup: bool,
+
+        /// Number of recorded Stab-side measurement runs per selected row.
+        #[arg(long, default_value_t = 1)]
+        measurement_runs: usize,
+
         /// Exit with an error while Stab benchmark comparison runners are pending.
         #[arg(long)]
         strict: bool,
@@ -213,6 +221,8 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             memory_baseline,
             thresholds,
             track_allocations,
+            warmup,
+            measurement_runs,
             strict,
         } => {
             run_compare(
@@ -232,6 +242,8 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     memory_baseline,
                     thresholds,
                     track_allocations,
+                    warmup,
+                    measurement_runs,
                     strict,
                 },
             )?;

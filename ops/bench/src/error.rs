@@ -155,6 +155,9 @@ pub(crate) enum BenchError {
     #[error("cli_iterations must be at least 1")]
     InvalidCliIterations,
 
+    #[error("measurement_runs must be at least 1")]
+    InvalidMeasurementRuns,
+
     #[error("benchmark output path {path} is invalid: {reason}")]
     InvalidBenchmarkOutputDir { path: PathBuf, reason: String },
 

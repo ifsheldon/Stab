@@ -132,6 +132,10 @@ pub(crate) struct CompareCommandMetadata {
     #[serde(default)]
     pub(crate) profiler_notes_path: Option<String>,
     pub(crate) track_allocations: bool,
+    #[serde(default)]
+    pub(crate) warmup: bool,
+    #[serde(default = "default_measurement_runs")]
+    pub(crate) measurement_runs: usize,
     pub(crate) strict: bool,
 }
 
@@ -304,6 +308,11 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
     if let Some(profiler_notes_path) = &report.command.profiler_notes_path {
         out.push_str(&format!("- Profiler notes: {profiler_notes_path}\n"));
     }
+    out.push_str(&format!("- Warmup: {}\n", report.command.warmup));
+    out.push_str(&format!(
+        "- Measurement runs: {}\n",
+        report.command.measurement_runs
+    ));
     out.push_str(&format!(
         "- Machine: {} {} with {} worker(s)\n\n",
         report.machine.os, report.machine.arch, report.machine.available_parallelism
@@ -424,4 +433,8 @@ where
         .next()
         .unwrap_or_default()
         .to_string())
+}
+
+fn default_measurement_runs() -> usize {
+    1
 }
