@@ -1,80 +1,177 @@
-# Milestone Implementation Goal
+# Post-Beta Timing Hardening Goal
 
-## Purpose
+## Position
 
-The goal of this plan is to make every Stab milestone mean the same thing: test parity is planned first, the feature is implemented to the milestone contract, done criteria are checked directly, and review findings are fixed before the milestone is considered complete.
+The old `GOAL.md` is no longer the right control document.
+It was useful when Stab was moving through broad M0 through M12 implementation milestones, but the active work is now narrower and stricter.
+The current goal is to finish `docs/plans/post-beta-timing-hardening-plan.md` correctly, with truthful timing evidence, meaningful tests, source-owned thresholds, synchronized documentation, and clean final reports.
 
-## Scope
+Use `docs/plans/post-beta-timing-hardening-plan.md` for row-specific tasks.
+Use this file to decide whether that plan is actually complete.
 
-This goal applies to milestones M0 through M12 in `docs/plans/rust-stim-drop-in-rewrite.md`.
-Future Plan items are out of scope until they are promoted into explicit milestones with objective, task, test, benchmark, and done-criteria sections.
+## Objective
 
-## Milestone Completion Loop
+Finish the post-beta timing-hardening plan for already implemented Rust and CLI surfaces.
+The plan is complete only when each target row or row family has either stable guarded timing evidence or a documented, evidence-backed reason why the remaining surface should not own a strict threshold yet.
 
-A milestone is not complete until each gate below is completed in order.
-Use this loop for every milestone from M0 through M12, even when a milestone is mostly documentation, infrastructure, tests, benchmarks, or review hardening.
-If a gate genuinely does not apply, record why it is not applicable instead of skipping it silently.
+Target rows and row families:
 
-## Per-Milestone Checklist
+1. `m8-measure-reader`, now represented in `benchmarks/manifest.csv` by `m8-measure-reader-01`, `m8-measure-reader-b8`, `m8-measure-reader-r8`, `m8-measure-reader-hits`, `m8-measure-reader-dets`, and `m8-measure-reader-ptb64-contract`
+2. `m5-simd-bits`
+3. `m5-sparse-xor`
+4. `m10-error-decomp`
+5. `m4-gate-lookup`
 
-Each milestone implementation report, pull request, or durable tracking artifact should include this checklist:
+Do not reopen intentionally deferred Stim parity or ecosystem surfaces while completing this goal.
+Python, JS/WASM, diagrams, `explain_errors`, `repl`, QASM/Quirk, GPU, sweep-conditioned conversion, `m2d --ran_without_feedback`, full ErrorMatcher provenance, and new public graph/vector simulator APIs remain out of scope unless the plan is explicitly amended.
 
-- Milestone: `Mx: Title` from `docs/plans/rust-stim-drop-in-rewrite.md`.
-- Contract: objective, tasks, linked tests and benchmarks, done criteria, explicit deferrals, and open spec-gap entries considered before implementation.
-- Test-first work: upstream Stim tests ported, Stab-specific tests created, oracle fixtures added, statistical checks defined, benchmark workloads added or updated, and any planned tests that remain red or manifest-only.
-- Implementation work: crates, modules, CLI commands, file formats, operational commands, docs, and generated artifacts changed for the milestone.
-- Done-criteria matrix: every task and done criterion marked `Satisfied`, `Partially satisfied`, `Missing`, `Not applicable`, or `Blocked`, with evidence for every satisfied item.
-- Milestone audit: command or workflow used, findings fixed, under-specification findings logged in `docs/plans/milestone-spec-gaps.md`, and the final milestone status.
-- Full code review: command or workflow used, findings fixed, intentionally deferred findings with rationale, and checks re-run after fixes.
-- Verification: exact commands run, benchmark report paths, oracle report paths, checks not run, and the reason any required check was skipped.
+## Sources Of Truth
 
-### Gate 1: Port Or Create Tests
+- Primary plan: `docs/plans/post-beta-timing-hardening-plan.md`
+- Current status report: `docs/plans/post-beta-fix-report.md`
+- Historical M12 report: `docs/plans/m12-progress-report.md`
+- Lessons for planning and verification: `docs/plans/lessons-learned.md`
+- Under-specified follow-ups: `docs/plans/milestone-spec-gaps.md`
+- Threshold source: `benchmarks/m12-primary-thresholds.json`
+- Waiver source: `benchmarks/m12-primary-beta-waivers.json`
+- Benchmark manifest: `benchmarks/manifest.csv`
+- Profiler notes: `benchmarks/profiler-notes/m12/`
 
-Before implementing milestone behavior, identify the tests needed to prove the milestone contract.
-Use `docs/plans/stim-test-porting-plan.md` as the source for upstream Stim tests to port from `vendor/stim`.
-When no direct upstream test exists, create focused Stab tests that prove the same public behavior, compatibility contract, statistical property, file-format rule, CLI behavior, or operational workflow.
-Tests should be meaningful and should fail before the feature exists whenever practical.
-Do not add tests that only restate constants, assert freshly constructed fields, or check generic library mechanics.
-For probabilistic behavior, define the semantic or statistical property, sample size, tolerance, and deterministic reporting strategy before treating the test as parity evidence.
-For performance milestones or performance-sensitive features, add or update benchmark workloads before making performance claims.
+If these files disagree, fix the stale file in the same change set.
+Do not leave contradictory row counts, waiver counts, threshold counts, command results, or evidence paths for the next agent to untangle.
 
-### Gate 2: Implement The Feature
+## Non-Negotiable Rules
 
-Implement only the feature scope specified by the milestone objective and tasks unless the plan is deliberately updated.
-Keep the implementation aligned with the workspace architecture, typed-boundary rules, portable-SIMD policy, operational-command policy, and Stim v1.16.0 compatibility target.
-Update docs in the same change set when implementation changes public behavior, CLI behavior, file formats, benchmark gates, operational workflows, or developer workflows.
-If implementation reveals an ambiguity in the milestone text, do not silently choose a broad interpretation.
-Either revise the plan before continuing, or log the ambiguity in `docs/plans/milestone-spec-gaps.md` if it can safely be handled as follow-up specification work.
+- Do not weaken a threshold to make a row pass.
+- Do not add a waiver for a row that can be made comparable with better benchmark shape.
+- Do not hide slow direct submeasurements behind a passing row median.
+- Do not add strict thresholds for tiny or noisy evidence until repeated clean runs prove the measurement is stable.
+- Do not optimize before the benchmark identifies the slow comparable surface.
+- Do not cite dirty-worktree benchmark reports as final acceptance evidence.
+- Do not mark a row complete while tests, thresholds, profiler notes, reports, and plan docs disagree.
+- Preserve Stim v1.16.0 compatibility for implemented public behavior.
+- Keep public API changes additive unless the plan is explicitly amended.
 
-### Gate 3: Check Done Criteria
+## Row Work Loop
 
-Check every task and done criterion in the milestone section directly.
-For each requirement, record whether it is satisfied, partially satisfied, missing, not applicable, or blocked.
-Evidence must point to code, tests, oracle fixtures, benchmark reports, docs, reproducible commands, or accepted plan text.
-Do not mark a requirement satisfied because adjacent work exists.
-If a linked test or benchmark cannot run, record the blocker and do not count it as passing evidence.
+Complete one target row or row family at a time.
+Each row or row family is a small milestone with its own tests, benchmark evidence, threshold decision, documentation update, audit, and review closure.
 
-### Gate 4: Run Milestone Audit
+### 1. Read The Contract
 
-Run the `.agents/skills/milestone-audit` workflow for the milestone.
-Fix every implementation, test, benchmark, documentation, compatibility, workflow, and verification issue found by the audit.
-Under-specification findings are handled differently: log them in `docs/plans/milestone-spec-gaps.md` with the milestone id, the weak current text, the implementation evidence that revealed the gap, and the proposed amendment.
-If an under-specification finding makes it impossible to decide whether the milestone is complete, the milestone remains blocked or incomplete until the plan is clarified.
+Read the row section in `docs/plans/post-beta-timing-hardening-plan.md`, the matching profiler note, the matching `benchmarks/manifest.csv` row or rows, and the current status in `docs/plans/post-beta-fix-report.md`.
+Classify each source-owned row as a direct comparable benchmark, a mixed comparable benchmark, a contract-only benchmark, or a benchmark with intentionally unguarded tiny evidence.
 
-### Gate 5: Run Full Code Review
+### 2. Make The Benchmark Truthful
 
-Run the `.agents/skills/full-code-review` workflow after the milestone audit is clean or has only logged under-specification follow-ups.
-Fix every correctness, compatibility, security, performance, architecture, test-quality, and documentation issue found by the review.
-If a finding is intentionally deferred, record the rationale and the target follow-up location.
-Re-run the relevant tests, benchmarks, audits, or review slices after fixes that could affect previous evidence.
+Split mixed rows before optimizing implementation code.
+Each comparable submeasurement needs a paired Stim name, Stab name, ratio, and normalized work unit where a normalized rate is meaningful.
+For configured schema-version-2 thresholds, the timing-regression report is the authoritative paired-evidence report because threshold application records explicit configured pairs even when plain compare or beta reports only include automatic exact-name or positional pairs.
+Each Stab-only contract extra must be documented as ineligible for Stim-relative timing thresholds.
+Tiny operations must be batched or repeated enough that benchmark time is measuring the operation instead of timer noise.
 
-## Completion Evidence
+### 3. Add Or Port Tests
 
-Every completed milestone should have enough evidence for a future agent to reconstruct why it was accepted.
-At minimum, the evidence should include the milestone id, tests or benchmarks added or ported, implementation areas changed, commands run, done-criteria status, milestone-audit outcome, full-code-review outcome, and any unresolved under-specification log entries.
-This evidence can live in a PR description, issue, milestone report, or another durable project-tracking artifact.
-Under-specification findings must always be recorded in `docs/plans/milestone-spec-gaps.md`.
+Add tests before or alongside implementation changes.
+Tests should protect compatibility, public behavior, format validation, numerical invariants, resource boundaries, and data-structure invariants.
+Avoid tests that only restate constants, assert freshly constructed struct fields, check generic serialization mechanics, or verify labels without exercising behavior.
 
-## Acceptance Rule
+### 4. Profile Stable Evidence
 
-A milestone is complete only when tests or benchmarks exist for the required behavior, the feature is implemented, done criteria are satisfied, milestone-audit issues are fixed or logged as under-specification follow-ups, full-code-review issues are fixed or explicitly deferred, and the verification evidence is durable.
+Profile only after the benchmark surface is stable enough to be meaningful.
+Update the matching profiler note with the dominant cost, optimization decision, evidence quality, and any reason a submeasurement remains outside strict threshold ownership.
+
+### 5. Optimize Conservatively
+
+Optimize the measured hot path behind existing abstractions.
+Keep changes local to the bottleneck.
+Preserve typed boundaries, validation semantics, file-format behavior, numerical stability, memory safety, and data-structure invariants.
+For bit and sparse-XOR work, prove equivalence against scalar or reference models.
+For probability arithmetic, preserve correctness and validation over speed.
+For result readers, preserve exact format validation and bounded-memory behavior.
+
+### 6. Decide Threshold Ownership
+
+After implementation, rerun repeated evidence.
+If the whole row is comparable, stable, and below `1.25x`, guard it with a row-level threshold.
+If only selected submeasurements are comparable, stable, and below `1.25x`, guard those pairs with schema-version-2 submeasurement thresholds.
+If a submeasurement is noisy, contract-only, intentionally deferred, or still too small to threshold honestly, keep it out of `benchmarks/m12-primary-thresholds.json` and document the reason in the profiler note.
+
+Any threshold-system behavior change must include tests for compatible schema-version-1 parsing, schema-version-2 parsing, stale submeasurement ids, missing evidence, and failing ratios.
+
+### 7. Synchronize Documentation
+
+Update every document that would otherwise mislead a future agent.
+At minimum, check `docs/plans/post-beta-timing-hardening-plan.md`, `docs/plans/post-beta-fix-report.md`, `docs/plans/m12-progress-report.md`, `docs/plans/milestone-spec-gaps.md`, `benchmarks/README.md`, and the matching profiler note under `benchmarks/profiler-notes/m12/`.
+
+### 8. Run Audit And Review
+
+Run milestone-audit for each completed row using the milestone name `post-beta-timing-hardening: row-id`.
+Fix implementation, test, benchmark, documentation, compatibility, workflow, and verification findings.
+Log only true under-specification issues in `docs/plans/milestone-spec-gaps.md`.
+
+Run full-code-review after milestone-audit is clean or has only accepted under-specification follow-ups.
+Fix correctness, compatibility, security, performance, architecture, test-quality, and documentation findings.
+Re-run affected tests, benchmarks, audits, or review slices after fixes.
+
+## Row Ledger
+
+| Row | Required finish state | Threshold expectation |
+| --- | --- | --- |
+| `m8-measure-reader-*` | Reader evidence is split into `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` source-owned rows; tests prove exact format parity, malformed-input rejection, and bounded streaming behavior where used. | Guard stable direct format pairs only; document mixed dense/sparse comparisons and contract-only `ptb64` surfaces. |
+| `m5-simd-bits` | Direct bit operations are split from Stab-only extras; tests prove scalar-reference equivalence across offsets, masks, lengths, overlaps, and dirty tails. | Guard stable direct comparable operations only. |
+| `m5-sparse-xor` | Table row-XOR and item-XOR are measured separately; tests prove sorted-unique invariants and symmetric-difference behavior. | Guard row-XOR and item-XOR only after each has stable meaningful evidence. |
+| `m10-error-decomp` | Approximate, exact, and independent-to-disjoint conversion families are measured with case-diverse batched evidence; tests prove numerical stability and boundary behavior. | Keep stable approximate thresholds; add exact or independent-to-disjoint thresholds only when clean repeated evidence supports them. |
+| `m4-gate-lookup` | Lookup evidence uses larger repeated sets and separates canonical names, aliases, lowercase normalization, and invalid names; tests prove metadata remains single-sourced. | Guard stable lookup submeasurements only; document sub-100ns noisy surfaces. |
+
+## Evidence Requirements
+
+Dirty-worktree benchmark reports are useful during iteration, but they are not final evidence.
+Final acceptance evidence must be generated from committed code and must report `local_modifications=false`.
+
+Every completed row needs durable evidence for:
+
+- Stab commit id
+- Pinned Stim commit id
+- Benchmark command
+- Report path
+- Warmup status
+- Measurement-run count
+- Local-modification status
+- Comparable Stim and Stab measurements
+- Threshold decision
+- Reason for every comparable-looking submeasurement left outside strict thresholds
+
+## Final Completion Criteria
+
+The post-beta timing-hardening plan is complete only when all of the following are true:
+
+- Every target row or row family has completed the row work loop.
+- Every behavior changed for performance has meaningful tests.
+- Every mixed row has explicit paired submeasurement evidence.
+- Every stable comparable row or submeasurement below `1.25x` is guarded in `benchmarks/m12-primary-thresholds.json`.
+- Every unthresholded row or submeasurement has a source-owned explanation in its profiler note.
+- `docs/plans/post-beta-timing-hardening-plan.md`, `docs/plans/post-beta-fix-report.md`, `docs/plans/m12-progress-report.md`, profiler notes, benchmark sources, threshold files, and waiver files match the final behavior.
+- Milestone-audit and full-code-review have been run, and their findings are fixed or logged as accepted specification follow-ups.
+- Final benchmark evidence was regenerated from committed code with `local_modifications=false`.
+
+If the worktree still contains uncommitted changes, the plan may have progress but it is not complete under this goal.
+
+## Required Final Verification
+
+Run these commands before declaring the plan complete:
+
+```sh
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace --quiet
+just oracle::run --implemented-only
+just bench::baseline --primary --out target/benchmarks/post-beta-primary-baseline
+just bench::compare --primary --warmup --measurement-runs 3 --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/m12 --baseline target/benchmarks/post-beta-primary-baseline/baseline.json --report target/benchmarks/post-beta-primary-compare
+just bench::primary-beta --baseline target/benchmarks/post-beta-primary-baseline/baseline.json
+just bench::primary-regression --baseline target/benchmarks/post-beta-primary-baseline/baseline.json --report target/benchmarks/post-beta-primary-regression
+just bench::primary-memory-regression --baseline target/benchmarks/post-beta-primary-baseline/baseline.json
+just maintenance::pre-commit
+```
+
+If any command is skipped, blocked, or replaced by a narrower check, record the reason in the durable completion evidence and do not mark the plan complete until the gap is resolved or explicitly accepted as follow-up scope.

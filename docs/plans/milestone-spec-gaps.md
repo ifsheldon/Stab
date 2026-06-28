@@ -93,7 +93,7 @@ Revealed by: milestone audit of M12 memory-gate evidence.
 Current text: M12 says no primary workload may regress peak allocations or resident memory by more than 25 percent relative to the first complete Stab benchmark report.
 Gap: the previous memory gate tracked Stab-side allocation counts and maximum live allocated bytes, but it did not measure resident set size.
 Proposed amendment: either narrow the done criterion to allocation counts and maximum live allocated bytes, or add RSS measurement to the benchmark report and memory gate before M12 completion.
-Resolution: `stab-bench compare --track-allocations` now samples Stab-side resident memory with `memory-stats`, records `resident_bytes` on measurements, promotes `stab_resident_bytes_max` to compare rows, and `--require-memory-gate` requires both allocation and resident-memory evidence. `benchmarks/m12-primary-memory-baseline.json` records both `stab_allocation_bytes_max` and `stab_resident_bytes_max` for all 71 primary rows, and `just bench::primary-memory-regression --baseline target/benchmarks/m12-primary-completion-baseline/baseline.json` passed with all 71 rows in `memory_gate_status=pass`.
+Resolution: `stab-bench compare --track-allocations` now samples Stab-side resident memory with `memory-stats`, records `resident_bytes` on measurements, promotes `stab_resident_bytes_max` to compare rows, and `--require-memory-gate` requires both allocation and resident-memory evidence. The historical M12 completion run passed with all 71 rows in `memory_gate_status=pass`, and the current post-beta `benchmarks/m12-primary-memory-baseline.json` records both `stab_allocation_bytes_max` and `stab_resident_bytes_max` for all 76 primary rows.
 
 ## 2026-06-28 - M12: Regression Threshold Automation
 
