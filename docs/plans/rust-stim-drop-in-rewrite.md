@@ -73,11 +73,18 @@ Linked tests and benchmarks:
 - Hook checks: `just maintenance::pre-commit`, `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace`.
 - Oracle smoke: `stim --help` and one tiny `.stim` parse-print or sample command against the pinned submodule.
 
+M0 extracts only oracle-process smoke checks from the upstream smoke references: help-command health, binary namespacing or inclusion health, and one tiny deterministic circuit case.
+Full parser behavior, gate metadata, analyzer behavior, and broader CLI mode handling stay with their owning implementation milestones.
+Any M0 `sample` path is an oracle-only smoke shim for `smoke-tiny-circuit`; it does not count as implemented `stim sample` CLI compatibility, and M8 remains responsible for the public `sample` command contract.
+Before M3 exists, `just bench::smoke` is a compile and wiring smoke for benchmark operations and must not claim benchmark baselines, performance thresholds, or workload parity.
+The M3 benchmark package and benchmark matrix replace the M0 smoke-only benchmark check with real baseline and compare commands.
+
 Done criteria:
 
 - `just maintenance::setup-hooks` installs a working local pre-commit hook without a tracked shell script.
 - `just oracle::version` fails unless `vendor/stim` resolves to `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 - `just oracle::run --case smoke/help` and `just oracle::run --case smoke/tiny-circuit` pass.
+- `just bench::smoke` runs as a compile and wiring smoke only; real benchmark rows and baselines remain M3 acceptance.
 - `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo fmt --all --check` pass in CI and locally.
 
 ### M1: Feature Parity Inventory And Acceptance Contracts
