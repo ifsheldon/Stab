@@ -223,12 +223,12 @@ Resolution: M9 now explicitly excludes sweep input data for detection conversion
 
 ## 2026-06-27 - M9: Benchmark Baseline Completeness
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of `just bench::compare --milestone M9` and `just bench::compare --milestone M9 --strict`.
 Current text: M9 requires `just bench::compare --milestone M9` to report `detect` and `m2d` throughput separately for text and bit-packed formats, while the benchmark plan describes comparisons against pinned Stim v1.16.0.
 Gap: the non-strict compare command reports Stab-side M9 timings, but the current baseline artifact has no M9 pinned Stim rows, so `--strict` fails and the command is not a complete Stab-vs-Stim comparison.
 Proposed amendment: either require M9 to record selected pinned Stim detect and m2d baselines before completion and run the strict comparison, or label M9 benchmark evidence as report-only until M12 freezes the primary performance matrix.
-Resolution: pending plan update.
+Resolution: M9 benchmark acceptance is explicitly report-only Stab-side timing from `just bench::compare --milestone M9`. Strict pinned-Stim baseline completeness, external CLI-vs-CLI timing comparability, beta-gate ratios, and promoted primary-matrix baseline rows belong to M12, where selected M9 rows can gain faithful public Stim CLI baselines without changing M9 completion. Evidence is `benchmarks/manifest.csv` marking the M9 rows as `report-only`, `cargo test -p stab-bench m9_benchmark_rows_have_stab_compare_runners --quiet`, and the M12 progress note for promoted M9 baseline rows.
 
 ## 2026-06-27 - M9: Detection Bit-Packed Format Scope
 

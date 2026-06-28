@@ -47,7 +47,7 @@ Milestone audit found implementation issues in structural oracle filtering, gaug
 Those were fixed by adding `--structural` support to `stab-oracle run`, expanding core detection tests, adding exact oracle fixtures, and adding M9 benchmark compare runners.
 
 Milestone audit also found under-specified scope around feedback-removal conversion, sweep-conditioned conversion, detector-analysis utility rows, generated fixture round trips, pinned benchmark baseline completeness, and bit-packed format scope.
-Those items are logged in `docs/plans/milestone-spec-gaps.md`.
+Resolved entries record explicit M9 boundaries in `docs/plans/milestone-spec-gaps.md`, and remaining open items stay logged there.
 
 ## Full Code Review Outcome
 
@@ -56,7 +56,6 @@ The concrete implementation issues were fixed with explicit observable output mo
 
 Open M9 spec follow-ups:
 
-- `2026-06-27 - M9: Benchmark Baseline Completeness`
 - `2026-06-27 - M9: Detection Conversion Streaming And Scale Limits`
 
 Resolved M9 spec entries:
@@ -68,6 +67,7 @@ Resolved M9 spec entries:
 - `2026-06-27 - M9: Feedback-Removal Conversion Scope`
 - `2026-06-27 - M9: Detector Analysis Utility Row Ownership`
 - `2026-06-27 - M9: Sweep-Conditioned Detection Conversion Scope`
+- `2026-06-27 - M9: Benchmark Baseline Completeness`
 
 ## Verification Commands
 
@@ -89,6 +89,7 @@ Resolved M9 spec entries:
 - `cargo test -p stab-cli m2d_rejects_sweep_conditioned_conversion_until_sweep_inputs_exist`
 - `cargo test -p stab-cli m2d_rejects_ran_without_feedback_until_feedback_removal_is_implemented`
 - `cargo test -p stab-bench m9_benchmark_rows_have_stab_compare_runners`
+- `cargo test -p stab-bench legacy_contract_named_rows_can_use_public_stim_cli_baselines`
 - `just oracle::matrix --check`
 - `just oracle::run --milestone M9 --exact`
 - `just oracle::run --milestone M9 --structural`

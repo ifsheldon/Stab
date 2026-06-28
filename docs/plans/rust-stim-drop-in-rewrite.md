@@ -343,6 +343,9 @@ Linked tests and benchmarks:
 - IO tests: C++ Input And Output Formats group for bit-packed and text result formats.
 - Benchmarks: `stim detect` and `stim m2d` on text and bit-packed input from the Benchmark Plan.
 
+M9 benchmark acceptance is report-only Stab-side timing from `just bench::compare --milestone M9`.
+Strict pinned-Stim baseline completeness, external CLI-vs-CLI timing comparability, beta-gate ratios, and promoted primary-matrix baseline rows are M12 responsibilities.
+
 Done criteria:
 
 - `just oracle::run --milestone M9 --exact` passes deterministic detection examples.
@@ -350,7 +353,7 @@ Done criteria:
 - `cargo test -p stab-core detection` covers coordinate shifts, repeats, measurement-record observables, Pauli-target observable flips, empty-detector circuits, invalid measurement references, and explicit rejection for sweep-conditioned conversion until sweep inputs exist.
 - `cargo test -p stab-core detection_sampling` covers frame-simulator Pauli-target observable parity for basis resets and product measurements.
 - `cargo test -p stab-cli m9` covers public `detect` and `m2d` CLI behavior, including `b8`, `detect` `ptb64` outputs, `m2d` `ptb64` input, `m2d` `ptb64` output rejection, `dets`, observable side outputs, route conflicts, zero-shot `detect`, zero-width and oversized `ptb64` input rejection, Pauli-target observable behavior, generated M7 repetition, rotated-surface, unrotated-surface, and color-code `sample -> m2d` round trips against `detect` for `01` and `b8`, clear sweep-conditioned conversion rejection until sweep inputs exist, and clear `--ran_without_feedback` rejection until feedback-removal conversion is implemented.
-- `just bench::compare --milestone M9` reports `detect` and `m2d` throughput separately for text and bit-packed formats.
+- `just bench::compare --milestone M9` reports `detect` and `m2d` throughput separately for text and bit-packed formats as report-only M9 evidence.
 
 ### M10: Detector Error Model Core
 
