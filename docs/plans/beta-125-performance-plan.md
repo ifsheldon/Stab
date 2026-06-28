@@ -33,10 +33,11 @@ The worst comparable row was `m10-error-decomp` at `1.1891891891891893x`, with p
 The prior headroom and watch rows passed in that dirty probe: `m8-measure-reader-dets` at `0.9818181818181818x`, `m5-simd-bits` at `0.7032967032967034x`, `m4-circuit-parse` at `0.62401875x`, `m5-sparse-xor` at `0.7869545454545454x`, `m4-gate-lookup` at `0.40714285714285714x`, and `m8-sample-primary-unrotated-surface-contract` at `0.49057704653770245x`.
 This is not final acceptance evidence because the worktree was dirty; B7 still requires regenerated clean reports from committed code with `local_modifications=false`.
 
-The final clean beta-125 reports were regenerated from committed Stab commit `f4580db8cdcd1e004cb3788da9e46efc8b494ae9` with `local_modifications=false`.
+The final clean beta-125 reports were regenerated from committed Stab commit `c9c96f80844dc2b4c952ec137d191ce369b2f233` with `local_modifications=false`.
 The clean beta report at `target/benchmarks/m12-primary-beta/compare.json` used `command.warmup=true` and `command.measurement_runs=3`, measured 76 primary rows, passed 72 comparable rows, had 4 checked `not-comparable` no-ratio rows, and had 0 comparable failures.
-Among rows with faithful ratios, 70 were faster than pinned Stim and 2 were slower but still below the active `1.25x` gate: `m5-sparse-xor` at `1.2217142857142858x` and `m10-error-decomp` at `1.1111111111111112x`.
-The clean timing-regression report at `target/benchmarks/beta-125-primary-regression/compare.json` passed with zero ambiguous `not-configured` rows, and the clean memory-regression report at `target/benchmarks/m12-primary-memory-regression/compare.json` passed all primary rows.
+Among rows with faithful ratios, 70 were faster than pinned Stim and 2 were slower but still below the active `1.25x` gate: `m5-sparse-xor` at `1.1817142857142857x` and `m10-error-decomp` at `1.1111111111111112x`.
+The clean beta report also proves the repaired `m8-reference-sample-tree` nested-circuit pair at `0.20833333333333334x`.
+The clean timing-regression report at `target/benchmarks/beta-125-primary-regression/compare.json` passed 72 configured threshold rows and 4 checked no-ratio waivers with zero ambiguous `not-configured` rows, and the clean memory-regression report at `target/benchmarks/m12-primary-memory-regression/compare.json` passed all 76 primary rows.
 
 The four current no-ratio beta waivers remain outside this performance optimization scope unless a faithful pinned-Stim ratio becomes available:
 

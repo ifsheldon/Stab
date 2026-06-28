@@ -83,10 +83,10 @@
         "hot_path_status": "above-profiler-threshold",
         "evidence_note": "The before report measured sparse XOR above the beta gate and above the profiler-note threshold."
       },
-      "after_report": "target/benchmarks/m12-primary-compare-after-sparse-xor-in-place/compare.json",
+      "after_report": "target/benchmarks/m12-primary-beta/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 1.06,
+        "relative_ratio": 1.1817142857142857,
         "hot_path_status": "below-profiler-threshold",
         "evidence_note": "The beta-125 focused M5 probe measured the table row-XOR and item-XOR pairs below the 1.25x gate after in-place row merging, small-row item shifting, and the 16-item stack-buffer symmetric-difference path."
       },
