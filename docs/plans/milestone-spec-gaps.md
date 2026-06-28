@@ -19,16 +19,18 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
-## 2026-06-28 - M12: Optimization Log Evidence Strength
-
-Status: Open
-Revealed by: fresh M12 milestone audit of the source-owned optimization log.
-Current text: M12 says rows optimized below the final-current profiler-note threshold must be listed in `benchmarks/profiler-notes/m12/optimization-log.json` with before and after report paths, dominant-cost evidence or a profiler blocker, implementation summary, semantic checks, and follow-up policy.
-Gap: the validator checks schema shape, safe ids, safe report paths, non-empty evidence fields, and required row coverage, but it does not prove that the referenced before and after reports contain the row or support the claimed movement below the profiler-note threshold.
-Proposed amendment: either extend the source-owned optimization log with machine-checkable before and after ratios/statuses that do not depend on local `target/` artifacts, or add an ops validator mode that checks referenced reports when the reports are archived alongside completion evidence.
-Resolution: unresolved.
+None.
 
 ## Resolved Entries
+
+## 2026-06-28 - M12: Optimization Log Evidence Strength
+
+Status: Resolved
+Revealed by: fresh M12 milestone audit of the source-owned optimization log.
+Current text: M12 says rows optimized below the final-current profiler-note threshold must be listed in `benchmarks/profiler-notes/m12/optimization-log.json` with before and after report paths, dominant-cost evidence or a profiler blocker, implementation summary, semantic checks, and follow-up policy.
+Gap: the validator checked schema shape, safe ids, safe report paths, non-empty evidence fields, and required row coverage, but it did not prove that the referenced before and after reports contain the row or support the claimed threshold or gate status.
+Proposed amendment: either extend the source-owned optimization log with machine-checkable before and after ratios/statuses that do not depend on local `target/` artifacts, or add an ops validator mode that checks referenced reports when the reports are archived alongside completion evidence.
+Resolution: `benchmarks/profiler-notes/m12/optimization-log.json` now uses schema version 2 with source-owned before and after ratios, gate statuses, hot-path statuses, and source profiler-note paths for after rows still above 1.5x. `cargo test -p stab-bench m12_optimization_log_validates_source_file` validates the new schema and required row coverage, while `docs/plans/rust-stim-drop-in-rewrite.md` and `benchmarks/README.md` now describe the stronger optimization-log evidence contract.
 
 ## 2026-06-28 - M10: ErrorMatcher Repeat-Contained Noise Scope
 
@@ -64,7 +66,7 @@ Revealed by: milestone audit of M12 profiler-note evidence.
 Current text: M12 says to profile every benchmark that is slower than the beta gate before optimizing it, and source-owned compare runs require notes for rows slower than 1.5x pinned Stim.
 Gap: the milestone does not say whether completion evidence requires pre-optimization profiler captures, final-current profiler notes for rows still slower than 1.5x, or both.
 Proposed amendment: choose a durable rule: either require pre-optimization notes for every row optimized during M12, or require final-current notes only for rows still slower than 1.5x and separate optimization logs for rows that were fixed.
-Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines final-current profiler-note evidence for rows still slower than 1.5x pinned Stim, plus source-owned optimization-log evidence for M12 rows optimized below that threshold. `benchmarks/profiler-notes/m12/optimization-log.json` records before and after reports, dominant-cost evidence, implementation summaries, semantic checks, and follow-up policy for optimized rows, and `cargo test -p stab-bench m12_optimization_log_validates_source_file` validates the log shape and required row coverage.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines final-current profiler-note evidence for rows still slower than 1.5x pinned Stim, plus source-owned optimization-log evidence for M12-optimized rows. `benchmarks/profiler-notes/m12/optimization-log.json` records before and after reports, source-owned ratios, gate statuses, hot-path statuses, dominant-cost evidence, implementation summaries, semantic checks, and follow-up policy for optimized rows, and `cargo test -p stab-bench m12_optimization_log_validates_source_file` validates the log shape and required row coverage.
 
 ## 2026-06-28 - M12: Memory Gate Metric Scope
 

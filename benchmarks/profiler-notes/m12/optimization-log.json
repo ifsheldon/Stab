@@ -1,10 +1,22 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "rows": [
     {
       "id": "m8-sample-throughput-1000000",
       "before_report": "target/benchmarks/m12-primary-probe/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 5.484743619619439,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured the high-shot sampler row above the 2.0x beta gate and above the 1.5x profiler-note threshold."
+      },
       "after_report": "target/benchmarks/m12-primary-compare-after-direct-z-fast-path/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 0.09042767748712784,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The after report measured the row below the beta gate and below the final-current profiler-note threshold after buffer reuse, frame reuse, and direct noisy Z-measurement output."
+      },
       "dominant_cost": "High-shot sampler throughput was dominated by repeated output-buffer allocation, per-shot frame allocation/reset work, and the simple noisy Z-measurement path.",
       "optimization_summary": "Reused sampler output buffers and frame state, reserved 01 and b8 output capacity, and added a direct noisy Z-measurement byte-output path.",
       "semantic_checks": [
@@ -17,7 +29,20 @@
     {
       "id": "m4-gate-lookup",
       "before_report": "target/benchmarks/m12-primary-compare-probe/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 41.28,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured gate lookup far above both the beta gate and the profiler-note threshold."
+      },
       "after_report": "target/benchmarks/m12-primary-beta-after-m4-fast-paths/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 1.6400000000000001,
+        "hot_path_status": "covered-by-source-profiler-note",
+        "evidence_note": "The after report measured the row under the 2.0x beta gate but still above the 1.5x profiler-note threshold, so the source-owned profiler note remains required.",
+        "source_profiler_note": "benchmarks/profiler-notes/m12/m4-gate-lookup.md"
+      },
       "dominant_cost": "Gate lookup spent avoidable time in allocation-heavy canonicalization and broader lookup scans for canonical uppercase names.",
       "optimization_summary": "Added an inline exact-name fast path for canonical names and aliases while preserving case-insensitive public lookup behavior.",
       "semantic_checks": [
@@ -28,7 +53,19 @@
     {
       "id": "m4-circuit-parse",
       "before_report": "target/benchmarks/m12-primary-compare-after-direct-z-fast-path/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 3.851013698630137,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured sparse circuit parsing above the beta gate and above the profiler-note threshold."
+      },
       "after_report": "target/benchmarks/m12-primary-beta-after-m4-fast-paths/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 1.3306575342465754,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The after report measured the row below the beta gate and below the profiler-note threshold after target-storage and simple-instruction parser fast paths."
+      },
       "dominant_cost": "Sparse .stim parsing was dominated by temporary target vectors, repeated integer scans, and generic dispatch for simple no-argument instructions.",
       "optimization_summary": "Moved target storage to SmallVec-backed instruction buffers, parsed plain numeric targets in one checked pass, and added simple no-argument parser fast paths for common H, M, MZ, CX, and CNOT instructions.",
       "semantic_checks": [
@@ -41,7 +78,19 @@
     {
       "id": "m5-sparse-xor",
       "before_report": "target/benchmarks/m12-primary-compare-after-direct-z-fast-path/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 2.9395,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured sparse XOR above the beta gate and above the profiler-note threshold."
+      },
       "after_report": "target/benchmarks/m12-primary-compare-after-sparse-xor-in-place/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 1.3371428571428572,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The after report measured the row below the beta gate and below the profiler-note threshold after in-place sparse row merging."
+      },
       "dominant_cost": "Sparse table row XOR allocated a new result vector for repeated row merges.",
       "optimization_summary": "Merged sparse XOR rows in place from the back so repeated table row XORs reuse the existing row allocation.",
       "semantic_checks": [
@@ -52,7 +101,20 @@
     {
       "id": "m8-measure-reader",
       "before_report": "target/benchmarks/m12-primary-compare-after-sparse-xor-in-place/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 2.152258064516129,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured the 01 measurement-record reader above the beta gate and above the profiler-note threshold."
+      },
       "after_report": "target/benchmarks/m12-primary-compare-after-zero-one-reader-checked-scan/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 1.914516129032258,
+        "hot_path_status": "covered-by-source-profiler-note",
+        "evidence_note": "The after report measured the row under the 2.0x beta gate but still above the 1.5x profiler-note threshold, so the source-owned profiler note remains required.",
+        "source_profiler_note": "benchmarks/profiler-notes/m12/m8-measure-reader.md"
+      },
       "dominant_cost": "The supported 01 measurement-record reader still paid generic text-record parsing overhead on dense bit lines.",
       "optimization_summary": "Added a direct byte scan for 01 measurement-record lines while preserving final-record-without-newline acceptance and invalid-byte rejection.",
       "semantic_checks": [
@@ -63,7 +125,19 @@
     {
       "id": "m8-probability-util",
       "before_report": "target/benchmarks/m12-primary-compare-after-parser-numeric-target-fast-paths/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 18.88,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured the old sampler-path probability utility proxy above the beta gate and above the profiler-note threshold."
+      },
       "after_report": "target/benchmarks/m12-primary-compare-after-probability-util-direct/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 0.9600000000000001,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The after report measured the direct probability utility comparison below the beta gate and below the profiler-note threshold."
+      },
       "dominant_cost": "The old benchmark compared pinned Stim probability utilities against a Stab sampler-path proxy instead of a matching probability-draw primitive.",
       "optimization_summary": "Added the direct biased_randomize_bits utility and a seven-filter direct benchmark matching the pinned Stim probability_util filters.",
       "semantic_checks": [
@@ -75,7 +149,19 @@
     {
       "id": "m6-clifford-string",
       "before_report": "target/benchmarks/m12-primary-compare-after-probability-util-direct/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 57.37142857142858,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured the old CliffordString proxy above the beta gate and above the profiler-note threshold."
+      },
       "after_report": "target/benchmarks/m12-primary-compare-after-m6-in-place-multiply-direct/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 0.0653061224489796,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The after report measured the direct in-place CliffordString multiplication comparison below the beta gate and below the profiler-note threshold."
+      },
       "dominant_cost": "The benchmark previously measured a proxy path that rebuilt CliffordString products instead of the direct in-place multiplication shape used by the pinned Stim filter.",
       "optimization_summary": "Added direct in-place CliffordString multiplication benchmark evidence matching the pinned 10K filter.",
       "semantic_checks": [
@@ -87,7 +173,19 @@
     {
       "id": "m6-pauli-string",
       "before_report": "target/benchmarks/m12-primary-compare-after-probability-util-direct/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 50.42,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured the old PauliString proxy above the beta gate and above the profiler-note threshold."
+      },
       "after_report": "target/benchmarks/m12-primary-compare-after-m6-in-place-multiply-direct/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 0.04,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The after report measured the direct in-place PauliString multiplication comparison below the beta gate and below the profiler-note threshold."
+      },
       "dominant_cost": "The benchmark previously measured a proxy path that rebuilt PauliString products instead of direct in-place multiplication at the pinned 10K, 100K, and 1M sizes.",
       "optimization_summary": "Added in-place PauliString multiplication and direct benchmark filters for 10K, 100K, and 1M cases.",
       "semantic_checks": [
@@ -99,7 +197,19 @@
     {
       "id": "m6-pauli-iter",
       "before_report": "target/benchmarks/m12-primary-compare-after-m6-in-place-multiply-direct/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 36.66705882352941,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured PauliStringIterator evidence above the beta gate and above the profiler-note threshold."
+      },
       "after_report": "target/benchmarks/m12-primary-compare-after-m6-pauli-iter-direct/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 0.5567058823529412,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The after report measured the direct borrowed-result iterator comparison below the beta gate and below the profiler-note threshold."
+      },
       "dominant_cost": "PauliStringIterator evidence previously included avoidable owned-result churn instead of a borrowed-result stepping shape.",
       "optimization_summary": "Added a borrowed-result PauliStringIterator stepping API and direct benchmark filters matching the pinned iterator cases.",
       "semantic_checks": [
@@ -111,7 +221,19 @@
     {
       "id": "m8-sample-primary-rotated-surface-contract",
       "before_report": "target/benchmarks/m12-m8-primary-cli-compare/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 15.660222577115388,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured the primary rotated-surface sampler row above the beta gate and above the profiler-note threshold."
+      },
       "after_report": "target/benchmarks/m12-primary-compare-after-lazy-small-frame/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 0.8295256939063698,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The after report measured the row below the beta gate and below the profiler-note threshold after the lazy packed small-frame sampler path."
+      },
       "dominant_cost": "Before the lazy packed small-frame sampler, rotated-surface sampling spent most time in Stab's scalar compiled-sampler frame path on the generated d3/r3 source-owned fixture.",
       "optimization_summary": "Added exact-generator measurement detection, direct H/CX operations, leading Z-reset elision, small-probability channel fast paths, and a private <=64 qubit lazy packed byte-sampling path.",
       "semantic_checks": [
@@ -124,7 +246,19 @@
     {
       "id": "m8-sample-primary-unrotated-surface-contract",
       "before_report": "target/benchmarks/m12-m8-primary-cli-compare/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 23.284734737682495,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured the primary unrotated-surface sampler row above the beta gate and above the profiler-note threshold."
+      },
       "after_report": "target/benchmarks/m12-primary-compare-after-lazy-small-frame/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 1.106963422983828,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The after report measured the row below the beta gate and below the profiler-note threshold after the lazy packed small-frame sampler path."
+      },
       "dominant_cost": "Before the lazy packed small-frame sampler, unrotated-surface sampling spent most time in Stab's scalar compiled-sampler frame path on the generated d3/r3 source-owned fixture.",
       "optimization_summary": "Added exact-generator measurement detection, direct H/CX operations, leading Z-reset elision, small-probability channel fast paths, and a private <=64 qubit lazy packed byte-sampling path.",
       "semantic_checks": [
@@ -137,7 +271,20 @@
     {
       "id": "m10-error-decomp",
       "before_report": "target/benchmarks/m12-primary-compare-probe/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 2.56,
+        "hot_path_status": "above-profiler-threshold",
+        "evidence_note": "The before report measured error decomposition above the beta gate and above the profiler-note threshold before paired submeasurement evidence exposed the tiny-filter bottleneck."
+      },
       "after_report": "target/benchmarks/m12-primary-regression-after-submeasurement-fixes-current/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 1.875,
+        "hot_path_status": "covered-by-source-profiler-note",
+        "evidence_note": "The after report measured the row under the 2.0x beta gate but still above the 1.5x profiler-note threshold under paired submeasurement evidence, so the source-owned profiler note remains required.",
+        "source_profiler_note": "benchmarks/profiler-notes/m12/m10-error-decomp.md"
+      },
       "dominant_cost": "The row median hid tiny independent/disjoint XYZ conversion filters where pinned Stim submeasurements were sub-nanosecond and timing overhead could dominate the arithmetic.",
       "optimization_summary": "Split the Stab-side direct-match measurements to match the pinned filters, added paired submeasurement ratio evidence, batched tiny direct-match timing, and removed this row from the 1.25x threshold file until the tiny filters stabilize.",
       "semantic_checks": [
