@@ -21,6 +21,9 @@ use crate::{CircuitError, CircuitResult, Probability, RepeatCount};
 const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
 const MAX_DEM_PARSE_LINES: usize = 1_000_000;
 pub(crate) const MAX_DEM_REPEAT_NESTING: usize = 256;
+const MAX_DEM_FLATTEN_REPEAT_UNROLL: u64 = 100_000;
+const MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
+const MAX_DEM_FLATTEN_REPEAT_ITERATIONS: u64 = 1_000_000;
 const DEM_FLOAT_PRECISION: i32 = 34;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -131,19 +134,87 @@ impl DetectorErrorModel {
                 },
                 DemItem::RepeatBlock(repeat) => {
                     let body_shift = repeat.body.total_detector_shift_inner()?;
-                    for _ in 0..repeat.repeat_count.get() {
-                        count = count.max(repeat.body.count_detectors_from(detector_offset)?);
-                        detector_offset =
-                            detector_offset.checked_add(body_shift).ok_or_else(|| {
+                    let repeat_count = repeat.repeat_count.get();
+                    if repeat_count > 0 {
+                        let body_count = repeat.body.count_detectors_from(0)?;
+                        let last_offset = body_shift
+                            .checked_mul(repeat_count.saturating_sub(1))
+                            .and_then(|shift| detector_offset.checked_add(shift))
+                            .ok_or_else(|| {
                                 CircuitError::invalid_detector_error_model(
                                     "repeat detector shift overflowed",
                                 )
                             })?;
+                        if body_count > 0 {
+                            count = count.max(last_offset.checked_add(body_count).ok_or_else(
+                                || {
+                                    CircuitError::invalid_detector_error_model(
+                                        "repeat detector count overflowed",
+                                    )
+                                },
+                            )?);
+                        }
                     }
+                    detector_offset = body_shift
+                        .checked_mul(repeat_count)
+                        .and_then(|shift| detector_offset.checked_add(shift))
+                        .ok_or_else(|| {
+                            CircuitError::invalid_detector_error_model(
+                                "repeat detector shift overflowed",
+                            )
+                        })?;
                 }
             }
         }
         Ok(count)
+    }
+
+    pub(crate) fn validate_flattening_budget(&self, context: &'static str) -> CircuitResult<()> {
+        let mut budget = DemFlatteningBudget::default();
+        self.validate_flattening_budget_items(1, 0, context, &mut budget)
+    }
+
+    fn validate_flattening_budget_items(
+        &self,
+        multiplier: u64,
+        depth: usize,
+        context: &'static str,
+        budget: &mut DemFlatteningBudget,
+    ) -> CircuitResult<()> {
+        if depth > MAX_DEM_REPEAT_NESTING {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "DEM {context} repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
+            )));
+        }
+        for item in &self.items {
+            match item {
+                DemItem::Instruction(_) => {
+                    budget.add_expanded_instructions(multiplier, context)?;
+                }
+                DemItem::RepeatBlock(repeat) => {
+                    let repeat_count = repeat.repeat_count.get();
+                    if repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL {
+                        return Err(CircuitError::invalid_detector_error_model(format!(
+                            "DEM {context} currently supports repeat counts up to {MAX_DEM_FLATTEN_REPEAT_UNROLL}, got {repeat_count}"
+                        )));
+                    }
+                    let repeated_multiplier =
+                        multiplier.checked_mul(repeat_count).ok_or_else(|| {
+                            CircuitError::invalid_detector_error_model(format!(
+                                "DEM {context} repeat expansion count overflowed"
+                            ))
+                        })?;
+                    budget.add_repeat_iterations(repeated_multiplier, context)?;
+                    repeat.body.validate_flattening_budget_items(
+                        repeated_multiplier,
+                        depth + 1,
+                        context,
+                        budget,
+                    )?;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn visit_observables(&self, max_observable: &mut Option<u64>) -> CircuitResult<()> {
@@ -168,6 +239,51 @@ impl DetectorErrorModel {
         for item in &self.items {
             item.write_dem(out, indent);
         }
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+struct DemFlatteningBudget {
+    expanded_instructions: u64,
+    repeat_iterations: u64,
+}
+
+impl DemFlatteningBudget {
+    fn add_expanded_instructions(
+        &mut self,
+        count: u64,
+        context: &'static str,
+    ) -> CircuitResult<()> {
+        self.expanded_instructions =
+            self.expanded_instructions
+                .checked_add(count)
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(format!(
+                        "DEM {context} expanded instruction count overflowed"
+                    ))
+                })?;
+        if self.expanded_instructions > MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "DEM {context} currently supports at most {MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
+                self.expanded_instructions
+            )));
+        }
+        Ok(())
+    }
+
+    fn add_repeat_iterations(&mut self, count: u64, context: &'static str) -> CircuitResult<()> {
+        self.repeat_iterations = self.repeat_iterations.checked_add(count).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(format!(
+                "DEM {context} repeat iteration count overflowed"
+            ))
+        })?;
+        if self.repeat_iterations > MAX_DEM_FLATTEN_REPEAT_ITERATIONS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "DEM {context} currently supports at most {MAX_DEM_FLATTEN_REPEAT_ITERATIONS} expanded repeat iterations, got at least {}",
+                self.repeat_iterations
+            )));
+        }
+        Ok(())
     }
 }
 

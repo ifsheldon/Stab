@@ -1,4 +1,6 @@
 use super::run_from;
+use std::ffi::OsString;
+use tempfile::tempdir;
 
 mod channels;
 mod parity_rows;
@@ -108,6 +110,60 @@ fn analyze_errors_fold_loops_nested_repeat_matches_m10_oracle_golden() {
         )
     );
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn analyze_errors_rejects_oversized_input_file_before_reading() {
+    let dir = tempdir().expect("tempdir");
+    let input_path = dir.path().join("oversized.stim");
+    let file = std::fs::File::create(&input_path).expect("create oversized circuit input");
+    file.set_len(64 * 1024 * 1024 + 1)
+        .expect("mark oversized circuit input");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("analyze_errors"),
+        OsString::from("--in"),
+        input_path.into_os_string(),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(args, b"".as_slice(), &mut stdout, &mut stderr);
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("analyze_errors input is too large; limit is 67108864 bytes")
+    );
+}
+
+#[test]
+fn analyze_errors_rejects_excessive_repeat_nesting() {
+    let mut input = String::new();
+    for _ in 0..257 {
+        input.push_str("REPEAT 1 {\n");
+    }
+    input.push_str("TICK\n");
+    for _ in 0..257 {
+        input.push_str("}\n");
+    }
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "analyze_errors"],
+        input.as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("repeat nesting exceeds current limit 256")
+    );
 }
 
 #[test]

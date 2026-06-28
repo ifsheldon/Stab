@@ -4,6 +4,9 @@ use crate::gate::{ArgRule, TargetGroupKind};
 use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
 use crate::{CircuitError, CircuitResult, Gate, ObservableId, Probability, RepeatCount, Target};
 
+const MAX_CIRCUIT_PARSE_LINES: usize = 1_000_000;
+const MAX_CIRCUIT_REPEAT_NESTING: usize = 256;
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Circuit {
     items: Vec<CircuitItem>,
@@ -474,14 +477,20 @@ impl<'a> Parser<'a> {
     }
 
     fn parse(mut self) -> CircuitResult<Circuit> {
-        let circuit = self.parse_block(false)?;
+        if self.lines.len() > MAX_CIRCUIT_PARSE_LINES {
+            return Err(CircuitError::parse_line(
+                MAX_CIRCUIT_PARSE_LINES.saturating_add(1),
+                format!("circuit input has more than {MAX_CIRCUIT_PARSE_LINES} lines"),
+            ));
+        }
+        let circuit = self.parse_block(false, 0)?;
         if self.index < self.lines.len() {
             return Err(CircuitError::UnexpectedRepeatTerminator);
         }
         Ok(circuit)
     }
 
-    fn parse_block(&mut self, stop_on_terminator: bool) -> CircuitResult<Circuit> {
+    fn parse_block(&mut self, stop_on_terminator: bool, depth: usize) -> CircuitResult<Circuit> {
         let mut circuit = if stop_on_terminator {
             Circuit::new()
         } else {
@@ -504,9 +513,11 @@ impl<'a> Parser<'a> {
                 return Err(CircuitError::UnexpectedRepeatTerminator);
             }
             if let Some(prefix) = line.strip_suffix('{') {
-                circuit.push(CircuitItem::RepeatBlock(
-                    self.parse_repeat(line_number, prefix.trim_end())?,
-                ));
+                circuit.push(CircuitItem::RepeatBlock(self.parse_repeat(
+                    line_number,
+                    prefix.trim_end(),
+                    depth,
+                )?));
             } else {
                 circuit.push_instruction(parse_instruction(line_number, line)?);
             }
@@ -518,7 +529,18 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_repeat(&mut self, line_number: usize, line: &str) -> CircuitResult<RepeatBlock> {
+    fn parse_repeat(
+        &mut self,
+        line_number: usize,
+        line: &str,
+        depth: usize,
+    ) -> CircuitResult<RepeatBlock> {
+        if depth >= MAX_CIRCUIT_REPEAT_NESTING {
+            return Err(CircuitError::parse_line(
+                line_number,
+                format!("repeat nesting exceeds current limit {MAX_CIRCUIT_REPEAT_NESTING}"),
+            ));
+        }
         let (name, rest) = parse_name(line_number, line)?;
         if !name.eq_ignore_ascii_case("REPEAT") {
             return Err(CircuitError::parse_line(
@@ -540,7 +562,7 @@ impl<'a> Parser<'a> {
         let count = count
             .parse::<u64>()
             .map_err(|_| CircuitError::parse_line(line_number, "invalid repeat count"))?;
-        let body = self.parse_block(true)?;
+        let body = self.parse_block(true, depth + 1)?;
         Ok(RepeatBlock::new(RepeatCount::try_new(count)?, body, tag))
     }
 }

@@ -4,6 +4,8 @@
     reason = "unit tests use direct assertions for compact compatibility diagnostics"
 )]
 
+use std::collections::BTreeSet;
+
 use super::*;
 use crate::{
     Circuit, CodeDistance, RepetitionCodeParams, RepetitionCodeTask, RoundCount, SurfaceCodeParams,
@@ -103,6 +105,20 @@ fn generated_qec_dem_rotated_surface_code_semantics_match_pinned_stim() {
     );
 }
 
+#[test]
+fn semantic_dem_treats_graphlike_decomposition_as_equivalent() {
+    let actual = DetectorErrorModel::from_dem_str("error(0.25) D0 D1 ^ D1 D2 L0\n")
+        .expect("decomposed DEM")
+        .semantic_dem()
+        .expect("semantic decomposed DEM");
+    let expected = DetectorErrorModel::from_dem_str("error(0.25) D0 D2 L0\n")
+        .expect("flat DEM")
+        .semantic_dem()
+        .expect("semantic flat DEM");
+
+    assert_semantic_dem_close(&actual, &expected);
+}
+
 fn probability(value: f64) -> Probability {
     Probability::try_new(value).expect("probability")
 }
@@ -156,7 +172,6 @@ struct SemanticDetector {
 enum SemanticTarget {
     Detector(u64),
     LogicalObservable(u64),
-    Separator,
 }
 
 #[derive(Debug, Default)]
@@ -197,11 +212,7 @@ fn collect_semantic_instruction(
                     "error instruction must have one probability argument",
                 )
             })?;
-            let targets = instruction
-                .targets()
-                .iter()
-                .map(|target| semantic_target(*target, state.detector_offset))
-                .collect::<CircuitResult<Vec<_>>>()?;
+            let targets = semantic_error_targets(instruction.targets(), state.detector_offset)?;
             out.errors.push(SemanticError {
                 probability,
                 targets,
@@ -248,20 +259,45 @@ fn collect_semantic_instruction(
     Ok(())
 }
 
-fn semantic_target(target: DemTarget, detector_offset: u64) -> CircuitResult<SemanticTarget> {
-    match target {
-        DemTarget::RelativeDetector(detector) => Ok(SemanticTarget::Detector(
-            detector_offset.checked_add(detector.get()).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model("semantic detector id overflowed")
-            })?,
-        )),
-        DemTarget::LogicalObservable(observable) => {
-            Ok(SemanticTarget::LogicalObservable(observable.get()))
+fn semantic_error_targets(
+    targets: &[DemTarget],
+    detector_offset: u64,
+) -> CircuitResult<Vec<SemanticTarget>> {
+    let mut detectors = BTreeSet::new();
+    let mut logical_observables = BTreeSet::new();
+    for target in targets {
+        match *target {
+            DemTarget::RelativeDetector(detector) => {
+                let detector_id = detector_offset.checked_add(detector.get()).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model("semantic detector id overflowed")
+                })?;
+                toggle(&mut detectors, detector_id);
+            }
+            DemTarget::LogicalObservable(observable) => {
+                toggle(&mut logical_observables, observable.get());
+            }
+            DemTarget::Separator => {}
+            DemTarget::Numeric(_) => {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "numeric targets are not error targets",
+                ));
+            }
         }
-        DemTarget::Separator => Ok(SemanticTarget::Separator),
-        DemTarget::Numeric(_) => Err(CircuitError::invalid_detector_error_model(
-            "numeric targets are not error targets",
-        )),
+    }
+
+    let mut out = Vec::new();
+    out.extend(detectors.into_iter().map(SemanticTarget::Detector));
+    out.extend(
+        logical_observables
+            .into_iter()
+            .map(SemanticTarget::LogicalObservable),
+    );
+    Ok(out)
+}
+
+fn toggle(set: &mut BTreeSet<u64>, value: u64) {
+    if !set.insert(value) {
+        set.remove(&value);
     }
 }
 

@@ -271,6 +271,7 @@ impl Graph {
         model: &DetectorErrorModel,
         ignore_ungraphlike_errors: bool,
     ) -> CircuitResult<Self> {
+        model.validate_flattening_budget("graphlike search")?;
         let node_count = usize::try_from(model.count_detectors()?).map_err(|_| {
             CircuitError::invalid_detector_error_model("detector count does not fit usize")
         })?;

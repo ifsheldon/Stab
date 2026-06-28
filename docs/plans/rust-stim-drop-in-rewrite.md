@@ -410,11 +410,20 @@ Linked tests and benchmarks:
 - Semantic-mining tests: Python detector error model, DEM instruction, DEM target, matched error, and circuit detector-error-model tests.
 - Benchmarks: `src/stim/simulators/error_analyzer.perf.cc`, `.dem` parse/print workloads, and `analyze_errors --decompose_errors` and `--fold_loops` workloads.
 
+M10 ErrorMatcher acceptance is a staged direct-Rust subset, not full parity for every upstream provenance case in `src/stim/simulators/error_matcher.test.cc`.
+The accepted subset is the implemented `coverage-simulators-error-matcher` row, including small direct circuits, generated repetition-code `DEPOLARIZE1`, generated surface-code `DEPOLARIZE2` filter matching, `PAULI_CHANNEL_2` component matching, DEM filtering, representative reduction, coordinate attribution, and matched-error formatting.
+Generated surface-code repeat matching, heralded matching, repeat-contained noise stack frames, and full sparse reverse tracker consumption remain future detector-analysis work until promoted into explicit acceptance rows.
+M10 Python semantic-mining rows are direct Rust or CLI semantic rows only; Python binding APIs remain future work.
+M10 structural DEM equivalence must normalize detector shifts, repeats, floating probabilities within tolerance, and graphlike target decomposition separators where byte-for-byte DEM output is too strict.
+M10 accepts bounded initial resource limits: `analyze_errors` input is capped at 64 MiB, circuit parsing is capped at 1,000,000 lines and 256 nested repeat blocks, and graphlike, hypergraph, and SAT DEM analysis reject flattening plans above 100,000 repeats, 1,000,000 expanded instructions, or 1,000,000 expanded repeat iterations.
+Removing or relaxing these limits requires streaming or folded traversal evidence and matching regression tests.
+
 Done criteria:
 
 - `just oracle::run --milestone M10 --exact` passes DEM parse/print and simple analyzer cases.
-- `just oracle::run --milestone M10 --structural` passes generated QEC circuit DEM equivalence cases.
-- `cargo test -p stab-core dem` covers repeat blocks, detector shifts, coordinates, observables, probabilities, separators, and invalid input.
+- `just oracle::run --milestone M10 --structural` passes generated QEC circuit DEM equivalence cases, direct graphlike and hypergraph rows, SAT rows, sparse reverse tracker rows, ErrorMatcher subset rows, matched-error rows, and Python semantic-mining traceability rows.
+- `cargo test -p stab-core dem` covers repeat blocks, detector shifts, coordinates, observables, probabilities, separators, invalid input, analytical detector counting through large repeats, and bounded DEM flattening for public analysis APIs.
+- `cargo test -p stab-cli m10` covers the staged `analyze_errors` flags plus oversized input and excessive repeat-nesting rejection.
 - `just bench::compare --milestone M10` reports `.dem` parse/print and `analyze_errors` workloads with loop-folding cases included.
 
 ### M11: Detector Error Model Sampling
@@ -542,6 +551,7 @@ Future work is intentionally outside the M0 through M12 core rewrite sequence. S
 - Cirq, Sinter, StimFlow, ZX, and lattice-surgery integrations: treat as ecosystem projects, not core drop-in CLI requirements.
 - Diagrams, `stim explain_errors`, and `stim repl`: plan separately because they need different UX, rendering, and interactivity acceptance checks.
 - QASM and Quirk exports: revisit only if drop-in compatibility scope expands beyond the initial CLI order.
+- Full error-matcher provenance parity: promote generated surface-code repeat matching, heralded matching, repeat-contained noise stack frames, and full sparse reverse tracker consumption into explicit detector-analysis acceptance rows before claiming full `ErrorMatcher` parity.
 - GPU acceleration: run a GPU spike only for `CompiledSampler` and `CompiledDemSampler`, and only if CPU profiles show a large batch-parallel bottleneck.
 - GPU acceptance condition: a future GPU implementation must include a benchmark proving that transfer and launch overhead are amortized for the target batch sizes before production code is accepted.
 

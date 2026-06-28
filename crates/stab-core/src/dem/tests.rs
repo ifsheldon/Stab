@@ -198,6 +198,45 @@ fn dem_counts_detector_shift_detectors_and_observables_through_repeats() {
 }
 
 #[test]
+fn dem_counts_large_repeat_detectors_without_unrolling() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 1000001 {\n    detector D0\n    shift_detectors 1\n}\n",
+    )
+    .unwrap();
+
+    assert_eq!(dem.count_detectors().unwrap(), 1_000_001);
+
+    let shift_only =
+        DetectorErrorModel::from_dem_str("repeat 1000001 {\n    shift_detectors 1\n}\n").unwrap();
+    assert_eq!(shift_only.count_detectors().unwrap(), 0);
+}
+
+#[test]
+fn dem_public_flattening_apis_reject_excessive_repeat_expansion() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0.1) D0\n    shift_detectors 1\n}\nerror(0.1) D0 L0\n",
+    )
+    .unwrap();
+
+    let graphlike_error = shortest_graphlike_undetectable_logical_error(&dem, true)
+        .expect_err("graphlike search should reject hostile repeat expansion")
+        .to_string();
+    assert!(
+        graphlike_error
+            .contains("DEM graphlike search currently supports repeat counts up to 100000"),
+        "{graphlike_error}"
+    );
+
+    let hyper_error = find_undetectable_logical_error(&dem, usize::MAX, usize::MAX, false)
+        .expect_err("hypergraph search should reject hostile repeat expansion")
+        .to_string();
+    assert!(
+        hyper_error.contains("DEM hypergraph search currently supports repeat counts up to 100000"),
+        "{hyper_error}"
+    );
+}
+
+#[test]
 fn dem_shortest_graphlike_logical_error_api_matches_direct_dem() {
     let dem = DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n").unwrap();
 

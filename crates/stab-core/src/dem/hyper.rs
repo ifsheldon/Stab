@@ -188,6 +188,7 @@ impl Graph {
     }
 
     fn from_dem(model: &DetectorErrorModel, max_weight: usize) -> CircuitResult<Self> {
+        model.validate_flattening_budget("hypergraph search")?;
         let node_count = usize::try_from(model.count_detectors()?).map_err(|_| {
             CircuitError::invalid_detector_error_model("detector count does not fit usize")
         })?;

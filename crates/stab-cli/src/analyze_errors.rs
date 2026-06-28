@@ -4,7 +4,9 @@ use std::path::PathBuf;
 use clap::Args;
 use stab_core::{ErrorAnalyzerOptions, Probability, circuit_to_detector_error_model};
 
-use crate::{CliError, parse_circuit_bytes, read_input, write_output};
+use crate::{CliError, parse_circuit_bytes, read_limited_input, write_output};
+
+const MAX_ANALYZE_ERRORS_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug, Args)]
 pub(crate) struct AnalyzeErrorsArgs {
@@ -55,7 +57,12 @@ where
     R: Read,
     W: Write,
 {
-    let input_bytes = read_input(args.input.as_ref(), input)?;
+    let input_bytes = read_limited_input(
+        args.input.as_ref(),
+        input,
+        MAX_ANALYZE_ERRORS_INPUT_BYTES,
+        "analyze_errors input",
+    )?;
     let circuit = parse_circuit_bytes(&input_bytes)?;
     let dem = circuit_to_detector_error_model(
         &circuit,

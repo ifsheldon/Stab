@@ -30,6 +30,24 @@ Resolution: unresolved.
 
 ## Resolved Entries
 
+## 2026-06-28 - M10: ErrorMatcher Repeat-Contained Noise Scope
+
+Status: Resolved
+Revealed by: milestone audit and full-code-review of the M10 detector-analysis implementation.
+Current text: M10 linked `src/stim/simulators/error_matcher.test.cc` as an analyzer test source and required structural oracle rows, but the roadmap did not say whether the milestone had to port every upstream ErrorMatcher provenance case.
+Gap: current Stab error matching covers a staged subset, while upstream repeat-contained noise stack frames, generated surface-code repeat matching, heralded matching, and full sparse reverse tracker consumption require broader detector-analysis provenance work than the M10 done criteria named.
+Proposed amendment: define M10 ErrorMatcher acceptance as the implemented staged direct-Rust subset and add a future detector-analysis item for the remaining provenance cases before claiming full ErrorMatcher parity.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now states that M10 accepts the implemented `coverage-simulators-error-matcher` subset only, names repeat-contained noise stack frames and related generated-circuit cases as future detector-analysis work, and adds that work to the Future Plan.
+
+## 2026-06-28 - M10: Initial Analyzer Resource Limits
+
+Status: Resolved
+Revealed by: full-code-review of M10 public DEM analysis and `stab analyze_errors` input handling.
+Current text: M10 required loop folding without accidental high-repeat flattening and linked graphlike, hypergraph, SAT, and analyzer workflows, but it did not specify temporary resource limits for the first compatible implementation.
+Gap: without explicit caps, public APIs could try to flatten huge DEM repeats and `stab analyze_errors` could accept oversized circuit input or deeply nested repeats before the milestone had streaming or folded traversal support.
+Proposed amendment: document accepted temporary limits for CLI input, circuit parser nesting, and DEM flattening-heavy analysis paths, require rejection tests for those limits, and require future streaming or folded traversal evidence before relaxing them.
+Resolution: M10 now documents a 64 MiB `analyze_errors` input cap, a 1,000,000 line circuit parser cap, a 256 repeat-nesting cap, and DEM analysis flattening caps of 100,000 repeats, 1,000,000 expanded instructions, and 1,000,000 expanded repeat iterations. Evidence includes `analyze_errors_rejects_oversized_input_file_before_reading`, `analyze_errors_rejects_excessive_repeat_nesting`, `parser_rejects_excessive_repeat_nesting`, `dem_counts_large_repeat_detectors_without_unrolling`, `dem_public_flattening_apis_reject_excessive_repeat_expansion`, and `sat_problem_rejects_excessive_repeat_expansion`.
+
 ## 2026-06-28 - M12: Resident Memory Peak Wording
 
 Status: Resolved

@@ -858,6 +858,26 @@ fn parser_reports_invalid_gate_target_and_repeat_errors() {
 }
 
 #[test]
+fn parser_rejects_excessive_repeat_nesting() {
+    let mut input = String::new();
+    for _ in 0..257 {
+        input.push_str("REPEAT 1 {\n");
+    }
+    input.push_str("TICK\n");
+    for _ in 0..257 {
+        input.push_str("}\n");
+    }
+
+    let error = Circuit::from_stim_str(&input)
+        .expect_err("repeat nesting should be bounded")
+        .to_string();
+    assert!(
+        error.contains("repeat nesting exceeds current limit 256"),
+        "{error}"
+    );
+}
+
+#[test]
 fn parser_rejects_inverted_targets_except_result_gates_like_stim() {
     // Adapted from Stim v1.16.0 src/stim/circuit/circuit.test.cc append_op_validation.
     assert!(Circuit::from_stim_str("M !0\n").is_ok());

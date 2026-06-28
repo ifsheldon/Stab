@@ -251,6 +251,7 @@ fn sat_problem_as_wcnf_string(
     model: &DetectorErrorModel,
     mode: SatProblemMode,
 ) -> CircuitResult<String> {
+    model.validate_flattening_budget("SAT problem generation")?;
     let errors = flattened_error_instructions(model)?;
     let num_observables = usize::try_from(model.count_observables()?).map_err(|_| {
         CircuitError::invalid_detector_error_model("observable count does not fit usize")
@@ -637,6 +638,33 @@ p wcnf 3 7 8
 8 -3 0
 8 3 0
 "
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sat_problem_rejects_excessive_repeat_expansion() -> CircuitResult<()> {
+        let model = dem("\
+repeat 100001 {
+    error(0.1) D0
+    shift_detectors 1
+}
+error(0.1) D0 L0
+")?;
+
+        let error = match shortest_error_sat_problem(&model) {
+            Ok(output) => {
+                return Err(crate::CircuitError::invalid_detector_error_model(format!(
+                    "SAT problem generation accepted hostile repeat expansion: {output}"
+                )));
+            }
+            Err(error) => error.to_string(),
+        };
+        assert!(
+            error.contains(
+                "DEM SAT problem generation currently supports repeat counts up to 100000"
+            ),
+            "{error}"
         );
         Ok(())
     }
