@@ -19,6 +19,42 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
+## 2026-06-28 - M12: Primary Row Comparability Classes
+
+Status: Open
+Revealed by: milestone audit of M12 beta-gate evidence and full code review of direct-match benchmark rows.
+Current text: M12 says comparable primary rows must pass the 2.0x beta gate, and measured `contract-only` rows may pass only with source-owned waivers.
+Gap: the milestone does not define the allowed comparability classes precisely enough for mixed rows such as direct internal perf matches, public CLI baselines, contract-representative in-process measurements, report-only rows, partial matches, and contract proxies.
+Proposed amendment: define benchmark comparability classes such as `direct-match`, `cli-baseline`, `contract-representative`, `report-only`, `partial-match`, and `contract-proxy`; state which classes may satisfy beta, which require waivers, and which must remain follow-up evidence only.
+Resolution: unresolved; the current implementation tightens direct-match rows with paired submeasurement ratios, but the milestone text still needs a complete comparability taxonomy.
+
+## 2026-06-28 - M12: Profile Evidence Timing
+
+Status: Open
+Revealed by: milestone audit of M12 profiler-note evidence.
+Current text: M12 says to profile every benchmark that is slower than the beta gate before optimizing it, and source-owned compare runs require notes for rows slower than 1.5x pinned Stim.
+Gap: the milestone does not say whether completion evidence requires pre-optimization profiler captures, final-current profiler notes for rows still slower than 1.5x, or both.
+Proposed amendment: choose a durable rule: either require pre-optimization notes for every row optimized during M12, or require final-current notes only for rows still slower than 1.5x and separate optimization logs for rows that were fixed.
+Resolution: unresolved.
+
+## 2026-06-28 - M12: Memory Gate Metric Scope
+
+Status: Open
+Revealed by: milestone audit of M12 memory-gate evidence.
+Current text: M12 says no primary workload may regress peak allocations or resident memory by more than 25 percent relative to the first complete Stab benchmark report.
+Gap: the current memory gate tracks Stab-side allocation counts and maximum live allocated bytes, but it does not measure resident set size.
+Proposed amendment: either narrow the done criterion to allocation counts and maximum live allocated bytes, or add RSS measurement to the benchmark report and memory gate before M12 completion.
+Resolution: unresolved.
+
+## 2026-06-28 - M12: Regression Threshold Automation
+
+Status: Open
+Revealed by: milestone audit of M12 regression-threshold evidence.
+Current text: M12 says workloads already at or below 1.25x Stim have benchmark thresholds checked by CI smoke or scheduled benchmark automation.
+Gap: the repository has source-owned threshold files and local `just bench::primary-regression` evidence, but no checked CI or scheduled automation currently runs the full threshold gate.
+Proposed amendment: add a CI or scheduled benchmark workflow for the full threshold gate, or revise the done criterion to accept archived local reports plus a lighter CI smoke command.
+Resolution: unresolved.
+
 ## Resolved Entries
 
 ## 2026-06-28 - M12: Beta Gate Scope For Contract-Only Primary Rows

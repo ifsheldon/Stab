@@ -1,0 +1,2 @@
+Dominant cost: the direct error-decomposition row is dominated by tiny independent/disjoint XYZ conversion filters, especially the sub-nanosecond pinned Stim `independent_to_disjoint_xyz_errors` and exact disjoint-to-independent cases where single-call timing overhead can obscure the arithmetic cost.
+Next owner action: keep the Stab-side direct-match filters batched in the benchmark harness, then profile the independent/disjoint conversion arithmetic separately before adding this row to the 1.25x regression threshold file.

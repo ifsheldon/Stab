@@ -12,7 +12,8 @@ use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner};
 use crate::memory_gate::{apply_memory_gate, read_memory_baseline};
 use crate::report::{
     BaselineReport, CompareCommandMetadata, CompareReport, CompareRowResult, Measurement,
-    machine_metadata, render_compare_markdown_report, stab_metadata, unix_epoch_seconds,
+    MeasurementRatio, machine_metadata, render_compare_markdown_report, stab_metadata,
+    unix_epoch_seconds,
 };
 use crate::root::RepoRoot;
 use crate::thresholds::{apply_regression_thresholds, read_thresholds};
@@ -436,11 +437,23 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
     } = input;
     let stim_median_seconds = median_seconds(&stim_measurements);
     let stab_median_seconds = median_seconds(&stab_measurements);
-    let relative_ratio = match (stim_median_seconds, stab_median_seconds) {
+    let median_relative_ratio = match (stim_median_seconds, stab_median_seconds) {
         (Some(stim_seconds), Some(stab_seconds)) if stim_seconds > 0.0 => {
             Some(stab_seconds / stim_seconds)
         }
         _ => None,
+    };
+    let measurement_ratios =
+        paired_measurement_ratios(&stim_measurements, &stab_measurements, note.as_deref());
+    let worst_paired_relative_ratio = measurement_ratios
+        .iter()
+        .map(|ratio| ratio.relative_ratio)
+        .max_by(f64::total_cmp);
+    let relative_ratio = match (median_relative_ratio, worst_paired_relative_ratio) {
+        (Some(median), Some(worst_paired)) => Some(median.max(worst_paired)),
+        (Some(median), None) => Some(median),
+        (None, Some(worst_paired)) => Some(worst_paired),
+        (None, None) => None,
     };
     let stab_allocation_count_max = max_stab_allocation_count(&stab_measurements);
     let stab_allocation_bytes_max = max_stab_allocation_bytes(&stab_measurements);
@@ -461,6 +474,7 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         stim_median_seconds,
         stab_median_seconds,
         relative_ratio,
+        measurement_ratios,
         stab_allocation_count_max,
         stab_allocation_bytes_max,
         pass_fail_status: compare_pass_fail_status(status, baseline_status, relative_ratio),
@@ -479,6 +493,73 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         profiler_note_path: None,
         profiler_note_error: None,
     }
+}
+
+fn paired_measurement_ratios(
+    stim_measurements: &[Measurement],
+    stab_measurements: &[Measurement],
+    note: Option<&str>,
+) -> Vec<MeasurementRatio> {
+    let mut ratios = exact_name_measurement_ratios(stim_measurements, stab_measurements);
+    if ratios.is_empty()
+        && note.is_some_and(|note| note.starts_with("direct-match:"))
+        && stim_measurements.len() == stab_measurements.len()
+    {
+        ratios = positional_measurement_ratios(stim_measurements, stab_measurements);
+    }
+    ratios
+}
+
+fn exact_name_measurement_ratios(
+    stim_measurements: &[Measurement],
+    stab_measurements: &[Measurement],
+) -> Vec<MeasurementRatio> {
+    let mut ratios = Vec::new();
+    let mut available_stab = stab_measurements.iter().collect::<Vec<_>>();
+    for stim in stim_measurements {
+        let stim_key = normalized_measurement_name(&stim.name);
+        let Some(stab_index) = available_stab
+            .iter()
+            .position(|stab| normalized_measurement_name(&stab.name) == stim_key)
+        else {
+            continue;
+        };
+        let stab = available_stab.remove(stab_index);
+        if let Some(ratio) = measurement_ratio(stim, stab) {
+            ratios.push(ratio);
+        }
+    }
+    ratios
+}
+
+fn positional_measurement_ratios(
+    stim_measurements: &[Measurement],
+    stab_measurements: &[Measurement],
+) -> Vec<MeasurementRatio> {
+    stim_measurements
+        .iter()
+        .zip(stab_measurements)
+        .filter_map(|(stim, stab)| measurement_ratio(stim, stab))
+        .collect()
+}
+
+fn measurement_ratio(stim: &Measurement, stab: &Measurement) -> Option<MeasurementRatio> {
+    (stim.seconds > 0.0).then(|| MeasurementRatio {
+        stim_name: stim.name.clone(),
+        stab_name: stab.name.clone(),
+        stim_seconds: stim.seconds,
+        stab_seconds: stab.seconds,
+        relative_ratio: stab.seconds / stim.seconds,
+    })
+}
+
+fn normalized_measurement_name(name: &str) -> String {
+    name.strip_prefix("stab_")
+        .unwrap_or(name)
+        .chars()
+        .filter(|character| *character != '_')
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 fn max_stab_allocation_count(measurements: &[Measurement]) -> Option<u64> {
@@ -785,20 +866,93 @@ mod tests {
         assert_eq!(result.stab_allocation_bytes_max, Some(2048));
     }
 
+    #[test]
+    fn compare_row_result_uses_worst_exact_submeasurement_ratio() {
+        let row = benchmark_row("paired-row");
+
+        let result = build_compare_row_result(CompareRowBuild {
+            row: &row,
+            status: "measured",
+            baseline_summary: "stim",
+            stab_summary: "stab",
+            note: None,
+            stim_measurements: vec![measurement("foo_bar", 1.0), measurement("tiny_case", 0.1)],
+            stab_measurements: vec![
+                measurement("stab_foo_bar", 1.2),
+                measurement("stab_tiny_case", 0.4),
+            ],
+            baseline_status: BaselineCompareStatus::Comparable,
+        });
+
+        assert_eq!(result.stim_median_seconds, Some(1.0));
+        assert_eq!(result.stab_median_seconds, Some(1.2));
+        assert_eq!(result.relative_ratio, Some(4.0));
+        assert_eq!(result.pass_fail_status, "fail");
+        assert_eq!(result.measurement_ratios.len(), 2);
+    }
+
+    #[test]
+    fn direct_match_rows_use_positional_submeasurement_ratios_when_names_differ() {
+        let row = benchmark_row("m5-sparse-xor");
+
+        let result = build_compare_row_result(CompareRowBuild {
+            row: &row,
+            status: "measured",
+            baseline_summary: "stim",
+            stab_summary: "stab",
+            note: Some("direct-match: same sparse xor filters".to_string()),
+            stim_measurements: vec![
+                measurement("SparseXorTable_SmallRowXor_1000", 0.000015),
+                measurement("SparseXorVec_XorItem", 0.000000015),
+            ],
+            stab_measurements: vec![
+                measurement("stab_sparse_table_row_xor_1000", 0.000019),
+                measurement("stab_sparse_xor_item_7", 0.000000080),
+            ],
+            baseline_status: BaselineCompareStatus::Comparable,
+        });
+
+        assert_eq!(result.stim_median_seconds, Some(0.000015));
+        assert_eq!(result.stab_median_seconds, Some(0.000019));
+        assert!(result.relative_ratio.is_some_and(|ratio| ratio > 5.0));
+        assert_eq!(result.pass_fail_status, "fail");
+        assert_eq!(
+            result
+                .measurement_ratios
+                .iter()
+                .map(|ratio| ratio.stab_name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["stab_sparse_table_row_xor_1000", "stab_sparse_xor_item_7"]
+        );
+    }
+
+    #[test]
+    fn compare_row_result_keeps_median_ratio_when_it_exceeds_paired_ratio() {
+        let row = benchmark_row("paired-row");
+
+        let result = build_compare_row_result(CompareRowBuild {
+            row: &row,
+            status: "measured",
+            baseline_summary: "stim",
+            stab_summary: "stab",
+            note: None,
+            stim_measurements: vec![
+                measurement("fast_case", 1.0),
+                measurement("slow_case", 10.0),
+            ],
+            stab_measurements: vec![
+                measurement("stab_fast_case", 1.1),
+                measurement("stab_slow_case", 12.0),
+            ],
+            baseline_status: BaselineCompareStatus::Comparable,
+        });
+
+        assert_eq!(result.relative_ratio, Some(1.2));
+        assert_eq!(result.pass_fail_status, "pass");
+    }
+
     fn compare_row(id: &str, ratio: Option<f64>) -> crate::report::CompareRowResult {
-        let row = BenchmarkRow {
-            id: id.to_string(),
-            milestone: Milestone::M12,
-            threshold_class: "performance-gate".to_string(),
-            runner: Runner::StimPerf,
-            upstream_source: "future/performance-primary-matrix".to_string(),
-            stim_perf_filter: "test".to_string(),
-            argv: String::new(),
-            stdin_path: String::new(),
-            phase: "performance-hardening".to_string(),
-            measurement: "primary-matrix".to_string(),
-            description: "test row".to_string(),
-        };
+        let row = benchmark_row(id);
         let stim_measurements = ratio.map_or_else(Vec::new, |_| {
             vec![Measurement {
                 name: "stim".to_string(),
@@ -827,5 +981,31 @@ mod tests {
             stab_measurements,
             baseline_status: BaselineCompareStatus::Comparable,
         })
+    }
+
+    fn benchmark_row(id: &str) -> BenchmarkRow {
+        BenchmarkRow {
+            id: id.to_string(),
+            milestone: Milestone::M12,
+            threshold_class: "performance-gate".to_string(),
+            runner: Runner::StimPerf,
+            upstream_source: "future/performance-primary-matrix".to_string(),
+            stim_perf_filter: "test".to_string(),
+            argv: String::new(),
+            stdin_path: String::new(),
+            phase: "performance-hardening".to_string(),
+            measurement: "primary-matrix".to_string(),
+            description: "test row".to_string(),
+        }
+    }
+
+    fn measurement(name: &str, seconds: f64) -> Measurement {
+        Measurement {
+            name: name.to_string(),
+            seconds,
+            variance_seconds: None,
+            allocation: None,
+            iterations: None,
+        }
     }
 }

@@ -349,6 +349,7 @@ mod tests {
             stim_median_seconds: None,
             stab_median_seconds: ratio,
             relative_ratio: ratio,
+            measurement_ratios: Vec::new(),
             stab_allocation_count_max: None,
             stab_allocation_bytes_max: None,
             pass_fail_status: pass_fail_status.to_string(),

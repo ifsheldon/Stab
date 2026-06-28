@@ -285,6 +285,7 @@ mod tests {
             stim_median_seconds: None,
             stab_median_seconds: None,
             relative_ratio: None,
+            measurement_ratios: Vec::new(),
             stab_allocation_count_max: None,
             stab_allocation_bytes_max: bytes,
             pass_fail_status: "not-comparable".to_string(),

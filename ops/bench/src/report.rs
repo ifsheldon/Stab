@@ -86,6 +86,15 @@ pub(crate) struct Measurement {
     pub(crate) iterations: Option<usize>,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub(crate) struct MeasurementRatio {
+    pub(crate) stim_name: String,
+    pub(crate) stab_name: String,
+    pub(crate) stim_seconds: f64,
+    pub(crate) stab_seconds: f64,
+    pub(crate) relative_ratio: f64,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct AllocationMeasurement {
     pub(crate) count_total: u64,
@@ -148,6 +157,8 @@ pub(crate) struct CompareRowResult {
     pub(crate) stab_median_seconds: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) relative_ratio: Option<f64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) measurement_ratios: Vec<MeasurementRatio>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) stab_allocation_count_max: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -297,13 +308,13 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
         "- Machine: {} {} with {} worker(s)\n\n",
         report.machine.os, report.machine.arch, report.machine.available_parallelism
     ));
-    out.push_str("| Benchmark | Milestone | Status | Pass/Fail | Beta Gate | Stim Median | Stab Median | Ratio | Stab Alloc Max | Memory Gate | Regression Threshold | Profiler Note | Note |\n");
+    out.push_str("| Benchmark | Milestone | Status | Pass/Fail | Beta Gate | Stim Median | Stab Median | Ratio | Ratio Source | Stab Alloc Max | Memory Gate | Regression Threshold | Profiler Note | Note |\n");
     out.push_str(
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n",
     );
     for row in &report.rows {
         out.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
             row.id,
             row.milestone.as_str(),
             row.status,
@@ -312,6 +323,7 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
             format_optional_seconds(row.stim_median_seconds),
             format_optional_seconds(row.stab_median_seconds),
             format_optional_ratio(row.relative_ratio),
+            format_ratio_source(row),
             format_optional_bytes(row.stab_allocation_bytes_max),
             format_memory_gate(row),
             format_regression_threshold(row),
@@ -345,6 +357,18 @@ fn format_optional_seconds(seconds: Option<f64>) -> String {
 
 fn format_optional_ratio(ratio: Option<f64>) -> String {
     ratio.map_or_else(String::new, |ratio| format!("{ratio:.3}x"))
+}
+
+fn format_ratio_source(row: &CompareRowResult) -> String {
+    row.measurement_ratios
+        .iter()
+        .max_by(|left, right| left.relative_ratio.total_cmp(&right.relative_ratio))
+        .map_or_else(String::new, |ratio| {
+            format!(
+                "{} / {} = {:.3}x",
+                ratio.stab_name, ratio.stim_name, ratio.relative_ratio
+            )
+        })
 }
 
 fn format_optional_bytes(bytes: Option<u64>) -> String {

@@ -191,7 +191,7 @@ mod tests {
         let thresholds = read_thresholds(&path).expect("read source-owned M12 thresholds");
 
         assert_eq!(thresholds.schema_version, 1);
-        assert_eq!(thresholds.rows.len(), 63);
+        assert_eq!(thresholds.rows.len(), 62);
         assert!(
             thresholds
                 .rows
@@ -218,6 +218,7 @@ mod tests {
             stim_median_seconds: None,
             stab_median_seconds: None,
             relative_ratio: ratio,
+            measurement_ratios: Vec::new(),
             stab_allocation_count_max: None,
             stab_allocation_bytes_max: None,
             pass_fail_status: "not-comparable".to_string(),

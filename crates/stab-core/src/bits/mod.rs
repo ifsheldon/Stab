@@ -567,14 +567,20 @@ impl SparseXorVec {
     }
 
     pub fn xor_item(&mut self, item: u32) {
-        match self.items.binary_search(&item) {
-            Ok(index) => {
-                self.items.remove(index);
-            }
-            Err(index) => {
-                self.items.insert(index, item);
+        for (index, existing) in self.items.iter().enumerate() {
+            match existing.cmp(&item) {
+                std::cmp::Ordering::Less => {}
+                std::cmp::Ordering::Equal => {
+                    self.items.remove(index);
+                    return;
+                }
+                std::cmp::Ordering::Greater => {
+                    self.items.insert(index, item);
+                    return;
+                }
             }
         }
+        self.items.push(item);
     }
 
     pub fn xor_assign(&mut self, rhs: &Self) {

@@ -12,7 +12,10 @@ use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
 
-use super::{measure_stab, measure_stab_iterations, stab_runner_error};
+use super::{
+    TINY_DIRECT_COMPARE_REPETITIONS, measure_stab, measure_stab_batched, measure_stab_iterations,
+    stab_runner_error,
+};
 
 const SAMPLE_NOISY_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/sample_noisy.stim");
@@ -239,7 +242,7 @@ fn run_probability_util_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Benc
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             let mut rng = SmallRng::seed_from_u64(0);
             let mut words = [0u64; PROBABILITY_UTIL_WORDS];
-            measure_stab_iterations(name, super::STAB_COMPARE_ITERATIONS, || {
+            measure_stab_batched(name, TINY_DIRECT_COMPARE_REPETITIONS, || {
                 biased_randomize_bits(probability, &mut words, &mut rng);
                 black_box(&words);
                 Ok(())

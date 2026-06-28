@@ -6,7 +6,6 @@
     { "id": "m10-analyze-errors-high-repeat-contract", "max_relative_ratio": 1.25 },
     { "id": "m10-dem-parse-contract", "max_relative_ratio": 1.25 },
     { "id": "m10-error-analyzer", "max_relative_ratio": 1.25 },
-    { "id": "m10-error-decomp", "max_relative_ratio": 1.25 },
     { "id": "m10-graphlike-search", "max_relative_ratio": 1.25 },
     { "id": "m11-dem-sampler", "max_relative_ratio": 1.25 },
     { "id": "m11-sample-dem-cli", "max_relative_ratio": 1.25 },

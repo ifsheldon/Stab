@@ -11,7 +11,10 @@ use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
 
-use super::{STAB_COMPARE_ITERATIONS, measure_stab_iterations, stab_runner_error};
+use super::{
+    STAB_COMPARE_ITERATIONS, TINY_DIRECT_COMPARE_REPETITIONS, measure_stab_batched,
+    measure_stab_iterations, stab_runner_error,
+};
 
 const DEM_PARSE_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/sample_dem_deterministic.dem");
@@ -205,39 +208,55 @@ fn run_error_decomp_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErr
     let p30 = Probability::try_new(0.3).map_err(|error| stab_runner_error(&row.id, error))?;
     let zero = Probability::try_new(0.0).map_err(|error| stab_runner_error(&row.id, error))?;
     Ok(vec![
-        measure_stab_iterations(
+        measure_stab_batched(
             "stab_independent_to_disjoint_xyz_errors",
-            STAB_COMPARE_ITERATIONS,
+            TINY_DIRECT_COMPARE_REPETITIONS,
             || {
-                black_box(independent_to_disjoint_xyz_errors(p10, p20, p30))
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(independent_to_disjoint_xyz_errors(
+                    black_box(p10),
+                    black_box(p20),
+                    black_box(p30),
+                ))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
                 Ok(())
             },
         )?,
-        measure_stab_iterations(
+        measure_stab_batched(
             "stab_disjoint_to_independent_xyz_errors_approx_exact",
-            STAB_COMPARE_ITERATIONS,
+            TINY_DIRECT_COMPARE_REPETITIONS,
             || {
-                black_box(try_disjoint_to_independent_xyz_errors(p10, p20, p15))
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(try_disjoint_to_independent_xyz_errors(
+                    black_box(p10),
+                    black_box(p20),
+                    black_box(p15),
+                ))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
                 Ok(())
             },
         )?,
-        measure_stab_iterations(
+        measure_stab_batched(
             "stab_disjoint_to_independent_xyz_errors_approx_p10",
-            STAB_COMPARE_ITERATIONS,
+            TINY_DIRECT_COMPARE_REPETITIONS,
             || {
-                black_box(try_disjoint_to_independent_xyz_errors(p10, p20, zero))
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(try_disjoint_to_independent_xyz_errors(
+                    black_box(p10),
+                    black_box(p20),
+                    black_box(zero),
+                ))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
                 Ok(())
             },
         )?,
-        measure_stab_iterations(
+        measure_stab_batched(
             "stab_disjoint_to_independent_xyz_errors_approx_p100",
-            STAB_COMPARE_ITERATIONS,
+            TINY_DIRECT_COMPARE_REPETITIONS,
             || {
-                black_box(try_disjoint_to_independent_xyz_errors(p01, p02, zero))
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(try_disjoint_to_independent_xyz_errors(
+                    black_box(p01),
+                    black_box(p02),
+                    black_box(zero),
+                ))
+                .map_err(|error| stab_runner_error(&row.id, error))?;
                 Ok(())
             },
         )?,

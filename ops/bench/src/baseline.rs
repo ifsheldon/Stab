@@ -38,6 +38,7 @@ const M5_BITVEC_BITS: usize = 10_000;
 const M5_POPCOUNT_BITS: usize = 1024 * 256;
 const M5_SPARSE_ROWS_USIZE: usize = 1000;
 const M5_SPARSE_ROWS_U32: u32 = 1000;
+const TINY_DIRECT_COMPARE_REPETITIONS: usize = 4096;
 const M6_CLIFFORD_QUBITS: usize = 10_000;
 const M6_PAULI_CASES: [(&str, usize); 3] = [
     ("stab_pauli_string_multiplication_1M", 1_000_000),
@@ -358,13 +359,17 @@ pub(crate) fn run_stab_compare_row(
                     );
                     Ok(())
                 })?,
-                measure_stab("stab_sparse_xor_item_7", || {
-                    for item in xor_items {
-                        buf.xor_item(item);
-                    }
-                    black_box(buf.items().len());
-                    Ok(())
-                })?,
+                measure_stab_batched(
+                    "stab_sparse_xor_item_7",
+                    TINY_DIRECT_COMPARE_REPETITIONS,
+                    || {
+                        for item in xor_items {
+                            buf.xor_item(item);
+                        }
+                        black_box(buf.items().len());
+                        Ok(())
+                    },
+                )?,
             ]))
         }
         "m6-clifford-string" => {
@@ -670,6 +675,48 @@ fn measure_stab_iterations(
     })
 }
 
+fn measure_stab_batched(
+    name: &str,
+    repetitions: usize,
+    mut operation: impl FnMut() -> Result<(), BenchError>,
+) -> Result<Measurement, BenchError> {
+    measure_stab_batched_iterations(name, STAB_COMPARE_ITERATIONS, repetitions, &mut operation)
+}
+
+fn measure_stab_batched_iterations(
+    name: &str,
+    iterations: usize,
+    repetitions: usize,
+    mut operation: impl FnMut() -> Result<(), BenchError>,
+) -> Result<Measurement, BenchError> {
+    let mut timings = Vec::with_capacity(iterations);
+    for _ in 0..iterations {
+        let start = Instant::now();
+        for _ in 0..repetitions {
+            operation()?;
+        }
+        timings.push(start.elapsed().div_f64(repetitions as f64));
+    }
+    let variance_seconds = duration_variance_seconds(&timings);
+    timings.sort();
+    let seconds = timings
+        .get(timings.len() / 2)
+        .map(Duration::as_secs_f64)
+        .unwrap_or_default();
+    Ok(Measurement {
+        name: name.to_string(),
+        seconds,
+        variance_seconds,
+        allocation: measure_allocations(|| {
+            for _ in 0..repetitions {
+                operation()?;
+            }
+            Ok(())
+        })?,
+        iterations: Some(iterations),
+    })
+}
+
 pub(crate) fn summarize_measurements(measurements: &[Measurement]) -> String {
     measurements
         .iter()
@@ -810,6 +857,9 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m5-simd-bits" => Some(
             "partial-match: xor/not_zero use upstream 10k size; masked/range/copy are Stab M5 contract extras; randomize is not implemented in M5",
+        ),
+        "m5-sparse-xor" => Some(
+            "direct-match: Stab measures sparse table row XOR and sparse item XOR against the pinned Stim sparse_xor_vec perf filters",
         ),
         "m6-clifford-string" => Some(
             "direct-match: Stab measures in-place 10K CliffordString multiplication against the pinned Stim perf filter",

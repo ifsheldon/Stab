@@ -24,6 +24,11 @@ Pass `--baseline <path>` to compare against a different generated baseline repor
 Pass `--primary` to select the frozen M12 primary matrix, which currently includes M4 through M11 benchmark rows except metadata anchors and the M12 placeholder row.
 Pass `--profile release` to record the intended Cargo profile in compare output; the `just bench::compare` recipe builds the benchmark ops binary with Cargo's release profile before running the subcommand.
 Pass `--report target/benchmarks/latest` or another repository-relative directory below `target/benchmarks/` to write `compare.json` and `report.md`.
+Compare row ratios use paired measurement ratios when comparable submeasurements are available.
+Pairs are matched by normalized measurement names, or by position for rows whose compare note starts with `direct-match:` and whose Stim and Stab measurement counts match.
+When paired ratios exist, beta and regression gates use the worse of the row median ratio and the worst paired ratio; otherwise they use the row median ratio.
+The JSON report records paired evidence in `measurement_ratios`, and the Markdown report prints the worst pair in the `Ratio Source` column.
+Tiny direct-match Stab measurements may use batched timing to reduce clock-noise dominance, but they still report seconds per operation.
 Pass `--require-beta-gate` to fail when any selected row does not prove a pass against the 2.0x pinned-Stim beta performance gate.
 Pass `--beta-waivers <path>` with `--require-beta-gate` to accept only measured `contract-only` rows whose lack of a comparable pinned-Stim ratio is explained by a source-owned waiver.
 Waivers do not apply to missing baselines, pending runners, invalid baselines, or rows with measured ratios above the beta gate.

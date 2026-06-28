@@ -492,6 +492,9 @@ For M12 benchmark operations, the frozen primary matrix is every benchmark contr
 The M12 `performance-gate` placeholder row documents the gate and is not itself part of `just bench::compare --primary`.
 Completion-style performance runs should pass `--require-beta-gate`.
 Rows with faithful pinned-Stim baselines must prove a ratio no slower than the 2.0x beta performance gate.
+When a row has comparable submeasurements, compare reports pair Stim and Stab measurements by normalized name or by direct-match position and use the worse of the row median ratio and the worst paired submeasurement ratio for beta and regression gates.
+Rows without paired submeasurement evidence keep using the row median ratio.
+Tiny direct-match Stab measurements may batch repeated operations to reduce clock noise, but reported timing must remain normalized to seconds per operation.
 Measured `contract-only` rows that cannot have a faithful pinned-Stim ratio may pass the gate only when `--beta-waivers <path>` names a source-owned JSON waiver with a non-empty reason and follow-up; waiver files must reject stale entries, missing baselines, pending runners, invalid baselines, and rows with measured ratios above the beta gate.
 Profiler notes for compare reports live beside the report under `<report>/profiler-notes/<benchmark-id>.md`.
 When `--require-profiler-notes` is passed, every row slower than 1.5x pinned Stim must have a note with non-empty `Dominant cost:` and `Next owner action:` lines.
