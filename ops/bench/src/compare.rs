@@ -519,6 +519,9 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         .map(|ratio| ratio.relative_ratio)
         .max_by(f64::total_cmp);
     let relative_ratio = match (median_relative_ratio, worst_paired_relative_ratio) {
+        (_, Some(worst_paired)) if comparability.uses_paired_ratios_without_mixed_median() => {
+            Some(worst_paired)
+        }
         (Some(median), Some(worst_paired)) => Some(median.max(worst_paired)),
         (Some(median), None) => Some(median),
         (None, Some(worst_paired)) => Some(worst_paired),
@@ -967,6 +970,34 @@ mod tests {
 
         assert_eq!(result.relative_ratio, Some(1.2));
         assert_eq!(result.pass_fail_status, "pass");
+    }
+
+    #[test]
+    fn partial_match_row_result_uses_paired_ratio_without_mixed_median() {
+        let row = benchmark_row("m5-simd-bits");
+
+        let result = build_compare_row_result(CompareRowBuild {
+            row: &row,
+            status: "measured",
+            baseline_summary: "stim",
+            stab_summary: "stab",
+            note: Some("partial-match: one direct pair plus unmatched contract extras".to_string()),
+            stim_measurements: vec![
+                measurement("simd_bits_randomize_10K", 0.1),
+                measurement("simd_bits_xor_10K", 1.0),
+            ],
+            stab_measurements: vec![
+                measurement("stab_simd_bits_xor_10K", 0.5),
+                measurement("stab_bitvec_range_xor_4096_contract", 10.0),
+            ],
+            baseline_status: BaselineCompareStatus::Comparable,
+        });
+
+        assert_eq!(result.stim_median_seconds, Some(1.0));
+        assert_eq!(result.stab_median_seconds, Some(10.0));
+        assert_eq!(result.relative_ratio, Some(0.5));
+        assert_eq!(result.pass_fail_status, "pass");
+        assert_eq!(result.stab_measurements.len(), 2);
     }
 
     #[test]

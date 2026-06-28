@@ -66,6 +66,10 @@ impl ComparabilityClass {
     pub(crate) fn allows_positional_measurement_pairs(self) -> bool {
         self == Self::DirectMatch
     }
+
+    pub(crate) fn uses_paired_ratios_without_mixed_median(self) -> bool {
+        self == Self::PartialMatch
+    }
 }
 
 fn note_prefix(note: &str) -> Option<&str> {

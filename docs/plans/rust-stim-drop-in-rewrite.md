@@ -512,7 +512,8 @@ Compare reports must record a machine-readable comparability class for every row
 `direct-match` and `cli-baseline` rows are the strongest beta evidence classes because they match either pinned Stim internal operation shape or the same public CLI command and input.
 `contract-representative`, `contract-proxy`, `contract-smoke`, `partial-match`, and `report-only` rows may count only as scoped M12 beta evidence when their compare note explains the representative surface, proxy, smoke scope, missing subcases, or non-exact workload.
 `contract-only` rows cannot prove a Stab-vs-Stim timing ratio and require source-owned beta waivers while they remain selected by the primary matrix.
-When a row has comparable submeasurements, compare reports pair Stim and Stab measurements by normalized name or by direct-match position and use the worse of the row median ratio and the worst paired submeasurement ratio for beta and regression gates.
+When a row has comparable submeasurements, compare reports pair Stim and Stab measurements by normalized name or by direct-match position.
+`direct-match` and `cli-baseline` rows use the worse of the row median ratio and the worst paired submeasurement ratio for beta and regression gates; `partial-match` rows with paired evidence use the worst paired ratio so unmatched contract extras remain visible without deciding a Stim-relative gate.
 Rows without paired submeasurement evidence keep using the row median ratio.
 Completion-style primary beta runs must include `--warmup --measurement-runs 3`, which runs the selected Stab-side workloads once before recording report measurements and then records the median of three Stab-side measurement runs.
 The warmup pass is not written into row measurements, but compare reports must record `command.warmup=true` and `command.measurement_runs >= 3`.

@@ -223,10 +223,14 @@ impl CompareRowResult {
             .max_by(f64::total_cmp);
         if let Some(worst_measurement_ratio) = worst_measurement_ratio {
             self.relative_ratio = Some(
-                self.relative_ratio
-                    .map_or(worst_measurement_ratio, |ratio| {
-                        ratio.max(worst_measurement_ratio)
-                    }),
+                if self.comparability.uses_paired_ratios_without_mixed_median() {
+                    worst_measurement_ratio
+                } else {
+                    self.relative_ratio
+                        .map_or(worst_measurement_ratio, |ratio| {
+                            ratio.max(worst_measurement_ratio)
+                        })
+                },
             );
         }
         if self.status == "measured"

@@ -33,7 +33,7 @@ Supported classes are `direct-match`, `cli-baseline`, `contract-representative`,
 `contract-representative`, `contract-proxy`, `contract-smoke`, `partial-match`, and `report-only` rows are narrower M12 beta evidence classes; their note must explain the missing exact parity or representative scope before the row is treated as reviewable benchmark evidence.
 `contract-only` rows do not prove a Stab-vs-Stim timing ratio and require a source-owned beta waiver when they are selected by `--require-beta-gate`.
 Pairs are matched by normalized measurement names, or by position for `direct-match` rows whose Stim and Stab measurement counts match.
-When paired ratios exist, beta and regression gates use the worse of the row median ratio and the worst paired ratio; otherwise they use the row median ratio.
+When paired ratios exist, `direct-match` and `cli-baseline` gates use the worse of the row median ratio and the worst paired ratio; `partial-match` gates use the worst paired ratio so unmatched Stab contract extras remain visible without deciding a Stim-relative gate; rows without paired evidence use the row median ratio.
 The JSON report records paired evidence in `measurement_ratios`, and the Markdown report prints the worst pair in the `Ratio Source` column.
 Tiny direct-match Stab measurements may use batched timing to reduce clock-noise dominance, but they still report seconds per operation.
 Pass `--require-beta-gate` to fail when any selected row does not prove a pass against the 1.25x pinned-Stim beta performance gate.
