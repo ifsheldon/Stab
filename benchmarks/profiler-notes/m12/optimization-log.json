@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "rows": [
+    {
+      "id": "m8-sample-throughput-1000000",
+      "before_report": "target/benchmarks/m12-primary-probe/compare.json",
+      "after_report": "target/benchmarks/m12-primary-compare-after-direct-z-fast-path/compare.json",
+      "dominant_cost": "High-shot sampler throughput was dominated by repeated output-buffer allocation, per-shot frame allocation/reset work, and the simple noisy Z-measurement path.",
+      "optimization_summary": "Reused sampler output buffers and frame state, reserved 01 and b8 output capacity, and added a direct noisy Z-measurement byte-output path.",
+      "semantic_checks": [
+        "cargo test -p stab-core sampling seeded_sample_bytes_match_seeded_record_samples",
+        "cargo test -p stab-core sampling direct_noisy_z_measurement_bytes_match_seeded_record_samples",
+        "cargo test -p stab-cli sample"
+      ],
+      "follow_up": "Broaden packed or bit-parallel sampler paths only after profiler evidence on larger Clifford plus Pauli-noise circuits shows the current path is the bottleneck."
+    },
+    {
+      "id": "m4-gate-lookup",
+      "before_report": "target/benchmarks/m12-primary-compare-probe/compare.json",
+      "after_report": "target/benchmarks/m12-primary-beta-after-m4-fast-paths/compare.json",
+      "dominant_cost": "Gate lookup spent avoidable time in allocation-heavy canonicalization and broader lookup scans for canonical uppercase names.",
+      "optimization_summary": "Added an inline exact-name fast path for canonical names and aliases while preserving case-insensitive public lookup behavior.",
+      "semantic_checks": [
+        "cargo test -p stab-core gates"
+      ],
+      "follow_up": "Keep the row outside the 1.25x threshold file until larger repeated evidence separates lookup-table value from timer noise."
+    },
+    {
+      "id": "m4-circuit-parse",
+      "before_report": "target/benchmarks/m12-primary-compare-after-direct-z-fast-path/compare.json",
+      "after_report": "target/benchmarks/m12-primary-beta-after-m4-fast-paths/compare.json",
+      "dominant_cost": "Sparse .stim parsing was dominated by temporary target vectors, repeated integer scans, and generic dispatch for simple no-argument instructions.",
+      "optimization_summary": "Moved target storage to SmallVec-backed instruction buffers, parsed plain numeric targets in one checked pass, and added simple no-argument parser fast paths for common H, M, MZ, CX, and CNOT instructions.",
+      "semantic_checks": [
+        "cargo test -p stab-core --test stim_format",
+        "cargo test -p stab-core gates",
+        "cargo test -p stab-core target"
+      ],
+      "follow_up": "Keep the row outside the 1.25x threshold file until fresh evidence proves whether remaining sparse-parser cost is dispatch, item allocation, or target parsing."
+    },
+    {
+      "id": "m5-sparse-xor",
+      "before_report": "target/benchmarks/m12-primary-compare-after-direct-z-fast-path/compare.json",
+      "after_report": "target/benchmarks/m12-primary-compare-after-sparse-xor-in-place/compare.json",
+      "dominant_cost": "Sparse table row XOR allocated a new result vector for repeated row merges.",
+      "optimization_summary": "Merged sparse XOR rows in place from the back so repeated table row XORs reuse the existing row allocation.",
+      "semantic_checks": [
+        "cargo test -p stab-core bits_sparse_xor"
+      ],
+      "follow_up": "Profile row-XOR and item-XOR separately before adding this mixed direct-match row to the 1.25x threshold file."
+    },
+    {
+      "id": "m8-measure-reader",
+      "before_report": "target/benchmarks/m12-primary-compare-after-sparse-xor-in-place/compare.json",
+      "after_report": "target/benchmarks/m12-primary-compare-after-zero-one-reader-checked-scan/compare.json",
+      "dominant_cost": "The supported 01 measurement-record reader still paid generic text-record parsing overhead on dense bit lines.",
+      "optimization_summary": "Added a direct byte scan for 01 measurement-record lines while preserving final-record-without-newline acceptance and invalid-byte rejection.",
+      "semantic_checks": [
+        "cargo test -p stab-core result_formats"
+      ],
+      "follow_up": "Add ptb64 reader parity and split reader thresholds by format before using this mixed row for strict regression gating."
+    },
+    {
+      "id": "m8-probability-util",
+      "before_report": "target/benchmarks/m12-primary-compare-after-parser-numeric-target-fast-paths/compare.json",
+      "after_report": "target/benchmarks/m12-primary-compare-after-probability-util-direct/compare.json",
+      "dominant_cost": "The old benchmark compared pinned Stim probability utilities against a Stab sampler-path proxy instead of a matching probability-draw primitive.",
+      "optimization_summary": "Added the direct biased_randomize_bits utility and a seven-filter direct benchmark matching the pinned Stim probability_util filters.",
+      "semantic_checks": [
+        "cargo test -p stab-core probability_util",
+        "cargo test -p stab-bench m8_benchmark_rows_have_stab_compare_runners"
+      ],
+      "follow_up": "Increase repeated work or per-filter threshold stability before adding this tiny utility row to the 1.25x threshold file."
+    },
+    {
+      "id": "m6-clifford-string",
+      "before_report": "target/benchmarks/m12-primary-compare-after-probability-util-direct/compare.json",
+      "after_report": "target/benchmarks/m12-primary-compare-after-m6-in-place-multiply-direct/compare.json",
+      "dominant_cost": "The benchmark previously measured a proxy path that rebuilt CliffordString products instead of the direct in-place multiplication shape used by the pinned Stim filter.",
+      "optimization_summary": "Added direct in-place CliffordString multiplication benchmark evidence matching the pinned 10K filter.",
+      "semantic_checks": [
+        "cargo test -p stab-core stabilizers::clifford",
+        "cargo test -p stab-bench m6_benchmark_rows_have_stab_compare_runners"
+      ],
+      "follow_up": "Keep the direct filter in the primary matrix and use threshold automation once repeated evidence remains stable."
+    },
+    {
+      "id": "m6-pauli-string",
+      "before_report": "target/benchmarks/m12-primary-compare-after-probability-util-direct/compare.json",
+      "after_report": "target/benchmarks/m12-primary-compare-after-m6-in-place-multiply-direct/compare.json",
+      "dominant_cost": "The benchmark previously measured a proxy path that rebuilt PauliString products instead of direct in-place multiplication at the pinned 10K, 100K, and 1M sizes.",
+      "optimization_summary": "Added in-place PauliString multiplication and direct benchmark filters for 10K, 100K, and 1M cases.",
+      "semantic_checks": [
+        "cargo test -p stab-core stabilizers::pauli",
+        "cargo test -p stab-bench m6_benchmark_rows_have_stab_compare_runners"
+      ],
+      "follow_up": "Keep the direct filter in the primary matrix and use threshold automation once repeated evidence remains stable."
+    },
+    {
+      "id": "m6-pauli-iter",
+      "before_report": "target/benchmarks/m12-primary-compare-after-m6-in-place-multiply-direct/compare.json",
+      "after_report": "target/benchmarks/m12-primary-compare-after-m6-pauli-iter-direct/compare.json",
+      "dominant_cost": "PauliStringIterator evidence previously included avoidable owned-result churn instead of a borrowed-result stepping shape.",
+      "optimization_summary": "Added a borrowed-result PauliStringIterator stepping API and direct benchmark filters matching the pinned iterator cases.",
+      "semantic_checks": [
+        "cargo test -p stab-core stabilizers_pauli_string_iter",
+        "cargo test -p stab-bench m6_benchmark_rows_have_stab_compare_runners"
+      ],
+      "follow_up": "Keep the direct iterator filter in the primary matrix and broaden iterator API only if later public compatibility needs it."
+    },
+    {
+      "id": "m8-sample-primary-rotated-surface-contract",
+      "before_report": "target/benchmarks/m12-m8-primary-cli-compare/compare.json",
+      "after_report": "target/benchmarks/m12-primary-compare-after-lazy-small-frame/compare.json",
+      "dominant_cost": "Before the lazy packed small-frame sampler, rotated-surface sampling spent most time in Stab's scalar compiled-sampler frame path on the generated d3/r3 source-owned fixture.",
+      "optimization_summary": "Added exact-generator measurement detection, direct H/CX operations, leading Z-reset elision, small-probability channel fast paths, and a private <=64 qubit lazy packed byte-sampling path.",
+      "semantic_checks": [
+        "cargo test -p stab-core sampling",
+        "cargo test -p stab-core byte_sampling_measure_reset_uses_physical_result_for_reset",
+        "cargo test -p stab-cli sample"
+      ],
+      "follow_up": "Future broadening needs profiler evidence from a machine that permits stack sampling because local perf was blocked by perf_event_paranoid=4."
+    },
+    {
+      "id": "m8-sample-primary-unrotated-surface-contract",
+      "before_report": "target/benchmarks/m12-m8-primary-cli-compare/compare.json",
+      "after_report": "target/benchmarks/m12-primary-compare-after-lazy-small-frame/compare.json",
+      "dominant_cost": "Before the lazy packed small-frame sampler, unrotated-surface sampling spent most time in Stab's scalar compiled-sampler frame path on the generated d3/r3 source-owned fixture.",
+      "optimization_summary": "Added exact-generator measurement detection, direct H/CX operations, leading Z-reset elision, small-probability channel fast paths, and a private <=64 qubit lazy packed byte-sampling path.",
+      "semantic_checks": [
+        "cargo test -p stab-core sampling",
+        "cargo test -p stab-core byte_sampling_measure_reset_uses_physical_result_for_reset",
+        "cargo test -p stab-cli sample"
+      ],
+      "follow_up": "Future broadening needs profiler evidence from a machine that permits stack sampling because local perf was blocked by perf_event_paranoid=4."
+    },
+    {
+      "id": "m10-error-decomp",
+      "before_report": "target/benchmarks/m12-primary-compare-probe/compare.json",
+      "after_report": "target/benchmarks/m12-primary-regression-after-submeasurement-fixes-current/compare.json",
+      "dominant_cost": "The row median hid tiny independent/disjoint XYZ conversion filters where pinned Stim submeasurements were sub-nanosecond and timing overhead could dominate the arithmetic.",
+      "optimization_summary": "Split the Stab-side direct-match measurements to match the pinned filters, added paired submeasurement ratio evidence, batched tiny direct-match timing, and removed this row from the 1.25x threshold file until the tiny filters stabilize.",
+      "semantic_checks": [
+        "cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners",
+        "cargo test -p stab-bench compare_row_result_uses_worst_exact_submeasurement_ratio",
+        "cargo test -p stab-bench direct_match_rows_use_positional_submeasurement_ratios_when_names_differ"
+      ],
+      "follow_up": "Profile independent/disjoint conversion arithmetic separately before adding the row back to the 1.25x regression threshold file."
+    }
+  ]
+}

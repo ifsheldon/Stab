@@ -20,6 +20,8 @@ mod error;
 mod manifest;
 mod memory_gate;
 mod process;
+#[cfg(test)]
+mod profile_evidence;
 mod report;
 mod root;
 mod stim;

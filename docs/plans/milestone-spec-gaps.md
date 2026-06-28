@@ -19,16 +19,18 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
+No open entries.
+
+## Resolved Entries
+
 ## 2026-06-28 - M12: Profile Evidence Timing
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of M12 profiler-note evidence.
 Current text: M12 says to profile every benchmark that is slower than the beta gate before optimizing it, and source-owned compare runs require notes for rows slower than 1.5x pinned Stim.
 Gap: the milestone does not say whether completion evidence requires pre-optimization profiler captures, final-current profiler notes for rows still slower than 1.5x, or both.
 Proposed amendment: choose a durable rule: either require pre-optimization notes for every row optimized during M12, or require final-current notes only for rows still slower than 1.5x and separate optimization logs for rows that were fixed.
-Resolution: unresolved.
-
-## Resolved Entries
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines final-current profiler-note evidence for rows still slower than 1.5x pinned Stim, plus source-owned optimization-log evidence for M12 rows optimized below that threshold. `benchmarks/profiler-notes/m12/optimization-log.json` records before and after reports, dominant-cost evidence, implementation summaries, semantic checks, and follow-up policy for optimized rows, and `cargo test -p stab-bench m12_optimization_log_validates_source_file` validates the log shape and required row coverage.
 
 ## 2026-06-28 - M12: Memory Gate Metric Scope
 
