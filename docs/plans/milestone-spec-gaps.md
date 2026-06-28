@@ -340,12 +340,12 @@ Resolution: `coverage-util-top-stabilizers-vs-amplitudes` now covers the upstrea
 
 ## 2026-06-27 - M6: Stabilizer Benchmark Exact Workload Parity
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of `just bench::compare --milestone M6`.
 Current text: M6 requires `just bench::compare --milestone M6` to report Pauli, Clifford, tableau, tableau-iterator, and stabilizers-to-tableau workloads, while benchmark manifest rows point at upstream random, fuzz-like, and large-tableau perf filters.
 Gap: the milestone does not distinguish report-only deterministic Stab benchmark runners from exact parity with upstream random and 10K-qubit perf workloads.
 Proposed amendment: require M6 compare output to provide deterministic Stab-side timings and normalized rates for each M6 benchmark row, label non-exact benchmark workloads in compare notes, and defer exact random and large-tableau threshold parity to M12 performance hardening after random hooks and optimized tableau internals are specified.
-Resolution: pending plan update.
+Resolution: M6 benchmark acceptance is now explicitly report-only deterministic Stab-side timing from `just bench::compare --milestone M6`. The roadmap allows direct operation-shape matches for Pauli, Clifford, and Pauli-iterator rows only when compare notes say so, while tableau, tableau-iterator, and stabilizers-to-tableau workloads remain deterministic substitutes until M12 decides exact random, fuzz-like, signed-tableau, and 10K-qubit threshold parity. Evidence is `cargo test -p stab-bench m6_benchmark_rows_have_stab_compare_runners --quiet` and `just bench::compare --milestone M6`.
 
 ## 2026-06-27 - M6: Stabilizer Algebra Public View And Text Scope
 

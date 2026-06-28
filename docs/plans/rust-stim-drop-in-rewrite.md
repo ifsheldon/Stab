@@ -250,12 +250,15 @@ Linked tests and benchmarks:
 - Semantic-mining tests: Python `pauli_string_pybind`, `clifford_string_pybind`, `tableau_pybind`, `flow_pybind`, and `tableau_simulator_pybind` cases that express core algebra semantics.
 - Benchmarks: `src/stim/stabilizers/*.perf.cc` and `src/stim/util_top/stabilizers_to_tableau.perf.cc`.
 
+M6 benchmark acceptance is report-only deterministic Stab-side timing from `just bench::compare --milestone M6`.
+Pauli, Clifford, and Pauli-iterator rows may be direct operation-shape matches when compare notes say so, but tableau, tableau-iterator, and stabilizers-to-tableau benchmark evidence uses deterministic Stab workloads until M12 decides exact random, fuzz-like, signed-tableau, and 10K-qubit threshold parity.
+
 Done criteria:
 
 - `cargo test -p stab-core stabilizers` passes direct and property tests.
 - `cargo test -p stab-core --test stabilizers_vs_amplitudes` passes the M6-owned unitary-to-tableau parity subset.
 - `just oracle::run --milestone M6` passes selected C++ Stim algebra comparisons.
-- `just bench::compare --milestone M6` reports Pauli, Clifford, tableau, tableau-iterator, and stabilizers-to-tableau workloads.
+- `just bench::compare --milestone M6` reports Pauli, Clifford, tableau, tableau-iterator, and stabilizers-to-tableau workloads with normalized rates and compare notes that label direct matches versus report-only deterministic substitutes.
 - Public algebra APIs avoid Python-hostile lifetime or generic shapes unless documented.
 
 ### M7: Circuit Generation And Early CLI
