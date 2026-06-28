@@ -47,6 +47,7 @@ pub(crate) fn aggregate_measurement_runs(
                 .unwrap_or(first_measurement.seconds),
             variance_seconds,
             allocation: aggregate_allocations(&runs, index),
+            resident_bytes: aggregate_resident_bytes(&runs, index),
             iterations: aggregate_iterations(&runs, index),
         });
     }
@@ -80,6 +81,13 @@ fn aggregate_iterations(runs: &[Vec<Measurement>], measurement_index: usize) -> 
         .try_fold(0usize, |total, iterations| {
             iterations.and_then(|iterations| total.checked_add(iterations))
         })
+}
+
+fn aggregate_resident_bytes(runs: &[Vec<Measurement>], measurement_index: usize) -> Option<u64> {
+    runs.iter()
+        .filter_map(|run| run.get(measurement_index))
+        .filter_map(|measurement| measurement.resident_bytes)
+        .max()
 }
 
 fn variance_seconds(seconds: &[f64]) -> Option<f64> {
@@ -222,6 +230,7 @@ mod tests {
             seconds,
             variance_seconds: None,
             allocation: None,
+            resident_bytes: None,
             iterations,
         }
     }

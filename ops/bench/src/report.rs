@@ -84,6 +84,8 @@ pub(crate) struct Measurement {
     pub(crate) variance_seconds: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) allocation: Option<AllocationMeasurement>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) resident_bytes: Option<u64>,
     pub(crate) iterations: Option<usize>,
 }
 
@@ -170,6 +172,8 @@ pub(crate) struct CompareRowResult {
     pub(crate) stab_allocation_count_max: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) stab_allocation_bytes_max: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) stab_resident_bytes_max: Option<u64>,
     pub(crate) pass_fail_status: String,
     #[serde(default)]
     pub(crate) beta_gate_status: String,
@@ -184,6 +188,10 @@ pub(crate) struct CompareRowResult {
     pub(crate) memory_gate_baseline_bytes_max: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) memory_gate_allowed_bytes_max: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) memory_gate_baseline_resident_bytes_max: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) memory_gate_allowed_resident_bytes_max: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) memory_gate_error: Option<String>,
     pub(crate) regression_threshold_status: String,
@@ -320,13 +328,13 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
         "- Machine: {} {} with {} worker(s)\n\n",
         report.machine.os, report.machine.arch, report.machine.available_parallelism
     ));
-    out.push_str("| Benchmark | Milestone | Class | Status | Pass/Fail | Beta Gate | Stim Median | Stab Median | Ratio | Ratio Source | Stab Alloc Max | Memory Gate | Regression Threshold | Profiler Note | Note |\n");
+    out.push_str("| Benchmark | Milestone | Class | Status | Pass/Fail | Beta Gate | Stim Median | Stab Median | Ratio | Ratio Source | Stab Alloc Max | Stab Resident Max | Memory Gate | Regression Threshold | Profiler Note | Note |\n");
     out.push_str(
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n",
     );
     for row in &report.rows {
         out.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
             row.id,
             row.milestone.as_str(),
             row.comparability.as_str(),
@@ -338,6 +346,7 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
             format_optional_ratio(row.relative_ratio),
             format_ratio_source(row),
             format_optional_bytes(row.stab_allocation_bytes_max),
+            format_optional_bytes(row.stab_resident_bytes_max),
             format_memory_gate(row),
             format_regression_threshold(row),
             format_profiler_note(row),
@@ -398,9 +407,13 @@ fn format_profiler_note(row: &CompareRowResult) -> String {
 }
 
 fn format_memory_gate(row: &CompareRowResult) -> String {
-    let allowed = row
+    let allocation_allowed = row
         .memory_gate_allowed_bytes_max
-        .map_or_else(String::new, |bytes| format!(" <= {bytes}"));
+        .map_or_else(String::new, |bytes| format!(" alloc<={bytes}"));
+    let resident_allowed = row
+        .memory_gate_allowed_resident_bytes_max
+        .map_or_else(String::new, |bytes| format!(" rss<={bytes}"));
+    let allowed = format!("{allocation_allowed}{resident_allowed}");
     match &row.memory_gate_error {
         Some(error) => format!("{}{} ({error})", row.memory_gate_status, allowed),
         None => format!("{}{}", row.memory_gate_status, allowed),

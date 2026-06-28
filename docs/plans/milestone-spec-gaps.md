@@ -28,16 +28,16 @@ Gap: the milestone does not say whether completion evidence requires pre-optimiz
 Proposed amendment: choose a durable rule: either require pre-optimization notes for every row optimized during M12, or require final-current notes only for rows still slower than 1.5x and separate optimization logs for rows that were fixed.
 Resolution: unresolved.
 
+## Resolved Entries
+
 ## 2026-06-28 - M12: Memory Gate Metric Scope
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of M12 memory-gate evidence.
 Current text: M12 says no primary workload may regress peak allocations or resident memory by more than 25 percent relative to the first complete Stab benchmark report.
-Gap: the current memory gate tracks Stab-side allocation counts and maximum live allocated bytes, but it does not measure resident set size.
+Gap: the previous memory gate tracked Stab-side allocation counts and maximum live allocated bytes, but it did not measure resident set size.
 Proposed amendment: either narrow the done criterion to allocation counts and maximum live allocated bytes, or add RSS measurement to the benchmark report and memory gate before M12 completion.
-Resolution: unresolved.
-
-## Resolved Entries
+Resolution: `stab-bench compare --track-allocations` now samples Stab-side resident memory with `memory-stats`, records `resident_bytes` on measurements, promotes `stab_resident_bytes_max` to compare rows, and `--require-memory-gate` requires both allocation and resident-memory evidence. `benchmarks/m12-primary-memory-baseline.json` records both `stab_allocation_bytes_max` and `stab_resident_bytes_max` for all 71 primary rows, and `just bench::primary-memory-regression --baseline target/benchmarks/m12-primary-completion-baseline/baseline.json` passed with all 71 rows in `memory_gate_status=pass`.
 
 ## 2026-06-28 - M12: Regression Threshold Automation
 

@@ -497,6 +497,7 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
     };
     let stab_allocation_count_max = max_stab_allocation_count(&stab_measurements);
     let stab_allocation_bytes_max = max_stab_allocation_bytes(&stab_measurements);
+    let stab_resident_bytes_max = max_stab_resident_bytes(&stab_measurements);
     CompareRowResult {
         id: row.id.clone(),
         milestone: row.milestone,
@@ -518,6 +519,7 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         measurement_ratios,
         stab_allocation_count_max,
         stab_allocation_bytes_max,
+        stab_resident_bytes_max,
         pass_fail_status: compare_pass_fail_status(status, baseline_status, relative_ratio),
         beta_gate_status: "not-checked".to_string(),
         beta_gate_waiver_reason: None,
@@ -526,6 +528,8 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         memory_gate_status: "not-required".to_string(),
         memory_gate_baseline_bytes_max: None,
         memory_gate_allowed_bytes_max: None,
+        memory_gate_baseline_resident_bytes_max: None,
+        memory_gate_allowed_resident_bytes_max: None,
         memory_gate_error: None,
         regression_threshold_status: "not-configured".to_string(),
         regression_threshold_max_ratio: None,
@@ -557,6 +561,13 @@ fn max_stab_allocation_bytes(measurements: &[Measurement]) -> Option<u64> {
                 .as_ref()
                 .map(|allocation| allocation.bytes_max)
         })
+        .max()
+}
+
+fn max_stab_resident_bytes(measurements: &[Measurement]) -> Option<u64> {
+    measurements
+        .iter()
+        .filter_map(|measurement| measurement.resident_bytes)
         .max()
 }
 
@@ -797,7 +808,7 @@ mod tests {
     }
 
     #[test]
-    fn compare_row_result_records_stab_allocation_maxima() {
+    fn compare_row_result_records_stab_memory_maxima() {
         let row = BenchmarkRow {
             id: "allocation-row".to_string(),
             milestone: Milestone::M12,
@@ -831,6 +842,7 @@ mod tests {
                     bytes_current: 0,
                     bytes_max: 2048,
                 }),
+                resident_bytes: Some(8192),
                 iterations: Some(1),
             }],
             baseline_status: BaselineCompareStatus::Comparable,
@@ -838,6 +850,7 @@ mod tests {
 
         assert_eq!(result.stab_allocation_count_max, Some(3));
         assert_eq!(result.stab_allocation_bytes_max, Some(2048));
+        assert_eq!(result.stab_resident_bytes_max, Some(8192));
     }
 
     #[test]
@@ -941,6 +954,7 @@ mod tests {
                 seconds: 1.0,
                 variance_seconds: None,
                 allocation: None,
+                resident_bytes: None,
                 iterations: None,
             }]
         });
@@ -950,6 +964,7 @@ mod tests {
                 seconds: ratio,
                 variance_seconds: Some(0.0),
                 allocation: None,
+                resident_bytes: None,
                 iterations: Some(1),
             }]
         });
@@ -995,6 +1010,7 @@ mod tests {
             seconds,
             variance_seconds: None,
             allocation: None,
+            resident_bytes: None,
             iterations,
         }
     }

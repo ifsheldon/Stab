@@ -17,6 +17,7 @@ struct MemoryBaselineReport {
 struct MemoryBaselineRow {
     id: String,
     stab_allocation_bytes_max: Option<u64>,
+    stab_resident_bytes_max: Option<u64>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -107,12 +108,38 @@ pub(crate) fn apply_memory_gate(
             findings.blockers.push(format!("{}: {message}", row.id));
             continue;
         };
-        if current_bytes <= allowed_bytes {
+        let Some(baseline_resident_bytes) = baseline_row.stab_resident_bytes_max else {
+            let message = "memory baseline row has no resident byte maximum".to_string();
+            row.memory_gate_status = "missing-baseline-resident".to_string();
+            row.memory_gate_error = Some(message.clone());
+            findings.blockers.push(format!("{}: {message}", row.id));
+            continue;
+        };
+        row.memory_gate_baseline_resident_bytes_max = Some(baseline_resident_bytes);
+        let allowed_resident_bytes = allowed_memory_bytes(baseline_resident_bytes);
+        row.memory_gate_allowed_resident_bytes_max = Some(allowed_resident_bytes);
+        let Some(current_resident_bytes) = row.stab_resident_bytes_max else {
+            let message = "current row has no resident byte maximum".to_string();
+            row.memory_gate_status = "missing-current-resident".to_string();
+            row.memory_gate_error = Some(message.clone());
+            findings.blockers.push(format!("{}: {message}", row.id));
+            continue;
+        };
+        let mut row_blockers = Vec::new();
+        if current_bytes > allowed_bytes {
+            row_blockers.push(format!(
+                "allocation bytes {current_bytes} exceeds memory gate limit {allowed_bytes} from baseline {baseline_bytes}"
+            ));
+        }
+        if current_resident_bytes > allowed_resident_bytes {
+            row_blockers.push(format!(
+                "resident bytes {current_resident_bytes} exceeds memory gate limit {allowed_resident_bytes} from baseline {baseline_resident_bytes}"
+            ));
+        }
+        if row_blockers.is_empty() {
             row.memory_gate_status = "pass".to_string();
         } else {
-            let message = format!(
-                "allocation bytes {current_bytes} exceeds memory gate limit {allowed_bytes} from baseline {baseline_bytes}"
-            );
+            let message = row_blockers.join("; ");
             row.memory_gate_status = "fail".to_string();
             row.memory_gate_error = Some(message.clone());
             findings.blockers.push(format!("{}: {message}", row.id));
@@ -135,23 +162,29 @@ mod tests {
     use crate::report::CompareRowResult;
 
     #[test]
-    fn memory_gate_marks_pass_fail_and_missing_allocation_rows() {
+    fn memory_gate_marks_pass_fail_and_missing_memory_rows() {
         let baseline = MemoryBaseline::from_report(MemoryBaselineReport {
             schema_version: 1,
             rows: vec![
-                baseline_row("pass-row", Some(100)),
-                baseline_row("fail-row", Some(100)),
-                baseline_row("missing-allocation-row", Some(100)),
-                baseline_row("missing-baseline-allocation-row", None),
+                baseline_row("pass-row", Some(100), Some(1000)),
+                baseline_row("allocation-fail-row", Some(100), Some(1000)),
+                baseline_row("resident-fail-row", Some(100), Some(1000)),
+                baseline_row("missing-allocation-row", Some(100), Some(1000)),
+                baseline_row("missing-resident-row", Some(100), Some(1000)),
+                baseline_row("missing-baseline-allocation-row", None, Some(1000)),
+                baseline_row("missing-baseline-resident-row", Some(100), None),
             ],
         })
         .expect("baseline");
         let mut rows = vec![
-            row("pass-row", Some(125)),
-            row("fail-row", Some(126)),
-            row("missing-allocation-row", None),
-            row("missing-baseline-row", Some(50)),
-            row("missing-baseline-allocation-row", Some(50)),
+            row("pass-row", Some(125), Some(1250)),
+            row("allocation-fail-row", Some(126), Some(1250)),
+            row("resident-fail-row", Some(125), Some(1251)),
+            row("missing-allocation-row", None, Some(1000)),
+            row("missing-resident-row", Some(100), None),
+            row("missing-baseline-row", Some(50), Some(500)),
+            row("missing-baseline-allocation-row", Some(50), Some(500)),
+            row("missing-baseline-resident-row", Some(50), Some(500)),
         ];
 
         let findings = apply_memory_gate(&mut rows, &baseline);
@@ -159,28 +192,56 @@ mod tests {
         assert_eq!(rows.first().expect("pass row").memory_gate_status, "pass");
         assert_eq!(rows.get(1).expect("fail row").memory_gate_status, "fail");
         assert_eq!(
-            rows.get(2).expect("missing current row").memory_gate_status,
+            rows.get(2).expect("rss fail row").memory_gate_status,
+            "fail"
+        );
+        assert_eq!(
+            rows.get(3)
+                .expect("missing allocation row")
+                .memory_gate_status,
             "missing-current-allocation"
         );
         assert_eq!(
             rows.get(3)
+                .expect("missing allocation row")
+                .memory_gate_error
+                .as_deref(),
+            Some("current row has no allocation byte maximum")
+        );
+        assert_eq!(
+            rows.get(4)
+                .expect("missing resident row")
+                .memory_gate_status,
+            "missing-current-resident"
+        );
+        assert_eq!(
+            rows.get(5)
                 .expect("missing baseline row")
                 .memory_gate_status,
             "missing-baseline"
         );
         assert_eq!(
-            rows.get(4)
+            rows.get(6)
                 .expect("missing baseline allocation row")
                 .memory_gate_status,
             "missing-baseline-allocation"
         );
         assert_eq!(
+            rows.get(7)
+                .expect("missing baseline resident row")
+                .memory_gate_status,
+            "missing-baseline-resident"
+        );
+        assert_eq!(
             findings.blockers,
             vec![
-                "fail-row: allocation bytes 126 exceeds memory gate limit 125 from baseline 100",
+                "allocation-fail-row: allocation bytes 126 exceeds memory gate limit 125 from baseline 100",
+                "resident-fail-row: resident bytes 1251 exceeds memory gate limit 1250 from baseline 1000",
                 "missing-allocation-row: current row has no allocation byte maximum",
+                "missing-resident-row: current row has no resident byte maximum",
                 "missing-baseline-row: memory baseline is missing row",
                 "missing-baseline-allocation-row: memory baseline row has no allocation byte maximum",
+                "missing-baseline-resident-row: memory baseline row has no resident byte maximum",
             ]
         );
     }
@@ -205,9 +266,9 @@ mod tests {
         let error = MemoryBaseline::from_report(MemoryBaselineReport {
             schema_version: 1,
             rows: vec![
-                baseline_row("../bad", Some(100)),
-                baseline_row("duplicate-row", Some(100)),
-                baseline_row("duplicate-row", Some(200)),
+                baseline_row("../bad", Some(100), Some(1000)),
+                baseline_row("duplicate-row", Some(100), Some(1000)),
+                baseline_row("duplicate-row", Some(200), Some(2000)),
             ],
         })
         .expect_err("reject invalid ids");
@@ -228,6 +289,7 @@ mod tests {
                         "id": "m8-sample-throughput-1024",
                         "status": "measured",
                         "stab_allocation_bytes_max": 2048,
+                        "stab_resident_bytes_max": 4096,
                         "memory_gate_status": "not-required"
                     }
                 ]
@@ -244,6 +306,13 @@ mod tests {
                 .stab_allocation_bytes_max,
             Some(2048)
         );
+        assert_eq!(
+            baseline
+                .row("m8-sample-throughput-1024")
+                .expect("row")
+                .stab_resident_bytes_max,
+            Some(4096)
+        );
     }
 
     #[test]
@@ -257,18 +326,28 @@ mod tests {
             baseline
                 .rows
                 .iter()
-                .all(|row| row.stab_allocation_bytes_max.is_some())
+                .all(|row| row.stab_allocation_bytes_max.is_some()
+                    && row.stab_resident_bytes_max.is_some())
         );
     }
 
-    fn baseline_row(id: &str, bytes: Option<u64>) -> super::MemoryBaselineRow {
+    fn baseline_row(
+        id: &str,
+        allocation_bytes: Option<u64>,
+        resident_bytes: Option<u64>,
+    ) -> super::MemoryBaselineRow {
         super::MemoryBaselineRow {
             id: id.to_string(),
-            stab_allocation_bytes_max: bytes,
+            stab_allocation_bytes_max: allocation_bytes,
+            stab_resident_bytes_max: resident_bytes,
         }
     }
 
-    fn row(id: &str, bytes: Option<u64>) -> CompareRowResult {
+    fn row(
+        id: &str,
+        allocation_bytes: Option<u64>,
+        resident_bytes: Option<u64>,
+    ) -> CompareRowResult {
         CompareRowResult {
             id: id.to_string(),
             milestone: Milestone::M12,
@@ -289,7 +368,8 @@ mod tests {
             relative_ratio: None,
             measurement_ratios: Vec::new(),
             stab_allocation_count_max: None,
-            stab_allocation_bytes_max: bytes,
+            stab_allocation_bytes_max: allocation_bytes,
+            stab_resident_bytes_max: resident_bytes,
             pass_fail_status: "not-comparable".to_string(),
             beta_gate_status: "not-checked".to_string(),
             beta_gate_waiver_reason: None,
@@ -298,6 +378,8 @@ mod tests {
             memory_gate_status: "not-required".to_string(),
             memory_gate_baseline_bytes_max: None,
             memory_gate_allowed_bytes_max: None,
+            memory_gate_baseline_resident_bytes_max: None,
+            memory_gate_allowed_resident_bytes_max: None,
             memory_gate_error: None,
             regression_threshold_status: "not-configured".to_string(),
             regression_threshold_max_ratio: None,

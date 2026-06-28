@@ -84,11 +84,11 @@ Beta waiver files are JSON with schema version 1:
 Waiver ids must be benchmark-id safe.
 Reasons and follow-up text must be non-empty because they are copied into the compare report as durable beta-gate evidence.
 Use `just bench::compare-allocations` to build `stab-bench` with the optional `count-allocations` feature and pass `--track-allocations` automatically.
-Allocation tracking runs an extra Stab-side measurement pass per reported measurement and records allocation counts and maximum live allocated bytes in `compare.json`; use plain `just bench::compare` for timing-gate evidence.
-Pass `--require-memory-gate --memory-baseline <compare.json>` with `just bench::compare-allocations` to compare selected rows against the first complete Stab allocation report.
-The memory gate fails rows missing current or baseline allocation bytes and rows whose `stab_allocation_bytes_max` exceeds the baseline by more than 25 percent.
-`m12-primary-memory-baseline.json` is the source-owned M12 memory-regression baseline for the frozen primary matrix.
-Run `just bench::primary-memory-regression --baseline <primary-baseline.json>` to check the source-owned memory baseline with allocation tracking, profiler-note validation, and a report at `target/benchmarks/m12-primary-memory-regression`.
+Allocation tracking runs an extra Stab-side measurement pass per reported measurement and records allocation counts, maximum live allocated bytes, and sampled resident bytes in `compare.json`; use plain `just bench::compare` for timing-gate evidence.
+Pass `--require-memory-gate --memory-baseline <compare.json>` with `just bench::compare-allocations` to compare selected rows against the first complete Stab memory report.
+The memory gate fails rows missing current or baseline allocation bytes, rows missing current or baseline resident bytes, rows whose `stab_allocation_bytes_max` exceeds the baseline by more than 25 percent, and rows whose `stab_resident_bytes_max` exceeds the baseline by more than 25 percent.
+`m12-primary-memory-baseline.json` is the source-owned M12 memory-regression baseline for the frozen primary matrix and records both `stab_allocation_bytes_max` and `stab_resident_bytes_max`.
+Run `just bench::primary-memory-regression --baseline <primary-baseline.json>` to check the source-owned memory baseline with allocation and resident-memory tracking, profiler-note validation, and a report at `target/benchmarks/m12-primary-memory-regression`.
 Compare prints Stab-side timings for rows whose implementation milestone has a runner and prints pending rows explicitly for future milestones.
 When a comparison runner reports workload-specific rates or comparability notes, treat those notes as part of the benchmark evidence.
 For example, M5 labels Stab-only contract-smoke bit-kernel workloads separately from upstream Stim perf rows until M12 introduces optimized parity thresholds.

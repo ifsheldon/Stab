@@ -8,7 +8,7 @@ use stab_core::{
     PauliStringIterator, SparseXorVec, TableauIterator, stabilizers_to_tableau,
 };
 
-use crate::allocations::measure_allocations;
+use crate::allocations::measure_tracked_memory;
 use crate::config::{PREFIX, STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
 use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner};
@@ -671,11 +671,13 @@ fn measure_stab_iterations(
         .get(timings.len() / 2)
         .map(Duration::as_secs_f64)
         .unwrap_or_default();
+    let tracked_memory = measure_tracked_memory(&mut operation)?;
     Ok(Measurement {
         name: name.to_string(),
         seconds,
         variance_seconds,
-        allocation: measure_allocations(operation)?,
+        allocation: tracked_memory.allocation,
+        resident_bytes: tracked_memory.resident_bytes_max,
         iterations: Some(iterations),
     })
 }
@@ -708,16 +710,18 @@ fn measure_stab_batched_iterations(
         .get(timings.len() / 2)
         .map(Duration::as_secs_f64)
         .unwrap_or_default();
+    let tracked_memory = measure_tracked_memory(|| {
+        for _ in 0..repetitions {
+            operation()?;
+        }
+        Ok(())
+    })?;
     Ok(Measurement {
         name: name.to_string(),
         seconds,
         variance_seconds,
-        allocation: measure_allocations(|| {
-            for _ in 0..repetitions {
-                operation()?;
-            }
-            Ok(())
-        })?,
+        allocation: tracked_memory.allocation,
+        resident_bytes: tracked_memory.resident_bytes_max,
         iterations: Some(iterations),
     })
 }
@@ -1014,6 +1018,7 @@ fn run_stim_cli_row(
             seconds: median,
             variance_seconds,
             allocation: None,
+            resident_bytes: None,
             iterations: Some(iterations),
         }],
     })
@@ -1038,6 +1043,7 @@ fn parse_stim_perf_line(line: &str) -> Option<Measurement> {
         seconds,
         variance_seconds: None,
         allocation: None,
+        resident_bytes: None,
         iterations: None,
     })
 }

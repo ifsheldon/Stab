@@ -10,6 +10,12 @@ pub(crate) struct AllocationTrackingGuard {
     previous: bool,
 }
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct TrackedMemoryMeasurement {
+    pub(crate) allocation: Option<AllocationMeasurement>,
+    pub(crate) resident_bytes_max: Option<u64>,
+}
+
 impl AllocationTrackingGuard {
     pub(crate) fn set(enabled: bool) -> Result<Self, BenchError> {
         if enabled && !cfg!(feature = "count-allocations") {
@@ -26,13 +32,23 @@ impl Drop for AllocationTrackingGuard {
     }
 }
 
-pub(crate) fn measure_allocations(
+pub(crate) fn measure_tracked_memory(
     mut operation: impl FnMut() -> Result<(), BenchError>,
-) -> Result<Option<AllocationMeasurement>, BenchError> {
+) -> Result<TrackedMemoryMeasurement, BenchError> {
     if !ALLOCATION_TRACKING_ENABLED.load(Ordering::SeqCst) {
-        return Ok(None);
+        return Ok(TrackedMemoryMeasurement::default());
     }
-    measure_allocations_enabled(&mut operation)
+    let before_resident = current_resident_bytes();
+    let allocation = measure_allocations_enabled(&mut operation)?;
+    let after_resident = current_resident_bytes();
+    Ok(TrackedMemoryMeasurement {
+        allocation,
+        resident_bytes_max: before_resident.into_iter().chain(after_resident).max(),
+    })
+}
+
+fn current_resident_bytes() -> Option<u64> {
+    memory_stats::memory_stats().map(|stats| u64::try_from(stats.physical_mem).unwrap_or(u64::MAX))
 }
 
 #[cfg(feature = "count-allocations")]

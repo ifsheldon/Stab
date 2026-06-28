@@ -506,8 +506,8 @@ Profiler notes for compare reports live beside the report under `<report>/profil
 When `--require-profiler-notes` is passed, every row slower than 1.5x pinned Stim must have a note with non-empty `Dominant cost:` and `Next owner action:` lines.
 Regression thresholds use JSON schema version 1 with benchmark ids and `max_relative_ratio` values, and `just bench::compare --thresholds <path>` fails configured selected rows that exceed their threshold or cannot produce a comparable ratio.
 `just bench::primary-regression` applies the source-owned M12 threshold file after a Stab-side warmup pass and three recorded measurement runs, and `.github/workflows/m12-benchmarks.yml` runs the same gate on a schedule and on manual dispatch using a fresh primary pinned-Stim baseline.
-Allocation tracking is recorded through `just bench::compare-allocations`, which builds `stab-bench` with the optional `count-allocations` feature and records Stab-side allocation counts and maximum live allocated bytes in `compare.json`.
-Completion-style memory runs should pass `--require-memory-gate --memory-baseline <compare.json>` through `just bench::compare-allocations`, which fails selected rows that lack allocation evidence or whose peak live allocation bytes exceed the first complete Stab allocation report by more than 25 percent.
+Allocation and resident-memory tracking are recorded through `just bench::compare-allocations`, which builds `stab-bench` with the optional `count-allocations` feature and records Stab-side allocation counts, maximum live allocated bytes, and sampled resident bytes in `compare.json`.
+Completion-style memory runs should pass `--require-memory-gate --memory-baseline <compare.json>` through `just bench::compare-allocations`, which fails selected rows that lack allocation evidence, lack resident-memory evidence, exceed the first complete Stab allocation report by more than 25 percent, or exceed the first complete Stab resident-memory report by more than 25 percent.
 Timing-gate evidence should use plain `just bench::compare`, because allocation instrumentation changes allocator behavior.
 
 Linked tests and benchmarks:
