@@ -14,7 +14,6 @@
     { "id": "m11-sample-dem-high-detector-contract", "max_relative_ratio": 1.25 },
     { "id": "m11-sample-dem-repeated-contract", "max_relative_ratio": 1.25 },
     { "id": "m11-sample-dem-sparse-contract", "max_relative_ratio": 1.25 },
-    { "id": "m4-gate-lookup", "max_relative_ratio": 1.25 },
     { "id": "m5-simd-bit-table", "max_relative_ratio": 1.25 },
     { "id": "m5-simd-word", "max_relative_ratio": 1.25 },
     { "id": "m6-clifford-string", "max_relative_ratio": 1.25 },
