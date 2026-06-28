@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "rows": [
+    {
+      "id": "m4-circuit-canonical-print",
+      "reason": "Pinned Stim v1.16.0 has no public CLI or stim_perf row that canonical-prints a .stim circuit without changing the workload into result-format conversion or diagram generation.",
+      "follow_up": "Replace this waiver with a faithful comparable baseline if Stim exposes circuit canonical-print timing, or keep the Stab-only timing plus M4 parser/printer parity tests as the contract evidence."
+    },
+    {
+      "id": "m7-convert-stim-canonical",
+      "reason": "Pinned Stim v1.16.0 `stim convert` converts measurement result formats and does not canonicalize .stim circuit input, so this Stab convert workload has no matching public Stim CLI ratio.",
+      "follow_up": "Replace this waiver with a faithful public Stim circuit-convert baseline if one becomes available, or keep the row as a source-owned CLI contract for Stab's .stim canonical conversion."
+    },
+    {
+      "id": "m10-dem-print-contract",
+      "reason": "Pinned Stim v1.16.0 exposes DEM parsing through commands such as `convert --dem` and `sample_dem`, but it has no public CLI or stim_perf row that canonical-prints an existing .dem file.",
+      "follow_up": "Replace this waiver with a faithful comparable DEM print baseline if Stim exposes one, or keep `.dem` parse and print covered by M10 oracle parity plus Stab-only throughput evidence."
+    }
+  ]
+}

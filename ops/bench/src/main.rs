@@ -11,6 +11,7 @@
 
 mod allocations;
 mod baseline;
+mod beta_gate;
 mod compare;
 mod config;
 mod error;
@@ -124,6 +125,10 @@ enum Command {
         #[arg(long)]
         require_beta_gate: bool,
 
+        /// JSON waiver file for measured contract-only rows that cannot prove a pinned-Stim ratio.
+        #[arg(long)]
+        beta_waivers: Option<PathBuf>,
+
         /// Fail when Stab allocation bytes regress more than the M12 beta memory budget.
         #[arg(long)]
         require_memory_gate: bool,
@@ -203,6 +208,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             require_profiler_notes,
             profiler_notes_dir,
             require_beta_gate,
+            beta_waivers,
             require_memory_gate,
             memory_baseline,
             thresholds,
@@ -221,6 +227,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     require_profiler_notes,
                     profiler_notes_dir,
                     require_beta_gate,
+                    beta_waivers,
                     require_memory_gate,
                     memory_baseline,
                     thresholds,

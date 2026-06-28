@@ -5,6 +5,7 @@ use crate::baseline::{
     compare_note, read_baseline_report, run_stab_compare_row, summarize_measurements,
     summarize_stab_measurements, validate_baseline_metadata,
 };
+use crate::beta_gate::{apply_beta_gate, read_beta_waivers};
 use crate::config::PREFIX;
 use crate::error::BenchError;
 use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner};
@@ -26,6 +27,7 @@ pub(crate) struct CompareOptions {
     pub(crate) require_profiler_notes: bool,
     pub(crate) profiler_notes_dir: Option<PathBuf>,
     pub(crate) require_beta_gate: bool,
+    pub(crate) beta_waivers: Option<PathBuf>,
     pub(crate) require_memory_gate: bool,
     pub(crate) memory_baseline: Option<PathBuf>,
     pub(crate) thresholds: Option<PathBuf>,
@@ -44,6 +46,9 @@ pub(crate) fn run_compare(
     if options.memory_baseline.is_some() && !options.require_memory_gate {
         return Err(BenchError::MemoryBaselineRequiresGate);
     }
+    if options.beta_waivers.is_some() && !options.require_beta_gate {
+        return Err(BenchError::BetaWaiversRequireGate);
+    }
     if options.require_memory_gate && !options.track_allocations {
         return Err(BenchError::MemoryGateRequiresAllocationTracking);
     }
@@ -59,6 +64,14 @@ pub(crate) fn run_compare(
         .as_ref()
         .map(|path| root.resolve_relative(path));
     let thresholds = threshold_path.as_deref().map(read_thresholds).transpose()?;
+    let beta_waivers_path = options
+        .beta_waivers
+        .as_ref()
+        .map(|path| root.resolve_relative(path));
+    let beta_waivers = beta_waivers_path
+        .as_deref()
+        .map(read_beta_waivers)
+        .transpose()?;
     let memory_baseline_path = options
         .memory_baseline
         .as_ref()
@@ -173,12 +186,13 @@ pub(crate) fn run_compare(
         .map_or_else(Default::default, |memory_baseline| {
             apply_memory_gate(&mut report_rows, memory_baseline)
         });
-    let beta_gate_findings = find_beta_gate_failures(&report_rows);
+    let beta_gate_findings = apply_beta_gate(&mut report_rows, beta_waivers.as_ref());
     let profiler_note_findings = if let Some(report_dir) = &options.report {
         write_compare_report(CompareReportWrite {
             root,
             baseline_report: &baseline_report,
             baseline_path: &baseline_path,
+            beta_waivers_path: beta_waivers_path.as_deref(),
             memory_baseline_path: memory_baseline_path.as_deref(),
             threshold_path: threshold_path.as_deref(),
             report_dir,
@@ -235,6 +249,7 @@ struct CompareReportWrite<'a> {
     root: &'a RepoRoot,
     baseline_report: &'a BaselineReport,
     baseline_path: &'a Path,
+    beta_waivers_path: Option<&'a Path>,
     memory_baseline_path: Option<&'a Path>,
     threshold_path: Option<&'a Path>,
     report_dir: &'a Path,
@@ -247,6 +262,7 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
         root,
         baseline_report,
         baseline_path,
+        beta_waivers_path,
         memory_baseline_path,
         threshold_path,
         report_dir,
@@ -280,6 +296,7 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
             primary: options.primary,
             require_profiler_notes: options.require_profiler_notes,
             require_beta_gate: options.require_beta_gate,
+            beta_waivers_path: beta_waivers_path.map(|path| path.display().to_string()),
             require_memory_gate: options.require_memory_gate,
             memory_baseline_path: memory_baseline_path.map(|path| path.display().to_string()),
             thresholds_path: threshold_path.map(|path| path.display().to_string()),
@@ -337,11 +354,6 @@ pub(crate) struct CompareRowBuild<'a> {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct ProfilerNoteFindings {
-    blockers: Vec<String>,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct BetaGateFindings {
     blockers: Vec<String>,
 }
 
@@ -452,6 +464,10 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         stab_allocation_count_max,
         stab_allocation_bytes_max,
         pass_fail_status: compare_pass_fail_status(status, baseline_status, relative_ratio),
+        beta_gate_status: "not-checked".to_string(),
+        beta_gate_waiver_reason: None,
+        beta_gate_waiver_follow_up: None,
+        beta_gate_error: None,
         memory_gate_status: "not-required".to_string(),
         memory_gate_baseline_bytes_max: None,
         memory_gate_allowed_bytes_max: None,
@@ -558,26 +574,6 @@ pub(crate) fn compare_incomplete_details(
     details.join("\n")
 }
 
-fn find_beta_gate_failures(rows: &[CompareRowResult]) -> BetaGateFindings {
-    let mut findings = BetaGateFindings::default();
-    for row in rows {
-        match row.pass_fail_status.as_str() {
-            "pass" => {}
-            "fail" => findings.blockers.push(format!(
-                "{}: ratio {} exceeds 2.000x beta gate",
-                row.id,
-                row.relative_ratio
-                    .map_or_else(|| "unknown".to_string(), |ratio| format!("{ratio:.3}x"))
-            )),
-            other => findings.blockers.push(format!(
-                "{}: beta gate is not proven because status is {other}",
-                row.id
-            )),
-        }
-    }
-    findings
-}
-
 fn apply_profiler_notes(
     rows: &mut [CompareRowResult],
     notes_dir: &Path,
@@ -682,7 +678,7 @@ mod tests {
 
     use super::{
         BaselineCompareStatus, CompareRowBuild, HOT_PATH_PROFILER_NOTE_RATIO, apply_profiler_notes,
-        build_compare_row_result, find_beta_gate_failures, validate_profiler_note_content,
+        build_compare_row_result, validate_profiler_note_content,
     };
     use crate::manifest::{BenchmarkRow, Milestone, Runner};
     use crate::report::{AllocationMeasurement, Measurement};
@@ -787,25 +783,6 @@ mod tests {
 
         assert_eq!(result.stab_allocation_count_max, Some(3));
         assert_eq!(result.stab_allocation_bytes_max, Some(2048));
-    }
-
-    #[test]
-    fn beta_gate_requires_every_selected_row_to_prove_a_pass() {
-        let pass = compare_row("passing-row", Some(1.25));
-        let fail = compare_row("failing-row", Some(2.25));
-        let missing = compare_row("missing-row", None);
-
-        let findings = find_beta_gate_failures(&[pass]);
-        assert!(findings.blockers.is_empty());
-
-        let findings = find_beta_gate_failures(&[fail, missing]);
-        assert_eq!(
-            findings.blockers,
-            vec![
-                "failing-row: ratio 2.250x exceeds 2.000x beta gate",
-                "missing-row: beta gate is not proven because status is not-comparable",
-            ]
-        );
     }
 
     fn compare_row(id: &str, ratio: Option<f64>) -> crate::report::CompareRowResult {

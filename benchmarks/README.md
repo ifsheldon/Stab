@@ -25,6 +25,11 @@ Pass `--primary` to select the frozen M12 primary matrix, which currently includ
 Pass `--profile release` to record the intended Cargo profile in compare output; the `just bench::compare` recipe builds the benchmark ops binary with Cargo's release profile before running the subcommand.
 Pass `--report target/benchmarks/latest` or another repository-relative directory below `target/benchmarks/` to write `compare.json` and `report.md`.
 Pass `--require-beta-gate` to fail when any selected row does not prove a pass against the 2.0x pinned-Stim beta performance gate.
+Pass `--beta-waivers <path>` with `--require-beta-gate` to accept only measured `contract-only` rows whose lack of a comparable pinned-Stim ratio is explained by a source-owned waiver.
+Waivers do not apply to missing baselines, pending runners, invalid baselines, or rows with measured ratios above the beta gate.
+Unused waivers fail the gate so the file stays in sync when a row becomes comparable or leaves the selected matrix.
+`m12-primary-beta-waivers.json` is the source-owned M12 waiver file for the remaining primary rows that have Stab-side timing evidence but no faithful public Stim baseline.
+Run `just bench::primary-beta --baseline <primary-baseline.json>` to check the M12 beta timing gate with source-owned profiler notes and waivers.
 Pass `--require-profiler-notes` with `--report` to fail when a row slower than 1.5x pinned Stim lacks a valid note at `<report>/profiler-notes/<benchmark-id>.md`.
 Profiler notes must include non-empty `Dominant cost:` and `Next owner action:` lines.
 Pass `--profiler-notes-dir benchmarks/profiler-notes/m12` to validate source-owned notes instead of report-local notes.
@@ -48,6 +53,23 @@ Threshold files are JSON with schema version 1:
 
 Only selected benchmark ids present in the threshold file are checked.
 Threshold ids must be benchmark-id safe because they are matched against report rows and may also be used by generated benchmark tooling.
+Beta waiver files are JSON with schema version 1:
+
+```json
+{
+  "schema_version": 1,
+  "rows": [
+    {
+      "id": "m4-circuit-canonical-print",
+      "reason": "Pinned Stim has no public comparable baseline for this exact workload.",
+      "follow_up": "Replace the waiver if a faithful baseline becomes available."
+    }
+  ]
+}
+```
+
+Waiver ids must be benchmark-id safe.
+Reasons and follow-up text must be non-empty because they are copied into the compare report as durable beta-gate evidence.
 Use `just bench::compare-allocations` to build `stab-bench` with the optional `count-allocations` feature and pass `--track-allocations` automatically.
 Allocation tracking runs an extra Stab-side measurement pass per reported measurement and records allocation counts and maximum live allocated bytes in `compare.json`; use plain `just bench::compare` for timing-gate evidence.
 Pass `--require-memory-gate --memory-baseline <compare.json>` with `just bench::compare-allocations` to compare selected rows against the first complete Stab allocation report.

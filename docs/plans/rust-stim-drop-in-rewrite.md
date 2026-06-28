@@ -443,7 +443,9 @@ Tasks:
 
 For M12 benchmark operations, the frozen primary matrix is every benchmark contract row from M4 through M11 except baseline metadata anchors.
 The M12 `performance-gate` placeholder row documents the gate and is not itself part of `just bench::compare --primary`.
-Completion-style performance runs should pass `--require-beta-gate`, which fails when any selected row lacks a proven Stab-vs-Stim ratio or exceeds the 2.0x beta performance gate.
+Completion-style performance runs should pass `--require-beta-gate`.
+Rows with faithful pinned-Stim baselines must prove a ratio no slower than the 2.0x beta performance gate.
+Measured `contract-only` rows that cannot have a faithful pinned-Stim ratio may pass the gate only when `--beta-waivers <path>` names a source-owned JSON waiver with a non-empty reason and follow-up; waiver files must reject stale entries, missing baselines, pending runners, invalid baselines, and rows with measured ratios above the beta gate.
 Profiler notes for compare reports live beside the report under `<report>/profiler-notes/<benchmark-id>.md`.
 When `--require-profiler-notes` is passed, every row slower than 1.5x pinned Stim must have a note with non-empty `Dominant cost:` and `Next owner action:` lines.
 Regression thresholds use JSON schema version 1 with benchmark ids and `max_relative_ratio` values, and `just bench::compare --thresholds <path>` fails configured selected rows that exceed their threshold or cannot produce a comparable ratio.
@@ -462,7 +464,7 @@ Done criteria:
 
 - `just oracle::run --implemented-only` passes before and after performance changes.
 - `just bench::compare --profile release --primary` produces a committed or archived report with no missing primary workloads.
-- Beta performance gate passes: every primary parser, generator, sampling, detection, DEM parsing, DEM sampling, and analyzer workload is no slower than 2.0x the pinned C++ Stim v1.16.0 median on the same machine.
+- Beta performance gate passes: every comparable primary parser, generator, sampling, detection, DEM parsing, DEM sampling, and analyzer workload is no slower than 2.0x the pinned C++ Stim v1.16.0 median on the same machine, and every remaining measured `contract-only` primary workload has a checked source-owned waiver explaining why no faithful ratio can be proven before beta.
 - Beta memory gate passes: no primary workload regresses peak allocations or resident memory by more than 25 percent relative to the first complete Stab benchmark report unless the report documents an accepted tradeoff.
 - Hot-path gate passes: every workload slower than 1.5x Stim has a profiler note naming the dominant cost and the next owner action.
 - Regression gate passes: workloads already at or below 1.25x Stim have benchmark thresholds checked by CI smoke or scheduled benchmark automation.

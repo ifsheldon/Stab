@@ -28,6 +28,11 @@ compare-allocations *args:
 primary-regression *args:
     cargo run -q -p stab-bench --profile release -- compare --primary --thresholds benchmarks/m12-primary-thresholds.json {{args}}
 
+# Check the M12 primary beta timing gate with source-owned contract-only waivers.
+[working-directory: '..']
+primary-beta *args:
+    cargo run -q -p stab-bench --profile release -- compare --primary --require-beta-gate --beta-waivers benchmarks/m12-primary-beta-waivers.json --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/m12 --report target/benchmarks/m12-primary-beta {{args}}
+
 # Check source-owned M12 primary memory-regression baseline.
 [working-directory: '..']
 primary-memory-regression *args:

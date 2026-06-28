@@ -34,11 +34,23 @@ pub(crate) enum BenchError {
         source: std::io::Error,
     },
 
+    #[error("failed to read benchmark beta-waiver file {path}: {source}")]
+    ReadBetaWaivers {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
     #[error("failed to parse benchmark manifest: {0}")]
     ParseManifest(#[from] csv::Error),
 
     #[error("failed to parse benchmark threshold file {path}: {source}")]
     ParseThresholds {
+        path: PathBuf,
+        source: serde_json::Error,
+    },
+
+    #[error("failed to parse benchmark beta-waiver file {path}: {source}")]
+    ParseBetaWaivers {
         path: PathBuf,
         source: serde_json::Error,
     },
@@ -54,6 +66,9 @@ pub(crate) enum BenchError {
 
     #[error("benchmark threshold file {path} is invalid:\n{details}")]
     ThresholdValidation { path: PathBuf, details: Box<str> },
+
+    #[error("benchmark beta-waiver file {path} is invalid:\n{details}")]
+    BetaWaiverValidation { path: PathBuf, details: Box<str> },
 
     #[error("memory baseline compare report {path} is invalid:\n{details}")]
     MemoryBaselineValidation { path: PathBuf, details: Box<str> },
@@ -162,6 +177,9 @@ pub(crate) enum BenchError {
 
     #[error("beta performance gate failed:\n{details}")]
     BetaGateFailed { details: Box<str> },
+
+    #[error("--beta-waivers requires --require-beta-gate")]
+    BetaWaiversRequireGate,
 
     #[error("--require-memory-gate requires --track-allocations")]
     MemoryGateRequiresAllocationTracking,
