@@ -10,21 +10,21 @@ Objective: implement measurement-to-detection conversion and the CLI workflows t
 
 Complete with spec follow-ups.
 
-The public M9 workflow slice is implemented and verified for measurement-record detector conversion, `detect`, `m2d`, observable routing, Pauli-target observable flips in `detect`, product-measurement frame updates, text formats, `b8`, `detect` `ptb64` outputs, `m2d` `ptb64` input, `m2d` `ptb64` output rejection, generated-circuit `sample -> m2d` round trips, clear `--ran_without_feedback` rejection, structural gauge behavior, and report-only benchmark runners.
+The public M9 workflow slice is implemented and verified for measurement-record detector conversion, `detect`, `m2d`, observable routing, Pauli-target observable flips in `detect`, product-measurement frame updates, text formats, `b8`, `detect` `ptb64` outputs, `m2d` `ptb64` input, `m2d` `ptb64` output rejection, generated-circuit `sample -> m2d` round trips, clear sweep-conditioned conversion rejection, clear `--ran_without_feedback` rejection, structural gauge behavior, and report-only benchmark runners.
 The remaining work is explicitly logged as milestone under-specification because the current roadmap does not yet define whether it belongs in M9, a detector-analysis submilestone, or M12 performance hardening.
 
 ## Tests Ported Or Created
 
-- Added `crates/stab-core/src/detection.rs` tests for reference-sample subtraction, `--skip_reference_sample`, repeats, coordinate annotations, empty detectors, empty-detector circuits, invalid `rec` references, observable ids, `dets`/`hits`/`01`/`b8` writers, `ptb64` detection writers, gauge-detector structural behavior, Pauli-target observable flips in `detect`, product-measurement frame updates, frame-path reference-sample measurement-bit cancellation, invalid frame-path feedback references, and bounded record-shape validation.
+- Added `crates/stab-core/src/detection.rs` tests for reference-sample subtraction, `--skip_reference_sample`, repeats, coordinate annotations, empty detectors, empty-detector circuits, invalid `rec` references, explicit sweep-conditioned conversion rejection until sweep inputs exist, observable ids, `dets`/`hits`/`01`/`b8` writers, `ptb64` detection writers, gauge-detector structural behavior, Pauli-target observable flips in `detect`, product-measurement frame updates, frame-path reference-sample measurement-bit cancellation, invalid frame-path feedback references, and bounded record-shape validation.
 - Added `crates/stab-core/src/result_formats.rs` `ptb64` tests for measurement-major encoding, full-input decoding, truncated input rejection, zero-width input rejection, and inferred record counts.
-- Added `crates/stab-cli/src/tests.rs` coverage for `detect`, `--detect`, `m2d`, `--m2d`, `--append_observables`, deprecated `--prepend_observables`, `--obs_out`, Pauli-target observable flips in `detect`, product-measurement Pauli-observable flips in `detect`, `m2d` Pauli-target conversion ignore behavior, `b8` input/output, `detect` `ptb64` detector and observable outputs, `m2d` `ptb64` measurement input, `m2d` `ptb64` output rejection, `dets` default observable placement, zero-shot `detect`, zero-width and oversized `ptb64` input rejection, observable-route conflicts, measurement-width errors, generated M7 circuit `sample -> m2d` round trips against `detect`, and clear `--ran_without_feedback` rejection until feedback-removal conversion is promoted.
+- Added `crates/stab-cli/src/tests.rs` coverage for `detect`, `--detect`, `m2d`, `--m2d`, `--append_observables`, deprecated `--prepend_observables`, `--obs_out`, Pauli-target observable flips in `detect`, product-measurement Pauli-observable flips in `detect`, `m2d` Pauli-target conversion ignore behavior, `b8` input/output, `detect` `ptb64` detector and observable outputs, `m2d` `ptb64` measurement input, `m2d` `ptb64` output rejection, `dets` default observable placement, zero-shot `detect`, zero-width and oversized `ptb64` input rejection, observable-route conflicts, measurement-width errors, generated M7 circuit `sample -> m2d` round trips against `detect`, clear sweep-conditioned conversion rejection until sweep inputs exist, and clear `--ran_without_feedback` rejection until feedback-removal conversion is promoted.
 - Added M9 exact oracle fixtures for public `detect`, public `m2d`, `m2d` `ptb64` input, `m2d` `ptb64` output rejection, and reference-sample parity from `measurements_to_detection_events`.
 - Added M9 structural oracle rows for detection-event sampling, Pauli-target observable frame-simulator parity, measurement-to-detection conversion subsets, and generated M7 circuit detection round trips.
 - Added M9 benchmark compare runners for `detect`, `m2d`, `b8`, `dets`, and generated repetition-code representative workloads.
 
 ## Implementation Areas
 
-- `crates/stab-core/src/detection.rs` owns the M9 conversion plan, reference-sample subtraction, detector and observable record construction, output writers, explicit observable placement modes, detection-sampling validation, and temporary resource limits.
+- `crates/stab-core/src/detection.rs` owns the M9 conversion plan, reference-sample subtraction, detector and observable record construction, output writers, explicit observable placement modes, detection-sampling validation, explicit sweep-conditioned conversion rejection until sweep inputs exist, and temporary resource limits.
 - `crates/stab-core/src/detection/frame.rs` owns the M9 scalar detector-frame path for Pauli-target observable flips in `detect`, including basis measurements, product measurements, Pauli noise, selected Clifford propagation, and explicit unsupported-instruction errors.
 - `crates/stab-core/src/result_formats.rs` now has a measurement-only `dets` reader for `m2d` so `D` and `L` tokens are not misread as measurement tokens, plus complete-file `ptb64` decoding and record-count inference for `m2d` measurement-major input.
 - `crates/stab-cli/src/detection.rs` implements `detect` and `m2d`, zero-shot `detect` behavior, observable-output routing validation, `ptb64` dispatch for supported M9 detection workflows, Stim-compatible `m2d` `ptb64` output rejection, decoded `ptb64` input bounds, limited `m2d` input reads, and clear unsupported-scope errors for `--ran_without_feedback` and unsupported detection formats; `crates/stab-cli/src/lib.rs` retains command dispatch and Stim legacy aliases.
@@ -56,7 +56,6 @@ The concrete implementation issues were fixed with explicit observable output mo
 
 Open M9 spec follow-ups:
 
-- `2026-06-27 - M9: Sweep-Conditioned Detection Conversion Scope`
 - `2026-06-27 - M9: Benchmark Baseline Completeness`
 - `2026-06-27 - M9: Detection Conversion Streaming And Scale Limits`
 
@@ -68,6 +67,7 @@ Resolved M9 spec entries:
 - `2026-06-27 - M9: Generated Fixture Round-Trip Coverage`
 - `2026-06-27 - M9: Feedback-Removal Conversion Scope`
 - `2026-06-27 - M9: Detector Analysis Utility Row Ownership`
+- `2026-06-27 - M9: Sweep-Conditioned Detection Conversion Scope`
 
 ## Verification Commands
 
@@ -75,6 +75,7 @@ Resolved M9 spec entries:
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo test --workspace`
 - `cargo test -p stab-core detection`
+- `cargo test -p stab-core detection_conversion_rejects_sweep_conditioned_circuits_until_sweep_inputs_exist`
 - `cargo test -p stab-core detection_sampling`
 - `cargo test -p stab-core result_formats::tests::ptb64_records_are_measurement_major_over_64_shot_groups`
 - `cargo test -p stab-core measure_record_reader_handles_multiple_records`
@@ -85,6 +86,7 @@ Resolved M9 spec entries:
 - `cargo test -p stab-cli m2d`
 - `cargo test -p stab-cli m2d_ignores_pauli_target_observables_like_stim_conversion`
 - `cargo test -p stab-cli m2d_round_trips_generated_m7_circuits_in_text_and_bitpacked_formats`
+- `cargo test -p stab-cli m2d_rejects_sweep_conditioned_conversion_until_sweep_inputs_exist`
 - `cargo test -p stab-cli m2d_rejects_ran_without_feedback_until_feedback_removal_is_implemented`
 - `cargo test -p stab-bench m9_benchmark_rows_have_stab_compare_runners`
 - `just oracle::matrix --check`

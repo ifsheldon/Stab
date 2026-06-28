@@ -14,6 +14,8 @@ use crate::{
 const MAX_DETECTION_RECORD_BITS: usize = 1_000_000;
 const MAX_DETECTION_BUFFER_BITS: usize = 64_000_000;
 const MAX_DETECTION_REPEAT_UNROLL: u64 = 100_000;
+const UNSUPPORTED_SWEEP_DETECTION_MESSAGE: &str =
+    "sweep-conditioned detection conversion requires sweep input support";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DetectionConversionOptions {
@@ -87,6 +89,7 @@ pub fn sample_detection_events(
     shots: usize,
     seed: Option<u64>,
 ) -> CircuitResult<DetectionConversionOutput> {
+    validate_no_sweep_targets(circuit)?;
     if circuit_has_pauli_observable_targets(circuit) {
         return sample_detection_events_with_frame(circuit, shots, seed);
     }
@@ -115,6 +118,7 @@ pub fn detection_record_width(circuit: &Circuit) -> CircuitResult<usize> {
 }
 
 pub fn validate_detection_sampling_circuit(circuit: &Circuit) -> CircuitResult<()> {
+    validate_no_sweep_targets(circuit)?;
     if circuit_has_pauli_observable_targets(circuit) {
         validate_frame_detection_circuit(circuit)
     } else {
@@ -228,6 +232,7 @@ impl ConversionPlan {
     }
 
     fn visit_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        reject_sweep_targets(instruction)?;
         match instruction.gate().canonical_name() {
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
@@ -388,6 +393,30 @@ impl ConversionPlan {
             observables,
         })
     }
+}
+
+fn validate_no_sweep_targets(circuit: &Circuit) -> CircuitResult<()> {
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(instruction) => reject_sweep_targets(instruction)?,
+            CircuitItem::RepeatBlock(repeat) => validate_no_sweep_targets(repeat.body())?,
+        }
+    }
+    Ok(())
+}
+
+fn reject_sweep_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
+    if let Some(target) = instruction
+        .targets()
+        .iter()
+        .find(|target| target.is_sweep_bit_target())
+    {
+        return Err(CircuitError::invalid_result_format(format!(
+            "{UNSUPPORTED_SWEEP_DETECTION_MESSAGE}; found {target} in {}",
+            instruction.gate().canonical_name()
+        )));
+    }
+    Ok(())
 }
 
 fn reference_sample(circuit: &Circuit, measurement_count: usize) -> CircuitResult<Vec<bool>> {
@@ -680,6 +709,50 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn detection_conversion_rejects_sweep_conditioned_circuits_until_sweep_inputs_exist() {
+        let conversion_circuit = Circuit::from_stim_str("CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n")
+            .expect("parse sweep-conditioned conversion circuit");
+        let conversion_error = convert_measurements_to_detection_events(
+            &conversion_circuit,
+            &[vec![false]],
+            DetectionConversionOptions {
+                skip_reference_sample: true,
+            },
+        )
+        .expect_err("reject conversion without sweep inputs");
+        assert!(
+            conversion_error
+                .to_string()
+                .contains(UNSUPPORTED_SWEEP_DETECTION_MESSAGE),
+            "{conversion_error}"
+        );
+
+        let repeated_circuit =
+            Circuit::from_stim_str("REPEAT 2 {\n    CX sweep[0] 0\n}\nM 0\nDETECTOR rec[-1]\n")
+                .expect("parse repeated sweep-conditioned circuit");
+        let repeated_error =
+            measurement_record_count(&repeated_circuit).expect_err("reject repeated sweep");
+        assert!(
+            repeated_error
+                .to_string()
+                .contains(UNSUPPORTED_SWEEP_DETECTION_MESSAGE),
+            "{repeated_error}"
+        );
+
+        let frame_circuit =
+            Circuit::from_stim_str("RX 0\nCX sweep[0] 0\nOBSERVABLE_INCLUDE(0) X0\n")
+                .expect("parse frame-path sweep-conditioned circuit");
+        let frame_error =
+            sample_detection_events(&frame_circuit, 1, Some(5)).expect_err("reject frame sweep");
+        assert!(
+            frame_error
+                .to_string()
+                .contains(UNSUPPORTED_SWEEP_DETECTION_MESSAGE),
+            "{frame_error}"
+        );
     }
 
     #[test]

@@ -332,6 +332,7 @@ The M9 scalar frame subset for Pauli-target observable detection includes annota
 M9 bit-packed detection parity includes `b8` for `detect` and `m2d` detector and observable streams, plus `ptb64` for `detect` detector output, `detect --obs_out`, and `m2d` measurement input.
 `m2d --out_format=ptb64` and `m2d --obs_out_format=ptb64` must reject like pinned Stim v1.16.0 because its detection-event writer does not accept `ptb64` output for `m2d`.
 The `ptb64` paths must enforce Stim-compatible 64-shot grouping for generated outputs, read complete measurement-major input groups for `m2d`, reject zero-width `ptb64` measurement input because the shot count is ambiguous, and bound decoded `m2d` shot records before allocation.
+M9 does not implement sweep input data for detection conversion; `detect` and `m2d` must reject sweep-conditioned circuits with a clear error until a later sweep-aware simulation milestone introduces typed sweep inputs and CLI flags.
 M9 does not implement feedback-removal conversion for `m2d --ran_without_feedback`; the M9 CLI must reject that flag with a clear error instead of silently treating skipped-feedback measurement records as ordinary measurement records.
 The detector-analysis utility rows for detecting regions, missing detectors, and transform-without-feedback remain manifest-only follow-up scope until a later detector-analysis milestone promotes explicit Rust APIs and acceptance fixtures.
 
@@ -346,9 +347,9 @@ Done criteria:
 
 - `just oracle::run --milestone M9 --exact` passes deterministic detection examples.
 - `just oracle::run --milestone M9 --structural` passes gauge-detector structural equivalence cases.
-- `cargo test -p stab-core detection` covers coordinate shifts, repeats, measurement-record observables, Pauli-target observable flips, empty-detector circuits, and invalid measurement references.
+- `cargo test -p stab-core detection` covers coordinate shifts, repeats, measurement-record observables, Pauli-target observable flips, empty-detector circuits, invalid measurement references, and explicit rejection for sweep-conditioned conversion until sweep inputs exist.
 - `cargo test -p stab-core detection_sampling` covers frame-simulator Pauli-target observable parity for basis resets and product measurements.
-- `cargo test -p stab-cli m9` covers public `detect` and `m2d` CLI behavior, including `b8`, `detect` `ptb64` outputs, `m2d` `ptb64` input, `m2d` `ptb64` output rejection, `dets`, observable side outputs, route conflicts, zero-shot `detect`, zero-width and oversized `ptb64` input rejection, Pauli-target observable behavior, generated M7 repetition, rotated-surface, unrotated-surface, and color-code `sample -> m2d` round trips against `detect` for `01` and `b8`, and clear `--ran_without_feedback` rejection until feedback-removal conversion is implemented.
+- `cargo test -p stab-cli m9` covers public `detect` and `m2d` CLI behavior, including `b8`, `detect` `ptb64` outputs, `m2d` `ptb64` input, `m2d` `ptb64` output rejection, `dets`, observable side outputs, route conflicts, zero-shot `detect`, zero-width and oversized `ptb64` input rejection, Pauli-target observable behavior, generated M7 repetition, rotated-surface, unrotated-surface, and color-code `sample -> m2d` round trips against `detect` for `01` and `b8`, clear sweep-conditioned conversion rejection until sweep inputs exist, and clear `--ran_without_feedback` rejection until feedback-removal conversion is implemented.
 - `just bench::compare --milestone M9` reports `detect` and `m2d` throughput separately for text and bit-packed formats.
 
 ### M10: Detector Error Model Core

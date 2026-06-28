@@ -214,12 +214,12 @@ Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now splits M9 public workf
 
 ## 2026-06-27 - M9: Sweep-Conditioned Detection Conversion Scope
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit against pinned Stim `measurements_to_detection_events.test.cc`.
 Current text: M9 requires measurement-to-detection conversion from measurement records and circuits with detectors, observables, coordinate shifts, and repeats, but it does not mention sweep data or sweep-conditioned detector expectations.
 Gap: upstream measurement-to-detection tests include sweep-bit inputs that can alter expected detector parities through sweep-controlled operations, while the current Stab converter and `m2d` CLI accept only measurements, a circuit, and reference-sample options.
 Proposed amendment: state whether sweep-conditioned conversion is in M9 scope. If it is, require typed sweep inputs, `--sweep` and `--sweep_format` CLI flags, and fixtures for sweep count mismatches and sweep-controlled parity changes. If not, move those upstream subcases to the first milestone that introduces sweep-aware simulation.
-Resolution: pending plan update.
+Resolution: M9 now explicitly excludes sweep input data for detection conversion. `detect`, `m2d`, and core detection conversion reject sweep-conditioned circuits with a clear error until a later sweep-aware simulation milestone introduces typed sweep inputs and CLI flags. Evidence is `cargo test -p stab-core detection_conversion_rejects_sweep_conditioned_circuits_until_sweep_inputs_exist --quiet`, `cargo test -p stab-cli m2d_rejects_sweep_conditioned_conversion_until_sweep_inputs_exist --quiet`, and the updated `coverage-simulators-measurements-to-detection-events-rust` manifest row.
 
 ## 2026-06-27 - M9: Benchmark Baseline Completeness
 

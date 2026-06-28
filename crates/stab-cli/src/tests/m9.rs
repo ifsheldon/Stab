@@ -394,6 +394,37 @@ fn m2d_rejects_ran_without_feedback_until_feedback_removal_is_implemented() {
 }
 
 #[test]
+fn m2d_rejects_sweep_conditioned_conversion_until_sweep_inputs_exist() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    std::fs::write(&circuit_path, "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").expect("write circuit");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=01",
+            "--out_format=dets",
+            "--circuit",
+            circuit_path.to_str().expect("utf-8 path"),
+        ],
+        b"0\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(stdout, b"");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("sweep-conditioned detection conversion requires sweep input support")
+    );
+}
+
+#[test]
 fn m2d_supports_reference_skip_observables_and_b8_input() {
     let temp_dir = tempdir().expect("temp dir");
     let circuit_path = temp_dir.path().join("input.stim");
