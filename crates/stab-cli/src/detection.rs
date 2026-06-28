@@ -14,7 +14,7 @@ use stab_core::{
 };
 
 use crate::{
-    CliError, RecordFormatArg, SampleOutFormatArg, parse_circuit_bytes, read_input,
+    CliError, MAX_CIRCUIT_INPUT_BYTES, RecordFormatArg, SampleOutFormatArg, parse_circuit_bytes,
     read_limited_input, write_empty_observables, write_output,
 };
 
@@ -128,7 +128,12 @@ where
         write_output(args.output.as_ref(), stdout, &[])?;
         return write_empty_observables(args.obs_output.as_ref(), stdout);
     }
-    let input_bytes = read_input(args.input.as_ref(), input)?;
+    let input_bytes = read_limited_input(
+        args.input.as_ref(),
+        input,
+        MAX_CIRCUIT_INPUT_BYTES,
+        "detect circuit input",
+    )?;
     let circuit = parse_circuit_bytes(&input_bytes)?;
     validate_detection_sampling_circuit(&circuit)?;
     let detection_output = sample_detection_events(&circuit, args.shots, args.seed)?;
@@ -152,10 +157,12 @@ where
         return Err(CliError::UnsupportedRanWithoutFeedback);
     }
     validate_m2d_output_formats(&args)?;
-    let circuit_bytes = std::fs::read(&args.circuit).map_err(|source| CliError::ReadPath {
-        path: args.circuit.clone(),
-        source,
-    })?;
+    let circuit_bytes = read_limited_input(
+        Some(&args.circuit),
+        input,
+        MAX_CIRCUIT_INPUT_BYTES,
+        "m2d circuit input",
+    )?;
     let circuit = parse_circuit_bytes(&circuit_bytes)?;
     let measurement_width = measurement_record_count(&circuit)?;
     let input_bytes =

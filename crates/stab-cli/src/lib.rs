@@ -29,8 +29,12 @@ use stab_core::{
     GeneratedCircuit, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
     SampleFormat, SurfaceCodeParams, SurfaceCodeTask, generate_color_code_circuit,
     generate_repetition_code_circuit, generate_surface_code_circuit,
+    result_formats::{MeasureRecordWriter, validate_ptb64_shot_count},
 };
 use thiserror::Error;
+
+pub(crate) const MAX_CIRCUIT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_CONVERT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -716,7 +720,12 @@ where
         return Err(CliError::MissingRecordTypesForDets);
     }
     let width = convert_record_width(&args)?;
-    let input = read_input(args.input.as_ref(), stdin)?;
+    let input = read_limited_input(
+        args.input.as_ref(),
+        stdin,
+        MAX_CONVERT_INPUT_BYTES,
+        "convert input",
+    )?;
     let records = parse_zero_one_records(&input, width)?;
     let output = match args.out_format {
         RecordFormatArg::ZeroOne => write_zero_one_records(&records),
@@ -737,7 +746,12 @@ where
     R: Read,
     W: Write,
 {
-    let input = read_input(args.input.as_ref(), stdin)?;
+    let input = read_limited_input(
+        args.input.as_ref(),
+        stdin,
+        MAX_CONVERT_INPUT_BYTES,
+        "convert input",
+    )?;
     let text = std::str::from_utf8(&input).map_err(|_| CliError::InvalidUtf8Input)?;
     let circuit = Circuit::from_stim_str(text)?;
     let output = circuit.to_stim_string();
@@ -760,22 +774,6 @@ fn typed_record_width(args: &ConvertArgs) -> Result<usize, CliError> {
         .checked_add(args.num_detectors)
         .and_then(|value| value.checked_add(args.num_observables))
         .ok_or(CliError::MeasurementCountOverflow)
-}
-
-pub(crate) fn read_input<R>(path: Option<&PathBuf>, stdin: &mut R) -> Result<Vec<u8>, CliError>
-where
-    R: Read,
-{
-    if let Some(path) = path {
-        std::fs::read(path).map_err(|source| CliError::ReadPath {
-            path: path.clone(),
-            source,
-        })
-    } else {
-        let mut input = Vec::new();
-        stdin.read_to_end(&mut input).map_err(CliError::ReadInput)?;
-        Ok(input)
-    }
 }
 
 pub(crate) fn write_output<W>(
@@ -911,54 +909,161 @@ where
         )
         .map_err(CliError::WriteOutput)?;
     }
-    let input_bytes = read_input(args.input.as_ref(), input)?;
+    let input_bytes = read_limited_input(
+        args.input.as_ref(),
+        input,
+        MAX_CIRCUIT_INPUT_BYTES,
+        "sample circuit input",
+    )?;
     let circuit_text = std::str::from_utf8(&input_bytes).map_err(|_| CliError::InvalidUtf8Input)?;
     let circuit = Circuit::from_stim_str(circuit_text)?;
     let sampler = CompiledSampler::compile(&circuit)?;
     let skip_reference_sample = args.skip_reference_sample || args.frame0;
-    let output = match args.out_format {
-        SampleOutFormatArg::ZeroOne => sampler.sample_bytes_with_seed_and_reference_mode(
+    if args.out_format == SampleOutFormatArg::Ptb64 {
+        validate_ptb64_shot_count(args.shots)?;
+    }
+    if let Some(output_path) = args.output.as_ref() {
+        let mut output =
+            std::fs::File::create(output_path).map_err(|source| CliError::WritePath {
+                path: output_path.clone(),
+                source,
+            })?;
+        return write_sample_output(
+            &sampler,
             args.shots,
-            SampleFormat::ZeroOne,
+            args.out_format,
             args.seed,
             skip_reference_sample,
-        ),
-        SampleOutFormatArg::B8 => sampler.sample_bytes_with_seed_and_reference_mode(
-            args.shots,
-            SampleFormat::B8,
-            args.seed,
-            skip_reference_sample,
-        ),
-        SampleOutFormatArg::R8 => sampler.sample_bytes_with_seed_and_reference_mode(
-            args.shots,
-            SampleFormat::R8,
-            args.seed,
-            skip_reference_sample,
-        ),
-        SampleOutFormatArg::Ptb64 => sampler.sample_ptb64_bytes_with_seed_and_reference_mode(
-            args.shots,
-            args.seed,
-            skip_reference_sample,
-        )?,
-        SampleOutFormatArg::Hits => sampler.sample_bytes_with_seed_and_reference_mode(
-            args.shots,
-            SampleFormat::Hits,
-            args.seed,
-            skip_reference_sample,
-        ),
-        SampleOutFormatArg::Dets => sampler.sample_bytes_with_seed_and_reference_mode(
-            args.shots,
-            SampleFormat::Dets,
-            args.seed,
-            skip_reference_sample,
-        ),
-    };
-    write_output(args.output.as_ref(), stdout, &output)
+            &mut output,
+        )
+        .map_err(|source| CliError::WritePath {
+            path: output_path.clone(),
+            source,
+        });
+    }
+    write_sample_output(
+        &sampler,
+        args.shots,
+        args.out_format,
+        args.seed,
+        skip_reference_sample,
+        stdout,
+    )
+    .map_err(CliError::WriteOutput)
 }
 
 pub(crate) fn parse_circuit_bytes(input: &[u8]) -> Result<Circuit, CliError> {
     let circuit_text = std::str::from_utf8(input).map_err(|_| CliError::InvalidUtf8Input)?;
     Ok(Circuit::from_stim_str(circuit_text)?)
+}
+
+fn write_sample_output<W>(
+    sampler: &CompiledSampler,
+    shots: usize,
+    format: SampleOutFormatArg,
+    seed: Option<u64>,
+    skip_reference_sample: bool,
+    output: &mut W,
+) -> std::io::Result<()>
+where
+    W: Write,
+{
+    match format {
+        SampleOutFormatArg::Ptb64 => {
+            write_ptb64_sample_output(sampler, shots, seed, skip_reference_sample, output)
+        }
+        _ => write_record_sample_output(
+            sampler,
+            shots,
+            format.sample_format().map_err(std::io::Error::other)?,
+            seed,
+            skip_reference_sample,
+            output,
+        ),
+    }
+}
+
+fn write_record_sample_output<W>(
+    sampler: &CompiledSampler,
+    shots: usize,
+    format: SampleFormat,
+    seed: Option<u64>,
+    skip_reference_sample: bool,
+    output: &mut W,
+) -> std::io::Result<()>
+where
+    W: Write,
+{
+    sampler.for_each_sample_with_seed_and_reference_mode(
+        shots,
+        seed,
+        skip_reference_sample,
+        |record| {
+            let mut writer = MeasureRecordWriter::new(format);
+            writer.write_bits(record);
+            writer.write_end();
+            output.write_all(&writer.into_bytes())
+        },
+    )
+}
+
+fn write_ptb64_sample_output<W>(
+    sampler: &CompiledSampler,
+    shots: usize,
+    seed: Option<u64>,
+    skip_reference_sample: bool,
+    output: &mut W,
+) -> std::io::Result<()>
+where
+    W: Write,
+{
+    let mut group = Vec::with_capacity(64);
+    sampler.for_each_sample_with_seed_and_reference_mode(
+        shots,
+        seed,
+        skip_reference_sample,
+        |record| {
+            group.push(record.to_vec());
+            if group.len() == 64 {
+                write_ptb64_group(&group, output)?;
+                group.clear();
+            }
+            Ok::<(), std::io::Error>(())
+        },
+    )?;
+    debug_assert!(group.is_empty());
+    Ok(())
+}
+
+fn write_ptb64_group<W>(records: &[Vec<bool>], output: &mut W) -> std::io::Result<()>
+where
+    W: Write,
+{
+    let bits_per_record = records.first().map_or(0, Vec::len);
+    let mut words = vec![0u64; bits_per_record];
+    for (shot_index, record) in records.iter().enumerate() {
+        if record.len() != bits_per_record {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "internal sampler emitted non-uniform ptb64 records",
+            ));
+        }
+        for (bit_index, bit) in record.iter().enumerate() {
+            if *bit {
+                let word = words.get_mut(bit_index).ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "internal sampler emitted ptb64 bit outside the record width",
+                    )
+                })?;
+                *word |= 1u64 << shot_index;
+            }
+        }
+    }
+    for word in words {
+        output.write_all(&word.to_le_bytes())?;
+    }
+    Ok(())
 }
 
 fn write_empty_observables<W>(output_path: Option<&PathBuf>, stdout: &mut W) -> Result<(), CliError>

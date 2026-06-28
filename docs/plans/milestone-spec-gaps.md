@@ -23,6 +23,15 @@ None.
 
 ## Resolved Entries
 
+## 2026-06-28 - M12: CLI Sampling And Input Resource Boundaries
+
+Status: Resolved
+Revealed by: final GOAL full-code-review of public CLI resource handling.
+Current text: M12 required allocation tracking, sampler hot-path optimization, memory gates, and future streaming detection conversion, but did not explicitly require the public `sample` CLI to avoid materializing all generated shots or require every implemented public CLI input path to use a bounded reader or streaming parser.
+Gap: `stab sample` could build the full output buffer before writing, and some public `sample`, `convert`, `detect`, and `m2d` circuit or result-input reads bypassed the existing bounded input helper. The benchmark and memory-gate criteria did not by themselves prove hostile-input or huge-output CLI behavior.
+Proposed amendment: add a M12 task and done criterion requiring public CLI resource-boundary regression tests: generated sample output must stream through the writer in bounded chunks, and implemented public circuit or result-input reads must have documented caps or streaming readers.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now requires CLI resource-boundary hardening in M12. The implementation adds `CompiledSampler::for_each_sample_with_seed_and_reference_mode`, streams `stab sample` output per shot or per 64-shot `ptb64` group, and routes public `sample`, `convert`, `detect`, and `m2d` circuit or result-input reads through documented 64 MiB caps unless the command already has a narrower streaming or bounded reader. Evidence includes `cargo test -p stab-core sampling streaming_samples_match_seeded_record_samples`, `cargo test -p stab-cli sample_streams_output_without_materializing_all_shots`, and `cargo test -p stab-cli oversized`.
+
 ## 2026-06-28 - M12: Optimization Log Evidence Strength
 
 Status: Resolved

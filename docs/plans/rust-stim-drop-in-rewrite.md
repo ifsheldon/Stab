@@ -495,6 +495,7 @@ Tasks:
 - Profile every benchmark that is slower than the beta gate before optimizing it, and store a short profiler note beside the benchmark report.
 - Optimize only behind existing abstractions unless profiler evidence justifies a new abstraction.
 - Tune portable SIMD lane widths, memory layouts, allocation patterns, and hot-loop structure behind `stab-core` bit, sampler, detector, and DEM modules.
+- Harden public CLI resource boundaries introduced by the core milestones: `stab sample` must be able to write generated output in bounded chunks without materializing all shots, and public circuit or result-input reads must either have a documented cap or a streaming reader.
 - Implement compiled or streaming detection conversion for large decoder workloads when profiler and benchmark evidence show the M9 materialized converter is the bottleneck, processing records in bounded batches, preserving folded repeat structure where possible, avoiding duplicate sampler analysis, and documenting any remaining temporary limits.
 - Add allocation tracking for parser, sampler compilation, detector conversion, analyzer, and DEM sampler hot paths.
 - Add or promote large generated-code `detect` and `m2d` benchmark rows when streaming detection conversion is implemented, including at least one folded-repeat detector workload and one primary-matrix generated-code workload.
@@ -530,6 +531,7 @@ Linked tests and benchmarks:
 - Full Benchmark Plan below, including `.stim` parse/print, `gen`, tableau/Pauli primitives, `sample`, `detect`, `m2d`, `analyze_errors`, `.dem` parse/print, and `sample_dem`.
 - Benchmark source hierarchy from `docs/plans/stim-test-porting-plan.md`.
 - Internal simulator cross-checks for graph and vector simulator behavior from `src/stim/simulators/graph_simulator.test.cc` and `src/stim/simulators/vector_simulator.test.cc`.
+- CLI resource-boundary regression tests for streaming sample output and bounded `sample`, `convert`, `detect`, and `m2d` inputs.
 - All oracle suites for M4 through M11, because performance changes must preserve functional parity.
 
 Graph/vector simulator evidence is scoped to Stab's public tableau and amplitude semantics for M12; adding public graph or vector simulator APIs remains outside this milestone unless a later milestone makes those APIs part of the drop-in surface.
@@ -537,6 +539,7 @@ Graph/vector simulator evidence is scoped to Stab's public tableau and amplitude
 Done criteria:
 
 - `just oracle::run --implemented-only` passes before and after performance changes.
+- Public CLI resource-boundary tests pass: `stab sample` streams output through the writer, and the implemented public CLI circuit and result-input reads use documented caps or streaming readers.
 - `just bench::compare --profile release --primary` produces a committed or archived report with no missing primary workloads.
 - Beta performance gate passes: every comparable primary parser, generator, sampling, detection, DEM parsing, DEM sampling, and analyzer workload is assigned a machine-readable comparability class and is no slower than 2.0x the pinned C++ Stim v1.16.0 median on the same machine after a Stab-side warmup pass and three recorded measurement runs, every completion-style beta report records `command.warmup=true` and `command.measurement_runs >= 3`, and every remaining measured `contract-only` primary workload has a checked source-owned waiver explaining why no faithful ratio can be proven before beta.
 - Beta memory gate passes: no primary workload regresses peak live allocations or sampled resident memory by more than 25 percent relative to the first complete Stab benchmark report unless the report documents an accepted tradeoff.

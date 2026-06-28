@@ -18,6 +18,7 @@ mod operation;
 pub(crate) mod pauli_product;
 mod small_frame;
 mod stabilizer_frame;
+mod stream;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledSampler {
@@ -51,11 +52,21 @@ impl CompiledSampler {
         seed: Option<u64>,
         skip_reference_sample: bool,
     ) -> Vec<Vec<bool>> {
-        let mut rng = sampler_rng(seed);
-        let reference_sample = skip_reference_sample.then(|| self.reference_sample());
-        (0..shots)
-            .map(|_| self.sample_shot_with_reference(&mut rng, reference_sample.as_deref()))
-            .collect()
+        let mut samples = Vec::with_capacity(shots);
+        let result = self.for_each_sample_with_seed_and_reference_mode(
+            shots,
+            seed,
+            skip_reference_sample,
+            |sample| {
+                samples.push(sample.to_vec());
+                Ok::<(), std::convert::Infallible>(())
+            },
+        );
+        match result {
+            Ok(()) => {}
+            Err(error) => match error {},
+        }
+        samples
     }
 
     pub fn sample_zero_one_bytes(&self, shots: usize) -> Vec<u8> {

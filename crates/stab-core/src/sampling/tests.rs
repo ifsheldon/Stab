@@ -471,6 +471,26 @@ fn seeded_sample_bytes_match_seeded_record_samples() {
 }
 
 #[test]
+fn streaming_samples_match_seeded_record_samples() {
+    let circuit = Circuit::from_stim_str("H 0\nM 0\nCX rec[-1] 1\nM 1\n").expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+    let expected = sampler.sample_zero_one_with_seed(32, Some(5));
+    let mut streamed = Vec::new();
+
+    let result =
+        sampler.for_each_sample_with_seed_and_reference_mode(32, Some(5), false, |record| {
+            streamed.push(record.to_vec());
+            Ok::<(), std::convert::Infallible>(())
+        });
+
+    match result {
+        Ok(()) => {}
+        Err(error) => match error {},
+    }
+    assert_eq!(streamed, expected);
+}
+
+#[test]
 fn byte_sampling_measure_reset_uses_physical_result_for_reset() {
     let inverted_circuit = Circuit::from_stim_str("MR !0\nM 0\n").expect("parse circuit");
     let inverted_sampler = CompiledSampler::compile(&inverted_circuit).expect("compile sampler");

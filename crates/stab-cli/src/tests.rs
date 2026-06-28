@@ -4,6 +4,7 @@ use tempfile::tempdir;
 mod m10;
 mod m11;
 mod m9;
+mod resource;
 
 #[cfg(unix)]
 #[test]
