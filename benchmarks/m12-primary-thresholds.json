@@ -1,11 +1,36 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "rows": [
+    {
+      "id": "m4-circuit-parse",
+      "measurement_thresholds": [
+        {
+          "stim_name": "circuit_parse",
+          "stab_name": "stab_circuit_parse",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    },
     { "id": "m10-analyze-errors-decompose-cli", "max_relative_ratio": 1.25 },
     { "id": "m10-analyze-errors-fold-cli", "max_relative_ratio": 1.25 },
     { "id": "m10-analyze-errors-high-repeat-contract", "max_relative_ratio": 1.25 },
     { "id": "m10-dem-parse-contract", "max_relative_ratio": 1.25 },
     { "id": "m10-error-analyzer", "max_relative_ratio": 1.25 },
+    {
+      "id": "m10-error-decomp",
+      "measurement_thresholds": [
+        {
+          "stim_name": "disjoint_to_independent_xyz_errors_approx_p10",
+          "stab_name": "stab_disjoint_to_independent_xyz_errors_approx_p10",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "disjoint_to_independent_xyz_errors_approx_p100",
+          "stab_name": "stab_disjoint_to_independent_xyz_errors_approx_p100",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    },
     { "id": "m10-graphlike-search", "max_relative_ratio": 1.25 },
     { "id": "m11-dem-sampler", "max_relative_ratio": 1.25 },
     { "id": "m11-sample-dem-cli", "max_relative_ratio": 1.25 },

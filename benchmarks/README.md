@@ -53,7 +53,8 @@ Threshold files must not contain stale ids: every configured threshold id must b
 Run `just bench::primary-regression --baseline <primary-baseline.json> --report target/benchmarks/<name>` to check those source-owned thresholds for the frozen primary matrix after a Stab-side warmup pass and three recorded measurement runs.
 The recipe defaults to the latest generated baseline path when no explicit `--baseline` is passed.
 The scheduled `.github/workflows/m12-benchmarks.yml` workflow records a fresh primary pinned-Stim baseline on a GitHub runner, runs this source-owned threshold gate, and uploads the generated baseline and compare reports.
-Threshold files are JSON with schema version 1:
+Threshold files are JSON with schema version 1 or 2.
+Schema version 1 rows use only row-level thresholds:
 
 ```json
 {
@@ -68,6 +69,27 @@ Threshold files are JSON with schema version 1:
 ```
 
 Every threshold id must match a selected benchmark row, and every selected benchmark row not present in the threshold file is reported as `not-configured`.
+Schema version 2 is backward compatible with row-level thresholds and additionally supports exact submeasurement thresholds for rows whose stable direct measurements can be guarded before the whole mixed row is stable:
+
+```json
+{
+  "schema_version": 2,
+  "rows": [
+    {
+      "id": "m10-error-decomp",
+      "measurement_thresholds": [
+        {
+          "stim_name": "disjoint_to_independent_xyz_errors_approx_p10",
+          "stab_name": "stab_disjoint_to_independent_xyz_errors_approx_p10",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    }
+  ]
+}
+```
+
+Submeasurement thresholds fail when the selected compare report lacks the named paired evidence or when the paired ratio exceeds the configured ratio.
 Threshold ids must be benchmark-id safe because they are matched against report rows and may also be used by generated benchmark tooling.
 Beta waiver files are JSON with schema version 1:
 
