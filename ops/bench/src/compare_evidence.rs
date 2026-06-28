@@ -1,5 +1,6 @@
 //! Measurement aggregation and ratio evidence for benchmark comparisons.
 
+use crate::comparability::ComparabilityClass;
 use crate::error::BenchError;
 use crate::report::{AllocationMeasurement, Measurement, MeasurementRatio};
 
@@ -108,11 +109,11 @@ fn inconsistent_measurement_runs(row_id: &str) -> BenchError {
 pub(crate) fn paired_measurement_ratios(
     stim_measurements: &[Measurement],
     stab_measurements: &[Measurement],
-    note: Option<&str>,
+    comparability: ComparabilityClass,
 ) -> Vec<MeasurementRatio> {
     let mut ratios = exact_name_measurement_ratios(stim_measurements, stab_measurements);
     if ratios.is_empty()
-        && note.is_some_and(|note| note.starts_with("direct-match:"))
+        && comparability.allows_positional_measurement_pairs()
         && stim_measurements.len() == stab_measurements.len()
     {
         ratios = positional_measurement_ratios(stim_measurements, stab_measurements);

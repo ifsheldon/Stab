@@ -858,7 +858,7 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures in-process gen dispatch; upstream baseline is sample-heavy main dispatch",
         ),
         "m7-convert-stim-canonical" => Some(
-            "contract-only baseline: Stab measures in-process canonical .stim conversion; pinned Stim has no matching circuit-convert CLI",
+            "contract-only: Stab measures in-process canonical .stim conversion; pinned Stim has no matching circuit-convert CLI",
         ),
         id if id.starts_with("m7-gen-") => Some(
             "report-only: Stab measures direct Rust generator construction and formatting-independent circuit access",
@@ -868,6 +868,9 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m5-simd-bits" => Some(
             "partial-match: xor/not_zero use upstream 10k size; masked/range/copy are Stab M5 contract extras; randomize is not implemented in M5",
+        ),
+        "m5-simd-word" => Some(
+            "direct-match: Stab measures popcount-like bit-vector work against the pinned Stim simd_compat_popcnt perf filter",
         ),
         "m5-sparse-xor" => Some(
             "direct-match: Stab measures sparse table row XOR and sparse item XOR against the pinned Stim sparse_xor_vec perf filters",

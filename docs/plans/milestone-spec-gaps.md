@@ -19,15 +19,6 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
-## 2026-06-28 - M12: Primary Row Comparability Classes
-
-Status: Open
-Revealed by: milestone audit of M12 beta-gate evidence and full code review of direct-match benchmark rows.
-Current text: M12 says comparable primary rows must pass the 2.0x beta gate, and measured `contract-only` rows may pass only with source-owned waivers.
-Gap: the milestone does not define the allowed comparability classes precisely enough for mixed rows such as direct internal perf matches, public CLI baselines, contract-representative in-process measurements, report-only rows, partial matches, and contract proxies.
-Proposed amendment: define benchmark comparability classes such as `direct-match`, `cli-baseline`, `contract-representative`, `report-only`, `partial-match`, and `contract-proxy`; state which classes may satisfy beta, which require waivers, and which must remain follow-up evidence only.
-Resolution: unresolved; the current implementation tightens direct-match rows with paired submeasurement ratios, but the milestone text still needs a complete comparability taxonomy.
-
 ## 2026-06-28 - M12: Profile Evidence Timing
 
 Status: Open
@@ -56,6 +47,15 @@ Proposed amendment: add a CI or scheduled benchmark workflow for the full thresh
 Resolution: unresolved.
 
 ## Resolved Entries
+
+## 2026-06-28 - M12: Primary Row Comparability Classes
+
+Status: Resolved
+Revealed by: milestone audit of M12 beta-gate evidence and full code review of direct-match benchmark rows.
+Current text: M12 says comparable primary rows must pass the 2.0x beta gate, and measured `contract-only` rows may pass only with source-owned waivers.
+Gap: the milestone does not define the allowed comparability classes precisely enough for mixed rows such as direct internal perf matches, public CLI baselines, contract-representative in-process measurements, report-only rows, partial matches, and contract proxies.
+Proposed amendment: define benchmark comparability classes such as `direct-match`, `cli-baseline`, `contract-representative`, `report-only`, `partial-match`, and `contract-proxy`; state which classes may satisfy beta, which require waivers, and which must remain follow-up evidence only.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` and `benchmarks/README.md` now define the M12 benchmark comparability taxonomy, `stab-bench compare` records `comparability` in compare rows, positional submeasurement pairing is limited to `direct-match`, beta-waiver diagnostics include the class, and `primary_compare_rows_have_machine_readable_comparability_classes` rejects unclassified primary rows.
 
 ## 2026-06-28 - M12: Microbenchmark Warmup And Repeated-Run Evidence
 

@@ -492,6 +492,10 @@ For M12 benchmark operations, the frozen primary matrix is every benchmark contr
 The M12 `performance-gate` placeholder row documents the gate and is not itself part of `just bench::compare --primary`.
 Completion-style performance runs should pass `--require-beta-gate`.
 Rows with faithful pinned-Stim baselines must prove a ratio no slower than the 2.0x beta performance gate.
+Compare reports must record a machine-readable comparability class for every row, using the classes `direct-match`, `cli-baseline`, `contract-representative`, `contract-proxy`, `contract-smoke`, `partial-match`, `report-only`, and `contract-only`.
+`direct-match` and `cli-baseline` rows are the strongest beta evidence classes because they match either pinned Stim internal operation shape or the same public CLI command and input.
+`contract-representative`, `contract-proxy`, `contract-smoke`, `partial-match`, and `report-only` rows may count only as scoped M12 beta evidence when their compare note explains the representative surface, proxy, smoke scope, missing subcases, or non-exact workload.
+`contract-only` rows cannot prove a Stab-vs-Stim timing ratio and require source-owned beta waivers while they remain selected by the primary matrix.
 When a row has comparable submeasurements, compare reports pair Stim and Stab measurements by normalized name or by direct-match position and use the worse of the row median ratio and the worst paired submeasurement ratio for beta and regression gates.
 Rows without paired submeasurement evidence keep using the row median ratio.
 Completion-style primary beta runs must include `--warmup --measurement-runs 3`, which runs the selected Stab-side workloads once before recording report measurements and then records the median of three Stab-side measurement runs.
@@ -516,7 +520,7 @@ Done criteria:
 
 - `just oracle::run --implemented-only` passes before and after performance changes.
 - `just bench::compare --profile release --primary` produces a committed or archived report with no missing primary workloads.
-- Beta performance gate passes: every comparable primary parser, generator, sampling, detection, DEM parsing, DEM sampling, and analyzer workload is no slower than 2.0x the pinned C++ Stim v1.16.0 median on the same machine after a Stab-side warmup pass and three recorded measurement runs, every completion-style beta report records `command.warmup=true` and `command.measurement_runs >= 3`, and every remaining measured `contract-only` primary workload has a checked source-owned waiver explaining why no faithful ratio can be proven before beta.
+- Beta performance gate passes: every comparable primary parser, generator, sampling, detection, DEM parsing, DEM sampling, and analyzer workload is assigned a machine-readable comparability class and is no slower than 2.0x the pinned C++ Stim v1.16.0 median on the same machine after a Stab-side warmup pass and three recorded measurement runs, every completion-style beta report records `command.warmup=true` and `command.measurement_runs >= 3`, and every remaining measured `contract-only` primary workload has a checked source-owned waiver explaining why no faithful ratio can be proven before beta.
 - Beta memory gate passes: no primary workload regresses peak allocations or resident memory by more than 25 percent relative to the first complete Stab benchmark report unless the report documents an accepted tradeoff.
 - Hot-path gate passes: every workload slower than 1.5x Stim has a profiler note naming the dominant cost and the next owner action.
 - Regression gate passes: workloads already at or below 1.25x Stim have benchmark thresholds checked by CI smoke or scheduled benchmark automation.

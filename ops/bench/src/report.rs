@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
+use crate::comparability::ComparabilityClass;
 use crate::error::BenchError;
 use crate::manifest::{Milestone, Runner};
 use crate::process::{check_success, run_process};
@@ -145,6 +146,8 @@ pub(crate) struct CompareRowResult {
     pub(crate) milestone: Milestone,
     pub(crate) threshold_class: String,
     pub(crate) runner: Runner,
+    #[serde(default)]
+    pub(crate) comparability: ComparabilityClass,
     pub(crate) upstream_source: String,
     pub(crate) phase: String,
     pub(crate) measurement: String,
@@ -317,15 +320,16 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
         "- Machine: {} {} with {} worker(s)\n\n",
         report.machine.os, report.machine.arch, report.machine.available_parallelism
     ));
-    out.push_str("| Benchmark | Milestone | Status | Pass/Fail | Beta Gate | Stim Median | Stab Median | Ratio | Ratio Source | Stab Alloc Max | Memory Gate | Regression Threshold | Profiler Note | Note |\n");
+    out.push_str("| Benchmark | Milestone | Class | Status | Pass/Fail | Beta Gate | Stim Median | Stab Median | Ratio | Ratio Source | Stab Alloc Max | Memory Gate | Regression Threshold | Profiler Note | Note |\n");
     out.push_str(
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n",
     );
     for row in &report.rows {
         out.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
             row.id,
             row.milestone.as_str(),
+            row.comparability.as_str(),
             row.status,
             row.pass_fail_status,
             format_beta_gate(row),

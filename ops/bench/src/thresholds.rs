@@ -114,6 +114,7 @@ mod tests {
     use std::path::Path;
 
     use super::{BenchmarkThresholds, apply_regression_thresholds, read_thresholds};
+    use crate::comparability::ComparabilityClass;
     use crate::manifest::{Milestone, Runner};
     use crate::report::CompareRowResult;
 
@@ -206,6 +207,7 @@ mod tests {
             milestone: Milestone::M12,
             threshold_class: "performance-gate".to_string(),
             runner: Runner::StimPerf,
+            comparability: ComparabilityClass::DirectMatch,
             upstream_source: "future/performance-primary-matrix".to_string(),
             phase: "performance-hardening".to_string(),
             measurement: "primary-matrix".to_string(),

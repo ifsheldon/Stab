@@ -497,6 +497,8 @@ const REQUIRED_BENCHMARK_IDS: &[&str] = &[
 #[cfg(test)]
 mod tests {
     use super::{BenchmarkManifest, Runner};
+    use crate::baseline::compare_note;
+    use crate::comparability::ComparabilityClass;
 
     const MANIFEST_CSV: &str = include_str!("../../../benchmarks/manifest.csv");
 
@@ -547,6 +549,31 @@ mod tests {
                 .iter()
                 .all(|row| row.id != "m7-perf-harness" && row.milestone != super::Milestone::M12)
         );
+    }
+
+    #[test]
+    fn primary_compare_rows_have_machine_readable_comparability_classes() {
+        let mut reader = csv::ReaderBuilder::new()
+            .trim(csv::Trim::All)
+            .from_reader(MANIFEST_CSV.as_bytes());
+        let rows = reader
+            .deserialize()
+            .collect::<Result<Vec<_>, _>>()
+            .expect("parse manifest");
+        let manifest = BenchmarkManifest { rows };
+
+        let primary = manifest
+            .compare_rows(None, true)
+            .expect("primary compare rows");
+
+        for row in primary {
+            let class = ComparabilityClass::from_note_and_runner(compare_note(&row.id), row.runner);
+            assert!(
+                class != ComparabilityClass::Unspecified,
+                "{} should have a machine-readable comparability class",
+                row.id
+            );
+        }
     }
 
     #[test]

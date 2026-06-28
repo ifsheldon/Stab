@@ -6,6 +6,7 @@ use crate::baseline::{
     summarize_stab_measurements, validate_baseline_metadata,
 };
 use crate::beta_gate::{apply_beta_gate, read_beta_waivers};
+use crate::comparability::ComparabilityClass;
 use crate::compare_evidence::{aggregate_measurement_runs, paired_measurement_ratios};
 use crate::config::PREFIX;
 use crate::error::BenchError;
@@ -481,8 +482,9 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         }
         _ => None,
     };
+    let comparability = ComparabilityClass::from_note_and_runner(note.as_deref(), row.runner);
     let measurement_ratios =
-        paired_measurement_ratios(&stim_measurements, &stab_measurements, note.as_deref());
+        paired_measurement_ratios(&stim_measurements, &stab_measurements, comparability);
     let worst_paired_relative_ratio = measurement_ratios
         .iter()
         .map(|ratio| ratio.relative_ratio)
@@ -500,6 +502,7 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         milestone: row.milestone,
         threshold_class: row.threshold_class.clone(),
         runner: row.runner,
+        comparability,
         upstream_source: row.upstream_source.clone(),
         phase: row.phase.clone(),
         measurement: row.measurement.clone(),

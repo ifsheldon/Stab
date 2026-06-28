@@ -12,6 +12,7 @@
 mod allocations;
 mod baseline;
 mod beta_gate;
+mod comparability;
 mod compare;
 mod compare_evidence;
 mod config;

@@ -74,8 +74,9 @@ pub(crate) fn apply_beta_gate(
                 }
                 Some(_) => {
                     let message = format!(
-                        "beta waiver cannot apply because status is {other}, runner is {}, and row status is {}",
+                        "beta waiver cannot apply because status is {other}, runner is {}, comparability is {}, and row status is {}",
                         row.runner.as_str(),
+                        row.comparability.as_str(),
                         row.status
                     );
                     row.beta_gate_status = "fail".to_string();
@@ -154,6 +155,7 @@ mod tests {
     use std::path::Path;
 
     use super::{BetaWaivers, apply_beta_gate, read_beta_waivers};
+    use crate::comparability::ComparabilityClass;
     use crate::manifest::{Milestone, Runner};
     use crate::report::CompareRowResult;
 
@@ -282,7 +284,7 @@ mod tests {
         assert_eq!(
             findings.blockers,
             vec![
-                "missing-row: beta waiver cannot apply because status is not-comparable, runner is stim-cli, and row status is measured",
+                "missing-row: beta waiver cannot apply because status is not-comparable, runner is stim-cli, comparability is direct-match, and row status is measured",
                 "missing-row: beta waiver did not match a selected measured contract-only not-comparable row",
                 "passing-row: beta waiver did not match a selected measured contract-only not-comparable row",
             ]
@@ -337,6 +339,7 @@ mod tests {
             milestone: Milestone::M12,
             threshold_class: "performance-gate".to_string(),
             runner,
+            comparability: ComparabilityClass::DirectMatch,
             upstream_source: "future/performance-primary-matrix".to_string(),
             phase: "performance-hardening".to_string(),
             measurement: "primary-matrix".to_string(),
