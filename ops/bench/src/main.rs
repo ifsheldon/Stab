@@ -13,6 +13,7 @@ mod allocations;
 mod baseline;
 mod beta_gate;
 mod compare;
+mod compare_evidence;
 mod config;
 mod error;
 mod manifest;
