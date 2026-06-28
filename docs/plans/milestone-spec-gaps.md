@@ -19,9 +19,25 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
-No open entries.
+## 2026-06-28 - M12: Optimization Log Evidence Strength
+
+Status: Open
+Revealed by: fresh M12 milestone audit of the source-owned optimization log.
+Current text: M12 says rows optimized below the final-current profiler-note threshold must be listed in `benchmarks/profiler-notes/m12/optimization-log.json` with before and after report paths, dominant-cost evidence or a profiler blocker, implementation summary, semantic checks, and follow-up policy.
+Gap: the validator checks schema shape, safe ids, safe report paths, non-empty evidence fields, and required row coverage, but it does not prove that the referenced before and after reports contain the row or support the claimed movement below the profiler-note threshold.
+Proposed amendment: either extend the source-owned optimization log with machine-checkable before and after ratios/statuses that do not depend on local `target/` artifacts, or add an ops validator mode that checks referenced reports when the reports are archived alongside completion evidence.
+Resolution: unresolved.
 
 ## Resolved Entries
+
+## 2026-06-28 - M12: Resident Memory Peak Wording
+
+Status: Resolved
+Revealed by: fresh M12 milestone audit of memory-gate evidence.
+Current text: the M12 done criterion said no primary workload may regress peak allocations or resident memory by more than 25 percent, while the implementation records allocation-counter maxima and samples process resident memory around each Stab-side benchmark measurement.
+Gap: the wording could be read as requiring true peak RSS tracking during the operation, but the implementation and reports provide sampled resident-memory evidence.
+Proposed amendment: describe the memory gate as peak live allocation evidence plus sampled resident-memory evidence, or replace the sampler with true peak-RSS tracking.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now says completion-style memory runs fail rows missing sampled resident-memory evidence or exceeding the first complete Stab sampled resident-memory report by more than 25 percent, and the done criterion now says sampled resident memory instead of unqualified resident memory.
 
 ## 2026-06-28 - M12: Profile Evidence Timing
 

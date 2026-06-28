@@ -507,10 +507,10 @@ When `--require-profiler-notes` is passed, every row slower than 1.5x pinned Sti
 M12 profile evidence is final-current for the hot-path gate: every row still slower than 1.5x pinned Stim in the accepted completion compare must have a source-owned profiler note, while rows optimized below that threshold during M12 must be listed in `benchmarks/profiler-notes/m12/optimization-log.json`.
 Optimization-log rows use JSON schema version 1 and must record the benchmark id, before and after compare report paths, dominant-cost evidence or a profiler blocker, implementation summary, semantic checks, and follow-up policy.
 For new M12 optimization work after this rule, update the source-owned profiler note or optimization log in the same change set as the optimization evidence.
-Regression thresholds use JSON schema version 1 with benchmark ids and `max_relative_ratio` values, and `just bench::compare --thresholds <path>` fails configured selected rows that exceed their threshold or cannot produce a comparable ratio.
+Regression thresholds use JSON schema version 1 with benchmark ids and `max_relative_ratio` values, and `just bench::compare --thresholds <path>` fails configured rows that are not selected by the compare run, exceed their threshold, or cannot produce a comparable ratio.
 `just bench::primary-regression` applies the source-owned M12 threshold file after a Stab-side warmup pass and three recorded measurement runs, and `.github/workflows/m12-benchmarks.yml` runs the same gate on a schedule and on manual dispatch using a fresh primary pinned-Stim baseline.
 Allocation and resident-memory tracking are recorded through `just bench::compare-allocations`, which builds `stab-bench` with the optional `count-allocations` feature and records Stab-side allocation counts, maximum live allocated bytes, and sampled resident bytes in `compare.json`.
-Completion-style memory runs should pass `--require-memory-gate --memory-baseline <compare.json>` through `just bench::compare-allocations`, which fails selected rows that lack allocation evidence, lack resident-memory evidence, exceed the first complete Stab allocation report by more than 25 percent, or exceed the first complete Stab resident-memory report by more than 25 percent.
+Completion-style memory runs should pass `--require-memory-gate --memory-baseline <compare.json>` through `just bench::compare-allocations`, which fails selected rows that lack allocation evidence, lack sampled resident-memory evidence, exceed the first complete Stab allocation report by more than 25 percent, or exceed the first complete Stab sampled resident-memory report by more than 25 percent.
 Timing-gate evidence should use plain `just bench::compare`, because allocation instrumentation changes allocator behavior.
 
 Linked tests and benchmarks:
@@ -520,12 +520,14 @@ Linked tests and benchmarks:
 - Internal simulator cross-checks for graph and vector simulator behavior from `src/stim/simulators/graph_simulator.test.cc` and `src/stim/simulators/vector_simulator.test.cc`.
 - All oracle suites for M4 through M11, because performance changes must preserve functional parity.
 
+Graph/vector simulator evidence is scoped to Stab's public tableau and amplitude semantics for M12; adding public graph or vector simulator APIs remains outside this milestone unless a later milestone makes those APIs part of the drop-in surface.
+
 Done criteria:
 
 - `just oracle::run --implemented-only` passes before and after performance changes.
 - `just bench::compare --profile release --primary` produces a committed or archived report with no missing primary workloads.
 - Beta performance gate passes: every comparable primary parser, generator, sampling, detection, DEM parsing, DEM sampling, and analyzer workload is assigned a machine-readable comparability class and is no slower than 2.0x the pinned C++ Stim v1.16.0 median on the same machine after a Stab-side warmup pass and three recorded measurement runs, every completion-style beta report records `command.warmup=true` and `command.measurement_runs >= 3`, and every remaining measured `contract-only` primary workload has a checked source-owned waiver explaining why no faithful ratio can be proven before beta.
-- Beta memory gate passes: no primary workload regresses peak allocations or resident memory by more than 25 percent relative to the first complete Stab benchmark report unless the report documents an accepted tradeoff.
+- Beta memory gate passes: no primary workload regresses peak live allocations or sampled resident memory by more than 25 percent relative to the first complete Stab benchmark report unless the report documents an accepted tradeoff.
 - Hot-path gate passes: every workload still slower than 1.5x Stim has a profiler note naming the dominant cost and the next owner action, and every M12-optimized row that moved below the final-current profiler-note threshold has an optimization-log entry naming before and after reports, dominant-cost evidence, semantic checks, and follow-up policy.
 - Regression gate passes: workloads already at or below 1.25x Stim have benchmark thresholds checked by `.github/workflows/m12-benchmarks.yml` scheduled benchmark automation or an equivalent manually dispatched run.
 - Any workload that misses the beta gate has a dedicated follow-up issue or milestone entry with profiler evidence, suspected cause, and a proposed implementation path.

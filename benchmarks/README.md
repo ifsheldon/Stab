@@ -47,6 +47,7 @@ Profiler notes must include non-empty `Dominant cost:` and `Next owner action:` 
 Pass `--profiler-notes-dir benchmarks/profiler-notes/m12` to validate source-owned notes instead of report-local notes.
 M12 rows that were optimized below the final-current profiler-note threshold are tracked in `profiler-notes/m12/optimization-log.json`, which records before and after reports, dominant-cost evidence, implementation summary, semantic checks, and follow-up policy.
 Pass `--thresholds <path>` to fail when a selected row with a configured regression threshold exceeds its maximum relative ratio or lacks a comparable Stab-vs-Stim ratio.
+Threshold files must not contain stale ids: every configured threshold id must be selected by the compare run so row renames and matrix changes cannot silently drop a regression guard.
 `m12-primary-thresholds.json` is the source-owned M12 timing-regression threshold file for primary rows that have reached the 1.25x pinned-Stim regression gate with enough local headroom to make an initial stable threshold useful.
 Run `just bench::primary-regression --baseline <primary-baseline.json> --report target/benchmarks/<name>` to check those source-owned thresholds for the frozen primary matrix after a Stab-side warmup pass and three recorded measurement runs.
 The recipe defaults to the latest generated baseline path when no explicit `--baseline` is passed.
@@ -65,7 +66,7 @@ Threshold files are JSON with schema version 1:
 }
 ```
 
-Only selected benchmark ids present in the threshold file are checked.
+Every threshold id must match a selected benchmark row, and every selected benchmark row not present in the threshold file is reported as `not-configured`.
 Threshold ids must be benchmark-id safe because they are matched against report rows and may also be used by generated benchmark tooling.
 Beta waiver files are JSON with schema version 1:
 

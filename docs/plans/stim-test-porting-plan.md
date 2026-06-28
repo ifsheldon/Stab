@@ -259,6 +259,7 @@ src/stim/simulators/vector_simulator.test.cc
 Small features:
 
 - Frame simulation, frame-simulator detection-output helpers, Pauli-target observable include behavior, tableau simulation, vector simulation, graph simulation, error analysis, error matching, DEM sampling, measurement-to-detection conversion, matched errors, and sparse reverse-frame tracking.
+- Current M12 graph/vector coverage lives in `crates/stab-core/tests/simulator_cross_checks.rs` as scoped tableau and amplitude semantic checks adapted from `graph_simulator.test.cc` and `vector_simulator.test.cc`; broader public graph/vector simulator APIs remain deferred until Stab exposes equivalent surfaces.
 
 ### Stabilizers And Algebra
 

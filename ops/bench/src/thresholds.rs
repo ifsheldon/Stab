@@ -48,6 +48,10 @@ pub(crate) fn apply_regression_thresholds(
     let mut findings = RegressionThresholdFindings::default();
     for threshold in &thresholds.rows {
         let Some(row) = rows.iter_mut().find(|row| row.id == threshold.id) else {
+            findings.blockers.push(format!(
+                "{}: threshold row is not selected by the compare run",
+                threshold.id
+            ));
             continue;
         };
         row.regression_threshold_status = "configured".to_string();
@@ -111,6 +115,7 @@ impl BenchmarkThresholds {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
     use std::path::Path;
 
     use super::{BenchmarkThresholds, apply_regression_thresholds, read_thresholds};
@@ -163,6 +168,32 @@ mod tests {
     }
 
     #[test]
+    fn regression_thresholds_reject_unselected_threshold_rows() {
+        let thresholds = serde_json::from_str::<BenchmarkThresholds>(
+            r#"{
+                "schema_version": 1,
+                "rows": [
+                    {"id": "pass-row", "max_relative_ratio": 1.25},
+                    {"id": "stale-row", "max_relative_ratio": 1.25}
+                ]
+            }"#,
+        )
+        .expect("parse thresholds");
+        let mut rows = vec![row("pass-row", Some(1.1))];
+
+        let findings = apply_regression_thresholds(&mut rows, &thresholds);
+
+        assert_eq!(
+            rows.first().expect("pass row").regression_threshold_status,
+            "pass"
+        );
+        assert_eq!(
+            findings.blockers,
+            vec!["stale-row: threshold row is not selected by the compare run"]
+        );
+    }
+
+    #[test]
     fn regression_thresholds_validate_schema_ids_and_ratios() {
         let thresholds = serde_json::from_str::<BenchmarkThresholds>(
             r#"{
@@ -190,6 +221,18 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../benchmarks/m12-primary-thresholds.json");
         let thresholds = read_thresholds(&path).expect("read source-owned M12 thresholds");
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("repo root");
+        let root = crate::root::RepoRoot::resolve(root).expect("resolve repo root");
+        let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("read manifest");
+        let primary_ids = manifest
+            .compare_rows(None, true)
+            .expect("primary rows")
+            .into_iter()
+            .map(|row| row.id.as_str())
+            .collect::<BTreeSet<_>>();
 
         assert_eq!(thresholds.schema_version, 1);
         assert_eq!(thresholds.rows.len(), 62);
@@ -199,6 +242,13 @@ mod tests {
                 .iter()
                 .all(|row| row.max_relative_ratio == 1.25)
         );
+        for row in &thresholds.rows {
+            assert!(
+                primary_ids.contains(row.id.as_str()),
+                "{} must still be selected by the M12 primary matrix",
+                row.id
+            );
+        }
     }
 
     fn row(id: &str, ratio: Option<f64>) -> CompareRowResult {
