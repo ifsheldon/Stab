@@ -36,7 +36,7 @@ Pairs are matched by normalized measurement names, or by position for `direct-ma
 When paired ratios exist, beta and regression gates use the worse of the row median ratio and the worst paired ratio; otherwise they use the row median ratio.
 The JSON report records paired evidence in `measurement_ratios`, and the Markdown report prints the worst pair in the `Ratio Source` column.
 Tiny direct-match Stab measurements may use batched timing to reduce clock-noise dominance, but they still report seconds per operation.
-Pass `--require-beta-gate` to fail when any selected row does not prove a pass against the 2.0x pinned-Stim beta performance gate.
+Pass `--require-beta-gate` to fail when any selected row does not prove a pass against the 1.25x pinned-Stim beta performance gate.
 Pass `--beta-waivers <path>` with `--require-beta-gate` to accept only measured no-ratio rows whose manifest `runner` is `contract-only` and whose lack of a comparable pinned-Stim ratio is explained by a source-owned waiver.
 Waivers do not apply to missing baselines, pending runners, invalid baselines, or rows with measured ratios above the beta gate.
 Unused waivers fail the gate so the file stays in sync when a row becomes comparable or leaves the selected matrix.

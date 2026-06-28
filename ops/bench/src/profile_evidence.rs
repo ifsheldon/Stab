@@ -4,6 +4,7 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::manifest::is_safe_benchmark_id;
+use crate::report::BETA_GATE_MAX_RELATIVE_RATIO;
 
 #[derive(Clone, Debug, Deserialize)]
 struct OptimizationLog {
@@ -207,10 +208,10 @@ fn validate_gate_status(
         ));
     }
     match value {
-        "pass" if relative_ratio > 2.0 => violations.push(format!(
+        "pass" if relative_ratio > BETA_GATE_MAX_RELATIVE_RATIO => violations.push(format!(
             "{row_id} {field}.gate_status=pass conflicts with relative_ratio={relative_ratio}"
         )),
-        "fail" if relative_ratio <= 2.0 => violations.push(format!(
+        "fail" if relative_ratio <= BETA_GATE_MAX_RELATIVE_RATIO => violations.push(format!(
             "{row_id} {field}.gate_status=fail conflicts with relative_ratio={relative_ratio}"
         )),
         "pass" | "fail" => {}

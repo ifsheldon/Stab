@@ -44,6 +44,7 @@ impl DisjointPauliProbabilities {
     }
 }
 
+#[inline]
 pub fn independent_to_disjoint_xyz_errors(
     x: Probability,
     y: Probability,
@@ -51,40 +52,74 @@ pub fn independent_to_disjoint_xyz_errors(
 ) -> CircuitResult<DisjointPauliProbabilities> {
     let [x, y, z] = independent_to_disjoint_xyz_raw(x.get(), y.get(), z.get());
     Ok(DisjointPauliProbabilities {
-        x: Probability::try_new(x)?,
-        y: Probability::try_new(y)?,
-        z: Probability::try_new(z)?,
+        x: Probability::from_valid_probability(x),
+        y: Probability::from_valid_probability(y),
+        z: Probability::from_valid_probability(z),
     })
 }
 
+#[inline]
 pub fn try_disjoint_to_independent_xyz_errors(
     x: Probability,
     y: Probability,
     z: Probability,
 ) -> CircuitResult<Option<IndependentPauliProbabilities>> {
-    let Some([x, y, z]) = solve_disjoint_to_independent_xyz(x.get(), y.get(), z.get(), 50) else {
+    let Some(solution) = solve_disjoint_to_independent_xyz(x.get(), y.get(), z.get(), 50) else {
         return Ok(None);
     };
-    Ok(Some(IndependentPauliProbabilities {
-        x: Probability::try_new(x)?,
-        y: Probability::try_new(y)?,
-        z: Probability::try_new(z)?,
-    }))
+    let [x, y, z] = solution.probabilities;
+    if solution.proven_probability_bounds {
+        Ok(Some(IndependentPauliProbabilities {
+            x: Probability::from_valid_probability(x),
+            y: Probability::from_valid_probability(y),
+            z: Probability::from_valid_probability(z),
+        }))
+    } else {
+        Ok(Some(IndependentPauliProbabilities {
+            x: Probability::try_new(x)?,
+            y: Probability::try_new(y)?,
+            z: Probability::try_new(z)?,
+        }))
+    }
 }
 
-fn solve_disjoint_to_independent_xyz(x: f64, y: f64, z: f64, max_steps: usize) -> Option<[f64; 3]> {
+#[derive(Clone, Copy, Debug)]
+struct XyzSolution {
+    probabilities: [f64; 3],
+    proven_probability_bounds: bool,
+}
+
+#[inline]
+fn solve_disjoint_to_independent_xyz(
+    x: f64,
+    y: f64,
+    z: f64,
+    max_steps: usize,
+) -> Option<XyzSolution> {
     let identity = (1.0 - x - y - z).max(0.0);
     if identity < x {
-        let [out_x, out_y, out_z] = solve_disjoint_to_independent_xyz(identity, z, y, max_steps)?;
-        return Some([1.0 - out_x, out_y, out_z]);
+        let solution = solve_disjoint_to_independent_xyz(identity, z, y, max_steps)?;
+        let [out_x, out_y, out_z] = solution.probabilities;
+        return Some(XyzSolution {
+            probabilities: [1.0 - out_x, out_y, out_z],
+            proven_probability_bounds: solution.proven_probability_bounds,
+        });
     }
     if identity < y {
-        let [out_x, out_y, out_z] = solve_disjoint_to_independent_xyz(z, identity, x, max_steps)?;
-        return Some([out_x, 1.0 - out_y, out_z]);
+        let solution = solve_disjoint_to_independent_xyz(z, identity, x, max_steps)?;
+        let [out_x, out_y, out_z] = solution.probabilities;
+        return Some(XyzSolution {
+            probabilities: [out_x, 1.0 - out_y, out_z],
+            proven_probability_bounds: solution.proven_probability_bounds,
+        });
     }
     if identity < z {
-        let [out_x, out_y, out_z] = solve_disjoint_to_independent_xyz(y, x, identity, max_steps)?;
-        return Some([out_x, out_y, 1.0 - out_z]);
+        let solution = solve_disjoint_to_independent_xyz(y, x, identity, max_steps)?;
+        let [out_x, out_y, out_z] = solution.probabilities;
+        return Some(XyzSolution {
+            probabilities: [out_x, out_y, 1.0 - out_z],
+            proven_probability_bounds: solution.proven_probability_bounds,
+        });
     }
 
     if x + z < 0.5 && x + y < 0.5 && y + z < 0.5 {
@@ -94,8 +129,11 @@ fn solve_disjoint_to_independent_xyz(x: f64, y: f64, z: f64, max_steps: usize) -
         let a = 0.5 - 0.5 * s_xz * s_xy / s_yz;
         let b = 0.5 - 0.5 * s_xy * s_yz / s_xz;
         let c = 0.5 - 0.5 * s_xz * s_yz / s_xy;
-        if a >= 0.0 && b >= 0.0 && c >= 0.0 {
-            return Some([a, b, c]);
+        if (0.0..=1.0).contains(&a) && (0.0..=1.0).contains(&b) && (0.0..=1.0).contains(&c) {
+            return Some(XyzSolution {
+                probabilities: [a, b, c],
+                proven_probability_bounds: true,
+            });
         }
     }
 
@@ -117,7 +155,10 @@ fn solve_disjoint_to_independent_xyz(x: f64, y: f64, z: f64, max_steps: usize) -
         let dy = y2 - y;
         let dz = z2 - z;
         if dx.abs() + dy.abs() + dz.abs() < 1e-14 {
-            return Some([a, b, c]);
+            return Some(XyzSolution {
+                probabilities: [a, b, c],
+                proven_probability_bounds: false,
+            });
         }
 
         let da = bc_i - bc;
@@ -130,6 +171,7 @@ fn solve_disjoint_to_independent_xyz(x: f64, y: f64, z: f64, max_steps: usize) -
     None
 }
 
+#[inline]
 fn independent_to_disjoint_xyz_raw(x: f64, y: f64, z: f64) -> [f64; 3] {
     let xy = x * y;
     let xz = x * z;

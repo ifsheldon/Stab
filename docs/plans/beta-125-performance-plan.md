@@ -25,6 +25,14 @@ These rows are below `1.25x` today but should get headroom or explicit stability
 The prior clean report at commit `2499f39b41e50478a8e2407f71da56f3442a7a97` showed `m5-simd-bits`, `m4-circuit-parse`, `m5-sparse-xor`, `m4-gate-lookup`, and `m8-sample-primary-unrotated-surface-contract` closer to the `1.25x` line.
 The B0 rerun supersedes that report for implementation targeting, but those historical rows should still be watched in final evidence because lessons learned require fresh baselines and explicit variance awareness for small benchmarks.
 
+## Current Implementation Evidence
+
+The dirty-worktree primary beta probe at `target/benchmarks/m12-primary-beta/compare.json` generated from commit `743b60892d82e56528139e0cdbe91703ddd991b0` with `local_modifications=true` passed the active `1.25x` gate after the beta-125 M10 optimization.
+It recorded 72 comparable `pass` rows and 4 checked `waived-not-comparable` rows.
+The worst comparable row was `m10-error-decomp` at `1.1891891891891893x`, with paired ratios `1.1764705882352942x` for exact disjoint-to-independent, `1.1891891891891893x` for p10, `1.1891891891891893x` for p100, and `1.1111111111111112x` for independent-to-disjoint.
+The prior headroom and watch rows passed in that dirty probe: `m8-measure-reader-dets` at `0.9818181818181818x`, `m5-simd-bits` at `0.7032967032967034x`, `m4-circuit-parse` at `0.62401875x`, `m5-sparse-xor` at `0.7869545454545454x`, `m4-gate-lookup` at `0.40714285714285714x`, and `m8-sample-primary-unrotated-surface-contract` at `0.49057704653770245x`.
+This is not final acceptance evidence because the worktree was dirty; B7 still requires regenerated clean reports from committed code with `local_modifications=false`.
+
 The four current no-ratio beta waivers remain outside this performance optimization scope unless a faithful pinned-Stim ratio becomes available:
 
 - `m4-circuit-canonical-print`
@@ -48,8 +56,8 @@ Tasks:
 
 - Regenerate a clean primary baseline and beta report from committed code before the first behavior change.
 - Record the exact current failures under a temporary `1.25x` beta check or an analysis command that applies the same worst-ratio rule.
-- Confirm that the starting failure set is exactly `m10-error-decomp`, `m5-simd-bits`, and `m4-circuit-parse`.
-- Confirm that `m5-sparse-xor`, `m4-gate-lookup`, and `m8-sample-primary-unrotated-surface-contract` are below `1.25x` but close enough to track.
+- Confirm that the starting failure set is exactly `m10-error-decomp` after applying the same worst-ratio rule to the clean B0 report.
+- Confirm that `m8-measure-reader-dets` is below `1.25x` but close enough to track, and keep `m5-simd-bits`, `m4-circuit-parse`, `m5-sparse-xor`, `m4-gate-lookup`, and `m8-sample-primary-unrotated-surface-contract` as historical watch rows from older clean evidence.
 - Do not use this starting evidence as completion evidence after code changes.
 
 Linked commands:
@@ -190,6 +198,9 @@ Done criteria:
 - `m10-error-decomp` passes beta at `<=1.25x` under the same worst paired-ratio rule used by the gate.
 - If the benchmark shape changes from tiny filters to larger faithful arrays, the docs explain why the replacement is more meaningful and the old tiny filters no longer decide strict beta completion.
 - No slow direct submeasurement is hidden behind the row median.
+
+Status: implementation probe complete in the dirty-worktree primary beta report listed above.
+The accepted implementation keeps the benchmark shape, inlines the tiny conversion helpers and probability accessors across crate boundaries, and uses a crate-private `Probability` constructor only for formulas whose output bounds are proven locally.
 
 ## Milestone B5: Add Headroom To Near Misses
 

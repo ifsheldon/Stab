@@ -331,7 +331,7 @@ fn compare_row_result_records_ratio_and_beta_gate_status() {
     assert_eq!(result.stim_median_seconds, Some(0.001));
     assert_eq!(result.stab_median_seconds, Some(0.0015));
     assert_eq!(result.relative_ratio, Some(1.5));
-    assert_eq!(result.pass_fail_status, "pass");
+    assert_eq!(result.pass_fail_status, "fail");
     assert_eq!(result.note.as_deref(), Some("same workload"));
 }
 

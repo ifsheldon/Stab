@@ -11,7 +11,7 @@ use crate::manifest::{Milestone, Runner};
 use crate::process::{check_success, run_process};
 use crate::root::RepoRoot;
 
-pub(crate) const BETA_GATE_MAX_RELATIVE_RATIO: f64 = 2.0;
+pub(crate) const BETA_GATE_MAX_RELATIVE_RATIO: f64 = 1.25;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct BaselineReport {

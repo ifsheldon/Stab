@@ -126,7 +126,7 @@ enum Command {
         #[arg(long)]
         profiler_notes_dir: Option<PathBuf>,
 
-        /// Fail when selected rows do not prove the 2.0x beta performance gate.
+        /// Fail when selected rows do not prove the 1.25x beta performance gate.
         #[arg(long)]
         require_beta_gate: bool,
 

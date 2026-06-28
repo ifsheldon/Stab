@@ -8,7 +8,7 @@
         "gate_status": "fail",
         "relative_ratio": 5.484743619619439,
         "hot_path_status": "above-profiler-threshold",
-        "evidence_note": "The before report measured the high-shot sampler row above the 2.0x beta gate and above the 1.5x profiler-note threshold."
+        "evidence_note": "The before report measured the high-shot sampler row above the historical 2.0x beta gate and above the 1.5x profiler-note threshold."
       },
       "after_report": "target/benchmarks/m12-primary-compare-after-direct-z-fast-path/compare.json",
       "after_evidence": {
@@ -58,12 +58,12 @@
         "hot_path_status": "above-profiler-threshold",
         "evidence_note": "The before report measured sparse circuit parsing above the beta gate and above the profiler-note threshold."
       },
-      "after_report": "target/benchmarks/m12-primary-beta-after-m4-fast-paths/compare.json",
+      "after_report": "target/benchmarks/m12-primary-beta/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 1.3306575342465754,
+        "relative_ratio": 0.62401875,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The after report measured the row below the beta gate and below the profiler-note threshold after target-storage and simple-instruction parser fast paths."
+        "evidence_note": "The beta-125 primary beta probe measured the row below the active 1.25x beta gate and below the profiler-note threshold after target-storage and simple-instruction parser fast paths."
       },
       "dominant_cost": "Sparse .stim parsing was dominated by temporary target vectors, repeated integer scans, and generic dispatch for simple no-argument instructions.",
       "optimization_summary": "Moved target storage to SmallVec-backed instruction buffers, parsed plain numeric targets in one checked pass, and added simple no-argument parser fast paths for common H, M, MZ, CX, and CNOT instructions.",
@@ -281,20 +281,19 @@
       "after_report": "target/benchmarks/m12-primary-beta/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 1.875,
-        "hot_path_status": "covered-by-source-profiler-note",
-        "evidence_note": "The post-beta beta report keeps the row under the 2.0x beta gate, while the separate post-beta regression report guards the stable approx_p10 pair with a schema-version-2 threshold and leaves exact, p100, and independent-to-disjoint filters documented in the source-owned profiler note.",
-        "source_profiler_note": "benchmarks/profiler-notes/m12/m10-error-decomp.md"
+        "relative_ratio": 1.1891891891891893,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The beta-125 primary beta probe measured every paired error-decomposition filter below the active 1.25x beta gate after inlining the tiny conversion helpers and avoiding redundant output validation for formulas with proven probability bounds."
       },
-      "dominant_cost": "The row median hid tiny independent/disjoint XYZ conversion filters where pinned Stim submeasurements were sub-nanosecond and timing overhead could dominate the arithmetic, while approx_p10 is stable enough to guard directly.",
-      "optimization_summary": "Split the Stab-side direct-match measurements to match the pinned filters, added paired submeasurement ratio evidence, batched tiny direct-match timing, and guarded only the stable approx_p10 pair in the 1.25x threshold file.",
+      "dominant_cost": "The row median hid tiny independent/disjoint XYZ conversion filters where cross-crate call overhead and redundant Probability output validation dominated the closed-form arithmetic, while the longer Newton p10 and p100 filters were already close to the 1.25x gate.",
+      "optimization_summary": "Split the Stab-side direct-match measurements to match the pinned filters, added paired submeasurement ratio evidence, batched tiny direct-match timing, marked the tiny conversion helpers and probability accessors inline, and used a crate-private Probability constructor only for formulas whose output bounds are proven locally.",
       "semantic_checks": [
         "cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners",
         "cargo test -p stab-bench compare_row_result_uses_worst_exact_submeasurement_ratio",
         "cargo test -p stab-bench direct_match_rows_use_positional_submeasurement_ratios_when_names_differ",
         "cargo test -p stab-core error_decomp"
       ],
-      "follow_up": "Keep exact, p100, and independent-to-disjoint filters outside the 1.25x gate until a future source-owned benchmark can compare larger paired case arrays or profiling proves a real arithmetic optimization."
+      "follow_up": "Keep all four direct pairs in beta evidence and promote additional schema-version-2 submeasurement thresholds only after repeated clean primary evidence shows the nanosecond exact and independent filters remain stable with enough headroom."
     }
   ]
 }

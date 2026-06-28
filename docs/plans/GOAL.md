@@ -44,13 +44,17 @@ The expected final state is:
 
 ## Active Row Groups
 
-The current hard blockers for a `1.25x` beta gate are:
+The original hard blocker for a `1.25x` beta gate was:
 
 1. `m10-error-decomp`
 
-The current headroom rows are:
+The current dirty-worktree beta-125 probe in `docs/plans/beta-125-performance-plan.md` shows no remaining comparable row above `1.25x`.
+Treat final clean committed-code evidence as the active blocker unless a clean rerun changes the row set.
+
+The headroom rows to recheck in clean final evidence are:
 
 1. `m8-measure-reader-dets`
+2. `m10-error-decomp`
 
 The historical watch rows from the older clean report are:
 
@@ -67,7 +71,7 @@ The current no-ratio beta-waiver rows are:
 3. `m8-measure-reader-ptb64-contract`
 4. `m10-dem-print-contract`
 
-If fresh clean evidence changes these sets, update `docs/plans/beta-125-performance-plan.md` before optimizing.
+If fresh clean evidence changes these sets, update `docs/plans/beta-125-performance-plan.md` before optimizing more code.
 
 ## Non-Negotiable Rules
 
@@ -109,8 +113,8 @@ Do not optimize SIMD code until the benchmark proves a faithful direct pair is s
 ### 4. Optimize Real Hot Paths
 
 For `m4-circuit-parse`, use focused evidence to identify the remaining sparse-parser cost before changing parser internals if the row returns above or near the strict gate.
-For `m10-error-decomp`, decide whether the current tiny filters are meaningful before optimizing arithmetic.
-If a larger faithful case-array benchmark is needed, add it and document why it replaces tiny-filter gate evidence.
+For `m10-error-decomp`, the current accepted implementation keeps the tiny direct-match filters and optimizes the real overhead exposed by focused evidence.
+Do not add larger case-array benchmark variants unless clean evidence shows the current tiny filters are still too unstable to support honest gate evidence.
 
 ### 5. Add Headroom
 

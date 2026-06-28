@@ -233,7 +233,7 @@ mod tests {
             findings.blockers,
             vec![
                 "missing-row: beta gate is not proven because status is not-comparable",
-                "failing-row: ratio 2.250x exceeds 2.000x beta gate",
+                "failing-row: ratio 2.250x exceeds 1.250x beta gate",
             ]
         );
         assert_eq!(
