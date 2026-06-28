@@ -135,6 +135,38 @@ fn bits_bitvec_multi_block_boundaries_match_reference() {
     }
 }
 
+#[test]
+fn bits_range_xor_word_chunk_edges_match_reference() {
+    for (len, target_start, source_start, count) in [
+        (130, 0, 0, 130),
+        (130, 1, 1, 127),
+        (257, 31, 17, 196),
+        (257, 64, 3, 128),
+        (257, 7, 64, 129),
+        (257, 193, 191, 2),
+        (8192, 31, 17, 4096),
+        (4099, 4098, 4098, 1),
+    ] {
+        let target_bools = patterned_bools(len, 3);
+        let source_bools = patterned_bools(len, 5);
+        let mut actual = bitvec_from_bools(&target_bools);
+        let source = bitvec_from_bools(&source_bools);
+
+        actual
+            .xor_range_from(target_start, &source.as_bitslice(), source_start, count)
+            .expect("range xor");
+
+        let mut expected = target_bools;
+        for offset in 0..count {
+            if source_bools[source_start + offset] {
+                let target = target_start + offset;
+                expected[target] = !expected[target];
+            }
+        }
+        assert_eq!(bools_from_bitvec(&actual), expected);
+    }
+}
+
 proptest! {
     #[test]
     fn bits_bitvec_simd_ops_match_scalar_reference(

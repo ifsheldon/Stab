@@ -8,6 +8,7 @@ use thiserror::Error;
 
 pub const BIT_BLOCK_WORDS: usize = 4;
 const WORD_BITS: usize = u64::BITS as usize;
+const SPARSE_XOR_STACK_ITEMS: usize = 64;
 
 pub type BitResult<T> = Result<T, BitError>;
 
@@ -274,21 +275,30 @@ impl BitVec {
     ) -> BitResult<()> {
         checked_range(target_start, bit_count, self.len())?;
         checked_range(source_start, bit_count, rhs.len())?;
-        for offset in 0..bit_count {
-            let source_index = source_start + offset;
-            let target_index = target_start + offset;
-            let source_bit = rhs.get(source_index).ok_or(BitError::BitIndexOutOfRange {
-                index: source_index,
-                len: rhs.len(),
-            })?;
-            if source_bit {
-                let current = self.get(target_index).ok_or(BitError::BitIndexOutOfRange {
-                    index: target_index,
-                    len: self.len(),
-                })?;
-                self.set(target_index, !current)?;
-            }
+        let mut remaining = bit_count;
+        let mut target_index = target_start;
+        let mut source_index = source_start;
+        let target_len = self.len();
+        while remaining > 0 {
+            let target_word_index = target_index / WORD_BITS;
+            let target_bit_offset = target_index % WORD_BITS;
+            let chunk_bits = remaining.min(WORD_BITS - target_bit_offset);
+            let source_word = read_word_range_low(rhs.words(), source_index, chunk_bits);
+            let chunk_mask = low_bits_mask(chunk_bits) << target_bit_offset;
+            let source_aligned = (source_word << target_bit_offset) & chunk_mask;
+            let target_word =
+                self.words
+                    .get_mut(target_word_index)
+                    .ok_or(BitError::BitIndexOutOfRange {
+                        index: target_index,
+                        len: target_len,
+                    })?;
+            *target_word ^= source_aligned;
+            remaining -= chunk_bits;
+            target_index += chunk_bits;
+            source_index += chunk_bits;
         }
+        self.mask_unused_tail_bits();
         Ok(())
     }
 
@@ -567,20 +577,54 @@ impl SparseXorVec {
     }
 
     pub fn xor_item(&mut self, item: u32) {
-        for (index, existing) in self.items.iter().enumerate() {
-            match existing.cmp(&item) {
-                std::cmp::Ordering::Less => {}
-                std::cmp::Ordering::Equal => {
-                    self.items.remove(index);
-                    return;
-                }
-                std::cmp::Ordering::Greater => {
-                    self.items.insert(index, item);
-                    return;
-                }
+        let Some(last) = self.items.last().copied() else {
+            self.items.push(item);
+            return;
+        };
+        match last.cmp(&item) {
+            std::cmp::Ordering::Less => {
+                self.items.push(item);
+                return;
+            }
+            std::cmp::Ordering::Equal => {
+                self.items.pop();
+                return;
+            }
+            std::cmp::Ordering::Greater => {}
+        }
+        match self.items.first().copied() {
+            Some(first) if first > item => {
+                self.items.insert(0, item);
+                return;
+            }
+            Some(first) if first == item => {
+                self.items.remove(0);
+                return;
+            }
+            _ => {}
+        }
+        self.xor_item_middle(item);
+    }
+
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "middle scan indexes stay within the vector length checked by the while condition"
+    )]
+    fn xor_item_middle(&mut self, item: u32) {
+        let mut index = 1usize;
+        while index + 1 < self.items.len() {
+            let existing = self.items[index];
+            if existing < item {
+                index += 1;
+            } else if existing == item {
+                self.items.remove(index);
+                return;
+            } else {
+                self.items.insert(index, item);
+                return;
             }
         }
-        self.items.push(item);
+        self.items.insert(index, item);
     }
 
     pub fn xor_assign(&mut self, rhs: &Self) {
@@ -666,6 +710,9 @@ fn symmetric_difference_sorted_in_place(left: &mut Vec<u32>, right: &[u32]) {
         left.extend_from_slice(right);
         return;
     }
+    if symmetric_difference_sorted_with_stack(left, right) {
+        return;
+    }
 
     let left_len = left.len();
     let total_len = left_len + right.len();
@@ -711,6 +758,52 @@ fn symmetric_difference_sorted_in_place(left: &mut Vec<u32>, right: &[u32]) {
         left.copy_within(write_index..total_len, 0);
     }
     left.truncate(output_len);
+}
+
+#[allow(
+    clippy::indexing_slicing,
+    reason = "stack output bounds are guarded by the combined sparse-vector length check"
+)]
+fn symmetric_difference_sorted_with_stack(left: &mut Vec<u32>, right: &[u32]) -> bool {
+    let total_len = left.len() + right.len();
+    if total_len > SPARSE_XOR_STACK_ITEMS {
+        return false;
+    }
+    let mut out = [0_u32; SPARSE_XOR_STACK_ITEMS];
+    let output_len = symmetric_difference_sorted_into(left, right, &mut out);
+    left.clear();
+    left.extend_from_slice(&out[..output_len]);
+    true
+}
+
+#[allow(
+    clippy::indexing_slicing,
+    reason = "merge indexes are bounded by input lengths and the pre-sized output buffer"
+)]
+fn symmetric_difference_sorted_into(left: &[u32], right: &[u32], out: &mut [u32]) -> usize {
+    let mut left_index = 0usize;
+    let mut right_index = 0usize;
+    let mut write_index = 0usize;
+    while left_index < left.len() {
+        if right_index == right.len() || left[left_index] < right[right_index] {
+            out[write_index] = left[left_index];
+            write_index += 1;
+            left_index += 1;
+        } else if right[right_index] < left[left_index] {
+            out[write_index] = right[right_index];
+            write_index += 1;
+            right_index += 1;
+        } else {
+            left_index += 1;
+            right_index += 1;
+        }
+    }
+    while right_index < right.len() {
+        out[write_index] = right[right_index];
+        write_index += 1;
+        right_index += 1;
+    }
+    write_index
 }
 
 fn get_bit(words: &[u64], bit_len: BitLen, index: usize) -> Option<bool> {
@@ -766,4 +859,29 @@ fn ensure_same_bit_len(left: usize, right: usize) -> BitResult<()> {
         return Err(BitError::LengthMismatch { left, right });
     }
     Ok(())
+}
+
+fn read_word_range_low(words: &[u64], bit_start: usize, bit_count: usize) -> u64 {
+    debug_assert!(bit_count <= WORD_BITS);
+    if bit_count == 0 {
+        return 0;
+    }
+    let word_index = bit_start / WORD_BITS;
+    let bit_offset = bit_start % WORD_BITS;
+    let low = words.get(word_index).copied().unwrap_or(0) >> bit_offset;
+    let value = if bit_offset == 0 || bit_offset + bit_count <= WORD_BITS {
+        low
+    } else {
+        let high = words.get(word_index + 1).copied().unwrap_or(0) << (WORD_BITS - bit_offset);
+        low | high
+    };
+    value & low_bits_mask(bit_count)
+}
+
+fn low_bits_mask(bit_count: usize) -> u64 {
+    if bit_count >= WORD_BITS {
+        u64::MAX
+    } else {
+        (1_u64 << bit_count) - 1
+    }
 }

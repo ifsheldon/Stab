@@ -21,6 +21,7 @@ mod mbqc_decomposition;
 mod probability_util;
 mod reference_sample_tree;
 pub mod result_formats;
+pub mod result_streaming;
 mod sampling;
 mod sparse_rev_frame_tracker;
 pub mod stabilizers;

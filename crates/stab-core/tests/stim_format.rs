@@ -710,6 +710,54 @@ fn gates_table_matches_stim_v116_canonical_names_and_aliases() {
 }
 
 #[test]
+fn gate_lookup_accepts_canonical_alias_and_lowercase_names() {
+    for gate in Gate::all() {
+        assert_eq!(
+            Gate::from_name(&gate.canonical_name().to_ascii_lowercase()).unwrap(),
+            gate,
+            "{}",
+            gate.canonical_name()
+        );
+    }
+
+    for (alias, canonical) in [
+        ("MZ", "M"),
+        ("MRZ", "MR"),
+        ("RZ", "R"),
+        ("CNOT", "CX"),
+        ("ZCX", "CX"),
+        ("ZCY", "CY"),
+        ("ZCZ", "CZ"),
+        ("H_XZ", "H"),
+        ("SQRT_Z", "S"),
+        ("SQRT_Z_DAG", "S_DAG"),
+        ("CORRELATED_ERROR", "E"),
+        ("SWAPCZ", "CZSWAP"),
+    ] {
+        assert_eq!(Gate::from_name(alias).unwrap().canonical_name(), canonical);
+        assert_eq!(
+            Gate::from_name(&alias.to_ascii_lowercase())
+                .unwrap()
+                .canonical_name(),
+            canonical
+        );
+    }
+
+    for invalid in [
+        "",
+        "H2345",
+        "CNOTS",
+        "SQRT_Q",
+        "OBSERVABLE",
+        "DETECTOR!",
+        "PAULI_CHANNEL_3",
+        "UNKNOWN_GATE",
+    ] {
+        assert!(Gate::from_name(invalid).is_err(), "{invalid}");
+    }
+}
+
+#[test]
 fn gate_inverse_metadata_matches_stim_v116() {
     // Adapted from Stim v1.16.0 src/stim/gates/gates.test.cc inverse metadata checks.
     for (gate, inverse) in [

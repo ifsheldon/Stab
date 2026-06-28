@@ -281,6 +281,31 @@ mod tests {
     }
 
     #[test]
+    fn error_decomp_xyz_round_trips_edge_case_grid() {
+        let cases = [
+            (0.0, 0.0, 0.0),
+            (1e-12, 2e-12, 3e-12),
+            (0.1, 0.2, 0.3),
+            (0.25, 0.25, 0.25),
+            (0.499999, 0.000001, 0.000001),
+            (1.0, 0.0, 0.0),
+            (0.0, 1.0, 0.0),
+            (0.0, 0.0, 1.0),
+        ];
+
+        for (x, y, z) in cases {
+            let disjoint = independent_to_disjoint_xyz_errors(prob(x), prob(y), prob(z)).unwrap();
+            let recovered =
+                try_disjoint_to_independent_xyz_errors(disjoint.x(), disjoint.y(), disjoint.z())
+                    .unwrap()
+                    .unwrap();
+            assert_near(recovered.x().get(), x);
+            assert_near(recovered.y().get(), y);
+            assert_near(recovered.z().get(), z);
+        }
+    }
+
+    #[test]
     fn error_decomp_depolarize1_conversion_matches_upstream_round_trips() {
         for probability in [0.0, 0.01, 0.125, 0.25, 0.75] {
             let independent =
@@ -300,6 +325,8 @@ mod tests {
             assert_near(disjoint.y.get(), independent.get());
             assert_near(disjoint.z.get(), independent.get());
         }
+
+        assert!(depolarize1_independent_channel_probability(prob(0.750001)).is_err());
     }
 
     #[test]
@@ -312,5 +339,7 @@ mod tests {
                 probability,
             );
         }
+
+        assert!(depolarize2_independent_channel_probability(prob(15.0 / 16.0 + 0.000001)).is_err());
     }
 }

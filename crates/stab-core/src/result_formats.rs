@@ -942,6 +942,23 @@ mod tests {
     }
 
     #[test]
+    fn ptb64_reader_round_trips_writer_output() {
+        let records = (0..64)
+            .map(|shot_index| {
+                (0..17)
+                    .map(|bit_index| (shot_index * 7 + bit_index * 11) % 13 == 0)
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        let encoded = write_ptb64_records_checked(&records).unwrap();
+
+        assert_eq!(read_ptb64_records(&encoded, 17, 64).unwrap(), records);
+        assert_eq!(read_ptb64_records_all(&encoded, 17).unwrap(), records);
+        assert_eq!(ptb64_record_count(&encoded, 17).unwrap(), 64);
+    }
+
+    #[test]
     fn measure_record_reader_handles_multiple_records() {
         let records = read_records(
             b"111011001\n010000000\n101100011\n",
