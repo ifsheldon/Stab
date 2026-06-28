@@ -109,10 +109,11 @@ fn execute_operations<R>(
             } => {
                 let noisy_flip =
                     measurement_flip::sample(*flip_probability, rng, super::ExecutionMode::Sample);
-                let result = frame.measure(*qubit, *basis, *inverted ^ noisy_flip, rng);
-                record.push(result);
-                output.push(result);
-                if *reset && result {
+                let physical_result = frame.measure(*qubit, *basis, false, rng);
+                let reported_result = physical_result ^ *inverted ^ noisy_flip;
+                record.push(reported_result);
+                output.push(reported_result);
+                if *reset && physical_result {
                     frame.apply_pauli(*qubit, reset_correction(*basis));
                 }
             }

@@ -471,6 +471,28 @@ fn seeded_sample_bytes_match_seeded_record_samples() {
 }
 
 #[test]
+fn byte_sampling_measure_reset_uses_physical_result_for_reset() {
+    let inverted_circuit = Circuit::from_stim_str("MR !0\nM 0\n").expect("parse circuit");
+    let inverted_sampler = CompiledSampler::compile(&inverted_circuit).expect("compile sampler");
+    assert_eq!(
+        inverted_sampler.sample_bytes(1, SampleFormat::ZeroOne),
+        b"10\n"
+    );
+    assert_eq!(inverted_sampler.sample_bytes(1, SampleFormat::B8), &[0x01]);
+
+    let noisy_circuit = Circuit::from_stim_str("MR(1) 0\nM 0\n").expect("parse circuit");
+    let noisy_sampler = CompiledSampler::compile(&noisy_circuit).expect("compile sampler");
+    assert_eq!(
+        noisy_sampler.sample_bytes_with_seed(1, SampleFormat::ZeroOne, Some(5)),
+        b"10\n"
+    );
+    assert_eq!(
+        noisy_sampler.sample_bytes_with_seed(1, SampleFormat::B8, Some(5)),
+        &[0x01]
+    );
+}
+
+#[test]
 fn packed_sample_bytes_match_seeded_record_samples_for_surface_like_ops() {
     let circuit = Circuit::from_stim_str(
         "
