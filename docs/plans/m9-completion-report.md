@@ -8,10 +8,10 @@ Objective: implement measurement-to-detection conversion and the CLI workflows t
 
 ## Status
 
-Complete with spec follow-ups.
+Complete against the clarified M9 detector-workflow contract.
 
 The public M9 workflow slice is implemented and verified for measurement-record detector conversion, `detect`, `m2d`, observable routing, Pauli-target observable flips in `detect`, product-measurement frame updates, text formats, `b8`, `detect` `ptb64` outputs, `m2d` `ptb64` input, `m2d` `ptb64` output rejection, generated-circuit `sample -> m2d` round trips, clear sweep-conditioned conversion rejection, clear `--ran_without_feedback` rejection, structural gauge behavior, and report-only benchmark runners.
-The remaining work is explicitly logged as milestone under-specification because the current roadmap does not yet define whether it belongs in M9, a detector-analysis submilestone, or M12 performance hardening.
+All M9 scope ambiguities raised during audit are resolved in `docs/plans/milestone-spec-gaps.md`; no open M9 under-specification entries remain.
 
 ## Tests Ported Or Created
 
@@ -48,14 +48,14 @@ Milestone audit found implementation issues in structural oracle filtering, gaug
 Those were fixed by adding `--structural` support to `stab-oracle run`, expanding core detection tests, adding exact oracle fixtures, and adding M9 benchmark compare runners.
 
 Milestone audit also found under-specified scope around feedback-removal conversion, sweep-conditioned conversion, detector-analysis utility rows, generated fixture round trips, pinned benchmark baseline completeness, and bit-packed format scope.
-Resolved entries record explicit M9 boundaries in `docs/plans/milestone-spec-gaps.md`, and remaining open items stay logged there.
+Resolved entries record explicit M9 boundaries in `docs/plans/milestone-spec-gaps.md`; the centralized log currently has no open M9 entries.
 
 ## Full Code Review Outcome
 
 Full code review found compatibility and resource issues in `detect` observable placement, `m2d --in_format=dets`, zero-shot `detect`, deprecated `--prepend_observables`, top-level `--m2d`, Pauli-target observable detection, unbounded detection planning, whole-workload materialization, and duplicate sampler analysis.
 The concrete implementation issues were fixed with explicit observable output modes, measurement-only `dets` parsing, zero-shot early return, legacy alias support, observable-route validation, scalar frame-simulator Pauli-target observable support for `detect`, product-measurement frame updates, bounded planning and buffering limits, limited `m2d` reads, and reference-sample reuse from the compiled sampler.
 
-Open M9 spec follow-ups:
+Current M9 spec follow-ups:
 
 - None currently logged.
 

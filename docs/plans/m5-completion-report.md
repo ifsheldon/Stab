@@ -6,6 +6,10 @@ M5: Portable SIMD Bit Core.
 
 Objective: provide maintainable portable high-throughput bit primitives that simulators can use without touching raw SIMD lanes.
 
+## Status
+
+Complete against the clarified M5 portable-SIMD bit-core contract.
+
 ## Tests Ported Or Created
 
 - Added `crates/stab-core/tests/bits.rs` with Rust tests adapted from Stim v1.16.0 memory and bit-utility tests.
@@ -71,4 +75,3 @@ P2 findings were fixed by narrowing oracle coverage wording, removing extra work
 - `just oracle::matrix --check`
 - `just oracle::run --milestone M5`
 - `just bench::compare --milestone M5 --strict`
-

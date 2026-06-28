@@ -6,6 +6,10 @@ M8: Circuit Sampling.
 
 Objective: implement Stim's core circuit-sampling behavior with clear analysis-vs-shot separation and early bit-packed output support.
 
+## Status
+
+Complete against the clarified M8 circuit-sampling contract.
+
 ## Tests Ported Or Created
 
 - Added and extended `crates/stab-core/src/sampling/tests.rs` for deterministic sampling, reset and measurement edge cases, measurement feedback, repeat blocks, reference-sample behavior, output-format padding, bit-packed output, Pauli noise, depolarizing noise, heralded local noise, Pauli-channel noise, and correlated-error branch semantics.
@@ -50,9 +54,6 @@ Resolved M8 spec entries:
 - `2026-06-27 - M8: Linked Simulator And Result-Format Subcase Ownership`
 - `2026-06-27 - M8: Benchmark Strictness And Baseline Completeness`
 - `2026-06-27 - M8: Multi-Outcome Statistical Evidence`
-
-Open M8 spec entries:
-
 - `2026-06-27 - M8: Skip Loop Folding Scope`
 
 ## Full Code Review Outcome

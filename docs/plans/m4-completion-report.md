@@ -1,5 +1,13 @@
 # M4 Completion Report
 
+## Milestone
+
+M4: Formats, Gate Model, And Canonical Printing.
+
+## Status
+
+Complete against the clarified M4 `.stim` format, gate metadata, parser, validator, and canonical-printer contract.
+
 ## Scope
 
 Milestone M4 implements the `.stim` circuit data model, gate metadata, parser, validator, canonical printer, typed argument boundaries, target helpers, and M4-owned oracle and benchmark evidence for Stim v1.16.0 parity.
@@ -29,7 +37,7 @@ Milestone M4 implements the `.stim` circuit data model, gate metadata, parser, v
 ## Audit And Review Outcome
 
 - Milestone audit found that M4 canonical printer benchmark evidence was contract-only, top-level algorithm rows were assigned too early, and M4-owned probability and gate-decomposition utility scope needed narrowing.
-- Implementation issues from milestone audit were fixed by moving top-level rows to M6 or M9, documenting the contract-only printer benchmark, adding typed instruction argument accessors, and keeping unresolved scope questions in the under-specification log.
+- Implementation issues from milestone audit were fixed by moving top-level rows to M6 or M9, documenting the contract-only printer benchmark, adding typed instruction argument accessors, and resolving scope questions in the under-specification log.
 - Full code review found four implementation issues: Stim-compatible float formatting, 24-bit target parsing and lowercase Pauli support, comparable dense and sparse parser benchmark runners, and `u64` observable IDs.
 - All full-code-review implementation findings were fixed in code and covered by focused tests or benchmark output.
 
@@ -44,7 +52,7 @@ Milestone M4 implements the `.stim` circuit data model, gate metadata, parser, v
 - `just bench::compare --milestone M4 --strict`
 - `just rust::parser-fuzz`
 
-## Open Under-Specification Entries
+## Resolved Under-Specification Entries
 
-- `docs/plans/milestone-spec-gaps.md` keeps `M4: Gate Decomposition Utility Scope` open for full MPP, SPP, pair-measurement, and base-gate decomposition behavior that depends on later tableau or simulator semantics.
-- `docs/plans/milestone-spec-gaps.md` keeps `M4: Probability Utility Fixture Scope` open for random hit-index sampling and biased random bit generation that belong with later RNG, bit-storage, or sampler APIs.
+- `2026-06-27 - M4: Gate Decomposition Utility Scope` resolves the M4 boundary by assigning structural decomposition prerequisites to M4 and full semantic decomposition behavior to later algebra, simulator, flow, or analyzer milestones.
+- `2026-06-27 - M4: Probability Utility Fixture Scope` resolves the M4 boundary by assigning probability validation to M4 and random hit-index or biased-bit generation to later bit, sampler, or performance milestones.
