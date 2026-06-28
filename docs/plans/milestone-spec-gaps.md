@@ -37,16 +37,16 @@ Gap: the current memory gate tracks Stab-side allocation counts and maximum live
 Proposed amendment: either narrow the done criterion to allocation counts and maximum live allocated bytes, or add RSS measurement to the benchmark report and memory gate before M12 completion.
 Resolution: unresolved.
 
+## Resolved Entries
+
 ## 2026-06-28 - M12: Regression Threshold Automation
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of M12 regression-threshold evidence.
 Current text: M12 says workloads already at or below 1.25x Stim have benchmark thresholds checked by CI smoke or scheduled benchmark automation.
 Gap: the repository has source-owned threshold files and local `just bench::primary-regression` evidence, but no checked CI or scheduled automation currently runs the full threshold gate.
 Proposed amendment: add a CI or scheduled benchmark workflow for the full threshold gate, or revise the done criterion to accept archived local reports plus a lighter CI smoke command.
-Resolution: unresolved.
-
-## Resolved Entries
+Resolution: `.github/workflows/m12-benchmarks.yml` now runs weekly and by manual dispatch, records a fresh `just bench::baseline --primary` report, runs `just bench::primary-regression --baseline <fresh-baseline> --report target/benchmarks/m12-scheduled-primary-regression`, and uploads the generated baseline and compare reports. `just bench::primary-regression` now includes `--warmup --measurement-runs 3` so the scheduled threshold gate uses the same warmed median-of-three Stab-side evidence policy as completion-style timing runs.
 
 ## 2026-06-28 - M12: Primary Row Comparability Classes
 

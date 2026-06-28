@@ -1,0 +1,44 @@
+name: M12 Benchmarks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  primary-regression:
+    name: Primary Regression Thresholds
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install just
+        run: cargo install just --locked
+
+      - name: Show toolchain
+        run: rustup show active-toolchain
+
+      - name: Record primary baseline
+        run: just bench::baseline --primary --out target/benchmarks/m12-scheduled-primary-baseline
+
+      - name: Check primary regression thresholds
+        run: just bench::primary-regression --baseline target/benchmarks/m12-scheduled-primary-baseline/baseline.json --report target/benchmarks/m12-scheduled-primary-regression
+
+      - name: Upload benchmark reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m12-primary-regression-reports
+          path: |
+            target/benchmarks/m12-scheduled-primary-baseline/baseline.json
+            target/benchmarks/m12-scheduled-primary-baseline/report.md
+            target/benchmarks/m12-scheduled-primary-regression/compare.json
+            target/benchmarks/m12-scheduled-primary-regression/report.md
+          if-no-files-found: ignore

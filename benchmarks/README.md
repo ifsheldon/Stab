@@ -47,8 +47,9 @@ Profiler notes must include non-empty `Dominant cost:` and `Next owner action:` 
 Pass `--profiler-notes-dir benchmarks/profiler-notes/m12` to validate source-owned notes instead of report-local notes.
 Pass `--thresholds <path>` to fail when a selected row with a configured regression threshold exceeds its maximum relative ratio or lacks a comparable Stab-vs-Stim ratio.
 `m12-primary-thresholds.json` is the source-owned M12 timing-regression threshold file for primary rows that have reached the 1.25x pinned-Stim regression gate with enough local headroom to make an initial stable threshold useful.
-Run `just bench::primary-regression --baseline <primary-baseline.json> --report target/benchmarks/<name>` to check those source-owned thresholds for the frozen primary matrix.
+Run `just bench::primary-regression --baseline <primary-baseline.json> --report target/benchmarks/<name>` to check those source-owned thresholds for the frozen primary matrix after a Stab-side warmup pass and three recorded measurement runs.
 The recipe defaults to the latest generated baseline path when no explicit `--baseline` is passed.
+The scheduled `.github/workflows/m12-benchmarks.yml` workflow records a fresh primary pinned-Stim baseline on a GitHub runner, runs this source-owned threshold gate, and uploads the generated baseline and compare reports.
 Threshold files are JSON with schema version 1:
 
 ```json
