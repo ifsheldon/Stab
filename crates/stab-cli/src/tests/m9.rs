@@ -8,6 +8,22 @@ fn ptb64_words(words: &[u64]) -> Vec<u8> {
     words.iter().flat_map(|word| word.to_le_bytes()).collect()
 }
 
+#[derive(Debug)]
+struct FailingWriter;
+
+impl std::io::Write for FailingWriter {
+    fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::BrokenPipe,
+            "intentional write stop",
+        ))
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 #[test]
 fn detect_basic_matches_m9_oracle_golden() {
     let mut stdout = Vec::new();
@@ -25,6 +41,25 @@ fn detect_basic_matches_m9_oracle_golden() {
         include_str!("../../../../oracle/fixtures/expected/m9_detect_basic.stdout")
     );
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn detect_streams_huge_output_until_writer_failure() {
+    let mut stdout = FailingWriter;
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "detect", "--shots", "64000001"],
+        b"M 0\nDETECTOR rec[-1]\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("failed to write output: intentional write stop")
+    );
 }
 
 #[test]
@@ -818,12 +853,12 @@ fn m2d_rejects_zero_width_ptb64_input() {
 }
 
 #[test]
-fn m2d_rejects_excessive_ptb64_decoded_shots_before_expansion() {
+fn m2d_streams_large_ptb64_input_until_writer_failure() {
     let temp_dir = tempdir().expect("temp dir");
     let circuit_path = temp_dir.path().join("input.stim");
     std::fs::write(&circuit_path, "M 0\nDETECTOR rec[-1]\n").expect("write circuit");
 
-    let mut stdout = Vec::new();
+    let mut stdout = FailingWriter;
     let mut stderr = Vec::new();
     let status = run_from(
         [
@@ -840,11 +875,10 @@ fn m2d_rejects_excessive_ptb64_decoded_shots_before_expansion() {
     );
 
     assert_eq!(status, 1);
-    assert_eq!(stdout, b"");
     assert!(
         String::from_utf8(stderr)
             .unwrap()
-            .contains("m2d ptb64 input decodes to 1000064 records but the limit is 1000000")
+            .contains("failed to write output: intentional write stop")
     );
 }
 

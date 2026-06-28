@@ -1,20 +1,21 @@
-use std::io::{BufRead, BufReader, Read, Write};
+use std::fs::File;
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 
 use clap::{Args, ValueEnum};
 use stab_core::{
-    CircuitError, CompiledDemSampler, DetectionObservableOutputMode, DetectorErrorModel,
-    SampleFormat,
-    result_formats::{
-        read_measurement_records, read_ptb64_records, validate_ptb64_shot_count,
-        write_ptb64_records_checked, write_records,
-    },
-    write_detection_records, write_observable_records, write_ptb64_detection_records,
-    write_ptb64_observable_records,
+    CircuitError, CompiledDemSampler, DetectionEventRecord, DetectionObservableOutputMode,
+    DetectorErrorModel, SampleFormat,
+    result_formats::{read_measurement_records, validate_ptb64_shot_count},
 };
 
 use super::{
-    CliError, SampleOutFormatArg, read_limited_input, write_empty_observables, write_output,
+    CliError, SampleOutFormatArg, read_limited_input,
+    streaming::{
+        FileOutputSink, OutputSink, detection_record_bits, write_bits_record,
+        write_detection_record, write_observable_record, write_ptb64_group,
+    },
+    write_empty_observables, write_output,
 };
 
 const MAX_SAMPLE_DEM_REPLAY_TEXT_RECORD_BYTES: usize = 1_048_576;
@@ -129,49 +130,92 @@ where
     )?;
     let dem = parse_dem_bytes(&input_bytes)?;
     let sampler = CompiledDemSampler::compile(&dem)?;
-    sampler.validate_sample_buffer_units(
-        args.shots,
-        args.error_output.is_some() || args.replay_error_input.is_some(),
-    )?;
-    let mut error_records = None;
-    let output = if let Some(replay_path) = args.replay_error_input.as_ref() {
-        let replayed_errors = read_replay_error_records(
+    if let Some(replay_path) = args.replay_error_input.as_ref() {
+        validate_replay_prefix(
             replay_path,
             args.replay_err_in_format,
             sampler.error_count(),
             args.shots,
         )?;
-        let output = sampler.sample_detection_events_from_error_records(&replayed_errors)?;
-        error_records = Some(replayed_errors);
-        output
-    } else if args.error_output.is_some() {
-        let (output, sampled_errors) =
-            sampler.sample_detection_events_and_errors_with_seed(args.shots, args.seed)?;
-        error_records = Some(sampled_errors);
-        output
-    } else {
-        sampler.sample_detection_events_with_seed(args.shots, args.seed)?
-    };
+    }
     let observable_mode = observable_output_mode(&args);
-    let bytes = write_sample_dem_detection_records(&output, observable_mode, args.out_format)?;
-    write_output(args.output.as_ref(), stdout, &bytes)?;
-    write_optional_sample_dem_observables(
-        args.obs_output.as_ref(),
-        args.obs_out_format,
-        stdout,
-        &output,
-    )?;
-    write_optional_error_records(
-        args.error_output.as_ref(),
-        args.err_out_format,
-        stdout,
-        error_records.as_deref().unwrap_or(&[]),
-    )
+    let stream_formats = SampleDemStreamFormats::from_args(&args, observable_mode);
+    let mut primary_output = OutputSink::create(args.output.as_ref(), stdout)?;
+    let mut observable_output = args
+        .obs_output
+        .as_ref()
+        .map(FileOutputSink::create)
+        .transpose()?;
+    let mut error_output = args
+        .error_output
+        .as_ref()
+        .map(FileOutputSink::create)
+        .transpose()?;
+    let mut stream_state = SampleDemStreamState::default();
+    if let Some(replay_path) = args.replay_error_input.as_ref() {
+        for_each_replay_error_record(
+            replay_path,
+            args.replay_err_in_format,
+            sampler.error_count(),
+            args.shots,
+            |error_record| {
+                sampler.try_for_each_detection_event_from_error_records(
+                    std::iter::once(error_record),
+                    |record, replayed_error_record| {
+                        write_sample_dem_stream_record(
+                            record,
+                            Some(replayed_error_record),
+                            stream_formats,
+                            &mut primary_output,
+                            observable_output.as_mut(),
+                            error_output.as_mut(),
+                            &mut stream_state,
+                        )
+                    },
+                )
+            },
+        )?;
+    } else if args.error_output.is_some() {
+        sampler.try_for_each_detection_event_and_error_with_seed(
+            args.shots,
+            args.seed,
+            |record, error_record| {
+                write_sample_dem_stream_record(
+                    record,
+                    Some(error_record),
+                    stream_formats,
+                    &mut primary_output,
+                    observable_output.as_mut(),
+                    error_output.as_mut(),
+                    &mut stream_state,
+                )
+            },
+        )?;
+    } else {
+        sampler.try_for_each_detection_event_with_seed(args.shots, args.seed, |record| {
+            write_sample_dem_stream_record(
+                record,
+                None,
+                stream_formats,
+                &mut primary_output,
+                observable_output.as_mut(),
+                error_output.as_mut(),
+                &mut stream_state,
+            )
+        })?;
+    }
+    stream_state.finish()
 }
 
 fn parse_dem_bytes(input: &[u8]) -> Result<DetectorErrorModel, CliError> {
     let dem_text = std::str::from_utf8(input).map_err(|_| CliError::InvalidUtf8Input)?;
     Ok(DetectorErrorModel::from_dem_str(dem_text)?)
+}
+
+fn invalid_result_format(message: impl Into<String>) -> CliError {
+    CliError::from(CircuitError::InvalidResultFormat {
+        message: message.into(),
+    })
 }
 
 fn validate_observable_routing(args: &SampleDemArgs) -> Result<(), CliError> {
@@ -215,88 +259,221 @@ fn ensure_readable_path(path: &Path) -> Result<(), CliError> {
         })
 }
 
-fn read_replay_error_records(
+fn for_each_replay_error_record<F>(
     path: &Path,
     format: SampleDemRecordFormatArg,
     error_count: usize,
     expected_shots: usize,
-) -> Result<Vec<Vec<bool>>, CliError> {
+    visit: F,
+) -> Result<(), CliError>
+where
+    F: FnMut(&[bool]) -> Result<(), CliError>,
+{
     match format {
         SampleDemRecordFormatArg::Ptb64 => {
-            let byte_count = ptb64_replay_byte_count(error_count, expected_shots)?;
-            let input = read_replay_prefix(path, byte_count)?;
-            read_ptb64_records(&input, error_count, expected_shots).map_err(CliError::from)
+            for_each_ptb64_replay_error_record(path, error_count, expected_shots, visit)
         }
         SampleDemRecordFormatArg::B8 => {
-            read_b8_replay_error_records(path, error_count, expected_shots)
+            for_each_b8_replay_error_record(path, error_count, expected_shots, visit)
         }
         SampleDemRecordFormatArg::R8 => {
-            read_r8_replay_error_records(path, error_count, expected_shots)
+            for_each_r8_replay_error_record(path, error_count, expected_shots, visit)
         }
         SampleDemRecordFormatArg::ZeroOne
         | SampleDemRecordFormatArg::Hits
         | SampleDemRecordFormatArg::Dets => {
-            read_line_replay_error_records(path, format, error_count, expected_shots)
+            for_each_line_replay_error_record(path, format, error_count, expected_shots, visit)
         }
     }
 }
 
-fn ptb64_replay_byte_count(error_count: usize, expected_shots: usize) -> Result<usize, CliError> {
-    let shot_groups = expected_shots / 64;
-    error_count
-        .checked_mul(8)
-        .and_then(|bytes_per_group| shot_groups.checked_mul(bytes_per_group))
-        .ok_or(CliError::MeasurementCountOverflow)
-}
-
-fn read_b8_replay_error_records(
-    path: &Path,
-    error_count: usize,
-    expected_shots: usize,
-) -> Result<Vec<Vec<bool>>, CliError> {
-    let bytes_per_record = error_count.div_ceil(8);
-    let byte_count = expected_shots
-        .checked_mul(bytes_per_record)
-        .ok_or(CliError::MeasurementCountOverflow)?;
-    let input = read_replay_prefix(path, byte_count)?;
-    let records = read_measurement_records(&input, SampleFormat::B8, error_count)?;
-    require_expected_replay_records(records, expected_shots)
-}
-
-fn read_replay_prefix(path: &Path, byte_count: usize) -> Result<Vec<u8>, CliError> {
-    let file = std::fs::File::open(path).map_err(|source| CliError::ReadPath {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    let mut input = Vec::new();
-    file.take(u64::try_from(byte_count).unwrap_or(u64::MAX))
-        .read_to_end(&mut input)
-        .map_err(|source| CliError::ReadPath {
-            path: path.to_path_buf(),
-            source,
-        })?;
-    Ok(input)
-}
-
-fn read_line_replay_error_records(
+fn validate_replay_prefix(
     path: &Path,
     format: SampleDemRecordFormatArg,
     error_count: usize,
     expected_shots: usize,
-) -> Result<Vec<Vec<bool>>, CliError> {
+) -> Result<(), CliError> {
+    for_each_replay_error_record(path, format, error_count, expected_shots, |_record| Ok(()))
+}
+
+fn for_each_ptb64_replay_error_record<F>(
+    path: &Path,
+    error_count: usize,
+    expected_shots: usize,
+    mut visit: F,
+) -> Result<(), CliError>
+where
+    F: FnMut(&[bool]) -> Result<(), CliError>,
+{
+    if expected_shots == 0 {
+        return Ok(());
+    }
+    if error_count == 0 {
+        return Err(invalid_result_format(
+            "ptb64 input cannot represent a nonzero number of zero-width records",
+        ));
+    }
+    let bytes_per_group = error_count
+        .checked_mul(8)
+        .ok_or(CliError::MeasurementCountOverflow)?;
+    let expected_bytes = bytes_per_group
+        .checked_mul(expected_shots / 64)
+        .ok_or(CliError::MeasurementCountOverflow)?;
+    let mut file = File::open(path).map_err(|source| CliError::ReadPath {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let mut group_bytes = vec![0u8; bytes_per_group];
+    let mut bytes_read = 0usize;
+    for _ in 0..(expected_shots / 64) {
+        read_exact_ptb64_replay_group(
+            path,
+            &mut file,
+            &mut group_bytes,
+            &mut bytes_read,
+            expected_bytes,
+            expected_shots,
+            error_count,
+        )?;
+        let mut group = vec![vec![false; error_count]; 64];
+        for (bit_index, word_chunk) in group_bytes.chunks_exact(8).enumerate() {
+            let mut word_bytes = [0u8; 8];
+            word_bytes.copy_from_slice(word_chunk);
+            let word = u64::from_le_bytes(word_bytes);
+            for (shot_offset, record) in group.iter_mut().enumerate() {
+                if word & (1u64 << shot_offset) != 0 {
+                    let bit = record.get_mut(bit_index).ok_or_else(|| {
+                        invalid_result_format("ptb64 bit index was out of decoded record bounds")
+                    })?;
+                    *bit = true;
+                }
+            }
+        }
+        for record in &group {
+            visit(record)?;
+        }
+    }
+    Ok(())
+}
+
+fn read_exact_ptb64_replay_group(
+    path: &Path,
+    reader: &mut impl Read,
+    buffer: &mut [u8],
+    bytes_read: &mut usize,
+    expected_bytes: usize,
+    expected_shots: usize,
+    error_count: usize,
+) -> Result<(), CliError> {
+    let mut offset = 0usize;
+    while offset < buffer.len() {
+        let remaining = buffer
+            .get_mut(offset..)
+            .ok_or_else(|| invalid_result_format("ptb64 replay byte cursor was out of range"))?;
+        match reader.read(remaining) {
+            Ok(0) => {
+                return Err(invalid_result_format(format!(
+                    "ptb64 input expected at least {expected_bytes} bytes for {expected_shots} records with {error_count} bits each, got {}",
+                    *bytes_read
+                )));
+            }
+            Ok(count) => {
+                offset += count;
+                *bytes_read = bytes_read.saturating_add(count);
+            }
+            Err(error) if error.kind() == ErrorKind::Interrupted => {}
+            Err(source) => {
+                return Err(CliError::ReadPath {
+                    path: path.to_path_buf(),
+                    source,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn for_each_b8_replay_error_record<F>(
+    path: &Path,
+    error_count: usize,
+    expected_shots: usize,
+    mut visit: F,
+) -> Result<(), CliError>
+where
+    F: FnMut(&[bool]) -> Result<(), CliError>,
+{
+    let bytes_per_record = error_count.div_ceil(8);
+    if bytes_per_record == 0 && expected_shots > 0 {
+        return Err(invalid_result_format(
+            "b8 input cannot represent zero-width records",
+        ));
+    }
+    let mut file = File::open(path).map_err(|source| CliError::ReadPath {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let mut record_bytes = vec![0u8; bytes_per_record];
+    for records_read in 0..expected_shots {
+        let mut offset = 0usize;
+        while offset < record_bytes.len() {
+            let remaining = record_bytes
+                .get_mut(offset..)
+                .ok_or_else(|| invalid_result_format("b8 replay byte cursor was out of range"))?;
+            match file.read(remaining) {
+                Ok(0) if offset == 0 => {
+                    return Err(CliError::ReplayErrorRecordCountMismatch {
+                        expected: expected_shots,
+                        actual: records_read,
+                    });
+                }
+                Ok(0) => {
+                    return Err(invalid_result_format(format!(
+                        "b8 input ended after {offset} bytes of a {bytes_per_record}-byte record"
+                    )));
+                }
+                Ok(count) => offset += count,
+                Err(source) => {
+                    return Err(CliError::ReadPath {
+                        path: path.to_path_buf(),
+                        source,
+                    });
+                }
+            }
+        }
+        let records = read_measurement_records(&record_bytes, SampleFormat::B8, error_count)?;
+        let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
+            CircuitError::InvalidResultFormat {
+                message: format!("b8 replay record decoded into {} records", records.len()),
+            }
+        })?;
+        visit(&record)?;
+    }
+    Ok(())
+}
+
+fn for_each_line_replay_error_record<F>(
+    path: &Path,
+    format: SampleDemRecordFormatArg,
+    error_count: usize,
+    expected_shots: usize,
+    mut visit: F,
+) -> Result<(), CliError>
+where
+    F: FnMut(&[bool]) -> Result<(), CliError>,
+{
     let sample_format = format.sample_format()?;
-    let file = std::fs::File::open(path).map_err(|source| CliError::ReadPath {
+    let file = File::open(path).map_err(|source| CliError::ReadPath {
         path: path.to_path_buf(),
         source,
     })?;
     let mut reader = BufReader::new(file);
-    let mut records = Vec::with_capacity(expected_shots);
+    let mut records_read = 0usize;
     let mut skipped_dets_blank_bytes = 0usize;
-    while records.len() < expected_shots {
+    while records_read < expected_shots {
         let Some(line) = read_replay_line(path, &mut reader)? else {
             return Err(CliError::ReplayErrorRecordCountMismatch {
                 expected: expected_shots,
-                actual: records.len(),
+                actual: records_read,
             });
         };
         if format == SampleDemRecordFormatArg::Dets && is_blank_dets_replay_line(&line) {
@@ -310,10 +487,11 @@ fn read_line_replay_error_records(
                 message: format!("replay record decoded into {} records", records.len()),
             }
         })?;
-        records.push(record);
+        visit(&record)?;
+        records_read += 1;
         skipped_dets_blank_bytes = 0;
     }
-    Ok(records)
+    Ok(())
 }
 
 fn is_blank_dets_replay_line(line: &[u8]) -> bool {
@@ -378,26 +556,29 @@ fn read_replay_line(path: &Path, reader: &mut impl BufRead) -> Result<Option<Vec
     }
 }
 
-fn read_r8_replay_error_records(
+fn for_each_r8_replay_error_record<F>(
     path: &Path,
     error_count: usize,
     expected_shots: usize,
-) -> Result<Vec<Vec<bool>>, CliError> {
-    let mut file = std::fs::File::open(path).map_err(|source| CliError::ReadPath {
+    mut visit: F,
+) -> Result<(), CliError>
+where
+    F: FnMut(&[bool]) -> Result<(), CliError>,
+{
+    let mut file = File::open(path).map_err(|source| CliError::ReadPath {
         path: path.to_path_buf(),
         source,
     })?;
-    let mut records = Vec::with_capacity(expected_shots);
-    for _ in 0..expected_shots {
+    for records_read in 0..expected_shots {
         let Some(record) = read_r8_replay_record(path, &mut file, error_count)? else {
             return Err(CliError::ReplayErrorRecordCountMismatch {
                 expected: expected_shots,
-                actual: records.len(),
+                actual: records_read,
             });
         };
-        records.push(record);
+        visit(&record)?;
     }
-    Ok(records)
+    Ok(())
 }
 
 fn read_r8_replay_record(
@@ -464,56 +645,182 @@ fn read_r8_replay_record(
     }
 }
 
-fn require_expected_replay_records(
-    records: Vec<Vec<bool>>,
-    expected_shots: usize,
-) -> Result<Vec<Vec<bool>>, CliError> {
-    if records.len() < expected_shots {
-        return Err(CliError::ReplayErrorRecordCountMismatch {
-            expected: expected_shots,
-            actual: records.len(),
-        });
-    }
-    Ok(records)
+#[derive(Default)]
+struct SampleDemStreamState {
+    primary_ptb64_records: Vec<Vec<bool>>,
+    observable_ptb64_records: Vec<Vec<bool>>,
+    error_ptb64_records: Vec<Vec<bool>>,
 }
 
-fn write_sample_dem_detection_records(
-    output: &stab_core::DetectionConversionOutput,
+impl SampleDemStreamState {
+    fn finish(self) -> Result<(), CliError> {
+        if self.primary_ptb64_records.is_empty()
+            && self.observable_ptb64_records.is_empty()
+            && self.error_ptb64_records.is_empty()
+        {
+            return Ok(());
+        }
+        Err(invalid_result_format(
+            "internal ptb64 stream ended with an incomplete 64-record group",
+        ))
+    }
+}
+
+#[derive(Clone, Copy)]
+struct SampleDemStreamFormats {
     observable_mode: DetectionObservableOutputMode,
-    format: SampleOutFormatArg,
-) -> Result<Vec<u8>, CliError> {
-    match format {
-        SampleOutFormatArg::Ptb64 => Ok(write_ptb64_detection_records(output, observable_mode)?),
-        SampleOutFormatArg::ZeroOne
-        | SampleOutFormatArg::B8
-        | SampleOutFormatArg::R8
-        | SampleOutFormatArg::Hits
-        | SampleOutFormatArg::Dets => Ok(write_detection_records(
-            output,
+    out_format: SampleOutFormatArg,
+    obs_out_format: SampleDemRecordFormatArg,
+    err_out_format: SampleDemRecordFormatArg,
+}
+
+impl SampleDemStreamFormats {
+    fn from_args(args: &SampleDemArgs, observable_mode: DetectionObservableOutputMode) -> Self {
+        Self {
             observable_mode,
-            format.sample_format()?,
-        )?),
+            out_format: args.out_format,
+            obs_out_format: args.obs_out_format,
+            err_out_format: args.err_out_format,
+        }
     }
 }
 
-fn write_optional_sample_dem_observables<W>(
-    output_path: Option<&PathBuf>,
-    format: SampleDemRecordFormatArg,
-    stdout: &mut W,
-    detection_output: &stab_core::DetectionConversionOutput,
+fn write_sample_dem_stream_record<W>(
+    record: &DetectionEventRecord,
+    error_record: Option<&[bool]>,
+    formats: SampleDemStreamFormats,
+    primary_output: &mut OutputSink<'_, W>,
+    observable_output: Option<&mut FileOutputSink>,
+    error_output: Option<&mut FileOutputSink>,
+    state: &mut SampleDemStreamState,
 ) -> Result<(), CliError>
 where
     W: Write,
 {
-    let Some(output_path) = output_path else {
-        return Ok(());
-    };
-    let output = if format == SampleDemRecordFormatArg::Ptb64 {
-        write_ptb64_observable_records(detection_output)?
-    } else {
-        write_observable_records(detection_output, format.sample_format()?)?
-    };
-    write_output(Some(output_path), stdout, &output)
+    write_primary_detection_stream_record(
+        record,
+        formats.observable_mode,
+        formats.out_format,
+        primary_output,
+        &mut state.primary_ptb64_records,
+    )?;
+    if let Some(output) = observable_output {
+        write_observable_stream_record(
+            record,
+            formats.obs_out_format,
+            output,
+            &mut state.observable_ptb64_records,
+        )?;
+    }
+    if let (Some(output), Some(error_record)) = (error_output, error_record) {
+        write_error_stream_record(
+            error_record,
+            formats.err_out_format,
+            output,
+            &mut state.error_ptb64_records,
+        )?;
+    }
+    Ok(())
+}
+
+fn write_primary_detection_stream_record<W>(
+    record: &DetectionEventRecord,
+    observable_mode: DetectionObservableOutputMode,
+    format: SampleOutFormatArg,
+    output: &mut OutputSink<'_, W>,
+    ptb64_records: &mut Vec<Vec<bool>>,
+) -> Result<(), CliError>
+where
+    W: Write,
+{
+    match format {
+        SampleOutFormatArg::Ptb64 => write_ptb64_stream_record(
+            detection_record_bits(record, observable_mode),
+            output,
+            ptb64_records,
+        ),
+        SampleOutFormatArg::ZeroOne
+        | SampleOutFormatArg::B8
+        | SampleOutFormatArg::R8
+        | SampleOutFormatArg::Hits
+        | SampleOutFormatArg::Dets => {
+            let sample_format = format.sample_format()?;
+            output.write_with(|writer| {
+                write_detection_record(record, observable_mode, sample_format, writer)
+            })
+        }
+    }
+}
+
+fn write_observable_stream_record(
+    record: &DetectionEventRecord,
+    format: SampleDemRecordFormatArg,
+    output: &mut FileOutputSink,
+    ptb64_records: &mut Vec<Vec<bool>>,
+) -> Result<(), CliError> {
+    match format {
+        SampleDemRecordFormatArg::Ptb64 => {
+            write_ptb64_file_stream_record(record.observables.clone(), output, ptb64_records)
+        }
+        SampleDemRecordFormatArg::ZeroOne
+        | SampleDemRecordFormatArg::B8
+        | SampleDemRecordFormatArg::R8
+        | SampleDemRecordFormatArg::Hits
+        | SampleDemRecordFormatArg::Dets => {
+            let sample_format = format.sample_format()?;
+            output.write_with(|writer| write_observable_record(record, sample_format, writer))
+        }
+    }
+}
+
+fn write_error_stream_record(
+    error_record: &[bool],
+    format: SampleDemRecordFormatArg,
+    output: &mut FileOutputSink,
+    ptb64_records: &mut Vec<Vec<bool>>,
+) -> Result<(), CliError> {
+    match format {
+        SampleDemRecordFormatArg::Ptb64 => {
+            write_ptb64_file_stream_record(error_record.to_vec(), output, ptb64_records)
+        }
+        SampleDemRecordFormatArg::ZeroOne
+        | SampleDemRecordFormatArg::B8
+        | SampleDemRecordFormatArg::R8
+        | SampleDemRecordFormatArg::Hits
+        | SampleDemRecordFormatArg::Dets => {
+            let sample_format = format.sample_format()?;
+            output.write_with(|writer| write_bits_record(error_record, sample_format, writer))
+        }
+    }
+}
+
+fn write_ptb64_stream_record<W>(
+    bits: Vec<bool>,
+    output: &mut OutputSink<'_, W>,
+    ptb64_records: &mut Vec<Vec<bool>>,
+) -> Result<(), CliError>
+where
+    W: Write,
+{
+    ptb64_records.push(bits);
+    if ptb64_records.len() == 64 {
+        output.write_with(|writer| write_ptb64_group(ptb64_records, writer))?;
+        ptb64_records.clear();
+    }
+    Ok(())
+}
+
+fn write_ptb64_file_stream_record(
+    bits: Vec<bool>,
+    output: &mut FileOutputSink,
+    ptb64_records: &mut Vec<Vec<bool>>,
+) -> Result<(), CliError> {
+    ptb64_records.push(bits);
+    if ptb64_records.len() == 64 {
+        output.write_with(|writer| write_ptb64_group(ptb64_records, writer))?;
+        ptb64_records.clear();
+    }
+    Ok(())
 }
 
 fn write_empty_errors<W>(output_path: Option<&PathBuf>, stdout: &mut W) -> Result<(), CliError>
@@ -524,26 +831,6 @@ where
         return Ok(());
     };
     write_output(Some(output_path), stdout, &[])
-}
-
-fn write_optional_error_records<W>(
-    output_path: Option<&PathBuf>,
-    format: SampleDemRecordFormatArg,
-    stdout: &mut W,
-    error_records: &[Vec<bool>],
-) -> Result<(), CliError>
-where
-    W: Write,
-{
-    let Some(output_path) = output_path else {
-        return Ok(());
-    };
-    let output = if format == SampleDemRecordFormatArg::Ptb64 {
-        write_ptb64_records_checked(error_records)?
-    } else {
-        write_records(error_records, format.sample_format()?)
-    };
-    write_output(Some(output_path), stdout, &output)
 }
 
 fn observable_output_mode(args: &SampleDemArgs) -> DetectionObservableOutputMode {

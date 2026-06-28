@@ -7,6 +7,22 @@ fn ptb64_words(words: &[u64]) -> Vec<u8> {
     words.iter().flat_map(|word| word.to_le_bytes()).collect()
 }
 
+#[derive(Debug)]
+struct FailingWriter;
+
+impl std::io::Write for FailingWriter {
+    fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::BrokenPipe,
+            "intentional write stop",
+        ))
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 #[test]
 fn sample_dem_deterministic_matches_m11_oracle_golden() {
     let mut stdout = Vec::new();
@@ -590,8 +606,8 @@ fn sample_dem_replay_ignores_partial_extra_b8_records_after_requested_shots() {
 }
 
 #[test]
-fn sample_dem_rejects_excessive_buffered_output_before_sampling() {
-    let mut stdout = Vec::new();
+fn sample_dem_streams_huge_output_until_writer_failure() {
+    let mut stdout = FailingWriter;
     let mut stderr = Vec::new();
     let status = run_from(
         ["stab", "sample_dem", "--shots", "64000001"],
@@ -601,31 +617,10 @@ fn sample_dem_rejects_excessive_buffered_output_before_sampling() {
     );
 
     assert_eq!(status, 1);
-    assert_eq!(String::from_utf8(stdout).unwrap(), "");
     assert!(
         String::from_utf8(stderr)
             .unwrap()
-            .contains("DEM sampler would require 64000001 buffered units")
-    );
-}
-
-#[test]
-fn sample_dem_rejects_materialized_byte_pressure_before_sampling() {
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        ["stab", "sample_dem", "--shots", "3000000"],
-        b"".as_slice(),
-        &mut stdout,
-        &mut stderr,
-    );
-
-    assert_eq!(status, 1);
-    assert_eq!(String::from_utf8(stdout).unwrap(), "");
-    assert!(
-        String::from_utf8(stderr)
-            .unwrap()
-            .contains("materialized bytes")
+            .contains("failed to write output: intentional write stop")
     );
 }
 
@@ -686,7 +681,7 @@ fn sample_dem_zero_shots_validates_declared_input_paths_like_stim() {
 }
 
 #[test]
-fn sample_dem_rejects_excessive_replay_buffers_before_reading_replay_path() {
+fn sample_dem_validates_replay_path_before_streaming_output() {
     let dir = tempdir().expect("tempdir");
     let missing_replay_path = dir.path().join("missing.01");
     let args = vec![
@@ -704,6 +699,6 @@ fn sample_dem_rejects_excessive_replay_buffers_before_reading_replay_path() {
     assert_eq!(status, 1);
     assert_eq!(String::from_utf8(stdout).unwrap(), "");
     let stderr = String::from_utf8(stderr).unwrap();
-    assert!(stderr.contains("DEM sampler would require 64000001 buffered units"));
-    assert!(!stderr.contains("missing.01"));
+    assert!(stderr.contains("failed to read"), "{stderr}");
+    assert!(stderr.contains("missing.01"), "{stderr}");
 }

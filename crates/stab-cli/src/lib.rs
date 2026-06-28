@@ -17,6 +17,7 @@ mod analyze_errors;
 mod detection;
 mod input;
 mod sample_dem;
+mod streaming;
 
 use analyze_errors::{AnalyzeErrorsArgs, run_analyze_errors};
 use clap::error::ErrorKind;
@@ -31,6 +32,7 @@ use stab_core::{
     generate_repetition_code_circuit, generate_surface_code_circuit,
     result_formats::{MeasureRecordWriter, validate_ptb64_shot_count},
 };
+use streaming::write_ptb64_group;
 use thiserror::Error;
 
 pub(crate) const MAX_CIRCUIT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
@@ -325,20 +327,6 @@ pub(crate) enum CliError {
 
     #[error("{kind} is too large; limit is {limit} bytes")]
     InputTooLarge { kind: &'static str, limit: u64 },
-
-    #[error("{kind} decodes to {actual} records but the limit is {limit}")]
-    DecodedRecordCountTooLarge {
-        kind: &'static str,
-        actual: usize,
-        limit: usize,
-    },
-
-    #[error("{kind} decodes to {actual} record bits but the limit is {limit}")]
-    DecodedRecordBitsTooLarge {
-        kind: &'static str,
-        actual: usize,
-        limit: usize,
-    },
 
     #[error("not enough information given to parse input file")]
     MissingRecordWidth,
@@ -1032,37 +1020,6 @@ where
         },
     )?;
     debug_assert!(group.is_empty());
-    Ok(())
-}
-
-fn write_ptb64_group<W>(records: &[Vec<bool>], output: &mut W) -> std::io::Result<()>
-where
-    W: Write,
-{
-    let bits_per_record = records.first().map_or(0, Vec::len);
-    let mut words = vec![0u64; bits_per_record];
-    for (shot_index, record) in records.iter().enumerate() {
-        if record.len() != bits_per_record {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "internal sampler emitted non-uniform ptb64 records",
-            ));
-        }
-        for (bit_index, bit) in record.iter().enumerate() {
-            if *bit {
-                let word = words.get_mut(bit_index).ok_or_else(|| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "internal sampler emitted ptb64 bit outside the record width",
-                    )
-                })?;
-                *word |= 1u64 << shot_index;
-            }
-        }
-    }
-    for word in words {
-        output.write_all(&word.to_le_bytes())?;
-    }
     Ok(())
 }
 
