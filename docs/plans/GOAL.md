@@ -47,14 +47,18 @@ The expected final state is:
 The current hard blockers for a `1.25x` beta gate are:
 
 1. `m10-error-decomp`
-2. `m5-simd-bits`
-3. `m4-circuit-parse`
 
 The current headroom rows are:
 
-1. `m5-sparse-xor`
-2. `m4-gate-lookup`
-3. `m8-sample-primary-unrotated-surface-contract`
+1. `m8-measure-reader-dets`
+
+The historical watch rows from the older clean report are:
+
+1. `m5-simd-bits`
+2. `m4-circuit-parse`
+3. `m5-sparse-xor`
+4. `m4-gate-lookup`
+5. `m8-sample-primary-unrotated-surface-contract`
 
 The current no-ratio beta-waiver rows are:
 
@@ -97,20 +101,20 @@ Historical `2.0x` evidence may remain only when it is explicitly labeled histori
 
 ### 3. Fix Benchmark Shape Before Performance Code
 
-Start with `m5-simd-bits`.
-Make faithful direct pairs and Stab-only contract extras impossible to confuse.
+Check `m5-simd-bits` before optimizing it.
+Make faithful direct pairs and Stab-only contract extras impossible to confuse if the strict gate exposes the older row-shape problem again.
 Prefer splitting rows over adding special-case prose when a split makes the evidence clearer.
 Do not optimize SIMD code until the benchmark proves a faithful direct pair is slow.
 
 ### 4. Optimize Real Hot Paths
 
-For `m4-circuit-parse`, use focused evidence to identify the remaining sparse-parser cost before changing parser internals.
+For `m4-circuit-parse`, use focused evidence to identify the remaining sparse-parser cost before changing parser internals if the row returns above or near the strict gate.
 For `m10-error-decomp`, decide whether the current tiny filters are meaningful before optimizing arithmetic.
 If a larger faithful case-array benchmark is needed, add it and document why it replaces tiny-filter gate evidence.
 
 ### 5. Add Headroom
 
-Recheck `m5-sparse-xor`, `m4-gate-lookup`, and `m8-sample-primary-unrotated-surface-contract` after the hard blockers are fixed.
+Recheck `m8-measure-reader-dets`, `m5-sparse-xor`, `m4-gate-lookup`, and `m8-sample-primary-unrotated-surface-contract` after the hard blockers are fixed.
 Optimize only where focused evidence shows real risk or repeated clean runs drift toward `1.25x`.
 Do not overfit nanosecond-scale rows.
 

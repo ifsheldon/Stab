@@ -5,26 +5,25 @@
 This plan tightens the Stab primary beta performance gate from `2.0x` to `1.25x` and then improves the currently slower or fragile rows until the stricter gate is honest, executable, and stable.
 It follows the lessons in `docs/plans/lessons-learned.md`: benchmark comparability must be explicit, tiny measurements need deliberate evidence policy, paired submeasurements must not be hidden behind row medians, final reports must be clean, and waivers must stay source-owned and machine-checked.
 
-## Current Evidence
+## Starting Evidence
 
-The current clean beta report is `target/benchmarks/m12-primary-beta/compare.json` from Stab commit `2499f39b41e50478a8e2407f71da56f3442a7a97` with `local_modifications=false`.
+The starting clean beta report for this plan is `target/benchmarks/m12-primary-beta/compare.json` generated from Stab commit `5a641b1e21241702cc3ed4d71264a89fb10bcd42` with `local_modifications=false`, using the baseline at `target/benchmarks/beta-125-start-baseline/baseline.json`.
 It passes the existing `2.0x` beta gate with 72 comparable pass rows and 4 checked no-ratio waivers.
 
 If the beta gate were changed to `1.25x` without further work, these comparable rows would fail:
 
 | Row | Comparability | Current worst ratio | Blocking surface |
 | --- | --- | ---: | --- |
-| `m10-error-decomp` | `direct-match` | `1.875x` | Tiny independent/disjoint XYZ filters, especially `independent_to_disjoint_xyz_errors` and exact disjoint-to-independent conversion. |
-| `m5-simd-bits` | `partial-match` | `1.488x` row-level | Bundled benchmark shape mixes direct Stim pairs with Stab-only masked, range, and copy contract extras. |
-| `m4-circuit-parse` | `direct-match` | `1.2877x` | Sparse `.stim` parser pair `circuit_parse_sparse` to `stab_circuit_parse_sparse`. |
+| `m10-error-decomp` | `direct-match` | `1.6667x` | Tiny independent/disjoint XYZ filters, especially `independent_to_disjoint_xyz_errors` and exact disjoint-to-independent conversion. |
 
 These rows are below `1.25x` today but should get headroom or explicit stability evidence before the stricter gate becomes completion evidence:
 
 | Row | Comparability | Current worst ratio | Headroom concern |
 | --- | --- | ---: | --- |
-| `m5-sparse-xor` | `direct-match` | `1.1589x` | Row-XOR pair is close enough to deserve extra profiling and repeated evidence. |
-| `m4-gate-lookup` | `partial-match` | `1.070x` | Tiny canonical hash pair should not be overfit, but it needs variance monitoring. |
-| `m8-sample-primary-unrotated-surface-contract` | `cli-baseline` | `1.0188x` | Close to parity and already thresholded, but sampler timing should be checked after every optimization. |
+| `m8-measure-reader-dets` | `direct-match` | `1.0173x` | Sparse `dets` per-100 reader pair is just above parity and should be monitored after code or gate changes. |
+
+The prior clean report at commit `2499f39b41e50478a8e2407f71da56f3442a7a97` showed `m5-simd-bits`, `m4-circuit-parse`, `m5-sparse-xor`, `m4-gate-lookup`, and `m8-sample-primary-unrotated-surface-contract` closer to the `1.25x` line.
+The B0 rerun supersedes that report for implementation targeting, but those historical rows should still be watched in final evidence because lessons learned require fresh baselines and explicit variance awareness for small benchmarks.
 
 The four current no-ratio beta waivers remain outside this performance optimization scope unless a faithful pinned-Stim ratio becomes available:
 
@@ -63,8 +62,10 @@ just bench::primary-beta --baseline target/benchmarks/beta-125-start-baseline/ba
 Done criteria:
 
 - A clean starting report exists with `local_modifications=false`.
-- The plan's failure and headroom tables are updated if the clean evidence differs from the current report.
+- The plan's failure and headroom tables are updated if the clean evidence differs from older reports.
 - Any discrepancy is explained before implementation begins.
+
+Status: complete for the starting evidence listed above.
 
 ## Milestone B1: Make The 1.25x Beta Gate Explicit
 
@@ -93,22 +94,24 @@ Done criteria:
 - It still waives only measured `contract-only` rows named by `benchmarks/m12-primary-beta-waivers.json`.
 - Documentation no longer describes the active beta gate as `2.0x`, except in historical evidence sections that clearly say the old gate was historical.
 
-## Milestone B2: Fix `m5-simd-bits` Comparability Shape
+## Milestone B2: Preserve `m5-simd-bits` Comparability Shape
 
-Objective: make `m5-simd-bits` satisfy the stricter beta gate by correcting benchmark shape before attempting unnecessary SIMD optimization.
+Objective: keep `m5-simd-bits` honest under the stricter beta gate without doing unnecessary SIMD optimization when fresh evidence already passes.
 
 Problem statement:
 
-The row-level ratio is above `1.25x` because the row bundles faithful direct pairs with Stab-only contract extras.
+An older clean report showed the row-level ratio above `1.25x` because the row bundles faithful direct pairs with Stab-only contract extras.
+The B0 report no longer shows this row above `1.25x`, but the comparability risk remains real.
 The direct `simd_bits_xor_10K` pair is already faster than pinned Stim, and the actual upstream `not_zero` workload is already guarded by a schema-version-2 threshold.
 
 Tasks:
 
-- Split the row or change row-level beta aggregation so unmatched Stab contract extras cannot dominate strict Stim-relative beta status.
-- Prefer separate rows for direct Stim pairs and Stab-only extras if that keeps comparability clearer.
+- Inspect final `1.25x` beta evidence for `m5-simd-bits` after the gate change.
+- Split the row or change row-level beta aggregation only if unmatched Stab contract extras dominate strict Stim-relative beta status again.
+- Prefer separate rows for direct Stim pairs and Stab-only extras if a split becomes necessary.
 - Keep direct pairs for `simd_bits_xor_10K` and the actual pinned `simd_bits_not_zero_100K` source workload mirrored as `stab_simd_bits_not_zero_10K`.
 - Keep masked XOR, range XOR, and copy workloads measured as Stab-only contract evidence until pinned Stim exposes faithful filters or a later plan defines Stab-only memory throughput gates.
-- Update `benchmarks/m12-primary-thresholds.json`, profiler notes, benchmark runner tests, and progress docs in the same change set as the benchmark-shape change.
+- Update `benchmarks/m12-primary-thresholds.json`, profiler notes, benchmark runner tests, and progress docs in the same change set if the benchmark shape changes.
 
 Linked tests and checks:
 
@@ -123,23 +126,24 @@ Done criteria:
 - Stab-only extras remain visible but no longer masquerade as strict Stim-relative row evidence.
 - No threshold is added for unmatched work.
 
-## Milestone B3: Optimize `m4-circuit-parse`
+## Milestone B3: Preserve `m4-circuit-parse` Headroom
 
-Objective: reduce the sparse parser pair `stab_circuit_parse_sparse` below `1.25x` with enough headroom to avoid flaky strict beta failures.
+Objective: keep the sparse parser pair below `1.25x` and optimize only if fresh strict-gate evidence shows it is still a real blocker or near miss.
 
 Problem statement:
 
 The dense parser pair is faster than pinned Stim, but sparse parsing currently determines the row ratio.
-Prior optimization removed temporary target vectors, repeated integer scans, and some generic dispatch, but the remaining sparse-parser cost is still slightly above the stricter gate.
+Prior optimization removed temporary target vectors, repeated integer scans, and some generic dispatch.
+The B0 report measures sparse parsing below `1.25x`, but older reports put it just above the stricter gate, so it remains a final-evidence watch row.
 
 Tasks:
 
-- Run focused M4 compare evidence before editing parser code.
-- Identify whether the remaining cost is parser dispatch, circuit item allocation, target construction, line scanning, or comment/tag handling.
+- Inspect final `1.25x` beta evidence for `m4-circuit-parse` after the gate change.
+- Run focused M4 compare evidence before editing parser code if the row is above `1.25x` or close enough to be unstable.
+- Identify whether any remaining cost is parser dispatch, circuit item allocation, target construction, line scanning, or comment/tag handling before changing parser internals.
 - Extend fast paths only for shapes that appear in the benchmark or common Stim circuits and preserve full parser semantics.
-- Investigate reusing target buffers or directly constructing small circuit instructions without extra intermediate containers.
 - Avoid broad parser rewrites unless focused evidence shows the current structure is the bottleneck.
-- Add regression tests before or alongside parser changes for comments, tags, numeric targets, no-argument gates, multi-target gates, malformed targets, and canonical round trips.
+- Add regression tests before or alongside parser changes for comments, tags, numeric targets, no-argument gates, multi-target gates, malformed targets, and canonical round trips if parser code changes.
 
 Linked tests and checks:
 
@@ -151,7 +155,7 @@ Linked tests and checks:
 
 Done criteria:
 
-- `m4-circuit-parse` worst paired ratio is `<=1.25x`, with a target of `<=1.15x` for headroom.
+- `m4-circuit-parse` worst paired ratio is `<=1.25x`.
 - The stable sparse pair is guarded by beta evidence and, if repeated clean evidence is stable enough, by a schema-version-2 threshold.
 - Parser behavior remains compatible with implemented Stim v1.16.0 surfaces.
 
@@ -191,22 +195,28 @@ Done criteria:
 
 Objective: make the stricter beta gate robust enough that clean reruns do not flap around `1.25x`.
 
-Tasks for `m5-sparse-xor`:
+Tasks for `m8-measure-reader-dets`:
+
+- Inspect the sparse per-100 reader pair after the gate change.
+- Avoid code changes unless repeated evidence drifts toward `1.15x` or higher.
+- If optimization is needed, keep dense and sparse reader pairs separate and preserve exact reader parsing semantics.
+
+Historical watch tasks for `m5-sparse-xor`:
 
 - Run focused evidence separating row-XOR and item-XOR.
 - Profile the row-XOR path before changing data structures.
 - Try small-row specialization, capacity reuse, branch reduction, or merge-loop simplification only if evidence points there.
 - Preserve sorted-unique invariants and symmetric-difference behavior.
-- Target `<=1.10x` for row-XOR if practical.
+- Do this only if fresh strict-gate evidence returns to the older near-miss shape.
 
-Tasks for `m4-gate-lookup`:
+Historical watch tasks for `m4-gate-lookup`:
 
 - Keep canonical hash pair thresholded.
 - Do not overfit nanosecond noise.
 - Add repeated clean evidence if the row drifts above `1.15x`.
 - Keep alias, lowercase, and invalid lookup contract extras outside strict Stim-relative evidence.
 
-Tasks for `m8-sample-primary-unrotated-surface-contract`:
+Historical watch tasks for `m8-sample-primary-unrotated-surface-contract`:
 
 - Recheck after other changes because sampler timing can move with unrelated parser or generator changes.
 - Optimize only if repeated clean evidence drifts above `1.15x`.
