@@ -91,34 +91,72 @@ pub(super) fn sample_detection_events_with_frame(
     validate_frame_detection_circuit(circuit)?;
     let plan = ConversionPlan::from_circuit(circuit)?;
     plan.validate_shot_count(shots)?;
+    let detector_count = plan.detector_terms.len();
+    let observable_count = plan.observable_terms.len();
     let mut rng = SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random));
     let mut records = Vec::with_capacity(shots);
+    sample_detection_events_with_frame_plan(circuit, shots, &plan, &mut rng, |record| {
+        records.push(record.clone());
+        Ok::<(), CircuitError>(())
+    })?;
+    Ok(DetectionConversionOutput {
+        records,
+        detector_count,
+        observable_count,
+    })
+}
+
+pub(super) fn try_for_each_detection_event_with_frame<E, F>(
+    circuit: &Circuit,
+    shots: usize,
+    seed: Option<u64>,
+    mut visit: F,
+) -> Result<(), E>
+where
+    E: From<CircuitError>,
+    F: FnMut(&DetectionEventRecord) -> Result<(), E>,
+{
+    validate_frame_detection_circuit(circuit)?;
+    let plan = ConversionPlan::from_circuit(circuit)?;
+    let mut rng = SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random));
+    sample_detection_events_with_frame_plan(circuit, shots, &plan, &mut rng, |record| visit(record))
+}
+
+fn sample_detection_events_with_frame_plan<E, F>(
+    circuit: &Circuit,
+    shots: usize,
+    plan: &ConversionPlan,
+    rng: &mut SmallRng,
+    mut visit: F,
+) -> Result<(), E>
+where
+    E: From<CircuitError>,
+    F: FnMut(&DetectionEventRecord) -> Result<(), E>,
+{
     for _ in 0..shots {
         let mut frame = ScalarDetectionFrame::new(
             circuit.count_qubits(),
             plan.measurement_count,
             plan.detector_terms.len(),
             plan.observable_terms.len(),
-            &mut rng,
+            rng,
         );
-        frame.execute_circuit(circuit, &mut rng)?;
+        frame.execute_circuit(circuit, rng)?;
         if frame.measurements.len() != plan.measurement_count {
             return Err(CircuitError::invalid_result_format(format!(
                 "frame detection sampled {} measurement bits but expected {}",
                 frame.measurements.len(),
                 plan.measurement_count
-            )));
+            ))
+            .into());
         }
-        records.push(DetectionEventRecord {
+        let record = DetectionEventRecord {
             detectors: frame.detectors,
             observables: frame.observables,
-        });
+        };
+        visit(&record)?;
     }
-    Ok(DetectionConversionOutput {
-        records,
-        detector_count: plan.detector_terms.len(),
-        observable_count: plan.observable_terms.len(),
-    })
+    Ok(())
 }
 
 struct ScalarDetectionFrame {

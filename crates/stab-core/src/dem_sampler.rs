@@ -47,10 +47,11 @@ impl CompiledDemSampler {
         seed: Option<u64>,
     ) -> CircuitResult<DetectionConversionOutput> {
         self.validate_sample_buffer_units(shots, false)?;
-        let mut rng = dem_sampler_rng(seed);
-        let records = (0..shots)
-            .map(|_| self.sample_record(&mut rng))
-            .collect::<CircuitResult<Vec<_>>>()?;
+        let mut records = Vec::with_capacity(shots);
+        self.try_for_each_detection_event_with_seed(shots, seed, |record| {
+            records.push(record.clone());
+            Ok::<(), CircuitError>(())
+        })?;
         Ok(DetectionConversionOutput {
             records,
             detector_count: self.detector_count,
@@ -138,14 +139,17 @@ impl CompiledDemSampler {
         seed: Option<u64>,
     ) -> CircuitResult<(DetectionConversionOutput, Vec<Vec<bool>>)> {
         self.validate_sample_buffer_units(shots, true)?;
-        let mut rng = dem_sampler_rng(seed);
         let mut records = Vec::with_capacity(shots);
         let mut error_records = Vec::with_capacity(shots);
-        for _ in 0..shots {
-            let error_record = self.sample_error_record(&mut rng);
-            records.push(self.detection_record_from_error_record(&error_record)?);
-            error_records.push(error_record);
-        }
+        self.try_for_each_detection_event_and_error_with_seed(
+            shots,
+            seed,
+            |record, error_record| {
+                records.push(record.clone());
+                error_records.push(error_record.to_vec());
+                Ok::<(), CircuitError>(())
+            },
+        )?;
         Ok((
             DetectionConversionOutput {
                 records,
@@ -161,11 +165,14 @@ impl CompiledDemSampler {
         error_records: &[Vec<bool>],
     ) -> CircuitResult<DetectionConversionOutput> {
         self.validate_sample_buffer_units(error_records.len(), true)?;
-        self.validate_error_record_widths(error_records)?;
-        let records = error_records
-            .iter()
-            .map(|error_record| self.detection_record_from_error_record(error_record))
-            .collect::<CircuitResult<Vec<_>>>()?;
+        let mut records = Vec::with_capacity(error_records.len());
+        self.try_for_each_detection_event_from_error_records(
+            error_records.iter().map(Vec::as_slice),
+            |record, _error_record| {
+                records.push(record.clone());
+                Ok::<(), CircuitError>(())
+            },
+        )?;
         Ok(DetectionConversionOutput {
             records,
             detector_count: self.detector_count,
@@ -173,65 +180,124 @@ impl CompiledDemSampler {
         })
     }
 
-    fn sample_record<R>(&self, rng: &mut R) -> CircuitResult<DetectionEventRecord>
+    pub fn try_for_each_detection_event_with_seed<E, F>(
+        &self,
+        shots: usize,
+        seed: Option<u64>,
+        mut visit: F,
+    ) -> Result<(), E>
     where
-        R: Rng,
+        E: From<CircuitError>,
+        F: FnMut(&DetectionEventRecord) -> Result<(), E>,
     {
-        let error_record = self.sample_error_record(rng);
-        self.detection_record_from_error_record(&error_record)
+        self.try_for_each_detection_event_and_error_with_seed(shots, seed, |record, _error| {
+            visit(record)
+        })
     }
 
-    fn sample_error_record<R>(&self, rng: &mut R) -> Vec<bool>
+    pub fn try_for_each_detection_event_and_error_with_seed<E, F>(
+        &self,
+        shots: usize,
+        seed: Option<u64>,
+        mut visit: F,
+    ) -> Result<(), E>
     where
-        R: Rng,
+        E: From<CircuitError>,
+        F: FnMut(&DetectionEventRecord, &[bool]) -> Result<(), E>,
     {
-        self.operations
-            .iter()
-            .map(|operation| operation.sample_occurs(rng))
-            .collect()
-    }
-
-    fn validate_error_record_widths(&self, error_records: &[Vec<bool>]) -> CircuitResult<()> {
-        for (shot_index, error_record) in error_records.iter().enumerate() {
-            if error_record.len() != self.operations.len() {
-                return Err(CircuitError::invalid_result_format(format!(
-                    "DEM error record {shot_index} expected {} bits, got {}",
-                    self.operations.len(),
-                    error_record.len()
-                )));
-            }
+        let mut rng = dem_sampler_rng(seed);
+        let mut error_record = Vec::with_capacity(self.operations.len());
+        let mut record = self.reusable_detection_record();
+        for _ in 0..shots {
+            self.sample_error_record_into(&mut rng, &mut error_record);
+            self.detection_record_from_error_record_into(&error_record, &mut record)?;
+            visit(&record, &error_record)?;
         }
         Ok(())
     }
 
-    fn detection_record_from_error_record(
+    pub fn try_for_each_detection_event_from_error_records<'a, E, I, F>(
+        &self,
+        error_records: I,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<CircuitError>,
+        I: IntoIterator<Item = &'a [bool]>,
+        F: FnMut(&DetectionEventRecord, &[bool]) -> Result<(), E>,
+    {
+        let mut record = self.reusable_detection_record();
+        for (shot_index, error_record) in error_records.into_iter().enumerate() {
+            self.validate_error_record_width(error_record, Some(shot_index))?;
+            self.detection_record_from_error_record_into(error_record, &mut record)?;
+            visit(&record, error_record)?;
+        }
+        Ok(())
+    }
+
+    fn reusable_detection_record(&self) -> DetectionEventRecord {
+        DetectionEventRecord {
+            detectors: vec![false; self.detector_count],
+            observables: vec![false; self.observable_count],
+        }
+    }
+
+    fn sample_error_record_into<R>(&self, rng: &mut R, error_record: &mut Vec<bool>)
+    where
+        R: Rng,
+    {
+        error_record.clear();
+        error_record.extend(
+            self.operations
+                .iter()
+                .map(|operation| operation.sample_occurs(rng)),
+        );
+    }
+
+    fn validate_error_record_width(
         &self,
         error_record: &[bool],
-    ) -> CircuitResult<DetectionEventRecord> {
-        if error_record.len() != self.operations.len() {
+        shot_index: Option<usize>,
+    ) -> CircuitResult<()> {
+        if error_record.len() == self.operations.len() {
+            return Ok(());
+        }
+        if let Some(shot_index) = shot_index {
             return Err(CircuitError::invalid_result_format(format!(
-                "DEM error record expected {} bits, got {}",
+                "DEM error record {shot_index} expected {} bits, got {}",
                 self.operations.len(),
                 error_record.len()
             )));
         }
-        let mut detectors = vec![false; self.detector_count];
-        let mut observables = vec![false; self.observable_count];
+        Err(CircuitError::invalid_result_format(format!(
+            "DEM error record expected {} bits, got {}",
+            self.operations.len(),
+            error_record.len()
+        )))
+    }
+
+    fn detection_record_from_error_record_into(
+        &self,
+        error_record: &[bool],
+        record: &mut DetectionEventRecord,
+    ) -> CircuitResult<()> {
+        self.validate_error_record_width(error_record, None)?;
+        record.detectors.clear();
+        record.detectors.resize(self.detector_count, false);
+        record.observables.clear();
+        record.observables.resize(self.observable_count, false);
         for (operation, occurred) in self.operations.iter().zip(error_record) {
             if !occurred {
                 continue;
             }
             for detector in &operation.detectors {
-                toggle_bit(&mut detectors, *detector, "detector")?;
+                toggle_bit(&mut record.detectors, *detector, "detector")?;
             }
             for observable in &operation.observables {
-                toggle_bit(&mut observables, *observable, "observable")?;
+                toggle_bit(&mut record.observables, *observable, "observable")?;
             }
         }
-        Ok(DetectionEventRecord {
-            detectors,
-            observables,
-        })
+        Ok(())
     }
 }
 
@@ -444,4 +510,69 @@ fn detector_index_overflow_error(kind: &'static str) -> CircuitError {
 
 fn dem_sampler_rng(seed: Option<u64>) -> SmallRng {
     SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random))
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::expect_used,
+        reason = "DEM sampler tests use direct fixture assertions for compact diagnostics"
+    )]
+
+    use super::*;
+
+    fn collect_streamed_samples(
+        sampler: &CompiledDemSampler,
+        shots: usize,
+        seed: Option<u64>,
+    ) -> CircuitResult<(Vec<DetectionEventRecord>, Vec<Vec<bool>>)> {
+        let mut records = Vec::new();
+        let mut errors = Vec::new();
+        sampler.try_for_each_detection_event_and_error_with_seed(
+            shots,
+            seed,
+            |record, error_record| {
+                records.push(record.clone());
+                errors.push(error_record.to_vec());
+                Ok::<(), CircuitError>(())
+            },
+        )?;
+        Ok((records, errors))
+    }
+
+    #[test]
+    fn dem_streaming_samples_match_materialized_seeded_samples() {
+        for dem_text in [
+            "error(1) D0\n",
+            "error(0.25) D0\n",
+            "error(0.25) L2\n",
+            "error(0.25) D0 D2\nerror(0.25) D2 D3\n",
+            "error(0.25) D0\nshift_detectors 1\nrepeat 2 {\n    error(0.25) D0\n    shift_detectors 1\n}\nerror(0) D0\n",
+        ] {
+            let model = DetectorErrorModel::from_dem_str(dem_text).expect("parse DEM");
+            let sampler = CompiledDemSampler::compile(&model).expect("compile DEM sampler");
+            let (materialized, materialized_errors) = sampler
+                .sample_detection_events_and_errors_with_seed(65, Some(7))
+                .expect("materialized samples");
+            let (streamed, streamed_errors) =
+                collect_streamed_samples(&sampler, 65, Some(7)).expect("streamed samples");
+
+            assert_eq!(streamed, materialized.records);
+            assert_eq!(streamed_errors, materialized_errors);
+            let replayed = sampler
+                .sample_detection_events_from_error_records(&streamed_errors)
+                .expect("materialized replay");
+            let mut streamed_replay = Vec::new();
+            sampler
+                .try_for_each_detection_event_from_error_records(
+                    streamed_errors.iter().map(Vec::as_slice),
+                    |record, _error_record| {
+                        streamed_replay.push(record.clone());
+                        Ok::<(), CircuitError>(())
+                    },
+                )
+                .expect("streamed replay");
+            assert_eq!(streamed_replay, replayed.records);
+        }
+    }
 }
