@@ -88,7 +88,8 @@ Rows:
 Tasks:
 
 - Add `benchmarks/m12-primary-regression-waivers.json` or an equivalent source-owned waiver file dedicated to timing-regression threshold waivers.
-- Require every waiver entry to include the row id, reason, follow-up owner action, and evidence that the row is measured but not thresholdable.
+- Require every waiver entry to include the row id, reason, and follow-up owner action.
+- Require the timing-regression gate to prove that each waiver applies only to a selected measured `contract-only` row with no faithful ratio and no configured threshold.
 - Teach the timing-regression gate to report a distinct waiver status for checked no-ratio rows instead of `not-configured`.
 - Reject stale waiver ids, waivers for selected comparable rows, waivers for rows with a faithful ratio, duplicate waiver ids, missing reasons, and missing follow-up text.
 - Keep `benchmarks/m12-primary-beta-waivers.json` separate unless the implementation deliberately unifies beta and regression waiver schemas with explicit status fields.

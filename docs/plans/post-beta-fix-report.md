@@ -75,10 +75,9 @@ Final archival acceptance still requires rerunning the final primary benchmark c
 
 ## Audit And Review Status
 
-- Milestone-audit was run against the post-beta timing-hardening goal and found the row work substantially reconciled, but it blocks final completion until the intended changes are committed and the primary benchmark reports are regenerated with `local_modifications=false`.
-- Full-code-review found no Rust correctness, Stim compatibility, file-format, SIMD isolation, hostile-input, or benchmark-policy blocker in the changed code, but it found stale source-owned profiler evidence in `benchmarks/profiler-notes/m12/optimization-log.json`.
-- The optimization log was updated so `m4-gate-lookup`, `m8-measure-reader`, and `m10-error-decomp` match the current manifest, threshold file, beta waivers, and per-row profiler notes.
-- Final audit and review closure still requires the clean committed-code benchmark reports named below, plus a fresh milestone-audit and full-code-review pass for `docs/plans/post-beta-threshold-completion-plan.md`.
+- Milestone-audit for `docs/plans/post-beta-threshold-completion-plan.md` found no source-shape blocker after clarifying that waiver entries carry row id, reason, and follow-up while the timing-regression gate supplies measured no-ratio evidence at report time.
+- Full-code-review of the threshold-completion commits found no confirmed Rust correctness, Stim compatibility, file-format, SIMD isolation, hostile-input, benchmark-policy, or documentation blocker.
+- Final audit and review closure still requires the clean committed-code benchmark reports named below.
 
 ## Clean Evidence Commands
 
