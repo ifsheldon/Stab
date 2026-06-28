@@ -254,16 +254,21 @@ pub(crate) fn run_stab_compare_row(
         }
         "m4-gate-lookup" => {
             let names = Gate::all().map(Gate::canonical_name).collect::<Vec<_>>();
-            Ok(Some(vec![measure_stab("stab_gate_lookup_all", || {
-                for name in &names {
-                    let gate = Gate::from_name(name).map_err(|error| BenchError::StabRunner {
-                        row_id: row.id.clone(),
-                        message: error.to_string(),
-                    })?;
-                    black_box(gate);
-                }
-                Ok(())
-            })?]))
+            Ok(Some(vec![measure_stab_batched(
+                "stab_gate_lookup_all",
+                TINY_DIRECT_COMPARE_REPETITIONS,
+                || {
+                    for name in &names {
+                        let gate =
+                            Gate::from_name(name).map_err(|error| BenchError::StabRunner {
+                                row_id: row.id.clone(),
+                                message: error.to_string(),
+                            })?;
+                        black_box(gate);
+                    }
+                    Ok(())
+                },
+            )?]))
         }
         "m5-simd-bit-table" => {
             let matrix = m5_bit_matrix(&row.id)?;
@@ -840,6 +845,12 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
         return Some(note);
     }
     match row_id {
+        "m4-circuit-parse" => Some(
+            "direct-match: Stab measures dense and sparse .stim parser cases against the pinned Stim circuit_parse perf filters",
+        ),
+        "m4-gate-lookup" => Some(
+            "direct-match: Stab measures all canonical gate-name lookups against the pinned Stim gate lookup perf filter",
+        ),
         "m7-perf-harness" => Some(
             "contract-only: verifies baseline metadata coverage; no Stab runtime workload is expected",
         ),

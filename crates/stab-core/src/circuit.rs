@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use crate::gate::{ArgRule, TargetGroupKind};
-use crate::target::{parse_plain_qubit_target_token_into, parse_target_token_into};
+use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
 use crate::{CircuitError, CircuitResult, Gate, ObservableId, Probability, RepeatCount, Target};
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -151,7 +151,7 @@ impl CircuitItem {
 pub struct CircuitInstruction {
     gate: Gate,
     args: Vec<f64>,
-    targets: Vec<Target>,
+    targets: TargetVec,
     tag: Option<String>,
 }
 
@@ -163,13 +163,23 @@ impl CircuitInstruction {
         targets: Vec<Target>,
         tag: Option<String>,
     ) -> CircuitResult<Self> {
+        let targets = TargetVec::from_vec(targets);
         gate.validate(&args, &targets)?;
-        Ok(Self {
+        Ok(Self::from_validated_parts(gate, args, targets, tag))
+    }
+
+    fn from_validated_parts(
+        gate: Gate,
+        args: Vec<f64>,
+        targets: TargetVec,
+        tag: Option<String>,
+    ) -> Self {
+        Self {
             gate,
             args,
             targets,
             tag: normalize_tag(tag),
-        })
+        }
     }
 
     pub fn gate(&self) -> Gate {
@@ -344,7 +354,7 @@ impl CircuitInstruction {
         if !self.can_fuse(other) {
             return false;
         }
-        self.targets.extend_from_slice(&other.targets);
+        self.targets.extend(other.targets.iter().cloned());
         true
     }
 
@@ -359,7 +369,7 @@ impl CircuitInstruction {
         Self {
             gate: self.gate,
             args: self.args.clone(),
-            targets,
+            targets: TargetVec::from_vec(targets),
             tag: self.tag.clone(),
         }
     }
@@ -537,11 +547,67 @@ impl<'a> Parser<'a> {
 
 fn parse_instruction(line_number: usize, line: &str) -> CircuitResult<CircuitInstruction> {
     let (name, rest) = parse_name(line_number, line)?;
+    if let Some(instruction) = parse_simple_plain_instruction(line_number, name, rest) {
+        return instruction;
+    }
     let gate = Gate::from_name(name).map_err(|error| wrap_line(line_number, error))?;
     let (tag, rest) = parse_optional_tag(line_number, rest)?;
     let (args, rest) = parse_optional_args(line_number, rest)?;
     let targets = parse_targets(rest).map_err(|error| wrap_line(line_number, error))?;
-    CircuitInstruction::new(gate, args, targets, tag).map_err(|error| wrap_line(line_number, error))
+    gate.validate(&args, &targets)
+        .map_err(|error| wrap_line(line_number, error))?;
+    Ok(CircuitInstruction::from_validated_parts(
+        gate, args, targets, tag,
+    ))
+}
+
+fn parse_simple_plain_instruction(
+    line_number: usize,
+    name: &str,
+    rest: &str,
+) -> Option<CircuitResult<CircuitInstruction>> {
+    let gate = Gate::from_simple_plain_name(name)?;
+    let rest = rest.trim_start();
+    if rest.starts_with('[') || rest.starts_with('(') {
+        return None;
+    }
+    let targets = match parse_plain_qubit_target_text(rest) {
+        Ok(Some(targets)) => targets,
+        Ok(None) => return None,
+        Err(error) => return Some(Err(wrap_line(line_number, error))),
+    };
+    let gate_name = gate.canonical_name();
+    if gate_name == "CX"
+        && let Err(error) = validate_simple_plain_pairs(gate_name, &targets)
+    {
+        return Some(Err(wrap_line(line_number, error)));
+    }
+    Some(Ok(CircuitInstruction::from_validated_parts(
+        gate,
+        Vec::new(),
+        targets,
+        None,
+    )))
+}
+
+fn validate_simple_plain_pairs(gate: &'static str, targets: &[Target]) -> CircuitResult<()> {
+    if !targets.len().is_multiple_of(2) {
+        return Err(CircuitError::InvalidTargetCount {
+            gate,
+            count: targets.len(),
+        });
+    }
+    for pair in targets.chunks_exact(2) {
+        if let [left, right] = pair
+            && left == right
+        {
+            return Err(CircuitError::InvalidTarget {
+                gate,
+                target: left.to_string(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn parse_name(line_number: usize, line: &str) -> CircuitResult<(&str, &str)> {
@@ -631,38 +697,16 @@ fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(Vec<f64
     Ok((args, tail))
 }
 
-fn parse_targets(rest: &str) -> CircuitResult<Vec<Target>> {
-    if let Some(target_count) = plain_qubit_target_count(rest) {
-        let mut targets = Vec::with_capacity(target_count);
-        for token in rest.split_ascii_whitespace() {
-            parse_plain_qubit_target_token_into(token, &mut targets)?;
-        }
+fn parse_targets(rest: &str) -> CircuitResult<TargetVec> {
+    if let Some(targets) = parse_plain_qubit_target_text(rest)? {
         return Ok(targets);
     }
 
-    let mut targets = Vec::new();
+    let mut targets = TargetVec::new();
     for token in rest.split_whitespace() {
         parse_target_token_into(token, &mut targets)?;
     }
     Ok(targets)
-}
-
-fn plain_qubit_target_count(rest: &str) -> Option<usize> {
-    let mut count = 0usize;
-    let mut in_token = false;
-    for byte in rest.bytes() {
-        if byte.is_ascii_digit() {
-            if !in_token {
-                count += 1;
-                in_token = true;
-            }
-        } else if byte.is_ascii_whitespace() {
-            in_token = false;
-        } else {
-            return None;
-        }
-    }
-    Some(count)
 }
 
 fn pauli_product_target_groups(targets: &[Target]) -> Vec<&[Target]> {

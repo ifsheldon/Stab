@@ -13,6 +13,7 @@ workspace = true
 [dependencies]
 num-complex = { workspace = true }
 rand = { workspace = true }
+smallvec = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

@@ -2058,6 +2058,7 @@ dependencies = [
  "num-complex",
  "proptest",
  "rand 0.10.1",
+ "smallvec",
  "thiserror",
 ]
 

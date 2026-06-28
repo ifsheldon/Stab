@@ -854,6 +854,7 @@ fn parser_reports_invalid_gate_target_and_repeat_errors() {
     assert!(Circuit::from_stim_str("DETECTOR 0\n").is_err());
     assert!(Circuit::from_stim_str("REPEAT 0 {\n    TICK\n}\n").is_err());
     assert!(Circuit::from_stim_str("REPEAT 2 {\n    TICK\n").is_err());
+    assert!(Circuit::from_stim_str("}\n").is_err());
 }
 
 #[test]

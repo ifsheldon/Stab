@@ -38,6 +38,11 @@ impl Gate {
     }
 
     #[inline]
+    pub(crate) fn from_simple_plain_name(name: &str) -> Option<Self> {
+        gate_info_from_simple_plain_name(name).map(|info| Self { info })
+    }
+
+    #[inline]
     pub fn canonical_name(self) -> &'static str {
         self.info.name
     }
@@ -360,6 +365,23 @@ fn gate_info_from_name(name: &str) -> Option<&'static GateInfo> {
     }
     let uppercase = name.to_ascii_uppercase();
     gate_info_from_uppercase_name(&uppercase)
+}
+
+#[inline]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
+)]
+fn gate_info_from_simple_plain_name(name: &str) -> Option<&'static GateInfo> {
+    Some(match name {
+        "M" | "MZ" => &GATES[9],
+        "CX" | "CNOT" => &GATES[22],
+        "H" => &GATES[25],
+        _ if name.eq_ignore_ascii_case("M") || name.eq_ignore_ascii_case("MZ") => &GATES[9],
+        _ if name.eq_ignore_ascii_case("CX") || name.eq_ignore_ascii_case("CNOT") => &GATES[22],
+        _ if name.eq_ignore_ascii_case("H") => &GATES[25],
+        _ => return None,
+    })
 }
 
 #[inline]

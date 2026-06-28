@@ -3,6 +3,9 @@ use std::str::FromStr;
 
 use crate::ids::STIM_TARGET_VALUE_LIMIT;
 use crate::{CircuitError, CircuitResult, MeasureRecordOffset, QubitId};
+use smallvec::SmallVec;
+
+pub(crate) type TargetVec = SmallVec<[Target; 4]>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Pauli {
@@ -287,7 +290,7 @@ impl Display for Target {
     }
 }
 
-pub(crate) fn parse_target_token_into(token: &str, targets: &mut Vec<Target>) -> CircuitResult<()> {
+pub(crate) fn parse_target_token_into(token: &str, targets: &mut TargetVec) -> CircuitResult<()> {
     if token == "*" {
         targets.push(Target::combiner());
         return Ok(());
@@ -317,13 +320,33 @@ pub(crate) fn parse_target_token_into(token: &str, targets: &mut Vec<Target>) ->
     Ok(())
 }
 
-pub(crate) fn parse_plain_qubit_target_token_into(
-    token: &str,
-    targets: &mut Vec<Target>,
-) -> CircuitResult<()> {
-    let id = parse_u24(token, "qubit target")?;
-    targets.push(Target::qubit(QubitId::new(id)?, false));
-    Ok(())
+pub(crate) fn parse_plain_qubit_target_text(text: &str) -> CircuitResult<Option<TargetVec>> {
+    let mut targets = TargetVec::new();
+    let mut value = None;
+    for byte in text.bytes() {
+        if byte.is_ascii_digit() {
+            let digit = u32::from(byte - b'0');
+            let next = value
+                .unwrap_or(0u32)
+                .checked_mul(10)
+                .and_then(|value| value.checked_add(digit))
+                .ok_or_else(|| CircuitError::invalid_domain_value("qubit target", text))?;
+            if next >= STIM_TARGET_VALUE_LIMIT {
+                return Err(CircuitError::invalid_domain_value("qubit target", text));
+            }
+            value = Some(next);
+        } else if byte.is_ascii_whitespace() {
+            if let Some(id) = value.take() {
+                targets.push(Target::qubit(QubitId::new(id)?, false));
+            }
+        } else {
+            return Ok(None);
+        }
+    }
+    if let Some(id) = value {
+        targets.push(Target::qubit(QubitId::new(id)?, false));
+    }
+    Ok(Some(targets))
 }
 
 fn parse_u24(text: &str, kind: &'static str) -> CircuitResult<u32> {
