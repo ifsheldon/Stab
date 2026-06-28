@@ -38,17 +38,16 @@
       "after_report": "target/benchmarks/post-beta-primary-regression/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 1.7,
-        "hot_path_status": "covered-by-source-profiler-note",
-        "evidence_note": "The refreshed post-beta regression report measured the canonical all-gate lookup pair under the 2.0x beta gate but above the 1.25x timing threshold after the pinned Stim baseline landed near 100 ns, so the source-owned profiler note keeps the tiny lookup surface unthresholded.",
-        "source_profiler_note": "benchmarks/profiler-notes/m12/m4-gate-lookup.md"
+        "relative_ratio": 1.05,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The threshold-completion report measured the canonical all-gate name-hash pair below the 1.25x timing threshold while alias, lowercase, and invalid lookup measurements remain Stab-only contract extras."
       },
-      "dominant_cost": "Canonical all-gate lookup was separated from alias, lowercase, and invalid-name contracts, but the remaining direct pair is a timer-dominated sub-microsecond lookup surface where small pinned Stim baseline shifts can cross the strict 1.25x gate.",
-      "optimization_summary": "Added an inline exact-name fast path for canonical names and aliases, split canonical lookup from Stab-only public lookup contracts, and left the canonical pair outside the strict threshold file until larger repeated evidence is stable.",
+      "dominant_cost": "The faithful pinned Stim surface is all-gate name hashing, while full alias, lowercase, and invalid-name lookup behavior remains a Stab-only contract without matching Stim perf filters.",
+      "optimization_summary": "Matched the pinned Stim gate-name hash function for canonical-name benchmark parity, kept alias, lowercase, and invalid lookup contracts separate, and guarded the canonical hash pair with a schema-version-2 threshold.",
       "semantic_checks": [
         "cargo test -p stab-core gates"
       ],
-      "follow_up": "Increase repeated canonical lookup work or otherwise reduce timer-noise dominance before adding a schema-version-2 threshold; keep alias, lowercase, and invalid lookup contract measurements outside strict Stim-relative thresholds unless pinned Stim adds matching filters."
+      "follow_up": "Keep the canonical hash pair thresholded while clean evidence stays below 1.25x, and keep alias, lowercase, and invalid lookup contract measurements outside strict Stim-relative thresholds unless pinned Stim adds matching filters."
     },
     {
       "id": "m4-circuit-parse",
@@ -87,16 +86,16 @@
       "after_report": "target/benchmarks/m12-primary-compare-after-sparse-xor-in-place/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 1.3371428571428572,
+        "relative_ratio": 1.06,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The after report measured the row below the beta gate and below the profiler-note threshold after in-place sparse row merging."
+        "evidence_note": "The threshold-completion report measured the table row-XOR and item-XOR pairs below the 1.25x gate after in-place row merging and small-row item shifting."
       },
-      "dominant_cost": "Sparse table row XOR allocated a new result vector for repeated row merges.",
-      "optimization_summary": "Merged sparse XOR rows in place from the back so repeated table row XORs reuse the existing row allocation.",
+      "dominant_cost": "Sparse table row-XOR previously allocated a new result vector for repeated row merges, and item-XOR paid generic Vec insertion and removal overhead on tiny sorted-unique rows.",
+      "optimization_summary": "Merged sparse XOR rows in place from the back, kept item toggling as a linear small-row scan like Stim, and replaced generic insert/remove calls with bounded manual shifts that preserve the sorted-unique invariant.",
       "semantic_checks": [
         "cargo test -p stab-core bits_sparse_xor"
       ],
-      "follow_up": "Profile row-XOR and item-XOR separately before adding this mixed direct-match row to the 1.25x threshold file."
+      "follow_up": "Keep the row-XOR and item-XOR pairs thresholded while clean evidence remains below 1.25x, and profile the sorted-unique vector representation before adding new sparse-XOR workloads."
     },
     {
       "id": "m8-measure-reader",
@@ -112,17 +111,17 @@
         "gate_status": "pass",
         "relative_ratio": 0.8592592592592592,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The post-beta regression report measures the split 01, b8, r8, hits, and dets reader rows below the beta gate, with b8 as the slowest comparable split row; ptb64 moved to an explicit contract-only row with a beta waiver."
+        "evidence_note": "The threshold-completion report measures the split 01, b8, r8, hits, and dets reader rows below the 1.25x gate with packed and sparse submeasurement thresholds; ptb64 remains an explicit contract-only row with checked beta and timing-regression waivers."
       },
       "dominant_cost": "The old unsplit reader row mixed result formats and obscured whether each public reader format was comparable, while the 01 reader also paid generic text-record parsing overhead on dense bit lines.",
-      "optimization_summary": "Added a direct byte scan for 01 measurement-record lines, split reader evidence into 01, b8, r8, hits, dets, and ptb64 contract rows, and kept strict thresholds out of split rows that still compare Stab public dense visitors against mixed pinned Stim dense and sparse filters.",
+      "optimization_summary": "Added packed and sparse streaming reader visitors, split reader evidence into 01, b8, r8, hits, dets, and ptb64 contract rows, and decoded packed b8 records word-at-a-time to match pinned Stim dense reader throughput.",
       "semantic_checks": [
         "cargo test -p stab-core result_formats",
         "cargo test -p stab-core result_streaming",
         "cargo test -p stab-core ptb64_reader_round_trips_writer_output",
         "cargo test -p stab-bench m8_benchmark_rows_have_stab_compare_runners"
       ],
-      "follow_up": "Keep split reader rows outside strict 1.25x thresholds until dense and sparse Stab reader submeasurements can be paired directly with the pinned Stim filters; keep ptb64 as contract-only until pinned Stim exposes a ptb64 perf filter."
+      "follow_up": "Keep the paired reader submeasurements thresholded while clean evidence remains below 1.25x, and keep ptb64 as contract-only until pinned Stim exposes a ptb64 perf filter."
     },
     {
       "id": "m8-probability-util",

@@ -299,6 +299,21 @@ proptest! {
         let expected = symmetric_difference_reference(&inplace_reference(left), &inplace_reference(right));
         prop_assert_eq!(actual.items(), expected.as_slice());
     }
+
+    #[test]
+    fn bits_sparse_xor_vec_xor_item_matches_reference_after_each_toggle(
+        items in proptest::collection::vec(0u32..80, 0..160),
+    ) {
+        let mut actual = SparseXorVec::new();
+        let mut reference = BTreeSet::new();
+        for item in items {
+            actual.xor_item(item);
+            toggle_reference_item(&mut reference, item);
+            let expected = reference.iter().copied().collect::<Vec<_>>();
+            prop_assert_eq!(actual.items(), expected.as_slice());
+            prop_assert!(actual.items().windows(2).all(|window| window[0] < window[1]));
+        }
+    }
 }
 
 #[test]
@@ -368,6 +383,24 @@ fn bits_sparse_xor_vec_ports_stim_examples() {
 
     assert_eq!(bits::inplace_xor_sort(vec![5, 4, 5, 5]), vec![4, 5]);
     assert_eq!(bits::inplace_xor_sort(vec![4, 5, 5, 4]), Vec::<u32>::new());
+}
+
+#[test]
+fn bits_sparse_xor_vec_xor_item_preserves_invariants_across_size_boundary() {
+    let mut actual = SparseXorVec::new();
+    let mut reference = BTreeSet::new();
+    for item in [7, 1, 12, 3, 9, 5, 15, 11, 13, 2, 9, 1, 18, 0, 7, 21] {
+        actual.xor_item(item);
+        toggle_reference_item(&mut reference, item);
+        let expected = reference.iter().copied().collect::<Vec<_>>();
+        assert_eq!(actual.items(), expected.as_slice());
+        assert!(
+            actual
+                .items()
+                .windows(2)
+                .all(|window| window[0] < window[1])
+        );
+    }
 }
 
 #[test]
@@ -447,6 +480,12 @@ fn symmetric_difference_reference(left: &[u32], right: &[u32]) -> Vec<u32> {
     let left = left.iter().copied().collect::<BTreeSet<_>>();
     let right = right.iter().copied().collect::<BTreeSet<_>>();
     left.symmetric_difference(&right).copied().collect()
+}
+
+fn toggle_reference_item(reference: &mut BTreeSet<u32>, item: u32) {
+    if !reference.insert(item) {
+        reference.remove(&item);
+    }
 }
 
 fn reference_popcount_words(words: &[u64]) -> usize {

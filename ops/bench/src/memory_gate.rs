@@ -383,6 +383,8 @@ mod tests {
             memory_gate_error: None,
             regression_threshold_status: "not-configured".to_string(),
             regression_threshold_max_ratio: None,
+            regression_threshold_waiver_reason: None,
+            regression_threshold_waiver_follow_up: None,
             regression_threshold_error: None,
             profiler_note_status: "not-required".to_string(),
             profiler_note_path: None,

@@ -12,6 +12,7 @@ use crate::config::PREFIX;
 use crate::error::BenchError;
 use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner};
 use crate::memory_gate::{apply_memory_gate, read_memory_baseline};
+use crate::regression_waivers::{apply_regression_waivers, read_regression_waivers};
 use crate::report::{
     BETA_GATE_MAX_RELATIVE_RATIO, BaselineReport, CompareCommandMetadata, CompareReport,
     CompareRowResult, Measurement, machine_metadata, render_compare_markdown_report, stab_metadata,
@@ -34,6 +35,7 @@ pub(crate) struct CompareOptions {
     pub(crate) require_memory_gate: bool,
     pub(crate) memory_baseline: Option<PathBuf>,
     pub(crate) thresholds: Option<PathBuf>,
+    pub(crate) regression_waivers: Option<PathBuf>,
     pub(crate) track_allocations: bool,
     pub(crate) warmup: bool,
     pub(crate) measurement_runs: usize,
@@ -54,6 +56,9 @@ pub(crate) fn run_compare(
     if options.beta_waivers.is_some() && !options.require_beta_gate {
         return Err(BenchError::BetaWaiversRequireGate);
     }
+    if options.regression_waivers.is_some() && options.thresholds.is_none() {
+        return Err(BenchError::RegressionWaiversRequireThresholds);
+    }
     if options.require_memory_gate && !options.track_allocations {
         return Err(BenchError::MemoryGateRequiresAllocationTracking);
     }
@@ -72,6 +77,14 @@ pub(crate) fn run_compare(
         .as_ref()
         .map(|path| root.resolve_relative(path));
     let thresholds = threshold_path.as_deref().map(read_thresholds).transpose()?;
+    let regression_waivers_path = options
+        .regression_waivers
+        .as_ref()
+        .map(|path| root.resolve_relative(path));
+    let regression_waivers = regression_waivers_path
+        .as_deref()
+        .map(read_regression_waivers)
+        .transpose()?;
     let beta_waivers_path = options
         .beta_waivers
         .as_ref()
@@ -192,6 +205,11 @@ pub(crate) fn run_compare(
         .map_or_else(Default::default, |thresholds| {
             apply_regression_thresholds(&mut report_rows, thresholds)
         });
+    let regression_waiver_findings = regression_waivers
+        .as_ref()
+        .map_or_else(Default::default, |regression_waivers| {
+            apply_regression_waivers(&mut report_rows, regression_waivers)
+        });
     let memory_gate_findings = memory_baseline
         .as_ref()
         .map_or_else(Default::default, |memory_baseline| {
@@ -204,6 +222,7 @@ pub(crate) fn run_compare(
             baseline_report: &baseline_report,
             baseline_path: &baseline_path,
             beta_waivers_path: beta_waivers_path.as_deref(),
+            regression_waivers_path: regression_waivers_path.as_deref(),
             memory_baseline_path: memory_baseline_path.as_deref(),
             threshold_path: threshold_path.as_deref(),
             report_dir,
@@ -228,12 +247,18 @@ pub(crate) fn run_compare(
             details: memory_gate_findings.blockers.join("\n").into_boxed_str(),
         });
     }
-    if !regression_threshold_findings.blockers.is_empty() {
+    if !regression_threshold_findings.blockers.is_empty()
+        || !regression_waiver_findings.blockers.is_empty()
+    {
+        let details = regression_threshold_findings
+            .blockers
+            .iter()
+            .chain(&regression_waiver_findings.blockers)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n");
         return Err(BenchError::RegressionThresholdFailed {
-            details: regression_threshold_findings
-                .blockers
-                .join("\n")
-                .into_boxed_str(),
+            details: details.into_boxed_str(),
         });
     }
     if options.strict
@@ -261,6 +286,7 @@ struct CompareReportWrite<'a> {
     baseline_report: &'a BaselineReport,
     baseline_path: &'a Path,
     beta_waivers_path: Option<&'a Path>,
+    regression_waivers_path: Option<&'a Path>,
     memory_baseline_path: Option<&'a Path>,
     threshold_path: Option<&'a Path>,
     report_dir: &'a Path,
@@ -274,6 +300,7 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
         baseline_report,
         baseline_path,
         beta_waivers_path,
+        regression_waivers_path,
         memory_baseline_path,
         threshold_path,
         report_dir,
@@ -308,6 +335,7 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
             require_profiler_notes: options.require_profiler_notes,
             require_beta_gate: options.require_beta_gate,
             beta_waivers_path: beta_waivers_path.map(|path| path.display().to_string()),
+            regression_waivers_path: regression_waivers_path.map(|path| path.display().to_string()),
             require_memory_gate: options.require_memory_gate,
             memory_baseline_path: memory_baseline_path.map(|path| path.display().to_string()),
             thresholds_path: threshold_path.map(|path| path.display().to_string()),
@@ -534,6 +562,8 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         memory_gate_error: None,
         regression_threshold_status: "not-configured".to_string(),
         regression_threshold_max_ratio: None,
+        regression_threshold_waiver_reason: None,
+        regression_threshold_waiver_follow_up: None,
         regression_threshold_error: None,
         profiler_note_status: "not-required".to_string(),
         profiler_note_path: None,

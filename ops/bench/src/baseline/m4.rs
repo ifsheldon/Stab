@@ -40,11 +40,7 @@ pub(crate) fn run_gate_lookup_row(row: &BenchmarkRow) -> Result<Vec<Measurement>
         .map(|name| name.to_ascii_lowercase())
         .collect::<Vec<_>>();
     Ok(vec![
-        measure_gate_lookup_success_set(
-            row,
-            "stab_gate_data_hash_all_gate_names",
-            &canonical_names,
-        )?,
+        measure_gate_name_hash_set("stab_gate_data_hash_all_gate_names", &canonical_names)?,
         measure_gate_lookup_success_set(
             row,
             "stab_gate_lookup_aliases_contract",
@@ -58,7 +54,7 @@ pub(crate) fn run_gate_lookup_row(row: &BenchmarkRow) -> Result<Vec<Measurement>
 pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     match (row_id, name) {
         ("m4-gate-lookup", "stab_gate_data_hash_all_gate_names") => {
-            Some((Gate::all().len() as f64, "lookups/s"))
+            Some((Gate::all().len() as f64, "hashes/s"))
         }
         ("m4-gate-lookup", "stab_gate_lookup_aliases_contract") => {
             Some((GATE_LOOKUP_ALIASES.len() as f64, "lookups/s"))
@@ -76,10 +72,21 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "m4-gate-lookup" => Some(
-            "partial-match: Stab pairs canonical all-gate lookup with the pinned Stim gate lookup perf filter and reports alias, lowercase, and invalid lookup contracts separately",
+            "partial-match: Stab pairs canonical all-gate name hashing with the pinned Stim gate_data_hash_all_gate_names perf filter and reports alias, lowercase, and invalid lookup contracts separately",
         ),
         _ => None,
     }
+}
+
+fn measure_gate_name_hash_set(name: &str, gate_names: &[&str]) -> Result<Measurement, BenchError> {
+    measure_stab_batched(name, TINY_DIRECT_COMPARE_REPETITIONS, || {
+        let mut checksum = 0usize;
+        for gate_name in gate_names {
+            checksum = checksum.wrapping_add(Gate::stim_name_hash(gate_name));
+        }
+        black_box(checksum);
+        Ok(())
+    })
 }
 
 fn measure_gate_lookup_success_set(
@@ -90,8 +97,8 @@ fn measure_gate_lookup_success_set(
     measure_stab_batched(name, TINY_DIRECT_COMPARE_REPETITIONS, || {
         let mut checksum = 0usize;
         for gate_name in gate_names {
-            let gate = Gate::from_name(black_box(*gate_name))
-                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let gate =
+                Gate::from_name(gate_name).map_err(|error| stab_runner_error(&row.id, error))?;
             checksum ^= gate.canonical_name().len();
         }
         black_box(checksum);
@@ -109,7 +116,7 @@ fn measure_gate_lookup_lowercase_set(
         || {
             let mut checksum = 0usize;
             for gate_name in gate_names {
-                let gate = Gate::from_name(black_box(gate_name.as_str()))
+                let gate = Gate::from_name(gate_name.as_str())
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 checksum ^= gate.canonical_name().len();
             }

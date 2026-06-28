@@ -11,6 +11,16 @@
         }
       ]
     },
+    {
+      "id": "m4-gate-lookup",
+      "measurement_thresholds": [
+        {
+          "stim_name": "gate_data_hash_all_gate_names",
+          "stab_name": "stab_gate_data_hash_all_gate_names",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    },
     { "id": "m10-analyze-errors-decompose-cli", "max_relative_ratio": 1.25 },
     { "id": "m10-analyze-errors-fold-cli", "max_relative_ratio": 1.25 },
     { "id": "m10-analyze-errors-high-repeat-contract", "max_relative_ratio": 1.25 },
@@ -50,6 +60,21 @@
       ]
     },
     { "id": "m5-simd-word", "max_relative_ratio": 1.25 },
+    {
+      "id": "m5-sparse-xor",
+      "measurement_thresholds": [
+        {
+          "stim_name": "SparseXorTable_SmallRowXor_1000",
+          "stab_name": "stab_sparse_table_row_xor_1000",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "SparseXorVec_XorItem",
+          "stab_name": "stab_sparse_xor_item_7",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    },
     { "id": "m6-clifford-string", "max_relative_ratio": 1.25 },
     { "id": "m6-pauli-iter", "max_relative_ratio": 1.25 },
     { "id": "m6-pauli-string", "max_relative_ratio": 1.25 },
@@ -81,6 +106,111 @@
     { "id": "m7-gen-unrotated-surface-d9-r9", "max_relative_ratio": 1.25 },
     { "id": "m7-gen-unrotated-surface-d9-r90", "max_relative_ratio": 1.25 },
     { "id": "m8-frame-simulator", "max_relative_ratio": 1.25 },
+    {
+      "id": "m8-measure-reader-01",
+      "measurement_thresholds": [
+        {
+          "stim_name": "read_01_dense_per10",
+          "stab_name": "stab_read_01_dense_per10",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "read_01_sparse_per10",
+          "stab_name": "stab_read_01_sparse_per10",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    },
+    {
+      "id": "m8-measure-reader-b8",
+      "measurement_thresholds": [
+        {
+          "stim_name": "read_b8_dense_per10",
+          "stab_name": "stab_read_b8_dense_per10",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "read_b8_sparse_per10",
+          "stab_name": "stab_read_b8_sparse_per10",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    },
+    {
+      "id": "m8-measure-reader-r8",
+      "measurement_thresholds": [
+        {
+          "stim_name": "read_r8_dense_per10",
+          "stab_name": "stab_read_r8_dense_per10",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "read_r8_dense_per100",
+          "stab_name": "stab_read_r8_dense_per100",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "read_r8_sparse_per10",
+          "stab_name": "stab_read_r8_sparse_per10",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "read_r8_sparse_per100",
+          "stab_name": "stab_read_r8_sparse_per100",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    },
+    {
+      "id": "m8-measure-reader-hits",
+      "measurement_thresholds": [
+        {
+          "stim_name": "read_hits_dense_per10",
+          "stab_name": "stab_read_hits_dense_per10",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "read_hits_dense_per100",
+          "stab_name": "stab_read_hits_dense_per100",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "read_hits_sparse_per10",
+          "stab_name": "stab_read_hits_sparse_per10",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "read_hits_sparse_per100",
+          "stab_name": "stab_read_hits_sparse_per100",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    },
+    {
+      "id": "m8-measure-reader-dets",
+      "measurement_thresholds": [
+        {
+          "stim_name": "read_dets_dense_per10",
+          "stab_name": "stab_read_dets_dense_per10",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "read_dets_dense_per100",
+          "stab_name": "stab_read_dets_dense_per100",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "read_dets_sparse_per10",
+          "stab_name": "stab_read_dets_sparse_per10",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "read_dets_sparse_per100",
+          "stab_name": "stab_read_dets_sparse_per100",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    },
     { "id": "m8-probability-util", "max_relative_ratio": 1.25 },
     { "id": "m8-reference-sample-tree", "max_relative_ratio": 1.25 },
     { "id": "m8-sample-analysis-1shot", "max_relative_ratio": 1.25 },

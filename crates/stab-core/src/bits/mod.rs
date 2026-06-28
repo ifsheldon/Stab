@@ -558,79 +558,92 @@ impl SparseXorVec {
         Self::default()
     }
 
+    #[inline]
     pub fn from_sorted_items(items: Vec<u32>) -> Self {
         let mut out = Self { items };
         out.items = inplace_xor_sort(std::mem::take(&mut out.items));
         out
     }
 
+    #[inline]
     pub fn items(&self) -> &[u32] {
         &self.items
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
 
+    #[inline]
     pub fn contains(&self, item: u32) -> bool {
         self.items.binary_search(&item).is_ok()
     }
 
+    #[inline]
     pub fn xor_item(&mut self, item: u32) {
-        let Some(last) = self.items.last().copied() else {
-            self.items.push(item);
-            return;
-        };
-        match last.cmp(&item) {
-            std::cmp::Ordering::Less => {
-                self.items.push(item);
-                return;
-            }
-            std::cmp::Ordering::Equal => {
-                self.items.pop();
-                return;
-            }
-            std::cmp::Ordering::Greater => {}
-        }
-        match self.items.first().copied() {
-            Some(first) if first > item => {
-                self.items.insert(0, item);
-                return;
-            }
-            Some(first) if first == item => {
-                self.items.remove(0);
-                return;
-            }
-            _ => {}
-        }
-        self.xor_item_middle(item);
+        self.xor_item_linear(item);
     }
 
     #[allow(
         clippy::indexing_slicing,
-        reason = "middle scan indexes stay within the vector length checked by the while condition"
+        reason = "linear scan indexes stay within the vector length from the range iterator"
     )]
-    fn xor_item_middle(&mut self, item: u32) {
-        let mut index = 1usize;
-        while index + 1 < self.items.len() {
-            let existing = self.items[index];
-            if existing < item {
-                index += 1;
-            } else if existing == item {
-                self.items.remove(index);
-                return;
-            } else {
-                self.items.insert(index, item);
-                return;
+    #[inline]
+    fn xor_item_linear(&mut self, item: u32) {
+        for index in 0..self.items.len() {
+            match self.items[index].cmp(&item) {
+                std::cmp::Ordering::Less => {}
+                std::cmp::Ordering::Equal => {
+                    self.remove_item_at(index);
+                    return;
+                }
+                std::cmp::Ordering::Greater => {
+                    self.insert_item_at(index, item);
+                    return;
+                }
             }
         }
-        self.items.insert(index, item);
+        self.items.push(item);
     }
 
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "manual shift indexes are bounded by the original vector length"
+    )]
+    #[inline]
+    fn insert_item_at(&mut self, index: usize, item: u32) {
+        let len = self.items.len();
+        self.items.push(item);
+        let mut shift_index = len;
+        while shift_index > index {
+            self.items[shift_index] = self.items[shift_index - 1];
+            shift_index -= 1;
+        }
+        self.items[index] = item;
+    }
+
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "manual shift indexes are bounded by the original vector length"
+    )]
+    #[inline]
+    fn remove_item_at(&mut self, index: usize) {
+        let len = self.items.len();
+        let mut shift_index = index + 1;
+        while shift_index < len {
+            self.items[shift_index - 1] = self.items[shift_index];
+            shift_index += 1;
+        }
+        self.items.pop();
+    }
+
+    #[inline]
     pub fn xor_assign(&mut self, rhs: &Self) {
         symmetric_difference_sorted_in_place(&mut self.items, &rhs.items);
     }
 
+    #[inline]
     pub fn is_superset_of(&self, rhs: &[u32]) -> bool {
         is_subset_of_sorted(rhs, &self.items)
     }

@@ -40,6 +40,12 @@ pub(crate) enum BenchError {
         source: std::io::Error,
     },
 
+    #[error("failed to read benchmark regression-waiver file {path}: {source}")]
+    ReadRegressionWaivers {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
     #[error("failed to parse benchmark manifest: {0}")]
     ParseManifest(#[from] csv::Error),
 
@@ -51,6 +57,12 @@ pub(crate) enum BenchError {
 
     #[error("failed to parse benchmark beta-waiver file {path}: {source}")]
     ParseBetaWaivers {
+        path: PathBuf,
+        source: serde_json::Error,
+    },
+
+    #[error("failed to parse benchmark regression-waiver file {path}: {source}")]
+    ParseRegressionWaivers {
         path: PathBuf,
         source: serde_json::Error,
     },
@@ -69,6 +81,9 @@ pub(crate) enum BenchError {
 
     #[error("benchmark beta-waiver file {path} is invalid:\n{details}")]
     BetaWaiverValidation { path: PathBuf, details: Box<str> },
+
+    #[error("benchmark regression-waiver file {path} is invalid:\n{details}")]
+    RegressionWaiverValidation { path: PathBuf, details: Box<str> },
 
     #[error("memory baseline compare report {path} is invalid:\n{details}")]
     MemoryBaselineValidation { path: PathBuf, details: Box<str> },
@@ -198,6 +213,9 @@ pub(crate) enum BenchError {
 
     #[error("regression threshold gate failed:\n{details}")]
     RegressionThresholdFailed { details: Box<str> },
+
+    #[error("--regression-waivers requires --thresholds")]
+    RegressionWaiversRequireThresholds,
 
     #[error("--track-allocations requires building stab-bench with --features count-allocations")]
     AllocationTrackingUnavailable,

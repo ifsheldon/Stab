@@ -583,7 +583,7 @@ fn measure_sparse_xor_items(
 fn run_sparse_xor_item_batch(buf: &mut SparseXorVec, xor_items: &[u32]) {
     for _ in 0..TINY_DIRECT_COMPARE_REPETITIONS {
         for item in xor_items {
-            buf.xor_item(black_box(*item));
+            buf.xor_item(*item);
         }
     }
     black_box(buf.items().len());

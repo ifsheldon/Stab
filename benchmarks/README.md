@@ -50,7 +50,7 @@ Optimization-log rows use schema version 2 and record before and after reports, 
 Pass `--thresholds <path>` to fail when a selected row with a configured regression threshold exceeds its maximum relative ratio or lacks a comparable Stab-vs-Stim ratio.
 Threshold files must not contain stale ids: every configured threshold id must be selected by the compare run so row renames and matrix changes cannot silently drop a regression guard.
 `m12-primary-thresholds.json` is the source-owned M12 timing-regression threshold file for primary rows that have reached the 1.25x pinned-Stim regression gate with enough local headroom to make an initial stable threshold useful.
-Run `just bench::primary-regression --baseline <primary-baseline.json> --report target/benchmarks/<name>` to check those source-owned thresholds for the frozen primary matrix after a Stab-side warmup pass, three recorded measurement runs, and source-owned profiler-note validation.
+Run `just bench::primary-regression --baseline <primary-baseline.json> --report target/benchmarks/<name>` to check those source-owned thresholds and checked timing-regression waivers for the frozen primary matrix after a Stab-side warmup pass, three recorded measurement runs, and source-owned profiler-note validation.
 The recipe defaults to the latest generated baseline path when no explicit `--baseline` is passed.
 The scheduled `.github/workflows/m12-benchmarks.yml` workflow records a fresh primary pinned-Stim baseline on a GitHub runner, runs this source-owned threshold gate, and uploads the generated baseline and compare reports.
 Threshold files are JSON with schema version 1 or 2.
@@ -69,6 +69,9 @@ Schema version 1 rows use only row-level thresholds:
 ```
 
 Every threshold id must match a selected benchmark row, and every selected benchmark row not present in the threshold file is reported as `not-configured`.
+If `--regression-waivers <path>` is also passed, selected measured `contract-only` rows that are not configured in the threshold file, have no comparable ratio, and have source-owned waiver entries are reported as `waived-not-thresholdable` instead of ambiguous `not-configured`.
+Timing-regression waivers do not apply to comparable rows, rows with ratios, unselected rows, pending rows, or configured threshold rows, and unused waivers fail the gate so the waiver file cannot drift when a row becomes comparable.
+`m12-primary-regression-waivers.json` is the source-owned M12 timing-regression waiver file for primary no-ratio rows that are measured but cannot have a faithful pinned-Stim 1.25x threshold.
 Schema version 2 is backward compatible with row-level thresholds and additionally supports exact submeasurement thresholds for rows whose stable direct measurements can be guarded before the whole mixed row is stable:
 
 ```json
@@ -92,7 +95,7 @@ Schema version 2 is backward compatible with row-level thresholds and additional
 Submeasurement thresholds fail when the selected compare report lacks the named paired evidence or when the paired ratio exceeds the configured ratio.
 The timing-regression report is the authoritative completion evidence for configured schema-version-2 threshold pairs because threshold application materializes any configured explicit pair that was not already produced by automatic exact-name or positional pairing.
 Threshold ids must be benchmark-id safe because they are matched against report rows and may also be used by generated benchmark tooling.
-Beta waiver files are JSON with schema version 1:
+Beta and timing-regression waiver files are JSON with schema version 1:
 
 ```json
 {

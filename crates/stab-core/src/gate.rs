@@ -47,6 +47,12 @@ impl Gate {
         self.info.name
     }
 
+    #[doc(hidden)]
+    #[inline(always)]
+    pub fn stim_name_hash(name: &str) -> usize {
+        gate_name_hash(name)
+    }
+
     #[inline]
     pub fn category(self) -> GateCategory {
         self.info.category
@@ -365,6 +371,33 @@ fn gate_info_from_name(name: &str) -> Option<&'static GateInfo> {
     }
     let uppercase = name.to_ascii_uppercase();
     gate_info_from_uppercase_name(&uppercase)
+}
+
+#[inline(always)]
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Stim v1.16.0 hash indexes are guarded by explicit byte-length checks"
+)]
+fn gate_name_hash(text: &str) -> usize {
+    // Matches Stim v1.16.0's gate_name_to_hash for benchmark parity.
+    let bytes = text.as_bytes();
+    let mut result = bytes.len();
+    if !bytes.is_empty() {
+        result ^= usize::from(bytes[0] | 0x20) * 2126;
+        result = result.wrapping_add(usize::from(bytes[bytes.len() - 1] | 0x20) * 9883);
+    }
+    if bytes.len() > 2 {
+        result ^= usize::from(bytes[1] | 0x20) * 8039;
+        result = result.wrapping_add(usize::from(bytes[2] | 0x20) * 9042);
+    }
+    if bytes.len() > 4 {
+        result ^= usize::from(bytes[3] | 0x20) * 4916;
+        result = result.wrapping_add(usize::from(bytes[4] | 0x20) * 4048);
+    }
+    if bytes.len() > 5 {
+        result ^= usize::from(bytes[5] | 0x20) * 7081;
+    }
+    result & 0x1ff
 }
 
 #[inline]

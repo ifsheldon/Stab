@@ -6,7 +6,7 @@ use stab_core::{
     Circuit, CompiledSampler, Probability, ReferenceSampleTree, SampleFormat,
     biased_randomize_bits,
     result_formats::{write_ptb64_records_checked, write_records},
-    result_streaming::{for_each_ptb64_record_all, for_each_record},
+    result_streaming::{for_each_packed_record, for_each_ptb64_record_all, for_each_sparse_record},
 };
 
 use crate::error::BenchError;
@@ -68,30 +68,83 @@ const MILLION_SHOT_COMPARE_ITERATIONS: usize = 8;
 #[cfg(test)]
 const MILLION_SHOT_COMPARE_ITERATIONS: usize = 1;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MeasureReaderMode {
+    Packed,
+    Sparse,
+}
+
 pub(super) fn run_sample_compare_row(
     row: &BenchmarkRow,
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
-        "m8-measure-reader-01" => {
-            run_measure_reader_format_row(row, "stab_measure_reader_01_10k", SampleFormat::ZeroOne)
-                .map(Some)
-        }
-        "m8-measure-reader-b8" => {
-            run_measure_reader_format_row(row, "stab_measure_reader_b8_10k", SampleFormat::B8)
-                .map(Some)
-        }
-        "m8-measure-reader-r8" => {
-            run_measure_reader_format_row(row, "stab_measure_reader_r8_10k", SampleFormat::R8)
-                .map(Some)
-        }
-        "m8-measure-reader-hits" => {
-            run_measure_reader_format_row(row, "stab_measure_reader_hits_10k", SampleFormat::Hits)
-                .map(Some)
-        }
-        "m8-measure-reader-dets" => {
-            run_measure_reader_format_row(row, "stab_measure_reader_dets_10k", SampleFormat::Dets)
-                .map(Some)
-        }
+        "m8-measure-reader-01" => run_measure_reader_format_row(
+            row,
+            SampleFormat::ZeroOne,
+            &[
+                ("stab_read_01_dense_per10", MeasureReaderMode::Packed, 10),
+                ("stab_read_01_sparse_per10", MeasureReaderMode::Sparse, 10),
+            ],
+        )
+        .map(Some),
+        "m8-measure-reader-b8" => run_measure_reader_format_row(
+            row,
+            SampleFormat::B8,
+            &[
+                ("stab_read_b8_dense_per10", MeasureReaderMode::Packed, 10),
+                ("stab_read_b8_sparse_per10", MeasureReaderMode::Sparse, 10),
+            ],
+        )
+        .map(Some),
+        "m8-measure-reader-r8" => run_measure_reader_format_row(
+            row,
+            SampleFormat::R8,
+            &[
+                ("stab_read_r8_dense_per10", MeasureReaderMode::Packed, 10),
+                ("stab_read_r8_dense_per100", MeasureReaderMode::Packed, 100),
+                ("stab_read_r8_sparse_per10", MeasureReaderMode::Sparse, 10),
+                ("stab_read_r8_sparse_per100", MeasureReaderMode::Sparse, 100),
+            ],
+        )
+        .map(Some),
+        "m8-measure-reader-hits" => run_measure_reader_format_row(
+            row,
+            SampleFormat::Hits,
+            &[
+                ("stab_read_hits_dense_per10", MeasureReaderMode::Packed, 10),
+                (
+                    "stab_read_hits_dense_per100",
+                    MeasureReaderMode::Packed,
+                    100,
+                ),
+                ("stab_read_hits_sparse_per10", MeasureReaderMode::Sparse, 10),
+                (
+                    "stab_read_hits_sparse_per100",
+                    MeasureReaderMode::Sparse,
+                    100,
+                ),
+            ],
+        )
+        .map(Some),
+        "m8-measure-reader-dets" => run_measure_reader_format_row(
+            row,
+            SampleFormat::Dets,
+            &[
+                ("stab_read_dets_dense_per10", MeasureReaderMode::Packed, 10),
+                (
+                    "stab_read_dets_dense_per100",
+                    MeasureReaderMode::Packed,
+                    100,
+                ),
+                ("stab_read_dets_sparse_per10", MeasureReaderMode::Sparse, 10),
+                (
+                    "stab_read_dets_sparse_per100",
+                    MeasureReaderMode::Sparse,
+                    100,
+                ),
+            ],
+        )
+        .map(Some),
         "m8-measure-reader-ptb64-contract" => run_measure_reader_ptb64_row(row).map(Some),
         "m8-frame-simulator" => run_frame_simulator_row(row).map(Some),
         "m8-tableau-simulator" => run_tableau_simulator_row(row).map(Some),
@@ -136,6 +189,20 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
     match (row_id, name) {
         ("m8-measure-reader-ptb64-contract", "stab_measure_reader_ptb64_64x10k_contract") => {
             Some((64.0 * 10_000.0, "bits/s"))
+        }
+        ("m8-measure-reader-01", name)
+        | ("m8-measure-reader-b8", name)
+        | ("m8-measure-reader-r8", name)
+        | ("m8-measure-reader-hits", name)
+        | ("m8-measure-reader-dets", name)
+            if name.starts_with("stab_read_") =>
+        {
+            if name.contains("_sparse_per") {
+                let denominator = measure_reader_denominator_from_name(name)?;
+                Some((10_000.0 / denominator as f64, "pops/s"))
+            } else {
+                Some((10_000.0, "bits/s"))
+            }
         }
         (row_id, name)
             if matches!(
@@ -189,19 +256,19 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "m8-measure-reader-01" => Some(
-            "partial-match: Stab measures the public 01 reusable-record reader against pinned Stim read_01 dense and sparse reader filters",
+            "direct-match: Stab measures packed and sparse 01 reusable-record readers against pinned Stim read_01 dense and sparse reader filters",
         ),
         "m8-measure-reader-b8" => Some(
-            "partial-match: Stab measures the public b8 reusable-record reader against pinned Stim read_b8 dense and sparse reader filters",
+            "direct-match: Stab measures packed and sparse b8 reusable-record readers against pinned Stim read_b8 dense and sparse reader filters",
         ),
         "m8-measure-reader-r8" => Some(
-            "partial-match: Stab measures the public r8 reusable-record reader against pinned Stim read_r8 dense and sparse reader filters",
+            "direct-match: Stab measures packed and sparse r8 reusable-record readers against pinned Stim read_r8 dense and sparse reader filters",
         ),
         "m8-measure-reader-hits" => Some(
-            "partial-match: Stab measures the public hits reusable-record reader against pinned Stim read_hits dense and sparse reader filters",
+            "direct-match: Stab measures packed and sparse hits reusable-record readers against pinned Stim read_hits dense and sparse reader filters",
         ),
         "m8-measure-reader-dets" => Some(
-            "partial-match: Stab measures the public dets reusable-record reader against pinned Stim read_dets dense and sparse reader filters",
+            "direct-match: Stab measures packed and sparse dets reusable-record readers against pinned Stim read_dets dense and sparse reader filters",
         ),
         "m8-measure-reader-ptb64-contract" => Some(
             "contract-only: Stab measures ptb64 reader throughput against upstream ptb64 reader tests because pinned Stim has no ptb64 reader perf filter",
@@ -242,25 +309,40 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
 
 fn run_measure_reader_format_row(
     row: &BenchmarkRow,
-    name: &'static str,
     format: SampleFormat,
+    cases: &[(&'static str, MeasureReaderMode, usize)],
 ) -> Result<Vec<Measurement>, BenchError> {
-    let source_record = deterministic_measure_reader_record();
-    let input = write_records(std::slice::from_ref(&source_record), format);
-    Ok(vec![measure_stab(name, || {
-        let mut set_bits = 0usize;
-        for_each_record(&input, format, MEASURE_READER_BITS, |record| {
-            set_bits += record.iter().filter(|bit| **bit).count();
-            Ok(())
+    cases
+        .iter()
+        .map(|(name, mode, denominator)| {
+            let source_record = measure_reader_record(*denominator);
+            let input = write_records(std::slice::from_ref(&source_record), format);
+            measure_stab_batched(name, TINY_DIRECT_COMPARE_REPETITIONS, || {
+                let mut set_bits = 0usize;
+                match mode {
+                    MeasureReaderMode::Packed => {
+                        for_each_packed_record(&input, format, MEASURE_READER_BITS, |record| {
+                            set_bits += record.popcount();
+                            Ok(())
+                        })
+                    }
+                    MeasureReaderMode::Sparse => {
+                        for_each_sparse_record(&input, format, MEASURE_READER_BITS, |hits| {
+                            set_bits += hits.len();
+                            Ok(())
+                        })
+                    }
+                }
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(set_bits);
+                Ok(())
+            })
         })
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-        black_box(set_bits);
-        Ok(())
-    })?])
+        .collect()
 }
 
 fn run_measure_reader_ptb64_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let source_record = deterministic_measure_reader_record();
+    let source_record = measure_reader_record(10);
     let ptb64_records = (0..64).map(|_| source_record.clone()).collect::<Vec<_>>();
     let ptb64_input = write_ptb64_records_checked(&ptb64_records)
         .map_err(|error| stab_runner_error(&row.id, error))?;
@@ -452,10 +534,15 @@ fn compile_sampler(row_id: &str, circuit: &Circuit) -> Result<CompiledSampler, B
     CompiledSampler::compile(circuit).map_err(|error| stab_runner_error(row_id, error))
 }
 
-fn deterministic_measure_reader_record() -> Vec<bool> {
+fn measure_reader_record(denominator: usize) -> Vec<bool> {
     (0..MEASURE_READER_BITS)
-        .map(|index| (index * 17 + 3) % 10 == 0)
+        .map(|index| (index * 17 + 3) % denominator == 0)
         .collect()
+}
+
+fn measure_reader_denominator_from_name(name: &str) -> Option<usize> {
+    name.rsplit_once("_per")
+        .and_then(|(_, denominator)| denominator.parse::<usize>().ok())
 }
 
 fn frame_simulator_fixture() -> String {
@@ -505,16 +592,40 @@ mod tests {
     #[test]
     fn m8_benchmark_rows_have_stab_compare_runners() {
         for (id, expected_measurements) in [
-            ("m8-measure-reader-01", &["stab_measure_reader_01_10k"][..]),
-            ("m8-measure-reader-b8", &["stab_measure_reader_b8_10k"][..]),
-            ("m8-measure-reader-r8", &["stab_measure_reader_r8_10k"][..]),
+            (
+                "m8-measure-reader-01",
+                &["stab_read_01_dense_per10", "stab_read_01_sparse_per10"][..],
+            ),
+            (
+                "m8-measure-reader-b8",
+                &["stab_read_b8_dense_per10", "stab_read_b8_sparse_per10"][..],
+            ),
+            (
+                "m8-measure-reader-r8",
+                &[
+                    "stab_read_r8_dense_per10",
+                    "stab_read_r8_dense_per100",
+                    "stab_read_r8_sparse_per10",
+                    "stab_read_r8_sparse_per100",
+                ][..],
+            ),
             (
                 "m8-measure-reader-hits",
-                &["stab_measure_reader_hits_10k"][..],
+                &[
+                    "stab_read_hits_dense_per10",
+                    "stab_read_hits_dense_per100",
+                    "stab_read_hits_sparse_per10",
+                    "stab_read_hits_sparse_per100",
+                ][..],
             ),
             (
                 "m8-measure-reader-dets",
-                &["stab_measure_reader_dets_10k"][..],
+                &[
+                    "stab_read_dets_dense_per10",
+                    "stab_read_dets_dense_per100",
+                    "stab_read_dets_sparse_per10",
+                    "stab_read_dets_sparse_per100",
+                ][..],
             ),
             (
                 "m8-measure-reader-ptb64-contract",

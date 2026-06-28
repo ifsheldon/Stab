@@ -22,6 +22,7 @@ mod memory_gate;
 mod process;
 #[cfg(test)]
 mod profile_evidence;
+mod regression_waivers;
 mod report;
 mod root;
 mod stim;
@@ -145,6 +146,10 @@ enum Command {
         #[arg(long)]
         thresholds: Option<PathBuf>,
 
+        /// JSON waiver file for measured contract-only rows with no faithful regression ratio.
+        #[arg(long)]
+        regression_waivers: Option<PathBuf>,
+
         /// Measure Stab-side allocation counts using the count-allocations feature.
         #[arg(long)]
         track_allocations: bool,
@@ -224,6 +229,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             require_memory_gate,
             memory_baseline,
             thresholds,
+            regression_waivers,
             track_allocations,
             warmup,
             measurement_runs,
@@ -245,6 +251,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     require_memory_gate,
                     memory_baseline,
                     thresholds,
+                    regression_waivers,
                     track_allocations,
                     warmup,
                     measurement_runs,

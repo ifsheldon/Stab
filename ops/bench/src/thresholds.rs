@@ -513,7 +513,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(thresholds.schema_version, 2);
-        assert_eq!(thresholds.rows.len(), 65);
+        assert_eq!(thresholds.rows.len(), 72);
         assert!(thresholds.rows.iter().all(|row| {
             row.max_relative_ratio == Some(1.25)
                 || row
@@ -566,6 +566,8 @@ mod tests {
             memory_gate_error: None,
             regression_threshold_status: "not-configured".to_string(),
             regression_threshold_max_ratio: None,
+            regression_threshold_waiver_reason: None,
+            regression_threshold_waiver_follow_up: None,
             regression_threshold_error: None,
             profiler_note_status: "not-required".to_string(),
             profiler_note_path: None,

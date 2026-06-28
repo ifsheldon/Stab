@@ -131,6 +131,8 @@ pub(crate) struct CompareCommandMetadata {
     pub(crate) require_beta_gate: bool,
     #[serde(default)]
     pub(crate) beta_waivers_path: Option<String>,
+    #[serde(default)]
+    pub(crate) regression_waivers_path: Option<String>,
     pub(crate) require_memory_gate: bool,
     pub(crate) memory_baseline_path: Option<String>,
     pub(crate) thresholds_path: Option<String>,
@@ -199,6 +201,10 @@ pub(crate) struct CompareRowResult {
     pub(crate) regression_threshold_status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) regression_threshold_max_ratio: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) regression_threshold_waiver_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) regression_threshold_waiver_follow_up: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) regression_threshold_error: Option<String>,
     pub(crate) profiler_note_status: String,
@@ -348,6 +354,11 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
     if let Some(thresholds_path) = &report.command.thresholds_path {
         out.push_str(&format!("- Thresholds: {thresholds_path}\n"));
     }
+    if let Some(regression_waivers_path) = &report.command.regression_waivers_path {
+        out.push_str(&format!(
+            "- Regression waivers: {regression_waivers_path}\n"
+        ));
+    }
     if let Some(profiler_notes_path) = &report.command.profiler_notes_path {
         out.push_str(&format!("- Profiler notes: {profiler_notes_path}\n"));
     }
@@ -456,9 +467,19 @@ fn format_regression_threshold(row: &CompareRowResult) -> String {
     let max_ratio = row
         .regression_threshold_max_ratio
         .map_or_else(String::new, |ratio| format!(" <= {ratio:.3}x"));
-    match &row.regression_threshold_error {
-        Some(error) => format!("{}{} ({error})", row.regression_threshold_status, max_ratio),
-        None => format!("{}{}", row.regression_threshold_status, max_ratio),
+    match (
+        &row.regression_threshold_waiver_reason,
+        &row.regression_threshold_waiver_follow_up,
+        &row.regression_threshold_error,
+    ) {
+        (Some(reason), Some(follow_up), None) => format!(
+            "{}{} ({reason}; follow-up: {follow_up})",
+            row.regression_threshold_status, max_ratio
+        ),
+        (_, _, Some(error)) => {
+            format!("{}{} ({error})", row.regression_threshold_status, max_ratio)
+        }
+        _ => format!("{}{}", row.regression_threshold_status, max_ratio),
     }
 }
 
