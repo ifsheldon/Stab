@@ -25,6 +25,7 @@ The remaining work is explicitly logged as milestone under-specification because
 ## Implementation Areas
 
 - `crates/stab-core/src/detection.rs` owns the M9 conversion plan, reference-sample subtraction, detector and observable record construction, output writers, explicit observable placement modes, detection-sampling validation, explicit sweep-conditioned conversion rejection until sweep inputs exist, and temporary resource limits.
+- The accepted M9 detection-conversion limits are a 1,000,000 bit cap for measurement, detector, and observable record widths, a 64,000,000 buffered-bit cap for materialized measurement samples and detection records, and a 100,000 iteration cap for repeat-block unrolling during conversion planning; compiled or streaming detection conversion is M12 or later work.
 - `crates/stab-core/src/detection/frame.rs` owns the M9 scalar detector-frame path for Pauli-target observable flips in `detect`, including basis measurements, product measurements, Pauli noise, selected Clifford propagation, and explicit unsupported-instruction errors.
 - `crates/stab-core/src/result_formats.rs` now has a measurement-only `dets` reader for `m2d` so `D` and `L` tokens are not misread as measurement tokens, plus complete-file `ptb64` decoding and record-count inference for `m2d` measurement-major input.
 - `crates/stab-cli/src/detection.rs` implements `detect` and `m2d`, zero-shot `detect` behavior, observable-output routing validation, `ptb64` dispatch for supported M9 detection workflows, Stim-compatible `m2d` `ptb64` output rejection, decoded `ptb64` input bounds, limited `m2d` input reads, and clear unsupported-scope errors for `--ran_without_feedback` and unsupported detection formats; `crates/stab-cli/src/lib.rs` retains command dispatch and Stim legacy aliases.
@@ -56,7 +57,7 @@ The concrete implementation issues were fixed with explicit observable output mo
 
 Open M9 spec follow-ups:
 
-- `2026-06-27 - M9: Detection Conversion Streaming And Scale Limits`
+- None currently logged.
 
 Resolved M9 spec entries:
 
@@ -68,6 +69,7 @@ Resolved M9 spec entries:
 - `2026-06-27 - M9: Detector Analysis Utility Row Ownership`
 - `2026-06-27 - M9: Sweep-Conditioned Detection Conversion Scope`
 - `2026-06-27 - M9: Benchmark Baseline Completeness`
+- `2026-06-27 - M9: Detection Conversion Streaming And Scale Limits`
 
 ## Verification Commands
 
@@ -76,6 +78,7 @@ Resolved M9 spec entries:
 - `cargo test --workspace`
 - `cargo test -p stab-core detection`
 - `cargo test -p stab-core detection_conversion_rejects_sweep_conditioned_circuits_until_sweep_inputs_exist`
+- `cargo test -p stab-core detection_conversion_rejects_unbounded_record_shapes`
 - `cargo test -p stab-core detection_sampling`
 - `cargo test -p stab-core result_formats::tests::ptb64_records_are_measurement_major_over_64_shot_groups`
 - `cargo test -p stab-core measure_record_reader_handles_multiple_records`

@@ -259,12 +259,12 @@ Resolution: M9 now requires `stim detect` to implement frame-simulator-style Pau
 
 ## 2026-06-27 - M9: Detection Conversion Streaming And Scale Limits
 
-Status: Open
+Status: Resolved
 Revealed by: full code review of `detect` and `m2d` resource behavior.
 Current text: M9 requires decoder-pipeline detection workflows and benchmark reporting but does not define streaming, batching, loop-folding, or maximum supported record sizes.
 Gap: current Stab materializes measurement records and detection records in memory and unrolls detection-conversion repeats within explicit temporary limits. This prevents unbounded CPU or memory use for hostile inputs, but it is not a final decoder-scale streaming design and does not match Stim's ability to process large files and folded repeats efficiently.
 Proposed amendment: add a follow-up milestone or M12 task for compiled/streaming detection conversion that processes records in bounded batches, preserves repeat structure where possible, avoids duplicate sampler analysis, documents or removes temporary limits, and includes benchmark rows for large generated-code detector workloads.
-Resolution: pending plan update.
+Resolution: M9 now explicitly accepts a bounded materialized detection-conversion implementation with documented temporary limits: 1,000,000 bits for measurement, detector, and observable record widths, 64,000,000 buffered bits for materialized measurement samples and detection records, and 100,000 repeat iterations during conversion planning. M12 now owns compiled or streaming detection conversion when benchmark evidence shows the materialized path is the bottleneck, including bounded batches, folded-repeat preservation where possible, duplicate-analysis removal, and large generated-code `detect` and `m2d` benchmark rows. Evidence is `cargo test -p stab-core detection_conversion_rejects_unbounded_record_shapes --quiet` and the M12 task list in `docs/plans/rust-stim-drop-in-rewrite.md`.
 
 ## 2026-06-27 - M8: Skip Loop Folding Scope
 

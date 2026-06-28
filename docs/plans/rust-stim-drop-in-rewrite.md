@@ -334,6 +334,9 @@ M9 bit-packed detection parity includes `b8` for `detect` and `m2d` detector and
 The `ptb64` paths must enforce Stim-compatible 64-shot grouping for generated outputs, read complete measurement-major input groups for `m2d`, reject zero-width `ptb64` measurement input because the shot count is ambiguous, and bound decoded `m2d` shot records before allocation.
 M9 does not implement sweep input data for detection conversion; `detect` and `m2d` must reject sweep-conditioned circuits with a clear error until a later sweep-aware simulation milestone introduces typed sweep inputs and CLI flags.
 M9 does not implement feedback-removal conversion for `m2d --ran_without_feedback`; the M9 CLI must reject that flag with a clear error instead of silently treating skipped-feedback measurement records as ordinary measurement records.
+M9 accepts a bounded materialized detection-conversion implementation with explicit temporary limits.
+The accepted M9 limits are a 1,000,000 bit cap for measurement, detector, and observable record widths, a 64,000,000 buffered-bit cap for materialized measurement samples and detection records, and a 100,000 iteration cap for repeat-block unrolling during conversion planning.
+Compiled or streaming detection conversion that processes records in bounded batches, preserves folded repeat structure where possible, avoids duplicate sampler analysis, and removes or justifies these temporary limits is M12 or later work.
 The detector-analysis utility rows for detecting regions, missing detectors, and transform-without-feedback remain manifest-only follow-up scope until a later detector-analysis milestone promotes explicit Rust APIs and acceptance fixtures.
 
 Linked tests and benchmarks:
@@ -350,7 +353,7 @@ Done criteria:
 
 - `just oracle::run --milestone M9 --exact` passes deterministic detection examples.
 - `just oracle::run --milestone M9 --structural` passes gauge-detector structural equivalence cases.
-- `cargo test -p stab-core detection` covers coordinate shifts, repeats, measurement-record observables, Pauli-target observable flips, empty-detector circuits, invalid measurement references, and explicit rejection for sweep-conditioned conversion until sweep inputs exist.
+- `cargo test -p stab-core detection` covers coordinate shifts, repeats, measurement-record observables, Pauli-target observable flips, empty-detector circuits, invalid measurement references, bounded record-shape validation, and explicit rejection for sweep-conditioned conversion until sweep inputs exist.
 - `cargo test -p stab-core detection_sampling` covers frame-simulator Pauli-target observable parity for basis resets and product measurements.
 - `cargo test -p stab-cli m9` covers public `detect` and `m2d` CLI behavior, including `b8`, `detect` `ptb64` outputs, `m2d` `ptb64` input, `m2d` `ptb64` output rejection, `dets`, observable side outputs, route conflicts, zero-shot `detect`, zero-width and oversized `ptb64` input rejection, Pauli-target observable behavior, generated M7 repetition, rotated-surface, unrotated-surface, and color-code `sample -> m2d` round trips against `detect` for `01` and `b8`, clear sweep-conditioned conversion rejection until sweep inputs exist, and clear `--ran_without_feedback` rejection until feedback-removal conversion is implemented.
 - `just bench::compare --milestone M9` reports `detect` and `m2d` throughput separately for text and bit-packed formats as report-only M9 evidence.
@@ -448,7 +451,9 @@ Tasks:
 - Profile every benchmark that is slower than the beta gate before optimizing it, and store a short profiler note beside the benchmark report.
 - Optimize only behind existing abstractions unless profiler evidence justifies a new abstraction.
 - Tune portable SIMD lane widths, memory layouts, allocation patterns, and hot-loop structure behind `stab-core` bit, sampler, detector, and DEM modules.
+- Implement compiled or streaming detection conversion for large decoder workloads when profiler and benchmark evidence show the M9 materialized converter is the bottleneck, processing records in bounded batches, preserving folded repeat structure where possible, avoiding duplicate sampler analysis, and documenting any remaining temporary limits.
 - Add allocation tracking for parser, sampler compilation, detector conversion, analyzer, and DEM sampler hot paths.
+- Add or promote large generated-code `detect` and `m2d` benchmark rows when streaming detection conversion is implemented, including at least one folded-repeat detector workload and one primary-matrix generated-code workload.
 - Add regression thresholds for all workloads that pass the beta gate so future work cannot accidentally erase performance wins.
 
 For M12 benchmark operations, the frozen primary matrix is every benchmark contract row from M4 through M11 except baseline metadata anchors.
