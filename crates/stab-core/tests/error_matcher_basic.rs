@@ -108,3 +108,87 @@ fn error_matcher_filter_keeps_unmatched_errors() {
         "ExplainedError {\n    dem_error_terms: D0\n    [no single circuit error had these exact symptoms]\n}"
     );
 }
+
+#[test]
+fn error_matcher_rejects_repeat_contained_noise_until_recursive_matching_exists() {
+    let circuit = Circuit::from_stim_str(
+        "
+        REPEAT 2 {
+            X_ERROR(0.125) 0
+        }
+        M 0
+        DETECTOR rec[-1]
+        ",
+    )
+    .expect("circuit");
+
+    let error =
+        explain_errors_from_circuit(&circuit, None, false).expect_err("reject repeated noise");
+
+    assert!(error.to_string().contains("repeat-contained noise"));
+}
+
+#[test]
+fn error_matcher_rejects_repeat_contained_mpp_noise_until_recursive_matching_exists() {
+    let circuit = Circuit::from_stim_str(
+        "
+        REPEAT 2 {
+            MPP(0.125) Z0
+        }
+        ",
+    )
+    .expect("circuit");
+
+    let error =
+        explain_errors_from_circuit(&circuit, None, false).expect_err("reject repeated MPP noise");
+
+    assert!(error.to_string().contains("repeat-contained noise"));
+}
+
+#[test]
+fn error_matcher_rejects_nested_repeat_expansion_budget() {
+    let circuit = Circuit::from_stim_str(
+        "
+        REPEAT 100000 {
+            REPEAT 100000 {
+                TICK
+            }
+        }
+        ",
+    )
+    .expect("circuit");
+
+    let error =
+        explain_errors_from_circuit(&circuit, None, false).expect_err("reject nested expansion");
+
+    assert!(error.to_string().contains("expanded repeat iterations"));
+}
+
+#[test]
+fn error_matcher_rejects_filter_dem_repeat_expansion_budget() {
+    let circuit = Circuit::from_stim_str(
+        "
+        M 0
+        DETECTOR rec[-1]
+        ",
+    )
+    .expect("circuit");
+    let filter = DetectorErrorModel::from_dem_str(
+        "
+        repeat 100001 {
+            error(0.1) D0
+            shift_detectors 1
+        }
+        ",
+    )
+    .expect("filter DEM");
+
+    let error =
+        explain_errors_from_circuit(&circuit, Some(&filter), false).expect_err("reject filter");
+
+    assert!(
+        error
+            .to_string()
+            .contains("DEM ErrorMatcher filter currently supports repeat counts")
+    );
+}

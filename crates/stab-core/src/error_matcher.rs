@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+mod budget;
+
 use crate::{
     Circuit, CircuitError, CircuitErrorLocation, CircuitErrorLocationStackFrame,
     CircuitInstruction, CircuitItem, CircuitResult, CircuitTargetsInsideInstruction, DemItem,
@@ -7,12 +9,14 @@ use crate::{
     GateTargetWithCoords, Pauli, Probability, QubitId, RepeatBlock, Target,
     circuit_to_detector_error_model,
 };
+use budget::validate_error_matcher_circuit;
 
 pub fn explain_errors_from_circuit(
     circuit: &Circuit,
     filter: Option<&DetectorErrorModel>,
     reduce_to_one_representative_error: bool,
 ) -> CircuitResult<Vec<ExplainedError>> {
+    validate_error_matcher_circuit(circuit)?;
     let detector_coords = detector_coordinates(circuit)?;
     let filter_keys = filter
         .map(error_keys_from_dem)
@@ -922,6 +926,7 @@ fn append_sanitized_instruction(
 }
 
 fn error_keys_from_dem(model: &DetectorErrorModel) -> CircuitResult<Vec<Vec<DemTarget>>> {
+    model.validate_flattening_budget("ErrorMatcher filter")?;
     let mut keys = Vec::new();
     collect_error_keys_from_dem(model, 0, &mut keys)?;
     Ok(keys)

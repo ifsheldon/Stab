@@ -103,6 +103,7 @@ fn solve_disjoint_to_independent_xyz(x: f64, y: f64, z: f64, max_steps: usize) -
     let mut b = y;
     let mut c = z;
     for _ in 0..max_steps {
+        let ab = a * b;
         let ac = a * c;
         let bc = b * c;
         let a_i = 1.0 - a;
@@ -121,7 +122,7 @@ fn solve_disjoint_to_independent_xyz(x: f64, y: f64, z: f64, max_steps: usize) -
 
         let da = bc_i - bc;
         let db = ac_i - ac;
-        let dc = ab_i - ac;
+        let dc = ab_i - ab;
         a = (a - dx / da).max(0.0);
         b = (b - dy / db).max(0.0);
         c = (c - dz / dc).max(0.0);

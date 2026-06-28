@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+mod budget;
 mod clifford;
 mod declarations;
 mod decompose;
@@ -19,6 +20,7 @@ use crate::{
 };
 
 use super::{DemInstruction, DemRepeatBlock, DemTarget, DetectorErrorModel};
+use budget::validate_analyzer_expansion_budget;
 use declarations::Declaration;
 use decompose::decompose_tagged_error_probabilities;
 use effects::{
@@ -110,6 +112,7 @@ impl Analyzer {
     }
 
     fn analyze_with_stats(mut self, circuit: &Circuit) -> CircuitResult<AnalyzerResult> {
+        validate_analyzer_expansion_budget(circuit)?;
         self.visit_circuit(circuit)?;
         self.gauge_errors = find_gauge_errors(
             circuit,

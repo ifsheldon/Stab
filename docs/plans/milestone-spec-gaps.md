@@ -50,6 +50,15 @@ Gap: without explicit caps, public APIs could try to flatten huge DEM repeats an
 Proposed amendment: document accepted temporary limits for CLI input, circuit parser nesting, and DEM flattening-heavy analysis paths, require rejection tests for those limits, and require future streaming or folded traversal evidence before relaxing them.
 Resolution: M10 now documents a 64 MiB `analyze_errors` input cap, a 1,000,000 line circuit parser cap, a 256 repeat-nesting cap, and DEM analysis flattening caps of 100,000 repeats, 1,000,000 expanded instructions, and 1,000,000 expanded repeat iterations. Evidence includes `analyze_errors_rejects_oversized_input_file_before_reading`, `analyze_errors_rejects_excessive_repeat_nesting`, `parser_rejects_excessive_repeat_nesting`, `dem_counts_large_repeat_detectors_without_unrolling`, `dem_public_flattening_apis_reject_excessive_repeat_expansion`, and `sat_problem_rejects_excessive_repeat_expansion`.
 
+## 2026-06-28 - M10: Benchmark Evidence Reproducibility
+
+Status: Resolved
+Revealed by: milestone audit and full-code-review of M10 benchmark completion evidence.
+Current text: M10 required `just bench::compare --milestone M10` to report `.dem` parse/print and `analyze_errors` workloads with loop-folding cases included.
+Gap: a bare non-strict compare can succeed while rows are missing from the selected pinned-Stim baseline, and a progress report can cite a stale local baseline path after benchmark row ownership changes.
+Proposed amendment: treat bare M10 benchmark comparison as reportable Stab-side evidence, but require a current selected pinned-Stim baseline path and matching strict compare report whenever completion evidence claims strict Stab-vs-Stim benchmark comparison.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now requires fresh named baseline and strict compare paths for strict M10 benchmark claims. `docs/plans/m10-progress-report.md` cites `target/benchmarks/m10-goal-baseline/baseline.json` and `target/benchmarks/m10-goal-strict-compare`, regenerated after the audit found the stale baseline.
+
 ## 2026-06-28 - M12: Resident Memory Peak Wording
 
 Status: Resolved
@@ -274,8 +283,6 @@ Current text: M11 requires `just bench::compare --milestone M11` to report spars
 Gap: the milestone does not say whether M11 completion requires a selected pinned-Stim baseline artifact, strict comparison, external `stab-cli sample_dem` process timings, in-process Stab core timings, or report-only representative workloads. The current Stab runners print useful in-process rates, but the latest local baseline artifact can omit M11 pinned-Stim rows and the `stim-cli` row is not an external CLI-vs-CLI comparison.
 Proposed amendment: define M11 benchmark acceptance as either `just bench::compare --milestone M11 --strict` against a baseline that includes `m11-dem-sampler` and `m11-sample-dem-cli`, or explicitly label the M11 benchmark rows as report-only until M12. If CLI comparability is required, add a Stab subprocess runner using the same argv and stdin path as the Stim CLI baseline, and normalize rates by shots, detector bits, error operations, and output bytes where appropriate.
 Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now defines M11 benchmark acceptance as report-only Stab-side throughput from `just bench::compare --milestone M11`. Strict pinned-Stim baseline completeness, external CLI-vs-CLI process timing comparability, performance thresholds, and normalized primary-matrix reporting are M12 responsibilities.
-
-## Open Entries
 
 ## 2026-06-27 - M9: Feedback-Removal Conversion Scope
 

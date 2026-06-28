@@ -415,8 +415,10 @@ The accepted subset is the implemented `coverage-simulators-error-matcher` row, 
 Generated surface-code repeat matching, heralded matching, repeat-contained noise stack frames, and full sparse reverse tracker consumption remain future detector-analysis work until promoted into explicit acceptance rows.
 M10 Python semantic-mining rows are direct Rust or CLI semantic rows only; Python binding APIs remain future work.
 M10 structural DEM equivalence must normalize detector shifts, repeats, floating probabilities within tolerance, and graphlike target decomposition separators where byte-for-byte DEM output is too strict.
-M10 accepts bounded initial resource limits: `analyze_errors` input is capped at 64 MiB, circuit parsing is capped at 1,000,000 lines and 256 nested repeat blocks, and graphlike, hypergraph, and SAT DEM analysis reject flattening plans above 100,000 repeats, 1,000,000 expanded instructions, or 1,000,000 expanded repeat iterations.
+M10 accepts bounded initial resource limits: `analyze_errors` input is capped at 64 MiB, circuit parsing is capped at 1,000,000 lines and 256 nested repeat blocks, non-folded analyzer traversal, ErrorMatcher traversal, and graphlike, hypergraph, and SAT DEM analysis reject flattening plans above 100,000 repeats, 1,000,000 expanded instructions, or 1,000,000 expanded repeat iterations, and ErrorMatcher rejects repeat-contained noise until recursive provenance support is promoted.
 Removing or relaxing these limits requires streaming or folded traversal evidence and matching regression tests.
+M10 benchmark acceptance is reportable through `just bench::compare --milestone M10`, but any completion report that claims strict Stab-vs-Stim benchmark evidence must cite a fresh selected pinned-Stim baseline path and a matching `just bench::compare --milestone M10 --baseline ... --strict` report.
+Baseline completeness and performance thresholds beyond the scoped M10 rows remain M12 performance-hardening responsibilities.
 
 Done criteria:
 
@@ -425,6 +427,7 @@ Done criteria:
 - `cargo test -p stab-core dem` covers repeat blocks, detector shifts, coordinates, observables, probabilities, separators, invalid input, analytical detector counting through large repeats, and bounded DEM flattening for public analysis APIs.
 - `cargo test -p stab-cli m10` covers the staged `analyze_errors` flags plus oversized input and excessive repeat-nesting rejection.
 - `just bench::compare --milestone M10` reports `.dem` parse/print and `analyze_errors` workloads with loop-folding cases included.
+- Strict M10 benchmark evidence, when claimed in a progress report, is backed by a current `just bench::baseline --only M10 --out ...` artifact and a matching strict compare report that does not rely on stale local `target/` paths.
 
 ### M11: Detector Error Model Sampling
 

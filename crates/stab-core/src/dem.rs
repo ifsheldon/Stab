@@ -111,13 +111,19 @@ impl DetectorErrorModel {
                     DemInstructionKind::Error | DemInstructionKind::Detector => {
                         for target in instruction.targets() {
                             if let DemTarget::RelativeDetector(id) = target {
-                                count = count.max(
+                                let detector_id =
                                     detector_offset.checked_add(id.get()).ok_or_else(|| {
                                         CircuitError::invalid_detector_error_model(
                                             "detector id overflowed",
                                         )
-                                    })? + 1,
-                                );
+                                    })?;
+                                let detector_count =
+                                    detector_id.checked_add(1).ok_or_else(|| {
+                                        CircuitError::invalid_detector_error_model(
+                                            "detector count overflowed",
+                                        )
+                                    })?;
+                                count = count.max(detector_count);
                             }
                         }
                     }
