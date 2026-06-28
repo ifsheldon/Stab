@@ -5,6 +5,7 @@
 This plan fixes the remaining post-beta timing rows and row families by making each benchmark surface comparable, stable, and source-owned before adding strict `1.25x` regression thresholds.
 The goal is not quick threshold coverage.
 The goal is correct benchmark evidence, real optimization where the evidence proves a bottleneck, and durable threshold ownership for implemented Stab surfaces.
+The narrower follow-up plan in `docs/plans/post-beta-threshold-completion-plan.md` closes the remaining ambiguous timing-regression rows by adding checked no-ratio regression waivers and thresholding `m4-gate-lookup`, `m5-sparse-xor`, and supported `m8-measure-reader-*` pairs.
 
 Do not fix these rows by weakening gates, adding broad waivers, or hiding slow submeasurements behind row medians.
 Every row or row family should end in one of two states: guarded by a row-level or schema-version-2 submeasurement threshold, or documented with source-owned evidence proving why the remaining surface is not a meaningful strict threshold target yet.
@@ -51,7 +52,7 @@ Tests and acceptance:
 - Add parity tests proving `ptb64` reader decoding matches `write_ptb64_records_checked` fixtures.
 - Add exact round-trip tests for `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64`.
 - Add benchmark-runner tests proving every format submeasurement is present and stale threshold ids are rejected.
-- Add schema-version-2 thresholds for stable direct format pairs that remain below `1.25x` in repeated clean evidence; keep split format rows unthresholded when they still compare a Stab public dense visitor against mixed pinned Stim dense and sparse internal buffers.
+- Add schema-version-2 thresholds for stable direct format pairs that remain below `1.25x` in repeated clean evidence; the threshold-completion follow-up pairs Stab packed and sparse reader submeasurements with the pinned Stim dense and sparse filters for `01`, `b8`, `r8`, `hits`, and `dets`, while keeping `ptb64` as a checked no-ratio contract row.
 
 ### `m5-simd-bits`
 
@@ -93,6 +94,7 @@ Tests and acceptance:
 - Add property-style tests comparing `SparseXorVec` behavior against a reference sorted set or symmetric-difference implementation.
 - Add a row-XOR submeasurement threshold when repeated clean evidence is stable below `1.25x`.
 - Add an item-XOR submeasurement threshold only after the repeated item benchmark is stable enough to be meaningful.
+- The threshold-completion follow-up guards both row-XOR and item-XOR with schema-version-2 thresholds after tightening the sorted-unique small-row `xor_item` path.
 
 ### `m10-error-decomp`
 
@@ -134,7 +136,7 @@ Tests and acceptance:
 - Add tests covering every canonical name, known alias, lowercase variant, and invalid lookup.
 - Add tests proving generated or table-driven lookup data is derived from the canonical gate metadata instead of duplicating hand-maintained definitions.
 - Add thresholds only for stable lookup submeasurements that remain below `1.25x` in repeated clean evidence.
-- Keep sub-100ns unstable timing surfaces out of the threshold file with a source-owned profiler note.
+- The threshold-completion follow-up guards the faithful pinned Stim `gate_data_hash_all_gate_names` pair and keeps alias, lowercase, and invalid lookup contracts outside Stim-relative thresholds.
 
 ## Verification Plan
 
