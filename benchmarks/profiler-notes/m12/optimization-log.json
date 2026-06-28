@@ -88,10 +88,10 @@
         "gate_status": "pass",
         "relative_ratio": 1.06,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The threshold-completion report measured the table row-XOR and item-XOR pairs below the 1.25x gate after in-place row merging and small-row item shifting."
+        "evidence_note": "The beta-125 focused M5 probe measured the table row-XOR and item-XOR pairs below the 1.25x gate after in-place row merging, small-row item shifting, and the 16-item stack-buffer symmetric-difference path."
       },
       "dominant_cost": "Sparse table row-XOR previously allocated a new result vector for repeated row merges, and item-XOR paid generic Vec insertion and removal overhead on tiny sorted-unique rows.",
-      "optimization_summary": "Merged sparse XOR rows in place from the back, kept item toggling as a linear small-row scan like Stim, and replaced generic insert/remove calls with bounded manual shifts that preserve the sorted-unique invariant.",
+      "optimization_summary": "Merged sparse XOR rows in place from the back, kept item toggling as a linear small-row scan like Stim, replaced generic insert/remove calls with bounded manual shifts, and added a 16-item stack-buffer symmetric-difference path before the 64-item path for tiny sorted rows.",
       "semantic_checks": [
         "cargo test -p stab-core bits_sparse_xor"
       ],

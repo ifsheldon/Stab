@@ -8,6 +8,7 @@ use thiserror::Error;
 
 pub const BIT_BLOCK_WORDS: usize = 4;
 const WORD_BITS: usize = u64::BITS as usize;
+const SPARSE_XOR_TINY_STACK_ITEMS: usize = 16;
 const SPARSE_XOR_STACK_ITEMS: usize = 64;
 
 pub type BitResult<T> = Result<T, BitError>;
@@ -779,6 +780,13 @@ fn symmetric_difference_sorted_in_place(left: &mut Vec<u32>, right: &[u32]) {
 )]
 fn symmetric_difference_sorted_with_stack(left: &mut Vec<u32>, right: &[u32]) -> bool {
     let total_len = left.len() + right.len();
+    if total_len <= SPARSE_XOR_TINY_STACK_ITEMS {
+        let mut out = [0_u32; SPARSE_XOR_TINY_STACK_ITEMS];
+        let output_len = symmetric_difference_sorted_into(left, right, &mut out);
+        left.clear();
+        left.extend_from_slice(&out[..output_len]);
+        return true;
+    }
     if total_len > SPARSE_XOR_STACK_ITEMS {
         return false;
     }
