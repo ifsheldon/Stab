@@ -376,12 +376,12 @@ Resolution: M4 now owns only closed-unit probability validation and disjoint pro
 
 ## 2026-06-27 - M2: Manifest-Only Subcase Granularity
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of the M2 manifest coverage rows.
 Current text: M2 and the test-porting plan allow red or manifest-only oracle cases for all P0 and P1 files needed by M4 through M11.
 Gap: file-level manifest-only rows can satisfy coverage without identifying the upstream subcases, fixture families, malformed-input cases, or extraction criteria that future implementation milestones must port.
 Proposed amendment: require manifest-only rows to name planned subcase groups or extraction criteria for each upstream test file before the owning implementation milestone starts.
-Resolution: pending plan update.
+Resolution: M2 now requires every manifest-only row to identify planned subcase groups, fixture families, malformed-input classes, or extraction criteria in its manifest note, and file-level placeholders must be split or updated before the owning implementation milestone starts. The remaining manifest-only M9 detector-analysis rows now name their planned subcase groups for detecting regions, missing detectors, and feedback inlining. Evidence is `rg ",manifest-only," oracle/fixtures/manifest.csv` and `just oracle::list --milestone M9`.
 
 ## 2026-06-26 - M0: Upstream Smoke References Overreach
 

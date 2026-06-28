@@ -118,6 +118,8 @@ Tasks:
 - Define statistical comparator contracts for noisy circuit sampling and DEM sampling, including sample counts, confidence bounds, fixed Rust seeds, and acceptable false-positive rate.
   Runnable statistical comparator implementations are completed in the owning sampling milestone before any matching row is marked `implemented`.
 - Mark not-yet-implemented Stab cases as red, ignored, or manifest-only without hiding them from `just oracle::list`.
+- Manifest-only rows are allowed only when they identify planned subcase groups, fixture families, malformed-input classes, or extraction criteria in their manifest note.
+  File-level placeholders must be split or updated with subcase groups before the owning implementation milestone starts.
 - Add source-license notes for any copied upstream tests or fixtures.
 
 Linked tests and benchmarks:
@@ -131,6 +133,7 @@ Done criteria:
 - `just oracle::list` prints every fixture grouped by milestone, parity mode, and status.
 - `just oracle::record --check-clean` can record runnable exact-output fixtures from `vendor/stim` without modifying existing committed fixtures.
   Exact-output parser/printer fixtures that exercise library-only behavior without a Stim CLI equivalent are committed as manifest-only golden files and skipped by recording.
+- `rg ",manifest-only," oracle/fixtures/manifest.csv` shows every manifest-only row with a note naming planned subcase groups or extraction criteria, not only an upstream filename.
 - `just oracle::run --implemented-only` passes for implemented smoke cases.
 - `just oracle::run --all` reports unimplemented cases as explicit red, ignored, or manifest-only cases, not as missing metadata.
 
