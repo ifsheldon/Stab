@@ -294,7 +294,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(waivers.schema_version, 1);
-        assert_eq!(waivers.rows.len(), 4);
+        assert_eq!(waivers.rows.len(), 5);
         for row in &waivers.rows {
             assert!(
                 primary_ids.contains(row.id.as_str()),

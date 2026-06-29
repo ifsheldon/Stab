@@ -35,10 +35,6 @@ pub(super) fn run_detection_compare_row(
     row: &BenchmarkRow,
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
-        "m9-convert-measurements-dets" => {
-            run_m2d_fixture_row(row, "stab_convert_measurements_to_dets", SampleFormat::Dets)
-                .map(Some)
-        }
         "m9-detect-text-cli" => {
             run_detect_fixture_row(row, "stab_detect_1024_dets", SampleFormat::Dets).map(Some)
         }
@@ -57,9 +53,9 @@ pub(super) fn run_detection_compare_row(
 
 pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     match (row_id, name) {
-        ("m9-convert-measurements-dets", "stab_convert_measurements_to_dets")
-        | ("m9-m2d-text-cli", "stab_m2d_dets")
-        | ("m9-m2d-bitpacked-contract", "stab_m2d_b8") => Some((2.0, "shots/s")),
+        ("m9-m2d-text-cli", "stab_m2d_dets") | ("m9-m2d-bitpacked-contract", "stab_m2d_b8") => {
+            Some((2.0, "shots/s"))
+        }
         ("m9-detect-text-cli", "stab_detect_1024_dets")
         | ("m9-detect-bitpacked-cli", "stab_detect_1024_b8") => {
             Some((DETECT_SHOTS as f64, "shots/s"))
@@ -76,9 +72,6 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
-        "m9-convert-measurements-dets" => Some(
-            "contract-proxy: Stab measures the M9 measurement-to-detection conversion path because circuit-aware convert flags remain folded into m2d",
-        ),
         "m9-detect-text-cli" | "m9-detect-bitpacked-cli" => Some(
             "report-only: Stab measures in-process detector sampling plus result writing for the public detect contract",
         ),

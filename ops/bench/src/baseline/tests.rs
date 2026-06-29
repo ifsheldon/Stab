@@ -523,6 +523,56 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
 }
 
 #[test]
+fn convert_benchmark_rows_have_stab_cli_runners() {
+    for (id, expected_measurement) in [
+        ("m7-convert-01-to-b8", "stab_convert_01_to_b8_128"),
+        ("m7-convert-b8-to-01", "stab_convert_b8_to_01_128"),
+        ("m7-convert-b8-to-b8-wide", "stab_convert_b8_to_b8_2048"),
+        ("m7-convert-dets-to-b8", "stab_convert_dets_to_b8_dl72"),
+        ("m7-convert-b8-to-dets", "stab_convert_b8_to_dets_dl72"),
+        ("m7-convert-ptb64-to-01", "stab_convert_ptb64_to_01_128"),
+        ("m7-convert-01-to-ptb64", "stab_convert_01_to_ptb64_128"),
+        (
+            "m7-convert-circuit-dl-obs-out",
+            "stab_convert_circuit_dl_obs_out",
+        ),
+        ("m7-convert-dem-dets-to-01", "stab_convert_dem_dets_to_01"),
+    ] {
+        let row = BenchmarkRow {
+            id: id.to_string(),
+            milestone: Milestone::M7,
+            threshold_class: "report-only".to_string(),
+            runner: Runner::StimCli,
+            upstream_source: "src/stim/cmd/command_convert.test.cc".to_string(),
+            stim_perf_filter: String::new(),
+            argv: String::new(),
+            stdin_path: String::new(),
+            phase: "throughput".to_string(),
+            measurement: "convert-cli".to_string(),
+            description: "test row".to_string(),
+        };
+
+        let measurements = run_stab_compare_row(&row)
+            .expect("run compare row")
+            .expect("Stab runner");
+        let names = measurements
+            .iter()
+            .map(|measurement| measurement.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(names, [expected_measurement]);
+        assert!(
+            compare_note(id).is_some(),
+            "{id} should explain benchmark comparability"
+        );
+        assert!(
+            measurement_work(id, expected_measurement).is_some(),
+            "{id}/{expected_measurement} should report normalized work"
+        );
+    }
+}
+
+#[test]
 fn m10_dem_benchmark_rows_have_stab_compare_runners() {
     for (id, runner, expected_measurements) in [
         (

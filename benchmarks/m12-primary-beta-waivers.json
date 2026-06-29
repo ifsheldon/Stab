@@ -12,6 +12,11 @@
       "follow_up": "Replace this waiver with a faithful public Stim circuit-convert baseline if one becomes available, or keep the row as a source-owned CLI contract for Stab's .stim canonical conversion."
     },
     {
+      "id": "m7-convert-01-to-ptb64",
+      "reason": "Pinned Stim v1.16.0 rejects `stim convert --in_format=01 --out_format=ptb64` with `SAMPLE_FORMAT_PTB64 incompatible with SingleMeasurementRecord`, so this Stab-supported output conversion has no faithful public Stim CLI ratio.",
+      "follow_up": "Replace this waiver if a pinned Stim-compatible ptb64 output conversion baseline becomes available, or keep the source-owned Stab CLI timing plus exact convert parity tests as the evidence."
+    },
+    {
       "id": "m8-measure-reader-ptb64-contract",
       "reason": "Pinned Stim v1.16.0 has ptb64 reader correctness tests but no `measure_record_reader.perf.cc` filter or public CLI timing surface that isolates ptb64 reader throughput.",
       "follow_up": "Replace this waiver with a faithful ptb64 reader perf baseline if pinned Stim exposes one, or keep the Stab-only contract row plus ptb64 reader parity tests as the evidence."

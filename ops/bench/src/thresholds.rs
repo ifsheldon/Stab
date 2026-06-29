@@ -513,7 +513,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(thresholds.schema_version, 2);
-        assert_eq!(thresholds.rows.len(), 72);
+        assert_eq!(thresholds.rows.len(), 79);
         assert!(thresholds.rows.iter().all(|row| {
             row.max_relative_ratio == Some(1.25)
                 || row

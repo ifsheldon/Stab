@@ -20,6 +20,7 @@ use crate::report::{
 use crate::root::RepoRoot;
 use crate::stim::{ensure_stim_binaries, validate_stim_source};
 
+mod convert;
 mod m10;
 mod m11;
 mod m4;
@@ -465,7 +466,9 @@ pub(crate) fn run_stab_compare_row(
             ]))
         }
         _ => {
-            if let Some(measurements) = m8::run_sample_compare_row(row)? {
+            if let Some(measurements) = convert::run_convert_compare_row(row)? {
+                Ok(Some(measurements))
+            } else if let Some(measurements) = m8::run_sample_compare_row(row)? {
                 Ok(Some(measurements))
             } else if let Some(measurements) = m9::run_detection_compare_row(row)? {
                 Ok(Some(measurements))
@@ -802,6 +805,9 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
     if let Some(work) = m4::measurement_work(row_id, name) {
         return Some(work);
     }
+    if let Some(work) = convert::measurement_work(row_id, name) {
+        return Some(work);
+    }
     if let Some(work) = m8::measurement_work(row_id, name) {
         return Some(work);
     }
@@ -879,6 +885,9 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 
 pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
     if let Some(note) = m4::compare_note(row_id) {
+        return Some(note);
+    }
+    if let Some(note) = convert::compare_note(row_id) {
         return Some(note);
     }
     if let Some(note) = m8::compare_note(row_id) {
@@ -1019,8 +1028,14 @@ fn run_stim_cli_row(
 ) -> Result<BaselineRowResult, BenchError> {
     let iterations = usize::try_from(cli_iterations)
         .map_err(|_| BenchError::CliIterationsOverflow(cli_iterations))?;
-    let args = row
-        .argv_tokens()
+    let argv_tokens = row.argv_tokens();
+    if argv_tokens
+        .iter()
+        .any(|arg| arg.contains("target/benchmarks/cli-scratch/"))
+    {
+        root.create_benchmark_output_dir(Path::new("target/benchmarks/cli-scratch"))?;
+    }
+    let args = argv_tokens
         .into_iter()
         .map(OsString::from)
         .collect::<Vec<_>>();

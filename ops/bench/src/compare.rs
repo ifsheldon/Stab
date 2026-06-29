@@ -27,6 +27,7 @@ pub(crate) struct CompareOptions {
     pub(crate) milestone: Option<String>,
     pub(crate) profile: String,
     pub(crate) primary: bool,
+    pub(crate) only: Vec<String>,
     pub(crate) report: Option<PathBuf>,
     pub(crate) require_profiler_notes: bool,
     pub(crate) profiler_notes_dir: Option<PathBuf>,
@@ -101,7 +102,18 @@ pub(crate) fn run_compare(
         .as_deref()
         .map(read_memory_baseline)
         .transpose()?;
-    let rows = manifest.compare_rows(options.milestone.as_deref(), options.primary)?;
+    let mut rows = manifest.compare_rows(options.milestone.as_deref(), options.primary)?;
+    if !options.only.is_empty() {
+        rows.retain(|row| {
+            options
+                .only
+                .iter()
+                .any(|filter| row.id == *filter || row.milestone.as_str() == filter)
+        });
+        if rows.is_empty() {
+            return Err(BenchError::UnmatchedFilter(options.only.join(",")));
+        }
+    }
     println!(
         "[{PREFIX}] comparing {} row(s) against {}",
         rows.len(),
@@ -332,6 +344,7 @@ fn write_compare_report(input: CompareReportWrite<'_>) -> Result<ProfilerNoteFin
             profile: options.profile.clone(),
             milestone: options.milestone.clone(),
             primary: options.primary,
+            filters: options.only.clone(),
             require_profiler_notes: options.require_profiler_notes,
             require_beta_gate: options.require_beta_gate,
             beta_waivers_path: beta_waivers_path.map(|path| path.display().to_string()),

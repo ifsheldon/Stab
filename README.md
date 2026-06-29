@@ -37,8 +37,10 @@ The tiny-circuit smoke case now runs through the public `stab sample` command.
 M7 early CLI compatibility includes `stab gen` for `repetition_code memory`, `surface_code rotated_memory_x`, `surface_code rotated_memory_z`, `surface_code unrotated_memory_x`, `surface_code unrotated_memory_z`, and `color_code memory_xyz`.
 The supported `gen` flags are `--code`, `--task`, `--distance`, `--rounds`, `--after_clifford_depolarization`, `--after_reset_flip_probability`, `--before_measure_flip_probability`, `--before_round_data_depolarization`, `--out`, and Stim's accepted no-op `--in`; the deprecated `--gen` spelling is accepted for Stim v1.16.0 compatibility.
 `stab convert --in_format=stim --out_format=stim` reads from stdin or `--in`, writes to stdout or `--out`, and emits canonical `.stim` text through the M4 parser/printer.
-The staged result-data conversion subset supports `convert --in_format=01 --out_format=01` and `convert --in_format=01 --out_format=dets` when explicit `--num_measurements`, `--num_detectors`, or `--num_observables` widths are provided.
+The result-data conversion surface supports `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` input and output formats with layouts from explicit `--num_measurements`, `--num_detectors`, and `--num_observables` counts, `--dem`, or `--circuit` plus unique `--types` letters from `M`, `D`, and `L`.
+`convert` also supports `--obs_out`, `--obs_out_format`, the legacy top-level `--convert` alias, default `--in_format=01`, and 64-record grouping checks for `ptb64` output.
 `convert --bits_per_shot ... --out_format=dets` is rejected like Stim because raw bit width does not identify measurement, detector, or observable record types.
+`stab help [topic]` and top-level `stab --help [topic]` provide Stab-native structural help for implemented commands, result formats, and gate names without claiming byte-for-byte Stim help text.
 M8 sampling compatibility has started with deterministic `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` output for the parser-backed Clifford subset, typed result-format reader/writer helpers, count-determined measurement helpers, basic reference-sample-tree helpers, X/Y/Z-basis measurement and reset, pair and Pauli-product measurement, measurement-record Pauli feedback, Bell-state entangling Clifford sampling, `--skip_reference_sample`/`--frame0`/`--skip_loop_folding`, plus seeded local noise sampling for `X_ERROR`, `Y_ERROR`, `Z_ERROR`, `I_ERROR`, `II_ERROR`, `DEPOLARIZE1`, `DEPOLARIZE2`, `PAULI_CHANNEL_1`, `PAULI_CHANNEL_2`, `HERALDED_ERASE`, and `HERALDED_PAULI_CHANNEL_1`; optimized loop-folded reference-sample-tree construction still belongs to later M8 work.
 M9 detection compatibility includes public `stab detect` and `stab m2d` rows for deterministic detector conversion, observable routing, reference-sample subtraction, text and bit-packed detection records, and M9 benchmark compare runners.
 M10 DEM compatibility has started with the `.dem` parser/printer, DEM core types, in-process oracle parse-print rows, and a staged `stab analyze_errors` command for deterministic detectors, measurement-flip errors, simple single-qubit Pauli-error analysis, unconditional and conditional correlated Pauli errors, identity-noise no-ops, reset cutoff of pending single-qubit errors, single-qubit `DEPOLARIZE1` analysis, two-qubit `DEPOLARIZE2` analysis, exact-solved and approximate single-qubit `PAULI_CHANNEL_1` analysis with numeric thresholds, approximate two-qubit `PAULI_CHANNEL_2` analysis with numeric thresholds, identical-symptom error merging, and top-level repeat loop folding; graphlike decomposition, general loop folding, gauge-detector analysis, broader approximation behavior, and large analyzer internals remain pending M10 work.
@@ -77,13 +79,15 @@ The matrix lives at `oracle/compatibility-matrix.csv` and records upstream sourc
 Benchmark contracts live at `benchmarks/manifest.csv`.
 The M3 benchmark workflow validates those contracts, records pinned C++ Stim baseline results, and writes generated reports under `target/benchmarks/`.
 Any explicit `--out` path must be repository-relative and under `target/benchmarks/`.
-`--only` filters use exact benchmark row ids or milestone names such as `M7`.
+`--only` filters use exact benchmark row ids or milestone names such as `M7` on both baseline and compare commands.
 
 ```sh
 just bench::list
 just bench::smoke
 just bench::baseline --stim vendor/stim --primary
+just bench::baseline --only m7-convert-01-to-b8 --out target/benchmarks/convert-probe-baseline
 just bench::compare --milestone M4
+just bench::compare --only m7-convert-01-to-b8 --baseline target/benchmarks/convert-probe-baseline/baseline.json --report target/benchmarks/convert-probe-compare
 just bench::compare --profile release --primary --report target/benchmarks/latest --require-beta-gate --require-profiler-notes
 just bench::compare-allocations --primary --report target/benchmarks/latest-allocations
 ```
@@ -92,7 +96,7 @@ just bench::compare-allocations --primary --report target/benchmarks/latest-allo
 Use `--primary` when recording the M12 baseline consumed by `just bench::compare --primary`.
 Use a small `--target-seconds` value for quick local smoke runs, and increase it when recording durable baseline artifacts.
 `just bench::compare` runs the benchmark ops binary with Cargo's release profile, reads `target/benchmarks/baseline/latest/baseline.json` by default, and can write `compare.json` plus `report.md` to a repository-relative directory under `target/benchmarks/`.
-Use `--require-beta-gate` for completion-style runs where every selected row must prove a Stab median no slower than 2.0x pinned Stim.
+Use `--require-beta-gate` for completion-style runs where every selected row must prove a Stab median no slower than 1.25x pinned Stim.
 Profiler notes for rows slower than 1.5x pinned Stim live under the report directory's `profiler-notes/` folder and must include `Dominant cost:` and `Next owner action:` lines when `--require-profiler-notes` is used.
 Use `--thresholds <path>` once regression thresholds exist to fail selected rows that exceed their configured maximum relative ratio or cannot produce a comparable ratio.
 `just bench::primary-regression` checks the source-owned M12 threshold file with a Stab-side warmup pass and three recorded measurement runs; the scheduled M12 benchmark workflow runs it against a fresh primary pinned-Stim baseline and uploads the generated reports.

@@ -110,6 +110,10 @@ enum Command {
         #[arg(long)]
         primary: bool,
 
+        /// Run only rows whose id or milestone matches this value.
+        #[arg(long = "only")]
+        only: Vec<String>,
+
         /// Baseline JSON report produced by `bench::baseline`.
         #[arg(long, default_value = DEFAULT_BASELINE_REPORT)]
         baseline: PathBuf,
@@ -220,6 +224,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             milestone,
             profile,
             primary,
+            only,
             baseline,
             report,
             require_profiler_notes,
@@ -243,6 +248,7 @@ fn run(cli: Cli) -> Result<(), BenchError> {
                     milestone,
                     profile,
                     primary,
+                    only,
                     report,
                     require_profiler_notes,
                     profiler_notes_dir,

@@ -127,6 +127,8 @@ pub(crate) struct CompareCommandMetadata {
     pub(crate) profile: String,
     pub(crate) milestone: Option<String>,
     pub(crate) primary: bool,
+    #[serde(default)]
+    pub(crate) filters: Vec<String>,
     pub(crate) require_profiler_notes: bool,
     pub(crate) require_beta_gate: bool,
     #[serde(default)]
@@ -349,6 +351,15 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
     ));
     out.push_str(&format!("- Profile: {}\n", report.command.profile));
     out.push_str(&format!("- Baseline: {}\n", report.command.baseline_path));
+    out.push_str(&format!(
+        "- Filters: {}\n",
+        if report.command.filters.is_empty() {
+            "none".to_string()
+        } else {
+            report.command.filters.join(", ")
+        }
+    ));
+    out.push_str(&format!("- Primary matrix: {}\n", report.command.primary));
     if let Some(memory_baseline_path) = &report.command.memory_baseline_path {
         out.push_str(&format!("- Memory baseline: {memory_baseline_path}\n"));
     }

@@ -2,7 +2,7 @@
 
 `manifest.csv` is the source-owned benchmark contract manifest for M3 and later performance work.
 Each row names the owning implementation milestone, threshold class, runner, upstream Stim source, workload phase, and measurement family.
-`just bench::smoke` validates that required M3 contracts remain present, including the primary benchmark matrix, canonical print and convert contracts, bit-packed detector conversion contracts, and the M12 performance-hardening target.
+`just bench::smoke` validates that required M3 contracts remain present, including the primary benchmark matrix, canonical print and convert contracts, result-format convert CLI rows, bit-packed detector conversion contracts, and the M12 performance-hardening target.
 
 Runner meanings:
 
@@ -21,6 +21,7 @@ Pass `--primary` to record only the frozen M12 primary matrix, using the same M4
 
 `just bench::compare` reads `target/benchmarks/baseline/latest/baseline.json` by default.
 Pass `--baseline <path>` to compare against a different generated baseline report.
+Use `--only` on compare commands for focused probe evidence against baseline reports recorded with the same row filter.
 Pass `--primary` to select the frozen M12 primary matrix, which currently includes M4 through M11 benchmark rows except metadata anchors and the M12 placeholder row.
 Pass `--profile release` to record the intended Cargo profile in compare output; the `just bench::compare` recipe builds the benchmark ops binary with Cargo's release profile before running the subcommand.
 Pass `--report target/benchmarks/latest` or another repository-relative directory below `target/benchmarks/` to write `compare.json` and `report.md`.
@@ -122,5 +123,7 @@ Compare prints Stab-side timings for rows whose implementation milestone has a r
 When a comparison runner reports workload-specific rates or comparability notes, treat those notes as part of the benchmark evidence.
 For example, M5 labels Stab-only contract-smoke bit-kernel workloads separately from upstream Stim perf rows until M12 introduces optimized parity thresholds.
 M8 sample compare rows split Stab core sampler compilation, one-shot latency, and batch throughput in-process; those report-only rows are not a strict CLI-vs-CLI performance gate, and the probability-util row measures the direct Stab biased-random utility API against pinned Stim's probability utility perf filters.
+M7 convert compare rows exercise `stab_cli::run_from(["stab", "convert", ...])` for representative result-format conversions over source-owned fixtures covering dense text, dense packed, sparse `dets`, `ptb64` input, circuit layout, DEM layout, raw bit width, and observable side-output overhead.
+Pinned Stim v1.16.0 rejects `convert --in_format=01 --out_format=ptb64`, so `m7-convert-01-to-ptb64` is a contract-only Stab timing row with source-owned beta and timing-regression waivers instead of a fake CLI ratio.
 When a row is contract-only, compare may report Stab-side timing with `stim=contract-only`; that is not a Stab-vs-Stim performance comparison for the row.
 Pass `--strict` to fail when any selected row is still pending, missing from the selected baseline report, backed by an invalid placeholder baseline row, contract-only without a Stab-side measurement, or backed by baseline metadata that does not match pinned Stim v1.16.0.

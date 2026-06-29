@@ -299,21 +299,21 @@ Tasks:
 - Add `stab-cli` with a binary name or compatibility wrapper that can be invoked as `stab` during development and compared against `stim`.
 - Implement `stim gen` compatibility for repetition code, rotated surface code, unrotated surface code, and color code tasks supported by v1.16.0.
 - Implement all supported `gen` flags with typed parsing, probability validation, distance/round validation, and helpful errors.
-- Implement staged `stim convert` evidence in two tracks: a Stab-specific `convert --in_format=stim --out_format=stim` canonical parse/print workflow backed by M4 parser/printer behavior, and pinned-Stim-compatible result-data conversion rows backed by the M7-owned `01`/`dets` subset from `command_convert.test.cc`.
+- Implement `stim convert` evidence in two tracks: a Stab-specific `convert --in_format=stim --out_format=stim` canonical parse/print workflow backed by M4 parser/printer behavior, and pinned-Stim-compatible result-data conversion rows backed by `command_convert.test.cc`. The post-beta tight CLI parity slice extends the original staged `01`/`dets` subset to `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` conversions with explicit counts, `--dem`, `--circuit`, unique `--types`, `--obs_out`, and `--obs_out_format`.
 - Store the generated-circuit acceptance matrix in source-owned oracle, direct-test, and benchmark manifests instead of checking in every generated circuit body. M7 exact CLI goldens cover the public command shape for each supported family and task, direct Rust structural tests cover representative larger noisy family/task/distance/round/probability cases, and benchmark rows cover generated-on-demand primary matrix circuits reused by M8 through M12.
 
 Linked tests and benchmarks:
 
 - Direct tests: C++ Circuit Generation group and CLI Commands group for `command_gen.test.cc` and `command_convert.test.cc`.
 - Related parser tests: M4 `.stim` parse/print fixtures.
-- Benchmarks: `stim gen` workloads for repetition code, rotated surface code, unrotated surface code, and color code circuits from the Benchmark Plan, plus `stim convert` CLI startup and canonical `.stim` conversion throughput.
+- Benchmarks: `stim gen` workloads for repetition code, rotated surface code, unrotated surface code, and color code circuits from the Benchmark Plan, plus `stim convert` CLI startup, canonical `.stim` conversion throughput, and source-owned result-format convert CLI rows for dense `01`/`b8`, wide packed `b8`, sparse `dets`, `ptb64` input, circuit layout with observable side output, and DEM layout conversion.
 
 Done criteria:
 
 - `just oracle::run --milestone M7` passes exact-output `gen` and `convert` golden cases.
 - `stab-cli gen` output matches Stim v1.16.0 for the M7 source-owned acceptance matrix: exact CLI goldens for every supported family and task, Stim-compatible flag-boundary behavior for implemented `gen` arguments, and direct Rust structural tests for representative larger noisy family/task/distance/round/probability cases.
-- `stab-cli convert` reads stdin and files and emits canonical `.stim` output for supported circuits.
-- `just bench::compare --milestone M7` reports Stab-side generator throughput for all primary generated-circuit families and convert throughput for supported `.stim` conversion workflows. M7 benchmark evidence is report-only: direct Rust generator construction, in-process CLI dispatch, and canonical conversion timings are accepted for this milestone, while strict external CLI-vs-CLI thresholds and process-startup comparability are deferred to M12 performance hardening.
+- `stab-cli convert` reads stdin and files, emits canonical `.stim` output for supported circuits when `--in_format=stim --out_format=stim`, and converts implemented result formats with typed layout inference and observable side outputs.
+- `just bench::compare --milestone M7` reports Stab-side generator throughput for all primary generated-circuit families and convert throughput for supported `.stim` and result-format conversion workflows. Result-format convert rows use the public `stab convert` CLI path through `stab_cli::run_from`, compare faithful rows against pinned Stim `stim convert`, and keep `01 -> ptb64` as a contract-only row because Stim v1.16.0 rejects that output shape.
 
 ### M8: Circuit Sampling
 
