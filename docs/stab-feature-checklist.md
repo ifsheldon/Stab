@@ -52,9 +52,9 @@ Status key:
 | `b8` dense binary | Done for implemented paths | Implemented for sampling, detection, m2d input/output where accepted, and DEM sampling side streams. |
 | `r8` sparse binary | Done for implemented paths | Implemented in result-format readers and writers and covered by M11 sample_dem side-stream tests. |
 | `hits` sparse text or binary sparse index format | Done for implemented paths | Implemented by result-format readers and writers for measurement, detection, and DEM-sampling flows where accepted. |
-| `dets` sparse text | Done for implemented paths | Implemented with command-specific measurement-only and detection-output behavior. `sample_dem --out_format=dets` is fixed to keep detector output separate from observable output. |
-| `ptb64` transposed packed format | Partial | Separate helper APIs support `ptb64`; CLI `sample`, `detect`, `sample_dem`, and `m2d` input support relevant `ptb64` surfaces. `m2d --out_format=ptb64` and `--obs_out_format=ptb64` intentionally reject like pinned Stim v1.16.0. |
-| Format conversion command coverage | Partial | `stab convert` supports `.stim -> .stim`, `01 -> 01`, and `01 -> dets` staged paths in [../crates/stab-cli/src/lib.rs](../crates/stab-cli/src/lib.rs). General `b8`, `r8`, `hits`, and `ptb64` conversion orchestration is not complete, and Stim options such as `--circuit`, `--types`, `--obs_out`, and `--obs_out_format` are not implemented for `convert`. |
+| `dets` sparse text | Done for implemented paths | Implemented with command-specific measurement-only, typed `convert` layout, and detection-output behavior. `sample_dem --out_format=dets` is fixed to keep detector output separate from observable output. |
+| `ptb64` transposed packed format | Done for implemented paths | Separate helper APIs support `ptb64`; CLI `sample`, `convert`, `detect`, `sample_dem`, and `m2d` input support relevant `ptb64` surfaces. `m2d --out_format=ptb64` and `--obs_out_format=ptb64` intentionally reject like pinned Stim v1.16.0. |
+| Format conversion command coverage | Done for result-format CLI parity | `stab convert` supports `.stim -> .stim` canonicalization as a Stab extension and Stim-style result-format conversion for `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` with explicit counts, `--dem`, `--circuit`, `--types`, `--obs_out`, and `--obs_out_format`. |
 | Streaming IO for large implemented CLI paths | Done for current post-beta surfaces | `stab sample`, `stab sample_dem`, `stab detect`, and implemented `stab m2d` paths stream output or input in bounded chunks. See [plans/post-beta-fix-report.md](plans/post-beta-fix-report.md). |
 
 ## 3. Gate And Instruction Surface
@@ -155,7 +155,7 @@ Status key:
 | Stim command | Stab status | Evidence and notes |
 | --- | --- | --- |
 | `stim gen` | Done for supported M7 families and tasks | `stab gen` and legacy `--gen` are implemented in [../crates/stab-cli/src/lib.rs](../crates/stab-cli/src/lib.rs). |
-| `stim convert` | Partial | `.stim -> .stim`, `01 -> 01`, and `01 -> dets` are implemented. General result-format conversion remains incomplete, including `b8`, `r8`, `hits`, `ptb64`, `--circuit`, `--types`, `--obs_out`, and `--obs_out_format` coverage. |
+| `stim convert` | Done for result-format CLI parity plus Stab `.stim` extension | `stab convert` supports `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` conversions with explicit counts, `--dem`, `--circuit`, unique `--types` letters, `--obs_out`, and `--obs_out_format`. The Stab-specific `.stim -> .stim` canonical conversion remains supported only for `--in_format=stim --out_format=stim`. |
 | `stim sample` | Done for current M8/M12 surface | `stab sample` supports current flags, deterministic and noisy statistical behavior, output formats, seed handling, skip-reference, skip-loop-folding, and streaming output. |
 | `stim detect` | Done for current M9/M12 surface | `stab detect` supports shots, input/output paths, detector/observable routing, relevant formats including supported `ptb64`, seeds, and streaming output. |
 | `stim m2d` | Partial | `stab m2d` supports text, `b8`, `r8`, `hits`, `dets`, and `ptb64` input where accepted, plus detector and observable outputs where accepted. `--sweep` and `--sweep_format` are not implemented, `--ran_without_feedback` is explicitly rejected, and `ptb64` output is rejected like pinned Stim v1.16.0. |
@@ -164,8 +164,8 @@ Status key:
 | `stim diagram` | Deferred | No Stab command. |
 | `stim explain_errors` | Deferred | No Stab command, despite scoped core matched-error support. |
 | `stim repl` | Deferred | No Stab command. |
-| `stim help` command | Missing or partial via Clap | Standard `--help` and subcommand help are available through Clap, but a Stim-compatible `stim help` command surface is not implemented as a documented Stab command. |
-| Legacy top-level command flags | Partial | `--gen`, `--sample`, `--detect`, `--m2d`, and `--analyze_errors` aliases are normalized in [../crates/stab-cli/src/lib.rs](../crates/stab-cli/src/lib.rs). Other legacy and deprecated Stim spellings are only implemented where explicitly covered; `--detector_hypergraph` is not implemented. |
+| `stim help` command | Done for Stab-native structural help | `stab help [topic]` and top-level `stab --help [topic]` are normalized to Stab-native help for implemented commands, result formats, and gate names. Exact byte-for-byte pinned-Stim help text remains intentionally out of scope. |
+| Legacy top-level command flags | Partial | `--gen`, `--convert`, `--sample`, `--detect`, `--m2d`, and `--analyze_errors` aliases are normalized in [../crates/stab-cli/src/lib.rs](../crates/stab-cli/src/lib.rs). Other legacy and deprecated Stim spellings are only implemented where explicitly covered; `--detector_hypergraph` is not implemented. |
 
 ## 12. Python API
 
@@ -224,7 +224,6 @@ This section is a short triage view of gaps that are visible after mapping the S
 
 | Gap | Status | Why it matters |
 | --- | --- | --- |
-| General `stab convert` result-format conversion | Partial | Stim's `convert` command is broader than Stab's staged `01` and `.stim` paths, including omitted observable side-output and type-selection options. |
 | Full circuit transform API parity | Partial | Functions such as full flattening, decomposition, noise removal, feedback inlining, QASM/Quirk/Crumble export, and richer flow transforms remain absent or scoped. |
 | Full DEM public API parity | Partial | DEM rounded/flattened/coordinate/diagram APIs and full Python-style ergonomics remain absent. |
 | Sweep-conditioned conversion | Deferred | Required for full `m2d` and detection conversion parity, but needs typed sweep inputs and acceptance tests. |

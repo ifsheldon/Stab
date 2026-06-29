@@ -14,7 +14,9 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 mod analyze_errors;
+mod convert;
 mod detection;
+mod help;
 mod input;
 mod sample_dem;
 mod streaming;
@@ -22,7 +24,9 @@ mod streaming;
 use analyze_errors::{AnalyzeErrorsArgs, run_analyze_errors};
 use clap::error::ErrorKind;
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
+use convert::{ConvertArgs, run_convert};
 use detection::{DetectArgs, M2dArgs, run_detect, run_m2d};
+use help::{HelpArgs, run_help};
 pub(crate) use input::read_limited_input;
 use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_core::{
@@ -36,12 +40,13 @@ use streaming::write_ptb64_group;
 use thiserror::Error;
 
 pub(crate) const MAX_CIRCUIT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
-const MAX_CONVERT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
+pub(crate) const MAX_CONVERT_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug, Parser)]
 #[command(
     name = "stab",
     version,
+    disable_help_subcommand = true,
     about = "A Rust implementation of Stim-compatible core workflows."
 )]
 struct Cli {
@@ -51,6 +56,9 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Prints Stab-native command, format, and gate help.
+    Help(HelpArgs),
+
     /// Generates example circuits.
     Gen(GenArgs),
 
@@ -160,6 +168,18 @@ enum RecordFormatArg {
 }
 
 impl RecordFormatArg {
+    fn name(self) -> &'static str {
+        match self {
+            Self::ZeroOne => "01",
+            Self::B8 => "b8",
+            Self::R8 => "r8",
+            Self::Ptb64 => "ptb64",
+            Self::Hits => "hits",
+            Self::Dets => "dets",
+            Self::Stim => "stim",
+        }
+    }
+
     fn sample_format(self) -> Result<SampleFormat, CliError> {
         match self {
             Self::ZeroOne => Ok(SampleFormat::ZeroOne),
@@ -200,41 +220,6 @@ impl SampleOutFormatArg {
             Self::Ptb64 => Err(CliError::UnsupportedDetectionFormat { format: "ptb64" }),
         }
     }
-}
-
-#[derive(Debug, Args)]
-struct ConvertArgs {
-    /// Input record format.
-    #[arg(long = "in_format", value_enum)]
-    in_format: RecordFormatArg,
-
-    /// Output record format.
-    #[arg(long = "out_format", value_enum, default_value = "01")]
-    out_format: RecordFormatArg,
-
-    /// Input path. Defaults to stdin.
-    #[arg(long = "in")]
-    input: Option<PathBuf>,
-
-    /// Output path. Defaults to stdout.
-    #[arg(long = "out")]
-    output: Option<PathBuf>,
-
-    /// Number of measurement bits per shot.
-    #[arg(long = "num_measurements", default_value_t = 0)]
-    num_measurements: usize,
-
-    /// Number of detector bits per shot.
-    #[arg(long = "num_detectors", default_value_t = 0)]
-    num_detectors: usize,
-
-    /// Number of observable bits per shot.
-    #[arg(long = "num_observables", default_value_t = 0)]
-    num_observables: usize,
-
-    /// Raw bits per shot when no value type is known.
-    #[arg(long = "bits_per_shot", default_value_t = 0)]
-    bits_per_shot: usize,
 }
 
 #[derive(Debug, Args)]
@@ -307,7 +292,7 @@ pub(crate) enum CliError {
     UnsupportedColorTask { task: String },
 
     #[error(
-        "unsupported conversion; supported conversions are 01 input to 01 or dets output, and stim input to stim output"
+        "unsupported conversion; supported conversions are result formats 01, b8, r8, hits, dets, and ptb64 with explicit layout information, plus stim input to stim output"
     )]
     UnsupportedConversion,
 
@@ -336,18 +321,23 @@ pub(crate) enum CliError {
     )]
     MissingRecordTypesForDets,
 
+    #[error("--circuit requires --types to select M, D, or L records")]
+    MissingConvertTypes,
+
+    #[error("--types contains unknown result type {result_type:?}; expected M, D, or L")]
+    UnknownConvertType { result_type: char },
+
+    #[error("--types contains duplicate result type {result_type}")]
+    DuplicateConvertType { result_type: char },
+
+    #[error("ptb64 output requires records in groups of 64; got trailing group of {count}")]
+    IncompletePtb64OutputGroup { count: usize },
+
+    #[error("unrecognized help topic {topic:?}")]
+    UnknownHelpTopic { topic: String },
+
     #[error("input is not valid UTF-8 text")]
     InvalidUtf8Input,
-
-    #[error("01 record on line {line} has {actual} bits but expected {expected}")]
-    RecordWidthMismatch {
-        line: usize,
-        actual: usize,
-        expected: usize,
-    },
-
-    #[error("01 record on line {line} contains invalid character {character:?}")]
-    InvalidZeroOneCharacter { line: usize, character: char },
 
     #[error("measurement count overflowed")]
     MeasurementCountOverflow,
@@ -390,6 +380,7 @@ where
     };
 
     let result = match cli.command {
+        Some(Command::Help(args)) => run_help(args, &mut stdout),
         Some(Command::Gen(args)) => run_gen(args, &mut stdout),
         Some(Command::Convert(args)) => run_convert(args, &mut input, &mut stdout),
         Some(Command::Sample(args)) => run_sample(args, &mut input, &mut stdout, &mut stderr),
@@ -431,7 +422,17 @@ where
         .get(1)
         .map(|arg| arg.to_string_lossy().into_owned())
         .unwrap_or_default();
-    if let Some(code) = legacy_arg.strip_prefix("--gen=") {
+    if let Some(topic) = legacy_arg.strip_prefix("--help=") {
+        args.splice(1..2, [OsString::from("help"), OsString::from(topic)]);
+    } else if legacy_arg == "--help" {
+        if let Some(arg) = args.get_mut(1) {
+            *arg = OsString::from("help");
+        }
+    } else if legacy_arg == "--convert" {
+        if let Some(arg) = args.get_mut(1) {
+            *arg = OsString::from("convert");
+        }
+    } else if let Some(code) = legacy_arg.strip_prefix("--gen=") {
         args.splice(
             1..2,
             [
@@ -681,89 +682,6 @@ fn write_probability_header(out: &mut String, name: &str, value: Probability) {
     out.push('\n');
 }
 
-fn run_convert<R, W>(args: ConvertArgs, stdin: &mut R, stdout: &mut W) -> Result<(), CliError>
-where
-    R: Read,
-    W: Write,
-{
-    match (args.in_format, args.out_format) {
-        (RecordFormatArg::ZeroOne, RecordFormatArg::ZeroOne | RecordFormatArg::Dets) => {
-            run_convert_zero_one(args, stdin, stdout)
-        }
-        (RecordFormatArg::Stim, RecordFormatArg::Stim) => run_convert_stim(args, stdin, stdout),
-        _ => Err(CliError::UnsupportedConversion),
-    }
-}
-
-fn run_convert_zero_one<R, W>(
-    args: ConvertArgs,
-    stdin: &mut R,
-    stdout: &mut W,
-) -> Result<(), CliError>
-where
-    R: Read,
-    W: Write,
-{
-    if args.out_format == RecordFormatArg::Dets && typed_record_width(&args)? == 0 {
-        return Err(CliError::MissingRecordTypesForDets);
-    }
-    let width = convert_record_width(&args)?;
-    let input = read_limited_input(
-        args.input.as_ref(),
-        stdin,
-        MAX_CONVERT_INPUT_BYTES,
-        "convert input",
-    )?;
-    let records = parse_zero_one_records(&input, width)?;
-    let output = match args.out_format {
-        RecordFormatArg::ZeroOne => write_zero_one_records(&records),
-        RecordFormatArg::Dets => write_dets_records(&records, &args),
-        RecordFormatArg::B8
-        | RecordFormatArg::R8
-        | RecordFormatArg::Ptb64
-        | RecordFormatArg::Hits
-        | RecordFormatArg::Stim => {
-            return Err(CliError::UnsupportedConversion);
-        }
-    };
-    write_output(args.output.as_ref(), stdout, output.as_bytes())
-}
-
-fn run_convert_stim<R, W>(args: ConvertArgs, stdin: &mut R, stdout: &mut W) -> Result<(), CliError>
-where
-    R: Read,
-    W: Write,
-{
-    let input = read_limited_input(
-        args.input.as_ref(),
-        stdin,
-        MAX_CONVERT_INPUT_BYTES,
-        "convert input",
-    )?;
-    let text = std::str::from_utf8(&input).map_err(|_| CliError::InvalidUtf8Input)?;
-    let circuit = Circuit::from_stim_str(text)?;
-    let output = circuit.to_stim_string();
-    write_output(args.output.as_ref(), stdout, output.as_bytes())
-}
-
-fn convert_record_width(args: &ConvertArgs) -> Result<usize, CliError> {
-    let typed_width = typed_record_width(args)?;
-    if typed_width > 0 {
-        Ok(typed_width)
-    } else if args.bits_per_shot > 0 {
-        Ok(args.bits_per_shot)
-    } else {
-        Err(CliError::MissingRecordWidth)
-    }
-}
-
-fn typed_record_width(args: &ConvertArgs) -> Result<usize, CliError> {
-    args.num_measurements
-        .checked_add(args.num_detectors)
-        .and_then(|value| value.checked_add(args.num_observables))
-        .ok_or(CliError::MeasurementCountOverflow)
-}
-
 pub(crate) fn write_output<W>(
     path: Option<&PathBuf>,
     stdout: &mut W,
@@ -779,81 +697,6 @@ where
         })
     } else {
         stdout.write_all(output).map_err(CliError::WriteOutput)
-    }
-}
-
-fn parse_zero_one_records(input: &[u8], width: usize) -> Result<Vec<Vec<bool>>, CliError> {
-    let text = std::str::from_utf8(input).map_err(|_| CliError::InvalidUtf8Input)?;
-    let mut records = Vec::new();
-    for (line_index, raw_line) in text.lines().enumerate() {
-        let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
-        let line_number = line_index
-            .checked_add(1)
-            .ok_or(CliError::MeasurementCountOverflow)?;
-        let mut record = Vec::with_capacity(width);
-        for character in line.chars() {
-            match character {
-                '0' => record.push(false),
-                '1' => record.push(true),
-                _ => {
-                    return Err(CliError::InvalidZeroOneCharacter {
-                        line: line_number,
-                        character,
-                    });
-                }
-            }
-        }
-        if record.len() != width {
-            return Err(CliError::RecordWidthMismatch {
-                line: line_number,
-                actual: record.len(),
-                expected: width,
-            });
-        }
-        records.push(record);
-    }
-    Ok(records)
-}
-
-fn write_zero_one_records(records: &[Vec<bool>]) -> String {
-    let mut out = String::new();
-    for record in records {
-        for bit in record {
-            out.push(if *bit { '1' } else { '0' });
-        }
-        out.push('\n');
-    }
-    out
-}
-
-fn write_dets_records(records: &[Vec<bool>], args: &ConvertArgs) -> String {
-    let mut out = String::new();
-    for record in records {
-        out.push_str("shot");
-        let mut offset = 0usize;
-        write_dets_record_type(&mut out, record, offset, args.num_measurements, 'M');
-        offset += args.num_measurements;
-        write_dets_record_type(&mut out, record, offset, args.num_detectors, 'D');
-        offset += args.num_detectors;
-        write_dets_record_type(&mut out, record, offset, args.num_observables, 'L');
-        out.push('\n');
-    }
-    out
-}
-
-fn write_dets_record_type(
-    out: &mut String,
-    record: &[bool],
-    offset: usize,
-    count: usize,
-    prefix: char,
-) {
-    for index in 0..count {
-        if record.get(offset + index).copied().unwrap_or(false) {
-            out.push(' ');
-            out.push(prefix);
-            out.push_str(&index.to_string());
-        }
     }
 }
 

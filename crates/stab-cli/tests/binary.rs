@@ -15,5 +15,6 @@ fn stab_binary_is_invokable_with_stable_help_name() {
     assert!(output.status.success());
     assert_eq!(String::from_utf8(output.stderr).expect("stderr"), "");
     let stdout = String::from_utf8(output.stdout).expect("stdout");
-    assert!(stdout.contains("Usage: stab [COMMAND]"));
+    assert!(stdout.contains("Available stab commands"));
+    assert!(stdout.contains("stab convert"));
 }
