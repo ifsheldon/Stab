@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::str::Lines;
 
 use crate::gate::{ArgRule, TargetGroupKind};
 use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
@@ -464,41 +465,39 @@ impl Display for Circuit {
 }
 
 struct Parser<'a> {
-    lines: Vec<&'a str>,
-    index: usize,
+    lines: Lines<'a>,
+    line_number: usize,
+    top_level_capacity: usize,
 }
 
 impl<'a> Parser<'a> {
     fn new(input: &'a str) -> Self {
         Self {
-            lines: input.lines().collect(),
-            index: 0,
+            lines: input.lines(),
+            line_number: 0,
+            top_level_capacity: top_level_item_capacity(input),
         }
     }
 
     fn parse(mut self) -> CircuitResult<Circuit> {
-        if self.lines.len() > MAX_CIRCUIT_PARSE_LINES {
-            return Err(CircuitError::parse_line(
-                MAX_CIRCUIT_PARSE_LINES.saturating_add(1),
-                format!("circuit input has more than {MAX_CIRCUIT_PARSE_LINES} lines"),
-            ));
-        }
-        let circuit = self.parse_block(false, 0)?;
-        if self.index < self.lines.len() {
-            return Err(CircuitError::UnexpectedRepeatTerminator);
-        }
-        Ok(circuit)
+        self.parse_block(false, 0)
     }
 
     fn parse_block(&mut self, stop_on_terminator: bool, depth: usize) -> CircuitResult<Circuit> {
         let mut circuit = if stop_on_terminator {
             Circuit::new()
         } else {
-            Circuit::with_capacity(self.lines.len().saturating_sub(self.index))
+            Circuit::with_capacity(self.top_level_capacity)
         };
-        while let Some(raw_line) = self.lines.get(self.index).copied() {
-            let line_number = self.index + 1;
-            self.index += 1;
+        while let Some(raw_line) = self.lines.next() {
+            self.line_number += 1;
+            let line_number = self.line_number;
+            if line_number > MAX_CIRCUIT_PARSE_LINES {
+                return Err(CircuitError::parse_line(
+                    line_number,
+                    format!("circuit input has more than {MAX_CIRCUIT_PARSE_LINES} lines"),
+                ));
+            }
             let Some(line) = strip_comment(raw_line) else {
                 continue;
             };
@@ -567,7 +566,15 @@ impl<'a> Parser<'a> {
     }
 }
 
+fn top_level_item_capacity(input: &str) -> usize {
+    let newline_count = input.bytes().filter(|byte| *byte == b'\n').count();
+    newline_count + usize::from(!input.is_empty() && !input.ends_with('\n'))
+}
+
 fn parse_instruction(line_number: usize, line: &str) -> CircuitResult<CircuitInstruction> {
+    if let Some(instruction) = parse_common_plain_instruction(line_number, line) {
+        return instruction;
+    }
     let (name, rest) = parse_name(line_number, line)?;
     if let Some(instruction) = parse_simple_plain_instruction(line_number, name, rest) {
         return instruction;
@@ -581,6 +588,99 @@ fn parse_instruction(line_number: usize, line: &str) -> CircuitResult<CircuitIns
     Ok(CircuitInstruction::from_validated_parts(
         gate, args, targets, tag,
     ))
+}
+
+fn parse_common_plain_instruction(
+    line_number: usize,
+    line: &str,
+) -> Option<CircuitResult<CircuitInstruction>> {
+    if let Some(rest) = line.strip_prefix("H ") {
+        return parse_common_single_qubit_instruction(line_number, Gate::plain_h(), rest);
+    }
+    if let Some(rest) = line.strip_prefix("M ").or_else(|| line.strip_prefix("MZ ")) {
+        return parse_common_single_qubit_instruction(line_number, Gate::plain_m(), rest);
+    }
+    if let Some(rest) = line
+        .strip_prefix("CX ")
+        .or_else(|| line.strip_prefix("CNOT "))
+    {
+        return parse_common_pair_instruction(line_number, Gate::plain_cx(), rest);
+    }
+    None
+}
+
+fn parse_common_single_qubit_instruction(
+    line_number: usize,
+    gate: Gate,
+    rest: &str,
+) -> Option<CircuitResult<CircuitInstruction>> {
+    let target = match parse_common_qubit_id(rest) {
+        Ok(Some(target)) => target,
+        Ok(None) => return None,
+        Err(error) => return Some(Err(wrap_line(line_number, error))),
+    };
+    let mut targets = TargetVec::new();
+    targets.push(Target::qubit(target, false));
+    Some(Ok(CircuitInstruction::from_validated_parts(
+        gate,
+        Vec::new(),
+        targets,
+        None,
+    )))
+}
+
+fn parse_common_pair_instruction(
+    line_number: usize,
+    gate: Gate,
+    rest: &str,
+) -> Option<CircuitResult<CircuitInstruction>> {
+    let (left, right) = rest.split_once(' ')?;
+    let left = match parse_common_qubit_id(left) {
+        Ok(Some(target)) => target,
+        Ok(None) => return None,
+        Err(error) => return Some(Err(wrap_line(line_number, error))),
+    };
+    let right = match parse_common_qubit_id(right) {
+        Ok(Some(target)) => target,
+        Ok(None) => return None,
+        Err(error) => return Some(Err(wrap_line(line_number, error))),
+    };
+    if left == right {
+        return Some(Err(wrap_line(
+            line_number,
+            CircuitError::InvalidTarget {
+                gate: gate.canonical_name(),
+                target: left.get().to_string(),
+            },
+        )));
+    }
+    let mut targets = TargetVec::new();
+    targets.push(Target::qubit(left, false));
+    targets.push(Target::qubit(right, false));
+    Some(Ok(CircuitInstruction::from_validated_parts(
+        gate,
+        Vec::new(),
+        targets,
+        None,
+    )))
+}
+
+fn parse_common_qubit_id(text: &str) -> CircuitResult<Option<crate::QubitId>> {
+    if text.is_empty() || !text.as_bytes().iter().all(u8::is_ascii_digit) {
+        return Ok(None);
+    }
+    let mut value = 0u32;
+    for byte in text.bytes() {
+        let digit = u32::from(byte - b'0');
+        value = value
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(digit))
+            .ok_or_else(|| CircuitError::invalid_domain_value("qubit target", text))?;
+        if value >= crate::ids::STIM_TARGET_VALUE_LIMIT {
+            return Err(CircuitError::invalid_domain_value("qubit target", text));
+        }
+    }
+    crate::QubitId::new(value).map(Some)
 }
 
 fn parse_simple_plain_instruction(

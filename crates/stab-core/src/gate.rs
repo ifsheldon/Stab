@@ -43,6 +43,33 @@ impl Gate {
     }
 
     #[inline]
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
+    )]
+    pub(crate) fn plain_h() -> Self {
+        Self { info: &GATES[25] }
+    }
+
+    #[inline]
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
+    )]
+    pub(crate) fn plain_m() -> Self {
+        Self { info: &GATES[9] }
+    }
+
+    #[inline]
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
+    )]
+    pub(crate) fn plain_cx() -> Self {
+        Self { info: &GATES[22] }
+    }
+
+    #[inline]
     pub fn canonical_name(self) -> &'static str {
         self.info.name
     }
