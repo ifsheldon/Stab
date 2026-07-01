@@ -14,6 +14,7 @@ pub(crate) struct AllocationTrackingGuard {
 pub(crate) struct TrackedMemoryMeasurement {
     pub(crate) allocation: Option<AllocationMeasurement>,
     pub(crate) resident_bytes_max: Option<u64>,
+    pub(crate) resident_delta_bytes_max: Option<u64>,
 }
 
 impl AllocationTrackingGuard {
@@ -41,9 +42,13 @@ pub(crate) fn measure_tracked_memory(
     let before_resident = current_resident_bytes();
     let allocation = measure_allocations_enabled(&mut operation)?;
     let after_resident = current_resident_bytes();
+    let resident_delta_bytes_max = before_resident
+        .zip(after_resident)
+        .map(|(before, after)| after.saturating_sub(before));
     Ok(TrackedMemoryMeasurement {
         allocation,
         resident_bytes_max: before_resident.into_iter().chain(after_resident).max(),
+        resident_delta_bytes_max,
     })
 }
 

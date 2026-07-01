@@ -513,7 +513,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(thresholds.schema_version, 2);
-        assert_eq!(thresholds.rows.len(), 79);
+        assert_eq!(thresholds.rows.len(), 80);
         assert!(thresholds.rows.iter().all(|row| {
             row.max_relative_ratio == Some(1.25)
                 || row
@@ -553,6 +553,7 @@ mod tests {
             stab_allocation_count_max: None,
             stab_allocation_bytes_max: None,
             stab_resident_bytes_max: None,
+            stab_resident_delta_bytes_max: None,
             pass_fail_status: "not-comparable".to_string(),
             beta_gate_status: "not-checked".to_string(),
             beta_gate_waiver_reason: None,
@@ -563,6 +564,8 @@ mod tests {
             memory_gate_allowed_bytes_max: None,
             memory_gate_baseline_resident_bytes_max: None,
             memory_gate_allowed_resident_bytes_max: None,
+            memory_gate_baseline_resident_delta_bytes_max: None,
+            memory_gate_allowed_resident_delta_bytes_max: None,
             memory_gate_error: None,
             regression_threshold_status: "not-configured".to_string(),
             regression_threshold_max_ratio: None,
@@ -600,6 +603,7 @@ mod tests {
             variance_seconds: None,
             allocation: None,
             resident_bytes: None,
+            resident_delta_bytes: None,
             iterations: None,
         }
     }

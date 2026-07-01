@@ -579,6 +579,7 @@ fn measure_sparse_xor_items(
         variance_seconds,
         allocation: tracked_memory.allocation,
         resident_bytes: tracked_memory.resident_bytes_max,
+        resident_delta_bytes: tracked_memory.resident_delta_bytes_max,
         iterations: Some(STAB_COMPARE_ITERATIONS),
     })
 }
@@ -718,6 +719,7 @@ fn measure_stab_iterations(
         variance_seconds,
         allocation: tracked_memory.allocation,
         resident_bytes: tracked_memory.resident_bytes_max,
+        resident_delta_bytes: tracked_memory.resident_delta_bytes_max,
         iterations: Some(iterations),
     })
 }
@@ -762,6 +764,7 @@ fn measure_stab_batched_iterations(
         variance_seconds,
         allocation: tracked_memory.allocation,
         resident_bytes: tracked_memory.resident_bytes_max,
+        resident_delta_bytes: tracked_memory.resident_delta_bytes_max,
         iterations: Some(iterations),
     })
 }
@@ -1076,6 +1079,7 @@ fn run_stim_cli_row(
             variance_seconds,
             allocation: None,
             resident_bytes: None,
+            resident_delta_bytes: None,
             iterations: Some(iterations),
         }],
     })
@@ -1101,6 +1105,7 @@ fn parse_stim_perf_line(line: &str) -> Option<Measurement> {
         variance_seconds: None,
         allocation: None,
         resident_bytes: None,
+        resident_delta_bytes: None,
         iterations: None,
     })
 }

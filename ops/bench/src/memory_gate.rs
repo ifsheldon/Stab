@@ -7,6 +7,8 @@ use crate::error::BenchError;
 use crate::manifest::is_safe_benchmark_id;
 use crate::report::CompareRowResult;
 
+const RESIDENT_DELTA_ABSOLUTE_SLACK_BYTES: u64 = 64 * 1024;
+
 #[derive(Clone, Debug, Deserialize)]
 struct MemoryBaselineReport {
     schema_version: u32,
@@ -18,6 +20,8 @@ struct MemoryBaselineRow {
     id: String,
     stab_allocation_bytes_max: Option<u64>,
     stab_resident_bytes_max: Option<u64>,
+    #[serde(default)]
+    stab_resident_delta_bytes_max: Option<u64>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -45,15 +49,16 @@ pub(crate) fn read_memory_baseline(path: &Path) -> Result<MemoryBaseline, BenchE
 
 #[derive(Clone, Debug)]
 pub(crate) struct MemoryBaseline {
+    schema_version: u32,
     rows: Vec<MemoryBaselineRow>,
 }
 
 impl MemoryBaseline {
     fn from_report(report: MemoryBaselineReport) -> Result<Self, String> {
         let mut violations = Vec::new();
-        if report.schema_version != 1 {
+        if !matches!(report.schema_version, 1 | 2) {
             violations.push(format!(
-                "memory baseline schema_version={} expected 1",
+                "memory baseline schema_version={} expected 1 or 2",
                 report.schema_version
             ));
         }
@@ -70,7 +75,10 @@ impl MemoryBaseline {
         if !violations.is_empty() {
             return Err(violations.join("\n"));
         }
-        Ok(Self { rows: report.rows })
+        Ok(Self {
+            schema_version: report.schema_version,
+            rows: report.rows,
+        })
     }
 
     fn row(&self, id: &str) -> Option<&MemoryBaselineRow> {
@@ -108,33 +116,19 @@ pub(crate) fn apply_memory_gate(
             findings.blockers.push(format!("{}: {message}", row.id));
             continue;
         };
-        let Some(baseline_resident_bytes) = baseline_row.stab_resident_bytes_max else {
-            let message = "memory baseline row has no resident byte maximum".to_string();
-            row.memory_gate_status = "missing-baseline-resident".to_string();
-            row.memory_gate_error = Some(message.clone());
-            findings.blockers.push(format!("{}: {message}", row.id));
-            continue;
-        };
-        row.memory_gate_baseline_resident_bytes_max = Some(baseline_resident_bytes);
-        let allowed_resident_bytes = allowed_memory_bytes(baseline_resident_bytes);
-        row.memory_gate_allowed_resident_bytes_max = Some(allowed_resident_bytes);
-        let Some(current_resident_bytes) = row.stab_resident_bytes_max else {
-            let message = "current row has no resident byte maximum".to_string();
-            row.memory_gate_status = "missing-current-resident".to_string();
-            row.memory_gate_error = Some(message.clone());
-            findings.blockers.push(format!("{}: {message}", row.id));
-            continue;
-        };
         let mut row_blockers = Vec::new();
         if current_bytes > allowed_bytes {
             row_blockers.push(format!(
                 "allocation bytes {current_bytes} exceeds memory gate limit {allowed_bytes} from baseline {baseline_bytes}"
             ));
         }
-        if current_resident_bytes > allowed_resident_bytes {
-            row_blockers.push(format!(
-                "resident bytes {current_resident_bytes} exceeds memory gate limit {allowed_resident_bytes} from baseline {baseline_resident_bytes}"
-            ));
+        match baseline.schema_version {
+            1 => apply_absolute_resident_gate(&mut row_blockers, row, baseline_row, &mut findings),
+            2 => apply_resident_delta_gate(&mut row_blockers, row, baseline_row, &mut findings),
+            _ => unreachable!("memory baseline validation rejects unsupported schema"),
+        }
+        if row.memory_gate_error.is_some() {
+            continue;
         }
         if row_blockers.is_empty() {
             row.memory_gate_status = "pass".to_string();
@@ -148,8 +142,73 @@ pub(crate) fn apply_memory_gate(
     findings
 }
 
+fn apply_absolute_resident_gate(
+    row_blockers: &mut Vec<String>,
+    row: &mut CompareRowResult,
+    baseline_row: &MemoryBaselineRow,
+    findings: &mut MemoryGateFindings,
+) {
+    let Some(baseline_resident_bytes) = baseline_row.stab_resident_bytes_max else {
+        let message = "memory baseline row has no resident byte maximum".to_string();
+        row.memory_gate_status = "missing-baseline-resident".to_string();
+        row.memory_gate_error = Some(message.clone());
+        findings.blockers.push(format!("{}: {message}", row.id));
+        return;
+    };
+    row.memory_gate_baseline_resident_bytes_max = Some(baseline_resident_bytes);
+    let allowed_resident_bytes = allowed_memory_bytes(baseline_resident_bytes);
+    row.memory_gate_allowed_resident_bytes_max = Some(allowed_resident_bytes);
+    let Some(current_resident_bytes) = row.stab_resident_bytes_max else {
+        let message = "current row has no resident byte maximum".to_string();
+        row.memory_gate_status = "missing-current-resident".to_string();
+        row.memory_gate_error = Some(message.clone());
+        findings.blockers.push(format!("{}: {message}", row.id));
+        return;
+    };
+    if current_resident_bytes > allowed_resident_bytes {
+        row_blockers.push(format!(
+            "resident bytes {current_resident_bytes} exceeds memory gate limit {allowed_resident_bytes} from baseline {baseline_resident_bytes}"
+        ));
+    }
+}
+
+fn apply_resident_delta_gate(
+    row_blockers: &mut Vec<String>,
+    row: &mut CompareRowResult,
+    baseline_row: &MemoryBaselineRow,
+    findings: &mut MemoryGateFindings,
+) {
+    row.memory_gate_baseline_resident_bytes_max = baseline_row.stab_resident_bytes_max;
+    let Some(baseline_delta_bytes) = baseline_row.stab_resident_delta_bytes_max else {
+        let message = "memory baseline row has no resident delta byte maximum".to_string();
+        row.memory_gate_status = "missing-baseline-resident-delta".to_string();
+        row.memory_gate_error = Some(message.clone());
+        findings.blockers.push(format!("{}: {message}", row.id));
+        return;
+    };
+    row.memory_gate_baseline_resident_delta_bytes_max = Some(baseline_delta_bytes);
+    let allowed_delta_bytes = allowed_resident_delta_bytes(baseline_delta_bytes);
+    row.memory_gate_allowed_resident_delta_bytes_max = Some(allowed_delta_bytes);
+    let Some(current_delta_bytes) = row.stab_resident_delta_bytes_max else {
+        let message = "current row has no resident delta byte maximum".to_string();
+        row.memory_gate_status = "missing-current-resident-delta".to_string();
+        row.memory_gate_error = Some(message.clone());
+        findings.blockers.push(format!("{}: {message}", row.id));
+        return;
+    };
+    if current_delta_bytes > allowed_delta_bytes {
+        row_blockers.push(format!(
+            "resident delta bytes {current_delta_bytes} exceeds memory gate limit {allowed_delta_bytes} from baseline {baseline_delta_bytes}"
+        ));
+    }
+}
+
 fn allowed_memory_bytes(baseline_bytes: u64) -> u64 {
     baseline_bytes.saturating_add(baseline_bytes / 4)
+}
+
+fn allowed_resident_delta_bytes(baseline_bytes: u64) -> u64 {
+    baseline_bytes.saturating_add((baseline_bytes / 4).max(RESIDENT_DELTA_ABSOLUTE_SLACK_BYTES))
 }
 
 #[cfg(test)]
@@ -247,9 +306,62 @@ mod tests {
     }
 
     #[test]
+    fn memory_gate_v2_uses_resident_delta_instead_of_absolute_resident_bytes() {
+        let baseline = MemoryBaseline::from_report(MemoryBaselineReport {
+            schema_version: 2,
+            rows: vec![
+                baseline_row_with_delta("absolute-drift-row", Some(100), Some(1000), Some(10)),
+                baseline_row_with_delta("delta-fail-row", Some(100), Some(1000), Some(10)),
+                baseline_row_with_delta("missing-delta-row", Some(100), Some(1000), Some(10)),
+                baseline_row_with_delta("missing-baseline-delta-row", Some(100), Some(1000), None),
+            ],
+        })
+        .expect("baseline");
+        let mut rows = vec![
+            row_with_delta("absolute-drift-row", Some(125), Some(10_000), Some(12)),
+            row_with_delta("delta-fail-row", Some(125), Some(1000), Some(70_000)),
+            row_with_delta("missing-delta-row", Some(125), Some(1000), None),
+            row_with_delta("missing-baseline-delta-row", Some(125), Some(1000), Some(1)),
+        ];
+
+        let findings = apply_memory_gate(&mut rows, &baseline);
+
+        assert_eq!(rows.first().expect("drift row").memory_gate_status, "pass");
+        assert_eq!(
+            rows.first()
+                .expect("drift row")
+                .memory_gate_baseline_resident_delta_bytes_max,
+            Some(10)
+        );
+        assert_eq!(
+            rows.first()
+                .expect("drift row")
+                .memory_gate_allowed_resident_delta_bytes_max,
+            Some(65_546)
+        );
+        assert_eq!(rows.get(1).expect("delta fail").memory_gate_status, "fail");
+        assert_eq!(
+            rows.get(2).expect("missing current").memory_gate_status,
+            "missing-current-resident-delta"
+        );
+        assert_eq!(
+            rows.get(3).expect("missing baseline").memory_gate_status,
+            "missing-baseline-resident-delta"
+        );
+        assert_eq!(
+            findings.blockers,
+            vec![
+                "delta-fail-row: resident delta bytes 70000 exceeds memory gate limit 65546 from baseline 10",
+                "missing-delta-row: current row has no resident delta byte maximum",
+                "missing-baseline-delta-row: memory baseline row has no resident delta byte maximum",
+            ]
+        );
+    }
+
+    #[test]
     fn memory_gate_rejects_unsupported_baseline_schema() {
         let error = MemoryBaseline::from_report(MemoryBaselineReport {
-            schema_version: 2,
+            schema_version: 3,
             rows: Vec::new(),
         })
         .expect_err("reject unsupported schema");
@@ -257,7 +369,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("memory baseline schema_version=2 expected 1")
+                .contains("memory baseline schema_version=3 expected 1 or 2")
         );
     }
 
@@ -322,12 +434,14 @@ mod tests {
         let baseline = super::read_memory_baseline(&path).expect("read M12 memory baseline");
 
         assert_eq!(baseline.rows.len(), 85);
+        assert_eq!(baseline.schema_version, 2);
         assert!(
             baseline
                 .rows
                 .iter()
                 .all(|row| row.stab_allocation_bytes_max.is_some()
-                    && row.stab_resident_bytes_max.is_some())
+                    && row.stab_resident_bytes_max.is_some()
+                    && row.stab_resident_delta_bytes_max.is_some())
         );
     }
 
@@ -336,10 +450,20 @@ mod tests {
         allocation_bytes: Option<u64>,
         resident_bytes: Option<u64>,
     ) -> super::MemoryBaselineRow {
+        baseline_row_with_delta(id, allocation_bytes, resident_bytes, None)
+    }
+
+    fn baseline_row_with_delta(
+        id: &str,
+        allocation_bytes: Option<u64>,
+        resident_bytes: Option<u64>,
+        resident_delta_bytes: Option<u64>,
+    ) -> super::MemoryBaselineRow {
         super::MemoryBaselineRow {
             id: id.to_string(),
             stab_allocation_bytes_max: allocation_bytes,
             stab_resident_bytes_max: resident_bytes,
+            stab_resident_delta_bytes_max: resident_delta_bytes,
         }
     }
 
@@ -347,6 +471,15 @@ mod tests {
         id: &str,
         allocation_bytes: Option<u64>,
         resident_bytes: Option<u64>,
+    ) -> CompareRowResult {
+        row_with_delta(id, allocation_bytes, resident_bytes, None)
+    }
+
+    fn row_with_delta(
+        id: &str,
+        allocation_bytes: Option<u64>,
+        resident_bytes: Option<u64>,
+        resident_delta_bytes: Option<u64>,
     ) -> CompareRowResult {
         CompareRowResult {
             id: id.to_string(),
@@ -370,6 +503,7 @@ mod tests {
             stab_allocation_count_max: None,
             stab_allocation_bytes_max: allocation_bytes,
             stab_resident_bytes_max: resident_bytes,
+            stab_resident_delta_bytes_max: resident_delta_bytes,
             pass_fail_status: "not-comparable".to_string(),
             beta_gate_status: "not-checked".to_string(),
             beta_gate_waiver_reason: None,
@@ -380,6 +514,8 @@ mod tests {
             memory_gate_allowed_bytes_max: None,
             memory_gate_baseline_resident_bytes_max: None,
             memory_gate_allowed_resident_bytes_max: None,
+            memory_gate_baseline_resident_delta_bytes_max: None,
+            memory_gate_allowed_resident_delta_bytes_max: None,
             memory_gate_error: None,
             regression_threshold_status: "not-configured".to_string(),
             regression_threshold_max_ratio: None,

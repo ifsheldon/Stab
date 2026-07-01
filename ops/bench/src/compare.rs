@@ -543,6 +543,7 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
     let stab_allocation_count_max = max_stab_allocation_count(&stab_measurements);
     let stab_allocation_bytes_max = max_stab_allocation_bytes(&stab_measurements);
     let stab_resident_bytes_max = max_stab_resident_bytes(&stab_measurements);
+    let stab_resident_delta_bytes_max = max_stab_resident_delta_bytes(&stab_measurements);
     CompareRowResult {
         id: row.id.clone(),
         milestone: row.milestone,
@@ -565,6 +566,7 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         stab_allocation_count_max,
         stab_allocation_bytes_max,
         stab_resident_bytes_max,
+        stab_resident_delta_bytes_max,
         pass_fail_status: compare_pass_fail_status(status, baseline_status, relative_ratio),
         beta_gate_status: "not-checked".to_string(),
         beta_gate_waiver_reason: None,
@@ -575,6 +577,8 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         memory_gate_allowed_bytes_max: None,
         memory_gate_baseline_resident_bytes_max: None,
         memory_gate_allowed_resident_bytes_max: None,
+        memory_gate_baseline_resident_delta_bytes_max: None,
+        memory_gate_allowed_resident_delta_bytes_max: None,
         memory_gate_error: None,
         regression_threshold_status: "not-configured".to_string(),
         regression_threshold_max_ratio: None,
@@ -615,6 +619,13 @@ fn max_stab_resident_bytes(measurements: &[Measurement]) -> Option<u64> {
     measurements
         .iter()
         .filter_map(|measurement| measurement.resident_bytes)
+        .max()
+}
+
+fn max_stab_resident_delta_bytes(measurements: &[Measurement]) -> Option<u64> {
+    measurements
+        .iter()
+        .filter_map(|measurement| measurement.resident_delta_bytes)
         .max()
 }
 
@@ -890,6 +901,7 @@ mod tests {
                     bytes_max: 2048,
                 }),
                 resident_bytes: Some(8192),
+                resident_delta_bytes: None,
                 iterations: Some(1),
             }],
             baseline_status: BaselineCompareStatus::Comparable,
@@ -1030,6 +1042,7 @@ mod tests {
                 variance_seconds: None,
                 allocation: None,
                 resident_bytes: None,
+                resident_delta_bytes: None,
                 iterations: None,
             }]
         });
@@ -1040,6 +1053,7 @@ mod tests {
                 variance_seconds: Some(0.0),
                 allocation: None,
                 resident_bytes: None,
+                resident_delta_bytes: None,
                 iterations: Some(1),
             }]
         });
@@ -1086,6 +1100,7 @@ mod tests {
             variance_seconds: None,
             allocation: None,
             resident_bytes: None,
+            resident_delta_bytes: None,
             iterations,
         }
     }

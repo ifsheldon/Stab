@@ -1,90 +1,515 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "rows": [
-    { "id": "m4-circuit-parse", "stab_allocation_bytes_max": 377536, "stab_resident_bytes_max": 4571136 },
-    { "id": "m4-circuit-canonical-print", "stab_allocation_bytes_max": 200, "stab_resident_bytes_max": 4636672 },
-    { "id": "m9-convert-measurements-dets", "stab_allocation_bytes_max": 88081, "stab_resident_bytes_max": 4771840 },
-    { "id": "m4-gate-lookup", "stab_allocation_bytes_max": 24, "stab_resident_bytes_max": 4771840 },
-    { "id": "m8-probability-util", "stab_allocation_bytes_max": 0, "stab_resident_bytes_max": 4968448 },
-    { "id": "m5-simd-bit-table", "stab_allocation_bytes_max": 4096, "stab_resident_bytes_max": 4968448 },
-    { "id": "m5-simd-bits", "stab_allocation_bytes_max": 1256, "stab_resident_bytes_max": 4968448 },
-    { "id": "m5-simd-word", "stab_allocation_bytes_max": 0, "stab_resident_bytes_max": 4976640 },
-    { "id": "m5-sparse-xor", "stab_allocation_bytes_max": 0, "stab_resident_bytes_max": 4980736 },
-    { "id": "m6-clifford-string", "stab_allocation_bytes_max": 0, "stab_resident_bytes_max": 4980736 },
-    { "id": "m6-pauli-string", "stab_allocation_bytes_max": 0, "stab_resident_bytes_max": 5132288 },
-    { "id": "m6-pauli-iter", "stab_allocation_bytes_max": 296, "stab_resident_bytes_max": 4739072 },
-    { "id": "m6-tableau", "stab_allocation_bytes_max": 17808, "stab_resident_bytes_max": 4804608 },
-    { "id": "m6-tableau-iter", "stab_allocation_bytes_max": 2456, "stab_resident_bytes_max": 4804608 },
-    { "id": "m6-stabilizers-to-tableau", "stab_allocation_bytes_max": 7264, "stab_resident_bytes_max": 4804608 },
-    { "id": "m7-cli-dispatch", "stab_allocation_bytes_max": 81286, "stab_resident_bytes_max": 4804608 },
-    { "id": "m7-convert-stim-canonical", "stab_allocation_bytes_max": 83158, "stab_resident_bytes_max": 4804608 },
-    { "id": "m7-convert-01-to-b8", "stab_allocation_bytes_max": 1802240, "stab_resident_bytes_max": 7000064 },
-    { "id": "m7-convert-b8-to-01", "stab_allocation_bytes_max": 1810432, "stab_resident_bytes_max": 7720960 },
-    { "id": "m7-convert-b8-to-b8-wide", "stab_allocation_bytes_max": 12681216, "stab_resident_bytes_max": 7319552 },
-    { "id": "m7-convert-dets-to-b8", "stab_allocation_bytes_max": 532480, "stab_resident_bytes_max": 7385088 },
-    { "id": "m7-convert-b8-to-dets", "stab_allocation_bytes_max": 1605632, "stab_resident_bytes_max": 8687616 },
-    { "id": "m7-convert-ptb64-to-01", "stab_allocation_bytes_max": 1810432, "stab_resident_bytes_max": 8843264 },
-    { "id": "m7-convert-01-to-ptb64", "stab_allocation_bytes_max": 1802240, "stab_resident_bytes_max": 8847360 },
-    { "id": "m7-convert-circuit-dl-obs-out", "stab_allocation_bytes_max": 1970445, "stab_resident_bytes_max": 9351168 },
-    { "id": "m7-convert-dem-dets-to-01", "stab_allocation_bytes_max": 1056833, "stab_resident_bytes_max": 9351168 },
-    { "id": "m7-gen-repetition-d3-r3", "stab_allocation_bytes_max": 4388, "stab_resident_bytes_max": 9351168 },
-    { "id": "m7-gen-repetition-d3-r30", "stab_allocation_bytes_max": 4388, "stab_resident_bytes_max": 9351168 },
-    { "id": "m7-gen-repetition-d5-r5", "stab_allocation_bytes_max": 7460, "stab_resident_bytes_max": 9351168 },
-    { "id": "m7-gen-repetition-d5-r50", "stab_allocation_bytes_max": 7460, "stab_resident_bytes_max": 9351168 },
-    { "id": "m7-gen-repetition-d9-r9", "stab_allocation_bytes_max": 8244, "stab_resident_bytes_max": 9351168 },
-    { "id": "m7-gen-repetition-d9-r90", "stab_allocation_bytes_max": 8244, "stab_resident_bytes_max": 9351168 },
-    { "id": "m7-gen-repetition-d17-r17", "stab_allocation_bytes_max": 16596, "stab_resident_bytes_max": 9351168 },
-    { "id": "m7-gen-repetition-d17-r170", "stab_allocation_bytes_max": 16596, "stab_resident_bytes_max": 9351168 },
-    { "id": "m7-gen-rotated-surface-d3-r3", "stab_allocation_bytes_max": 18304, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-rotated-surface-d3-r30", "stab_allocation_bytes_max": 18304, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-rotated-surface-d5-r5", "stab_allocation_bytes_max": 44608, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-rotated-surface-d5-r50", "stab_allocation_bytes_max": 44608, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-rotated-surface-d9-r9", "stab_allocation_bytes_max": 155272, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-rotated-surface-d9-r90", "stab_allocation_bytes_max": 155272, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-rotated-surface-d17-r17", "stab_allocation_bytes_max": 492416, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-rotated-surface-d17-r170", "stab_allocation_bytes_max": 492416, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-unrotated-surface-d3-r3", "stab_allocation_bytes_max": 21904, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-unrotated-surface-d3-r30", "stab_allocation_bytes_max": 21904, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-unrotated-surface-d5-r5", "stab_allocation_bytes_max": 77200, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-unrotated-surface-d5-r50", "stab_allocation_bytes_max": 77200, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-unrotated-surface-d9-r9", "stab_allocation_bytes_max": 229688, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-unrotated-surface-d9-r90", "stab_allocation_bytes_max": 229688, "stab_resident_bytes_max": 9416704 },
-    { "id": "m7-gen-color-d5-r5", "stab_allocation_bytes_max": 26944, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-measure-reader-01", "stab_allocation_bytes_max": 10096, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-measure-reader-b8", "stab_allocation_bytes_max": 10096, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-measure-reader-r8", "stab_allocation_bytes_max": 10096, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-measure-reader-hits", "stab_allocation_bytes_max": 10096, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-measure-reader-dets", "stab_allocation_bytes_max": 10096, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-measure-reader-ptb64-contract", "stab_allocation_bytes_max": 90000, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-frame-simulator", "stab_allocation_bytes_max": 14592, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-tableau-simulator", "stab_allocation_bytes_max": 1314, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-reference-sample-tree", "stab_allocation_bytes_max": 3122, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-sample-analysis-1shot", "stab_allocation_bytes_max": 608, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-sample-throughput-1024", "stab_allocation_bytes_max": 2048, "stab_resident_bytes_max": 9416704 },
-    { "id": "m8-sample-throughput-1000000", "stab_allocation_bytes_max": 2000000, "stab_resident_bytes_max": 9580544 },
-    { "id": "m8-sample-primary-repetition-contract", "stab_allocation_bytes_max": 1730, "stab_resident_bytes_max": 9580544 },
-    { "id": "m8-sample-primary-rotated-surface-contract", "stab_allocation_bytes_max": 4322, "stab_resident_bytes_max": 9580544 },
-    { "id": "m8-sample-primary-unrotated-surface-contract", "stab_allocation_bytes_max": 4370, "stab_resident_bytes_max": 9580544 },
-    { "id": "m8-sample-high-repeat-contract", "stab_allocation_bytes_max": 2128, "stab_resident_bytes_max": 9580544 },
-    { "id": "m9-detect-text-cli", "stab_allocation_bytes_max": 83681, "stab_resident_bytes_max": 9580544 },
-    { "id": "m9-detect-bitpacked-cli", "stab_allocation_bytes_max": 83681, "stab_resident_bytes_max": 9580544 },
-    { "id": "m9-detect-primary-matrix-contract", "stab_allocation_bytes_max": 12873, "stab_resident_bytes_max": 9580544 },
-    { "id": "m9-m2d-text-cli", "stab_allocation_bytes_max": 772, "stab_resident_bytes_max": 9580544 },
-    { "id": "m9-m2d-bitpacked-contract", "stab_allocation_bytes_max": 772, "stab_resident_bytes_max": 9580544 },
-    { "id": "m9-m2d-primary-matrix-contract", "stab_allocation_bytes_max": 9088, "stab_resident_bytes_max": 9580544 },
-    { "id": "m10-graphlike-search", "stab_allocation_bytes_max": 151000, "stab_resident_bytes_max": 9580544 },
-    { "id": "m10-error-analyzer", "stab_allocation_bytes_max": 704128, "stab_resident_bytes_max": 9580544 },
-    { "id": "m10-error-decomp", "stab_allocation_bytes_max": 0, "stab_resident_bytes_max": 9580544 },
-    { "id": "m10-analyze-errors-decompose-cli", "stab_allocation_bytes_max": 1456, "stab_resident_bytes_max": 9580544 },
-    { "id": "m10-analyze-errors-fold-cli", "stab_allocation_bytes_max": 1976, "stab_resident_bytes_max": 9580544 },
-    { "id": "m10-analyze-errors-high-repeat-contract", "stab_allocation_bytes_max": 1976, "stab_resident_bytes_max": 9580544 },
-    { "id": "m10-dem-parse-contract", "stab_allocation_bytes_max": 416, "stab_resident_bytes_max": 9580544 },
-    { "id": "m10-dem-print-contract", "stab_allocation_bytes_max": 27, "stab_resident_bytes_max": 9580544 },
-    { "id": "m11-dem-sampler", "stab_allocation_bytes_max": 181376, "stab_resident_bytes_max": 9580544 },
-    { "id": "m11-sample-dem-cli", "stab_allocation_bytes_max": 74913, "stab_resident_bytes_max": 9580544 },
-    { "id": "m11-sample-dem-sparse-contract", "stab_allocation_bytes_max": 183488, "stab_resident_bytes_max": 9580544 },
-    { "id": "m11-sample-dem-dense-contract", "stab_allocation_bytes_max": 12864, "stab_resident_bytes_max": 9580544 },
-    { "id": "m11-sample-dem-repeated-contract", "stab_allocation_bytes_max": 14464, "stab_resident_bytes_max": 9580544 },
-    { "id": "m11-sample-dem-high-detector-contract", "stab_allocation_bytes_max": 314432, "stab_resident_bytes_max": 9580544 }
+    {
+      "id": "m4-circuit-parse",
+      "stab_allocation_bytes_max": 377536,
+      "stab_resident_bytes_max": 4526080,
+      "stab_resident_delta_bytes_max": 28672
+    },
+    {
+      "id": "m4-circuit-canonical-print",
+      "stab_allocation_bytes_max": 200,
+      "stab_resident_bytes_max": 4591616,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m9-convert-measurements-dets",
+      "stab_allocation_bytes_max": 88093,
+      "stab_resident_bytes_max": 4857856,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m4-gate-lookup",
+      "stab_allocation_bytes_max": 24,
+      "stab_resident_bytes_max": 4857856,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-probability-util",
+      "stab_allocation_bytes_max": 0,
+      "stab_resident_bytes_max": 5054464,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m5-simd-bit-table",
+      "stab_allocation_bytes_max": 4096,
+      "stab_resident_bytes_max": 5054464,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m5-simd-bits",
+      "stab_allocation_bytes_max": 1256,
+      "stab_resident_bytes_max": 5054464,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m5-simd-word",
+      "stab_allocation_bytes_max": 0,
+      "stab_resident_bytes_max": 5058560,
+      "stab_resident_delta_bytes_max": 4096
+    },
+    {
+      "id": "m5-sparse-xor",
+      "stab_allocation_bytes_max": 0,
+      "stab_resident_bytes_max": 5062656,
+      "stab_resident_delta_bytes_max": 4096
+    },
+    {
+      "id": "m6-clifford-string",
+      "stab_allocation_bytes_max": 0,
+      "stab_resident_bytes_max": 5128192,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m6-pauli-string",
+      "stab_allocation_bytes_max": 0,
+      "stab_resident_bytes_max": 5287936,
+      "stab_resident_delta_bytes_max": 28672
+    },
+    {
+      "id": "m6-pauli-iter",
+      "stab_allocation_bytes_max": 296,
+      "stab_resident_bytes_max": 4890624,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m6-tableau",
+      "stab_allocation_bytes_max": 17808,
+      "stab_resident_bytes_max": 4890624,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m6-tableau-iter",
+      "stab_allocation_bytes_max": 2456,
+      "stab_resident_bytes_max": 4890624,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m6-stabilizers-to-tableau",
+      "stab_allocation_bytes_max": 7264,
+      "stab_resident_bytes_max": 4890624,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-cli-dispatch",
+      "stab_allocation_bytes_max": 87102,
+      "stab_resident_bytes_max": 4890624,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-convert-stim-canonical",
+      "stab_allocation_bytes_max": 84968,
+      "stab_resident_bytes_max": 4890624,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-convert-01-to-b8",
+      "stab_allocation_bytes_max": 1769616,
+      "stab_resident_bytes_max": 7081984,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-convert-b8-to-01",
+      "stab_allocation_bytes_max": 1546624,
+      "stab_resident_bytes_max": 7270400,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-convert-b8-to-b8-wide",
+      "stab_allocation_bytes_max": 3145728,
+      "stab_resident_bytes_max": 9826304,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-convert-dets-to-b8",
+      "stab_allocation_bytes_max": 514136,
+      "stab_resident_bytes_max": 9891840,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-convert-b8-to-dets",
+      "stab_allocation_bytes_max": 1319168,
+      "stab_resident_bytes_max": 9891840,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-convert-ptb64-to-01",
+      "stab_allocation_bytes_max": 1546624,
+      "stab_resident_bytes_max": 9891840,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-convert-01-to-ptb64",
+      "stab_allocation_bytes_max": 1780224,
+      "stab_resident_bytes_max": 9891840,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-convert-circuit-dl-obs-out",
+      "stab_allocation_bytes_max": 1706477,
+      "stab_resident_bytes_max": 10153984,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-convert-dem-dets-to-01",
+      "stab_allocation_bytes_max": 907545,
+      "stab_resident_bytes_max": 10153984,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-repetition-d3-r3",
+      "stab_allocation_bytes_max": 4388,
+      "stab_resident_bytes_max": 10153984,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-repetition-d3-r30",
+      "stab_allocation_bytes_max": 4388,
+      "stab_resident_bytes_max": 10153984,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-repetition-d5-r5",
+      "stab_allocation_bytes_max": 7460,
+      "stab_resident_bytes_max": 10153984,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-repetition-d5-r50",
+      "stab_allocation_bytes_max": 7460,
+      "stab_resident_bytes_max": 10153984,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-repetition-d9-r9",
+      "stab_allocation_bytes_max": 8244,
+      "stab_resident_bytes_max": 10153984,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-repetition-d9-r90",
+      "stab_allocation_bytes_max": 8244,
+      "stab_resident_bytes_max": 10153984,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-repetition-d17-r17",
+      "stab_allocation_bytes_max": 16596,
+      "stab_resident_bytes_max": 10153984,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-repetition-d17-r170",
+      "stab_allocation_bytes_max": 16596,
+      "stab_resident_bytes_max": 10153984,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-rotated-surface-d3-r3",
+      "stab_allocation_bytes_max": 18304,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-rotated-surface-d3-r30",
+      "stab_allocation_bytes_max": 18304,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-rotated-surface-d5-r5",
+      "stab_allocation_bytes_max": 44608,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-rotated-surface-d5-r50",
+      "stab_allocation_bytes_max": 44608,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-rotated-surface-d9-r9",
+      "stab_allocation_bytes_max": 155272,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-rotated-surface-d9-r90",
+      "stab_allocation_bytes_max": 155272,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-rotated-surface-d17-r17",
+      "stab_allocation_bytes_max": 492416,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-rotated-surface-d17-r170",
+      "stab_allocation_bytes_max": 492416,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d3-r3",
+      "stab_allocation_bytes_max": 21904,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d3-r30",
+      "stab_allocation_bytes_max": 21904,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d5-r5",
+      "stab_allocation_bytes_max": 77200,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d5-r50",
+      "stab_allocation_bytes_max": 77200,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d9-r9",
+      "stab_allocation_bytes_max": 229688,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-unrotated-surface-d9-r90",
+      "stab_allocation_bytes_max": 229688,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m7-gen-color-d5-r5",
+      "stab_allocation_bytes_max": 26944,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-measure-reader-01",
+      "stab_allocation_bytes_max": 12288,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-measure-reader-b8",
+      "stab_allocation_bytes_max": 12288,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-measure-reader-r8",
+      "stab_allocation_bytes_max": 12288,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-measure-reader-hits",
+      "stab_allocation_bytes_max": 12288,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-measure-reader-dets",
+      "stab_allocation_bytes_max": 12288,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-measure-reader-ptb64-contract",
+      "stab_allocation_bytes_max": 90000,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-frame-simulator",
+      "stab_allocation_bytes_max": 14592,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-tableau-simulator",
+      "stab_allocation_bytes_max": 1314,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-reference-sample-tree",
+      "stab_allocation_bytes_max": 3122,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-sample-analysis-1shot",
+      "stab_allocation_bytes_max": 608,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-sample-throughput-1024",
+      "stab_allocation_bytes_max": 2048,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-sample-throughput-1000000",
+      "stab_allocation_bytes_max": 2000000,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-sample-primary-repetition-contract",
+      "stab_allocation_bytes_max": 1730,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-sample-primary-rotated-surface-contract",
+      "stab_allocation_bytes_max": 4322,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-sample-primary-unrotated-surface-contract",
+      "stab_allocation_bytes_max": 4370,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m8-sample-high-repeat-contract",
+      "stab_allocation_bytes_max": 2128,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m9-detect-text-cli",
+      "stab_allocation_bytes_max": 76514,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m9-detect-bitpacked-cli",
+      "stab_allocation_bytes_max": 76514,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m9-detect-primary-matrix-contract",
+      "stab_allocation_bytes_max": 12434,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m9-m2d-text-cli",
+      "stab_allocation_bytes_max": 772,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m9-m2d-bitpacked-contract",
+      "stab_allocation_bytes_max": 772,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m9-m2d-primary-matrix-contract",
+      "stab_allocation_bytes_max": 9088,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m10-graphlike-search",
+      "stab_allocation_bytes_max": 151000,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m10-error-analyzer",
+      "stab_allocation_bytes_max": 704128,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m10-error-decomp",
+      "stab_allocation_bytes_max": 0,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m10-analyze-errors-decompose-cli",
+      "stab_allocation_bytes_max": 1456,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m10-analyze-errors-fold-cli",
+      "stab_allocation_bytes_max": 1976,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m10-analyze-errors-high-repeat-contract",
+      "stab_allocation_bytes_max": 1976,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m10-dem-parse-contract",
+      "stab_allocation_bytes_max": 416,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m10-dem-print-contract",
+      "stab_allocation_bytes_max": 27,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m11-dem-sampler",
+      "stab_allocation_bytes_max": 181505,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m11-sample-dem-cli",
+      "stab_allocation_bytes_max": 53920,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m11-sample-dem-sparse-contract",
+      "stab_allocation_bytes_max": 183488,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m11-sample-dem-dense-contract",
+      "stab_allocation_bytes_max": 12864,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m11-sample-dem-repeated-contract",
+      "stab_allocation_bytes_max": 14464,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    },
+    {
+      "id": "m11-sample-dem-high-detector-contract",
+      "stab_allocation_bytes_max": 314432,
+      "stab_resident_bytes_max": 10219520,
+      "stab_resident_delta_bytes_max": 0
+    }
   ]
 }

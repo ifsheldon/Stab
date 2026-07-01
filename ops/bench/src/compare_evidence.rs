@@ -48,6 +48,7 @@ pub(crate) fn aggregate_measurement_runs(
             variance_seconds,
             allocation: aggregate_allocations(&runs, index),
             resident_bytes: aggregate_resident_bytes(&runs, index),
+            resident_delta_bytes: aggregate_resident_delta_bytes(&runs, index),
             iterations: aggregate_iterations(&runs, index),
         });
     }
@@ -87,6 +88,16 @@ fn aggregate_resident_bytes(runs: &[Vec<Measurement>], measurement_index: usize)
     runs.iter()
         .filter_map(|run| run.get(measurement_index))
         .filter_map(|measurement| measurement.resident_bytes)
+        .max()
+}
+
+fn aggregate_resident_delta_bytes(
+    runs: &[Vec<Measurement>],
+    measurement_index: usize,
+) -> Option<u64> {
+    runs.iter()
+        .filter_map(|run| run.get(measurement_index))
+        .filter_map(|measurement| measurement.resident_delta_bytes)
         .max()
 }
 
@@ -231,6 +242,7 @@ mod tests {
             variance_seconds: None,
             allocation: None,
             resident_bytes: None,
+            resident_delta_bytes: None,
             iterations,
         }
     }
