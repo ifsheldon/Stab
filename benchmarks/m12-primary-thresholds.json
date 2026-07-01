@@ -89,6 +89,7 @@
     { "id": "m7-convert-circuit-dl-obs-out", "max_relative_ratio": 1.25 },
     { "id": "m7-convert-dem-dets-to-01", "max_relative_ratio": 1.25 },
     { "id": "m7-convert-dets-to-b8", "max_relative_ratio": 1.25 },
+    { "id": "m7-convert-ptb64-to-01", "max_relative_ratio": 1.25 },
     { "id": "m7-gen-color-d5-r5", "max_relative_ratio": 1.25 },
     { "id": "m7-gen-repetition-d17-r17", "max_relative_ratio": 1.25 },
     { "id": "m7-gen-repetition-d17-r170", "max_relative_ratio": 1.25 },

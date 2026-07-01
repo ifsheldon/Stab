@@ -1,5 +1,6 @@
 use std::ffi::OsString;
 use std::hint::black_box;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use crate::error::BenchError;
@@ -59,7 +60,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
 }
 
 fn run_convert_workload(row: &BenchmarkRow, workload: ConvertWorkload) -> Result<(), BenchError> {
-    let mut stdout = Vec::new();
+    let mut stdout = CountingWriter::default();
     let mut stderr = Vec::new();
     let side_output = workload.side_output();
     if let Some(path) = side_output.as_ref() {
@@ -88,6 +89,31 @@ fn run_convert_workload(row: &BenchmarkRow, workload: ConvertWorkload) -> Result
         black_box(stdout.len());
     }
     Ok(())
+}
+
+#[derive(Default)]
+struct CountingWriter {
+    bytes: usize,
+}
+
+impl CountingWriter {
+    fn len(&self) -> usize {
+        self.bytes
+    }
+}
+
+impl Write for CountingWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.bytes = self
+            .bytes
+            .checked_add(buf.len())
+            .ok_or_else(|| io::Error::other("convert benchmark output byte count overflowed"))?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug)]

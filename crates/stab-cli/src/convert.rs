@@ -228,6 +228,9 @@ where
         MAX_CONVERT_INPUT_BYTES,
         "convert input",
     )?;
+    if try_write_b8_identity(&args, layout, &input, stdout)? {
+        return Ok(());
+    }
     let records = read_convert_records(&input, args.in_format, layout)?;
     let (primary_output, observable_output) = write_convert_records(&records, layout, &args)?;
     write_output(args.output.as_ref(), stdout, &primary_output)?;
@@ -235,6 +238,36 @@ where
         write_output(args.obs_output.as_ref(), stdout, &observable_output)?;
     }
     Ok(())
+}
+
+fn try_write_b8_identity<W>(
+    args: &ConvertArgs,
+    layout: ConvertLayout,
+    input: &[u8],
+    stdout: &mut W,
+) -> Result<bool, CliError>
+where
+    W: Write,
+{
+    if args.in_format != RecordFormatArg::B8
+        || args.out_format != RecordFormatArg::B8
+        || args.obs_output.is_some()
+    {
+        return Ok(false);
+    }
+    let width = layout.input_width()?;
+    if width == 0 || !width.is_multiple_of(8) {
+        return Ok(false);
+    }
+    let bytes_per_record = width / 8;
+    if !input.len().is_multiple_of(bytes_per_record) {
+        return Err(invalid_result_format(format!(
+            "b8 input length {} is not a multiple of record byte width {bytes_per_record}",
+            input.len()
+        )));
+    }
+    write_output(args.output.as_ref(), stdout, input)?;
+    Ok(true)
 }
 
 fn run_convert_stim<R, W>(args: ConvertArgs, stdin: &mut R, stdout: &mut W) -> Result<(), CliError>

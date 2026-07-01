@@ -264,6 +264,21 @@ fn convert_measurement_records_and_raw_bits_round_trip() {
 }
 
 #[test]
+fn convert_b8_to_b8_preserves_byte_aligned_records_exactly() {
+    let input = vec![
+        0x00, 0xff, 0x5a, 0xa5, 0x13, 0x37, 0xc0, 0xde, 0x10, 0x32, 0x54, 0x76,
+    ];
+    let output = convert_between_formats(&input, "b8", "b8", &["--bits_per_shot", "24"]);
+    assert_eq!(output, input);
+}
+
+#[test]
+fn convert_b8_to_b8_keeps_non_byte_aligned_padding_canonical() {
+    let output = convert_between_formats(&[0xff], "b8", "b8", &["--bits_per_shot", "3"]);
+    assert_eq!(output, vec![0x07]);
+}
+
+#[test]
 fn convert_rejects_incomplete_ptb64_output_group() {
     let (status, stdout, stderr) = run_cli(
         &[
