@@ -41,16 +41,16 @@ The clean timing-regression report at `target/benchmarks/beta-125-primary-regres
 
 After the M7 convert benchmark matrix expanded the primary set to 85 rows, the dirty-worktree beta probe at `target/benchmarks/m12-primary-beta/compare.json` from commit `bd9fef4e770bb4278f908fd6274e98ed4f4f14fb` with `local_modifications=true` exposed a renewed `m10-error-decomp` blocker at `1.3559322033898304x`.
 The first M10 fast-path diagnostic moved `m10-error-decomp` below the gate but exposed `m7-convert-b8-to-b8-wide` at `1.6303223990426075x` because byte-aligned packed `b8 -> b8` conversion expanded records into booleans and repacked them.
-The current dirty-worktree primary beta report at `target/benchmarks/m12-primary-beta/compare.json` keeps all four M10 direct pairs visible, passes the 85-row primary beta gate with 80 comparable rows and 5 checked `waived-not-comparable` no-ratio rows, reports `m10-error-decomp` at `1.1764705882352942x`, reports `m7-convert-b8-to-b8-wide` at `0.0018439704138050598x`, and keeps `approx_p10` protected by the existing schema-version-2 threshold.
-The current dirty-worktree timing-regression report at `target/benchmarks/m10-error-decomp-primary-regression/compare.json` passes with 80 configured threshold rows and 5 checked `waived-not-thresholdable` rows, including `m7-convert-b8-to-b8-wide` at `0.0015078042257655317x`.
-The current dirty-worktree memory-regression report at `target/benchmarks/m12-primary-memory-regression/compare.json` passes all 85 rows after the source memory baseline moved to schema version 2, which gates allocation bytes at the existing 25 percent budget and gates row-local resident deltas with a 64 KiB page-noise slack.
+The first M10 and M7 dirty diagnostics kept all four M10 direct pairs visible and moved `m7-convert-b8-to-b8-wide` well below the gate, but they were not final acceptance evidence.
 This diagnostic adds a narrow byte-aligned `b8 -> b8` identity conversion, splits the exact closed-form error-decomposition branch out of the generic solver result path, and fixes the memory gate's order-sensitive absolute-RSS shape without weakening the allocation regression budget.
-These diagnostics are not final acceptance evidence until they are regenerated from committed code with `local_modifications=false`.
+The final clean committed-code primary beta report at `target/benchmarks/m12-primary-beta/compare.json` was generated from Stab commit `c5ccd7967130e764d3319d699ed0a9fe680de81a` with `local_modifications=false`, keeps all four M10 direct pairs visible, passes the 85-row primary beta gate with 80 comparable rows and 5 checked `waived-not-comparable` no-ratio rows, reports `m10-error-decomp` at `1.25x`, reports `m7-convert-b8-to-b8-wide` at `0.00337415937762406x`, and keeps `approx_p10` protected by the existing schema-version-2 threshold.
+The final clean timing-regression report at `target/benchmarks/m10-error-decomp-primary-regression/compare.json` passes with 80 configured threshold rows and 5 checked `waived-not-thresholdable` rows, including `m7-convert-b8-to-b8-wide` at `0.002401335057205131x`.
+The final clean memory-regression report at `target/benchmarks/m12-primary-memory-regression/compare.json` passes all 85 rows after the source memory baseline moved to schema version 2, which gates allocation bytes at the existing 25 percent budget and gates row-local resident deltas with a 64 KiB page-noise slack.
 
 The next clean committed-code primary beta run from commit `e723b815268b59cb62894ddcecf4a0674ffad14c` with `local_modifications=false` kept `m10-error-decomp` and `m7-convert-b8-to-b8-wide` below the gate but exposed two watch rows as active blockers: `m4-circuit-parse` at `1.2973150684931507x` and `m8-sample-primary-unrotated-surface-contract` at `1.2581244226168387x`.
 Focused M4 evidence repeated the sparse parser failure, so the accepted M4 fix streams parser input lines instead of materializing `Vec<&str>`, keeps top-level circuit capacity from a newline count, and adds exact fast paths for common plain `H`, `M`, `MZ`, `CX`, and `CNOT` instructions.
-The focused M4 parser report at `target/benchmarks/m4-watch-focused-final-parser/compare.json` measured `m4-circuit-parse` at `1.1081780821917808x`, and the dirty full primary beta diagnostic at `target/benchmarks/m12-primary-beta/compare.json` measured it at `1.110794520547945x`.
-The same dirty full primary beta diagnostic measured `m8-sample-primary-unrotated-surface-contract` at `1.2458306026893222x`, so no speculative sampler micro-optimization is accepted in this plan; the row remains a narrow final-evidence watch row and requires a dedicated sampler plan if it fails repeatedly from committed code.
+The focused M4 parser report at `target/benchmarks/m4-watch-focused-final-parser/compare.json` measured `m4-circuit-parse` at `1.0867027027027027x`, and the final clean primary beta report at `target/benchmarks/m12-primary-beta/compare.json` measured it at `1.1185x`.
+The final clean primary beta report measured `m8-sample-primary-unrotated-surface-contract` at `1.0918461483384692x`, so no speculative sampler micro-optimization is accepted in this plan; the row remains a watch row and requires a dedicated sampler plan if committed-code beta evidence repeatedly crosses 1.25x.
 
 The five current no-ratio beta waivers remain outside this performance optimization scope unless a faithful pinned-Stim ratio becomes available:
 
@@ -187,7 +187,7 @@ Done criteria:
 - The stable sparse pair is guarded by beta evidence and, if repeated clean evidence is stable enough, by a schema-version-2 threshold.
 - Parser behavior remains compatible with implemented Stim v1.16.0 surfaces.
 
-Status: implementation probe complete in the dirty-worktree primary beta diagnostic listed above.
+Status: complete in the clean committed-code primary beta report listed above.
 The accepted parser implementation streams line iteration, avoids materializing the full line table, uses a newline-count capacity estimate, and fast-parses exact common plain one- and two-qubit instructions while preserving the generic parser for tags, arguments, comments, unusual whitespace, multi-target instructions, classical targets, and error cases.
 
 ## Milestone B4: Rework `m10-error-decomp` Evidence And Arithmetic
@@ -222,7 +222,7 @@ Done criteria:
 - If the benchmark shape changes from tiny filters to larger faithful arrays, the docs explain why the replacement is more meaningful and the old tiny filters no longer decide strict beta completion.
 - No slow direct submeasurement is hidden behind the row median.
 
-Status: implementation probe complete in the dirty-worktree primary beta report listed above.
+Status: complete in the clean committed-code primary beta report listed above.
 The accepted implementation keeps the benchmark shape, inlines the tiny conversion helpers and probability accessors across crate boundaries, uses a crate-private `Probability` constructor only for formulas whose output bounds are proven locally, minimizes exact-branch validation to the lower-bound checks needed by the closed-form proof, and fast-rejects one-zero two-positive disjoint triples that cannot decompose exactly.
 
 ## Milestone B5: Add Headroom To Near Misses
@@ -255,7 +255,7 @@ Historical watch tasks for `m8-sample-primary-unrotated-surface-contract`:
 - Recheck after other changes because sampler timing can move with unrelated parser or generator changes.
 - Optimize only if repeated clean evidence drifts above `1.15x`.
 - Keep public sampler semantics and oracle parity unchanged.
-- The current diagnostic pass leaves this row as a narrow watch row at `1.2458306026893222x`; failed experiments in direct B8 writing, repeat inlining, row-mask caching, and integer-threshold noise sampling were not retained because focused evidence did not show a stable production win.
+- The final clean primary beta report leaves this row as a watch row at `1.0918461483384692x`; failed experiments in direct B8 writing, repeat inlining, row-mask caching, and integer-threshold noise sampling were not retained because focused evidence did not show a stable production win.
 
 Linked tests and checks:
 

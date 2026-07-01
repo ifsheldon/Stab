@@ -267,7 +267,7 @@
         "cargo test -p stab-core byte_sampling_measure_reset_uses_physical_result_for_reset",
         "cargo test -p stab-cli sample"
       ],
-      "follow_up": "The dirty full primary beta diagnostic after the M4 parser fix measured this row as a narrow pass at 1.2458306026893222x. Keep it as a final-evidence watch row, and write a dedicated sampler plan if committed-code beta evidence repeatedly crosses 1.25x."
+      "follow_up": "The final clean primary beta report after the M4 parser fix measured this row as a pass at 1.0918461483384692x. Keep it as a watch row, and write a dedicated sampler plan if committed-code beta evidence repeatedly crosses 1.25x."
     },
     {
       "id": "m7-convert-b8-to-b8-wide",
@@ -281,9 +281,9 @@
       "after_report": "target/benchmarks/m12-primary-beta/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 0.0018439704138050598,
+        "relative_ratio": 0.00337415937762406,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The current primary beta diagnostic measured byte-aligned b8-to-b8 conversion far below the active 1.25x beta gate after validating the packed record byte width, writing the original bytes directly, and avoiding benchmark-harness output allocation."
+        "evidence_note": "The final clean primary beta report measured byte-aligned b8-to-b8 conversion far below the active 1.25x beta gate after validating the packed record byte width, writing the original bytes directly, and avoiding benchmark-harness output allocation."
       },
       "dominant_cost": "The previous public CLI convert path expanded byte-aligned b8 input into Vec<Vec<bool>> records and repacked them even when the output format and record layout were byte-identical.",
       "optimization_summary": "Added a narrow byte-aligned b8-to-b8 identity path that still uses bounded input reading, validates record byte width, writes through the normal output path, keeps non-byte-aligned inputs on the canonical reader/writer path, and changed the benchmark runner to count primary output bytes instead of retaining them in a Vec.",
@@ -305,9 +305,9 @@
       "after_report": "target/benchmarks/m12-primary-beta/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 1.1764705882352942,
+        "relative_ratio": 1.25,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The current primary beta diagnostic measured every paired error-decomposition filter below the active 1.25x beta gate after inlining tiny conversion helpers, splitting the exact closed-form branch out of the generic solver result path, keeping exact-branch validation minimal, and fast-rejecting zero-component disjoint cases that cannot decompose exactly."
+        "evidence_note": "The final clean primary beta report measured every paired error-decomposition filter at or below the active 1.25x beta gate after inlining tiny conversion helpers, splitting the exact closed-form branch out of the generic solver result path, keeping exact-branch validation minimal, and fast-rejecting zero-component disjoint cases that cannot decompose exactly."
       },
       "dominant_cost": "The row median hid tiny independent/disjoint XYZ conversion filters where exact closed-form overhead decided the remaining worst pair, while the p10 and p100 filters spent the full Newton fallback on disjoint triples with one zero component and two positive components even though those triples cannot be decomposed exactly.",
       "optimization_summary": "Split the Stab-side direct-match measurements to match the pinned filters, added paired submeasurement ratio evidence, batched tiny direct-match timing, marked the tiny conversion helpers and probability accessors inline, split the exact closed-form branch out of the generic solver result path, kept exact-branch validation to the lower-bound checks needed by the closed-form proof, used a crate-private Probability constructor only for formulas whose output bounds are proven locally, and added a semantic fast reject for impossible zero-component disjoint triples.",

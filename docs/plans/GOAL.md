@@ -13,7 +13,7 @@ Included:
 
 - Preserve the completed `m10-error-decomp` repair and keep all four direct paired measurements visible.
 - Fix `m4-circuit-parse` with a production parser improvement, not by hiding or waiving the sparse parser pair.
-- Keep `m8-sample-primary-unrotated-surface-contract` in the beta gate and document it as a narrow watch row when it passes without a measured sampler-code win.
+- Keep `m8-sample-primary-unrotated-surface-contract` in the beta gate and document it as a watch row when it passes without a measured sampler-code win.
 - Update benchmark runner tests, profiler notes, optimization logs, active plan documents, and progress reports when benchmark shape, implementation behavior, or evidence changes.
 - Run milestone-audit and full-code-review before declaring the goal complete.
 
@@ -44,9 +44,9 @@ If these sources disagree on ratios, row counts, waiver counts, threshold owners
 The clean committed-code primary beta run from the post-M10/post-convert state failed because `m4-circuit-parse` measured `1.2973150684931507x` and `m8-sample-primary-unrotated-surface-contract` measured `1.2581244226168387x`.
 The focused M4 before report at `target/benchmarks/m4-watch-focused-before/compare.json` repeated the sparse parser failure at about `1.343x`.
 The parser fix streams input lines instead of materializing a `Vec<&str>`, keeps top-level capacity from a newline count, and adds exact fast paths for common plain `H`, `M`, `MZ`, `CX`, and `CNOT` instructions.
-The focused M4 after report at `target/benchmarks/m4-watch-focused-final-parser/compare.json` measured `m4-circuit-parse` at `1.1081780821917808x`.
-The dirty full primary beta report at `target/benchmarks/m12-primary-beta/compare.json` passed all 85 primary rows with `m4-circuit-parse` at `1.110794520547945x`, `m8-sample-primary-unrotated-surface-contract` at `1.2458306026893222x`, and `m10-error-decomp` at `1.25x`.
-This dirty report is diagnostic only; final acceptance still requires committed-code reports with `local_modifications=false`.
+The focused M4 final report at `target/benchmarks/m4-watch-focused-final-parser/compare.json` measured `m4-circuit-parse` at `1.0867027027027027x`.
+The clean committed-code primary beta report at `target/benchmarks/m12-primary-beta/compare.json` was generated from Stab commit `c5ccd7967130e764d3319d699ed0a9fe680de81a` with `local_modifications=false`, passed all 85 primary rows with 80 comparable rows and 5 checked no-ratio waivers, measured `m4-circuit-parse` at `1.1185x`, measured `m8-sample-primary-unrotated-surface-contract` at `1.0918461483384692x`, and measured `m10-error-decomp` at `1.25x`.
+The clean timing-regression report at `target/benchmarks/m10-error-decomp-primary-regression/compare.json` passed with 80 configured threshold rows and 5 checked no-ratio waivers, and the clean memory-regression report at `target/benchmarks/m12-primary-memory-regression/compare.json` passed the memory gate for all 85 rows.
 
 ## Success State
 
