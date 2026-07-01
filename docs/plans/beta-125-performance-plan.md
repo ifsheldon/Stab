@@ -47,6 +47,11 @@ The current dirty-worktree memory-regression report at `target/benchmarks/m12-pr
 This diagnostic adds a narrow byte-aligned `b8 -> b8` identity conversion, splits the exact closed-form error-decomposition branch out of the generic solver result path, and fixes the memory gate's order-sensitive absolute-RSS shape without weakening the allocation regression budget.
 These diagnostics are not final acceptance evidence until they are regenerated from committed code with `local_modifications=false`.
 
+The next clean committed-code primary beta run from commit `e723b815268b59cb62894ddcecf4a0674ffad14c` with `local_modifications=false` kept `m10-error-decomp` and `m7-convert-b8-to-b8-wide` below the gate but exposed two watch rows as active blockers: `m4-circuit-parse` at `1.2973150684931507x` and `m8-sample-primary-unrotated-surface-contract` at `1.2581244226168387x`.
+Focused M4 evidence repeated the sparse parser failure, so the accepted M4 fix streams parser input lines instead of materializing `Vec<&str>`, keeps top-level circuit capacity from a newline count, and adds exact fast paths for common plain `H`, `M`, `MZ`, `CX`, and `CNOT` instructions.
+The focused M4 parser report at `target/benchmarks/m4-watch-focused-final-parser/compare.json` measured `m4-circuit-parse` at `1.1081780821917808x`, and the dirty full primary beta diagnostic at `target/benchmarks/m12-primary-beta/compare.json` measured it at `1.110794520547945x`.
+The same dirty full primary beta diagnostic measured `m8-sample-primary-unrotated-surface-contract` at `1.2458306026893222x`, so no speculative sampler micro-optimization is accepted in this plan; the row remains a narrow final-evidence watch row and requires a dedicated sampler plan if it fails repeatedly from committed code.
+
 The five current no-ratio beta waivers remain outside this performance optimization scope unless a faithful pinned-Stim ratio becomes available:
 
 - `m4-circuit-canonical-print`
@@ -182,6 +187,9 @@ Done criteria:
 - The stable sparse pair is guarded by beta evidence and, if repeated clean evidence is stable enough, by a schema-version-2 threshold.
 - Parser behavior remains compatible with implemented Stim v1.16.0 surfaces.
 
+Status: implementation probe complete in the dirty-worktree primary beta diagnostic listed above.
+The accepted parser implementation streams line iteration, avoids materializing the full line table, uses a newline-count capacity estimate, and fast-parses exact common plain one- and two-qubit instructions while preserving the generic parser for tags, arguments, comments, unusual whitespace, multi-target instructions, classical targets, and error cases.
+
 ## Milestone B4: Rework `m10-error-decomp` Evidence And Arithmetic
 
 Objective: make `m10-error-decomp` pass the stricter beta gate without hiding tiny slow filters or relying on timer artifacts.
@@ -247,6 +255,7 @@ Historical watch tasks for `m8-sample-primary-unrotated-surface-contract`:
 - Recheck after other changes because sampler timing can move with unrelated parser or generator changes.
 - Optimize only if repeated clean evidence drifts above `1.15x`.
 - Keep public sampler semantics and oracle parity unchanged.
+- The current diagnostic pass leaves this row as a narrow watch row at `1.2458306026893222x`; failed experiments in direct B8 writing, repeat inlining, row-mask caching, and integer-threshold noise sampling were not retained because focused evidence did not show a stable production win.
 
 Linked tests and checks:
 

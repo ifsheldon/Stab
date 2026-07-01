@@ -1,176 +1,98 @@
-# Goal: Fix `m10-error-decomp` For The 1.25x Beta Gate
+# Goal: Close The 1.25x Primary Beta Gate
 
 ## Purpose
 
-This document is the active execution contract for fixing the renewed `m10-error-decomp` performance blocker.
-The current observed blocker is `m10-error-decomp` at `1.3559322033898304x` in the expanded primary beta report generated from `just bench::primary-beta --baseline target/benchmarks/convert-primary-baseline/baseline.json`, which is above the active `1.25x` beta gate.
-The goal is to make the row pass the gate with honest paired evidence, not to hide or waive the slow submeasurement.
-This work must follow `docs/plans/lessons-learned.md`: use fresh baselines, compare paired submeasurements, treat tiny benchmarks carefully, keep waivers machine-checked, avoid dirty-worktree completion claims, and synchronize docs with benchmark sources.
+This document is the active execution contract for closing the renewed 1.25x primary beta performance gate after the expanded benchmark matrix.
+The original blocker was `m10-error-decomp` above the active `1.25x` beta gate, but clean committed-code evidence after the M10 and convert fixes also exposed `m4-circuit-parse` at `1.2973150684931507x` and `m8-sample-primary-unrotated-surface-contract` at `1.2581244226168387x`.
+The goal is to make the gate pass with honest paired evidence, no new comparable-row waivers, no hidden slow submeasurements, and final reports regenerated from committed code with `local_modifications=false`.
+This work must follow `docs/plans/lessons-learned.md`: use fresh baselines, compare paired submeasurements, treat noisy near-threshold rows carefully, keep waivers machine-checked, avoid dirty-worktree completion claims, and synchronize docs with benchmark sources.
 
 ## Scope
 
 Included:
 
-- Fix `m10-error-decomp` until it passes `just bench::primary-beta` at `<=1.25x` under the same paired-ratio rule used by the gate.
-- Preserve direct-match evidence for the four pinned Stim error-decomposition filters: `independent_to_disjoint_xyz_errors`, `disjoint_to_independent_xyz_errors_approx_exact`, `disjoint_to_independent_xyz_errors_approx_p10`, and `disjoint_to_independent_xyz_errors_approx_p100`.
-- Determine whether the failing pair reflects real arithmetic cost, benchmark timer overhead, or an unfaithful benchmark shape before changing implementation code.
-- Update benchmark runner tests, profiler notes, threshold files, optimization logs, and plan documents when benchmark shape, implementation behavior, or evidence changes.
+- Preserve the completed `m10-error-decomp` repair and keep all four direct paired measurements visible.
+- Fix `m4-circuit-parse` with a production parser improvement, not by hiding or waiving the sparse parser pair.
+- Keep `m8-sample-primary-unrotated-surface-contract` in the beta gate and document it as a narrow watch row when it passes without a measured sampler-code win.
+- Update benchmark runner tests, profiler notes, optimization logs, active plan documents, and progress reports when benchmark shape, implementation behavior, or evidence changes.
 - Run milestone-audit and full-code-review before declaring the goal complete.
 
 Excluded:
 
 - Do not reopen Python, JS/WASM, Crumble, diagrams, `explain_errors`, `repl`, QASM/Quirk, GPU, sweep-conditioned conversion, `m2d --ran_without_feedback`, full ErrorMatcher provenance, or new public graph/vector simulator APIs.
-- Do not optimize unrelated rows unless a fresh full primary beta run proves another comparable row is blocking the same gate after the M10 fix.
+- Do not add beta waivers for comparable rows.
+- Do not keep speculative sampler micro-optimizations unless repeated focused evidence shows a real win and semantic tests cover the changed path.
 - Do not change public CLI behavior, file formats, DEM semantics, or compatibility scope unless a correctness test proves the current behavior is wrong and the roadmap is updated in the same change set.
 
 ## Sources Of Truth
 
-- Active performance plan: `docs/plans/beta-125-performance-plan.md`, especially Milestone B4.
+- Active performance plan: `docs/plans/beta-125-performance-plan.md`.
 - Planning lessons: `docs/plans/lessons-learned.md`.
 - Roadmap and benchmark policy: `docs/plans/rust-stim-drop-in-rewrite.md`.
 - Benchmark manifest: `benchmarks/manifest.csv`.
-- M10 benchmark runner: `ops/bench/src/baseline/m10.rs`.
-- M10 profiler note: `benchmarks/profiler-notes/m12/m10-error-decomp.md`.
+- Parser implementation: `crates/stab-core/src/circuit.rs` and `crates/stab-core/src/gate.rs`.
+- M10 implementation: `crates/stab-core/src/dem/analyze/error_decomp.rs` and `crates/stab-core/src/ids.rs`.
+- M4, M8, and M10 profiler notes under `benchmarks/profiler-notes/m12/`.
 - Optimization log: `benchmarks/profiler-notes/m12/optimization-log.json`.
 - Beta waivers: `benchmarks/m12-primary-beta-waivers.json`.
 - Timing thresholds: `benchmarks/m12-primary-thresholds.json`.
-- Error-decomposition implementation: `crates/stab-core/src/dem/analyze/error_decomp.rs`.
-- Probability wrapper implementation: `crates/stab-core/src/ids.rs`.
 
 If these sources disagree on ratios, row counts, waiver counts, threshold ownership, report paths, commit ids, local-modification status, or completion status, fix the stale source before claiming progress.
+
+## Current Evidence
+
+The clean committed-code primary beta run from the post-M10/post-convert state failed because `m4-circuit-parse` measured `1.2973150684931507x` and `m8-sample-primary-unrotated-surface-contract` measured `1.2581244226168387x`.
+The focused M4 before report at `target/benchmarks/m4-watch-focused-before/compare.json` repeated the sparse parser failure at about `1.343x`.
+The parser fix streams input lines instead of materializing a `Vec<&str>`, keeps top-level capacity from a newline count, and adds exact fast paths for common plain `H`, `M`, `MZ`, `CX`, and `CNOT` instructions.
+The focused M4 after report at `target/benchmarks/m4-watch-focused-final-parser/compare.json` measured `m4-circuit-parse` at `1.1081780821917808x`.
+The dirty full primary beta report at `target/benchmarks/m12-primary-beta/compare.json` passed all 85 primary rows with `m4-circuit-parse` at `1.110794520547945x`, `m8-sample-primary-unrotated-surface-contract` at `1.2458306026893222x`, and `m10-error-decomp` at `1.25x`.
+This dirty report is diagnostic only; final acceptance still requires committed-code reports with `local_modifications=false`.
 
 ## Success State
 
 The goal is complete only when:
 
-- `m10-error-decomp` passes `just bench::primary-beta` at `<=1.25x`.
+- `just bench::primary-beta` passes from committed code with `local_modifications=false`.
+- `m4-circuit-parse`, `m8-sample-primary-unrotated-surface-contract`, and `m10-error-decomp` all pass the `1.25x` beta gate.
 - All four M10 paired direct measurements remain visible in the compare report.
-- No M10 measurement is waived, renamed casually, hidden behind a row median, downgraded to report-only, or compared against unmatched work.
-- Any benchmark-shape change keeps Stim and Stab workloads faithful and normalizes batched timings back to seconds per operation.
+- No comparable row is waived, renamed casually, hidden behind a row median, downgraded to report-only, or compared against unmatched work to make the gate pass.
 - Timing regression still protects every stable thresholded submeasurement and has no stale submeasurement ids.
 - Memory regression still passes.
-- The profiler note, optimization log, beta-125 plan, M12 progress report, post-beta report, roadmap, and benchmark source files agree with the final evidence.
-- Final benchmark evidence is regenerated from committed code with `local_modifications=false`.
+- The profiler notes, optimization log, beta-125 plan, M12 progress report, post-beta report, roadmap, and benchmark source files agree with the final evidence.
 - Milestone-audit and full-code-review findings are fixed or logged as accepted future specification gaps.
 
 ## Non-Negotiable Rules
 
 - Do not raise the beta gate above `1.25x`.
-- Do not add a beta waiver for `m10-error-decomp`.
-- Do not remove or merge the failing paired submeasurement to make the row pass.
+- Do not add beta waivers for `m4-circuit-parse`, `m8-sample-primary-unrotated-surface-contract`, or `m10-error-decomp`.
+- Do not remove or merge failing paired submeasurements to make a row pass.
 - Do not treat a dirty-worktree benchmark report as completion evidence.
-- Do not optimize from one noisy nanosecond measurement and call it final evidence.
-- Do not weaken public `Probability` validation or error-decomposition semantics for benchmark speed.
-- Do not use unchecked constructors unless the local formula proves probability bounds and tests cover the proof boundary.
-- Do not add new strict thresholds for exact, p100, or independent-to-disjoint pairs until repeated clean reports show enough headroom below `1.25x`.
+- Do not optimize from one noisy near-threshold measurement and call it final evidence.
+- Do not weaken parser validation, target bounds, public sampler semantics, probability validation, or error-decomposition semantics for benchmark speed.
 
 ## Work Loop
 
-### 1. Establish Fresh Evidence
-
-Regenerate a primary baseline and beta report from the current code before changing behavior:
-
-```sh
-just bench::baseline --primary --out target/benchmarks/m10-error-decomp-primary-baseline
-just bench::primary-beta --baseline target/benchmarks/m10-error-decomp-primary-baseline/baseline.json
-```
-
-Inspect whether `m10-error-decomp` is still the blocker.
-If the row passes on the fresh run, do not immediately declare success; run focused warm evidence to determine whether the `1.3559322033898304x` result was noise:
-
-```sh
-just bench::compare --only m10-error-decomp --warmup --measurement-runs 3 --baseline target/benchmarks/m10-error-decomp-primary-baseline/baseline.json --report target/benchmarks/m10-error-decomp-focused-before
-```
-
-If a different comparable row fails after M10 is repaired, update this document or the active performance plan before changing that row.
-
-### 2. Identify The Failing Pair
-
-Inspect paired ratios instead of row medians:
-
-```sh
-jq -r '.rows[] | select(.id == "m10-error-decomp") | .measurement_ratios[] | [.stim_name, .stab_name, .relative_ratio, .stim_seconds, .stab_seconds] | @tsv' target/benchmarks/m12-primary-beta/compare.json
-```
-
-Record which pair is above `1.25x`, the exact ratio, absolute Stim timing, absolute Stab timing, and whether the failure repeats across at least two warm focused runs.
-The renewed blocker must inspect all four pairs, because previous evidence has shown exact disjoint-to-independent and Newton fallback pairs can fail independently.
-
-### 3. Fix Benchmark Shape Before Arithmetic
-
-Decide whether the failing pair measures useful arithmetic or mostly timer overhead.
-If the operation is too small for honest strict-gate evidence, fix the benchmark shape before optimizing code.
-
-Acceptable benchmark-shape fixes must:
-
-- keep the `m10-error-decomp` row id unless a split is explicitly documented;
-- keep all four paired measurements visible;
-- use workloads that faithfully correspond to pinned Stim perf filters;
-- keep Stim and Stab pair names stable enough for threshold and profiler-note tooling;
-- normalize batched or case-array timings back to seconds per operation;
-- add benchmark runner tests that prove expected measurements, comparability class, compare notes, and normalized work are emitted.
-
-Do not change benchmark shape merely to hide a slow pair.
-If a faithful larger shape still fails, optimize the implementation.
-
-### 4. Optimize The Real Hot Path
-
-Optimize only after the evidence shape is honest.
-Focus first on `crates/stab-core/src/dem/analyze/error_decomp.rs` and the tiny probability helpers in `crates/stab-core/src/ids.rs`.
-
-Investigate in this order:
-
-- missed inlining on tiny probability conversion helpers;
-- avoidable `Probability` construction or validation on locally proven intermediate values;
-- repeated `Probability::get()` extraction;
-- exact zero, identity, and symmetric-case branches;
-- Newton solver iteration count and termination checks;
-- algebraic fast rejects for disjoint triples that cannot decompose exactly;
-- repeated floating-point transformations for fixed benchmark probabilities.
-
-For every fast path, add or update tests that cover exact solved cases, approximate cases, zero-probability edges, invalid probability rejection, and round-trip consistency where relevant.
-Preserve analyzer behavior and public error semantics, not just benchmark inputs.
-
-### 5. Keep Gates And Waivers Honest
-
-Keep `m10-error-decomp` as a comparable direct-match row.
-Do not edit `benchmarks/m12-primary-beta-waivers.json` for this row.
-Keep existing schema-version-2 threshold coverage only for submeasurements that have repeated stable evidence below `1.25x`.
-Add or remove submeasurement thresholds only with matching profiler-note updates, threshold-source tests, and focused benchmark evidence in the same change set.
-
-### 6. Synchronize Documentation
-
-Update every affected source in the same change set:
-
-- `docs/plans/GOAL.md`;
-- `docs/plans/beta-125-performance-plan.md`;
-- `docs/plans/rust-stim-drop-in-rewrite.md`;
-- `docs/plans/m12-progress-report.md`;
-- `docs/plans/post-beta-fix-report.md`;
-- `docs/plans/milestone-spec-gaps.md`, only for true under-specified acceptance criteria;
-- `benchmarks/profiler-notes/m12/m10-error-decomp.md`;
-- `benchmarks/profiler-notes/m12/optimization-log.json`;
-- `benchmarks/m12-primary-thresholds.json`, only if threshold ownership changes.
-
-Do not leave contradictory ratios, row counts, waiver counts, report paths, commit ids, or `local_modifications` claims for the next agent.
-
-### 7. Audit And Review
-
-After implementation and evidence updates, run milestone-audit against this goal and Milestone B4 in `docs/plans/beta-125-performance-plan.md`.
-Then run full-code-review.
-Fix all correctness, compatibility, benchmark-policy, and documentation findings.
-Only log a finding in `docs/plans/milestone-spec-gaps.md` when it is genuinely future-scope under-specification rather than an implementation bug or stale documentation.
+1. Keep the M10 fix intact and recheck its paired submeasurements whenever primary beta is rerun.
+2. Fix M4 through parser implementation work, then prove the sparse parser pair with focused and primary beta evidence.
+3. Recheck M8 in focused and primary beta reports; if it fails repeatedly from clean committed code, stop and write a dedicated sampler plan before changing sampler internals.
+4. Remove failed speculative code experiments instead of committing them as incidental churn.
+5. Synchronize `docs/plans/beta-125-performance-plan.md`, profiler notes, optimization log, and progress reports with the evidence that remains.
+6. Run milestone-audit against this goal and the beta-125 plan, then run full-code-review.
 
 ## Required Targeted Tests
 
 Use targeted checks during iteration:
 
 ```sh
-cargo test -p stab-core error_decomp --quiet
-cargo test -p stab-core dem_analyzer_pauli_channel_clifford --quiet
+cargo test -p stab-core --test stim_format --quiet
+cargo test -p stab-core gates --quiet
+cargo test -p stab-core target --quiet
 cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners --quiet
+just bench::compare --only m4-circuit-parse --warmup --measurement-runs 3 --baseline target/benchmarks/m10-error-decomp-primary-baseline/baseline.json --report target/benchmarks/m4-watch-focused-final-parser
+just bench::compare --only m8-sample-primary-unrotated-surface-contract --warmup --measurement-runs 3 --baseline target/benchmarks/m10-error-decomp-primary-baseline/baseline.json --report target/benchmarks/m8-unrotated-focused-final
 ```
 
-Add or update targeted tests for any changed arithmetic branch, benchmark batching rule, measurement name, threshold parser behavior, or compare-note expectation.
+Add or update targeted tests for any changed parser branch, arithmetic branch, benchmark batching rule, measurement name, threshold parser behavior, or compare-note expectation.
 Avoid tests that only restate constants.
 
 ## Required Final Verification
@@ -184,6 +106,8 @@ cargo test --workspace --quiet
 just oracle::run --implemented-only
 just bench::baseline --primary --out target/benchmarks/m10-error-decomp-primary-baseline
 just bench::compare --only m10-error-decomp --warmup --measurement-runs 3 --baseline target/benchmarks/m10-error-decomp-primary-baseline/baseline.json --report target/benchmarks/m10-error-decomp-focused-final
+just bench::compare --only m4-circuit-parse --warmup --measurement-runs 3 --baseline target/benchmarks/m10-error-decomp-primary-baseline/baseline.json --report target/benchmarks/m4-watch-focused-final-parser
+just bench::compare --only m8-sample-primary-unrotated-surface-contract --warmup --measurement-runs 3 --baseline target/benchmarks/m10-error-decomp-primary-baseline/baseline.json --report target/benchmarks/m8-unrotated-focused-final
 just bench::primary-beta --baseline target/benchmarks/m10-error-decomp-primary-baseline/baseline.json
 just bench::primary-regression --baseline target/benchmarks/m10-error-decomp-primary-baseline/baseline.json --report target/benchmarks/m10-error-decomp-primary-regression
 just bench::primary-memory-regression --baseline target/benchmarks/m10-error-decomp-primary-baseline/baseline.json
@@ -191,4 +115,4 @@ just maintenance::pre-commit
 ```
 
 Final completion requires committed-code evidence with `local_modifications=false`.
-If the user has not explicitly requested commits, stop after successful uncommitted verification and ask before committing.
+The user has explicitly allowed commits for this goal, so commit focused implementation and documentation changes before final evidence collection.

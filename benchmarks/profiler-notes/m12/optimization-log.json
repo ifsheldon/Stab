@@ -58,15 +58,15 @@
         "hot_path_status": "above-profiler-threshold",
         "evidence_note": "The before report measured sparse circuit parsing above the beta gate and above the profiler-note threshold."
       },
-      "after_report": "target/benchmarks/m12-primary-beta/compare.json",
+      "after_report": "target/benchmarks/m4-watch-focused-final-parser/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 0.61,
+        "relative_ratio": 1.1081780821917808,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The final clean beta-125 primary beta report measured the row below the active 1.25x beta gate and below the profiler-note threshold after target-storage and simple-instruction parser fast paths."
+        "evidence_note": "The focused parser report measured the row below the active 1.25x beta gate after streaming line iteration, newline-count capacity estimation, and exact common plain-instruction parser fast paths."
       },
-      "dominant_cost": "Sparse .stim parsing was dominated by temporary target vectors, repeated integer scans, and generic dispatch for simple no-argument instructions.",
-      "optimization_summary": "Moved target storage to SmallVec-backed instruction buffers, parsed plain numeric targets in one checked pass, and added simple no-argument parser fast paths for common H, M, MZ, CX, and CNOT instructions.",
+      "dominant_cost": "Sparse .stim parsing was dominated by materializing the input line table and generic dispatch for exact common plain instructions.",
+      "optimization_summary": "Streamed parser line iteration, kept top-level circuit capacity from a newline count, and added exact parser fast paths for common plain H, M, MZ, CX, and CNOT instructions while leaving richer Stim syntax on the generic parser.",
       "semantic_checks": [
         "cargo test -p stab-core --test stim_format",
         "cargo test -p stab-core gates",
@@ -267,7 +267,7 @@
         "cargo test -p stab-core byte_sampling_measure_reset_uses_physical_result_for_reset",
         "cargo test -p stab-cli sample"
       ],
-      "follow_up": "Future broadening needs profiler evidence from a machine that permits stack sampling because local perf was blocked by perf_event_paranoid=4."
+      "follow_up": "The dirty full primary beta diagnostic after the M4 parser fix measured this row as a narrow pass at 1.2458306026893222x. Keep it as a final-evidence watch row, and write a dedicated sampler plan if committed-code beta evidence repeatedly crosses 1.25x."
     },
     {
       "id": "m7-convert-b8-to-b8-wide",
