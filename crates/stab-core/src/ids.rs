@@ -71,7 +71,7 @@ impl RepeatCount {
 pub struct Probability(f64);
 
 impl Probability {
-    #[inline]
+    #[inline(always)]
     pub fn try_new(value: f64) -> CircuitResult<Self> {
         if !value.is_finite() || !(0.0..=1.0).contains(&value) {
             return Err(CircuitError::invalid_domain_value("probability", value));
@@ -79,14 +79,14 @@ impl Probability {
         Ok(Self(value))
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn from_valid_probability(value: f64) -> Self {
         debug_assert!(value.is_finite());
         debug_assert!((0.0..=1.0).contains(&value));
         Self(value)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn get(self) -> f64 {
         self.0
     }

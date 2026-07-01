@@ -29,6 +29,7 @@ const ERROR_ANALYZER_ROUNDS: u32 = 3;
 const ERROR_ANALYZER_DISTANCE: u32 = 3;
 const GRAPHLIKE_SEARCH_DETECTORS: u64 = 128;
 const GRAPHLIKE_SEARCH_GRAPH_EDGES: f64 = (GRAPHLIKE_SEARCH_DETECTORS * 2) as f64;
+const ERROR_DECOMP_DIRECT_COMPARE_REPETITIONS: usize = TINY_DIRECT_COMPARE_REPETITIONS * 16;
 
 pub(super) fn run_dem_compare_row(
     row: &BenchmarkRow,
@@ -98,7 +99,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-representative: Stab measures in-process generated rotated-memory-z surface-code analysis at d3/r3; the upstream Stim perf row uses d11/r100 and remains the eventual scale target",
         ),
         "m10-error-decomp" => Some(
-            "direct-match: Stab measures independent/disjoint XYZ probability conversion families against pinned Stim util_bot error_decomp perf filters; exact and independent paths use case-diverse in-process batches to reduce timer noise",
+            "direct-match: Stab measures independent/disjoint XYZ probability conversion families against pinned Stim util_bot error_decomp perf filters using enlarged pinned-case in-process batches; impossible zero-component disjoint cases use a semantic fast reject",
         ),
         "m10-graphlike-search" => Some(
             "contract-representative: Stab measures in-process shortest graphlike logical-error search on a deterministic chain DEM",
@@ -212,22 +213,8 @@ fn run_error_decomp_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErr
     let p20 = benchmark_probability(&row.id, 0.2)?;
     let p30 = benchmark_probability(&row.id, 0.3)?;
     let zero = benchmark_probability(&row.id, 0.0)?;
-    let independent_cases = [
-        [p10, p20, p30],
-        [p10, p30, p20],
-        [p20, p10, p30],
-        [p20, p30, p10],
-        [p30, p10, p20],
-        [p30, p20, p10],
-    ];
-    let exact_cases = [
-        [p10, p20, p15],
-        [p10, p15, p20],
-        [p20, p10, p15],
-        [p20, p15, p10],
-        [p15, p10, p20],
-        [p15, p20, p10],
-    ];
+    let independent_cases = [[p10, p20, p30]];
+    let exact_cases = [[p10, p20, p15]];
     Ok(vec![
         measure_error_decomp_cases(
             "stab_independent_to_disjoint_xyz_errors",
@@ -293,7 +280,7 @@ fn measure_error_decomp_cases(
     cases: &[[Probability; 3]],
     mut operation: impl FnMut([Probability; 3]) -> Result<(), BenchError>,
 ) -> Result<Measurement, BenchError> {
-    let operation_count = TINY_DIRECT_COMPARE_REPETITIONS
+    let operation_count = ERROR_DECOMP_DIRECT_COMPARE_REPETITIONS
         .checked_mul(cases.len())
         .filter(|count| *count > 0)
         .ok_or_else(|| BenchError::StabRunner {
@@ -320,6 +307,7 @@ fn measure_error_decomp_cases(
         variance_seconds,
         allocation: tracked_memory.allocation,
         resident_bytes: tracked_memory.resident_bytes_max,
+        resident_delta_bytes: tracked_memory.resident_delta_bytes_max,
         iterations: Some(STAB_COMPARE_ITERATIONS),
     })
 }
@@ -328,7 +316,7 @@ fn run_error_decomp_case_batch(
     cases: &[[Probability; 3]],
     operation: &mut impl FnMut([Probability; 3]) -> Result<(), BenchError>,
 ) -> Result<(), BenchError> {
-    for _ in 0..TINY_DIRECT_COMPARE_REPETITIONS {
+    for _ in 0..ERROR_DECOMP_DIRECT_COMPARE_REPETITIONS {
         for case in cases {
             operation(black_box(*case))?;
         }

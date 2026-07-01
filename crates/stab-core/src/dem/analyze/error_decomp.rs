@@ -44,7 +44,7 @@ impl DisjointPauliProbabilities {
     }
 }
 
-#[inline]
+#[inline(always)]
 pub fn independent_to_disjoint_xyz_errors(
     x: Probability,
     y: Probability,
@@ -58,13 +58,27 @@ pub fn independent_to_disjoint_xyz_errors(
     })
 }
 
-#[inline]
+#[inline(always)]
 pub fn try_disjoint_to_independent_xyz_errors(
     x: Probability,
     y: Probability,
     z: Probability,
 ) -> CircuitResult<Option<IndependentPauliProbabilities>> {
-    let Some(solution) = solve_disjoint_to_independent_xyz(x.get(), y.get(), z.get(), 50) else {
+    let x = x.get();
+    let y = y.get();
+    let z = z.get();
+    match solve_disjoint_to_independent_xyz_exact(x, y, z) {
+        Some(ExactXyzSolution::Solved([x, y, z])) => {
+            return Ok(Some(IndependentPauliProbabilities {
+                x: Probability::from_valid_probability(x),
+                y: Probability::from_valid_probability(y),
+                z: Probability::from_valid_probability(z),
+            }));
+        }
+        Some(ExactXyzSolution::Impossible) => return Ok(None),
+        None => {}
+    }
+    let Some(solution) = solve_disjoint_to_independent_xyz(x, y, z, 50) else {
         return Ok(None);
     };
     let [x, y, z] = solution.probabilities;
@@ -89,13 +103,30 @@ struct XyzSolution {
     proven_probability_bounds: bool,
 }
 
-#[inline]
+#[derive(Clone, Copy, Debug)]
+enum ExactXyzSolution {
+    Solved([f64; 3]),
+    Impossible,
+}
+
+#[inline(always)]
 fn solve_disjoint_to_independent_xyz(
     x: f64,
     y: f64,
     z: f64,
     max_steps: usize,
 ) -> Option<XyzSolution> {
+    match solve_disjoint_to_independent_xyz_exact(x, y, z) {
+        Some(ExactXyzSolution::Solved(probabilities)) => {
+            return Some(XyzSolution {
+                probabilities,
+                proven_probability_bounds: true,
+            });
+        }
+        Some(ExactXyzSolution::Impossible) => return None,
+        None => {}
+    }
+
     let identity = (1.0 - x - y - z).max(0.0);
     if identity < x {
         let solution = solve_disjoint_to_independent_xyz(identity, z, y, max_steps)?;
@@ -120,21 +151,6 @@ fn solve_disjoint_to_independent_xyz(
             probabilities: [out_x, out_y, 1.0 - out_z],
             proven_probability_bounds: solution.proven_probability_bounds,
         });
-    }
-
-    if x + z < 0.5 && x + y < 0.5 && y + z < 0.5 {
-        let s_xz = (1.0 - 2.0 * x - 2.0 * z).sqrt();
-        let s_xy = (1.0 - 2.0 * x - 2.0 * y).sqrt();
-        let s_yz = (1.0 - 2.0 * y - 2.0 * z).sqrt();
-        let a = 0.5 - 0.5 * s_xz * s_xy / s_yz;
-        let b = 0.5 - 0.5 * s_xy * s_yz / s_xz;
-        let c = 0.5 - 0.5 * s_xz * s_yz / s_xy;
-        if (0.0..=1.0).contains(&a) && (0.0..=1.0).contains(&b) && (0.0..=1.0).contains(&c) {
-            return Some(XyzSolution {
-                probabilities: [a, b, c],
-                proven_probability_bounds: true,
-            });
-        }
     }
 
     let mut a = x;
@@ -171,7 +187,36 @@ fn solve_disjoint_to_independent_xyz(
     None
 }
 
-#[inline]
+#[inline(always)]
+fn solve_disjoint_to_independent_xyz_exact(x: f64, y: f64, z: f64) -> Option<ExactXyzSolution> {
+    if !(x + z < 0.5 && x + y < 0.5 && y + z < 0.5) {
+        return None;
+    }
+    if (x == 0.0 || y == 0.0 || z == 0.0) && has_impossible_zero_disjoint_component(x, y, z) {
+        return Some(ExactXyzSolution::Impossible);
+    }
+    let s_xz = (1.0 - 2.0 * x - 2.0 * z).sqrt();
+    let s_xy = (1.0 - 2.0 * x - 2.0 * y).sqrt();
+    let s_yz = (1.0 - 2.0 * y - 2.0 * z).sqrt();
+    let a = 0.5 - 0.5 * s_xz * s_xy / s_yz;
+    let b = 0.5 - 0.5 * s_xy * s_yz / s_xz;
+    let c = 0.5 - 0.5 * s_xz * s_yz / s_xy;
+    if a >= 0.0 && b >= 0.0 && c >= 0.0 {
+        debug_assert!(a <= 1.0 && b <= 1.0 && c <= 1.0);
+        Some(ExactXyzSolution::Solved([a, b, c]))
+    } else {
+        None
+    }
+}
+
+#[inline(always)]
+fn has_impossible_zero_disjoint_component(x: f64, y: f64, z: f64) -> bool {
+    (x == 0.0 && y > 0.0 && z > 0.0)
+        || (y == 0.0 && x > 0.0 && z > 0.0)
+        || (z == 0.0 && x > 0.0 && y > 0.0)
+}
+
+#[inline(always)]
 fn independent_to_disjoint_xyz_raw(x: f64, y: f64, z: f64) -> [f64; 3] {
     let xy = x * y;
     let xz = x * z;
@@ -320,6 +365,25 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn error_decomp_rejects_zero_disjoint_component_with_two_positive_components() {
+        for (x, y, z) in [
+            (0.0, 0.1, 0.2),
+            (0.1, 0.0, 0.2),
+            (0.1, 0.2, 0.0),
+            (0.0, 0.01, 0.02),
+            (0.01, 0.0, 0.02),
+            (0.01, 0.02, 0.0),
+        ] {
+            assert!(
+                try_disjoint_to_independent_xyz_errors(prob(x), prob(y), prob(z))
+                    .unwrap()
+                    .is_none(),
+                "{x}, {y}, {z} should be impossible to decompose exactly"
+            );
+        }
     }
 
     #[test]
