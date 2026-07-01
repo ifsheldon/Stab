@@ -99,12 +99,13 @@ Tests and acceptance:
 ### `m10-error-decomp`
 
 The `approx_p10` submeasurement is guarded.
-The `approx_p100`, exact, and independent-to-disjoint filters are too small or too close to the `1.25x` line for honest strict thresholding, so they need arithmetic-normalized batched evidence before any future threshold expansion.
+The `approx_p100`, exact, and independent-to-disjoint filters remain unthresholded until repeated clean reports prove stable headroom.
+The current implementation keeps p10 and p100 visible as direct pairs while fast-rejecting one-zero two-positive disjoint triples that cannot decompose exactly, leaving exact and independent-to-disjoint as the remaining nanosecond-scale threshold-expansion risks.
 
 Tasks:
 
 - Keep the existing `approx_p10` schema-version-2 threshold.
-- Replace nanosecond-scale single-case evidence for exact and independent-to-disjoint paths with batched conversion arrays.
+- Keep enlarged pinned-case batched evidence for exact and independent-to-disjoint paths, matching the pinned Stim perf filters while reducing timer noise.
 - Report normalized conversions-per-second evidence for exact, approximate, and independent-to-disjoint conversion families.
 - Profile only after batched evidence separates arithmetic cost from timer overhead.
 - If profiling proves real arithmetic overhead, reduce temporary wrappers in internal loops, avoid repeated validation where public `Probability` boundaries have already validated inputs, and keep public validation at external API boundaries.

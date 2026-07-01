@@ -75,7 +75,7 @@ Revealed by: fresh M12 milestone audit of memory-gate evidence.
 Current text: the M12 done criterion said no primary workload may regress peak allocations or resident memory by more than 25 percent, while the implementation records allocation-counter maxima and samples process resident memory around each Stab-side benchmark measurement.
 Gap: the wording could be read as requiring true peak RSS tracking during the operation, but the implementation and reports provide sampled resident-memory evidence.
 Proposed amendment: describe the memory gate as peak live allocation evidence plus sampled resident-memory evidence, or replace the sampler with true peak-RSS tracking.
-Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now says completion-style memory runs fail rows missing sampled resident-memory evidence or exceeding the first complete Stab sampled resident-memory report by more than 25 percent, and the done criterion now says sampled resident memory instead of unqualified resident memory.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now says completion-style memory runs fail rows missing sampled resident-memory evidence and distinguishes historical schema-version-1 absolute sampled resident-memory checks from schema-version-2 row-local resident-delta checks with a 64 KiB absolute slack for page-granular RSS sampling noise. The done criterion now names sampled resident deltas for schema-version-2 memory evidence instead of unqualified resident memory.
 
 ## 2026-06-28 - M12: Profile Evidence Timing
 
@@ -93,7 +93,7 @@ Revealed by: milestone audit of M12 memory-gate evidence.
 Current text: M12 says no primary workload may regress peak allocations or resident memory by more than 25 percent relative to the first complete Stab benchmark report.
 Gap: the previous memory gate tracked Stab-side allocation counts and maximum live allocated bytes, but it did not measure resident set size.
 Proposed amendment: either narrow the done criterion to allocation counts and maximum live allocated bytes, or add RSS measurement to the benchmark report and memory gate before M12 completion.
-Resolution: `stab-bench compare --track-allocations` now samples Stab-side resident memory with `memory-stats`, records `resident_bytes` on measurements, promotes `stab_resident_bytes_max` to compare rows, and `--require-memory-gate` requires both allocation and resident-memory evidence. The historical M12 completion run passed with all 71 rows in `memory_gate_status=pass`, and the current post-beta `benchmarks/m12-primary-memory-baseline.json` records both `stab_allocation_bytes_max` and `stab_resident_bytes_max` for all 76 primary rows.
+Resolution: `stab-bench compare --track-allocations` now samples Stab-side resident memory with `memory-stats`, records both `resident_bytes` and `resident_delta_bytes` on measurements, promotes `stab_resident_bytes_max` and `stab_resident_delta_bytes_max` to compare rows, and `--require-memory-gate` requires allocation evidence plus the schema-selected resident-memory evidence. The historical M12 completion run passed with all 71 rows in `memory_gate_status=pass`, and the current post-beta `benchmarks/m12-primary-memory-baseline.json` uses schema version 2 with `stab_allocation_bytes_max`, `stab_resident_bytes_max`, and `stab_resident_delta_bytes_max` for the expanded 85-row primary matrix.
 
 ## 2026-06-28 - M12: Regression Threshold Automation
 

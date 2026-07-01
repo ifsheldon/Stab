@@ -270,30 +270,55 @@
       "follow_up": "Future broadening needs profiler evidence from a machine that permits stack sampling because local perf was blocked by perf_event_paranoid=4."
     },
     {
-      "id": "m10-error-decomp",
-      "before_report": "target/benchmarks/m12-primary-compare-probe/compare.json",
+      "id": "m7-convert-b8-to-b8-wide",
+      "before_report": "target/benchmarks/m12-primary-beta/compare.json",
       "before_evidence": {
         "gate_status": "fail",
-        "relative_ratio": 2.56,
+        "relative_ratio": 1.6303223990426075,
         "hot_path_status": "above-profiler-threshold",
-        "evidence_note": "The before report measured error decomposition above the beta gate and above the profiler-note threshold before paired submeasurement evidence exposed the tiny-filter bottleneck."
+        "evidence_note": "The expanded primary beta report measured the public wide packed convert row above the 1.25x beta gate and above the profiler-note threshold before byte-aligned identity conversion."
       },
       "after_report": "target/benchmarks/m12-primary-beta/compare.json",
       "after_evidence": {
         "gate_status": "pass",
-        "relative_ratio": 1.1111111111111112,
+        "relative_ratio": 0.0018439704138050598,
         "hot_path_status": "below-profiler-threshold",
-        "evidence_note": "The final clean beta-125 primary beta report measured every paired error-decomposition filter below the active 1.25x beta gate after inlining the tiny conversion helpers and avoiding redundant output validation for formulas with proven probability bounds."
+        "evidence_note": "The current primary beta diagnostic measured byte-aligned b8-to-b8 conversion far below the active 1.25x beta gate after validating the packed record byte width, writing the original bytes directly, and avoiding benchmark-harness output allocation."
       },
-      "dominant_cost": "The row median hid tiny independent/disjoint XYZ conversion filters where cross-crate call overhead and redundant Probability output validation dominated the closed-form arithmetic, while the longer Newton p10 and p100 filters were already close to the 1.25x gate.",
-      "optimization_summary": "Split the Stab-side direct-match measurements to match the pinned filters, added paired submeasurement ratio evidence, batched tiny direct-match timing, marked the tiny conversion helpers and probability accessors inline, and used a crate-private Probability constructor only for formulas whose output bounds are proven locally.",
+      "dominant_cost": "The previous public CLI convert path expanded byte-aligned b8 input into Vec<Vec<bool>> records and repacked them even when the output format and record layout were byte-identical.",
+      "optimization_summary": "Added a narrow byte-aligned b8-to-b8 identity path that still uses bounded input reading, validates record byte width, writes through the normal output path, keeps non-byte-aligned inputs on the canonical reader/writer path, and changed the benchmark runner to count primary output bytes instead of retaining them in a Vec.",
+      "semantic_checks": [
+        "cargo test -p stab-cli convert_b8_to_b8 --quiet",
+        "cargo test -p stab-cli convert --quiet"
+      ],
+      "follow_up": "Do not broaden same-format copying to non-byte-aligned b8 records unless tests prove padding-bit semantics remain canonical, and do not bypass observable side-output splitting."
+    },
+    {
+      "id": "m10-error-decomp",
+      "before_report": "target/benchmarks/m10-error-decomp-focused-before/compare.json",
+      "before_evidence": {
+        "gate_status": "fail",
+        "relative_ratio": 1.3559322033898304,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The focused before report measured the exact disjoint-to-independent pair above the 1.25x beta gate at 1.3559322033898304x and the p10 Newton fallback pair above the gate at 1.2621621621621621x."
+      },
+      "after_report": "target/benchmarks/m12-primary-beta/compare.json",
+      "after_evidence": {
+        "gate_status": "pass",
+        "relative_ratio": 1.1764705882352942,
+        "hot_path_status": "below-profiler-threshold",
+        "evidence_note": "The current primary beta diagnostic measured every paired error-decomposition filter below the active 1.25x beta gate after inlining tiny conversion helpers, splitting the exact closed-form branch out of the generic solver result path, keeping exact-branch validation minimal, and fast-rejecting zero-component disjoint cases that cannot decompose exactly."
+      },
+      "dominant_cost": "The row median hid tiny independent/disjoint XYZ conversion filters where exact closed-form overhead decided the remaining worst pair, while the p10 and p100 filters spent the full Newton fallback on disjoint triples with one zero component and two positive components even though those triples cannot be decomposed exactly.",
+      "optimization_summary": "Split the Stab-side direct-match measurements to match the pinned filters, added paired submeasurement ratio evidence, batched tiny direct-match timing, marked the tiny conversion helpers and probability accessors inline, split the exact closed-form branch out of the generic solver result path, kept exact-branch validation to the lower-bound checks needed by the closed-form proof, used a crate-private Probability constructor only for formulas whose output bounds are proven locally, and added a semantic fast reject for impossible zero-component disjoint triples.",
       "semantic_checks": [
         "cargo test -p stab-bench m10_dem_benchmark_rows_have_stab_compare_runners",
         "cargo test -p stab-bench compare_row_result_uses_worst_exact_submeasurement_ratio",
         "cargo test -p stab-bench direct_match_rows_use_positional_submeasurement_ratios_when_names_differ",
-        "cargo test -p stab-core error_decomp"
+        "cargo test -p stab-core error_decomp",
+        "cargo test -p stab-core --test dem_analyzer_pauli_channel_clifford --quiet"
       ],
-      "follow_up": "Keep all four direct pairs in beta evidence and promote additional schema-version-2 submeasurement thresholds only after repeated clean primary evidence shows the nanosecond exact and independent filters remain stable with enough headroom."
+      "follow_up": "Keep all four direct pairs in beta evidence and promote additional schema-version-2 submeasurement thresholds only after repeated clean primary evidence shows the exact, p100, and independent filters remain stable with enough headroom."
     }
   ]
 }

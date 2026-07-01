@@ -39,10 +39,19 @@ Among rows with faithful ratios, 70 were faster than pinned Stim and 2 were slow
 The clean beta report also proves the repaired `m8-reference-sample-tree` nested-circuit pair at `0.20833333333333334x`.
 The clean timing-regression report at `target/benchmarks/beta-125-primary-regression/compare.json` passed 72 configured threshold rows and 4 checked no-ratio waivers with zero ambiguous `not-configured` rows, and the clean memory-regression report at `target/benchmarks/m12-primary-memory-regression/compare.json` passed all 76 primary rows.
 
-The four current no-ratio beta waivers remain outside this performance optimization scope unless a faithful pinned-Stim ratio becomes available:
+After the M7 convert benchmark matrix expanded the primary set to 85 rows, the dirty-worktree beta probe at `target/benchmarks/m12-primary-beta/compare.json` from commit `bd9fef4e770bb4278f908fd6274e98ed4f4f14fb` with `local_modifications=true` exposed a renewed `m10-error-decomp` blocker at `1.3559322033898304x`.
+The first M10 fast-path diagnostic moved `m10-error-decomp` below the gate but exposed `m7-convert-b8-to-b8-wide` at `1.6303223990426075x` because byte-aligned packed `b8 -> b8` conversion expanded records into booleans and repacked them.
+The current dirty-worktree primary beta report at `target/benchmarks/m12-primary-beta/compare.json` keeps all four M10 direct pairs visible, passes the 85-row primary beta gate with 80 comparable rows and 5 checked `waived-not-comparable` no-ratio rows, reports `m10-error-decomp` at `1.1764705882352942x`, reports `m7-convert-b8-to-b8-wide` at `0.0018439704138050598x`, and keeps `approx_p10` protected by the existing schema-version-2 threshold.
+The current dirty-worktree timing-regression report at `target/benchmarks/m10-error-decomp-primary-regression/compare.json` passes with 80 configured threshold rows and 5 checked `waived-not-thresholdable` rows, including `m7-convert-b8-to-b8-wide` at `0.0015078042257655317x`.
+The current dirty-worktree memory-regression report at `target/benchmarks/m12-primary-memory-regression/compare.json` passes all 85 rows after the source memory baseline moved to schema version 2, which gates allocation bytes at the existing 25 percent budget and gates row-local resident deltas with a 64 KiB page-noise slack.
+This diagnostic adds a narrow byte-aligned `b8 -> b8` identity conversion, splits the exact closed-form error-decomposition branch out of the generic solver result path, and fixes the memory gate's order-sensitive absolute-RSS shape without weakening the allocation regression budget.
+These diagnostics are not final acceptance evidence until they are regenerated from committed code with `local_modifications=false`.
+
+The five current no-ratio beta waivers remain outside this performance optimization scope unless a faithful pinned-Stim ratio becomes available:
 
 - `m4-circuit-canonical-print`
 - `m7-convert-stim-canonical`
+- `m7-convert-01-to-ptb64`
 - `m8-measure-reader-ptb64-contract`
 - `m10-dem-print-contract`
 
@@ -206,7 +215,7 @@ Done criteria:
 - No slow direct submeasurement is hidden behind the row median.
 
 Status: implementation probe complete in the dirty-worktree primary beta report listed above.
-The accepted implementation keeps the benchmark shape, inlines the tiny conversion helpers and probability accessors across crate boundaries, and uses a crate-private `Probability` constructor only for formulas whose output bounds are proven locally.
+The accepted implementation keeps the benchmark shape, inlines the tiny conversion helpers and probability accessors across crate boundaries, uses a crate-private `Probability` constructor only for formulas whose output bounds are proven locally, minimizes exact-branch validation to the lower-bound checks needed by the closed-form proof, and fast-rejects one-zero two-positive disjoint triples that cannot decompose exactly.
 
 ## Milestone B5: Add Headroom To Near Misses
 
