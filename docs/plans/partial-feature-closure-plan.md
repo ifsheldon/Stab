@@ -75,7 +75,7 @@ Objective: complete non-deferred Rust API gaps for circuit, gate, target, refere
 
 Included features:
 
-- Circuit programmatic mutation: append text through the parser, clear, copy, insert, pop, concatenate, repeat, and file constructor or file writer helpers where they are useful Rust APIs. The implemented PF1 circuit API slices cover `clear`, Rust-native append-from-Stim-text parsing, the Stim Python compatibility alias name, and atomic parse-failure handling for text append.
+- Circuit programmatic mutation: append text through the parser, clear, copy, insert, pop, concatenate, repeat, and file constructor or file writer helpers where they are useful Rust APIs. The implemented PF1 circuit API slices cover `clear`, Rust-native append-from-Stim-text parsing, the Stim Python compatibility alias name, atomic parse-failure handling for text append, derived `Clone` copy semantics, circuit append and concatenation helpers, repeat special cases, nested repeat-count fusion, and repeat overflow rejection.
 - Circuit introspection: operation count, detector count, observable count, sweep-bit count, tick count, instruction-range views, and stable typed iterators. The first implemented PF1 circuit API slice covers top-level length, emptiness, measurement counts, detector counts, observable counts, tick counts, and sweep-bit counts.
 - Circuit coordinates: final qubit coordinates and detector coordinates, including coordinate shifts through repeat blocks. The first implemented PF1 circuit API slice covers folded final coordinate shifts and final qubit coordinates; detector-coordinate maps remain active PF1 work.
 - Reference samples and determined measurements: public Rust helpers for deterministic support used by sampler, detection, and analyzer flows.

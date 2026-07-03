@@ -2,9 +2,9 @@
 
 ## Summary
 
-This PF1 slice implements the bounded Rust circuit stats, final-coordinate query, and append-from-text mutation subset from `docs/plans/partial-feature-closure-plan.md`.
+This PF1 slice implements the bounded Rust circuit stats, final-coordinate query, and Rust mutation-helper subset from `docs/plans/partial-feature-closure-plan.md`.
 It does not claim full Python `stim.Circuit` API parity.
-Insert, pop, concatenation operators, file helpers, detector-coordinate maps, instruction-range views, stable typed iterators, reference-sample API closure, and determined-measurement API closure remain active PF1 work.
+Insert, pop, file helpers, detector-coordinate maps, instruction-range views, stable typed iterators, reference-sample API closure, and determined-measurement API closure remain active PF1 work.
 
 ## Implemented Surfaces
 
@@ -12,6 +12,8 @@ Insert, pop, concatenation operators, file helpers, detector-coordinate maps, in
 - Added public `Circuit::append_from_stim_text`, plus `Circuit::append_from_stim_program_text` as a Stim Python compatibility alias.
 - Text append parses into a temporary circuit before mutating the receiver, so parse failures leave the original circuit unchanged.
 - Text append uses the existing append path, so adjacent compatible instructions fuse and parsed tags or repeat blocks are preserved.
+- Added public `Circuit::append_circuit` and `Circuit::concatenated`, which copy circuit items and fuse compatible boundary instructions through the normal append path.
+- Added public `Circuit::repeated` and `Circuit::repeat_in_place`, including Stim-style special cases for zero and one repetitions, single-repeat-block count fusion, and overflow rejection.
 - Added public folded count methods for measurements, detectors, observables, ticks, and sweep bits.
 - Added public `Circuit::final_coordinate_shift` and `Circuit::final_qubit_coordinates`.
 - Added folded repeat handling for count and coordinate queries so large repeat blocks do not need full unrolling.
@@ -25,6 +27,8 @@ Implemented row:
 
 - `pf1-circuit-stats-coordinates`
 - `pf1-circuit-append-text`
+- `pf1-circuit-concat`
+- `pf1-circuit-repeat`
 
 Still broad and manifest-only:
 
@@ -49,7 +53,7 @@ Fresh probe rates from the current worktree:
 
 This benchmark remains `non-primary-report-only` because pinned Stim exposes comparable behavior through C++ and Python APIs but not through a faithful Rust direct baseline.
 It was not added to `benchmarks/m12-primary-thresholds.json`.
-No separate benchmark row was added for append-from-text because this helper is parser-backed mutation glue; the relevant high-volume path is covered by existing parser benchmarks and the PF1 coordinate-query row covers the PF1 query workload.
+No separate benchmark row was added for append-from-text, concatenation, or repetition helpers because these are structural mutation APIs rather than the PF1 high-volume query workload; parser-backed append is covered by existing parser benchmarks and the PF1 coordinate-query row covers the PF1 query workload.
 
 ## Verification Evidence
 
@@ -68,7 +72,7 @@ just bench::compare --only pf1-circuit-coordinate-query --baseline target/benchm
 
 ## Remaining PF1 Circuit API Work
 
-- Copy, insert, pop, concatenate, repeat, file constructor, and file writer helpers where they are useful Rust APIs.
+- Insert, pop, file constructor, and file writer helpers where they are useful Rust APIs.
 - Detector-coordinate maps and single-detector coordinate lookup.
 - Instruction-range views and stable typed iterators.
 - Public reference-sample helpers beyond the existing internal sampler support.

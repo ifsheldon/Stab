@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use stab_core::{Circuit, QubitId};
 
 #[test]
-fn circuit_counts_match_owned_upstream_semantics() {
+fn pf1_circuit_stats_counts_match_owned_upstream_semantics() {
     let circuit = Circuit::from_stim_str(
         "M 0 1\n\
          REPEAT 100 {\n\
@@ -32,7 +32,7 @@ fn circuit_counts_match_owned_upstream_semantics() {
 }
 
 #[test]
-fn circuit_measurement_counts_use_result_groups() {
+fn pf1_circuit_stats_measurement_counts_use_result_groups() {
     let circuit = Circuit::from_stim_str(
         "MPP X0*X1 Y2*Y3 Z4\n\
          MXX 5 6 7 8\n\
@@ -45,7 +45,7 @@ fn circuit_measurement_counts_use_result_groups() {
 }
 
 #[test]
-fn circuit_counts_do_not_unroll_large_repeats() {
+fn pf1_circuit_stats_counts_do_not_unroll_large_repeats() {
     let circuit = Circuit::from_stim_str(
         "REPEAT 1000000 {\n\
              REPEAT 1000000 {\n\
@@ -69,7 +69,7 @@ fn circuit_counts_do_not_unroll_large_repeats() {
 }
 
 #[test]
-fn circuit_counts_reject_folded_overflow() {
+fn pf1_circuit_stats_counts_reject_folded_overflow() {
     let circuit = Circuit::from_stim_str(
         "REPEAT 18446744073709551615 {\n\
              M 0 1\n\
@@ -88,7 +88,7 @@ fn circuit_counts_reject_folded_overflow() {
 }
 
 #[test]
-fn circuit_final_coordinate_shift_matches_nested_upstream_case() {
+fn pf1_circuit_stats_final_coordinate_shift_matches_nested_upstream_case() {
     let circuit = Circuit::from_stim_str(
         "REPEAT 1000 {\n\
              REPEAT 2000 {\n\
@@ -111,7 +111,7 @@ fn circuit_final_coordinate_shift_matches_nested_upstream_case() {
 }
 
 #[test]
-fn circuit_final_qubit_coordinates_apply_shifts_and_repeats() {
+fn pf1_circuit_stats_final_qubit_coordinates_apply_shifts_and_repeats() {
     let circuit = Circuit::from_stim_str(
         "QUBIT_COORDS(1, 2, 3) 0\n\
          QUBIT_COORDS(2) 1\n\
@@ -141,7 +141,7 @@ fn circuit_final_qubit_coordinates_apply_shifts_and_repeats() {
 }
 
 #[test]
-fn circuit_clear_resets_items_and_counts() {
+fn pf1_circuit_stats_clear_resets_items_and_counts() {
     let mut circuit = Circuit::from_stim_str("H 0\nM 0\nDETECTOR rec[-1]\n").expect("parse");
     circuit.clear();
 
@@ -153,7 +153,7 @@ fn circuit_clear_resets_items_and_counts() {
 }
 
 #[test]
-fn circuit_append_from_stim_text_preserves_tags_repeats_and_fuses() {
+fn pf1_circuit_append_text_preserves_tags_repeats_and_fuses() {
     let mut circuit = Circuit::from_stim_str("H[tag] 0\n").expect("parse base");
 
     circuit
@@ -182,7 +182,7 @@ fn circuit_append_from_stim_text_preserves_tags_repeats_and_fuses() {
 }
 
 #[test]
-fn circuit_append_from_stim_program_text_alias_appends() {
+fn pf1_circuit_append_text_program_alias_appends() {
     let mut circuit = Circuit::new();
 
     circuit
@@ -200,7 +200,7 @@ fn circuit_append_from_stim_program_text_alias_appends() {
 }
 
 #[test]
-fn circuit_append_from_stim_text_is_atomic_on_parse_error() {
+fn pf1_circuit_append_text_is_atomic_on_parse_error() {
     let mut circuit = Circuit::from_stim_str("H 0\nM 0\n").expect("parse base");
     let before = circuit.clone();
 
@@ -216,7 +216,75 @@ fn circuit_append_from_stim_text_is_atomic_on_parse_error() {
 }
 
 #[test]
-fn circuit_coordinate_queries_reject_non_finite_folded_shift() {
+fn pf1_circuit_concat_append_circuit_and_concatenated_fuse_boundary() {
+    let mut circuit = Circuit::from_stim_str("H[tag] 0\n").expect("parse base");
+    let rhs = Circuit::from_stim_str("H[tag] 1\nM 0\n").expect("parse rhs");
+
+    let concatenated = circuit.concatenated(&rhs);
+    circuit.append_circuit(&rhs);
+
+    let expected = "H[tag] 0 1\nM 0\n";
+    assert_eq!(circuit.to_stim_string(), expected);
+    assert_eq!(concatenated.to_stim_string(), expected);
+    assert_eq!(rhs.to_stim_string(), "H[tag] 1\nM 0\n");
+}
+
+#[test]
+fn pf1_circuit_repeat_matches_upstream_special_cases() {
+    let circuit = Circuit::from_stim_str("Y 3\nM 4\n").expect("parse circuit");
+
+    assert_eq!(
+        circuit.repeated(0).expect("repeat zero").to_stim_string(),
+        ""
+    );
+    assert_eq!(
+        circuit.repeated(1).expect("repeat one").to_stim_string(),
+        "Y 3\nM 4\n"
+    );
+    assert_eq!(
+        circuit.repeated(2).expect("repeat two").to_stim_string(),
+        concat!("REPEAT 2 {\n", "    Y 3\n", "    M 4\n", "}\n")
+    );
+
+    let mut in_place = circuit.clone();
+    in_place.repeat_in_place(3).expect("repeat in place");
+    assert_eq!(
+        in_place.to_stim_string(),
+        concat!("REPEAT 3 {\n", "    Y 3\n", "    M 4\n", "}\n")
+    );
+}
+
+#[test]
+fn pf1_circuit_repeat_fuses_single_repeat_block_counts() {
+    let circuit =
+        Circuit::from_stim_str("REPEAT[tag] 2 {\n    H[tag2] 0\n}\n").expect("parse circuit");
+
+    assert_eq!(
+        circuit.repeated(3).expect("repeat nested").to_stim_string(),
+        concat!("REPEAT 6 {\n", "    H[tag2] 0\n", "}\n")
+    );
+}
+
+#[test]
+fn pf1_circuit_repeat_rejects_fused_repeat_count_overflow() {
+    let circuit =
+        Circuit::from_stim_str("REPEAT 1234567890123456789 {\n    H 0\n}\n").expect("parse");
+
+    let error = circuit
+        .repeated(16)
+        .expect_err("reject repeat count overflow");
+
+    assert_eq!(
+        error,
+        stab_core::CircuitError::InvalidDomainValue {
+            kind: "repetition count",
+            value: "overflowed".to_string()
+        }
+    );
+}
+
+#[test]
+fn pf1_circuit_stats_coordinate_queries_reject_non_finite_folded_shift() {
     let circuit = Circuit::from_stim_str(
         "REPEAT 1000000000000 {\n\
              SHIFT_COORDS(1e308)\n\

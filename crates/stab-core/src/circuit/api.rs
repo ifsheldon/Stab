@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::{CircuitError, CircuitResult, GateTargetGroupKind, QubitId};
+use crate::{CircuitError, CircuitResult, GateTargetGroupKind, QubitId, RepeatCount};
 
-use super::{Circuit, CircuitInstruction, CircuitItem};
+use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 
 impl Circuit {
     pub fn len(&self) -> usize {
@@ -25,10 +25,7 @@ impl Circuit {
     pub fn append_from_stim_text(&mut self, input: &str) -> CircuitResult<()> {
         let parsed = Self::from_stim_str(input)?;
         for item in parsed.items {
-            match item {
-                CircuitItem::Instruction(instruction) => self.append_instruction(instruction),
-                CircuitItem::RepeatBlock(repeat) => self.append_repeat_block(repeat),
-            }
+            self.append_item(item);
         }
         Ok(())
     }
@@ -36,6 +33,58 @@ impl Circuit {
     /// Compatibility alias matching Stim's Python API name.
     pub fn append_from_stim_program_text(&mut self, input: &str) -> CircuitResult<()> {
         self.append_from_stim_text(input)
+    }
+
+    /// Appends a copy of another circuit, fusing adjacent compatible instructions at the boundary.
+    pub fn append_circuit(&mut self, other: &Self) {
+        for item in other.items.iter().cloned() {
+            self.append_item(item);
+        }
+    }
+
+    /// Returns a copy of this circuit followed by a copy of another circuit.
+    pub fn concatenated(&self, other: &Self) -> Self {
+        let mut result = self.clone();
+        result.append_circuit(other);
+        result
+    }
+
+    /// Returns this circuit repeated using Stim's repeat-block special cases.
+    pub fn repeated(&self, repetitions: u64) -> CircuitResult<Self> {
+        if repetitions == 0 {
+            return Ok(Self::new());
+        }
+        if repetitions == 1 {
+            return Ok(self.clone());
+        }
+        if let [CircuitItem::RepeatBlock(repeat)] = self.items() {
+            let repeat_count = repeat
+                .repeat_count()
+                .get()
+                .checked_mul(repetitions)
+                .ok_or_else(repetition_count_overflow)?;
+            return Ok(Self {
+                items: vec![CircuitItem::RepeatBlock(RepeatBlock::new(
+                    RepeatCount::try_new(repeat_count)?,
+                    repeat.body().clone(),
+                    None,
+                ))],
+            });
+        }
+
+        Ok(Self {
+            items: vec![CircuitItem::RepeatBlock(RepeatBlock::new(
+                RepeatCount::try_new(repetitions)?,
+                self.clone(),
+                None,
+            ))],
+        })
+    }
+
+    /// Mutates this circuit into its repeated form.
+    pub fn repeat_in_place(&mut self, repetitions: u64) -> CircuitResult<()> {
+        *self = self.repeated(repetitions)?;
+        Ok(())
     }
 
     pub fn count_measurements(&self) -> CircuitResult<u64> {
@@ -94,6 +143,13 @@ impl Circuit {
         apply_final_qubit_coordinates(self, &mut shift, &mut coordinates)?;
         Ok(coordinates)
     }
+
+    fn append_item(&mut self, item: CircuitItem) {
+        match item {
+            CircuitItem::Instruction(instruction) => self.append_instruction(instruction),
+            CircuitItem::RepeatBlock(repeat) => self.append_repeat_block(repeat),
+        }
+    }
 }
 
 fn flat_sum_operations(
@@ -136,6 +192,10 @@ fn flat_sum_operations(
 
 fn circuit_count_overflow() -> CircuitError {
     CircuitError::invalid_result_format("circuit count overflowed")
+}
+
+fn repetition_count_overflow() -> CircuitError {
+    CircuitError::invalid_domain_value("repetition count", "overflowed")
 }
 
 fn instruction_target_group_count(instruction: &CircuitInstruction) -> usize {
