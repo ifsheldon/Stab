@@ -41,6 +41,20 @@ pub(crate) enum Milestone {
     M11,
     #[serde(rename = "M12")]
     M12,
+    #[serde(rename = "PF1")]
+    Pf1,
+    #[serde(rename = "PF2")]
+    Pf2,
+    #[serde(rename = "PF3")]
+    Pf3,
+    #[serde(rename = "PF4")]
+    Pf4,
+    #[serde(rename = "PF5")]
+    Pf5,
+    #[serde(rename = "PF6")]
+    Pf6,
+    #[serde(rename = "PF7")]
+    Pf7,
 }
 
 impl Milestone {
@@ -55,6 +69,13 @@ impl Milestone {
             Self::M10 => "M10",
             Self::M11 => "M11",
             Self::M12 => "M12",
+            Self::Pf1 => "PF1",
+            Self::Pf2 => "PF2",
+            Self::Pf3 => "PF3",
+            Self::Pf4 => "PF4",
+            Self::Pf5 => "PF5",
+            Self::Pf6 => "PF6",
+            Self::Pf7 => "PF7",
         }
     }
 
@@ -69,7 +90,21 @@ impl Milestone {
             Self::M10,
             Self::M11,
             Self::M12,
+            Self::Pf1,
+            Self::Pf2,
+            Self::Pf3,
+            Self::Pf4,
+            Self::Pf5,
+            Self::Pf6,
+            Self::Pf7,
         ]
+    }
+
+    fn is_post_beta_plan(self) -> bool {
+        matches!(
+            self,
+            Self::Pf1 | Self::Pf2 | Self::Pf3 | Self::Pf4 | Self::Pf5 | Self::Pf6 | Self::Pf7
+        )
     }
 }
 
@@ -359,7 +394,12 @@ impl BenchmarkManifest {
 
 impl BenchmarkRow {
     pub(crate) fn is_primary(&self) -> bool {
-        self.milestone != Milestone::M12 && self.threshold_class != "baseline-metadata"
+        self.milestone != Milestone::M12
+            && !self.milestone.is_post_beta_plan()
+            && !matches!(
+                self.threshold_class.as_str(),
+                "baseline-metadata" | "non-primary-report-only"
+            )
     }
 
     pub(crate) fn argv_tokens(&self) -> Vec<String> {
@@ -562,6 +602,19 @@ mod tests {
                 .iter()
                 .all(|row| row.id != "m7-perf-harness" && row.milestone != super::Milestone::M12)
         );
+        assert!(primary.iter().all(|row| !row.milestone.is_post_beta_plan()));
+        for non_primary in [
+            "m9-detecting-regions-basic-batch",
+            "m9-missing-detectors-basic-batch",
+            "m9-feedback-inline-mpp-batch",
+            "pf1-circuit-coordinate-query",
+            "pf7-cli-legacy-dispatch-startup",
+        ] {
+            assert!(
+                primary.iter().all(|row| row.id != non_primary),
+                "{non_primary} should remain outside the primary matrix"
+            );
+        }
     }
 
     #[test]

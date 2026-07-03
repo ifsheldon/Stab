@@ -558,6 +558,7 @@ Done criteria:
 ## Future Plan
 
 Future work is intentionally outside the M0 through M12 core rewrite sequence. Start any of these only after the Rust library and CLI compatibility surface has passed the first public beta gate or after the roadmap is deliberately revised.
+Non-deferred partial Rust and CLI surfaces after M12 are governed by [partial-feature-closure-plan.md](partial-feature-closure-plan.md), [partial-feature-inventory.md](partial-feature-inventory.md), and [GOAL.md](GOAL.md). The future list below covers intentionally deferred surfaces and any full-parity work that remains outside those PF milestones.
 
 - Python bindings: add `pyo3` and `maturin` bindings after the Rust API is stable enough to avoid binding-driven churn.
 - JS/WASM: add browser bindings only after the Rust API has settled and the memory model is compatible with WASM constraints.
@@ -565,7 +566,7 @@ Future work is intentionally outside the M0 through M12 core rewrite sequence. S
 - Cirq, Sinter, StimFlow, ZX, and lattice-surgery integrations: treat as ecosystem projects, not core drop-in CLI requirements.
 - Diagrams, `stim explain_errors`, and `stim repl`: plan separately because they need different UX, rendering, and interactivity acceptance checks.
 - QASM and Quirk exports: revisit only if drop-in compatibility scope expands beyond the initial CLI order.
-- Full error-matcher provenance parity: promote generated surface-code repeat matching, heralded matching, repeat-contained noise stack frames, and full sparse reverse tracker consumption into explicit detector-analysis acceptance rows before claiming full `ErrorMatcher` parity.
+- Full detector-analysis parity: after the PF plan closes selected non-deferred Rust and CLI subcases, promote any remaining broader detecting-region gauge handling, MPP and observable missing-detector analysis, honeycomb suffix analysis, toric suffix analysis, generated surface-code repeat matching, heralded matching, repeat-contained noise stack frames, and full sparse reverse tracker consumption into explicit detector-analysis acceptance rows before claiming full analyzer utility parity.
 - GPU acceleration: run a GPU spike only for `CompiledSampler` and `CompiledDemSampler`, and only if CPU profiles show a large batch-parallel bottleneck.
 - GPU acceptance condition: a future GPU implementation must include a benchmark proving that transfer and launch overhead are amortized for the target batch sizes before production code is accepted.
 

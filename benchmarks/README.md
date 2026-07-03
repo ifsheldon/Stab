@@ -18,11 +18,13 @@ The default baseline command writes `target/benchmarks/baseline/latest/baseline.
 Any explicit `--out` value must be a repository-relative path under `target/benchmarks/`.
 Use `--only` with exact benchmark ids or milestone names, for example `--only m4-circuit-parse` or `--only M9`.
 Pass `--primary` to record only the frozen M12 primary matrix, using the same M4 through M11 row selection as `just bench::compare --primary`.
+Post-beta PF rows are planning placeholders for `docs/plans/partial-feature-closure-plan.md`.
+They are excluded from `--primary` until a later milestone replaces a placeholder with a real runner, source-owned comparability notes, and explicit threshold policy.
 
 `just bench::compare` reads `target/benchmarks/baseline/latest/baseline.json` by default.
 Pass `--baseline <path>` to compare against a different generated baseline report.
 Use `--only` on compare commands for focused probe evidence against baseline reports recorded with the same row filter.
-Pass `--primary` to select the frozen M12 primary matrix, which currently includes M4 through M11 benchmark rows except metadata anchors and the M12 placeholder row.
+Pass `--primary` to select the frozen M12 primary matrix, which currently includes M4 through M11 benchmark rows except metadata anchors, explicit `non-primary-report-only` rows, post-beta PF planning rows, and the M12 placeholder row.
 Pass `--profile release` to record the intended Cargo profile in compare output; the `just bench::compare` recipe builds the benchmark ops binary with Cargo's release profile before running the subcommand.
 Pass `--report target/benchmarks/latest` or another repository-relative directory below `target/benchmarks/` to write `compare.json` and `report.md`.
 Compare row ratios use paired measurement ratios when comparable submeasurements are available.

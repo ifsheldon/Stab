@@ -9,10 +9,12 @@ use thiserror::Error;
 
 use crate::{OracleError, RepoRoot, StderrClass, compare_exact, compare_help_health};
 
+mod milestone;
 mod outputs;
 mod paths;
 mod statistical;
 
+pub(crate) use milestone::Milestone;
 use paths::{fixture_file, prepare_fixture_output_file, validate_fixture_path};
 
 const FIXTURE_ROOT: &str = "oracle/fixtures";
@@ -27,7 +29,7 @@ pub(crate) enum RunMode {
 impl RunMode {
     fn milestone_filter(&self) -> Result<Option<Milestone>, FixtureError> {
         match self {
-            Self::Milestone(milestone) => Milestone::parse(milestone).map(Some),
+            Self::Milestone(milestone) => parse_milestone(milestone).map(Some),
             Self::ImplementedOnly | Self::All => Ok(None),
         }
     }
@@ -76,6 +78,10 @@ impl RunFilter {
     }
 }
 
+fn parse_milestone(value: &str) -> Result<Milestone, FixtureError> {
+    Milestone::parse(value).map_err(|milestone| FixtureError::UnknownMilestone { milestone })
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 struct FixtureRow {
     id: String,
@@ -92,65 +98,6 @@ struct FixtureRow {
     status: FixtureStatus,
     statistical_plan: String,
     source_license_note: String,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-enum Milestone {
-    #[serde(rename = "M0")]
-    M0,
-    #[serde(rename = "M4")]
-    M4,
-    #[serde(rename = "M5")]
-    M5,
-    #[serde(rename = "M6")]
-    M6,
-    #[serde(rename = "M7")]
-    M7,
-    #[serde(rename = "M8")]
-    M8,
-    #[serde(rename = "M9")]
-    M9,
-    #[serde(rename = "M10")]
-    M10,
-    #[serde(rename = "M11")]
-    M11,
-    #[serde(rename = "M12")]
-    M12,
-}
-
-impl Milestone {
-    fn parse(value: &str) -> Result<Self, FixtureError> {
-        match value {
-            "M0" => Ok(Self::M0),
-            "M4" => Ok(Self::M4),
-            "M5" => Ok(Self::M5),
-            "M6" => Ok(Self::M6),
-            "M7" => Ok(Self::M7),
-            "M8" => Ok(Self::M8),
-            "M9" => Ok(Self::M9),
-            "M10" => Ok(Self::M10),
-            "M11" => Ok(Self::M11),
-            "M12" => Ok(Self::M12),
-            _ => Err(FixtureError::UnknownMilestone {
-                milestone: value.to_string(),
-            }),
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::M0 => "M0",
-            Self::M4 => "M4",
-            Self::M5 => "M5",
-            Self::M6 => "M6",
-            Self::M7 => "M7",
-            Self::M8 => "M8",
-            Self::M9 => "M9",
-            Self::M10 => "M10",
-            Self::M11 => "M11",
-            Self::M12 => "M12",
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
@@ -411,7 +358,7 @@ pub(crate) enum FixtureError {
     Validation(Box<str>),
 
     #[error(
-        "unknown fixture milestone {milestone}; expected one of M0, M4, M5, M6, M7, M8, M9, M10, M11, or M12"
+        "unknown fixture milestone {milestone}; expected one of M0, M4, M5, M6, M7, M8, M9, M10, M11, M12, PF1, PF2, PF3, PF4, PF5, PF6, or PF7"
     )]
     UnknownMilestone { milestone: String },
 
@@ -728,7 +675,7 @@ impl FixtureRow {
 
 pub(crate) fn list_fixtures(root: &RepoRoot, milestone: Option<&str>) -> Result<(), OracleError> {
     let manifest = load_manifest(root)?;
-    let milestone_filter = milestone.map(Milestone::parse).transpose()?;
+    let milestone_filter = milestone.map(parse_milestone).transpose()?;
     manifest.list(milestone_filter);
     Ok(())
 }

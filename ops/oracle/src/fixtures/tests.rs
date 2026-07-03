@@ -74,6 +74,13 @@ fn milestone_run_mode_parses_m4_filter() {
 }
 
 #[test]
+fn milestone_run_mode_parses_post_beta_filter() {
+    let mode = RunMode::Milestone("PF5".to_string());
+
+    assert_eq!(mode.milestone_filter().unwrap(), Some(Milestone::Pf5));
+}
+
+#[test]
 fn run_filter_flags_select_one_comparator_family() {
     assert_eq!(RunFilter::from_flags(false, false, false).unwrap(), None);
     assert_eq!(
