@@ -153,6 +153,69 @@ fn circuit_clear_resets_items_and_counts() {
 }
 
 #[test]
+fn circuit_append_from_stim_text_preserves_tags_repeats_and_fuses() {
+    let mut circuit = Circuit::from_stim_str("H[tag] 0\n").expect("parse base");
+
+    circuit
+        .append_from_stim_text(
+            "H[tag] 1\n\
+             REPEAT[loop] 2 {\n\
+                 M[meas] 0\n\
+                 DETECTOR[det] rec[-1]\n\
+             }\n",
+        )
+        .expect("append text");
+
+    assert_eq!(
+        circuit.to_stim_string(),
+        concat!(
+            "H[tag] 0 1\n",
+            "REPEAT[loop] 2 {\n",
+            "    M[meas] 0\n",
+            "    DETECTOR[det] rec[-1]\n",
+            "}\n",
+        )
+    );
+    assert_eq!(circuit.len(), 2);
+    assert_eq!(circuit.count_measurements().expect("measurements"), 2);
+    assert_eq!(circuit.count_detectors().expect("detectors"), 2);
+}
+
+#[test]
+fn circuit_append_from_stim_program_text_alias_appends() {
+    let mut circuit = Circuit::new();
+
+    circuit
+        .append_from_stim_program_text(
+            "H[test] 0\n\
+             CX[test2] 1 2\n",
+        )
+        .expect("append text");
+
+    assert_eq!(
+        circuit.to_stim_string(),
+        "H[test] 0\n\
+         CX[test2] 1 2\n"
+    );
+}
+
+#[test]
+fn circuit_append_from_stim_text_is_atomic_on_parse_error() {
+    let mut circuit = Circuit::from_stim_str("H 0\nM 0\n").expect("parse base");
+    let before = circuit.clone();
+
+    let error = circuit
+        .append_from_stim_text(
+            "H 1\n\
+             NOT_A_GATE 2\n",
+        )
+        .expect_err("reject invalid append text");
+
+    assert!(error.to_string().contains("unknown gate"), "{error}");
+    assert_eq!(circuit, before);
+}
+
+#[test]
 fn circuit_coordinate_queries_reject_non_finite_folded_shift() {
     let circuit = Circuit::from_stim_str(
         "REPEAT 1000000000000 {\n\

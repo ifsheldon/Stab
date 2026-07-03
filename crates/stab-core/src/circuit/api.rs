@@ -17,6 +17,27 @@ impl Circuit {
         self.items.clear();
     }
 
+    /// Parses Stim circuit text and appends the resulting operations to this circuit.
+    ///
+    /// The text is parsed into a temporary circuit before mutating `self`, so parse failures leave
+    /// the existing circuit unchanged. Appended instructions use the normal append path, including
+    /// Stim-style fusion with the previous instruction when applicable.
+    pub fn append_from_stim_text(&mut self, input: &str) -> CircuitResult<()> {
+        let parsed = Self::from_stim_str(input)?;
+        for item in parsed.items {
+            match item {
+                CircuitItem::Instruction(instruction) => self.append_instruction(instruction),
+                CircuitItem::RepeatBlock(repeat) => self.append_repeat_block(repeat),
+            }
+        }
+        Ok(())
+    }
+
+    /// Compatibility alias matching Stim's Python API name.
+    pub fn append_from_stim_program_text(&mut self, input: &str) -> CircuitResult<()> {
+        self.append_from_stim_text(input)
+    }
+
     pub fn count_measurements(&self) -> CircuitResult<u64> {
         flat_sum_operations(self, |instruction| -> CircuitResult<u64> {
             if instruction.gate().produces_measurements() {
