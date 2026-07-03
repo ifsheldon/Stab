@@ -1,12 +1,95 @@
 use std::hint::black_box;
 
-use stab_core::{Gate, GateArgumentRule};
+use stab_core::{Circuit, Gate, GateArgumentRule};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
 
 use super::{TINY_DIRECT_COMPARE_REPETITIONS, measure_stab_batched, stab_runner_error};
+
+const CIRCUIT_STATS_FIXTURE: &str = r#"
+M 0 1
+REPEAT 1000000 {
+    REPEAT 1000 {
+        TICK
+        M 2
+        DETECTOR rec[-1]
+        OBSERVABLE_INCLUDE(3) rec[-1]
+        CY sweep[77] 3
+    }
+}
+"#;
+
+const CIRCUIT_COORDINATE_FIXTURE: &str = r#"
+QUBIT_COORDS(1, 2, 3) 0
+QUBIT_COORDS(2) 1
+SHIFT_COORDS(5)
+QUBIT_COORDS(3) 4
+REPEAT 1000000 {
+    SHIFT_COORDS(10, 1)
+    QUBIT_COORDS(7) 1
+}
+QUBIT_COORDS(0, 0) 2
+"#;
+
+pub(super) fn run_circuit_coordinate_row(
+    row: &BenchmarkRow,
+) -> Result<Vec<Measurement>, BenchError> {
+    let stats_circuit = Circuit::from_stim_str(CIRCUIT_STATS_FIXTURE)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let coordinate_circuit = Circuit::from_stim_str(CIRCUIT_COORDINATE_FIXTURE)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+
+    Ok(vec![
+        measure_stab_batched(
+            "stab_circuit_counts_nested_repeat",
+            TINY_DIRECT_COMPARE_REPETITIONS,
+            || {
+                let mut checksum = 0_u64;
+                checksum ^= stats_circuit
+                    .count_measurements()
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                checksum ^= stats_circuit
+                    .count_detectors()
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                checksum ^= stats_circuit
+                    .count_observables()
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                checksum ^= stats_circuit
+                    .count_ticks()
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                checksum ^= stats_circuit
+                    .count_sweep_bits()
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(checksum);
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_circuit_final_coordinate_shift_nested_repeat",
+            TINY_DIRECT_COMPARE_REPETITIONS,
+            || {
+                let shift = coordinate_circuit
+                    .final_coordinate_shift()
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(shift.len());
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_circuit_final_qubit_coordinates_nested_repeat",
+            TINY_DIRECT_COMPARE_REPETITIONS,
+            || {
+                let coordinates = coordinate_circuit
+                    .final_qubit_coordinates()
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(coordinates.len());
+                Ok(())
+            },
+        )?,
+    ])
+}
 
 pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let gates = Gate::all().collect::<Vec<_>>();
@@ -79,21 +162,32 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
 }
 
 pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
-    if row_id != "pf1-gate-metadata-lookup" {
-        return None;
+    if row_id == "pf1-circuit-coordinate-query" {
+        return match name {
+            "stab_circuit_counts_nested_repeat"
+            | "stab_circuit_final_coordinate_shift_nested_repeat"
+            | "stab_circuit_final_qubit_coordinates_nested_repeat" => Some((1.0, "queries/s")),
+            _ => None,
+        };
     }
-    match name {
-        "stab_gate_metadata_flags_all_gates" => Some((Gate::all().len() as f64, "gates/s")),
-        "stab_gate_metadata_inverse_all_gates" => Some((Gate::all().len() as f64, "gates/s")),
-        "stab_gate_metadata_alias_lookup_all_aliases" => {
-            Some((gate_alias_count() as f64, "lookups/s"))
-        }
-        _ => None,
+    if row_id == "pf1-gate-metadata-lookup" {
+        return match name {
+            "stab_gate_metadata_flags_all_gates" => Some((Gate::all().len() as f64, "gates/s")),
+            "stab_gate_metadata_inverse_all_gates" => Some((Gate::all().len() as f64, "gates/s")),
+            "stab_gate_metadata_alias_lookup_all_aliases" => {
+                Some((gate_alias_count() as f64, "lookups/s"))
+            }
+            _ => None,
+        };
     }
+    None
 }
 
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
+        "pf1-circuit-coordinate-query" => Some(
+            "contract-only: Stab measures Rust circuit count and final-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
+        ),
         "pf1-gate-metadata-lookup" => Some(
             "contract-only: Stab measures Rust gate metadata accessors and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
         ),

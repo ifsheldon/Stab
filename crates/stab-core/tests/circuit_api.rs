@@ -1,0 +1,172 @@
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "PF1 circuit API compatibility tests use direct assertions for compact diagnostics"
+)]
+
+use std::collections::BTreeMap;
+
+use stab_core::{Circuit, QubitId};
+
+#[test]
+fn circuit_counts_match_owned_upstream_semantics() {
+    let circuit = Circuit::from_stim_str(
+        "M 0 1\n\
+         REPEAT 100 {\n\
+             TICK\n\
+             M 2\n\
+             DETECTOR rec[-1]\n\
+             OBSERVABLE_INCLUDE(2) rec[-1]\n\
+             CY sweep[77] 3\n\
+         }\n",
+    )
+    .expect("parse circuit");
+
+    assert_eq!(circuit.len(), 2);
+    assert!(!circuit.is_empty());
+    assert_eq!(circuit.count_measurements().expect("measurements"), 102);
+    assert_eq!(circuit.count_detectors().expect("detectors"), 100);
+    assert_eq!(circuit.count_observables().expect("observables"), 3);
+    assert_eq!(circuit.count_ticks().expect("ticks"), 100);
+    assert_eq!(circuit.count_sweep_bits().expect("sweep bits"), 78);
+}
+
+#[test]
+fn circuit_measurement_counts_use_result_groups() {
+    let circuit = Circuit::from_stim_str(
+        "MPP X0*X1 Y2*Y3 Z4\n\
+         MXX 5 6 7 8\n\
+         HERALDED_ERASE(0.25) 9 10\n\
+         MPAD 0 1 0\n",
+    )
+    .expect("parse circuit");
+
+    assert_eq!(circuit.count_measurements().expect("measurements"), 10);
+}
+
+#[test]
+fn circuit_counts_do_not_unroll_large_repeats() {
+    let circuit = Circuit::from_stim_str(
+        "REPEAT 1000000 {\n\
+             REPEAT 1000000 {\n\
+                 M 0\n\
+                 DETECTOR rec[-1]\n\
+                 OBSERVABLE_INCLUDE(4) rec[-1]\n\
+             }\n\
+         }\n",
+    )
+    .expect("parse circuit");
+
+    assert_eq!(
+        circuit.count_measurements().expect("measurements"),
+        1_000_000_000_000
+    );
+    assert_eq!(
+        circuit.count_detectors().expect("detectors"),
+        1_000_000_000_000
+    );
+    assert_eq!(circuit.count_observables().expect("observables"), 5);
+}
+
+#[test]
+fn circuit_counts_reject_folded_overflow() {
+    let circuit = Circuit::from_stim_str(
+        "REPEAT 18446744073709551615 {\n\
+             M 0 1\n\
+         }\n",
+    )
+    .expect("parse circuit");
+
+    let error = circuit
+        .count_measurements()
+        .expect_err("reject count overflow");
+
+    assert!(
+        error.to_string().contains("circuit count overflowed"),
+        "{error}"
+    );
+}
+
+#[test]
+fn circuit_final_coordinate_shift_matches_nested_upstream_case() {
+    let circuit = Circuit::from_stim_str(
+        "REPEAT 1000 {\n\
+             REPEAT 2000 {\n\
+                 REPEAT 3000 {\n\
+                     SHIFT_COORDS(0, 0, 1)\n\
+                 }\n\
+                 SHIFT_COORDS(1)\n\
+             }\n\
+             SHIFT_COORDS(0, 1)\n\
+         }\n",
+    )
+    .expect("parse circuit");
+
+    assert_eq!(
+        circuit
+            .final_coordinate_shift()
+            .expect("final coordinate shift"),
+        vec![2_000_000.0, 1000.0, 6_000_000_000.0]
+    );
+}
+
+#[test]
+fn circuit_final_qubit_coordinates_apply_shifts_and_repeats() {
+    let circuit = Circuit::from_stim_str(
+        "QUBIT_COORDS(1, 2, 3) 0\n\
+         QUBIT_COORDS(2) 1\n\
+         SHIFT_COORDS(5)\n\
+         QUBIT_COORDS(3) 4\n\
+         REPEAT 3 {\n\
+             SHIFT_COORDS(10, 1)\n\
+             QUBIT_COORDS(7) 1\n\
+         }\n\
+         QUBIT_COORDS(0, 0) 2\n",
+    )
+    .expect("parse circuit");
+
+    let expected = BTreeMap::from([
+        (QubitId::new(0).unwrap(), vec![1.0, 2.0, 3.0]),
+        (QubitId::new(1).unwrap(), vec![42.0, 3.0]),
+        (QubitId::new(2).unwrap(), vec![35.0, 3.0]),
+        (QubitId::new(4).unwrap(), vec![8.0]),
+    ]);
+
+    assert_eq!(
+        circuit
+            .final_qubit_coordinates()
+            .expect("final qubit coordinates"),
+        expected
+    );
+}
+
+#[test]
+fn circuit_clear_resets_items_and_counts() {
+    let mut circuit = Circuit::from_stim_str("H 0\nM 0\nDETECTOR rec[-1]\n").expect("parse");
+    circuit.clear();
+
+    assert!(circuit.is_empty());
+    assert_eq!(circuit.len(), 0);
+    assert_eq!(circuit.to_stim_string(), "");
+    assert_eq!(circuit.count_measurements().expect("measurements"), 0);
+    assert_eq!(circuit.count_detectors().expect("detectors"), 0);
+}
+
+#[test]
+fn circuit_coordinate_queries_reject_non_finite_folded_shift() {
+    let circuit = Circuit::from_stim_str(
+        "REPEAT 1000000000000 {\n\
+             SHIFT_COORDS(1e308)\n\
+         }\n",
+    )
+    .expect("parse circuit");
+
+    let error = circuit
+        .final_coordinate_shift()
+        .expect_err("reject infinite coordinate shift");
+
+    assert!(
+        error.to_string().contains("coordinate shift overflowed"),
+        "{error}"
+    );
+}

@@ -75,9 +75,9 @@ Objective: complete non-deferred Rust API gaps for circuit, gate, target, refere
 
 Included features:
 
-- Circuit programmatic mutation: append text through the parser, clear, copy, insert, pop, concatenate, repeat, and file constructor or file writer helpers where they are useful Rust APIs.
-- Circuit introspection: operation count, detector count, observable count, sweep-bit count, tick count, instruction-range views, and stable typed iterators.
-- Circuit coordinates: final qubit coordinates and detector coordinates, including coordinate shifts through repeat blocks.
+- Circuit programmatic mutation: append text through the parser, clear, copy, insert, pop, concatenate, repeat, and file constructor or file writer helpers where they are useful Rust APIs. The first implemented PF1 circuit API slice covers `clear`.
+- Circuit introspection: operation count, detector count, observable count, sweep-bit count, tick count, instruction-range views, and stable typed iterators. The first implemented PF1 circuit API slice covers top-level length, emptiness, measurement counts, detector counts, observable counts, tick counts, and sweep-bit counts.
+- Circuit coordinates: final qubit coordinates and detector coordinates, including coordinate shifts through repeat blocks. The first implemented PF1 circuit API slice covers folded final coordinate shifts and final qubit coordinates; detector-coordinate maps remain active PF1 work.
 - Reference samples and determined measurements: public Rust helpers for deterministic support used by sampler, detection, and analyzer flows.
 - Gate metadata: Rust-accessible metadata for aliases, inverse, category, target requirements, validation flags, flow, unitary/tableau, and decomposition where Stim semantics depend on it. The first implemented PF1 slice covers aliases, argument rules, target rules, target grouping, fusing, noisy/reset/measurement/unitary/single-qubit/two-qubit/target-capability/symmetry flags, unitary inverse, and generalized inverse; flow data, tableau data, unitary matrices, and decomposition metadata remain active PF1 work.
 - DEM construction and mutation basics: clear, copy, append text or parsed instruction helpers, repeat helpers, and ergonomic typed constructors that do not clone Python operators merely for shape.

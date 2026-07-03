@@ -8,6 +8,8 @@ use crate::{CircuitError, CircuitResult, Gate, ObservableId, Probability, Repeat
 const MAX_CIRCUIT_PARSE_LINES: usize = 1_000_000;
 const MAX_CIRCUIT_REPEAT_NESTING: usize = 256;
 
+mod api;
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Circuit {
     items: Vec<CircuitItem>,

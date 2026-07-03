@@ -278,6 +278,47 @@ fn m4_gate_lookup_benchmark_splits_lookup_surfaces() {
 }
 
 #[test]
+fn pf1_circuit_coordinate_benchmark_reports_public_query_surfaces() {
+    let row = BenchmarkRow {
+        id: "pf1-circuit-coordinate-query".to_string(),
+        milestone: Milestone::Pf1,
+        threshold_class: "non-primary-report-only".to_string(),
+        runner: Runner::ContractOnly,
+        upstream_source: "src/stim/circuit/circuit.perf.cc".to_string(),
+        stim_perf_filter: String::new(),
+        argv: String::new(),
+        stdin_path: String::new(),
+        phase: "analysis".to_string(),
+        measurement: "circuit-coordinate-query".to_string(),
+        description: "test row".to_string(),
+    };
+
+    let measurements = run_stab_compare_row(&row)
+        .expect("run compare row")
+        .expect("Stab runner");
+    let names = measurements
+        .iter()
+        .map(|measurement| measurement.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        names,
+        [
+            "stab_circuit_counts_nested_repeat",
+            "stab_circuit_final_coordinate_shift_nested_repeat",
+            "stab_circuit_final_qubit_coordinates_nested_repeat",
+        ]
+    );
+    assert!(compare_note("pf1-circuit-coordinate-query").is_some());
+    for name in names {
+        assert!(
+            measurement_work("pf1-circuit-coordinate-query", name).is_some(),
+            "pf1-circuit-coordinate-query/{name} should report normalized work"
+        );
+    }
+}
+
+#[test]
 fn pf1_gate_metadata_benchmark_reports_public_metadata_surfaces() {
     let row = BenchmarkRow {
         id: "pf1-gate-metadata-lookup".to_string(),
