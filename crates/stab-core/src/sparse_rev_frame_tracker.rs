@@ -6,8 +6,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, QubitId,
-    Target,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, Pauli,
+    QubitId, Target,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -82,6 +82,18 @@ impl SparseReverseFrameTracker {
             }
             _ => Ok(()),
         }
+    }
+
+    pub(crate) fn feedback_sensitivity(
+        &self,
+        qubit: QubitId,
+        feedback: Pauli,
+    ) -> CircuitResult<BTreeSet<DemTarget>> {
+        self.anticommuting_sensitivity(qubit, TrackerBasis::from_pauli(feedback))
+    }
+
+    pub(crate) fn absolute_record_index_from_offset(&self, offset: i32) -> CircuitResult<usize> {
+        self.record_index_from_offset(offset)
     }
 
     fn undo_measure_resets(
@@ -255,6 +267,12 @@ impl SparseReverseFrameTracker {
             };
             if control.is_measurement_record_target() {
                 self.undo_classical_feedback(instruction, control, target)?;
+            } else if target.is_measurement_record_target() {
+                self.undo_classical_feedback(instruction, target, control)?;
+            } else if control.is_sweep_bit_target() || target.is_sweep_bit_target() {
+                // Sweep-controlled Paulis are preserved by the feedback-inlining
+                // transform. The sparse tracker currently has no symbolic sweep
+                // branch, so they do not affect fixed detector sensitivities here.
             } else {
                 self.undo_quantum_controlled_pauli(instruction, control, target)?;
             }
@@ -319,6 +337,20 @@ impl SparseReverseFrameTracker {
                 self.toggle_zs(control, &target_zs)?;
                 let control_xs = self.xs_for(control)?.clone();
                 self.toggle_xs(target, &control_xs)?;
+                Ok(())
+            }
+            "CZ" => {
+                let target_xs = self.xs_for(target)?.clone();
+                self.toggle_zs(control, &target_xs)?;
+                let control_xs = self.xs_for(control)?.clone();
+                self.toggle_zs(target, &control_xs)?;
+                Ok(())
+            }
+            "CY" if self.xs_for(control)?.is_empty()
+                && self.zs_for(control)?.is_empty()
+                && self.xs_for(target)?.is_empty()
+                && self.zs_for(target)?.is_empty() =>
+            {
                 Ok(())
             }
             name => Err(CircuitError::invalid_detector_error_model(format!(
@@ -712,7 +744,7 @@ mod tests {
         reason = "unit tests use direct fixed-width tracker assertions for compact diagnostics"
     )]
 
-    use crate::{Gate, MeasureRecordOffset, Pauli, measurement_record_count};
+    use crate::{Gate, MeasureRecordOffset, measurement_record_count};
 
     use super::*;
 

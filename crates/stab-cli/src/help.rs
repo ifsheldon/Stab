@@ -125,7 +125,7 @@ fn command_help(command: &str) -> Option<String> {
             "stab detect\n\nSamples detector events and observable flips from a circuit.\n\nKey flags: --shots, --in, --out, --out_format, --obs_out, --obs_out_format, --append_observables, --prepend_observables, and --seed.\n"
         }
         "m2d" => {
-            "stab m2d\n\nConverts measurement records into detector-event records using a circuit.\n\nKey flags: --circuit, --in_format, --out_format, --in, --out, --obs_out, --obs_out_format, --append_observables, --skip_reference_sample, and --frame0.\n"
+            "stab m2d\n\nConverts measurement records into detector-event records using a circuit.\n\nKey flags: --circuit, --in_format, --out_format, --in, --out, --sweep, --sweep_format, --obs_out, --obs_out_format, --append_observables, --skip_reference_sample, and --ran_without_feedback.\n"
         }
         "analyze_errors" => {
             "stab analyze_errors\n\nConverts a supported circuit into a detector error model.\n\nKey flags: --in, --out, --decompose_errors, --fold_loops, --allow_gauge_detectors, --approximate_disjoint_errors, --block_decomposition_from_introducing_remnant_edges, and --ignore_decomposition_failures.\n"

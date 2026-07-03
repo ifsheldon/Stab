@@ -4,6 +4,7 @@
 
 pub mod bits;
 mod circuit;
+mod circuit_feedback;
 mod circuit_flow;
 mod circuit_generation;
 mod circuit_inverse;
@@ -29,6 +30,7 @@ mod target;
 
 pub use bits::{BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVec, SparseXorVec};
 pub use circuit::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
+pub use circuit_feedback::circuit_with_inlined_feedback;
 pub use circuit_flow::{check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators};
 pub use circuit_generation::{
     CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
@@ -50,10 +52,10 @@ pub use dem_sampler::CompiledDemSampler;
 pub use detection::{
     CompiledDetectionConverter, DetectionConversionOptions, DetectionConversionOutput,
     DetectionEventRecord, DetectionObservableOutputMode, convert_measurements_to_detection_events,
-    detection_record_width, measurement_record_count, sample_detection_events,
-    try_for_each_sampled_detection_event, validate_detection_sampling_circuit,
-    write_detection_records, write_observable_records, write_ptb64_detection_records,
-    write_ptb64_observable_records,
+    convert_measurements_to_detection_events_with_sweep, detection_record_width,
+    measurement_record_count, sample_detection_events, try_for_each_sampled_detection_event,
+    validate_detection_sampling_circuit, write_detection_records, write_observable_records,
+    write_ptb64_detection_records, write_ptb64_observable_records,
 };
 pub use error::{CircuitError, CircuitResult};
 pub use error_matcher::explain_errors_from_circuit;

@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::path::PathBuf;
@@ -5,7 +6,7 @@ use std::path::PathBuf;
 use clap::Args;
 use stab_core::{
     CircuitError, CompiledDetectionConverter, DetectionConversionOptions, DetectionEventRecord,
-    DetectionObservableOutputMode,
+    DetectionObservableOutputMode, circuit_with_inlined_feedback,
     result_formats::{read_measurement_records, validate_ptb64_shot_count},
     try_for_each_sampled_detection_event, validate_detection_sampling_circuit,
 };
@@ -78,6 +79,14 @@ pub(crate) struct M2dArgs {
     /// Input measurement format.
     #[arg(long = "in_format", value_enum)]
     in_format: RecordFormatArg,
+
+    /// Optional sweep-bit input path.
+    #[arg(long = "sweep")]
+    sweep: Option<PathBuf>,
+
+    /// Input sweep-bit format.
+    #[arg(long = "sweep_format", value_enum, default_value = "01")]
+    sweep_format: RecordFormatArg,
 
     /// Output detection-event format.
     #[arg(long = "out_format", value_enum, default_value = "01")]
@@ -163,9 +172,6 @@ where
     R: Read,
     W: Write,
 {
-    if args.ran_without_feedback {
-        return Err(CliError::UnsupportedRanWithoutFeedback);
-    }
     validate_m2d_output_formats(&args)?;
     let circuit_bytes = read_limited_input(
         Some(&args.circuit),
@@ -174,6 +180,11 @@ where
         "m2d circuit input",
     )?;
     let circuit = parse_circuit_bytes(&circuit_bytes)?;
+    let circuit = if args.ran_without_feedback {
+        circuit_with_inlined_feedback(&circuit)?
+    } else {
+        circuit
+    };
     let converter = CompiledDetectionConverter::compile(
         &circuit,
         DetectionConversionOptions {
@@ -187,22 +198,80 @@ where
         .as_ref()
         .map(FileOutputSink::create)
         .transpose()?;
+    let mut reference_sample = converter.reusable_reference_sample();
+    let mut detection_record = converter.reusable_detection_record();
+    if let Some(sweep_path) = args.sweep.as_ref() {
+        let mut measurements = M2dRecordStream::from_path_or_stdin(
+            args.input.as_ref(),
+            input,
+            args.in_format,
+            converter.measurement_count(),
+            "m2d measurement input",
+        )?;
+        let mut sweeps = M2dRecordStream::from_path(
+            sweep_path,
+            args.sweep_format,
+            converter.sweep_bit_count(),
+            "m2d sweep input",
+        )?;
+        loop {
+            match measurements.next_record()? {
+                Some(measurement_record) => {
+                    let Some(sweep_record) = sweeps.next_record()? else {
+                        return Err(invalid_result_format(
+                            "m2d measurement input has more records than sweep input",
+                        ));
+                    };
+                    converter.convert_record_with_sweep_into(
+                        &measurement_record,
+                        &sweep_record,
+                        &mut reference_sample,
+                        &mut detection_record,
+                    )?;
+                    write_m2d_stream_record(
+                        &detection_record,
+                        observable_mode,
+                        args.out_format,
+                        args.obs_out_format,
+                        &mut primary_output,
+                        observable_output.as_mut(),
+                    )?;
+                }
+                None => {
+                    if sweeps.finish_empty_b8_zero_width_sweep_after_measurement_eof()? {
+                        return Ok(());
+                    }
+                    if sweeps.next_record()?.is_none() {
+                        return Ok(());
+                    }
+                    return Err(invalid_result_format(
+                        "m2d sweep input has more records than measurement input",
+                    ));
+                }
+            }
+        }
+    }
+    let sweep_record = vec![false; converter.sweep_bit_count()];
     for_each_m2d_measurement_record(
         args.input.as_ref(),
         input,
         args.in_format,
         converter.measurement_count(),
         |measurement_record| {
-            converter.try_for_each_detection_event(std::iter::once(measurement_record), |record| {
-                write_m2d_stream_record(
-                    record,
-                    observable_mode,
-                    args.out_format,
-                    args.obs_out_format,
-                    &mut primary_output,
-                    observable_output.as_mut(),
-                )
-            })
+            converter.convert_record_with_sweep_into(
+                measurement_record,
+                &sweep_record,
+                &mut reference_sample,
+                &mut detection_record,
+            )?;
+            write_m2d_stream_record(
+                &detection_record,
+                observable_mode,
+                args.out_format,
+                args.obs_out_format,
+                &mut primary_output,
+                observable_output.as_mut(),
+            )
         },
     )
 }
@@ -270,6 +339,186 @@ fn read_error(path: Option<&PathBuf>, source: std::io::Error) -> CliError {
     CliError::ReadInput(source)
 }
 
+struct M2dRecordStream<'a> {
+    reader: Box<dyn BufRead + 'a>,
+    input_path: Option<PathBuf>,
+    format: RecordFormatArg,
+    bits_per_record: usize,
+    kind: &'static str,
+    ptb64_records: VecDeque<Vec<bool>>,
+    empty_b8_zero_width_sweep_checked: bool,
+}
+
+impl<'a> M2dRecordStream<'a> {
+    fn from_path_or_stdin<R>(
+        input_path: Option<&PathBuf>,
+        stdin: &'a mut R,
+        format: RecordFormatArg,
+        bits_per_record: usize,
+        kind: &'static str,
+    ) -> Result<Self, CliError>
+    where
+        R: Read + 'a,
+    {
+        let reader: Box<dyn BufRead + 'a> = if let Some(path) = input_path {
+            Box::new(BufReader::new(File::open(path).map_err(|source| {
+                CliError::ReadPath {
+                    path: path.clone(),
+                    source,
+                }
+            })?))
+        } else {
+            Box::new(BufReader::new(stdin))
+        };
+        Ok(Self {
+            reader,
+            input_path: input_path.cloned(),
+            format,
+            bits_per_record,
+            kind,
+            ptb64_records: VecDeque::new(),
+            empty_b8_zero_width_sweep_checked: false,
+        })
+    }
+
+    fn from_path(
+        input_path: &PathBuf,
+        format: RecordFormatArg,
+        bits_per_record: usize,
+        kind: &'static str,
+    ) -> Result<Self, CliError> {
+        let file = File::open(input_path).map_err(|source| CliError::ReadPath {
+            path: input_path.clone(),
+            source,
+        })?;
+        Ok(Self {
+            reader: Box::new(BufReader::new(file)),
+            input_path: Some(input_path.clone()),
+            format,
+            bits_per_record,
+            kind,
+            ptb64_records: VecDeque::new(),
+            empty_b8_zero_width_sweep_checked: false,
+        })
+    }
+
+    fn is_b8_zero_width_sweep(&self) -> bool {
+        self.kind == "m2d sweep input"
+            && self.format == RecordFormatArg::B8
+            && self.bits_per_record == 0
+    }
+
+    fn finish_empty_b8_zero_width_sweep_after_measurement_eof(&mut self) -> Result<bool, CliError> {
+        if !self.is_b8_zero_width_sweep() {
+            return Ok(false);
+        }
+        self.validate_empty_b8_zero_width_sweep()?;
+        Ok(true)
+    }
+
+    fn next_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
+        match self.format {
+            RecordFormatArg::ZeroOne | RecordFormatArg::Hits | RecordFormatArg::Dets => {
+                let Some(line) =
+                    read_m2d_line(&mut self.reader, self.input_path.as_ref(), self.kind)?
+                else {
+                    return Ok(None);
+                };
+                let sample_format = self.format.sample_format()?;
+                decode_single_m2d_record(&line, sample_format, self.bits_per_record, self.kind)
+                    .map(Some)
+            }
+            RecordFormatArg::B8 => self.next_b8_record(),
+            RecordFormatArg::R8 => read_m2d_r8_record(
+                &mut self.reader,
+                self.input_path.as_ref(),
+                self.bits_per_record,
+                self.kind,
+            ),
+            RecordFormatArg::Ptb64 => self.next_ptb64_record(),
+            RecordFormatArg::Stim => Err(CliError::UnsupportedConversion),
+        }
+    }
+
+    fn next_b8_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
+        let bytes_per_record = self.bits_per_record.div_ceil(8);
+        if bytes_per_record == 0 {
+            if self.is_b8_zero_width_sweep() {
+                self.validate_empty_b8_zero_width_sweep()?;
+                return Ok(Some(Vec::new()));
+            }
+            return Err(invalid_result_format(format!(
+                "{} b8 input cannot represent zero-width records",
+                self.kind
+            )));
+        }
+        let mut record_bytes = vec![0u8; bytes_per_record];
+        match read_m2d_exact_record_bytes(
+            &mut self.reader,
+            self.input_path.as_ref(),
+            &mut record_bytes,
+            self.kind,
+        )? {
+            RecordRead::Complete => decode_single_m2d_record(
+                &record_bytes,
+                stab_core::SampleFormat::B8,
+                self.bits_per_record,
+                self.kind,
+            )
+            .map(Some),
+            RecordRead::EofBeforeRecord => Ok(None),
+        }
+    }
+
+    fn validate_empty_b8_zero_width_sweep(&mut self) -> Result<(), CliError> {
+        if self.empty_b8_zero_width_sweep_checked {
+            return Ok(());
+        }
+        let mut byte = [0u8; 1];
+        match self.reader.read(&mut byte) {
+            Ok(0) => {
+                self.empty_b8_zero_width_sweep_checked = true;
+                Ok(())
+            }
+            Ok(_) => Err(invalid_result_format(
+                "m2d sweep input b8 zero-width input must be empty",
+            )),
+            Err(source) => Err(read_error(self.input_path.as_ref(), source)),
+        }
+    }
+
+    fn next_ptb64_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
+        if let Some(record) = self.ptb64_records.pop_front() {
+            return Ok(Some(record));
+        }
+        if self.bits_per_record == 0 {
+            return Err(invalid_result_format(format!(
+                "{} ptb64 input cannot infer a shot count for zero-width records",
+                self.kind
+            )));
+        }
+        let bytes_per_group = self
+            .bits_per_record
+            .checked_mul(8)
+            .ok_or(CliError::MeasurementCountOverflow)?;
+        let mut group_bytes = vec![0u8; bytes_per_group];
+        match read_m2d_exact_record_bytes(
+            &mut self.reader,
+            self.input_path.as_ref(),
+            &mut group_bytes,
+            self.kind,
+        )? {
+            RecordRead::Complete => {
+                self.ptb64_records = decode_ptb64_group(&group_bytes, self.bits_per_record)?
+                    .into_iter()
+                    .collect();
+                Ok(self.ptb64_records.pop_front())
+            }
+            RecordRead::EofBeforeRecord => Ok(None),
+        }
+    }
+}
+
 fn for_each_m2d_measurement_record<R, F>(
     input_path: Option<&PathBuf>,
     stdin: &mut R,
@@ -281,68 +530,14 @@ where
     R: Read,
     F: FnMut(&[bool]) -> Result<(), CliError>,
 {
-    if let Some(path) = input_path {
-        let file = File::open(path).map_err(|source| CliError::ReadPath {
-            path: path.clone(),
-            source,
-        })?;
-        let mut reader = BufReader::new(file);
-        return for_each_m2d_measurement_record_from_reader(
-            &mut reader,
-            Some(path),
-            format,
-            measurement_width,
-            visit,
-        );
-    }
-    let mut reader = BufReader::new(stdin);
-    for_each_m2d_measurement_record_from_reader(
-        &mut reader,
-        None,
+    let mut records = M2dRecordStream::from_path_or_stdin(
+        input_path,
+        stdin,
         format,
         measurement_width,
-        &mut visit,
-    )
-}
-
-fn for_each_m2d_measurement_record_from_reader<R, F>(
-    reader: &mut R,
-    input_path: Option<&PathBuf>,
-    format: RecordFormatArg,
-    measurement_width: usize,
-    visit: F,
-) -> Result<(), CliError>
-where
-    R: BufRead,
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
-    match format {
-        RecordFormatArg::ZeroOne | RecordFormatArg::Hits | RecordFormatArg::Dets => {
-            for_each_m2d_text_record(reader, input_path, format, measurement_width, visit)
-        }
-        RecordFormatArg::B8 => for_each_m2d_b8_record(reader, input_path, measurement_width, visit),
-        RecordFormatArg::R8 => for_each_m2d_r8_record(reader, input_path, measurement_width, visit),
-        RecordFormatArg::Ptb64 => {
-            for_each_m2d_ptb64_record(reader, input_path, measurement_width, visit)
-        }
-        RecordFormatArg::Stim => Err(CliError::UnsupportedConversion),
-    }
-}
-
-fn for_each_m2d_text_record<R, F>(
-    reader: &mut R,
-    input_path: Option<&PathBuf>,
-    format: RecordFormatArg,
-    measurement_width: usize,
-    mut visit: F,
-) -> Result<(), CliError>
-where
-    R: BufRead,
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
-    let sample_format = format.sample_format()?;
-    while let Some(line) = read_m2d_line(reader, input_path)? {
-        let record = decode_single_m2d_record(&line, sample_format, measurement_width)?;
+        "m2d measurement input",
+    )?;
+    while let Some(record) = records.next_record()? {
         visit(&record)?;
     }
     Ok(())
@@ -351,9 +546,10 @@ where
 fn read_m2d_line<R>(
     reader: &mut R,
     input_path: Option<&PathBuf>,
+    kind: &'static str,
 ) -> Result<Option<Vec<u8>>, CliError>
 where
-    R: BufRead,
+    R: BufRead + ?Sized,
 {
     let mut line = Vec::new();
     let bytes = reader
@@ -364,7 +560,7 @@ where
     }
     if line.len() > MAX_M2D_TEXT_RECORD_BYTES {
         return Err(CliError::InputTooLarge {
-            kind: "m2d text record",
+            kind,
             limit: u64::try_from(MAX_M2D_TEXT_RECORD_BYTES).unwrap_or(u64::MAX),
         });
     }
@@ -375,71 +571,25 @@ fn decode_single_m2d_record(
     input: &[u8],
     format: stab_core::SampleFormat,
     measurement_width: usize,
+    kind: &str,
 ) -> Result<Vec<bool>, CliError> {
     let records = read_measurement_records(input, format, measurement_width)?;
     let [record] = <[Vec<bool>; 1]>::try_from(records).map_err(|records| {
         CircuitError::InvalidResultFormat {
-            message: format!("m2d record decoded into {} records", records.len()),
+            message: format!("{kind} record decoded into {} records", records.len()),
         }
     })?;
     Ok(record)
-}
-
-fn for_each_m2d_b8_record<R, F>(
-    reader: &mut R,
-    input_path: Option<&PathBuf>,
-    measurement_width: usize,
-    mut visit: F,
-) -> Result<(), CliError>
-where
-    R: Read,
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
-    let bytes_per_record = measurement_width.div_ceil(8);
-    if bytes_per_record == 0 {
-        return Err(invalid_result_format(
-            "b8 input cannot represent zero-width records",
-        ));
-    }
-    let mut record_bytes = vec![0u8; bytes_per_record];
-    loop {
-        match read_m2d_exact_record_bytes(reader, input_path, &mut record_bytes)? {
-            RecordRead::Complete => {
-                let record = decode_single_m2d_record(
-                    &record_bytes,
-                    stab_core::SampleFormat::B8,
-                    measurement_width,
-                )?;
-                visit(&record)?;
-            }
-            RecordRead::EofBeforeRecord => return Ok(()),
-        }
-    }
-}
-
-fn for_each_m2d_r8_record<R, F>(
-    reader: &mut R,
-    input_path: Option<&PathBuf>,
-    measurement_width: usize,
-    mut visit: F,
-) -> Result<(), CliError>
-where
-    R: Read,
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
-    while let Some(record) = read_m2d_r8_record(reader, input_path, measurement_width)? {
-        visit(&record)?;
-    }
-    Ok(())
 }
 
 fn read_m2d_r8_record<R>(
     reader: &mut R,
     input_path: Option<&PathBuf>,
     bits_per_record: usize,
+    kind: &'static str,
 ) -> Result<Option<Vec<bool>>, CliError>
 where
-    R: Read,
+    R: Read + ?Sized,
 {
     let mut record = vec![false; bits_per_record];
     let mut bit_index = 0usize;
@@ -449,71 +599,43 @@ where
         match reader.read(&mut byte) {
             Ok(0) if !read_any => return Ok(None),
             Ok(0) => {
-                return Err(invalid_result_format(
-                    "r8 input ended before record completed",
-                ));
+                return Err(invalid_result_format(format!(
+                    "{kind} r8 input ended before record completed"
+                )));
             }
             Ok(_) => read_any = true,
             Err(source) => return Err(read_error(input_path, source)),
         }
 
         if byte[0] == u8::MAX {
-            bit_index = bit_index
-                .checked_add(usize::from(u8::MAX))
-                .ok_or_else(|| invalid_result_format("r8 run-length offset overflowed"))?;
+            bit_index = bit_index.checked_add(usize::from(u8::MAX)).ok_or_else(|| {
+                invalid_result_format(format!("{kind} r8 run-length offset overflowed"))
+            })?;
             if bit_index > bits_per_record {
-                return Err(invalid_result_format("r8 run-length overshot record width"));
+                return Err(invalid_result_format(format!(
+                    "{kind} r8 run-length overshot record width"
+                )));
             }
             continue;
         }
-        bit_index = bit_index
-            .checked_add(usize::from(byte[0]))
-            .ok_or_else(|| invalid_result_format("r8 run-length offset overflowed"))?;
+        bit_index = bit_index.checked_add(usize::from(byte[0])).ok_or_else(|| {
+            invalid_result_format(format!("{kind} r8 run-length offset overflowed"))
+        })?;
         if bit_index > bits_per_record {
-            return Err(invalid_result_format("r8 run-length overshot record width"));
+            return Err(invalid_result_format(format!(
+                "{kind} r8 run-length overshot record width"
+            )));
         }
         if bit_index == bits_per_record {
             return Ok(Some(record));
         }
         let Some(bit) = record.get_mut(bit_index) else {
             return Err(invalid_result_format(format!(
-                "r8 hit index {bit_index} exceeds record width {bits_per_record}"
+                "{kind} r8 hit index {bit_index} exceeds record width {bits_per_record}"
             )));
         };
         *bit = true;
         bit_index += 1;
-    }
-}
-
-fn for_each_m2d_ptb64_record<R, F>(
-    reader: &mut R,
-    input_path: Option<&PathBuf>,
-    measurement_width: usize,
-    mut visit: F,
-) -> Result<(), CliError>
-where
-    R: Read,
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
-    if measurement_width == 0 {
-        return Err(invalid_result_format(
-            "ptb64 input cannot infer a shot count for zero-width records",
-        ));
-    }
-    let bytes_per_group = measurement_width
-        .checked_mul(8)
-        .ok_or(CliError::MeasurementCountOverflow)?;
-    let mut group_bytes = vec![0u8; bytes_per_group];
-    loop {
-        match read_m2d_exact_record_bytes(reader, input_path, &mut group_bytes)? {
-            RecordRead::Complete => {
-                let group = decode_ptb64_group(&group_bytes, measurement_width)?;
-                for record in &group {
-                    visit(record)?;
-                }
-            }
-            RecordRead::EofBeforeRecord => return Ok(()),
-        }
     }
 }
 
@@ -526,9 +648,10 @@ fn read_m2d_exact_record_bytes<R>(
     reader: &mut R,
     input_path: Option<&PathBuf>,
     buffer: &mut [u8],
+    kind: &'static str,
 ) -> Result<RecordRead, CliError>
 where
-    R: Read,
+    R: Read + ?Sized,
 {
     let mut offset = 0usize;
     while offset < buffer.len() {
@@ -539,7 +662,7 @@ where
             Ok(0) if offset == 0 => return Ok(RecordRead::EofBeforeRecord),
             Ok(0) => {
                 return Err(invalid_result_format(format!(
-                    "m2d input ended after {offset} bytes of a {}-byte record",
+                    "{kind} ended after {offset} bytes of a {}-byte record",
                     buffer.len()
                 )));
             }

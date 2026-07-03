@@ -6,7 +6,8 @@ use super::measurement_flip;
 use super::operation::{
     SINGLE_QUBIT_PAULI_CHANNEL_BASES, SampleOperation, TWO_QUBIT_PAULI_CHANNEL_BASES,
 };
-use super::{estimated_sample_bytes_capacity, record_lookback, reset_correction};
+use super::stabilizer_frame::reset_correction;
+use super::{estimated_sample_bytes_capacity, execute::record_lookback};
 
 pub(super) fn sample_bytes<R>(
     qubit_count: usize,
@@ -72,7 +73,7 @@ fn supports_operations(operations: &[SampleOperation]) -> bool {
         | SampleOperation::HeraldedPauliChannel { .. }
         | SampleOperation::FeedbackPauli { .. } => true,
         SampleOperation::Repeat { body, .. } => supports_operations(body),
-        SampleOperation::ApplyTableau { .. } => false,
+        SampleOperation::ApplyTableau { .. } | SampleOperation::SweepPauli { .. } => false,
     })
 }
 
@@ -198,6 +199,7 @@ fn execute_operations<R>(
                     frame.apply_pauli(*qubit, *basis);
                 }
             }
+            SampleOperation::SweepPauli { .. } => return,
             SampleOperation::Repeat { count, body } => {
                 for _ in 0..*count {
                     execute_operations(body, frame, record, output, correlated_error_occurred, rng);

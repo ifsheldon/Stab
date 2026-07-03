@@ -19,7 +19,14 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
-None.
+## 2026-07-04 - M9: Feedback-Inlining Transform Subcase Boundaries
+
+Status: Open
+Revealed by: implementation of `docs/plans/m9-m2d-sweep-feedback-parity-plan.md`.
+Current text: the M9 sweep and feedback plan asks to implement `--ran_without_feedback` and port transform subcases for `basic`, `demolition_feedback`, `loop`, `mpp`, and interleaved feedback ordering, while allowing unfinished transform subcases to be logged precisely.
+Gap: the implemented M9 slice supports the public command-level `m2d --ran_without_feedback` case, exact `basic`, exact `demolition_feedback`, interleaved-operation ordering, and sweep-control preservation, but it does not claim full `Circuit.with_inlined_feedback` parity. Exact loop refolding is not implemented, and full MPP feedback transform parity is not proven in this slice.
+Proposed amendment: define this M9 wave as command-level feedback-inlining parity plus the exact transform subcases now covered by source-owned tests. Add a later transform milestone for exact loop refolding, full MPP feedback behavior, and public transform API parity before the checklist can mark full feedback-inlining transform parity done.
+Resolution: Pending future transform milestone.
 
 ## Resolved Entries
 

@@ -4,6 +4,8 @@ use std::path::Path;
 use super::run_from;
 use tempfile::tempdir;
 
+mod sweep;
+
 fn ptb64_words(words: &[u64]) -> Vec<u8> {
     words.iter().flat_map(|word| word.to_le_bytes()).collect()
 }
@@ -399,10 +401,33 @@ fn legacy_m2d_flag_matches_m9_oracle_golden() {
 }
 
 #[test]
-fn m2d_rejects_ran_without_feedback_until_feedback_removal_is_implemented() {
+fn m2d_ran_without_feedback_matches_feedback_inlined_oracle_case() {
     let temp_dir = tempdir().expect("temp dir");
     let circuit_path = temp_dir.path().join("input.stim");
-    std::fs::write(&circuit_path, "M 0\nDETECTOR rec[-1]\n").expect("write circuit");
+    std::fs::write(
+        &circuit_path,
+        "\
+CX 0 2 1 2
+M 2
+CX rec[-1] 2
+DETECTOR rec[-1]
+TICK
+CX 0 2 1 2
+M 2
+CX rec[-1] 2
+DETECTOR rec[-1] rec[-2]
+TICK
+CX 0 2 1 2
+M 2
+CX rec[-1] 2
+DETECTOR rec[-1] rec[-2]
+TICK
+M 0 1
+DETECTOR rec[-1] rec[-2] rec[-3]
+OBSERVABLE_INCLUDE(0) rec[-1]
+",
+    )
+    .expect("write circuit");
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -412,51 +437,22 @@ fn m2d_rejects_ran_without_feedback_until_feedback_removal_is_implemented() {
             "m2d",
             "--in_format=01",
             "--out_format=dets",
+            "--append_observables",
             "--ran_without_feedback",
             "--circuit",
             circuit_path.to_str().expect("utf-8 path"),
         ],
-        b"0\n".as_slice(),
+        b"00000\n11100\n01100\n00100\n00010\n00001\n".as_slice(),
         &mut stdout,
         &mut stderr,
     );
 
-    assert_eq!(status, 1);
-    assert_eq!(stdout, b"");
-    assert!(String::from_utf8(stderr).unwrap().contains(
-        "--ran_without_feedback is not supported until feedback-removal conversion is implemented"
-    ));
-}
-
-#[test]
-fn m2d_rejects_sweep_conditioned_conversion_until_sweep_inputs_exist() {
-    let temp_dir = tempdir().expect("temp dir");
-    let circuit_path = temp_dir.path().join("input.stim");
-    std::fs::write(&circuit_path, "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").expect("write circuit");
-
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    let status = run_from(
-        [
-            "stab",
-            "m2d",
-            "--in_format=01",
-            "--out_format=dets",
-            "--circuit",
-            circuit_path.to_str().expect("utf-8 path"),
-        ],
-        b"0\n".as_slice(),
-        &mut stdout,
-        &mut stderr,
+    assert_eq!(status, 0);
+    assert_eq!(
+        String::from_utf8(stdout).unwrap(),
+        "shot\nshot D0 D1\nshot D1 D2\nshot D2 D3\nshot D3\nshot D3 L0\n"
     );
-
-    assert_eq!(status, 1);
-    assert_eq!(stdout, b"");
-    assert!(
-        String::from_utf8(stderr)
-            .unwrap()
-            .contains("sweep-conditioned detection conversion requires sweep input support")
-    );
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
 }
 
 #[test]

@@ -42,25 +42,46 @@ pub enum DetectionObservableOutputMode {
     Prepend,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CompiledDetectionConverter {
     plan: ConversionPlan,
-    reference_sample: Vec<bool>,
+    reference_sample: ReferenceSampleSource,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum ReferenceSampleSource {
+    Zero,
+    Static(Vec<bool>),
+    Sweep(CompiledSampler),
 }
 
 impl CompiledDetectionConverter {
     pub fn compile(circuit: &Circuit, options: DetectionConversionOptions) -> CircuitResult<Self> {
         let plan = ConversionPlan::from_circuit(circuit)?;
         let reference_sample = if options.skip_reference_sample {
-            vec![false; plan.measurement_count]
+            ReferenceSampleSource::Zero
+        } else if plan.sweep_bit_count > 0 {
+            let sampler = CompiledSampler::compile_allowing_sweep(circuit)?;
+            if sampler.sweep_bit_count() != plan.sweep_bit_count {
+                return Err(CircuitError::invalid_result_format(format!(
+                    "sweep reference sampler has {} sweep bits but detection conversion expected {}",
+                    sampler.sweep_bit_count(),
+                    plan.sweep_bit_count
+                )));
+            }
+            ReferenceSampleSource::Sweep(sampler)
         } else {
-            reference_sample(circuit, plan.measurement_count)?
+            ReferenceSampleSource::Static(reference_sample(circuit, plan.measurement_count)?)
         };
         Self::from_plan_and_reference_sample(plan, reference_sample)
     }
 
     pub fn measurement_count(&self) -> usize {
         self.plan.measurement_count
+    }
+
+    pub fn sweep_bit_count(&self) -> usize {
+        self.plan.sweep_bit_count
     }
 
     pub fn detector_count(&self) -> usize {
@@ -75,9 +96,15 @@ impl CompiledDetectionConverter {
         &self,
         measurement_record: &[bool],
     ) -> CircuitResult<DetectionEventRecord> {
-        self.validate_measurement_record_width(measurement_record, None)?;
         let mut record = self.reusable_detection_record();
-        self.convert_record_into(measurement_record, &mut record)?;
+        let mut reference_sample = self.reusable_reference_sample();
+        let sweep_record = vec![false; self.sweep_bit_count()];
+        self.convert_record_with_sweep_into(
+            measurement_record,
+            &sweep_record,
+            &mut reference_sample,
+            &mut record,
+        )?;
         Ok(record)
     }
 
@@ -92,30 +119,106 @@ impl CompiledDetectionConverter {
         F: FnMut(&DetectionEventRecord) -> Result<(), E>,
     {
         let mut record = self.reusable_detection_record();
+        let mut reference_sample = self.reusable_reference_sample();
+        let sweep_record = vec![false; self.sweep_bit_count()];
         for (shot_index, measurement_record) in measurements.into_iter().enumerate() {
             self.validate_measurement_record_width(measurement_record, Some(shot_index))?;
-            self.convert_record_into(measurement_record, &mut record)?;
+            self.convert_record_with_sweep_into(
+                measurement_record,
+                &sweep_record,
+                &mut reference_sample,
+                &mut record,
+            )?;
             visit(&record)?;
         }
         Ok(())
     }
 
-    fn from_plan_and_reference_sample(
-        plan: ConversionPlan,
-        reference_sample: Vec<bool>,
-    ) -> CircuitResult<Self> {
-        validate_reference_sample_len(&reference_sample, plan.measurement_count)?;
-        Ok(Self {
-            plan,
-            reference_sample,
-        })
+    pub fn try_for_each_detection_event_with_sweep<'a, 'b, E, M, S, F>(
+        &self,
+        measurements: M,
+        sweeps: S,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<CircuitError>,
+        M: IntoIterator<Item = &'a [bool]>,
+        S: IntoIterator<Item = &'b [bool]>,
+        F: FnMut(&DetectionEventRecord) -> Result<(), E>,
+    {
+        let mut measurement_iter = measurements.into_iter();
+        let mut sweep_iter = sweeps.into_iter();
+        let mut record = self.reusable_detection_record();
+        let mut reference_sample = self.reusable_reference_sample();
+        let mut shot_index = 0usize;
+        loop {
+            match (measurement_iter.next(), sweep_iter.next()) {
+                (Some(measurement_record), Some(sweep_record)) => {
+                    self.validate_measurement_record_width(measurement_record, Some(shot_index))?;
+                    self.validate_sweep_record_width(sweep_record, Some(shot_index))?;
+                    self.convert_record_with_sweep_into(
+                        measurement_record,
+                        sweep_record,
+                        &mut reference_sample,
+                        &mut record,
+                    )?;
+                    visit(&record)?;
+                    shot_index += 1;
+                }
+                (None, None) => return Ok(()),
+                (Some(_), None) => {
+                    return Err(CircuitError::invalid_result_format(
+                        "measurement records have more shots than sweep records",
+                    )
+                    .into());
+                }
+                (None, Some(_)) => {
+                    return Err(CircuitError::invalid_result_format(
+                        "sweep records have more shots than measurement records",
+                    )
+                    .into());
+                }
+            }
+        }
     }
 
-    fn reusable_detection_record(&self) -> DetectionEventRecord {
+    pub fn reusable_detection_record(&self) -> DetectionEventRecord {
         DetectionEventRecord {
             detectors: vec![false; self.detector_count()],
             observables: vec![false; self.observable_count()],
         }
+    }
+
+    pub fn reusable_reference_sample(&self) -> Vec<bool> {
+        vec![false; self.measurement_count()]
+    }
+
+    pub fn convert_record_with_sweep_into(
+        &self,
+        measurement_record: &[bool],
+        sweep_record: &[bool],
+        reference_sample: &mut Vec<bool>,
+        record: &mut DetectionEventRecord,
+    ) -> CircuitResult<()> {
+        self.validate_measurement_record_width(measurement_record, None)?;
+        self.validate_sweep_record_width(sweep_record, None)?;
+        self.reference_sample
+            .fill(sweep_record, self.measurement_count(), reference_sample)?;
+        self.plan
+            .convert_record_into(measurement_record, reference_sample, record)
+    }
+
+    fn from_plan_and_reference_sample(
+        plan: ConversionPlan,
+        reference_sample: ReferenceSampleSource,
+    ) -> CircuitResult<Self> {
+        if let ReferenceSampleSource::Static(reference_sample) = &reference_sample {
+            validate_reference_sample_len(reference_sample, plan.measurement_count)?;
+        }
+        Ok(Self {
+            plan,
+            reference_sample,
+        })
     }
 
     fn validate_measurement_record_width(
@@ -140,13 +243,45 @@ impl CompiledDetectionConverter {
         )))
     }
 
-    fn convert_record_into(
+    fn validate_sweep_record_width(
         &self,
-        measurement_record: &[bool],
-        record: &mut DetectionEventRecord,
+        sweep_record: &[bool],
+        shot_index: Option<usize>,
     ) -> CircuitResult<()> {
-        self.plan
-            .convert_record_into(measurement_record, &self.reference_sample, record)
+        if sweep_record.len() == self.plan.sweep_bit_count {
+            return Ok(());
+        }
+        if let Some(shot_index) = shot_index {
+            return Err(CircuitError::invalid_result_format(format!(
+                "sweep record {shot_index} expected {} bits, got {}",
+                self.plan.sweep_bit_count,
+                sweep_record.len()
+            )));
+        }
+        Err(CircuitError::invalid_result_format(format!(
+            "sweep record expected {} bits, got {}",
+            self.plan.sweep_bit_count,
+            sweep_record.len()
+        )))
+    }
+}
+
+impl ReferenceSampleSource {
+    fn fill(
+        &self,
+        sweep_record: &[bool],
+        measurement_count: usize,
+        output: &mut Vec<bool>,
+    ) -> CircuitResult<()> {
+        output.clear();
+        match self {
+            Self::Zero => output.resize(measurement_count, false),
+            Self::Static(reference_sample) => output.extend_from_slice(reference_sample),
+            Self::Sweep(sampler) => {
+                sampler.reference_sample_with_sweep_into(sweep_record, output)?
+            }
+        }
+        validate_reference_sample_len(output, measurement_count)
     }
 }
 
@@ -170,6 +305,39 @@ pub fn convert_measurements_to_detection_events(
     })
 }
 
+pub fn convert_measurements_to_detection_events_with_sweep(
+    circuit: &Circuit,
+    measurements: &[Vec<bool>],
+    sweeps: &[Vec<bool>],
+    options: DetectionConversionOptions,
+) -> CircuitResult<DetectionConversionOutput> {
+    if measurements.len() != sweeps.len() {
+        return Err(CircuitError::invalid_result_format(format!(
+            "measurement records have {} shots but sweep records have {} shots",
+            measurements.len(),
+            sweeps.len()
+        )));
+    }
+    let converter = CompiledDetectionConverter::compile(circuit, options)?;
+    converter.plan.validate_shot_count(measurements.len())?;
+    validate_buffer_bits("sweep records", sweeps.len(), converter.sweep_bit_count())?;
+    let mut records = Vec::with_capacity(measurements.len());
+    converter.try_for_each_detection_event_with_sweep(
+        measurements.iter().map(Vec::as_slice),
+        sweeps.iter().map(Vec::as_slice),
+        |record| {
+            records.push(record.clone());
+            Ok::<(), CircuitError>(())
+        },
+    )?;
+
+    Ok(DetectionConversionOutput {
+        records,
+        detector_count: converter.detector_count(),
+        observable_count: converter.observable_count(),
+    })
+}
+
 pub fn sample_detection_events(
     circuit: &Circuit,
     shots: usize,
@@ -184,8 +352,10 @@ pub fn sample_detection_events(
     plan.validate_shot_count(shots)?;
     let sampler = CompiledSampler::compile(circuit)?;
     let reference_sample = sampler.reference_sample();
-    let converter =
-        CompiledDetectionConverter::from_plan_and_reference_sample(plan, reference_sample)?;
+    let converter = CompiledDetectionConverter::from_plan_and_reference_sample(
+        plan,
+        ReferenceSampleSource::Static(reference_sample),
+    )?;
     let measurements = sampler.sample_zero_one_with_seed(shots, seed);
     let mut records = Vec::with_capacity(measurements.len());
     converter.try_for_each_detection_event(measurements.iter().map(Vec::as_slice), |record| {
@@ -217,12 +387,21 @@ where
     let plan = ConversionPlan::from_circuit(circuit)?;
     let sampler = CompiledSampler::compile(circuit)?;
     let reference_sample = sampler.reference_sample();
-    let converter =
-        CompiledDetectionConverter::from_plan_and_reference_sample(plan, reference_sample)?;
+    let converter = CompiledDetectionConverter::from_plan_and_reference_sample(
+        plan,
+        ReferenceSampleSource::Static(reference_sample),
+    )?;
     let mut record = converter.reusable_detection_record();
+    let mut reference_sample = converter.reusable_reference_sample();
+    let sweep_record = vec![false; converter.sweep_bit_count()];
     sampler.for_each_sample_with_seed_and_reference_mode(shots, seed, false, |measurement_record| {
         converter.validate_measurement_record_width(measurement_record, None)?;
-        converter.convert_record_into(measurement_record, &mut record)?;
+        converter.convert_record_with_sweep_into(
+            measurement_record,
+            &sweep_record,
+            &mut reference_sample,
+            &mut record,
+        )?;
         visit(&record)
     })
 }
@@ -311,6 +490,7 @@ pub fn write_ptb64_observable_records(
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct ConversionPlan {
     measurement_count: usize,
+    sweep_bit_count: usize,
     detector_terms: Vec<Vec<usize>>,
     observable_terms: Vec<Vec<usize>>,
 }
@@ -319,6 +499,7 @@ impl ConversionPlan {
     fn from_circuit(circuit: &Circuit) -> CircuitResult<Self> {
         let mut plan = Self {
             measurement_count: 0,
+            sweep_bit_count: 0,
             detector_terms: Vec::new(),
             observable_terms: Vec::new(),
         };
@@ -350,7 +531,7 @@ impl ConversionPlan {
     }
 
     fn visit_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        reject_sweep_targets(instruction)?;
+        self.record_sweep_bits(instruction)?;
         match instruction.gate().canonical_name() {
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
@@ -376,6 +557,38 @@ impl ConversionPlan {
         self.detector_terms.push(terms);
         self.validate_record_width()?;
         Ok(())
+    }
+
+    fn record_sweep_bits(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let mut found_sweep = None;
+        for target in instruction.targets() {
+            if let Some(sweep_id) = target.sweep_bit_id() {
+                found_sweep = Some(target.clone());
+                let next_count = usize::try_from(sweep_id)
+                    .ok()
+                    .and_then(|id| id.checked_add(1))
+                    .ok_or_else(|| {
+                        CircuitError::invalid_result_format(format!(
+                            "sweep bit id {sweep_id} does not fit this platform"
+                        ))
+                    })?;
+                if next_count > MAX_DETECTION_RECORD_BITS {
+                    return Err(CircuitError::invalid_result_format(format!(
+                        "sweep bit width {next_count} exceeds current detection conversion limit {MAX_DETECTION_RECORD_BITS}"
+                    )));
+                }
+                self.sweep_bit_count = self.sweep_bit_count.max(next_count);
+            }
+        }
+        let Some(target) = found_sweep else {
+            return Ok(());
+        };
+        match instruction.gate().canonical_name() {
+            "CX" | "CY" | "CZ" => Ok(()),
+            name => Err(CircuitError::invalid_result_format(format!(
+                "{UNSUPPORTED_SWEEP_DETECTION_MESSAGE}; found {target} in {name}"
+            ))),
+        }
     }
 
     fn record_observable(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
@@ -618,7 +831,7 @@ fn observable_records_as_bits(output: &DetectionConversionOutput) -> CircuitResu
         .collect()
 }
 
-fn instruction_measurement_count(instruction: &CircuitInstruction) -> usize {
+pub(crate) fn instruction_measurement_count(instruction: &CircuitInstruction) -> usize {
     match instruction.gate().canonical_name() {
         "M"
         | "MX"
@@ -678,489 +891,4 @@ fn validate_record_widths(
 }
 
 #[cfg(test)]
-mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::indexing_slicing,
-        clippy::unwrap_used,
-        reason = "detection tests use direct fixture assertions for compact diagnostics"
-    )]
-
-    use super::*;
-
-    fn convert(
-        circuit_text: &str,
-        measurements: &[&[bool]],
-        skip_reference_sample: bool,
-    ) -> DetectionConversionOutput {
-        let circuit = Circuit::from_stim_str(circuit_text).expect("parse circuit");
-        let measurements = measurements
-            .iter()
-            .map(|record| record.to_vec())
-            .collect::<Vec<_>>();
-        convert_measurements_to_detection_events(
-            &circuit,
-            &measurements,
-            DetectionConversionOptions {
-                skip_reference_sample,
-            },
-        )
-        .expect("convert measurements")
-    }
-
-    #[test]
-    fn compiled_detection_converter_streams_like_materialized_conversion() {
-        let circuit = Circuit::from_stim_str(
-            "X 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-1]\n",
-        )
-        .expect("parse circuit");
-        let measurements = vec![
-            vec![false, false],
-            vec![false, true],
-            vec![true, false],
-            vec![true, true],
-        ];
-        let materialized = convert_measurements_to_detection_events(
-            &circuit,
-            &measurements,
-            DetectionConversionOptions {
-                skip_reference_sample: false,
-            },
-        )
-        .expect("materialized conversion");
-        let converter = CompiledDetectionConverter::compile(
-            &circuit,
-            DetectionConversionOptions {
-                skip_reference_sample: false,
-            },
-        )
-        .expect("compile converter");
-        let mut streamed = Vec::new();
-        converter
-            .try_for_each_detection_event(measurements.iter().map(Vec::as_slice), |record| {
-                streamed.push(record.clone());
-                Ok::<(), CircuitError>(())
-            })
-            .expect("stream conversion");
-
-        assert_eq!(streamed, materialized.records);
-    }
-
-    #[test]
-    fn sampled_detection_streams_like_materialized_sampling() {
-        for circuit_text in [
-            "X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n",
-            "RX 0\nZ_ERROR(0.25) 0\nOBSERVABLE_INCLUDE(0) X0\n",
-        ] {
-            let circuit = Circuit::from_stim_str(circuit_text).expect("parse circuit");
-            let materialized =
-                sample_detection_events(&circuit, 32, Some(11)).expect("materialized sampling");
-            let mut streamed = Vec::new();
-            try_for_each_sampled_detection_event(&circuit, 32, Some(11), |record| {
-                streamed.push(record.clone());
-                Ok::<(), CircuitError>(())
-            })
-            .expect("stream sampling");
-
-            assert_eq!(streamed, materialized.records);
-        }
-    }
-
-    #[test]
-    fn detection_conversion_uses_reference_sample_for_detectors_and_observables() {
-        let output = convert(
-            "X 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-1]\n",
-            &[
-                &[false, false],
-                &[false, true],
-                &[true, false],
-                &[true, true],
-            ],
-            false,
-        );
-
-        assert_eq!(output.detector_count, 2);
-        assert_eq!(output.observable_count, 3);
-        assert_eq!(
-            output.records,
-            vec![
-                DetectionEventRecord {
-                    detectors: vec![true, false],
-                    observables: vec![false, false, false],
-                },
-                DetectionEventRecord {
-                    detectors: vec![true, true],
-                    observables: vec![false, false, true],
-                },
-                DetectionEventRecord {
-                    detectors: vec![false, false],
-                    observables: vec![false, false, false],
-                },
-                DetectionEventRecord {
-                    detectors: vec![false, true],
-                    observables: vec![false, false, true],
-                },
-            ],
-        );
-    }
-
-    #[test]
-    fn detection_conversion_can_skip_reference_sample() {
-        let output = convert(
-            "X 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-1]\n",
-            &[
-                &[false, false],
-                &[false, true],
-                &[true, false],
-                &[true, true],
-            ],
-            true,
-        );
-
-        assert_eq!(
-            output.records,
-            vec![
-                DetectionEventRecord {
-                    detectors: vec![false, false],
-                    observables: vec![false, false, false],
-                },
-                DetectionEventRecord {
-                    detectors: vec![false, true],
-                    observables: vec![false, false, true],
-                },
-                DetectionEventRecord {
-                    detectors: vec![true, false],
-                    observables: vec![false, false, false],
-                },
-                DetectionEventRecord {
-                    detectors: vec![true, true],
-                    observables: vec![false, false, true],
-                },
-            ],
-        );
-    }
-
-    #[test]
-    fn detection_conversion_handles_repeats_coordinates_and_empty_detectors() {
-        let output = convert(
-            "M 0 !1\nSHIFT_COORDS(2, 3)\nDETECTOR(5) rec[-2]\nDETECTOR rec[-1]\nREPEAT 2 {\n    DETECTOR rec[-2] rec[-1]\n}\nDETECTOR\n",
-            &[&[false, true]],
-            true,
-        );
-
-        assert_eq!(
-            output.records,
-            vec![DetectionEventRecord {
-                detectors: vec![false, true, true, true, false],
-                observables: Vec::new(),
-            }],
-        );
-    }
-
-    #[test]
-    fn detection_conversion_handles_empty_detector_circuits() {
-        let output = convert("M 0\n", &[&[false], &[true]], true);
-
-        assert_eq!(output.detector_count, 0);
-        assert_eq!(
-            output.records,
-            vec![
-                DetectionEventRecord {
-                    detectors: Vec::new(),
-                    observables: Vec::new(),
-                },
-                DetectionEventRecord {
-                    detectors: Vec::new(),
-                    observables: Vec::new(),
-                },
-            ],
-        );
-    }
-
-    #[test]
-    fn detection_conversion_rejects_invalid_measurement_references() {
-        let circuit = Circuit::from_stim_str("DETECTOR rec[-1]\n").expect("parse circuit");
-        let result = convert_measurements_to_detection_events(
-            &circuit,
-            &[Vec::new()],
-            DetectionConversionOptions {
-                skip_reference_sample: true,
-            },
-        );
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn detection_conversion_rejects_sweep_conditioned_circuits_until_sweep_inputs_exist() {
-        let conversion_circuit = Circuit::from_stim_str("CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n")
-            .expect("parse sweep-conditioned conversion circuit");
-        let conversion_error = convert_measurements_to_detection_events(
-            &conversion_circuit,
-            &[vec![false]],
-            DetectionConversionOptions {
-                skip_reference_sample: true,
-            },
-        )
-        .expect_err("reject conversion without sweep inputs");
-        assert!(
-            conversion_error
-                .to_string()
-                .contains(UNSUPPORTED_SWEEP_DETECTION_MESSAGE),
-            "{conversion_error}"
-        );
-
-        let repeated_circuit =
-            Circuit::from_stim_str("REPEAT 2 {\n    CX sweep[0] 0\n}\nM 0\nDETECTOR rec[-1]\n")
-                .expect("parse repeated sweep-conditioned circuit");
-        let repeated_error =
-            measurement_record_count(&repeated_circuit).expect_err("reject repeated sweep");
-        assert!(
-            repeated_error
-                .to_string()
-                .contains(UNSUPPORTED_SWEEP_DETECTION_MESSAGE),
-            "{repeated_error}"
-        );
-
-        let frame_circuit =
-            Circuit::from_stim_str("RX 0\nCX sweep[0] 0\nOBSERVABLE_INCLUDE(0) X0\n")
-                .expect("parse frame-path sweep-conditioned circuit");
-        let frame_error =
-            sample_detection_events(&frame_circuit, 1, Some(5)).expect_err("reject frame sweep");
-        assert!(
-            frame_error
-                .to_string()
-                .contains(UNSUPPORTED_SWEEP_DETECTION_MESSAGE),
-            "{frame_error}"
-        );
-    }
-
-    #[test]
-    fn detection_sampling_supports_pauli_target_observables_like_frame_simulator() {
-        // Adapted from Stim v1.16.0 src/stim/simulators/frame_simulator.test.cc
-        // observable_include_paulis_rx/ry/rz.
-        for (reset, random_pair, stable_observable) in
-            [("RZ", (0, 1), 2), ("RY", (0, 2), 1), ("RX", (1, 2), 0)]
-        {
-            let circuit = Circuit::from_stim_str(&format!(
-                "{reset} 0\n\
-                 OBSERVABLE_INCLUDE(0) X0\n\
-                 OBSERVABLE_INCLUDE(1) Y0\n\
-                 OBSERVABLE_INCLUDE(2) Z0\n"
-            ))
-            .expect("parse");
-            let output = sample_detection_events(&circuit, 1024, Some(5)).expect("detect");
-
-            let hits = |observable: usize| {
-                output
-                    .records
-                    .iter()
-                    .filter(|record| record.observables[observable])
-                    .count()
-            };
-            let first_hits = hits(random_pair.0);
-            assert_eq!(first_hits, hits(random_pair.1));
-            assert!((300..700).contains(&first_hits));
-            assert_eq!(hits(stable_observable), 0);
-        }
-    }
-
-    #[test]
-    fn detection_sampling_supports_product_measurements_with_pauli_observables() {
-        for circuit_text in [
-            "RX 0 1\nMXX 0 1\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) Z0\n",
-            "RY 0 1\nMYY 0 1\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) X0\n",
-            "R 0 1\nMZZ 0 1\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) X0\n",
-            "RX 0\nRY 1\nR 2\nMPP X0*Y1*Z2\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) Z0\n",
-        ] {
-            let circuit = Circuit::from_stim_str(circuit_text).expect("parse");
-            let output = sample_detection_events(&circuit, 1024, Some(5)).expect("detect");
-
-            assert!(
-                output
-                    .records
-                    .iter()
-                    .all(|record| record.detectors.first() == Some(&false))
-            );
-            let hits = output
-                .records
-                .iter()
-                .filter(|record| record.observables[0])
-                .count();
-            assert!((300..700).contains(&hits));
-        }
-    }
-
-    #[test]
-    fn detection_sampling_frame_path_ignores_reference_sample_measurement_bits() {
-        let circuit = Circuit::from_stim_str(
-            "M !0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) Z0\n",
-        )
-        .expect("parse");
-        let output = sample_detection_events(&circuit, 8, Some(5)).expect("detect");
-
-        assert!(
-            output.records.iter().all(|record| {
-                record.detectors == [false] && record.observables == [false, false]
-            })
-        );
-    }
-
-    #[test]
-    fn detection_sampling_frame_path_rejects_invalid_feedback_measurement_references() {
-        let circuit =
-            Circuit::from_stim_str("CX rec[-1] 0\nOBSERVABLE_INCLUDE(0) Z0\n").expect("parse");
-        let result = sample_detection_events(&circuit, 1, Some(5));
-
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn detection_conversion_rejects_unbounded_record_shapes() {
-        let huge_observable =
-            Circuit::from_stim_str("M 0\nOBSERVABLE_INCLUDE(1000000) rec[-1]\n").expect("parse");
-        assert!(
-            convert_measurements_to_detection_events(
-                &huge_observable,
-                &[vec![false]],
-                DetectionConversionOptions {
-                    skip_reference_sample: true,
-                },
-            )
-            .is_err()
-        );
-
-        let huge_repeat =
-            Circuit::from_stim_str("REPEAT 100001 {\n    M 0\n}\n").expect("parse repeat");
-        assert!(measurement_record_count(&huge_repeat).is_err());
-    }
-
-    #[test]
-    fn detection_record_writers_cover_text_and_bit_packed_formats() {
-        let output = DetectionConversionOutput {
-            detector_count: 2,
-            observable_count: 2,
-            records: vec![
-                DetectionEventRecord {
-                    detectors: vec![true, false],
-                    observables: vec![false, true],
-                },
-                DetectionEventRecord {
-                    detectors: vec![false, true],
-                    observables: vec![true, false],
-                },
-            ],
-        };
-
-        assert_eq!(
-            write_detection_records(
-                &output,
-                DetectionObservableOutputMode::Append,
-                SampleFormat::ZeroOne
-            )
-            .unwrap(),
-            b"1001\n0110\n"
-        );
-        assert_eq!(
-            write_detection_records(
-                &output,
-                DetectionObservableOutputMode::Append,
-                SampleFormat::Dets
-            )
-            .unwrap(),
-            b"shot D0 L1\nshot D1 L0\n"
-        );
-        assert_eq!(
-            write_detection_records(
-                &output,
-                DetectionObservableOutputMode::Prepend,
-                SampleFormat::Dets
-            )
-            .unwrap(),
-            b"shot L1 D0\nshot L0 D1\n"
-        );
-        assert_eq!(
-            write_detection_records(
-                &output,
-                DetectionObservableOutputMode::Append,
-                SampleFormat::Hits
-            )
-            .unwrap(),
-            b"0,3\n1,2\n"
-        );
-        assert_eq!(
-            write_detection_records(
-                &output,
-                DetectionObservableOutputMode::Append,
-                SampleFormat::B8
-            )
-            .unwrap(),
-            [0b0000_1001, 0b0000_0110]
-        );
-        assert_eq!(
-            write_observable_records(&output, SampleFormat::B8).unwrap(),
-            [0b0000_0010, 0b0000_0001]
-        );
-
-        let ptb64_output = DetectionConversionOutput {
-            detector_count: 2,
-            observable_count: 1,
-            records: vec![
-                DetectionEventRecord {
-                    detectors: vec![true, false],
-                    observables: vec![true],
-                };
-                64
-            ],
-        };
-        assert_eq!(
-            write_ptb64_detection_records(&ptb64_output, DetectionObservableOutputMode::Append)
-                .unwrap(),
-            [
-                0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff,
-                0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-            ]
-        );
-        assert_eq!(
-            write_ptb64_observable_records(&ptb64_output).unwrap(),
-            [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
-        );
-    }
-
-    #[test]
-    fn detection_sampling_matches_basic_frame_simulator_utility_semantics() {
-        let circuit =
-            Circuit::from_stim_str("X_ERROR(1) 0\nM 0\nDETECTOR rec[-1]\n").expect("parse");
-        let output = sample_detection_events(&circuit, 5, Some(5)).expect("sample detections");
-
-        assert_eq!(output.detector_count, 1);
-        assert_eq!(
-            output.records,
-            vec![
-                DetectionEventRecord {
-                    detectors: vec![true],
-                    observables: Vec::new(),
-                };
-                5
-            ],
-        );
-    }
-
-    #[test]
-    fn detection_sampling_handles_gauge_detectors_structurally() {
-        let circuit = Circuit::from_stim_str("MPP Z8*X9\nDETECTOR rec[-1]\n").expect("parse");
-        let first = sample_detection_events(&circuit, 1000, Some(5)).expect("sample detections");
-        let second = sample_detection_events(&circuit, 1000, Some(5)).expect("sample detections");
-
-        assert_eq!(first, second);
-        let hits = first
-            .records
-            .iter()
-            .filter(|record| record.detectors.first().copied().unwrap_or(false))
-            .count();
-        assert!(
-            (350..=650).contains(&hits),
-            "expected gauge detector to produce random-looking events, got {hits}"
-        );
-    }
-}
+mod tests;

@@ -1,10 +1,9 @@
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng as _};
 
+use self::execute::{ExecutionBuffers, count_determined_operations, execute_operations};
 use self::operation::SampleOperation;
-use self::stabilizer_frame::{
-    LocalTableauTransform, MeasurementRandomness, StabilizerFrame, reset_correction,
-};
+use self::stabilizer_frame::{LocalTableauTransform, MeasurementRandomness, StabilizerFrame};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
     MeasureRecordOffset, Pauli, PauliBasis, SampleFormat, SingleQubitClifford,
@@ -12,6 +11,7 @@ use crate::{
 };
 
 mod direct_z_measurement;
+mod execute;
 mod measurement_flip;
 mod noise;
 mod operation;
@@ -24,16 +24,29 @@ mod stream;
 pub struct CompiledSampler {
     qubit_count: usize,
     measurement_count: usize,
+    sweep_bit_count: usize,
     operations: Vec<SampleOperation>,
 }
 
 impl CompiledSampler {
     pub fn compile(circuit: &Circuit) -> CircuitResult<Self> {
         let mut operations = Vec::new();
-        let measurement_count = compile_circuit(circuit, &mut operations)?;
+        let counts = compile_circuit(circuit, &mut operations, SweepCompilation::Reject)?;
         Ok(Self {
             qubit_count: circuit.count_qubits(),
-            measurement_count,
+            measurement_count: counts.measurements,
+            sweep_bit_count: counts.sweep_bits,
+            operations,
+        })
+    }
+
+    pub(crate) fn compile_allowing_sweep(circuit: &Circuit) -> CircuitResult<Self> {
+        let mut operations = Vec::new();
+        let counts = compile_circuit(circuit, &mut operations, SweepCompilation::Allow)?;
+        Ok(Self {
+            qubit_count: circuit.count_qubits(),
+            measurement_count: counts.measurements,
+            sweep_bit_count: counts.sweep_bits,
             operations,
         })
     }
@@ -197,7 +210,7 @@ impl CompiledSampler {
     ) where
         R: Rng,
     {
-        self.sample_shot_in_mode_into(rng, ExecutionMode::Sample, frame, record, output);
+        self.sample_shot_in_mode_into(rng, ExecutionMode::Sample, &[], frame, record, output);
         if let Some(reference) = reference {
             for (bit, reference_bit) in output.iter_mut().zip(reference) {
                 *bit ^= *reference_bit;
@@ -207,17 +220,59 @@ impl CompiledSampler {
 
     pub fn reference_sample(&self) -> Vec<bool> {
         let mut rng = SmallRng::seed_from_u64(0);
-        self.sample_shot_in_mode(&mut rng, ExecutionMode::ReferenceSample)
+        self.sample_shot_in_mode(&mut rng, ExecutionMode::ReferenceSample, &[])
     }
 
-    fn sample_shot_in_mode<R>(&self, rng: &mut R, mode: ExecutionMode) -> Vec<bool>
+    pub(crate) fn sweep_bit_count(&self) -> usize {
+        self.sweep_bit_count
+    }
+
+    pub(crate) fn reference_sample_with_sweep_into(
+        &self,
+        sweep_record: &[bool],
+        output: &mut Vec<bool>,
+    ) -> CircuitResult<()> {
+        if sweep_record.len() != self.sweep_bit_count {
+            return Err(CircuitError::invalid_result_format(format!(
+                "sweep record expected {} bits, got {}",
+                self.sweep_bit_count,
+                sweep_record.len()
+            )));
+        }
+        let mut rng = SmallRng::seed_from_u64(0);
+        let mut frame = StabilizerFrame::new(self.qubit_count);
+        let mut record = Vec::with_capacity(self.measurement_count);
+        self.sample_shot_in_mode_into(
+            &mut rng,
+            ExecutionMode::ReferenceSample,
+            sweep_record,
+            &mut frame,
+            &mut record,
+            output,
+        );
+        Ok(())
+    }
+
+    fn sample_shot_in_mode<R>(
+        &self,
+        rng: &mut R,
+        mode: ExecutionMode,
+        sweep_record: &[bool],
+    ) -> Vec<bool>
     where
         R: Rng,
     {
         let mut frame = StabilizerFrame::new(self.qubit_count);
         let mut record = Vec::with_capacity(self.measurement_count);
         let mut output = Vec::with_capacity(self.measurement_count);
-        self.sample_shot_in_mode_into(rng, mode, &mut frame, &mut record, &mut output);
+        self.sample_shot_in_mode_into(
+            rng,
+            mode,
+            sweep_record,
+            &mut frame,
+            &mut record,
+            &mut output,
+        );
         output
     }
 
@@ -225,6 +280,7 @@ impl CompiledSampler {
         &self,
         rng: &mut R,
         mode: ExecutionMode,
+        sweep_record: &[bool],
         frame: &mut StabilizerFrame,
         record: &mut Vec<bool>,
         output: &mut Vec<bool>,
@@ -235,15 +291,13 @@ impl CompiledSampler {
         record.clear();
         output.clear();
         let mut correlated_error_occurred = false;
-        execute_operations(
-            &self.operations,
+        let mut buffers = ExecutionBuffers {
             frame,
             record,
             output,
-            &mut correlated_error_occurred,
-            rng,
-            mode,
-        );
+            correlated_error_occurred: &mut correlated_error_occurred,
+        };
+        execute_operations(&self.operations, &mut buffers, rng, mode, sweep_record);
     }
 }
 
@@ -289,131 +343,31 @@ fn estimated_sample_bytes_capacity(
         .unwrap_or(0)
 }
 
-fn count_determined_operations<R>(
-    operations: &[SampleOperation],
-    frame: &mut StabilizerFrame,
-    record: &mut Vec<bool>,
-    rng: &mut R,
-) -> u64
-where
-    R: Rng,
-{
-    let mut count = 0;
-    for operation in operations {
-        match operation {
-            SampleOperation::ApplyHadamard { qubit } => {
-                frame.apply_hadamard(*qubit);
-            }
-            SampleOperation::ApplyControlledX { control, target } => {
-                frame.apply_controlled_x(*control, *target);
-            }
-            SampleOperation::ApplyTableau { targets, transform } => {
-                frame.apply_tableau(targets, transform);
-            }
-            SampleOperation::Reset { qubit, basis } => {
-                frame.reset(
-                    *qubit,
-                    *basis,
-                    rng,
-                    MeasurementRandomness::DeterministicFalse,
-                );
-            }
-            SampleOperation::Measure {
-                qubit,
-                basis,
-                inverted,
-                flip_probability,
-                reset,
-            } => {
-                if frame.measure_is_deterministic(*qubit, *basis)
-                    && measurement_flip::is_deterministic(*flip_probability)
-                {
-                    count += 1;
-                }
-                let noisy_flip = measurement_flip::deterministic_value(*flip_probability);
-                let measured = frame.measure(
-                    *qubit,
-                    *basis,
-                    *inverted ^ noisy_flip,
-                    rng,
-                    MeasurementRandomness::DeterministicFalse,
-                );
-                record.push(measured);
-                if *reset && measured {
-                    frame.apply_pauli(*qubit, reset_correction(*basis));
-                }
-            }
-            SampleOperation::MeasureProduct {
-                terms,
-                inverted,
-                flip_probability,
-            } => {
-                if frame.pauli_product_measurement_is_deterministic(terms)
-                    && measurement_flip::is_deterministic(*flip_probability)
-                {
-                    count += 1;
-                }
-                let noisy_flip = measurement_flip::deterministic_value(*flip_probability);
-                let measured = frame.measure_pauli_product(
-                    terms,
-                    *inverted ^ noisy_flip,
-                    rng,
-                    MeasurementRandomness::DeterministicFalse,
-                );
-                record.push(measured);
-            }
-            SampleOperation::Pad {
-                value,
-                flip_probability,
-            } => {
-                if measurement_flip::is_deterministic(*flip_probability) {
-                    count += 1;
-                }
-                record.push(*value ^ measurement_flip::deterministic_value(*flip_probability));
-            }
-            SampleOperation::FeedbackPauli {
-                offset,
-                qubit,
-                basis,
-            } => {
-                if record_lookback(record, *offset) {
-                    frame.apply_pauli(*qubit, *basis);
-                }
-            }
-            SampleOperation::Repeat { count: reps, body } => {
-                for _ in 0..*reps {
-                    count += count_determined_operations(body, frame, record, rng);
-                }
-            }
-            SampleOperation::SingleQubitPauliChannel { .. }
-            | SampleOperation::TwoQubitPauliChannel { .. }
-            | SampleOperation::CorrelatedError { .. }
-            | SampleOperation::HeraldedPauliChannel { .. } => {}
-        }
-    }
-    count
-}
-
-fn record_lookback(record: &[bool], offset: MeasureRecordOffset) -> bool {
-    let index = i64::try_from(record.len())
-        .ok()
-        .and_then(|len| len.checked_add(i64::from(offset.get())))
-        .and_then(|index| usize::try_from(index).ok());
-    index
-        .and_then(|index| record.get(index))
-        .copied()
-        .unwrap_or(false)
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct CompileState {
     measurement_count: u64,
+    sweep_bit_count: u64,
+    sweep_compilation: SweepCompilation,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SweepCompilation {
+    Reject,
+    Allow,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct CompiledCounts {
+    measurements: usize,
+    sweep_bits: usize,
 }
 
 impl CompileState {
-    fn new() -> Self {
+    fn new(sweep_compilation: SweepCompilation) -> Self {
         Self {
             measurement_count: 0,
+            sweep_bit_count: 0,
+            sweep_compilation,
         }
     }
 
@@ -460,19 +414,43 @@ impl CompileState {
             instruction.gate().canonical_name()
         )))
     }
+
+    fn add_sweep_bit(&mut self, sweep_id: u32) -> CircuitResult<usize> {
+        let sweep_id = u64::from(sweep_id);
+        self.sweep_bit_count =
+            self.sweep_bit_count
+                .max(sweep_id.checked_add(1).ok_or_else(|| {
+                    CircuitError::invalid_sampler_compilation("sweep bit count overflowed")
+                })?);
+        usize::try_from(sweep_id).map_err(|_| {
+            CircuitError::invalid_sampler_compilation(format!(
+                "sweep bit id {sweep_id} cannot fit in this platform's usize"
+            ))
+        })
+    }
 }
 
 fn compile_circuit(
     circuit: &Circuit,
     operations: &mut Vec<SampleOperation>,
-) -> CircuitResult<usize> {
-    let mut state = CompileState::new();
+    sweep_compilation: SweepCompilation,
+) -> CircuitResult<CompiledCounts> {
+    let mut state = CompileState::new(sweep_compilation);
     compile_circuit_with_state(circuit, operations, &mut state)?;
     elide_leading_z_resets(operations);
-    usize::try_from(state.measurement_count).map_err(|_| {
+    let measurements = usize::try_from(state.measurement_count).map_err(|_| {
         CircuitError::invalid_sampler_compilation(
             "measurement record count cannot fit in usize during sampler compilation",
         )
+    })?;
+    let sweep_bits = usize::try_from(state.sweep_bit_count).map_err(|_| {
+        CircuitError::invalid_sampler_compilation(
+            "sweep bit count cannot fit in usize during sampler compilation",
+        )
+    })?;
+    Ok(CompiledCounts {
+        measurements,
+        sweep_bits,
     })
 }
 
@@ -493,6 +471,7 @@ fn compile_circuit_with_state(
                 compile_circuit_with_state(repeat.body(), &mut body, &mut body_state)?;
                 let body_measurements = body_state.measurement_count - before_body;
                 state.add_repeated_measurements(body_measurements, repeat.repeat_count().get())?;
+                state.sweep_bit_count = state.sweep_bit_count.max(body_state.sweep_bit_count);
                 operations.push(SampleOperation::Repeat {
                     count: repeat.repeat_count().get(),
                     body,
@@ -784,11 +763,22 @@ fn compile_measurement_pads(
 fn compile_controlled_or_feedback(
     instruction: &CircuitInstruction,
     operations: &mut Vec<SampleOperation>,
-    state: &CompileState,
+    state: &mut CompileState,
     feedback_basis: PauliBasis,
 ) -> CircuitResult<()> {
     for target_group in instruction.target_groups() {
         if target_group
+            .iter()
+            .any(|target| target.is_sweep_bit_target())
+        {
+            compile_sweep_pauli_group(
+                instruction,
+                operations,
+                state,
+                feedback_basis,
+                target_group,
+            )?;
+        } else if target_group
             .first()
             .and_then(|target| target.measurement_record_offset())
             .is_some()
@@ -807,10 +797,76 @@ fn compile_controlled_or_feedback(
     Ok(())
 }
 
+fn compile_sweep_pauli_group(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    state: &mut CompileState,
+    basis: PauliBasis,
+    target_group: &[crate::Target],
+) -> CircuitResult<()> {
+    if state.sweep_compilation == SweepCompilation::Reject {
+        return Err(unsupported_sampler_instruction(instruction));
+    }
+    let [first, second] = target_group else {
+        return Err(unsupported_sampler_instruction(instruction));
+    };
+    let first_sweep = first
+        .sweep_bit_id()
+        .map(|sweep_id| state.add_sweep_bit(sweep_id))
+        .transpose()?;
+    let second_sweep = second
+        .sweep_bit_id()
+        .map(|sweep_id| state.add_sweep_bit(sweep_id))
+        .transpose()?;
+
+    match (
+        instruction.gate().canonical_name(),
+        first_sweep,
+        second_sweep,
+    ) {
+        ("CX" | "CY", Some(sweep_id), None) if second.qubit_id().is_some() => {
+            operations.push(SampleOperation::SweepPauli {
+                sweep_id,
+                qubit: qubit_index(instruction, second)?,
+                basis,
+            });
+            Ok(())
+        }
+        ("CX" | "CY", None, Some(sweep_id)) if first.qubit_id().is_some() => {
+            operations.push(SampleOperation::SweepPauli {
+                sweep_id,
+                qubit: qubit_index(instruction, first)?,
+                basis,
+            });
+            Ok(())
+        }
+        ("CZ", Some(sweep_id), None) if second.qubit_id().is_some() => {
+            operations.push(SampleOperation::SweepPauli {
+                sweep_id,
+                qubit: qubit_index(instruction, second)?,
+                basis: PauliBasis::Z,
+            });
+            Ok(())
+        }
+        ("CZ", None, Some(sweep_id)) if first.qubit_id().is_some() => {
+            operations.push(SampleOperation::SweepPauli {
+                sweep_id,
+                qubit: qubit_index(instruction, first)?,
+                basis: PauliBasis::Z,
+            });
+            Ok(())
+        }
+        (_, Some(_), Some(_)) | (_, Some(_), None) | (_, None, Some(_)) => {
+            Err(unsupported_sampler_instruction(instruction))
+        }
+        _ => Err(unsupported_sampler_instruction(instruction)),
+    }
+}
+
 fn compile_feedback_pauli_group(
     instruction: &CircuitInstruction,
     operations: &mut Vec<SampleOperation>,
-    state: &CompileState,
+    state: &mut CompileState,
     basis: PauliBasis,
     target_group: &[crate::Target],
 ) -> CircuitResult<()> {
@@ -1012,170 +1068,6 @@ fn qubit_index(instruction: &CircuitInstruction, target: &crate::Target) -> Circ
             qubit.get()
         ))
     })
-}
-
-fn execute_operations(
-    operations: &[SampleOperation],
-    frame: &mut StabilizerFrame,
-    record: &mut Vec<bool>,
-    output: &mut Vec<bool>,
-    correlated_error_occurred: &mut bool,
-    rng: &mut impl Rng,
-    mode: ExecutionMode,
-) {
-    for operation in operations {
-        match operation {
-            SampleOperation::ApplyHadamard { qubit } => {
-                frame.apply_hadamard(*qubit);
-            }
-            SampleOperation::ApplyControlledX { control, target } => {
-                frame.apply_controlled_x(*control, *target);
-            }
-            SampleOperation::ApplyTableau { targets, transform } => {
-                frame.apply_tableau(targets, transform);
-            }
-            SampleOperation::Reset { qubit, basis } => {
-                frame.reset(*qubit, *basis, rng, mode.measurement_randomness());
-            }
-            SampleOperation::Measure {
-                qubit,
-                basis,
-                inverted,
-                flip_probability,
-                reset,
-            } => {
-                let noisy_flip = measurement_flip::sample(*flip_probability, rng, mode);
-                let result = frame.measure(
-                    *qubit,
-                    *basis,
-                    *inverted ^ noisy_flip,
-                    rng,
-                    mode.measurement_randomness(),
-                );
-                record.push(result);
-                output.push(result);
-                if *reset {
-                    frame.reset(*qubit, *basis, rng, mode.measurement_randomness());
-                }
-            }
-            SampleOperation::MeasureProduct {
-                terms,
-                inverted,
-                flip_probability,
-            } => {
-                let noisy_flip = measurement_flip::sample(*flip_probability, rng, mode);
-                let result = frame.measure_pauli_product(
-                    terms,
-                    *inverted ^ noisy_flip,
-                    rng,
-                    mode.measurement_randomness(),
-                );
-                record.push(result);
-                output.push(result);
-            }
-            SampleOperation::Pad {
-                value,
-                flip_probability,
-            } => {
-                let result = *value ^ measurement_flip::sample(*flip_probability, rng, mode);
-                record.push(result);
-                output.push(result);
-            }
-            SampleOperation::SingleQubitPauliChannel {
-                qubit,
-                probabilities,
-                total_probability,
-            } => {
-                if mode.includes_noise() {
-                    noise::apply_single_qubit_pauli_channel(
-                        frame,
-                        *qubit,
-                        probabilities,
-                        *total_probability,
-                        rng,
-                    );
-                }
-            }
-            SampleOperation::TwoQubitPauliChannel {
-                left,
-                right,
-                probabilities,
-                total_probability,
-            } => {
-                if mode.includes_noise() {
-                    noise::apply_two_qubit_pauli_channel(
-                        frame,
-                        *left,
-                        *right,
-                        probabilities,
-                        *total_probability,
-                        rng,
-                    );
-                }
-            }
-            SampleOperation::CorrelatedError {
-                else_branch,
-                probability,
-                terms,
-            } => {
-                if mode.includes_noise() {
-                    noise::apply_correlated_error(
-                        frame,
-                        terms,
-                        *probability,
-                        *else_branch,
-                        correlated_error_occurred,
-                        rng,
-                    );
-                } else if !else_branch {
-                    *correlated_error_occurred = false;
-                }
-            }
-            SampleOperation::HeraldedPauliChannel {
-                qubit,
-                probabilities,
-            } => {
-                if mode.includes_noise() {
-                    noise::apply_heralded_pauli_channel(frame, *qubit, probabilities, record, rng);
-                } else {
-                    record.push(false);
-                }
-            }
-            SampleOperation::FeedbackPauli {
-                offset,
-                qubit,
-                basis,
-            } => {
-                if measurement_record_bit(record, *offset) {
-                    frame.apply_pauli(*qubit, *basis);
-                }
-            }
-            SampleOperation::Repeat { count, body } => {
-                for _ in 0..*count {
-                    execute_operations(
-                        body,
-                        frame,
-                        record,
-                        output,
-                        correlated_error_occurred,
-                        rng,
-                        mode,
-                    );
-                }
-            }
-        }
-    }
-}
-
-fn measurement_record_bit(measurements: &[bool], offset: MeasureRecordOffset) -> bool {
-    let Ok(len) = i64::try_from(measurements.len()) else {
-        return false;
-    };
-    let index = len + i64::from(offset.get());
-    let Ok(index) = usize::try_from(index) else {
-        return false;
-    };
-    measurements.get(index).copied().unwrap_or(false)
 }
 
 fn unsupported_sampler_instruction(instruction: &CircuitInstruction) -> CircuitError {

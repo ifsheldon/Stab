@@ -299,11 +299,6 @@ pub(crate) enum CliError {
     #[error("format {format} is not supported for detection data")]
     UnsupportedDetectionFormat { format: &'static str },
 
-    #[error(
-        "--ran_without_feedback is not supported until feedback-removal conversion is implemented"
-    )]
-    UnsupportedRanWithoutFeedback,
-
     #[error("cannot combine --prepend_observables, --append_observables, or --obs_out")]
     ConflictingObservableRouting,
 

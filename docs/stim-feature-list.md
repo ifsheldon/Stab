@@ -168,7 +168,7 @@ Stim's stable 1.x compatibility contract covers the Python API and command-line 
 - **`m2d`:** `--append_observables`, `--circuit`, `--in`, `--in_format`, `--obs_out`, `--obs_out_format`, `--out`, `--out_format`, `--ran_without_feedback`, `--skip_reference_sample`, `--sweep`, `--sweep_format`.
 - **`sample`:** `--in`, `--out`, `--out_format`, `--seed`, `--shots`, `--skip_loop_folding`, `--skip_reference_sample`.
 - **`sample_dem`:** `--err_out`, `--err_out_format`, `--in`, `--obs_out`, `--obs_out_format`, `--out`, `--out_format`, `--replay_err_in`, `--replay_err_in_format`, `--seed`, `--shots`.
-- **Legacy dispatch modes:** `--sample`, `--detect`, `--gen`, `--m2d`, `--detector_hypergraph`, `--frame0`, and `--prepend_observables` exist in command dispatch and should be checked before declaring CLI parity complete.
+- **Legacy dispatch modes:** `--sample`, `--detect`, `--gen`, `--m2d`, `--detector_hypergraph`, `--frame0`, and `--prepend_observables` exist in upstream Stim command dispatch. This inventory records their existence; Stab's checklist is the source of truth for which deprecated legacy modes are intentionally kept or excluded from Stab CLI parity.
 - **Source:** [usage_command_line.md](../vendor/stim/doc/usage_command_line.md), [main_namespaced.cc](../vendor/stim/src/stim/main_namespaced.cc), [cmd](../vendor/stim/src/stim/cmd).
 
 ## 12. Python API

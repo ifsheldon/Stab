@@ -60,6 +60,11 @@ pub(super) enum SampleOperation {
         qubit: usize,
         basis: PauliBasis,
     },
+    SweepPauli {
+        sweep_id: usize,
+        qubit: usize,
+        basis: PauliBasis,
+    },
     Repeat {
         count: u64,
         body: Vec<SampleOperation>,
