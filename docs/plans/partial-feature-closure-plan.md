@@ -198,7 +198,7 @@ Objective: finish active Rust utility APIs for detecting regions, missing detect
 Included features:
 
 - Broader `circuit_detecting_regions` support for repeat-block traversal, additional Clifford gates, additional target shapes, tick windows, detector filtering, and gauge behavior selected during PF0.
-- Broader `missing_detectors` support for repeated MPP stabilizer-product cases, observable-interaction cases, honeycomb suffix cases, and toric suffix cases only if PF0 promotes exact subcases into active scope.
+- Broader `missing_detectors` support for multi-record detector row reduction, repeated MPP stabilizer-product cases, observable-interaction cases, honeycomb suffix cases, and toric suffix cases only if PF0 promotes exact subcases into active scope.
 - Measurement-rich flow solving for `Flow`, `has_flow`, `has_all_flows`, `flow_generators`, and related circuit checks.
 - Flow-aware transforms required by PF2, including time reversal for flows and feedback-inlining semantics.
 
@@ -206,7 +206,7 @@ Tests:
 
 - Port owned cases from `vendor/stim/src/stim/util_top/circuit_to_detecting_regions.test.cc`, `vendor/stim/src/stim/util_top/missing_detectors.test.cc`, `vendor/stim/src/stim/stabilizers/flow.test.cc`, and Python flow tests as semantic-mining sources.
 - Add positive tests for every promoted detecting-region gate and target shape.
-- Add positive and negative tests for every promoted missing-detector family, including nondeterminism, observables, repeated MPP products, and suffix-specific circuits if included.
+- Add positive and negative tests for every promoted missing-detector family, including nondeterminism, multi-record detector rows, observables, repeated MPP products, and suffix-specific circuits if included.
 - Add flow tests that include measurement indices, observables, flow multiplication, flow validation, and failure explanations.
 
 Benchmarks:
@@ -218,7 +218,7 @@ Acceptance criteria:
 
 - Utility APIs fail closed for unpromoted subfamilies with precise errors.
 - Flow APIs prove both positive and negative cases, including measurement-rich circuits and observable-including flows.
-- If honeycomb or toric suffix analysis remains unpromoted, it is recorded as deferred in the checklist and spec-gap log.
+- If multi-record row reduction, honeycomb suffix analysis, or toric suffix analysis remains unpromoted, it is recorded as deferred in the checklist and spec-gap log.
 
 ## Milestone PF6: Analyzer, Search, And Sparse Reverse Tracking Closure
 

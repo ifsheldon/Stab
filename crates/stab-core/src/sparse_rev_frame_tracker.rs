@@ -6,9 +6,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, Pauli,
-    QubitId, Target,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget,
+    FlexPauliString, Pauli, PauliBasis, PauliPhase, QubitId, Target,
 };
+
+mod pauli_product;
+
+use pauli_product::pauli_product_measurement_terms_reversed;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SparseReverseFrameTracker {
@@ -64,6 +68,7 @@ impl SparseReverseFrameTracker {
             "MXX" => self.undo_pair_measurements(instruction, TrackerBasis::X),
             "MYY" => self.undo_pair_measurements(instruction, TrackerBasis::Y),
             "MZZ" => self.undo_pair_measurements(instruction, TrackerBasis::Z),
+            "MPP" => self.undo_pauli_product_measurements(instruction),
             "MR" => self.undo_measure_resets(instruction, TrackerBasis::Z),
             "MRX" => self.undo_measure_resets(instruction, TrackerBasis::X),
             "MRY" => self.undo_measure_resets(instruction, TrackerBasis::Y),
@@ -94,6 +99,34 @@ impl SparseReverseFrameTracker {
 
     pub(crate) fn absolute_record_index_from_offset(&self, offset: i32) -> CircuitResult<usize> {
         self.record_index_from_offset(offset)
+    }
+
+    pub(crate) fn region_for_target(&self, target: DemTarget) -> CircuitResult<FlexPauliString> {
+        let bases = self.xs.iter().zip(&self.zs).map(|(xs, zs)| {
+            match (xs.contains(&target), zs.contains(&target)) {
+                (false, false) => PauliBasis::I,
+                (true, false) => PauliBasis::X,
+                (false, true) => PauliBasis::Z,
+                (true, true) => PauliBasis::Y,
+            }
+        });
+        FlexPauliString::from_phase_and_bases(PauliPhase::Plus, bases).map_err(|error| {
+            CircuitError::invalid_detector_error_model(format!(
+                "failed to build detecting region for {target}: {error}"
+            ))
+        })
+    }
+
+    pub(crate) fn undo_implicit_rz_at_start_of_circuit(&mut self) -> CircuitResult<()> {
+        for index in 0..self.xs.len() {
+            let qubit = QubitId::new(u32::try_from(index).map_err(|_| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "qubit index {index} does not fit u32 during implicit start-state check"
+                ))
+            })?)?;
+            self.check_reset_gauge(qubit, TrackerBasis::Z)?;
+        }
+        Ok(())
     }
 
     fn undo_measure_resets(
@@ -135,6 +168,22 @@ impl SparseReverseFrameTracker {
         basis: TrackerBasis,
     ) -> CircuitResult<()> {
         let terms = pair_measurement_terms_reversed(instruction, basis)?;
+        self.ensure_measurements_available(terms.len(), instruction.gate().canonical_name())?;
+        for term in &terms {
+            self.check_product_measurement_gauge(term)?;
+        }
+        for term in terms {
+            let sensitivity = self.pop_record_sensitivity()?;
+            self.toggle_product_sensitivity(&term, &sensitivity)?;
+        }
+        Ok(())
+    }
+
+    fn undo_pauli_product_measurements(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<()> {
+        let terms = pauli_product_measurement_terms_reversed(instruction)?;
         self.ensure_measurements_available(terms.len(), instruction.gate().canonical_name())?;
         for term in &terms {
             self.check_product_measurement_gauge(term)?;
@@ -935,6 +984,35 @@ mod tests {
             expected.measurement_count = 1;
             assert_eq!(actual, expected);
         }
+    }
+
+    #[test]
+    fn sparse_rev_frame_tracker_mpp_measurements_subset() {
+        let mut actual = SparseReverseFrameTracker::new(6, 2, 0, true);
+        actual.rec_bits.insert(0, single_pauli_set(0));
+        actual.rec_bits.insert(1, single_pauli_set(1));
+        actual
+            .undo_instruction(&instruction("MPP X0*Y1*Z2 Z5\n"))
+            .unwrap();
+
+        let mut expected = tracker_from_pauli_text("XYZIIZ");
+        expected.xs[0] = single_pauli_set(0);
+        expected.xs[1] = single_pauli_set(0);
+        expected.zs[1] = single_pauli_set(0);
+        expected.zs[2] = single_pauli_set(0);
+        expected.zs[5] = single_pauli_set(1);
+        expected.measurement_count = 0;
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn sparse_rev_frame_tracker_rejects_anti_hermitian_mpp_products() {
+        let mut actual = SparseReverseFrameTracker::new(1, 1, 0, true);
+        let error = actual
+            .undo_instruction(&instruction("MPP X0*Z0\n"))
+            .unwrap_err();
+
+        assert!(error.to_string().contains("anti-Hermitian"));
     }
 
     #[test]

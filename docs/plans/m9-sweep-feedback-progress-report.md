@@ -70,6 +70,6 @@ Focused probe reports were generated under:
 
 - `detect` sweep-conditioned sampling still rejects sweep-conditioned circuits because no public detector-sampling sweep input exists yet.
 - Full `Circuit.with_inlined_feedback` parity is not claimed.
-- Exact loop refolding and full MPP feedback transform parity remain open spec gaps in `docs/plans/milestone-spec-gaps.md`.
+- Exact loop refolding and unsupported feedback-inlining shapes remain open spec gaps in `docs/plans/milestone-spec-gaps.md`.
 - Deprecated `--detector_hypergraph` remains excluded from Stab CLI parity.
 - Python, JS/WASM, diagrams, `explain_errors`, `repl`, QASM/Quirk, GPU, public graph/vector simulator APIs, and broader ecosystem surfaces remain out of this M9 slice.

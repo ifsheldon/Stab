@@ -19,13 +19,13 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
-## 2026-07-04 - M9: Feedback-Inlining Transform Subcase Boundaries
+## 2026-07-04 - M9: Exact Feedback Loop Refolding Boundary
 
 Status: Open
 Revealed by: implementation of `docs/plans/m9-m2d-sweep-feedback-parity-plan.md`.
 Current text: the M9 sweep and feedback plan asks to implement `--ran_without_feedback` and port transform subcases for `basic`, `demolition_feedback`, `loop`, `mpp`, and interleaved feedback ordering, while allowing unfinished transform subcases to be logged precisely.
-Gap: the implemented M9 slice supports the public command-level `m2d --ran_without_feedback` case, exact `basic`, exact `demolition_feedback`, interleaved-operation ordering, and sweep-control preservation, but it does not claim full `Circuit.with_inlined_feedback` parity. Exact loop refolding is not implemented, and full MPP feedback transform parity is not proven in this slice.
-Proposed amendment: define this M9 wave as command-level feedback-inlining parity plus the exact transform subcases now covered by source-owned tests. Add a later transform milestone for exact loop refolding, full MPP feedback behavior, and public transform API parity before the checklist can mark full feedback-inlining transform parity done.
+Gap: the implemented M9 slice supports the public command-level `m2d --ran_without_feedback` case, exact `basic`, exact `demolition_feedback`, exact MPP feedback-transform parity, interleaved-operation ordering, and sweep-control preservation, but it does not claim full `Circuit.with_inlined_feedback` parity. Exact loop refolding is not implemented.
+Proposed amendment: define this M9 wave as command-level feedback-inlining parity plus the exact transform subcases now covered by source-owned tests. Add a later transform milestone for exact loop refolding and public transform API parity before the checklist can mark full feedback-inlining transform parity done.
 Resolution: Pending future transform milestone.
 
 ## Resolved Entries
@@ -307,7 +307,7 @@ Revealed by: implementing `stab m2d` and inspecting pinned Stim `command_m2d.tes
 Current text: M9 requires `stim m2d` with measurement input parsing, detector conversion, observable output, and inconsistent-input errors, and the compatibility matrix assigns `transform_without_feedback.test.cc` to M9.
 Gap: the milestone does not explicitly say whether `m2d --ran_without_feedback` and circuit feedback inlining are required for the initial M9 CLI surface, even though pinned Stim tests exercise that path and Stab currently rejects the flag instead of silently returning incorrect output.
 Proposed amendment: add an explicit M9 task and fixture group for `--ran_without_feedback` if feedback-removal parity is required now, or defer it to a named later detector-conversion submilestone while requiring the CLI to reject the flag with a clear error.
-Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now states that M9 does not implement feedback-removal conversion for `m2d --ran_without_feedback`; the M9 CLI must reject the flag with a clear error instead of silently treating skipped-feedback measurement records as ordinary records. Evidence is `cargo test -p stab-cli m2d_rejects_ran_without_feedback_until_feedback_removal_is_implemented --quiet`, and `coverage-util-top-transform-without-feedback` remains a manifest-only follow-up for a later detector-analysis milestone.
+Resolution: the later M9 sweep and detector-utility follow-ups implemented the scoped `m2d --ran_without_feedback` path and promoted `coverage-util-top-transform-without-feedback` into an executable row for the owned subset. The implementation covers basic measurement feedback, demolition feedback, interleaved ordering, sweep-control preservation, and MPP feedback inlining while rejecting repeat blocks and unsupported classical controlled feedback gates. Exact loop refolding and full feedback-transform parity remain future work.
 
 ## 2026-06-27 - M9: Detector Analysis Utility Row Ownership
 
@@ -316,7 +316,7 @@ Revealed by: M9 oracle manifest after implementing detector sampling, measuremen
 Current text: M9 links detector-conversion workflows and the compatibility matrix assigns `circuit_to_detecting_regions.test.cc`, `missing_detectors.test.cc`, and `transform_without_feedback.test.cc` to M9.
 Gap: the milestone objective and tasks describe public `detect` and `m2d` workflows, but they do not define public Rust APIs, fixture subsets, or done criteria for detecting regions, missing-detector analysis, or feedback-removal transforms; those rows remain manifest-only while the public CLI/core conversion rows are implemented.
 Proposed amendment: split M9 into explicit public workflow acceptance and detector-analysis utility acceptance, naming the APIs and upstream subcases required for each utility row, or move the utility rows to the DEM/analyzer milestone that introduces the required analysis structures.
-Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now splits M9 public workflow acceptance from detector-analysis utilities. M9 completion evidence is limited to public `detect` and `m2d` workflows plus the implemented M9 core conversion subsets, while `coverage-util-top-circuit-to-detecting-regions`, `coverage-util-top-missing-detectors`, and `coverage-util-top-transform-without-feedback` remain manifest-only follow-up rows until a later detector-analysis milestone promotes explicit Rust APIs and acceptance fixtures.
+Resolution: `docs/plans/rust-stim-drop-in-rewrite.md` now splits M9 public workflow acceptance from detector-analysis utilities. The M9 detector utility closure promoted simple detecting regions, basic single-record missing-detector suggestions, and MPP feedback inlining into explicit Rust APIs and executable rows. Broader detecting-region repeat-block traversal, gate and target-shape support, gauge handling, multi-record missing-detector row reduction, MPP and observable missing-detector analysis, honeycomb suffix analysis, toric suffix analysis, exact loop refolding, and full transform API parity remain future work with explicit manifest or gap entries.
 
 ## 2026-06-27 - M9: Sweep-Conditioned Detection Conversion Scope
 

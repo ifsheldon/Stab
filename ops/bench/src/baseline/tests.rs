@@ -216,10 +216,17 @@ fn primary_baseline_selection_excludes_metadata_and_m12_placeholder_rows() {
     let mut metadata_row = benchmark_row("m7-perf-harness", Runner::ContractOnly);
     metadata_row.milestone = Milestone::M7;
     metadata_row.threshold_class = "baseline-metadata".to_string();
+    let mut non_primary_row =
+        benchmark_row("m9-detecting-regions-basic-batch", Runner::ContractOnly);
+    non_primary_row.milestone = Milestone::M9;
+    non_primary_row.threshold_class = "non-primary-report-only".to_string();
     let mut m12_row = benchmark_row("m12-primary-performance-matrix", Runner::ContractOnly);
     m12_row.milestone = Milestone::M12;
+    let mut pf_row = benchmark_row("pf1-circuit-coordinate-query", Runner::ContractOnly);
+    pf_row.milestone = Milestone::Pf1;
+    pf_row.threshold_class = "non-primary-report-only".to_string();
     let manifest = BenchmarkManifest {
-        rows: vec![m4_row, metadata_row, m12_row],
+        rows: vec![m4_row, metadata_row, non_primary_row, m12_row, pf_row],
     };
 
     let rows = selected_baseline_rows(&manifest, &[], true).expect("primary rows");
@@ -500,6 +507,27 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
             "m9-m2d-ran-without-feedback-cli",
             Runner::StimCli,
             &["stab_m2d_ran_without_feedback"][..],
+        ),
+        (
+            "m9-detecting-regions-basic-batch",
+            Runner::ContractOnly,
+            &[
+                "stab_detecting_regions_basic_cases",
+                "stab_detecting_regions_basic_regions",
+            ][..],
+        ),
+        (
+            "m9-missing-detectors-basic-batch",
+            Runner::ContractOnly,
+            &[
+                "stab_missing_detectors_basic_cases",
+                "stab_missing_detectors_basic_suggestions",
+            ][..],
+        ),
+        (
+            "m9-feedback-inline-mpp-batch",
+            Runner::ContractOnly,
+            &["stab_feedback_inline_mpp_transforms"][..],
         ),
         (
             "m9-m2d-primary-matrix-contract",

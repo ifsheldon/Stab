@@ -4,10 +4,11 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use stab_core::{
-    Circuit, CodeDistance, CompiledSampler, DetectionConversionOptions,
-    DetectionObservableOutputMode, Probability, RepetitionCodeParams, RepetitionCodeTask,
-    RoundCount, SampleFormat, convert_measurements_to_detection_events,
-    generate_repetition_code_circuit, measurement_record_count,
+    Circuit, CodeDistance, CompiledSampler, DemDetectorId, DetectingRegionOptions,
+    DetectionConversionOptions, DetectionObservableOutputMode, MissingDetectorOptions, Probability,
+    RepetitionCodeParams, RepetitionCodeTask, RoundCount, SampleFormat, circuit_detecting_regions,
+    circuit_with_inlined_feedback, convert_measurements_to_detection_events,
+    generate_repetition_code_circuit, measurement_record_count, missing_detectors,
     result_formats::{read_records, write_records},
     sample_detection_events, write_detection_records,
 };
@@ -39,6 +40,26 @@ const DETECT_SHOTS: usize = 4;
 const PRIMARY_SHOTS: usize = 64;
 #[cfg(test)]
 const PRIMARY_SHOTS: usize = 2;
+#[cfg(not(test))]
+const UTILITY_BATCH: usize = 4096;
+#[cfg(test)]
+const UTILITY_BATCH: usize = 2;
+const MISSING_DETECTOR_BASIC_CASES: usize = 10;
+const MISSING_DETECTOR_BASIC_SUGGESTIONS: usize = 4;
+const DETECTING_REGIONS_PER_CASE: usize = 2;
+const DETECTING_REGIONS_SIMPLE: &str = "H 0\n\
+                                        TICK\n\
+                                        CX 0 1\n\
+                                        TICK\n\
+                                        MXX 0 1\n\
+                                        DETECTOR rec[-1]\n";
+const FEEDBACK_INLINE_MPP: &str = "RX 0\n\
+                                  RY 1\n\
+                                  RZ 2\n\
+                                  MPP X0*Y1*Z2 Z5\n\
+                                  CX rec[-2] 3\n\
+                                  M 3\n\
+                                  DETECTOR rec[-1]\n";
 
 pub(super) fn run_detection_compare_row(
     row: &BenchmarkRow,
@@ -86,6 +107,9 @@ pub(super) fn run_detection_compare_row(
             None,
         )
         .map(Some),
+        "m9-detecting-regions-basic-batch" => run_detecting_regions_basic_batch(row).map(Some),
+        "m9-missing-detectors-basic-batch" => run_missing_detectors_basic_batch(row).map(Some),
+        "m9-feedback-inline-mpp-batch" => run_feedback_inline_mpp_batch(row).map(Some),
         "m9-detect-primary-matrix-contract" => run_primary_detect_row(row).map(Some),
         "m9-m2d-primary-matrix-contract" => run_primary_m2d_row(row).map(Some),
         _ => Ok(None),
@@ -102,6 +126,24 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("m9-m2d-sweep-b8-cli", "stab_m2d_sweep_b8") => Some((5.0, "shots/s")),
         ("m9-m2d-ran-without-feedback-cli", "stab_m2d_ran_without_feedback") => {
             Some((6.0, "shots/s"))
+        }
+        ("m9-detecting-regions-basic-batch", "stab_detecting_regions_basic_cases") => {
+            Some((UTILITY_BATCH as f64, "cases/s"))
+        }
+        ("m9-detecting-regions-basic-batch", "stab_detecting_regions_basic_regions") => Some((
+            (UTILITY_BATCH * DETECTING_REGIONS_PER_CASE) as f64,
+            "regions/s",
+        )),
+        ("m9-missing-detectors-basic-batch", "stab_missing_detectors_basic_cases") => Some((
+            (UTILITY_BATCH * MISSING_DETECTOR_BASIC_CASES) as f64,
+            "cases/s",
+        )),
+        ("m9-missing-detectors-basic-batch", "stab_missing_detectors_basic_suggestions") => Some((
+            (UTILITY_BATCH * MISSING_DETECTOR_BASIC_SUGGESTIONS) as f64,
+            "suggestions/s",
+        )),
+        ("m9-feedback-inline-mpp-batch", "stab_feedback_inline_mpp_transforms") => {
+            Some((UTILITY_BATCH as f64, "transforms/s"))
         }
         ("m9-detect-text-cli", "stab_detect_1024_dets")
         | ("m9-detect-bitpacked-cli", "stab_detect_1024_b8") => {
@@ -140,6 +182,15 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "m9-m2d-ran-without-feedback-cli" => Some(
             "report-only: Stab measures in-process public m2d --ran_without_feedback conversion; threshold ownership awaits repeated probe evidence",
         ),
+        "m9-detecting-regions-basic-batch" => Some(
+            "report-only: Stab measures the Rust detecting-regions utility subset without a faithful pinned Stim CLI timing ratio",
+        ),
+        "m9-missing-detectors-basic-batch" => Some(
+            "report-only: Stab measures the Rust basic missing-detectors utility subset without a faithful pinned Stim CLI timing ratio",
+        ),
+        "m9-feedback-inline-mpp-batch" => Some(
+            "report-only: Stab measures the Rust MPP feedback-inlining utility subset without a faithful pinned Stim CLI timing ratio",
+        ),
         "m9-detect-primary-matrix-contract" => Some(
             "cli-baseline: Stab detects the source-owned generated repetition-code d3/r3 fixture with b8 output against pinned Stim detect on the same fixture",
         ),
@@ -148,6 +199,129 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         _ => None,
     }
+}
+
+fn run_detecting_regions_basic_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    Ok(vec![
+        measure_detecting_regions_basic(row, "stab_detecting_regions_basic_cases")?,
+        measure_detecting_regions_basic(row, "stab_detecting_regions_basic_regions")?,
+    ])
+}
+
+fn measure_detecting_regions_basic(
+    row: &BenchmarkRow,
+    measurement_name: &'static str,
+) -> Result<Measurement, BenchError> {
+    let circuit = parse_circuit(&row.id, DETECTING_REGIONS_SIMPLE)?;
+    let detector = DemDetectorId::try_new(0).map_err(|error| stab_runner_error(&row.id, error))?;
+    measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
+        let mut regions = 0usize;
+        for _ in 0..UTILITY_BATCH {
+            let output = circuit_detecting_regions(
+                &circuit,
+                DetectingRegionOptions {
+                    detectors: vec![detector],
+                    ticks: vec![0, 1],
+                    ignore_anticommutation_errors: false,
+                },
+            )
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+            let detector_regions = output
+                .get(&detector)
+                .ok_or_else(|| BenchError::StabRunner {
+                    row_id: row.id.clone(),
+                    message: "detecting-regions benchmark output omitted detector D0".to_string(),
+                })?;
+            regions = regions.checked_add(detector_regions.len()).ok_or_else(|| {
+                BenchError::StabRunner {
+                    row_id: row.id.clone(),
+                    message: "detecting-regions benchmark region count overflowed".to_string(),
+                }
+            })?;
+        }
+        black_box(regions);
+        Ok(())
+    })
+}
+
+fn run_missing_detectors_basic_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    Ok(vec![
+        measure_missing_detectors_basic(row, "stab_missing_detectors_basic_cases")?,
+        measure_missing_detectors_basic(row, "stab_missing_detectors_basic_suggestions")?,
+    ])
+}
+
+fn measure_missing_detectors_basic(
+    row: &BenchmarkRow,
+    measurement_name: &'static str,
+) -> Result<Measurement, BenchError> {
+    let cases = missing_detector_basic_corpus(&row.id)?;
+    measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
+        let mut suggestions = 0usize;
+        for _ in 0..UTILITY_BATCH {
+            for (circuit, ignore_non_deterministic_measurements) in &cases {
+                let output = missing_detectors(
+                    circuit,
+                    MissingDetectorOptions {
+                        ignore_non_deterministic_measurements:
+                            *ignore_non_deterministic_measurements,
+                    },
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+                suggestions = suggestions
+                    .checked_add(output.items().len())
+                    .ok_or_else(|| BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: "missing-detectors benchmark suggestion count overflowed"
+                            .to_string(),
+                    })?;
+            }
+        }
+        black_box(suggestions);
+        Ok(())
+    })
+}
+
+fn missing_detector_basic_corpus(row_id: &str) -> Result<Vec<(Circuit, bool)>, BenchError> {
+    [
+        ("", false),
+        ("R 0\nM 0\nDETECTOR rec[-1]\n", false),
+        ("R 0\nM 0\nDETECTOR rec[-1]\nDETECTOR rec[-1]\n", false),
+        ("R 0\nM 0\n", false),
+        ("M 0\n", false),
+        ("M 0\n", true),
+        ("R 0 1\nM 0 1\nDETECTOR rec[-1]\n", false),
+        ("M 0\nDETECTOR rec[-1] rec[-1]\n", false),
+        ("MX 0\n", false),
+        ("RX 0\nMY 0\n", false),
+    ]
+    .into_iter()
+    .map(|(text, ignore)| parse_circuit(row_id, text).map(|circuit| (circuit, ignore)))
+    .collect()
+}
+
+fn run_feedback_inline_mpp_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = parse_circuit(&row.id, FEEDBACK_INLINE_MPP)?;
+    Ok(vec![measure_stab_iterations(
+        "stab_feedback_inline_mpp_transforms",
+        super::STAB_COMPARE_ITERATIONS,
+        || {
+            let mut instructions = 0usize;
+            for _ in 0..UTILITY_BATCH {
+                let output = circuit_with_inlined_feedback(&circuit)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                instructions = instructions
+                    .checked_add(output.items().len())
+                    .ok_or_else(|| BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: "feedback-inlining benchmark instruction count overflowed"
+                            .to_string(),
+                    })?;
+            }
+            black_box(instructions);
+            Ok(())
+        },
+    )?])
 }
 
 fn run_m2d_cli_row(

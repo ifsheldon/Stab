@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, Gate,
-    MeasureRecordOffset, Pauli, Target, detection::instruction_measurement_count,
+    GateCategory, MeasureRecordOffset, Pauli, Target, detection::instruction_measurement_count,
     measurement_record_count, sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
@@ -37,9 +37,10 @@ impl WithoutFeedbackHelper {
             match item {
                 CircuitItem::Instruction(instruction) => self.undo_instruction(instruction)?,
                 CircuitItem::RepeatBlock(repeat) => {
-                    for _ in 0..repeat.repeat_count().get() {
-                        self.undo_circuit(repeat.body())?;
-                    }
+                    return Err(CircuitError::invalid_detector_error_model(format!(
+                        "feedback inlining does not support repeat blocks with count {}",
+                        repeat.repeat_count().get()
+                    )));
                 }
             }
         }
@@ -49,6 +50,17 @@ impl WithoutFeedbackHelper {
     fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         if matches!(instruction.gate().canonical_name(), "CX" | "CY" | "CZ") {
             return self.undo_feedback_capable_controlled_pauli(instruction);
+        }
+        if instruction.gate().category() == GateCategory::Controlled
+            && instruction
+                .targets()
+                .iter()
+                .any(Target::is_classical_bit_target)
+        {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "feedback inlining does not support {} with classical controls",
+                instruction.gate().canonical_name()
+            )));
         }
         self.reversed_output.push(instruction.clone());
         self.tracker.undo_instruction(instruction)
@@ -319,6 +331,8 @@ mod tests {
         reason = "transform unit tests use exact circuit text for compact parity diagnostics"
     )]
 
+    use crate::{ErrorAnalyzerOptions, circuit_to_detector_error_model};
+
     use super::*;
 
     fn transform(text: &str) -> String {
@@ -391,5 +405,80 @@ mod tests {
             "M 0 1 2 3\n\
              DETECTOR rec[-2] rec[-1]\n"
         );
+    }
+
+    #[test]
+    fn circuit_with_inlined_feedback_mpp() {
+        let input = Circuit::from_stim_str(
+            "RX 0\n\
+             RY 1\n\
+             RZ 2\n\
+             MPP X0*Y1*Z2 Z5\n\
+             CX rec[-2] 3\n\
+             M 3\n\
+             DETECTOR rec[-1]\n",
+        )
+        .unwrap();
+        let actual = circuit_with_inlined_feedback(&input).unwrap();
+
+        assert_eq!(
+            actual.to_stim_string(),
+            "RX 0\n\
+             RY 1\n\
+             R 2\n\
+             MPP X0*Y1*Z2 Z5\n\
+             M 3\n\
+             DETECTOR rec[-3] rec[-1]\n"
+        );
+
+        let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
+            .unwrap()
+            .to_dem_string();
+        let actual_dem = circuit_to_detector_error_model(&actual, ErrorAnalyzerOptions::default())
+            .unwrap()
+            .to_dem_string();
+        assert_eq!(actual_dem, expected_dem);
+    }
+
+    #[test]
+    fn circuit_with_inlined_feedback_rejects_anti_hermitian_mpp() {
+        let circuit = Circuit::from_stim_str(
+            "MPP X0*Z0\n\
+             CX rec[-1] 1\n\
+             M 1\n\
+             DETECTOR rec[-1]\n",
+        )
+        .unwrap();
+        let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
+
+        assert!(error.to_string().contains("anti-Hermitian"));
+    }
+
+    #[test]
+    fn circuit_with_inlined_feedback_rejects_unsupported_feedback_gate() {
+        let circuit = Circuit::from_stim_str(
+            "M 0\n\
+             XCX rec[-1] 1\n\
+             M 1\n\
+             DETECTOR rec[-1]\n",
+        )
+        .unwrap();
+        let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
+
+        assert!(error.to_string().contains("does not support XCX"));
+    }
+
+    #[test]
+    fn circuit_with_inlined_feedback_rejects_repeat_blocks() {
+        let circuit = Circuit::from_stim_str(
+            "REPEAT 2 {\n\
+                 M 0\n\
+                 CX rec[-1] 0\n\
+             }\n",
+        )
+        .unwrap();
+        let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
+
+        assert!(error.to_string().contains("does not support repeat blocks"));
     }
 }
