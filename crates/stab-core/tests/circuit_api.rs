@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use stab_core::{Circuit, QubitId};
+use stab_core::{Circuit, CircuitDetectorId, QubitId};
 
 #[test]
 fn pf1_circuit_stats_counts_match_owned_upstream_semantics() {
@@ -300,4 +300,133 @@ fn pf1_circuit_stats_coordinate_queries_reject_non_finite_folded_shift() {
         error.to_string().contains("coordinate shift overflowed"),
         "{error}"
     );
+}
+
+#[test]
+fn pf1_circuit_detector_coords_include_empty_and_shifted_coordinates() {
+    let circuit = Circuit::from_stim_str(
+        "M 0\n\
+         DETECTOR rec[-1]\n\
+         DETECTOR(1, 2, 3) rec[-1]\n\
+         REPEAT 3 {\n\
+             DETECTOR(42) rec[-1]\n\
+             SHIFT_COORDS(100)\n\
+         }\n",
+    )
+    .expect("parse circuit");
+
+    let expected = BTreeMap::from([
+        (detector(0), vec![]),
+        (detector(1), vec![1.0, 2.0, 3.0]),
+        (detector(2), vec![42.0]),
+        (detector(3), vec![142.0]),
+        (detector(4), vec![242.0]),
+    ]);
+
+    assert_eq!(
+        circuit.detector_coordinates().expect("all coordinates"),
+        expected
+    );
+    assert_eq!(
+        circuit
+            .coordinates_of_detector(detector(0))
+            .expect("detector zero"),
+        vec![]
+    );
+    assert_eq!(
+        circuit
+            .detector_coordinates_for([detector(1), detector(3)])
+            .expect("selected coordinates"),
+        BTreeMap::from([
+            (detector(1), vec![1.0, 2.0, 3.0]),
+            (detector(3), vec![142.0])
+        ])
+    );
+}
+
+#[test]
+fn pf1_circuit_detector_coords_fold_nested_repeat_queries() {
+    let circuit = Circuit::from_stim_str(
+        "TICK\n\
+         REPEAT 1000 {\n\
+             REPEAT 2000 {\n\
+                 REPEAT 1000 {\n\
+                     DETECTOR(0, 0, 0, 4)\n\
+                     SHIFT_COORDS(1, 0, 0)\n\
+                 }\n\
+                 DETECTOR(0, 0, 0, 3)\n\
+                 SHIFT_COORDS(0, 1, 0)\n\
+             }\n\
+             DETECTOR(0, 0, 0, 2)\n\
+             SHIFT_COORDS(0, 0, 1)\n\
+         }\n\
+         DETECTOR(0, 0, 0, 1)\n",
+    )
+    .expect("parse circuit");
+
+    assert_eq!(
+        circuit
+            .coordinates_of_detector(detector(0))
+            .expect("detector 0"),
+        vec![0.0, 0.0, 0.0, 4.0]
+    );
+    assert_eq!(
+        circuit
+            .coordinates_of_detector(detector(1002))
+            .expect("detector 1002"),
+        vec![1001.0, 1.0, 0.0, 4.0]
+    );
+    assert_eq!(
+        circuit
+            .detector_coordinates_for([
+                detector(0),
+                detector(1),
+                detector(999),
+                detector(1000),
+                detector(1001),
+                detector(1002),
+            ])
+            .expect("selected coordinates"),
+        BTreeMap::from([
+            (detector(0), vec![0.0, 0.0, 0.0, 4.0]),
+            (detector(1), vec![1.0, 0.0, 0.0, 4.0]),
+            (detector(999), vec![999.0, 0.0, 0.0, 4.0]),
+            (detector(1000), vec![1000.0, 0.0, 0.0, 3.0]),
+            (detector(1001), vec![1000.0, 1.0, 0.0, 4.0]),
+            (detector(1002), vec![1001.0, 1.0, 0.0, 4.0]),
+        ])
+    );
+}
+
+#[test]
+fn pf1_circuit_detector_coords_skip_detector_free_repeat_shift() {
+    let circuit = Circuit::from_stim_str(
+        "REPEAT 1000 {\n\
+             SHIFT_COORDS(1)\n\
+         }\n\
+         DETECTOR(5)\n",
+    )
+    .expect("parse circuit");
+
+    assert_eq!(
+        circuit
+            .coordinates_of_detector(detector(0))
+            .expect("detector after shift-only repeat"),
+        vec![1005.0]
+    );
+}
+
+#[test]
+fn pf1_circuit_detector_coords_reject_missing_detector_id() {
+    let circuit = Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n").expect("parse");
+
+    let error = circuit
+        .coordinates_of_detector(detector(1))
+        .expect_err("reject missing detector");
+
+    assert!(error.to_string().contains("Detector index 1 is too big"));
+}
+
+fn detector(id: u64) -> CircuitDetectorId {
+    CircuitDetectorId::new(id)
 }

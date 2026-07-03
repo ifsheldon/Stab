@@ -307,6 +307,8 @@ fn pf1_circuit_coordinate_benchmark_reports_public_query_surfaces() {
             "stab_circuit_counts_nested_repeat",
             "stab_circuit_final_coordinate_shift_nested_repeat",
             "stab_circuit_final_qubit_coordinates_nested_repeat",
+            "stab_circuit_detector_coordinates_nested_repeat",
+            "stab_circuit_detector_coordinates_late_nested_repeat",
         ]
     );
     assert!(compare_note("pf1-circuit-coordinate-query").is_some());

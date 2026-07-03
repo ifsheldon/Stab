@@ -1,6 +1,8 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{CircuitError, CircuitResult, GateTargetGroupKind, QubitId, RepeatCount};
+use crate::{
+    CircuitDetectorId, CircuitError, CircuitResult, GateTargetGroupKind, QubitId, RepeatCount,
+};
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
 
@@ -144,6 +146,38 @@ impl Circuit {
         Ok(coordinates)
     }
 
+    pub fn detector_coordinates(&self) -> CircuitResult<BTreeMap<CircuitDetectorId, Vec<f64>>> {
+        let detector_count = self.count_detectors()?;
+        let detectors = (0..detector_count)
+            .map(CircuitDetectorId::new)
+            .collect::<BTreeSet<_>>();
+        self.detector_coordinates_for(detectors)
+    }
+
+    pub fn detector_coordinates_for(
+        &self,
+        detectors: impl IntoIterator<Item = CircuitDetectorId>,
+    ) -> CircuitResult<BTreeMap<CircuitDetectorId, Vec<f64>>> {
+        let detectors = detectors.into_iter().collect::<BTreeSet<_>>();
+        let mut scan = DetectorCoordinateScan::new(detectors);
+        scan.visit_circuit(self, &mut Vec::new())?;
+        if let Some(missing) = scan.next_unresolved_detector() {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "Detector index {} is too big. The circuit has {} detectors",
+                missing.get(),
+                self.count_detectors()?
+            )));
+        }
+        Ok(scan.out)
+    }
+
+    pub fn coordinates_of_detector(&self, detector: CircuitDetectorId) -> CircuitResult<Vec<f64>> {
+        let mut coordinates = self.detector_coordinates_for([detector])?;
+        coordinates.remove(&detector).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model("detector coordinate lookup failed")
+        })
+    }
+
     fn append_item(&mut self, item: CircuitItem) {
         match item {
             CircuitItem::Instruction(instruction) => self.append_instruction(instruction),
@@ -196,6 +230,10 @@ fn circuit_count_overflow() -> CircuitError {
 
 fn repetition_count_overflow() -> CircuitError {
     CircuitError::invalid_domain_value("repetition count", "overflowed")
+}
+
+fn detector_count_overflow() -> CircuitError {
+    CircuitError::invalid_detector_error_model("detector count overflowed")
 }
 
 fn instruction_target_group_count(instruction: &CircuitInstruction) -> usize {
@@ -316,6 +354,128 @@ fn apply_final_qubit_coordinates(
     Ok(())
 }
 
+struct DetectorCoordinateScan {
+    desired: Vec<CircuitDetectorId>,
+    desired_cursor: usize,
+    next_detector_index: u64,
+    out: BTreeMap<CircuitDetectorId, Vec<f64>>,
+}
+
+impl DetectorCoordinateScan {
+    fn new(desired: BTreeSet<CircuitDetectorId>) -> Self {
+        Self {
+            desired: desired.into_iter().collect(),
+            desired_cursor: 0,
+            next_detector_index: 0,
+            out: BTreeMap::new(),
+        }
+    }
+
+    fn next_unresolved_detector(&self) -> Option<CircuitDetectorId> {
+        self.desired.get(self.desired_cursor).copied()
+    }
+
+    fn visit_circuit(&mut self, circuit: &Circuit, shift: &mut Vec<f64>) -> CircuitResult<()> {
+        for item in circuit.items() {
+            if self.next_unresolved_detector().is_none() {
+                return Ok(());
+            }
+            match item {
+                CircuitItem::Instruction(instruction) => {
+                    self.visit_instruction(instruction, shift)?
+                }
+                CircuitItem::RepeatBlock(repeat) => self.visit_repeat(repeat, shift)?,
+            }
+        }
+        Ok(())
+    }
+
+    fn visit_repeat(&mut self, repeat: &RepeatBlock, shift: &mut Vec<f64>) -> CircuitResult<()> {
+        let body = repeat.body();
+        let body_detector_count = body.count_detectors()?;
+        let body_shift = coordinate_shift_of(body)?;
+        let mut used_repetitions = 0_u64;
+        let repetitions = repeat.repeat_count().get();
+
+        while used_repetitions < repetitions {
+            let Some(next_desired) = self.next_unresolved_detector() else {
+                return Ok(());
+            };
+            let skip = if body_detector_count == 0 {
+                repetitions.saturating_sub(used_repetitions)
+            } else if next_desired.get() <= self.next_detector_index {
+                0
+            } else {
+                let remaining = repetitions.saturating_sub(used_repetitions);
+                let distance = next_desired.get().saturating_sub(self.next_detector_index);
+                remaining.min(distance / body_detector_count)
+            };
+
+            if skip > 0 {
+                let detector_skip = body_detector_count
+                    .checked_mul(skip)
+                    .ok_or_else(detector_count_overflow)?;
+                self.next_detector_index = self
+                    .next_detector_index
+                    .checked_add(detector_skip)
+                    .ok_or_else(detector_count_overflow)?;
+                add_coordinate_shift_mul(shift, &body_shift, skip as f64)?;
+                used_repetitions = used_repetitions
+                    .checked_add(skip)
+                    .ok_or_else(detector_count_overflow)?;
+            }
+
+            if used_repetitions < repetitions {
+                self.visit_circuit(body, shift)?;
+                used_repetitions = used_repetitions
+                    .checked_add(1)
+                    .ok_or_else(detector_count_overflow)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn visit_instruction(
+        &mut self,
+        instruction: &CircuitInstruction,
+        shift: &mut Vec<f64>,
+    ) -> CircuitResult<()> {
+        match instruction.gate().canonical_name() {
+            "SHIFT_COORDS" => {
+                if let Some(args) = instruction.coordinate_arguments() {
+                    add_coordinate_shift_mul(shift, args, 1.0)?;
+                }
+            }
+            "DETECTOR" => self.visit_detector(instruction, shift)?,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn visit_detector(
+        &mut self,
+        instruction: &CircuitInstruction,
+        shift: &[f64],
+    ) -> CircuitResult<()> {
+        let detector_id = CircuitDetectorId::new(self.next_detector_index);
+        if self
+            .next_unresolved_detector()
+            .is_some_and(|desired| desired == detector_id)
+        {
+            self.out.insert(
+                detector_id,
+                shifted_detector_coordinates(instruction.args(), shift)?,
+            );
+            self.desired_cursor += 1;
+        }
+        self.next_detector_index = self
+            .next_detector_index
+            .checked_add(1)
+            .ok_or_else(detector_count_overflow)?;
+        Ok(())
+    }
+}
+
 fn add_coordinate_shift_mul(
     shift: &mut Vec<f64>,
     delta: &[f64],
@@ -336,6 +496,21 @@ fn add_coordinate_shift_mul(
         }
     }
     Ok(())
+}
+
+fn shifted_detector_coordinates(coordinates: &[f64], shift: &[f64]) -> CircuitResult<Vec<f64>> {
+    let mut shifted = coordinates.to_vec();
+    for (index, coordinate) in shifted.iter_mut().enumerate() {
+        if let Some(offset) = shift.get(index) {
+            *coordinate += *offset;
+            if !coordinate.is_finite() {
+                return Err(CircuitError::invalid_result_format(
+                    "coordinate shift overflowed",
+                ));
+            }
+        }
+    }
+    Ok(shifted)
 }
 
 fn shifted_coordinates(coordinates: &[f64], shift: &[f64]) -> CircuitResult<Vec<f64>> {

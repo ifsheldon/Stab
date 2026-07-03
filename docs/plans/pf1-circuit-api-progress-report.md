@@ -4,7 +4,7 @@
 
 This PF1 slice implements the bounded Rust circuit stats, final-coordinate query, and Rust mutation-helper subset from `docs/plans/partial-feature-closure-plan.md`.
 It does not claim full Python `stim.Circuit` API parity.
-Insert, pop, file helpers, detector-coordinate maps, instruction-range views, stable typed iterators, reference-sample API closure, and determined-measurement API closure remain active PF1 work.
+Insert, pop, file helpers, instruction-range views, stable typed iterators, reference-sample API closure, and determined-measurement API closure remain active PF1 work.
 
 ## Implemented Surfaces
 
@@ -16,10 +16,15 @@ Insert, pop, file helpers, detector-coordinate maps, instruction-range views, st
 - Added public `Circuit::repeated` and `Circuit::repeat_in_place`, including Stim-style special cases for zero and one repetitions, single-repeat-block count fusion, and overflow rejection.
 - Added public folded count methods for measurements, detectors, observables, ticks, and sweep bits.
 - Added public `Circuit::final_coordinate_shift` and `Circuit::final_qubit_coordinates`.
+- Added public `CircuitDetectorId`, `Circuit::detector_coordinates`, `Circuit::detector_coordinates_for`, and `Circuit::coordinates_of_detector`.
+- Detector-coordinate lookup uses folded repeat skipping for requested detectors and preserves Stim semantics for empty detector coordinates.
 - Added folded repeat handling for count and coordinate queries so large repeat blocks do not need full unrolling.
 - Added measurement-result count coverage for grouped measurement gates including `MPP`, pair measurements, heralded noise, and `MPAD`.
 - Added folded-count overflow rejection instead of saturating or silently wrapping.
 - Added non-finite folded-coordinate rejection instead of silently returning infinity.
+
+Compatibility note: Stim v1.16.0 C++ coordinate helpers allow finite coordinate inputs to overflow into infinities during folded double arithmetic.
+Stab's Rust coordinate query APIs currently reject non-finite folded coordinate results as a deliberate Rust API hardening choice; this must be revisited before claiming exact Python binding or C++ API side-effect parity for coordinate queries.
 
 ## Oracle Rows
 
@@ -29,6 +34,7 @@ Implemented row:
 - `pf1-circuit-append-text`
 - `pf1-circuit-concat`
 - `pf1-circuit-repeat`
+- `pf1-circuit-detector-coordinates`
 
 Still broad and manifest-only:
 
@@ -47,9 +53,11 @@ Probe reports:
 
 Fresh probe rates from the current worktree:
 
-- `stab_circuit_counts_nested_repeat`: `7.692e6 queries/s`.
-- `stab_circuit_final_coordinate_shift_nested_repeat`: `2.500e7 queries/s`.
-- `stab_circuit_final_qubit_coordinates_nested_repeat`: `6.211e6 queries/s`.
+- `stab_circuit_counts_nested_repeat`: `7.634e6 queries/s`.
+- `stab_circuit_final_coordinate_shift_nested_repeat`: `2.564e7 queries/s`.
+- `stab_circuit_final_qubit_coordinates_nested_repeat`: `6.098e6 queries/s`.
+- `stab_circuit_detector_coordinates_nested_repeat`: `4.310e6 queries/s`.
+- `stab_circuit_detector_coordinates_late_nested_repeat`: `6.250e6 queries/s`.
 
 This benchmark remains `non-primary-report-only` because pinned Stim exposes comparable behavior through C++ and Python APIs but not through a faithful Rust direct baseline.
 It was not added to `benchmarks/m12-primary-thresholds.json`.
@@ -73,7 +81,6 @@ just bench::compare --only pf1-circuit-coordinate-query --baseline target/benchm
 ## Remaining PF1 Circuit API Work
 
 - Insert, pop, file constructor, and file writer helpers where they are useful Rust APIs.
-- Detector-coordinate maps and single-detector coordinate lookup.
 - Instruction-range views and stable typed iterators.
 - Public reference-sample helpers beyond the existing internal sampler support.
 - Public determined-measurement helpers beyond the currently implemented count subset.

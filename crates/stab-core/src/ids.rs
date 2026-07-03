@@ -51,6 +51,19 @@ impl MeasureRecordOffset {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct CircuitDetectorId(u64);
+
+impl CircuitDetectorId {
+    pub fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    pub fn get(self) -> u64 {
+        self.0
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct RepeatCount(u64);
 

@@ -19,6 +19,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
+## 2026-07-04 - PF1: Rust Coordinate Query Non-Finite Results
+
+Status: Open
+Revealed by: full-code-review of the PF1 circuit detector-coordinate API slice.
+Current text: PF1 requires Rust circuit coordinate query parity for final qubit coordinates and detector coordinates, but it does not define whether Rust APIs should exactly mirror Stim v1.16.0 C++ double-overflow behavior or reject non-finite folded coordinate results.
+Gap: Stim v1.16.0's C++ coordinate helpers can return infinities when finite coordinate inputs overflow during folded repeat arithmetic, while Stab's current Rust coordinate APIs reject non-finite folded coordinate results as a deliberate hardening choice.
+Proposed amendment: keep the Rust API hardening documented for PF1, and require a later binding-parity decision before claiming exact Python or C++ coordinate-query side-effect parity.
+Resolution: Pending future binding-parity decision.
+
 ## 2026-07-04 - M9: Exact Feedback Loop Refolding Boundary
 
 Status: Open

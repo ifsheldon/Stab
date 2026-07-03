@@ -1,7 +1,8 @@
 use std::hint::black_box;
 
 use stab_core::{
-    Circuit, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel, Gate, GateArgumentRule,
+    Circuit, CircuitDetectorId, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel, Gate,
+    GateArgumentRule,
 };
 
 use crate::error::BenchError;
@@ -35,6 +36,23 @@ REPEAT 1000000 {
 QUBIT_COORDS(0, 0) 2
 "#;
 
+const CIRCUIT_DETECTOR_COORDINATE_FIXTURE: &str = r#"
+TICK
+REPEAT 1000 {
+    REPEAT 2000 {
+        REPEAT 1000 {
+            DETECTOR(0, 0, 0, 4)
+            SHIFT_COORDS(1, 0, 0)
+        }
+        DETECTOR(0, 0, 0, 3)
+        SHIFT_COORDS(0, 1, 0)
+    }
+    DETECTOR(0, 0, 0, 2)
+    SHIFT_COORDS(0, 0, 1)
+}
+DETECTOR(0, 0, 0, 1)
+"#;
+
 const DEM_COUNTS_FIXTURE: &str = r#"
 shift_detectors(0, 0.5) 100
 repeat 1000000 {
@@ -65,6 +83,10 @@ pub(super) fn run_circuit_coordinate_row(
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let coordinate_circuit = Circuit::from_stim_str(CIRCUIT_COORDINATE_FIXTURE)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let detector_coordinate_circuit = Circuit::from_stim_str(CIRCUIT_DETECTOR_COORDINATE_FIXTURE)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let early_detector = CircuitDetectorId::new(1002);
+    let late_detector = CircuitDetectorId::new(2_002_001_000);
 
     Ok(vec![
         measure_stab_batched(
@@ -110,6 +132,28 @@ pub(super) fn run_circuit_coordinate_row(
                     .final_qubit_coordinates()
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(coordinates.len());
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_circuit_detector_coordinates_nested_repeat",
+            TINY_DIRECT_COMPARE_REPETITIONS,
+            || {
+                let coordinates = detector_coordinate_circuit
+                    .coordinates_of_detector(early_detector)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(float_slice_checksum(&coordinates));
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_circuit_detector_coordinates_late_nested_repeat",
+            TINY_DIRECT_COMPARE_REPETITIONS,
+            || {
+                let coordinates = detector_coordinate_circuit
+                    .coordinates_of_detector(late_detector)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(float_slice_checksum(&coordinates));
                 Ok(())
             },
         )?,
@@ -245,7 +289,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         return match name {
             "stab_circuit_counts_nested_repeat"
             | "stab_circuit_final_coordinate_shift_nested_repeat"
-            | "stab_circuit_final_qubit_coordinates_nested_repeat" => Some((1.0, "queries/s")),
+            | "stab_circuit_final_qubit_coordinates_nested_repeat"
+            | "stab_circuit_detector_coordinates_nested_repeat"
+            | "stab_circuit_detector_coordinates_late_nested_repeat" => Some((1.0, "queries/s")),
             _ => None,
         };
     }
@@ -279,7 +325,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "pf1-circuit-coordinate-query" => Some(
-            "contract-only: Stab measures Rust circuit count and final-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
+            "contract-only: Stab measures Rust circuit count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
         ),
         "pf1-gate-metadata-lookup" => Some(
             "contract-only: Stab measures Rust gate metadata accessors and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
