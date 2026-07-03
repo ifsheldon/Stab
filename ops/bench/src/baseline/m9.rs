@@ -1,4 +1,7 @@
+use std::ffi::OsString;
 use std::hint::black_box;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
 
 use stab_core::{
     Circuit, CodeDistance, CompiledSampler, DetectionConversionOptions,
@@ -20,6 +23,12 @@ const DETECT_BASIC_FIXTURE: &str =
 const M2D_BASIC_CIRCUIT: &str = include_str!("../../../../oracle/fixtures/inputs/m2d_basic.stim");
 const M2D_BASIC_MEASUREMENTS: &[u8] =
     include_bytes!("../../../../oracle/fixtures/inputs/m2d_basic_measurements.01");
+const M2D_SWEEP_MEASUREMENTS: &[u8] =
+    include_bytes!("../../../../oracle/fixtures/inputs/m2d_sweep_measurements.01");
+const M2D_SWEEP_B8_MEASUREMENTS: &[u8] =
+    include_bytes!("../../../../benchmarks/fixtures/m9_m2d_sweep_b8_measurements.b8");
+const M2D_RAN_WITHOUT_FEEDBACK_MEASUREMENTS: &[u8] =
+    include_bytes!("../../../../oracle/fixtures/inputs/m2d_ran_without_feedback_measurements.01");
 const PRIMARY_DISTANCE: u32 = 3;
 const PRIMARY_ROUNDS: u64 = 3;
 #[cfg(not(test))]
@@ -45,6 +54,38 @@ pub(super) fn run_detection_compare_row(
             run_m2d_fixture_row(row, "stab_m2d_dets", SampleFormat::Dets).map(Some)
         }
         "m9-m2d-bitpacked-contract" => run_m2d_bitpacked_row(row).map(Some),
+        "m9-m2d-sweep-01-cli" => run_m2d_cli_row(
+            row,
+            "stab_m2d_sweep_01_dets",
+            m2d_sweep_args(false),
+            M2D_SWEEP_MEASUREMENTS,
+            None,
+        )
+        .map(Some),
+        "m9-m2d-sweep-b8-cli" => run_m2d_cli_row(
+            row,
+            "stab_m2d_sweep_b8",
+            m2d_sweep_b8_args(),
+            M2D_SWEEP_B8_MEASUREMENTS,
+            None,
+        )
+        .map(Some),
+        "m9-m2d-sweep-obs-out-cli" => run_m2d_cli_row(
+            row,
+            "stab_m2d_sweep_obs_out",
+            m2d_sweep_args(true),
+            M2D_SWEEP_MEASUREMENTS,
+            Some(obs_out_path()),
+        )
+        .map(Some),
+        "m9-m2d-ran-without-feedback-cli" => run_m2d_cli_row(
+            row,
+            "stab_m2d_ran_without_feedback",
+            m2d_ran_without_feedback_args(),
+            M2D_RAN_WITHOUT_FEEDBACK_MEASUREMENTS,
+            None,
+        )
+        .map(Some),
         "m9-detect-primary-matrix-contract" => run_primary_detect_row(row).map(Some),
         "m9-m2d-primary-matrix-contract" => run_primary_m2d_row(row).map(Some),
         _ => Ok(None),
@@ -55,6 +96,12 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
     match (row_id, name) {
         ("m9-m2d-text-cli", "stab_m2d_dets") | ("m9-m2d-bitpacked-contract", "stab_m2d_b8") => {
             Some((2.0, "shots/s"))
+        }
+        ("m9-m2d-sweep-01-cli", "stab_m2d_sweep_01_dets")
+        | ("m9-m2d-sweep-obs-out-cli", "stab_m2d_sweep_obs_out") => Some((4.0, "shots/s")),
+        ("m9-m2d-sweep-b8-cli", "stab_m2d_sweep_b8") => Some((5.0, "shots/s")),
+        ("m9-m2d-ran-without-feedback-cli", "stab_m2d_ran_without_feedback") => {
+            Some((6.0, "shots/s"))
         }
         ("m9-detect-text-cli", "stab_detect_1024_dets")
         | ("m9-detect-bitpacked-cli", "stab_detect_1024_b8") => {
@@ -81,6 +128,18 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "m9-m2d-bitpacked-contract" => Some(
             "cli-baseline: Stab measures in-process measurement-to-detection conversion with b8 output against pinned Stim m2d on the same fixture",
         ),
+        "m9-m2d-sweep-01-cli" => Some(
+            "report-only: Stab measures in-process public m2d --sweep text conversion against a pinned-Stim-compatible command shape",
+        ),
+        "m9-m2d-sweep-b8-cli" => Some(
+            "report-only: Stab measures in-process public m2d --sweep packed b8 conversion; threshold ownership awaits repeated probe evidence",
+        ),
+        "m9-m2d-sweep-obs-out-cli" => Some(
+            "report-only: Stab measures in-process public m2d --sweep observable side-output routing; threshold ownership awaits repeated probe evidence",
+        ),
+        "m9-m2d-ran-without-feedback-cli" => Some(
+            "report-only: Stab measures in-process public m2d --ran_without_feedback conversion; threshold ownership awaits repeated probe evidence",
+        ),
         "m9-detect-primary-matrix-contract" => Some(
             "cli-baseline: Stab detects the source-owned generated repetition-code d3/r3 fixture with b8 output against pinned Stim detect on the same fixture",
         ),
@@ -89,6 +148,127 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         _ => None,
     }
+}
+
+fn run_m2d_cli_row(
+    row: &BenchmarkRow,
+    measurement_name: &'static str,
+    args: Vec<OsString>,
+    input: &'static [u8],
+    side_output: Option<PathBuf>,
+) -> Result<Vec<Measurement>, BenchError> {
+    if let Some(path) = side_output.as_ref() {
+        create_parent_dir(row, path)?;
+    }
+    Ok(vec![measure_stab_iterations(
+        measurement_name,
+        super::STAB_COMPARE_ITERATIONS,
+        || {
+            let mut stdout = CountingWriter::default();
+            let mut stderr = Vec::new();
+            let status = stab_cli::run_from(args.clone(), input, &mut stdout, &mut stderr);
+            if status != 0 {
+                return Err(BenchError::StabRunner {
+                    row_id: row.id.clone(),
+                    message: format!(
+                        "stab-cli m2d failed with status {status}: {}",
+                        String::from_utf8_lossy(&stderr)
+                    ),
+                });
+            }
+            if let Some(path) = side_output.as_ref() {
+                let side_bytes = std::fs::read(path).map_err(|source| BenchError::StabRunner {
+                    row_id: row.id.clone(),
+                    message: format!(
+                        "failed to read m2d side output {}: {source}",
+                        path.display()
+                    ),
+                })?;
+                black_box((stdout.len(), side_bytes.len()));
+            } else {
+                black_box(stdout.len());
+            }
+            Ok(())
+        },
+    )?])
+}
+
+#[derive(Default)]
+struct CountingWriter {
+    bytes: usize,
+}
+
+impl CountingWriter {
+    fn len(&self) -> usize {
+        self.bytes
+    }
+}
+
+impl Write for CountingWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.bytes = self
+            .bytes
+            .checked_add(buf.len())
+            .ok_or_else(|| io::Error::other("m2d benchmark output byte count overflowed"))?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn m2d_sweep_args(obs_out: bool) -> Vec<OsString> {
+    let mut args = vec![
+        OsString::from("stab"),
+        OsString::from("m2d"),
+        OsString::from("--in_format=01"),
+        OsString::from(if obs_out {
+            "--out_format=01"
+        } else {
+            "--out_format=dets"
+        }),
+        OsString::from("--sweep"),
+        repo_path("oracle/fixtures/inputs/m2d_sweep_bits.01").into_os_string(),
+        OsString::from("--sweep_format=01"),
+        OsString::from("--circuit"),
+        repo_path("oracle/fixtures/inputs/m2d_sweep.stim").into_os_string(),
+    ];
+    if obs_out {
+        args.extend([
+            OsString::from("--obs_out"),
+            obs_out_path().into_os_string(),
+            OsString::from("--obs_out_format=b8"),
+        ]);
+    }
+    args
+}
+
+fn m2d_sweep_b8_args() -> Vec<OsString> {
+    vec![
+        OsString::from("stab"),
+        OsString::from("m2d"),
+        OsString::from("--in_format=b8"),
+        OsString::from("--out_format=b8"),
+        OsString::from("--sweep"),
+        repo_path("benchmarks/fixtures/m9_m2d_sweep_b8_sweep.b8").into_os_string(),
+        OsString::from("--sweep_format=b8"),
+        OsString::from("--circuit"),
+        repo_path("benchmarks/fixtures/m9_m2d_sweep_b8.stim").into_os_string(),
+    ]
+}
+
+fn m2d_ran_without_feedback_args() -> Vec<OsString> {
+    vec![
+        OsString::from("stab"),
+        OsString::from("m2d"),
+        OsString::from("--in_format=01"),
+        OsString::from("--append_observables"),
+        OsString::from("--out_format=dets"),
+        OsString::from("--ran_without_feedback"),
+        OsString::from("--circuit"),
+        repo_path("oracle/fixtures/inputs/m2d_ran_without_feedback.stim").into_os_string(),
+    ]
 }
 
 fn run_detect_fixture_row(
@@ -296,4 +476,27 @@ fn primary_repetition_circuit(row_id: &str) -> Result<Circuit, BenchError> {
 
 fn parse_circuit(row_id: &str, text: &str) -> Result<Circuit, BenchError> {
     Circuit::from_stim_str(text).map_err(|error| stab_runner_error(row_id, error))
+}
+
+fn repo_path(relative: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(relative)
+}
+
+fn obs_out_path() -> PathBuf {
+    repo_path("target/benchmarks/cli-scratch/m9-m2d-sweep-obs-out.b8")
+}
+
+fn create_parent_dir(row: &BenchmarkRow, path: &Path) -> Result<(), BenchError> {
+    let Some(parent) = path.parent() else {
+        return Ok(());
+    };
+    std::fs::create_dir_all(parent).map_err(|source| BenchError::StabRunner {
+        row_id: row.id.clone(),
+        message: format!(
+            "failed to create m2d side-output directory {}: {source}",
+            parent.display()
+        ),
+    })
 }

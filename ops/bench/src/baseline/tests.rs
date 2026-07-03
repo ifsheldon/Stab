@@ -482,6 +482,26 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
             &["stab_m2d_b8"][..],
         ),
         (
+            "m9-m2d-sweep-01-cli",
+            Runner::StimCli,
+            &["stab_m2d_sweep_01_dets"][..],
+        ),
+        (
+            "m9-m2d-sweep-b8-cli",
+            Runner::StimCli,
+            &["stab_m2d_sweep_b8"][..],
+        ),
+        (
+            "m9-m2d-sweep-obs-out-cli",
+            Runner::StimCli,
+            &["stab_m2d_sweep_obs_out"][..],
+        ),
+        (
+            "m9-m2d-ran-without-feedback-cli",
+            Runner::StimCli,
+            &["stab_m2d_ran_without_feedback"][..],
+        ),
+        (
             "m9-m2d-primary-matrix-contract",
             Runner::StimCli,
             &[
