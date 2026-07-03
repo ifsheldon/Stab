@@ -89,6 +89,58 @@ impl Circuit {
         Ok(())
     }
 
+    /// Inserts an item, fusing compatible instruction boundaries around the insertion point.
+    pub fn insert_item(&mut self, index: usize, item: CircuitItem) -> CircuitResult<()> {
+        validate_insert_index(index, self.items.len())?;
+        self.items.insert(index, item);
+        self.fuse_inserted_range(index, 1);
+        Ok(())
+    }
+
+    /// Inserts an instruction, fusing compatible instruction boundaries around the insertion point.
+    pub fn insert_instruction(
+        &mut self,
+        index: usize,
+        instruction: CircuitInstruction,
+    ) -> CircuitResult<()> {
+        self.insert_item(index, CircuitItem::Instruction(instruction))
+    }
+
+    /// Inserts a repeat block at the requested top-level item index.
+    pub fn insert_repeat_block(&mut self, index: usize, repeat: RepeatBlock) -> CircuitResult<()> {
+        self.insert_item(index, CircuitItem::RepeatBlock(repeat))
+    }
+
+    /// Inserts a copy of another circuit, fusing compatible instruction boundaries.
+    pub fn insert_circuit(&mut self, index: usize, other: &Self) -> CircuitResult<()> {
+        validate_insert_index(index, self.items.len())?;
+        let inserted_len = other.items.len();
+        if inserted_len == 0 {
+            return Ok(());
+        }
+        self.items.splice(index..index, other.items.iter().cloned());
+        self.fuse_inserted_range(index, inserted_len);
+        Ok(())
+    }
+
+    /// Removes and returns the top-level item at `index`.
+    pub fn pop_item(&mut self, index: usize) -> CircuitResult<CircuitItem> {
+        if index >= self.items.len() {
+            return Err(pop_index_error(index));
+        }
+        Ok(self.items.remove(index))
+    }
+
+    /// Removes and returns the last top-level item.
+    pub fn pop_last_item(&mut self) -> CircuitResult<CircuitItem> {
+        let index = self
+            .items
+            .len()
+            .checked_sub(1)
+            .ok_or_else(|| pop_index_error("empty"))?;
+        self.pop_item(index)
+    }
+
     pub fn count_measurements(&self) -> CircuitResult<u64> {
         flat_sum_operations(self, |instruction| -> CircuitResult<u64> {
             if instruction.gate().produces_measurements() {
@@ -184,6 +236,41 @@ impl Circuit {
             CircuitItem::RepeatBlock(repeat) => self.append_repeat_block(repeat),
         }
     }
+
+    fn fuse_inserted_range(&mut self, index: usize, inserted_len: usize) {
+        if inserted_len == 0 {
+            return;
+        }
+        self.try_fuse_after(index + inserted_len - 1);
+        if index > 0 {
+            self.try_fuse_after(index - 1);
+        }
+    }
+
+    fn try_fuse_after(&mut self, index: usize) -> bool {
+        let Some(next_index) = index.checked_add(1) else {
+            return false;
+        };
+        if next_index >= self.items.len() {
+            return false;
+        }
+        let can_fuse = match (self.items.get(index), self.items.get(next_index)) {
+            (Some(CircuitItem::Instruction(left)), Some(CircuitItem::Instruction(right))) => {
+                left.can_fuse(right)
+            }
+            _ => false,
+        };
+        if !can_fuse {
+            return false;
+        }
+        let CircuitItem::Instruction(right) = self.items.remove(next_index) else {
+            return false;
+        };
+        let Some(CircuitItem::Instruction(left)) = self.items.get_mut(index) else {
+            return false;
+        };
+        left.try_fuse(&right)
+    }
 }
 
 fn flat_sum_operations(
@@ -230,6 +317,20 @@ fn circuit_count_overflow() -> CircuitError {
 
 fn repetition_count_overflow() -> CircuitError {
     CircuitError::invalid_domain_value("repetition count", "overflowed")
+}
+
+fn validate_insert_index(index: usize, len: usize) -> CircuitResult<()> {
+    if index > len {
+        return Err(CircuitError::invalid_domain_value(
+            "circuit insertion index",
+            index,
+        ));
+    }
+    Ok(())
+}
+
+fn pop_index_error(index: impl ToString) -> CircuitError {
+    CircuitError::invalid_domain_value("circuit pop index", index)
 }
 
 fn detector_count_overflow() -> CircuitError {

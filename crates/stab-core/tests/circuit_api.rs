@@ -6,7 +6,29 @@
 
 use std::collections::BTreeMap;
 
-use stab_core::{Circuit, CircuitDetectorId, QubitId};
+use stab_core::{
+    Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, QubitId, RepeatBlock,
+};
+
+fn single_item(input: &str) -> CircuitItem {
+    let circuit = Circuit::from_stim_str(input).expect("parse single item circuit");
+    assert_eq!(circuit.len(), 1);
+    circuit.items().first().expect("single item").clone()
+}
+
+fn single_instruction(input: &str) -> Option<CircuitInstruction> {
+    match single_item(input) {
+        CircuitItem::Instruction(instruction) => Some(instruction),
+        CircuitItem::RepeatBlock(_) => None,
+    }
+}
+
+fn single_repeat_block(input: &str) -> Option<RepeatBlock> {
+    match single_item(input) {
+        CircuitItem::Instruction(_) => None,
+        CircuitItem::RepeatBlock(repeat) => Some(repeat),
+    }
+}
 
 #[test]
 fn pf1_circuit_stats_counts_match_owned_upstream_semantics() {
@@ -281,6 +303,99 @@ fn pf1_circuit_repeat_rejects_fused_repeat_count_overflow() {
             value: "overflowed".to_string()
         }
     );
+}
+
+#[test]
+fn pf1_circuit_insert_pop_insert_instruction_fuses_boundaries() {
+    let base = "CX 0 1\nH 0\nS 0\nCX 0 1\n";
+
+    let mut circuit = Circuit::from_stim_str(base).expect("parse base");
+    circuit
+        .insert_item(2, single_item("H 1\n"))
+        .expect("insert H");
+    assert_eq!(circuit.to_stim_string(), "CX 0 1\nH 0 1\nS 0\nCX 0 1\n");
+
+    let mut circuit = Circuit::from_stim_str(base).expect("parse base");
+    circuit
+        .insert_item(2, single_item("S 1\n"))
+        .expect("insert S");
+    assert_eq!(circuit.to_stim_string(), "CX 0 1\nH 0\nS 1 0\nCX 0 1\n");
+
+    let mut circuit = Circuit::from_stim_str("H 0\nH 2\n").expect("parse base");
+    circuit
+        .insert_instruction(1, single_instruction("H 1\n").expect("parse instruction"))
+        .expect("insert instruction");
+    assert_eq!(circuit.to_stim_string(), "H 0 2 1\n");
+
+    let mut circuit = Circuit::from_stim_str(base).expect("parse base");
+    circuit
+        .insert_item(0, single_item("X 1\n"))
+        .expect("insert at start");
+    circuit
+        .insert_item(circuit.len(), single_item("X 1\n"))
+        .expect("insert at end");
+    assert_eq!(
+        circuit.to_stim_string(),
+        "X 1\nCX 0 1\nH 0\nS 0\nCX 0 1\nX 1\n"
+    );
+}
+
+#[test]
+fn pf1_circuit_insert_pop_insert_circuit_fuses_both_boundaries() {
+    let mut circuit = Circuit::from_stim_str("CX 0 1\nH 0\nS 0\nCX 0 1\n").expect("parse base");
+    let inserted = Circuit::from_stim_str("H 1\nX 3\nS 2\n").expect("parse inserted");
+
+    circuit
+        .insert_circuit(2, &inserted)
+        .expect("insert circuit");
+
+    assert_eq!(
+        circuit.to_stim_string(),
+        "CX 0 1\nH 0 1\nX 3\nS 2 0\nCX 0 1\n"
+    );
+    assert_eq!(inserted.to_stim_string(), "H 1\nX 3\nS 2\n");
+}
+
+#[test]
+fn pf1_circuit_insert_pop_insert_repeat_block_and_reject_bad_index() {
+    let mut circuit = Circuit::from_stim_str("H 0\nM 0\n").expect("parse base");
+
+    circuit
+        .insert_repeat_block(
+            1,
+            single_repeat_block("REPEAT[tag] 2 {\n    X 1\n}\n").expect("parse repeat"),
+        )
+        .expect("insert repeat");
+    assert_eq!(
+        circuit.to_stim_string(),
+        concat!("H 0\n", "REPEAT[tag] 2 {\n", "    X 1\n", "}\n", "M 0\n",)
+    );
+
+    let error = circuit
+        .insert_circuit(circuit.len() + 1, &Circuit::new())
+        .expect_err("reject bad insert index");
+    assert!(
+        error.to_string().contains("circuit insertion index"),
+        "{error}"
+    );
+}
+
+#[test]
+fn pf1_circuit_insert_pop_pop_item_removes_without_fusing_neighbors() {
+    let mut circuit = Circuit::from_stim_str("H 0\nX 1\nH 2\n").expect("parse circuit");
+
+    let popped = circuit.pop_item(1).expect("pop middle");
+    assert_eq!(popped, single_item("X 1\n"));
+    assert_eq!(circuit.to_stim_string(), "H 0\nH 2\n");
+
+    let last = circuit.pop_last_item().expect("pop last");
+    assert_eq!(last, single_item("H 2\n"));
+    assert_eq!(circuit.to_stim_string(), "H 0\n");
+
+    let error = Circuit::new()
+        .pop_last_item()
+        .expect_err("reject empty pop");
+    assert!(error.to_string().contains("circuit pop index"), "{error}");
 }
 
 #[test]
