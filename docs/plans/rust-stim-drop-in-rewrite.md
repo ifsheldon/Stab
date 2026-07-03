@@ -181,7 +181,7 @@ Tasks:
 - Implement `Circuit`, `CircuitInstruction`, `RepeatBlock`, `Gate`, `Target`, and typed argument/newtype APIs in `stab-core`.
 - Implement `.stim` parsing for gates, targets, arguments, tags, comments, whitespace, `TICK`, annotations, target combiners, measurement-record targets, sweep targets, detector targets, observable targets, and `REPEAT` blocks.
 - Implement canonical `.stim` printing compatible with Stim v1.16.0 for supported constructs.
-- Implement the v1.16.0 gate table, aliases, categories, inverse metadata, arity rules, argument rules, and target validation.
+- Implement the v1.16.0 gate table, aliases, categories, inverse metadata, arity rules, argument rules, target validation, and bounded Rust metadata accessors.
 - Implement clear domain errors for invalid gates, invalid arguments, invalid target separators, invalid repeat counts, and invalid measurement references.
 - Add a minimal parse-print-parse invariant suite and fuzz target for `.stim` input.
 

@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::str::Lines;
 
-use crate::gate::{ArgRule, TargetGroupKind};
+use crate::gate::{ArgRule, GateTargetGroupKind};
 use crate::target::{TargetVec, parse_plain_qubit_target_text, parse_target_token_into};
 use crate::{CircuitError, CircuitResult, Gate, ObservableId, Probability, RepeatCount, Target};
 
@@ -211,7 +211,10 @@ impl CircuitInstruction {
 
     /// Returns this instruction's disjoint probability-list arguments when the gate has them.
     pub fn probability_arguments(&self) -> CircuitResult<Option<Vec<Probability>>> {
-        if !matches!(self.gate.arg_rule(), ArgRule::ProbabilityList(_)) {
+        if !matches!(
+            self.gate.arg_rule(),
+            ArgRule::ProbabilityList(_) | ArgRule::AnyProbabilityList
+        ) {
             return Ok(None);
         }
         self.args
@@ -259,11 +262,11 @@ impl CircuitInstruction {
 
     pub fn target_groups(&self) -> Vec<&[Target]> {
         match self.gate.target_group_kind() {
-            TargetGroupKind::None => Vec::new(),
-            TargetGroupKind::Singles => self.targets.chunks(1).collect(),
-            TargetGroupKind::Pairs => self.targets.chunks(2).collect(),
-            TargetGroupKind::PauliProducts => pauli_product_target_groups(&self.targets),
-            TargetGroupKind::AllTargets => {
+            GateTargetGroupKind::None => Vec::new(),
+            GateTargetGroupKind::Singles => self.targets.chunks(1).collect(),
+            GateTargetGroupKind::Pairs => self.targets.chunks(2).collect(),
+            GateTargetGroupKind::PauliProducts => pauli_product_target_groups(&self.targets),
+            GateTargetGroupKind::AllTargets => {
                 if self.targets.is_empty() {
                     Vec::new()
                 } else {

@@ -1,3 +1,7 @@
+mod metadata;
+
+pub use metadata::{GateArgumentRule, GateTargetGroupKind, GateTargetRule};
+
 use crate::{CircuitError, CircuitResult, Probability, Target};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -97,14 +101,6 @@ impl Gate {
     pub(crate) fn arg_rule(self) -> ArgRule {
         self.info.arg_rule
     }
-
-    pub(crate) fn target_group_kind(self) -> TargetGroupKind {
-        self.info.target_rule.target_group_kind()
-    }
-
-    pub(crate) fn can_fuse(self) -> bool {
-        self.info.can_fuse
-    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -123,6 +119,7 @@ pub(crate) enum ArgRule {
     Any,
     ZeroOrOneProbability,
     ProbabilityList(usize),
+    AnyProbabilityList,
     UnsignedInteger,
 }
 
@@ -172,22 +169,9 @@ impl ArgRule {
                         actual: args.len(),
                     });
                 }
-                let mut total = 0.0;
-                for arg in args {
-                    Probability::try_new(*arg).map_err(|_| CircuitError::InvalidArgument {
-                        gate,
-                        argument: arg.to_string(),
-                    })?;
-                    total += *arg;
-                }
-                if total > 1.0000001 {
-                    return Err(CircuitError::InvalidArgument {
-                        gate,
-                        argument: format!("sum {total}"),
-                    });
-                }
-                Ok(())
+                validate_probability_list(gate, args)
             }
+            Self::AnyProbabilityList => validate_probability_list(gate, args),
             Self::UnsignedInteger => {
                 if args.len() != 1 {
                     return Err(CircuitError::InvalidArgumentCount {
@@ -213,6 +197,24 @@ impl ArgRule {
             }
         }
     }
+}
+
+fn validate_probability_list(gate: &'static str, args: &[f64]) -> CircuitResult<()> {
+    let mut total = 0.0;
+    for arg in args {
+        Probability::try_new(*arg).map_err(|_| CircuitError::InvalidArgument {
+            gate,
+            argument: arg.to_string(),
+        })?;
+        total += *arg;
+    }
+    if total > 1.0000001 {
+        return Err(CircuitError::InvalidArgument {
+            gate,
+            argument: format!("sum {total}"),
+        });
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -267,31 +269,22 @@ impl TargetRule {
         }
     }
 
-    fn target_group_kind(self) -> TargetGroupKind {
+    fn target_group_kind(self) -> GateTargetGroupKind {
         match self {
-            Self::None => TargetGroupKind::None,
+            Self::None => GateTargetGroupKind::None,
             Self::AnySingleQubit
             | Self::MeasurementQubits
             | Self::MeasurementPads
             | Self::RecOnly
             | Self::RecOrPauli
-            | Self::QubitCoords => TargetGroupKind::Singles,
+            | Self::QubitCoords => GateTargetGroupKind::Singles,
             Self::PlainPairs | Self::ClassicalControlPairs | Self::MeasurementPairs => {
-                TargetGroupKind::Pairs
+                GateTargetGroupKind::Pairs
             }
-            Self::PauliProducts => TargetGroupKind::PauliProducts,
-            Self::PauliList => TargetGroupKind::AllTargets,
+            Self::PauliProducts => GateTargetGroupKind::PauliProducts,
+            Self::PauliList => GateTargetGroupKind::AllTargets,
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum TargetGroupKind {
-    None,
-    Singles,
-    Pairs,
-    PauliProducts,
-    AllTargets,
 }
 
 fn is_plain_qubit_target(target: &Target) -> bool {
@@ -640,13 +633,13 @@ const GATES: &[GateInfo] = &[
         "XCX",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::ClassicalControlPairs,
+        TargetRule::PlainPairs,
     ),
     gate(
         "XCY",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::ClassicalControlPairs,
+        TargetRule::PlainPairs,
     ),
     gate(
         "XCZ",
@@ -658,13 +651,13 @@ const GATES: &[GateInfo] = &[
         "YCX",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::ClassicalControlPairs,
+        TargetRule::PlainPairs,
     ),
     gate(
         "YCY",
         GateCategory::Controlled,
         ArgRule::Exact(0),
-        TargetRule::ClassicalControlPairs,
+        TargetRule::PlainPairs,
     ),
     gate(
         "YCZ",
@@ -759,13 +752,13 @@ const GATES: &[GateInfo] = &[
     gate(
         "I_ERROR",
         GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
+        ArgRule::AnyProbabilityList,
         TargetRule::AnySingleQubit,
     ),
     gate(
         "II_ERROR",
         GateCategory::Noise,
-        ArgRule::ProbabilityList(1),
+        ArgRule::AnyProbabilityList,
         TargetRule::PlainPairs,
     ),
     gate(

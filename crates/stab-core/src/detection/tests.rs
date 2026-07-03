@@ -405,7 +405,7 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
         "{error}"
     );
 
-    let unsupported = Circuit::from_stim_str("R 0\nXCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n")
+    let unsupported = Circuit::from_stim_str("R 0\nXCZ sweep[0] 0\nM 0\nDETECTOR rec[-1]\n")
         .expect("parse unsupported sweep circuit");
     let unsupported_error = convert_measurements_to_detection_events_with_sweep(
         &unsupported,

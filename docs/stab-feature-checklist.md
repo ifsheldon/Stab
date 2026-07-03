@@ -63,7 +63,7 @@ Status key:
 | --- | --- | --- |
 | 81 canonical Stim v1.16.0 gates | Done for registry and validation | `GATES` in [../crates/stab-core/src/gate.rs](../crates/stab-core/src/gate.rs) contains the canonical table excluding `NOT_A_GATE`, with categories, argument rules, target rules, and inverse names. |
 | Parser aliases | Done | Aliases such as `MZ`, `MRZ`, `RZ`, `CNOT`, `ZCX`, `H_XZ`, `CORRELATED_ERROR`, `SQRT_Z`, and `SWAPCZ` are handled in [../crates/stab-core/src/gate.rs](../crates/stab-core/src/gate.rs). |
-| Gate validation flags and categories | Partial | Stab has typed validation for argument counts, target categories, grouping, probabilities, and selected metadata. Full Python `GateData` parity, including public flow, unitary matrix, tableau, and decomposition metadata accessors, is not exposed. |
+| Gate validation flags and categories | Partial with Rust accessor subset | Stab has typed validation for argument counts, target categories, grouping, probabilities, and selected metadata. Rust `Gate` now exposes aliases, argument rules, target rules, target grouping, fusing, noisy/reset/measurement/unitary/single-qubit/two-qubit/target-capability/symmetry flags, unitary inverse, and generalized inverse for the owned PF1 subset. Full Python `GateData` parity, including public flow, unitary matrix, tableau, and decomposition metadata accessors, is not exposed. |
 | Gate semantic execution | Partial | Execution exists for the subsets owned by algebra, sampler, detector conversion, analyzer, and DEM work. Full public interactive simulator parity is not complete. |
 
 ## 4. Core Circuit Features
@@ -177,7 +177,7 @@ Status key:
 | `stim.DetectorErrorModel` class | Deferred with Rust subset | `DetectorErrorModel` exists as a Rust type, but Python class operators, coordinate queries, diagrams, rounded/flattened APIs, and full method parity are not bound. |
 | Sampler and converter classes | Deferred with Rust subset | Rust `CompiledSampler`, `CompiledDetectionConverter`, and `CompiledDemSampler` exist, but Python classes do not. |
 | Error explanation classes | Deferred with Rust subset | Rust matched-error value objects exist for scoped M10 support, but Python `ExplainedError` and related classes are not exposed. |
-| Stabilizer, gate metadata, and simulator classes | Deferred with Rust subset | Rust Pauli, Clifford, Tableau, and Flow APIs exist. Python `GateData`, `TableauSimulator`, `FlipSimulator`, numpy conversions, and full class operator parity are not exposed. |
+| Stabilizer, gate metadata, and simulator classes | Deferred with Rust subset | Rust Pauli, Clifford, Tableau, Flow, and bounded `Gate` metadata APIs exist. Python `GateData`, `TableauSimulator`, `FlipSimulator`, numpy conversions, and full class operator parity are not exposed. |
 
 ## 13. JavaScript And WASM API
 

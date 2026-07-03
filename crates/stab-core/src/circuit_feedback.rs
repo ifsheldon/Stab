@@ -458,14 +458,14 @@ mod tests {
     fn circuit_with_inlined_feedback_rejects_unsupported_feedback_gate() {
         let circuit = Circuit::from_stim_str(
             "M 0\n\
-             XCX rec[-1] 1\n\
+             XCZ rec[-1] 1\n\
              M 1\n\
              DETECTOR rec[-1]\n",
         )
         .unwrap();
         let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
 
-        assert!(error.to_string().contains("does not support XCX"));
+        assert!(error.to_string().contains("does not support XCZ"));
     }
 
     #[test]

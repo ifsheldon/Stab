@@ -65,7 +65,7 @@ pub use detection::{
 };
 pub use error::{CircuitError, CircuitResult};
 pub use error_matcher::explain_errors_from_circuit;
-pub use gate::{Gate, GateCategory};
+pub use gate::{Gate, GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule};
 pub use ids::{MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount};
 pub use matched_error::{
     CircuitErrorLocation, CircuitErrorLocationStackFrame, CircuitTargetsInsideInstruction,

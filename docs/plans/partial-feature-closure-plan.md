@@ -79,7 +79,7 @@ Included features:
 - Circuit introspection: operation count, detector count, observable count, sweep-bit count, tick count, instruction-range views, and stable typed iterators.
 - Circuit coordinates: final qubit coordinates and detector coordinates, including coordinate shifts through repeat blocks.
 - Reference samples and determined measurements: public Rust helpers for deterministic support used by sampler, detection, and analyzer flows.
-- Gate metadata: Rust-accessible metadata for flow, unitary/tableau, inverse, category, decomposition, target requirements, and validation flags where Stim semantics depend on it.
+- Gate metadata: Rust-accessible metadata for aliases, inverse, category, target requirements, validation flags, flow, unitary/tableau, and decomposition where Stim semantics depend on it. The first implemented PF1 slice covers aliases, argument rules, target rules, target grouping, fusing, noisy/reset/measurement/unitary/single-qubit/two-qubit/target-capability/symmetry flags, unitary inverse, and generalized inverse; flow data, tableau data, unitary matrices, and decomposition metadata remain active PF1 work.
 - DEM construction and mutation basics: clear, copy, append text or parsed instruction helpers, repeat helpers, and ergonomic typed constructors that do not clone Python operators merely for shape.
 
 Tests:

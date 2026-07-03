@@ -1,0 +1,307 @@
+use super::{ArgRule, Gate, GateCategory, TargetRule};
+
+/// Public argument validation shape for a Stim gate.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GateArgumentRule {
+    /// The gate takes exactly this many parenthesized arguments.
+    Exact(usize),
+    /// The gate accepts any finite coordinate-like argument list.
+    Any,
+    /// The gate accepts zero or one probability argument.
+    OptionalProbability,
+    /// The gate takes exactly this many disjoint probability arguments.
+    ProbabilityList(usize),
+    /// The gate accepts any number of disjoint probability arguments.
+    AnyProbabilityList,
+    /// The gate takes exactly one unsigned integer argument.
+    UnsignedInteger,
+}
+
+/// Public target validation shape for a Stim gate.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GateTargetRule {
+    None,
+    AnySingleQubit,
+    MeasurementQubits,
+    MeasurementPads,
+    PlainPairs,
+    ClassicalControlPairs,
+    MeasurementPairs,
+    RecOnly,
+    RecOrPauli,
+    QubitCoords,
+    PauliProducts,
+    PauliList,
+}
+
+/// How a circuit instruction's flat target list is grouped by this gate.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GateTargetGroupKind {
+    None,
+    Singles,
+    Pairs,
+    PauliProducts,
+    AllTargets,
+}
+
+impl Gate {
+    /// Returns all accepted names for this gate, in Stim v1.16.0 alias order.
+    pub fn aliases(self) -> &'static [&'static str] {
+        match self.info.name {
+            "DETECTOR" => &["DETECTOR"],
+            "OBSERVABLE_INCLUDE" => &["OBSERVABLE_INCLUDE"],
+            "TICK" => &["TICK"],
+            "QUBIT_COORDS" => &["QUBIT_COORDS"],
+            "SHIFT_COORDS" => &["SHIFT_COORDS"],
+            "REPEAT" => &["REPEAT"],
+            "MPAD" => &["MPAD"],
+            "MX" => &["MX"],
+            "MY" => &["MY"],
+            "M" => &["M", "MZ"],
+            "MRX" => &["MRX"],
+            "MRY" => &["MRY"],
+            "MR" => &["MR", "MRZ"],
+            "RX" => &["RX"],
+            "RY" => &["RY"],
+            "R" => &["R", "RZ"],
+            "XCX" => &["XCX"],
+            "XCY" => &["XCY"],
+            "XCZ" => &["XCZ"],
+            "YCX" => &["YCX"],
+            "YCY" => &["YCY"],
+            "YCZ" => &["YCZ"],
+            "CX" => &["CNOT", "CX", "ZCX"],
+            "CY" => &["CY", "ZCY"],
+            "CZ" => &["CZ", "ZCZ"],
+            "H" => &["H", "H_XZ"],
+            "H_XY" => &["H_XY"],
+            "H_YZ" => &["H_YZ"],
+            "H_NXY" => &["H_NXY"],
+            "H_NXZ" => &["H_NXZ"],
+            "H_NYZ" => &["H_NYZ"],
+            "DEPOLARIZE1" => &["DEPOLARIZE1"],
+            "DEPOLARIZE2" => &["DEPOLARIZE2"],
+            "X_ERROR" => &["X_ERROR"],
+            "Y_ERROR" => &["Y_ERROR"],
+            "Z_ERROR" => &["Z_ERROR"],
+            "I_ERROR" => &["I_ERROR"],
+            "II_ERROR" => &["II_ERROR"],
+            "PAULI_CHANNEL_1" => &["PAULI_CHANNEL_1"],
+            "PAULI_CHANNEL_2" => &["PAULI_CHANNEL_2"],
+            "E" => &["CORRELATED_ERROR", "E"],
+            "ELSE_CORRELATED_ERROR" => &["ELSE_CORRELATED_ERROR"],
+            "HERALDED_ERASE" => &["HERALDED_ERASE"],
+            "HERALDED_PAULI_CHANNEL_1" => &["HERALDED_PAULI_CHANNEL_1"],
+            "I" => &["I"],
+            "X" => &["X"],
+            "Y" => &["Y"],
+            "Z" => &["Z"],
+            "C_XYZ" => &["C_XYZ"],
+            "C_ZYX" => &["C_ZYX"],
+            "C_NXYZ" => &["C_NXYZ"],
+            "C_XNYZ" => &["C_XNYZ"],
+            "C_XYNZ" => &["C_XYNZ"],
+            "C_NZYX" => &["C_NZYX"],
+            "C_ZNYX" => &["C_ZNYX"],
+            "C_ZYNX" => &["C_ZYNX"],
+            "SQRT_X" => &["SQRT_X"],
+            "SQRT_X_DAG" => &["SQRT_X_DAG"],
+            "SQRT_Y" => &["SQRT_Y"],
+            "SQRT_Y_DAG" => &["SQRT_Y_DAG"],
+            "S" => &["S", "SQRT_Z"],
+            "S_DAG" => &["S_DAG", "SQRT_Z_DAG"],
+            "II" => &["II"],
+            "SQRT_XX" => &["SQRT_XX"],
+            "SQRT_XX_DAG" => &["SQRT_XX_DAG"],
+            "SQRT_YY" => &["SQRT_YY"],
+            "SQRT_YY_DAG" => &["SQRT_YY_DAG"],
+            "SQRT_ZZ" => &["SQRT_ZZ"],
+            "SQRT_ZZ_DAG" => &["SQRT_ZZ_DAG"],
+            "MPP" => &["MPP"],
+            "SPP" => &["SPP"],
+            "SPP_DAG" => &["SPP_DAG"],
+            "SWAP" => &["SWAP"],
+            "ISWAP" => &["ISWAP"],
+            "CXSWAP" => &["CXSWAP"],
+            "SWAPCX" => &["SWAPCX"],
+            "CZSWAP" => &["CZSWAP", "SWAPCZ"],
+            "ISWAP_DAG" => &["ISWAP_DAG"],
+            "MXX" => &["MXX"],
+            "MYY" => &["MYY"],
+            "MZZ" => &["MZZ"],
+            _ => &[],
+        }
+    }
+
+    pub fn argument_rule(self) -> GateArgumentRule {
+        self.info.arg_rule.into()
+    }
+
+    pub fn target_rule(self) -> GateTargetRule {
+        self.info.target_rule.into()
+    }
+
+    pub fn target_group_kind(self) -> GateTargetGroupKind {
+        self.info.target_rule.target_group_kind()
+    }
+
+    /// Returns true when Stim has a unitary/tableau inverse for this gate.
+    pub fn is_unitary(self) -> bool {
+        matches!(
+            self.info.category,
+            GateCategory::Controlled
+                | GateCategory::HadamardLike
+                | GateCategory::Pauli
+                | GateCategory::Period3
+                | GateCategory::Period4
+                | GateCategory::ParityPhasing
+                | GateCategory::Swap
+        ) || matches!(self.info.name, "SPP" | "SPP_DAG")
+    }
+
+    /// Returns true for reset or measure-reset gates.
+    pub fn is_reset(self) -> bool {
+        matches!(self.info.name, "RX" | "RY" | "R" | "MRX" | "MRY" | "MR")
+    }
+
+    /// Returns Stim v1.16.0's `GateData.is_noisy_gate` flag.
+    ///
+    /// This intentionally excludes `MPAD`, which can take a probability argument but is not flagged as noisy by Stim.
+    pub fn is_noisy(self) -> bool {
+        matches!(
+            self.info.category,
+            GateCategory::Noise | GateCategory::HeraldedNoise | GateCategory::PairMeasurement
+        ) || matches!(
+            self.info.name,
+            "MX" | "MY" | "M" | "MRX" | "MRY" | "MR" | "MPP"
+        )
+    }
+
+    pub fn produces_measurements(self) -> bool {
+        matches!(
+            self.info.name,
+            "MPAD"
+                | "MX"
+                | "MY"
+                | "M"
+                | "MRX"
+                | "MRY"
+                | "MR"
+                | "MPP"
+                | "HERALDED_ERASE"
+                | "HERALDED_PAULI_CHANNEL_1"
+                | "MXX"
+                | "MYY"
+                | "MZZ"
+        )
+    }
+
+    pub fn is_single_qubit_gate(self) -> bool {
+        matches!(
+            self.info.target_rule,
+            TargetRule::AnySingleQubit | TargetRule::MeasurementQubits
+        )
+    }
+
+    pub fn is_two_qubit_gate(self) -> bool {
+        matches!(
+            self.info.target_rule,
+            TargetRule::PlainPairs
+                | TargetRule::ClassicalControlPairs
+                | TargetRule::MeasurementPairs
+        )
+    }
+
+    pub fn takes_measurement_record_targets(self) -> bool {
+        matches!(
+            self.info.target_rule,
+            TargetRule::ClassicalControlPairs | TargetRule::RecOnly | TargetRule::RecOrPauli
+        )
+    }
+
+    pub fn takes_pauli_targets(self) -> bool {
+        matches!(
+            self.info.target_rule,
+            TargetRule::RecOrPauli | TargetRule::PauliProducts | TargetRule::PauliList
+        )
+    }
+
+    pub fn is_symmetric_gate(self) -> bool {
+        if matches!(
+            self.info.target_rule,
+            TargetRule::AnySingleQubit | TargetRule::MeasurementQubits
+        ) {
+            return true;
+        }
+        matches!(
+            self.info.name,
+            "DEPOLARIZE2"
+                | "II_ERROR"
+                | "XCX"
+                | "YCY"
+                | "CZ"
+                | "II"
+                | "SQRT_XX"
+                | "SQRT_XX_DAG"
+                | "SQRT_YY"
+                | "SQRT_YY_DAG"
+                | "SQRT_ZZ"
+                | "SQRT_ZZ_DAG"
+                | "SWAP"
+                | "ISWAP"
+                | "ISWAP_DAG"
+                | "CZSWAP"
+                | "MXX"
+                | "MYY"
+                | "MZZ"
+        )
+    }
+
+    /// Returns the true unitary inverse, or `None` for non-unitary gates.
+    pub fn inverse(self) -> Option<Self> {
+        self.is_unitary()
+            .then(|| Self::from_name(self.info.inverse_name).ok())
+            .flatten()
+    }
+
+    /// Returns Stim's best candidate inverse, including non-unitary generalized inverses.
+    pub fn generalized_inverse(self) -> crate::CircuitResult<Self> {
+        self.best_candidate_inverse()
+    }
+
+    pub fn can_fuse(self) -> bool {
+        self.info.can_fuse
+    }
+}
+
+impl From<ArgRule> for GateArgumentRule {
+    fn from(value: ArgRule) -> Self {
+        match value {
+            ArgRule::Exact(count) => Self::Exact(count),
+            ArgRule::Any => Self::Any,
+            ArgRule::ZeroOrOneProbability => Self::OptionalProbability,
+            ArgRule::ProbabilityList(count) => Self::ProbabilityList(count),
+            ArgRule::AnyProbabilityList => Self::AnyProbabilityList,
+            ArgRule::UnsignedInteger => Self::UnsignedInteger,
+        }
+    }
+}
+
+impl From<TargetRule> for GateTargetRule {
+    fn from(value: TargetRule) -> Self {
+        match value {
+            TargetRule::None => Self::None,
+            TargetRule::AnySingleQubit => Self::AnySingleQubit,
+            TargetRule::MeasurementQubits => Self::MeasurementQubits,
+            TargetRule::MeasurementPads => Self::MeasurementPads,
+            TargetRule::PlainPairs => Self::PlainPairs,
+            TargetRule::ClassicalControlPairs => Self::ClassicalControlPairs,
+            TargetRule::MeasurementPairs => Self::MeasurementPairs,
+            TargetRule::RecOnly => Self::RecOnly,
+            TargetRule::RecOrPauli => Self::RecOrPauli,
+            TargetRule::QubitCoords => Self::QubitCoords,
+            TargetRule::PauliProducts => Self::PauliProducts,
+            TargetRule::PauliList => Self::PauliList,
+        }
+    }
+}
