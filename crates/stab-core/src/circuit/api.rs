@@ -6,7 +6,8 @@ use std::{
 };
 
 use crate::{
-    CircuitDetectorId, CircuitError, CircuitResult, GateTargetGroupKind, QubitId, RepeatCount,
+    CircuitDetectorId, CircuitError, CircuitResult, CompiledSampler, GateTargetGroupKind, QubitId,
+    ReferenceSampleTree, RepeatCount,
 };
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
@@ -188,6 +189,21 @@ impl Circuit {
             .checked_sub(1)
             .ok_or_else(|| pop_index_error("empty"))?;
         self.pop_item(index)
+    }
+
+    /// Computes Stim's deterministic reference sample for this circuit.
+    pub fn reference_sample(&self) -> CircuitResult<Vec<bool>> {
+        Ok(CompiledSampler::compile_allowing_sweep(self)?.reference_sample())
+    }
+
+    /// Computes a reference-sample tree for this circuit.
+    pub fn reference_sample_tree(&self) -> CircuitResult<ReferenceSampleTree> {
+        ReferenceSampleTree::from_circuit_reference_sample(self)
+    }
+
+    /// Counts deterministic measurement results under known-zero or unknown input assumptions.
+    pub fn count_determined_measurements(&self, unknown_input: bool) -> CircuitResult<u64> {
+        crate::count_determined_measurements(self, unknown_input)
     }
 
     pub fn count_measurements(&self) -> CircuitResult<u64> {

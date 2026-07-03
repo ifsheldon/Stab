@@ -302,7 +302,8 @@ impl CompiledSampler {
 }
 
 pub fn count_determined_measurements(circuit: &Circuit, unknown_input: bool) -> CircuitResult<u64> {
-    Ok(CompiledSampler::compile(circuit)?.count_determined_measurements(unknown_input))
+    Ok(CompiledSampler::compile_allowing_sweep(circuit)?
+        .count_determined_measurements(unknown_input))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

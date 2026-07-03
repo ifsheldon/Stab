@@ -9,7 +9,7 @@ pub struct ReferenceSampleTree {
 
 impl ReferenceSampleTree {
     pub fn from_circuit_reference_sample(circuit: &Circuit) -> CircuitResult<Self> {
-        let sampler = CompiledSampler::compile(circuit)?;
+        let sampler = CompiledSampler::compile_allowing_sweep(circuit)?;
         Ok(Self {
             prefix_bits: sampler.reference_sample(),
             suffix_children: Vec::new(),

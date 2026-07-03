@@ -2,9 +2,9 @@
 
 ## Summary
 
-This PF1 slice implements the bounded Rust circuit stats, final-coordinate query, file-helper, and Rust mutation-helper subset from `docs/plans/partial-feature-closure-plan.md`.
+This PF1 slice implements the bounded Rust circuit stats, final-coordinate query, file-helper, reference-sample, determined-measurement, and Rust mutation-helper subset from `docs/plans/partial-feature-closure-plan.md`.
 It does not claim full Python `stim.Circuit` API parity.
-Instruction-range views, stable typed iterators, reference-sample API closure, and determined-measurement API closure remain active PF1 work.
+Instruction-range views and stable typed iterators remain active PF1 circuit API work.
 
 ## Implemented Surfaces
 
@@ -24,6 +24,8 @@ Instruction-range views, stable typed iterators, reference-sample API closure, a
 - Detector-coordinate lookup uses folded repeat skipping for requested detectors and preserves Stim semantics for empty detector coordinates.
 - Added folded repeat handling for count and coordinate queries so large repeat blocks do not need full unrolling.
 - Added measurement-result count coverage for grouped measurement gates including `MPP`, pair measurements, heralded noise, and `MPAD`.
+- Added public `Circuit::reference_sample`, `Circuit::reference_sample_tree`, and `Circuit::count_determined_measurements`.
+- Reference-sample and determined-measurement helpers delegate to the existing sampler and `ReferenceSampleTree` implementations, cover the current deterministic Rust subset, and compile sweep controls with default-false reference semantics; Python bit-packed return shapes remain deferred.
 - Added folded-count overflow rejection instead of saturating or silently wrapping.
 - Added non-finite folded-coordinate rejection instead of silently returning infinity.
 
@@ -43,6 +45,7 @@ Implemented row:
 - `pf1-circuit-concat`
 - `pf1-circuit-repeat`
 - `pf1-circuit-insert-pop`
+- `pf1-circuit-reference-determined`
 - `pf1-circuit-detector-coordinates`
 
 Still broad and manifest-only:
@@ -70,7 +73,7 @@ Fresh probe rates from the current worktree:
 
 This benchmark remains `non-primary-report-only` because pinned Stim exposes comparable behavior through C++ and Python APIs but not through a faithful Rust direct baseline.
 It was not added to `benchmarks/m12-primary-thresholds.json`.
-No separate benchmark row was added for append-from-text, file helpers, concatenation, repetition, insert, or pop helpers because these are structural mutation and file-bound APIs rather than the PF1 high-volume query workload; parser-backed text handling already has behavior coverage, while the PF1 coordinate-query row covers the PF1 query workload.
+No separate benchmark row was added for append-from-text, file helpers, concatenation, repetition, insert, pop, reference-sample wrappers, or determined-measurement wrappers because these are structural mutation, file-bound, or thin delegating APIs rather than the PF1 high-volume query workload; parser-backed text handling already has behavior coverage, while the PF1 coordinate-query row covers the PF1 query workload.
 
 ## Verification Evidence
 
@@ -79,6 +82,7 @@ Passed during implementation:
 ```sh
 cargo test -p stab-core --test circuit_api --quiet
 cargo test -p stab-core --test circuit_api pf1_circuit_file_helpers_ --quiet
+cargo test -p stab-core --test circuit_api pf1_circuit_reference_determined_ --quiet
 cargo test -p stab-core count_determined --quiet
 cargo test -p stab-bench pf1_circuit_coordinate --quiet
 cargo test -p stab-bench manifest --quiet
@@ -91,5 +95,3 @@ just bench::compare --only pf1-circuit-coordinate-query --baseline target/benchm
 ## Remaining PF1 Circuit API Work
 
 - Instruction-range views and stable typed iterators.
-- Public reference-sample helpers beyond the existing internal sampler support.
-- Public determined-measurement helpers beyond the currently implemented count subset.
