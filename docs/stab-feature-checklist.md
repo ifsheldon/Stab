@@ -40,8 +40,8 @@ Status key:
 | Feature | Stab status | Evidence and notes |
 | --- | --- | --- |
 | DEM parser and canonical printer | Partial | Implemented in [../crates/stab-core/src/dem.rs](../crates/stab-core/src/dem.rs). M10 marks `.dem` parser and printer complete for the scoped M10 contract, but broader full API parity remains partial. |
-| DEM instruction types | Done for core types | `error`, `detector`, `logical_observable`, `shift_detectors`, separators, and repeat blocks are implemented in [../crates/stab-core/src/dem.rs](../crates/stab-core/src/dem.rs). |
-| DEM detector shifts, observables, coordinates, and counts | Partial | `count_detectors`, `count_observables`, and `total_detector_shift` are implemented. Full coordinate-query API parity with Python `DetectorErrorModel.get_detector_coordinates` is not exposed as a complete public API. |
+| DEM instruction types | Done for core types | `error`, `detector`, `logical_observable`, `shift_detectors`, separators, and repeat blocks are implemented in [../crates/stab-core/src/dem.rs](../crates/stab-core/src/dem.rs), including Stim-compatible exact-one-target validation for `detector` and `logical_observable`. |
+| DEM detector shifts, observables, coordinates, and counts | Partial with Rust final-shift subset | `count_detectors`, `count_observables`, `total_detector_shift`, and folded `final_coordinate_shift` are implemented. Full detector-coordinate map API parity with Python `DetectorErrorModel.get_detector_coordinates` is not exposed as a complete public API. |
 | DEM flattening and large repeat traversal | Partial | Public graphlike, hypergraph, SAT, analyzer, matcher, and sampler paths have explicit expansion limits. M12 removed materialized CLI output limits for implemented streaming paths, but full folded traversal for every DEM operation is not complete. |
 
 ### 2.3 Shot And Result Data Formats
@@ -84,9 +84,9 @@ Status key:
 
 | Feature | Stab status | Evidence and notes |
 | --- | --- | --- |
-| DEM construction and mutation | Partial | `DetectorErrorModel::new`, `push_instruction`, `push_repeat_block`, `DemInstruction` constructors, and `DemRepeatBlock` exist. Python-style list operations, concatenation, repetition operators, and full mutation ergonomics are not complete. |
-| DEM introspection | Partial | Detector, observable, and final detector-shift counts are implemented. Error counts, full coordinate maps, final coordinate shifts, flattened iterators, and exact Python API parity are not complete. |
-| DEM transforms | Partial | Scoped flattening and repeat traversal exist for search, SAT, analyzer, matcher, and sampler paths. Public `flattened`, `rounded`, and `without_tags` style DEM API parity is not complete. |
+| DEM construction and mutation | Partial with Rust basic subset | `DetectorErrorModel::new`, `len`, `is_empty`, `clear`, `append_from_dem_text`, `push_instruction`, `push_repeat_block`, `DemInstruction` constructors, and `DemRepeatBlock` exist. Python-style list operations, concatenation, repetition operators, and full mutation ergonomics are not complete. |
+| DEM introspection | Partial with Rust count and final-shift subset | Detector counts, observable counts, final detector shifts, and folded final coordinate-shift vectors are implemented. Error counts, full coordinate maps, flattened iterators, and exact Python API parity are not complete. |
+| DEM transforms | Partial with Rust tag-stripping subset | Scoped flattening and repeat traversal exist for search, SAT, analyzer, matcher, and sampler paths, and `DetectorErrorModel::without_tags` is available. Public `flattened`, `rounded`, and full transform API parity is not complete. |
 | DEM sampling | Done for current Rust and CLI surface | `CompiledDemSampler` and `stab sample_dem` support deterministic, noisy statistical, observable side output, sampled-error output, replay, and current result formats. See [../crates/stab-core/src/dem_sampler.rs](../crates/stab-core/src/dem_sampler.rs), [../crates/stab-cli/src/sample_dem.rs](../crates/stab-cli/src/sample_dem.rs), and [plans/m11-progress-report.md](plans/m11-progress-report.md). |
 | Streaming DEM sampling | Done for CLI; partial for public API parity | Post-beta Stab added visitor APIs and moved CLI `sample_dem` to streaming writers. Existing materialized APIs remain and keep limits. |
 | DEM analysis and shortest graphlike error | Partial | Graphlike, hypergraph, SAT, and shortest-error APIs exist for scoped M10 cases in [../crates/stab-core/src/dem.rs](../crates/stab-core/src/dem/analyze](../crates/stab-core/src/dem/analyze). Full DEM diagram and public API parity is not complete. |

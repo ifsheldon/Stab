@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::str::Lines;
 
 mod analyze;
+mod api;
 #[cfg(test)]
 mod generated_qec_tests;
 mod graphlike;
@@ -621,7 +622,7 @@ fn validate_dem_instruction(
         }
         DemInstructionKind::Detector => {
             validate_finite_args("detector", args)?;
-            validate_non_empty_targets("detector", targets)?;
+            validate_exactly_one_target("detector", targets)?;
             validate_targets("detector", targets, |target| {
                 matches!(target, DemTarget::RelativeDetector(_))
             })
@@ -632,7 +633,7 @@ fn validate_dem_instruction(
                     "logical_observable instructions do not take arguments",
                 ));
             }
-            validate_non_empty_targets("logical_observable", targets)?;
+            validate_exactly_one_target("logical_observable", targets)?;
             validate_targets("logical_observable", targets, |target| {
                 matches!(target, DemTarget::LogicalObservable(_))
             })
@@ -690,10 +691,10 @@ fn validate_finite_args(kind: &'static str, args: &[f64]) -> CircuitResult<()> {
     Ok(())
 }
 
-fn validate_non_empty_targets(kind: &'static str, targets: &[DemTarget]) -> CircuitResult<()> {
-    if targets.is_empty() {
+fn validate_exactly_one_target(kind: &'static str, targets: &[DemTarget]) -> CircuitResult<()> {
+    if targets.len() != 1 {
         return Err(CircuitError::invalid_detector_error_model(format!(
-            "{kind} requires at least one target"
+            "{kind} requires exactly one target"
         )));
     }
     Ok(())

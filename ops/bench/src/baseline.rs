@@ -260,6 +260,8 @@ pub(crate) fn run_stab_compare_row(
         }
         "m4-gate-lookup" => Ok(Some(m4::run_gate_lookup_row(row)?)),
         "pf1-circuit-coordinate-query" => Ok(Some(pf1::run_circuit_coordinate_row(row)?)),
+        "pf1-dem-counts-repeat" => Ok(Some(pf1::run_dem_counts_repeat_row(row)?)),
+        "pf1-dem-without-tags" => Ok(Some(pf1::run_dem_without_tags_row(row)?)),
         "pf1-gate-metadata-lookup" => Ok(Some(pf1::run_gate_metadata_row(row)?)),
         "m5-simd-bit-table" => {
             let matrix = m5_bit_matrix(&row.id)?;

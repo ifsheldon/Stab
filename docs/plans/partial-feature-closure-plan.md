@@ -80,7 +80,7 @@ Included features:
 - Circuit coordinates: final qubit coordinates and detector coordinates, including coordinate shifts through repeat blocks. The first implemented PF1 circuit API slice covers folded final coordinate shifts and final qubit coordinates; detector-coordinate maps remain active PF1 work.
 - Reference samples and determined measurements: public Rust helpers for deterministic support used by sampler, detection, and analyzer flows.
 - Gate metadata: Rust-accessible metadata for aliases, inverse, category, target requirements, validation flags, flow, unitary/tableau, and decomposition where Stim semantics depend on it. The first implemented PF1 slice covers aliases, argument rules, target rules, target grouping, fusing, noisy/reset/measurement/unitary/single-qubit/two-qubit/target-capability/symmetry flags, unitary inverse, and generalized inverse; flow data, tableau data, unitary matrices, and decomposition metadata remain active PF1 work.
-- DEM construction and mutation basics: clear, copy, append text or parsed instruction helpers, repeat helpers, and ergonomic typed constructors that do not clone Python operators merely for shape.
+- DEM construction and mutation basics: clear, copy, append text or parsed instruction helpers, repeat helpers, and ergonomic typed constructors that do not clone Python operators merely for shape. The first implemented PF1 DEM API slice covers top-level length, emptiness, `clear`, append-from-text, recursive tag stripping, folded final coordinate shifts, and exact-one-target validation for detector and logical observable declarations; detector-coordinate maps, flattened iterators, rounded transforms, error counts, and transform resource boundaries remain active PF1/PF4 work.
 
 Tests:
 
@@ -91,7 +91,7 @@ Tests:
 
 Benchmarks:
 
-- Add report-only or direct rows for high-volume introspection and coordinate queries: `pf1-circuit-coordinate-query`, `pf1-circuit-counts-repeat`, `pf1-dem-counts-repeat`, and `pf1-gate-metadata-lookup`.
+- Add report-only or direct rows for high-volume introspection and coordinate queries: `pf1-circuit-coordinate-query`, `pf1-circuit-counts-repeat`, `pf1-dem-counts-repeat`, `pf1-dem-without-tags`, and `pf1-gate-metadata-lookup`.
 - Classify rows as `direct-match` only when a faithful pinned Stim baseline exists; otherwise use `contract-representative` or `report-only`.
 
 Acceptance criteria:
