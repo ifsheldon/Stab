@@ -1,10 +1,19 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs::File,
+    io::{BufWriter, Read, Write},
+    path::Path,
+};
 
 use crate::{
     CircuitDetectorId, CircuitError, CircuitResult, GateTargetGroupKind, QubitId, RepeatCount,
 };
 
 use super::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
+
+const MAX_CIRCUIT_FILE_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_CIRCUIT_FILE_BYTES_USIZE: usize = 64 * 1024 * 1024;
+const CIRCUIT_FILE_READ_LIMIT: u64 = MAX_CIRCUIT_FILE_BYTES + 1;
 
 impl Circuit {
     pub fn len(&self) -> usize {
@@ -35,6 +44,46 @@ impl Circuit {
     /// Compatibility alias matching Stim's Python API name.
     pub fn append_from_stim_program_text(&mut self, input: &str) -> CircuitResult<()> {
         self.append_from_stim_text(input)
+    }
+
+    /// Reads a `.stim` circuit file from a filesystem path.
+    ///
+    /// Files larger than 64 MiB are rejected while the parser remains string-backed.
+    pub fn from_stim_file(path: impl AsRef<Path>) -> CircuitResult<Self> {
+        let path = path.as_ref();
+        let file = File::open(path).map_err(|error| CircuitError::circuit_io("read", error))?;
+        let metadata = file
+            .metadata()
+            .map_err(|error| CircuitError::circuit_io("read", error))?;
+        if metadata.len() > MAX_CIRCUIT_FILE_BYTES {
+            return Err(circuit_file_size_error(metadata.len()));
+        }
+
+        let mut bytes = Vec::new();
+        file.take(CIRCUIT_FILE_READ_LIMIT)
+            .read_to_end(&mut bytes)
+            .map_err(|error| CircuitError::circuit_io("read", error))?;
+        if bytes.len() > MAX_CIRCUIT_FILE_BYTES_USIZE {
+            return Err(circuit_file_size_error(CIRCUIT_FILE_READ_LIMIT));
+        }
+
+        let input = String::from_utf8(bytes).map_err(|error| {
+            CircuitError::circuit_io(
+                "read",
+                std::io::Error::new(std::io::ErrorKind::InvalidData, error),
+            )
+        })?;
+        Self::from_stim_str(&input)
+    }
+
+    /// Writes this circuit as canonical `.stim` text to a filesystem path.
+    pub fn write_stim_file(&self, path: impl AsRef<Path>) -> CircuitResult<()> {
+        let file = File::create(path.as_ref())
+            .map_err(|error| CircuitError::circuit_io("write", error))?;
+        let mut writer = BufWriter::new(file);
+        self.write_stim_io(&mut writer)
+            .and_then(|()| writer.flush())
+            .map_err(|error| CircuitError::circuit_io("write", error))
     }
 
     /// Appends a copy of another circuit, fusing adjacent compatible instructions at the boundary.
@@ -317,6 +366,13 @@ fn circuit_count_overflow() -> CircuitError {
 
 fn repetition_count_overflow() -> CircuitError {
     CircuitError::invalid_domain_value("repetition count", "overflowed")
+}
+
+fn circuit_file_size_error(size: u64) -> CircuitError {
+    CircuitError::invalid_domain_value(
+        "circuit file size",
+        format!("{size} bytes exceeds {MAX_CIRCUIT_FILE_BYTES} byte limit"),
+    )
 }
 
 fn validate_insert_index(index: usize, len: usize) -> CircuitResult<()> {

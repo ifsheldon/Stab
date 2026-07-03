@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use std::io::{self, Write};
 use std::str::Lines;
 
 use crate::gate::{ArgRule, GateTargetGroupKind};
@@ -122,6 +123,17 @@ impl Circuit {
             item.write_stim(out, indent);
         }
     }
+
+    pub(crate) fn write_stim_io(&self, out: &mut impl Write) -> io::Result<()> {
+        self.write_stim_io_indented(out, 0)
+    }
+
+    fn write_stim_io_indented(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+        for item in &self.items {
+            item.write_stim_io(out, indent)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -149,6 +161,13 @@ impl CircuitItem {
         match self {
             Self::Instruction(instruction) => instruction.write_stim(out, indent),
             Self::RepeatBlock(repeat) => repeat.write_stim(out, indent),
+        }
+    }
+
+    fn write_stim_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+        match self {
+            Self::Instruction(instruction) => instruction.write_stim_io(out, indent),
+            Self::RepeatBlock(repeat) => repeat.write_stim_io(out, indent),
         }
     }
 }
@@ -404,6 +423,28 @@ impl CircuitInstruction {
         write_targets(out, &self.targets);
         out.push('\n');
     }
+
+    fn write_stim_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+        write_indent_io(out, indent)?;
+        out.write_all(self.gate.canonical_name().as_bytes())?;
+        if let Some(tag) = &self.tag {
+            out.write_all(b"[")?;
+            write_escaped_tag_io(out, tag)?;
+            out.write_all(b"]")?;
+        }
+        if !self.args.is_empty() {
+            out.write_all(b"(")?;
+            for (index, arg) in self.args.iter().enumerate() {
+                if index > 0 {
+                    out.write_all(b", ")?;
+                }
+                out.write_all(format_float(*arg).as_bytes())?;
+            }
+            out.write_all(b")")?;
+        }
+        write_targets_io(out, &self.targets)?;
+        out.write_all(b"\n")
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -460,6 +501,20 @@ impl RepeatBlock {
         self.body.write_stim(out, indent + 4);
         write_indent(out, indent);
         out.push_str("}\n");
+    }
+
+    fn write_stim_io(&self, out: &mut impl Write, indent: usize) -> io::Result<()> {
+        write_indent_io(out, indent)?;
+        out.write_all(b"REPEAT")?;
+        if let Some(tag) = &self.tag {
+            out.write_all(b"[")?;
+            write_escaped_tag_io(out, tag)?;
+            out.write_all(b"]")?;
+        }
+        writeln!(out, " {} {{", self.repeat_count.get())?;
+        self.body.write_stim_io_indented(out, indent + 4)?;
+        write_indent_io(out, indent)?;
+        out.write_all(b"}\n")
     }
 }
 
@@ -884,6 +939,13 @@ fn write_indent(out: &mut String, indent: usize) {
     out.extend(std::iter::repeat_n(' ', indent));
 }
 
+fn write_indent_io(out: &mut impl Write, indent: usize) -> io::Result<()> {
+    for _ in 0..indent {
+        out.write_all(b" ")?;
+    }
+    Ok(())
+}
+
 fn write_targets(out: &mut String, targets: &[Target]) {
     let mut pending_combiner = false;
     for target in targets {
@@ -901,6 +963,24 @@ fn write_targets(out: &mut String, targets: &[Target]) {
     }
 }
 
+fn write_targets_io(out: &mut impl Write, targets: &[Target]) -> io::Result<()> {
+    let mut pending_combiner = false;
+    for target in targets {
+        if target.is_combiner() {
+            pending_combiner = true;
+            continue;
+        }
+        if pending_combiner {
+            out.write_all(b"*")?;
+            pending_combiner = false;
+        } else {
+            out.write_all(b" ")?;
+        }
+        out.write_all(target.to_string().as_bytes())?;
+    }
+    Ok(())
+}
+
 fn write_escaped_tag(out: &mut String, tag: &str) {
     for ch in tag.chars() {
         match ch {
@@ -911,6 +991,22 @@ fn write_escaped_tag(out: &mut String, tag: &str) {
             _ => out.push(ch),
         }
     }
+}
+
+fn write_escaped_tag_io(out: &mut impl Write, tag: &str) -> io::Result<()> {
+    for ch in tag.chars() {
+        match ch {
+            ']' => out.write_all(b"\\C")?,
+            '\r' => out.write_all(b"\\r")?,
+            '\n' => out.write_all(b"\\n")?,
+            '\\' => out.write_all(b"\\B")?,
+            _ => {
+                let mut buffer = [0; 4];
+                out.write_all(ch.encode_utf8(&mut buffer).as_bytes())?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn normalize_tag(tag: Option<String>) -> Option<String> {

@@ -19,6 +19,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
+## 2026-07-04 - PF1: Path-Based Circuit File Helper Streaming Boundary
+
+Status: Open
+Revealed by: full-code-review of the PF1 circuit file-helper API slice.
+Current text: PF1 asks for circuit file constructor and writer helpers where they are useful Rust APIs, but it does not define whether path-based Rust helpers must stream through the parser or may use a bounded string-backed parser until a streaming `.stim` parser exists.
+Gap: `Circuit::write_stim_file` can stream canonical output through an `io::Write`, but `Circuit::from_stim_file` still delegates to the existing string-backed parser. The current Rust API rejects files larger than 64 MiB before parsing to avoid unbounded allocation, so it is bounded but not a full replacement for Stim v1.16.0's streaming `FILE*` reader.
+Proposed amendment: keep path-based Rust file helpers in PF1 with the documented 64 MiB read cap, and add a later parser milestone before claiming unbounded streaming `.stim` file-read parity for Rust APIs or future bindings.
+Resolution: Pending future streaming parser milestone.
+
 ## 2026-07-04 - PF1: Rust Coordinate Query Non-Finite Results
 
 Status: Open

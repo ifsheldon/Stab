@@ -4,11 +4,19 @@
     reason = "PF1 circuit API compatibility tests use direct assertions for compact diagnostics"
 )]
 
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    fs,
+    io::ErrorKind,
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use stab_core::{
-    Circuit, CircuitDetectorId, CircuitInstruction, CircuitItem, QubitId, RepeatBlock,
+    Circuit, CircuitDetectorId, CircuitError, CircuitInstruction, CircuitItem, QubitId, RepeatBlock,
 };
+
+const OVERSIZED_CIRCUIT_FILE_BYTES: u64 = 64 * 1024 * 1024 + 1;
 
 fn single_item(input: &str) -> CircuitItem {
     let circuit = Circuit::from_stim_str(input).expect("parse single item circuit");
@@ -28,6 +36,19 @@ fn single_repeat_block(input: &str) -> Option<RepeatBlock> {
         CircuitItem::Instruction(_) => None,
         CircuitItem::RepeatBlock(repeat) => Some(repeat),
     }
+}
+
+fn temp_test_dir(name: &str) -> PathBuf {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock")
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!(
+        "stab-circuit-api-{name}-{}-{timestamp}",
+        std::process::id()
+    ));
+    fs::create_dir(&dir).expect("create temp test dir");
+    dir
 }
 
 #[test]
@@ -172,6 +193,106 @@ fn pf1_circuit_stats_clear_resets_items_and_counts() {
     assert_eq!(circuit.to_stim_string(), "");
     assert_eq!(circuit.count_measurements().expect("measurements"), 0);
     assert_eq!(circuit.count_detectors().expect("detectors"), 0);
+}
+
+#[test]
+fn pf1_circuit_file_helpers_read_and_write_canonical_stim_text() {
+    let dir = temp_test_dir("read-write");
+    let input_path = dir.join("input.stim");
+    fs::write(
+        &input_path,
+        "H[test] 5\ncnot 0 1\nREPEAT[tag] 2 {\n    H 2\n}\n",
+    )
+    .expect("write input circuit");
+
+    let circuit = Circuit::from_stim_file(&input_path).expect("read circuit");
+    assert_eq!(
+        circuit.to_stim_string(),
+        concat!(
+            "H[test] 5\n",
+            "CX 0 1\n",
+            "REPEAT[tag] 2 {\n",
+            "    H 2\n",
+            "}\n",
+        )
+    );
+
+    let output_path = dir.join("output.stim");
+    circuit
+        .write_stim_file(&output_path)
+        .expect("write canonical circuit");
+    assert_eq!(
+        fs::read_to_string(&output_path).expect("read output circuit"),
+        circuit.to_stim_string()
+    );
+
+    fs::remove_dir_all(dir).expect("cleanup temp test dir");
+}
+
+#[test]
+fn pf1_circuit_file_helpers_report_read_and_write_errors() {
+    let dir = temp_test_dir("io-errors");
+    let missing_path = dir.join("missing.stim");
+
+    let read_error = Circuit::from_stim_file(&missing_path).expect_err("reject missing file");
+    assert!(matches!(
+        read_error,
+        CircuitError::CircuitIo {
+            operation: "read",
+            kind: ErrorKind::NotFound,
+            ..
+        }
+    ));
+    assert!(
+        read_error
+            .to_string()
+            .contains("failed to read circuit file"),
+        "{read_error}"
+    );
+
+    let invalid_path = dir.join("invalid.stim");
+    fs::write(&invalid_path, "UNKNOWN 0\n").expect("write invalid circuit");
+    let parse_error = Circuit::from_stim_file(&invalid_path).expect_err("reject invalid circuit");
+    assert!(
+        matches!(parse_error, CircuitError::ParseLine { .. }),
+        "{parse_error}"
+    );
+
+    let oversized_path = dir.join("oversized.stim");
+    fs::File::create(&oversized_path)
+        .expect("create oversized circuit")
+        .set_len(OVERSIZED_CIRCUIT_FILE_BYTES)
+        .expect("resize oversized circuit");
+    let oversized_error =
+        Circuit::from_stim_file(&oversized_path).expect_err("reject oversized circuit");
+    assert!(matches!(
+        oversized_error,
+        CircuitError::InvalidDomainValue {
+            kind: "circuit file size",
+            ..
+        }
+    ));
+
+    let circuit = Circuit::from_stim_str("H 0\n").expect("parse circuit");
+    let write_error = circuit
+        .write_stim_file(dir.join("missing-parent").join("out.stim"))
+        .expect_err("reject missing output parent");
+    assert!(matches!(
+        write_error,
+        CircuitError::CircuitIo {
+            operation: "write",
+            kind: ErrorKind::NotFound,
+            ..
+        }
+    ));
+    assert!(
+        write_error
+            .to_string()
+            .contains("failed to write circuit file"),
+        "{write_error}"
+    );
+
+    fs::remove_dir_all(dir).expect("cleanup temp test dir");
 }
 
 #[test]

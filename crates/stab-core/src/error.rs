@@ -44,6 +44,13 @@ pub enum CircuitError {
     #[error("invalid result format data: {message}")]
     InvalidResultFormat { message: String },
 
+    #[error("failed to {operation} circuit file: {message}")]
+    CircuitIo {
+        operation: &'static str,
+        kind: std::io::ErrorKind,
+        message: String,
+    },
+
     #[error("invalid detector error model: {message}")]
     InvalidDetectorErrorModel { message: String },
 
@@ -90,6 +97,14 @@ impl CircuitError {
     pub(crate) fn invalid_result_format(message: impl Into<String>) -> Self {
         Self::InvalidResultFormat {
             message: message.into(),
+        }
+    }
+
+    pub(crate) fn circuit_io(operation: &'static str, error: std::io::Error) -> Self {
+        Self::CircuitIo {
+            operation,
+            kind: error.kind(),
+            message: error.to_string(),
         }
     }
 
