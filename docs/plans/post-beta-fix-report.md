@@ -5,7 +5,7 @@
 This report records the implemented post-beta hardening work for already implemented Stab surfaces.
 The implemented work adds source-owned schema-version-2 threshold support, checked timing-regression waivers, mixed-row timing thresholds with submeasurement guards, streaming `sample_dem`, streaming implemented `detect` and `m2d` conversion paths, and the threshold-completion fixes from `docs/plans/post-beta-threshold-completion-plan.md`.
 Historical note: at the time this post-beta hardening report was written, the intentionally deferred Stim parity and ecosystem surfaces included Python, JS/WASM, diagrams, `explain_errors`, `repl`, QASM/Quirk, GPU, sweep-conditioned conversion, `m2d --ran_without_feedback`, full ErrorMatcher provenance, and new public graph/vector simulator APIs.
-Later M9 work added scoped `m2d --sweep`, `--sweep_format`, and `--ran_without_feedback` support, so current scope should be checked against `docs/stab-feature-checklist.md`, `docs/plans/m9-sweep-feedback-progress-report.md`, and `docs/plans/remaining-partial-feature-milestones.md`.
+Later M9 work added scoped `m2d --sweep`, `--sweep_format`, and `--ran_without_feedback` support, so current scope should be checked against `docs/stab-feature-checklist.md`, `docs/plans/m9-sweep-feedback-progress-report.md`, and `docs/plans/non-deferred-partial-feature-milestones.md`.
 
 ## Rows Fixed Or Reconciled
 

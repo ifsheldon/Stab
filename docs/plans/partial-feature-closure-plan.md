@@ -1,7 +1,7 @@
 # Partial Feature Closure Plan
 
 Historical note: this document is retained as the first post-beta PF planning pass.
-The active execution plan for remaining non-deferred partial rows is `docs/plans/remaining-partial-feature-milestones.md`, and `docs/plans/GOAL.md` now points at that plan.
+The active execution plan for remaining non-deferred partial rows is `docs/plans/non-deferred-partial-feature-milestones.md`, and `docs/plans/GOAL.md` now points at that plan.
 
 ## Summary
 

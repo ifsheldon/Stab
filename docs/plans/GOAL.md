@@ -1,88 +1,55 @@
-# Goal: Execute Remaining Partial Feature Milestones
+# Goal: Finish Non-Deferred Partial Feature Milestones
 
 ## Mission
 
-Finish the active milestones in `docs/plans/remaining-partial-feature-milestones.md`.
-The objective is to close every `Partial` row in `docs/stab-feature-checklist.md` whose remaining work is not intentionally deferred.
-Completion means the implemented Rust and CLI surfaces have source-owned tests, oracle evidence, benchmark evidence where relevant, synchronized documentation, milestone-audit closure, and full-code-review closure.
+Finish the active milestones in `docs/plans/non-deferred-partial-feature-milestones.md`.
+The objective is to close every `Partial` row in `docs/stab-feature-checklist.md` whose remaining work is not intentionally deferred, while keeping deferred Python, JS/WASM, diagram, ecosystem, simulator-product, GPU, exact-randomness, C++ header, and deprecated `--detector_hypergraph` surfaces out of scope.
 
 Use `docs/plans/lessons-learned.md` before planning or implementing each milestone.
-The recurring failure to avoid is claiming progress from broad checklist wording, broad upstream test files, stale benchmark reports, or nearby tests that do not prove the exact subcase.
+The recurring failure to avoid is claiming completion from broad checklist wording, broad upstream test files, stale reports, report-only benchmarks, or nearby tests that do not prove the exact subcase.
 
 ## Active Sources Of Truth
 
-- Active milestone plan: `docs/plans/remaining-partial-feature-milestones.md`.
-- Partial row inventory: `docs/plans/partial-feature-inventory.md`.
+- Active execution plan: `docs/plans/non-deferred-partial-feature-milestones.md`.
 - Feature status: `docs/stab-feature-checklist.md`.
 - Stim feature inventory: `docs/stim-feature-list.md`.
-- Historical roadmap and milestone policy: `docs/plans/rust-stim-drop-in-rewrite.md`.
+- Partial-row extraction map: `docs/plans/partial-feature-inventory.md`.
+- Historical RPF plan and reports: `docs/plans/remaining-partial-feature-milestones.md` and `docs/plans/rpf*-*.md`.
+- Historical roadmap and benchmark policy: `docs/plans/rust-stim-drop-in-rewrite.md`.
 - Test-porting map: `docs/plans/stim-test-porting-plan.md`.
-- Spec-gap log: `docs/plans/milestone-spec-gaps.md`.
+- Lessons and known spec gaps: `docs/plans/lessons-learned.md` and `docs/plans/milestone-spec-gaps.md`.
 - Upstream baseline: pinned Stim v1.16.0 in `vendor/stim`.
-- Oracle source of truth: `oracle/fixtures/manifest.csv`.
-- Benchmark source of truth: `benchmarks/manifest.csv`, `benchmarks/m12-primary-thresholds.json`, `benchmarks/m12-primary-beta-waivers.json`, and `benchmarks/profiler-notes/`.
+- Oracle metadata: `oracle/fixtures/manifest.csv`.
+- Benchmark metadata: `benchmarks/manifest.csv`, `benchmarks/m12-primary-thresholds.json`, `benchmarks/m12-primary-beta-waivers.json`, and `benchmarks/profiler-notes/`.
 
 If these files disagree, fix the stale source before implementing or claiming completion.
 
-## Scope
+## Work Loop For Each Milestone
 
-Included:
+For every PFM milestone:
 
-- RPF0 inventory and comparator lock.
-- RPF1 gate metadata and gate execution support contracts.
-- RPF2 circuit transforms and feedback-inlining transforms.
-- RPF3 sweep-conditioned execution and legal-gate execution gaps.
-- RPF4 DEM APIs, transforms, coordinates, counts, and folded traversal.
-- RPF5 detector utility APIs and measurement-rich flows.
-- RPF6 analyzer, search, sparse reverse tracking, and active matched-error value-object hardening.
-- RPF7 visible CLI parity for `m2d`, `analyze_errors`, and accepted legacy aliases.
-- RPF8 benchmark-gate, audit, review, and documentation closure.
-
-Excluded:
-
-- Python bindings and Python API clone behavior.
-- JavaScript/WASM.
-- Diagrams and visualization.
-- `stim explain_errors` CLI.
-- `stim repl`.
-- QASM, Quirk, Crumble, ecosystem packages, GPU backends, exact random-stream parity, and C++ header compatibility.
-- New public graph simulator, vector simulator, `TableauSimulator`, or `FlipSimulator` products.
-- Deprecated `--detector_hypergraph` support.
-
-Do not silently widen scope into an excluded surface.
-When an active subcase depends on excluded work, log the under-specification in `docs/plans/milestone-spec-gaps.md` and keep the feature partial or deferred.
-
-## Milestone Work Loop
-
-For every RPF milestone:
-
-1. Re-read the owned milestone section in `docs/plans/remaining-partial-feature-milestones.md`.
-2. Reconcile the milestone with `docs/stab-feature-checklist.md`, `docs/plans/partial-feature-inventory.md`, `docs/stim-feature-list.md`, pinned Stim source, `docs/plans/lessons-learned.md`, and `docs/plans/milestone-spec-gaps.md`.
-3. Write or refresh a scope note before coding that names owned subcases, deferred subcases, unsupported shapes, comparator class, oracle rows, benchmark rows, and resource behavior.
-4. Add or port targeted tests before or alongside implementation.
-5. Implement the feature with existing Stab abstractions, typed boundaries, clear domain errors, and streaming or documented caps for public IO paths.
+1. Re-read the milestone section in `docs/plans/non-deferred-partial-feature-milestones.md`.
+2. Reconcile the milestone with the checklist, partial inventory, Stim feature inventory, pinned Stim source, lessons learned, and spec-gap log.
+3. Write or refresh a scope note before coding that names owned subcases, explicit rejections, explicit deferrals, comparator class, oracle rows, benchmark rows, resource behavior, and public API or CLI shape.
+4. Port or create meaningful tests before or alongside implementation.
+5. Implement the feature using existing Stab abstractions, typed boundaries, clear domain errors, and streaming or documented caps for public IO paths.
 6. Run targeted tests while iterating and fix failures.
 7. Add or update oracle rows, benchmark rows, measurement work units, compare notes, profiler notes, waivers, threshold entries, and fixture metadata when the milestone requires them.
-8. Update docs in the same change set, including the checklist, active plan, milestone progress or completion report, roadmap text, oracle metadata, benchmark metadata, and user-facing docs when behavior changes.
+8. Update documentation in the same change set, including the checklist, active plan, milestone report, roadmap text, oracle metadata, benchmark metadata, and user-facing docs when behavior changes.
 9. Run milestone-audit and fix implementation, evidence, test, benchmark, or documentation findings.
 10. Run full-code-review for touched surfaces and fix findings; when using Codex, spawn GPT-5.5/xhigh subagents during the review.
-11. Log under-specified scope in `docs/plans/milestone-spec-gaps.md` instead of hiding it in checklist wording.
+11. Log true under-specification in `docs/plans/milestone-spec-gaps.md` instead of hiding it in checklist wording.
 
 A milestone is incomplete if any item in this loop is missing.
 
-## Tests Required By Milestone
+## Test Rules
 
-- RPF0: `cargo test -p stab-oracle fixtures --quiet`, `just oracle::list`, `just oracle::matrix --check`, and `just bench::list`.
-- RPF1: gate metadata tests, gate execution support table tests, unsupported metadata tests, and any gate benchmark metadata tests.
-- RPF2: circuit transform tests for `flattened`, `flattened_operations`, `without_noise`, `decomposed`, feedback inlining, repeat traversal, semantic preservation, and resource caps.
-- RPF3: sweep-conditioned sampler, converter, detector, analyzer, and CLI tests across accepted formats, omitted defaults, width mismatches, unsupported sweep shapes, and legal-gate execution boundaries.
-- RPF4: DEM exact, structural, negative, and resource-boundary tests for `flattened`, `rounded`, `without_tags`, coordinates, counts, final shifts, repeats, and folded traversal consumers.
-- RPF5: detecting-region, missing-detector, measurement-rich flow, flow validation, failure-diagnostic, and transform-integration tests for every promoted utility subfamily.
-- RPF6: analyzer, generated-circuit, decomposition, gauge, loop-folding, search, sparse reverse tracking, and active matched-error value-object tests using exact or structural comparators as appropriate.
-- RPF7: CLI tests and oracle rows for accepted flags, rejected flags, path errors, writer errors, stdout behavior, stderr class, exit status, input formats, output formats, side outputs, resource boundaries, accepted legacy aliases, conflicts, and `--detector_hypergraph` exclusion.
-- RPF8: benchmark, oracle, audit, review, documentation, and checklist consistency checks for every completed milestone slice.
+Use the milestone-specific tests listed in `docs/plans/non-deferred-partial-feature-milestones.md`.
+Tests must protect behavior, compatibility, resource boundaries, typed errors, malformed inputs, CLI stdout and stderr behavior, exit status, and unsupported-shape handling where relevant.
+Do not count tests that only check constants, static labels, or broad smoke behavior as completion evidence.
 
-Use narrower filters during iteration, but do not claim milestone completion from tests that only cover constants, static labels, or broad smoke behavior.
+During iteration, use focused filters.
+Before claiming milestone completion, run the milestone’s full targeted test set plus any oracle, benchmark, and documentation checks named by the plan.
 
 ## Benchmark Rules
 
@@ -101,10 +68,10 @@ For each benchmark row:
 Fresh primary benchmark evidence for newly gated rows must come from current committed `HEAD` or an explicitly recorded local-modification state:
 
 ```sh
-just bench::baseline --primary --out target/benchmarks/remaining-partial-primary-baseline
-just bench::compare --primary --warmup --measurement-runs 3 --require-profiler-notes --baseline target/benchmarks/remaining-partial-primary-baseline/baseline.json --report target/benchmarks/remaining-partial-primary-compare
-just bench::primary-regression --baseline target/benchmarks/remaining-partial-primary-baseline/baseline.json --report target/benchmarks/remaining-partial-primary-regression
-just bench::primary-memory-regression --baseline target/benchmarks/remaining-partial-primary-baseline/baseline.json
+just bench::baseline --primary --out target/benchmarks/non-deferred-partials-primary-baseline
+just bench::compare --primary --warmup --measurement-runs 3 --require-profiler-notes --baseline target/benchmarks/non-deferred-partials-primary-baseline/baseline.json --report target/benchmarks/non-deferred-partials-primary-compare
+just bench::primary-regression --baseline target/benchmarks/non-deferred-partials-primary-baseline/baseline.json --report target/benchmarks/non-deferred-partials-primary-regression
+just bench::primary-memory-regression --baseline target/benchmarks/non-deferred-partials-primary-baseline/baseline.json
 ```
 
 Do not cite exploratory probes as release evidence.
@@ -112,15 +79,14 @@ Do not cite exploratory probes as release evidence.
 ## Documentation Rules
 
 When behavior changes, update documentation in the same change set.
-
 At minimum, check whether the change affects:
 
 - `docs/stab-feature-checklist.md`.
-- `docs/plans/remaining-partial-feature-milestones.md`.
+- `docs/plans/non-deferred-partial-feature-milestones.md`.
+- `docs/plans/partial-feature-inventory.md`.
 - The matching milestone progress or completion report in `docs/plans/`.
 - `docs/plans/rust-stim-drop-in-rewrite.md`.
 - `docs/plans/stim-test-porting-plan.md`.
-- `docs/plans/partial-feature-inventory.md`.
 - `docs/plans/milestone-spec-gaps.md`.
 - `README.md` or CLI docs.
 - Oracle manifests, benchmark manifests, threshold files, waivers, profiler notes, and fixture metadata.
@@ -156,8 +122,8 @@ The goal is complete only when:
 - Every benchmarked feature has source-owned manifest metadata, runner coverage or explicit placeholder status, measurement work, compare notes, and a comparability class.
 - Every primary-gated benchmark row has repeated stable comparable evidence and matching profiler notes.
 - Report-only rows are labeled as report-only and are not used as release gates.
-- `docs/stab-feature-checklist.md`, active plan docs, roadmap docs, oracle metadata, benchmark metadata, threshold files, waivers, profiler notes, and milestone reports agree with current behavior.
-- Milestone-audit and full-code-review findings are fixed, or under-specification findings are logged.
+- Checklist, active plan docs, roadmap docs, oracle metadata, benchmark metadata, threshold files, waivers, profiler notes, and milestone reports agree with current behavior.
+- Milestone-audit and full-code-review findings are fixed, or true under-specification findings are logged.
 
 ## Stop Conditions
 
@@ -170,3 +136,8 @@ Stop and write a spec-gap entry instead of coding when:
 - A completion claim would require stale reports, informal waivers, or unrecorded local modifications.
 - A public parser, converter, sampler, analyzer, transformer, search, or writer path has neither streaming behavior nor a documented cap.
 - A checklist update would need to overstate implemented behavior to mark a row done.
+
+## Commit Policy
+
+Do not commit solely because this goal exists.
+When the current thread explicitly authorizes commits, use focused commits following the repository commit-message convention and run the required targeted verification before committing.

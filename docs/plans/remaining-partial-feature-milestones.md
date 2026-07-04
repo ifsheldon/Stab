@@ -2,11 +2,11 @@
 
 ## Summary
 
-This plan covers every feature row marked `Partial` in `docs/stab-feature-checklist.md` whose remaining work is not intentionally deferred.
-It turns the checklist into executable milestones with owned tests, oracle evidence, benchmark rows, acceptance criteria, and explicit exclusions.
+This historical plan covers every feature row marked `Partial` in `docs/stab-feature-checklist.md` whose remaining work is not intentionally deferred.
+It turned the checklist into executable RPF milestones with owned tests, oracle evidence, benchmark rows, acceptance criteria, and explicit exclusions.
 
-This plan is the current execution plan for finishing the non-deferred Rust and CLI partial surfaces.
-It supersedes `docs/plans/partial-feature-closure-plan.md` as the active milestone contract, while preserving the older document as historical planning context.
+The current execution plan is now `docs/plans/non-deferred-partial-feature-milestones.md`.
+Keep this document as historical RPF source material and update it only when old RPF references would otherwise mislead an implementation agent.
 
 Use `docs/plans/lessons-learned.md` while executing every milestone.
 The most important lesson for this plan is that a milestone is not actionable until it names exact subcases, executable comparators, resource behavior, benchmark class, and deferred edges.

@@ -2,7 +2,8 @@
 
 ## Summary
 
-RPF0 locks the source-owned map from the partial feature checklist to the active remaining partial feature milestones in `docs/plans/remaining-partial-feature-milestones.md`.
+RPF0 locked the source-owned map from the partial feature checklist to the remaining partial feature milestones in `docs/plans/remaining-partial-feature-milestones.md`.
+The current execution plan is `docs/plans/non-deferred-partial-feature-milestones.md`, which uses that RPF inventory as source material.
 This report records the current inventory, oracle, benchmark, audit, and review evidence for that lock.
 
 Status: complete against the RPF0 inventory-lock contract.
@@ -24,8 +25,8 @@ Excluded:
 
 ## Inventory Changes
 
-- `docs/plans/remaining-partial-feature-milestones.md` is the active execution plan for the remaining non-deferred partial rows.
-- `docs/plans/GOAL.md` points agents at the RPF plan and defines milestone work loops, benchmark rules, and stop conditions.
+- `docs/plans/non-deferred-partial-feature-milestones.md` is the active execution plan for the remaining non-deferred partial rows.
+- `docs/plans/GOAL.md` points agents at the PFM plan and defines milestone work loops, benchmark rules, and stop conditions.
 - `docs/plans/partial-feature-inventory.md` now maps the historical PF rows to active RPF milestones, locks owned/semantic-mining/deferred subcases for RPF1 through RPF7, and explicitly includes the `analyze_errors --decompose_errors` checklist row under both core analyzer and CLI analyzer owners.
 - `benchmarks/manifest.csv` now has non-primary `contract-only` placeholders for every RPF2 through RPF7 benchmark row promised by the active plan.
 - `oracle/fixtures/manifest.csv` keeps historical manifest-only `pf1-` through `pf7-` extraction rows, but their descriptions now point at locked RPF subcases instead of saying subcase splitting is future work.
@@ -36,7 +37,7 @@ Excluded:
 
 | Requirement | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Every partial row has an active owner, rollup owner, mixed owner, or deferral reason. | Satisfied | `docs/plans/remaining-partial-feature-milestones.md`; `docs/plans/partial-feature-inventory.md` | The plan contains the full partial-row coverage matrix, and the inventory maps implementation rows to historical PF ids plus RPF owners. |
+| Every partial row has an active owner, rollup owner, mixed owner, or deferral reason. | Satisfied | `docs/plans/non-deferred-partial-feature-milestones.md`; `docs/plans/partial-feature-inventory.md` | The plan contains the full partial-row coverage matrix, and the inventory maps implementation rows to historical PF ids plus RPF owners. |
 | Exact owned subcases are locked before implementation starts. | Satisfied | `docs/plans/partial-feature-inventory.md` | The locked subcase section splits RPF1 through RPF7 into owned, semantic-mining, and deferred or out-of-scope subcases. |
 | Oracle manifest has manifest-only rows for active implementation work items. | Satisfied | `oracle/fixtures/manifest.csv`; `just oracle::list` | Existing `pf1-` through `pf7-` manifest-only rows remain source-owned extraction contracts and point at locked RPF subcases. |
 | Benchmark manifest has non-primary placeholders for milestones needing performance evidence. | Satisfied | `benchmarks/manifest.csv`; `just bench::list` | Added missing RPF2 through RPF7 placeholder rows as `non-primary-report-only` and `contract-only`, and the inventory names the matching rows. |

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This inventory is the source-owned map from `docs/stab-feature-checklist.md` partial rows to the active remaining partial feature milestones in `docs/plans/remaining-partial-feature-milestones.md`.
+This inventory is the source-owned map from `docs/stab-feature-checklist.md` partial rows to the non-deferred partial feature milestones in `docs/plans/non-deferred-partial-feature-milestones.md`.
 It still records the earlier PF milestone ids because existing oracle rows, benchmark rows, and progress reports use those ids.
 It exists so later implementation agents do not have to infer active scope from broad Stim source files or from checklist prose.
 
@@ -11,7 +11,7 @@ Rows that are partial only because deferred products are absent are recorded in 
 
 ## Status Classes
 
-- `Active`: implement or tighten the named Rust or CLI surface during the matching RPF milestone in `docs/plans/remaining-partial-feature-milestones.md`.
+- `Active`: implement or tighten the named Rust or CLI surface during the matching PFM milestone in `docs/plans/non-deferred-partial-feature-milestones.md`, using the historical RPF mapping as source material.
 - `Rollup`: parent checklist row that becomes complete only after its active child rows are complete.
 - `Deferred-only`: partial or missing checklist row whose remaining work is intentionally outside this plan.
 - `Decision`: RPF0 must lock the subcases before implementation because the checklist currently mixes active and deferred work.
@@ -203,7 +203,7 @@ Deferred or out of scope:
 ## RPF0 Manifest Rows
 
 The earlier PF0 pass added manifest-only oracle rows with ids beginning `pf1-` through `pf7-` and non-primary benchmark placeholders with ids beginning `pf1-` through `pf7-`.
-RPF0 keeps those historical ids as source-owned extraction contracts and adds any missing placeholders promised by `docs/plans/remaining-partial-feature-milestones.md`.
+RPF0 keeps those historical ids as source-owned extraction contracts, and PFM0 keeps any missing placeholders promised by `docs/plans/non-deferred-partial-feature-milestones.md` synchronized.
 These rows are intentionally not implementation evidence.
 They are extraction contracts: before a matching RPF milestone claims implementation, the matching manifest-only row must be replaced or supplemented by executable exact, structural, property, statistical, or benchmark evidence.
 
