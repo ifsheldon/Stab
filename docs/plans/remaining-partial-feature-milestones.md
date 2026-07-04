@@ -355,7 +355,7 @@ Implementation tasks:
 
 - Extend `circuit_detecting_regions` for selected repeat traversal, Clifford gates, target shapes, tick windows, detector filtering, multi-detector regions, anticommutation behavior, and gauge behavior. The bounded repeat-tick traversal subset is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf5-detecting-regions-progress-report.md`.
 - Extend `missing_detectors` for selected multi-record row reduction, repeated MPP stabilizer products, observable interaction, honeycomb suffix, and toric suffix cases. The Gaussian row-reduction, repeated MPP and pair-measurement stabilizer-product, record-only observable-row, and ignored Pauli observable-row subset is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf5-missing-detectors-progress-report.md`.
-- Implement measurement-rich flow solving for `Flow`, `has_flow`, `has_all_flows`, `flow_generators`, and failure explanations. The unsigned `has_flow` subset with measurement-record and observable dependencies is implemented and tracked in [rpf5-flow-progress-report.md](rpf5-flow-progress-report.md).
+- Implement measurement-rich flow solving for `Flow`, `has_flow`, `has_all_flows`, `flow_generators`, and failure explanations. The unsigned `has_flow` subset with measurement-record and observable dependencies and the exact single-instruction measurement/reset/MPAD `circuit_flow_generators` subset are implemented and tracked in [rpf5-flow-progress-report.md](rpf5-flow-progress-report.md).
 - Integrate flow semantics with `time_reversed_for_flows`, feedback inlining, and gate metadata where selected.
 - Add precise errors for unpromoted utility families.
 
@@ -374,7 +374,7 @@ Oracle rows:
 
 Benchmarks:
 
-- Implement `pf5-detecting-regions-repeat`, `pf5-missing-detectors-mpp`, `pf5-missing-detectors-generated-code`, `pf5-flow-solve-measurement-rich`, and `pf5-has-all-flows-batch`. The `pf5-detecting-regions-repeat` row now has report-only runner coverage for the bounded repeat-tick subset, `pf5-missing-detectors-mpp` has report-only runner coverage for the promoted MPP and observable-row subset, and `pf5-has-all-flows-batch` has report-only runner coverage for the promoted unsigned has-flow record and observable subset.
+- Implement `pf5-detecting-regions-repeat`, `pf5-missing-detectors-mpp`, `pf5-missing-detectors-generated-code`, `pf5-flow-solve-measurement-rich`, `pf5-has-all-flows-batch`, and `pf5-flow-generators-measurement-rich`. The `pf5-detecting-regions-repeat` row now has report-only runner coverage for the bounded repeat-tick subset, `pf5-missing-detectors-mpp` has report-only runner coverage for the promoted MPP and observable-row subset, `pf5-has-all-flows-batch` has report-only runner coverage for the promoted unsigned has-flow record and observable subset, and `pf5-flow-generators-measurement-rich` has report-only runner coverage for the promoted single-instruction measurement/reset/MPAD generator subset.
 - Keep complex utility rows report-only unless faithful Stim comparison and repeated stable ratios exist.
 
 Acceptance criteria:

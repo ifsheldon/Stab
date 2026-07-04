@@ -30,6 +30,7 @@ mod m9;
 mod pf1;
 mod pf2;
 mod pf4;
+mod pf5;
 #[cfg(test)]
 mod tests;
 
@@ -492,6 +493,8 @@ pub(crate) fn run_stab_compare_row(
                 Ok(Some(measurements))
             } else if let Some(measurements) = pf4::run_dem_transform_compare_row(row)? {
                 Ok(Some(measurements))
+            } else if let Some(measurements) = pf5::run_flow_compare_row(row)? {
+                Ok(Some(measurements))
             } else if row.runner == Runner::ContractOnly {
                 Ok(Some(Vec::new()))
             } else {
@@ -846,6 +849,9 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
     if let Some(work) = pf4::measurement_work(row_id, name) {
         return Some(work);
     }
+    if let Some(work) = pf5::measurement_work(row_id, name) {
+        return Some(work);
+    }
     if let Some(work) = m7::measurement_work(row_id, name) {
         return Some(work);
     }
@@ -929,6 +935,9 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
         return Some(note);
     }
     if let Some(note) = pf4::compare_note(row_id) {
+        return Some(note);
+    }
+    if let Some(note) = pf5::compare_note(row_id) {
         return Some(note);
     }
     if let Some(note) = m7::compare_note(row_id) {

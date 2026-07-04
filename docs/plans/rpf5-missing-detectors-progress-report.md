@@ -64,5 +64,5 @@ just bench::smoke
 
 - Generated-code missing-detector suffix analysis for honeycomb and toric cases.
 - Broader gate support in the invariant tracker if generated-code cases require it.
-- Public measurement-rich flow semantics, `has_flow`, `has_all_flows`, `flow_generators`, diagnostics, and transform integration.
+- Public measurement-rich flow semantics beyond the promoted unsigned `has_flow` and single-instruction generator subsets, including `has_all_flows`, composed `flow_generators`, diagnostics, and transform integration.
 - A split of `ops/bench/src/baseline/tests.rs` before adding more benchmark harness cases, because the file is now close to the project’s 1200-line threshold.

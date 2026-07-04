@@ -3,7 +3,9 @@
     reason = "M6 circuit-flow-generator parity tests mirror compact upstream examples"
 )]
 
-use stab_core::{Circuit, Flow, circuit_flow_generators};
+use stab_core::{
+    Circuit, Flow, check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
+};
 
 #[test]
 fn circuit_flow_generators_empty_and_single_qubit_unitaries_match_stim() {
@@ -49,8 +51,79 @@ fn circuit_flow_generators_two_qubit_unitary_order_matches_stim() {
 }
 
 #[test]
-fn circuit_flow_generators_rejects_measurement_rich_flows_for_later_slices() {
-    assert!(circuit_flow_generators(&circuit("M 0\n")).is_err());
+fn circuit_flow_generators_promotes_single_instruction_measurement_subset() {
+    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators.test.cc.
+    assert_eq!(
+        generator_strings("M 0\n"),
+        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
+    );
+    assert_eq!(
+        generator_strings("M 0 0\n"),
+        vec!["1 -> rec[0] xor rec[1]", "1 -> Z xor rec[1]", "Z -> rec[1]",]
+    );
+    assert_eq!(
+        generator_strings("MX 0\n"),
+        vec!["1 -> X xor rec[0]", "X -> rec[0]"]
+    );
+    assert_eq!(
+        generator_strings("MY 0\n"),
+        vec!["1 -> Y xor rec[0]", "Y -> rec[0]"]
+    );
+    assert_eq!(generator_strings("R 0\n"), vec!["1 -> Z"]);
+    assert_eq!(generator_strings("RX 0\n"), vec!["1 -> X"]);
+    assert_eq!(generator_strings("RY 0\n"), vec!["1 -> Y"]);
+    assert_eq!(generator_strings("MR 0\n"), vec!["1 -> Z", "Z -> rec[0]"]);
+    assert_eq!(generator_strings("MRX 0\n"), vec!["1 -> X", "X -> rec[0]"]);
+    assert_eq!(generator_strings("MRY 0\n"), vec!["1 -> Y", "Y -> rec[0]"]);
+    assert_eq!(
+        generator_strings("MPAD 0 1 1 0\n"),
+        vec!["1 -> rec[0]", "1 -> rec[3]", "1 -> -rec[1]", "1 -> -rec[2]"]
+    );
+}
+
+#[test]
+fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
+    for text in [
+        "M 0\n",
+        "M 0 0\n",
+        "MX 0\n",
+        "MY 0\n",
+        "R 0\n",
+        "RX 0\n",
+        "RY 0\n",
+        "MR 0\n",
+        "MRX 0\n",
+        "MRY 0\n",
+        "MPAD 0 1 1 0\n",
+    ] {
+        let circuit = circuit(text);
+        let flows = circuit_flow_generators(&circuit).expect(text);
+        assert_eq!(
+            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+            vec![true; flows.len()],
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn circuit_flow_generators_rejects_unpromoted_measurement_rich_shapes() {
+    for text in [
+        "MXX 0 1\n",
+        "MPP X0*X1\n",
+        "MR 0 0\n",
+        "M 0\nH 0\n",
+        "M 0\nCX rec[-1] 0\n",
+        "REPEAT 2 {\n    M 0\n}\n",
+    ] {
+        let error = circuit_flow_generators(&circuit(text))
+            .expect_err("unpromoted measurement-rich flow generator shape")
+            .to_string();
+        assert!(
+            error.contains("circuit_flow_generators only supports"),
+            "{text}: {error}"
+        );
+    }
 }
 
 fn generator_strings(text: &str) -> Vec<String> {

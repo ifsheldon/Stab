@@ -317,7 +317,7 @@ Tasks:
 
 - Extend `circuit_detecting_regions` for selected Clifford gates, target shapes, tick windows, detector filtering, multi-detector regions, anticommutation behavior, gauge behavior, and repeat traversal.
 - Extend `missing_detectors` for selected generated honeycomb and toric suffix cases, plus any remaining MPP, pair-measurement, observable, gauge, and row-reduction cases that are not already implemented.
-- Implement measurement-rich `Flow`, `has_flow`, `has_all_flows`, `flow_generators`, `solve_for_flow_measurements`, flow multiplication, included observables, measurement indices, and failure diagnostics for the selected Rust scope.
+- Implement measurement-rich `Flow`, `has_flow`, `has_all_flows`, `flow_generators`, `solve_for_flow_measurements`, flow multiplication, included observables, measurement indices, and failure diagnostics for the selected Rust scope. The single-instruction `M`/`MX`/`MY`, `R`/`RX`/`RY`, `MR`/`MRX`/`MRY`, and `MPAD` `circuit_flow_generators` subset is implemented; composed measurement-rich generators and solve-for-measurements remain active.
 - Integrate measurement-rich flow semantics with `time_reversed_for_flows`, flow-aware decomposition checks, feedback transforms, and gate metadata decisions.
 - Add precise errors for unpromoted utility families.
 
@@ -337,7 +337,7 @@ Oracle rows:
 
 Benchmarks:
 
-- Keep or refresh `pf5-detecting-regions-repeat`, `pf5-missing-detectors-mpp`, and `pf5-has-all-flows-batch`.
+- Keep or refresh `pf5-detecting-regions-repeat`, `pf5-missing-detectors-mpp`, `pf5-has-all-flows-batch`, and `pf5-flow-generators-measurement-rich`.
 - Implement `pf5-missing-detectors-generated-code` and `pf5-flow-solve-measurement-rich` when those subcases become active.
 - Keep rows report-only unless faithful Stim comparison and repeated stable ratios exist.
 

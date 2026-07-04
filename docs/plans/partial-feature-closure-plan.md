@@ -214,7 +214,7 @@ Tests:
 
 Benchmarks:
 
-- Add rows `pf5-detecting-regions-repeat`, `pf5-missing-detectors-mpp`, `pf5-missing-detectors-generated-code`, `pf5-flow-solve-measurement-rich`, and `pf5-has-all-flows-batch`.
+- Add rows `pf5-detecting-regions-repeat`, `pf5-missing-detectors-mpp`, `pf5-missing-detectors-generated-code`, `pf5-flow-solve-measurement-rich`, `pf5-has-all-flows-batch`, and `pf5-flow-generators-measurement-rich`.
 - Keep complex utility rows report-only until faithful Stim comparison and stable ratios exist.
 
 Acceptance criteria:
