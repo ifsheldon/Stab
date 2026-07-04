@@ -103,6 +103,66 @@ fn dem_rejects_multi_target_detector_and_logical_observable() {
 }
 
 #[test]
+fn pf4_dem_public_validation_rejects_malformed_inputs() {
+    for (text, expected) in [
+        ("error(1.5) D0\n", "probability"),
+        ("error(0.25) ^ D0\n", "separators cannot be first"),
+        ("error(0.25) D0 ^\n", "separators cannot be last"),
+        (
+            "error(0.25) D0 ^ ^ D1\n",
+            "separators cannot be first or consecutive",
+        ),
+        ("error(0.25) 5\n", "raw numbers"),
+        ("detector L0\n", "detector received invalid target"),
+        (
+            "logical_observable D0\n",
+            "logical_observable received invalid target",
+        ),
+        (
+            "shift_detectors D0\n",
+            "shift_detectors requires exactly one numeric target",
+        ),
+        ("repeat nope {\n}\n", "invalid repeat count"),
+        ("error[tag\n](0.25) D0\n", "unterminated tag"),
+    ] {
+        let error = DetectorErrorModel::from_dem_str(text).expect_err("reject malformed DEM");
+        assert!(
+            error.to_string().contains(expected),
+            "expected {expected:?} for {text:?}, got {error}"
+        );
+    }
+
+    let programmatic_error = DemInstruction::new(
+        DemInstructionKind::Error,
+        vec![0.25],
+        vec![
+            DemTarget::separator(),
+            DemTarget::relative_detector(0).expect("D0"),
+        ],
+        None,
+    )
+    .expect_err("reject programmatic leading separator");
+    assert!(
+        programmatic_error
+            .to_string()
+            .contains("separators cannot be first"),
+        "{programmatic_error}"
+    );
+
+    let programmatic_detector = DemInstruction::new(
+        DemInstructionKind::Detector,
+        vec![f64::INFINITY],
+        vec![DemTarget::relative_detector(0).expect("D0")],
+        None,
+    )
+    .expect_err("reject non-finite detector coordinates");
+    assert!(
+        programmatic_detector.to_string().contains("not finite"),
+        "{programmatic_detector}"
+    );
+}
+
+#[test]
 fn dem_final_coordinate_shift_folds_nested_repeats() {
     let dem = DetectorErrorModel::from_dem_str(
         "repeat 1000 {\n\

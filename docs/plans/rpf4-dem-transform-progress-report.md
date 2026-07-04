@@ -20,14 +20,16 @@ Implemented Rust tests:
 - `pf4_dem_materialized_flattened_rejects_excessive_repeat`
 - `pf4_dem_materialized_rounded_matches_pinned_stim_probability_cases`
 - `pf4_dem_materialized_rounded_keeps_zero_probability_errors`
+- `pf4_dem_public_validation_rejects_malformed_inputs`
 
-These tests cover empty models, detector shifts, coordinate shifts, repeat blocks, instruction tags, repeat-tag dropping, logical observables, probability rounding, unchanged non-error coordinate arguments, zero-probability rounded errors, and materialized repeat rejection.
+These tests cover empty models, detector shifts, coordinate shifts, repeat blocks, instruction tags, repeat-tag dropping, logical observables, probability rounding, unchanged non-error coordinate arguments, zero-probability rounded errors, materialized repeat rejection, malformed DEM text, invalid probabilities, invalid separators, invalid targets, invalid repeat counts, invalid tags, and programmatic non-finite coordinate rejection.
 
 ## Oracle Rows
 
 Implemented row:
 
 - `pf4-dem-materialized-transforms-rust`
+- `pf4-dem-validation-negative-rust`
 
 Still broad and manifest-only:
 
@@ -58,6 +60,7 @@ Target checks for this slice:
 
 ```sh
 cargo test -p stab-core --test dem_api pf4_dem_materialized_ --quiet
+cargo test -p stab-core --test dem_api pf4_dem_public_validation_ --quiet
 cargo test -p stab-bench pf4_dem_transform_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-bench --quiet
 cargo test -p stab-oracle fixtures --quiet
@@ -71,4 +74,4 @@ just bench::smoke
 - Finish folded coordinate-map and final-shift resource policy where current APIs still require caps or do not prove large nested repeat behavior; the all-coordinate map cap and selected-query fallback are tracked separately in `docs/plans/rpf4-dem-coordinate-progress-report.md`.
 - Finish folded or capped traversal evidence for graphlike search, hypergraph search, SAT or WCNF encoding, matcher-adjacent operations, sampler-adjacent operations, and analyzer-adjacent operations.
 - Decide whether any Rust-specific copy, concat, repetition, or mutation helpers beyond existing `Clone`, `push_instruction`, `push_repeat_block`, and `append_from_dem_text` are still worth adding.
-- Add remaining malformed-input and resource-boundary cases for high detector shifts, high observable counts, invalid separator use, invalid coordinate values, and unsupported transform shapes.
+- Add remaining resource-boundary cases for high detector shifts, high observable counts, and unsupported transform shapes.
