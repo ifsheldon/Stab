@@ -97,6 +97,15 @@ fn circuit_flow_generators_promotes_single_instruction_measurement_subset() {
         ]
     );
     assert_eq!(
+        generator_strings("MPP X0*X1\nCX rec[-1] 0\n"),
+        vec![
+            "1 -> XX xor rec[0]",
+            "_X -> _X",
+            "X_ -> _X xor rec[0]",
+            "ZZ -> ZZ xor rec[0]",
+        ]
+    );
+    assert_eq!(
         generator_strings("MXX 2 0\n"),
         vec![
             "1 -> X_X xor rec[0]",
@@ -133,6 +142,37 @@ fn circuit_flow_generators_promotes_single_instruction_measurement_subset() {
             "Z___ -> Z___",
         ]
     );
+    assert_eq!(
+        generator_strings("MPP Y0*Y1 Y2*Y3\n"),
+        vec![
+            "1 -> __YY xor rec[1]",
+            "1 -> YY__ xor rec[0]",
+            "___Y -> ___Y",
+            "__XZ -> __ZX xor rec[1]",
+            "__ZZ -> __ZZ",
+            "_Y__ -> _Y__",
+            "XZ__ -> ZX__ xor rec[0]",
+            "ZZ__ -> ZZ__",
+        ]
+    );
+    assert_eq!(
+        generator_strings("MPP X0*X0\n"),
+        vec!["1 -> rec[0]", "X -> X", "Z -> Z"]
+    );
+    assert_eq!(
+        generator_strings("MPP !X0*X0\n"),
+        vec!["1 -> -rec[0]", "X -> X", "Z -> Z"]
+    );
+    assert_eq!(
+        generator_strings("MPP X0 X1*X1\n"),
+        vec![
+            "1 -> rec[1]",
+            "1 -> X_ xor rec[0]",
+            "_X -> _X",
+            "_Z -> _Z",
+            "X_ -> rec[0]",
+        ]
+    );
 }
 
 #[test]
@@ -152,7 +192,12 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
         "MXX !0 1\n",
         "MYY 3 1 2 3\n",
         "MZZ 3 1 2 3\n",
+        "MPP Y0*Y1 Y2*Y3\n",
+        "MPP X0*X0\n",
+        "MPP !X0*X0\n",
+        "MPP X0 X1*X1\n",
         "M 0\nCX rec[-1] 0\n",
+        "MPP X0*X1\nCX rec[-1] 0\n",
         "M 0\nCY rec[-1] 1\n",
         "MPAD 0 1 1 0\n",
     ] {
@@ -169,7 +214,6 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
 #[test]
 fn circuit_flow_generators_rejects_unpromoted_measurement_rich_shapes() {
     for text in [
-        "MPP X0*X1\n",
         "MR 0 0\n",
         "MXX 0 1\nH 0\n",
         "M 0\nH 0\n",
@@ -184,6 +228,17 @@ fn circuit_flow_generators_rejects_unpromoted_measurement_rich_shapes() {
             "{text}: {error}"
         );
     }
+}
+
+#[test]
+fn circuit_flow_generators_measurement_subset_rejects_anti_hermitian_mpp_products() {
+    let error = circuit_flow_generators(&circuit("MPP X0*Y0\n"))
+        .expect_err("anti-Hermitian MPP product")
+        .to_string();
+    assert!(
+        error.contains("not Hermitian"),
+        "unexpected anti-Hermitian MPP error: {error}"
+    );
 }
 
 fn generator_strings(text: &str) -> Vec<String> {
