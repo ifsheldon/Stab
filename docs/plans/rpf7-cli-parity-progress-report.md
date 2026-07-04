@@ -47,6 +47,13 @@ Each subcase compares status, stdout bytes, and stderr bytes against the matchin
 The comparator class is structural CLI behavior against the selected Stim legacy-dispatch contract: accepted alias spelling, command normalization, stdout behavior, stderr class, and exit status.
 No benchmark row changes are needed because the existing PF7 startup row samples the accepted legacy dispatch path through `--gen`; this slice adds correctness evidence for the full selected alias set without adding a new hot path.
 
+## Implemented Slice: Selected Legacy Dispatch Closure
+
+This PFM7 slice promotes the broad `pf7-legacy-dispatch-parity` row from manifest-only to executable structural evidence for the selected Stab legacy surface.
+The row is intentionally scoped to the aliases and failure modes selected by the active plan: accepted `--gen`, `--convert`, `--sample`, `--detect`, `--m2d`, and `--analyze_errors`; selected multiple-mode conflicts; explicit `--detector_hypergraph` exclusion; and fail-closed behavior for unselected legacy-style `--diagram`, `--explain_errors`, `--repl`, and `--sample_dem`.
+It does not add support for deferred commands or deprecated spellings beyond the selected aliases.
+No benchmark row changes are needed because this is a dispatch-contract closure over already measured or intentionally report-only startup behavior.
+
 ## Evidence
 
 Benchmark row:
@@ -64,6 +71,7 @@ Oracle rows:
 - `pf7-m2d-command-contract-rust` proves selected `stab m2d` command behavior for append-observables, skip-reference, observable side outputs, Pauli-target observable annotations, format and width failures, writer failure propagation, stdout behavior, stderr class, and exit status.
 - `pf7-analyze-errors-path-io-rust` proves `stab analyze_errors --in` and `--out` success, missing input path rejection, output-open precedence, stdout behavior, stderr class, and exit status.
 - `pf7-analyze-errors-flags-rust` proves selected `stab analyze_errors` flag shapes, flag-value failures, malformed stdin behavior, stdout behavior, stderr class, and exit status.
+- `pf7-legacy-dispatch-parity` now runs the selected PF7 legacy-dispatch closure over the accepted-alias, conflict, deprecated-exclusion, and unselected-mode evidence.
 - `pf7-legacy-dispatch-accepted-rust` proves selected accepted legacy aliases dispatch to the same command implementation as canonical subcommands for `gen`, `convert`, `sample`, `detect`, `m2d`, and `analyze_errors`.
 - `pf7-legacy-dispatch-conflicts-rust` runs selected legacy conflict cases for `--convert`, `--sample`, `--detect`, `--m2d`, `--analyze_errors`, and `--gen=...`, checking nonzero status, empty stdout, and diagnostic stderr.
 - `pf7-detector-hypergraph-excluded-rust` proves deprecated `--detector_hypergraph` is not accepted as a mode and is not exposed as a help topic.
@@ -109,6 +117,19 @@ cargo test -p stab-oracle fixtures --quiet
 just oracle::run --milestone PF7 --structural
 ```
 
+Verification for the selected legacy-dispatch closure:
+
+```sh
+cargo test -p stab-cli legacy_dispatch --quiet
+cargo test -p stab-oracle fixtures --quiet
+just oracle::run --milestone PF7 --structural
+```
+
+Audit and review for the selected legacy-dispatch closure:
+
+- `milestone-audit` found no implementation, evidence, or blocking spec-loophole findings for this selected closure.
+- `full-code-review` found one P3 historical-doc consistency issue in `docs/plans/remaining-partial-feature-milestones.md`; the stale RPF7 references now point to the implemented selected legacy-dispatch closure.
+
 ## Still Open In RPF7
 
-- The broad `pf7-m2d-cli-parity`, `pf7-analyze-errors-cli-parity`, and `pf7-legacy-dispatch-parity` oracle rows remain manifest-only until their selected CLI subcases are exhausted.
+- The broad `pf7-m2d-cli-parity` and `pf7-analyze-errors-cli-parity` oracle rows remain manifest-only until their selected CLI subcases are exhausted.
