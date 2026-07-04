@@ -125,6 +125,14 @@ pub(super) fn run_detection_compare_row(
         )
         .map(Some),
         "pf3-detect-sweep-sampling" => run_detect_sweep_sampling_row(row).map(Some),
+        "pf7-cli-m2d-sweep-b8" => run_m2d_cli_row(
+            row,
+            "stab_pf7_cli_m2d_sweep_b8",
+            m2d_sweep_b8_args(),
+            M2D_SWEEP_B8_MEASUREMENTS,
+            None,
+        )
+        .map(Some),
         _ => Ok(None),
     }
 }
@@ -138,6 +146,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         | ("m9-m2d-sweep-obs-out-cli", "stab_m2d_sweep_obs_out") => Some((4.0, "shots/s")),
         ("m9-m2d-sweep-b8-cli", "stab_m2d_sweep_b8") => Some((5.0, "shots/s")),
         ("pf3-m2d-sweep-b8", "stab_pf3_m2d_sweep_b8") => Some((5.0, "shots/s")),
+        ("pf7-cli-m2d-sweep-b8", "stab_pf7_cli_m2d_sweep_b8") => Some((5.0, "shots/s")),
         ("m9-m2d-ran-without-feedback-cli", "stab_m2d_ran_without_feedback") => {
             Some((6.0, "shots/s"))
         }
@@ -216,6 +225,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf3-m2d-sweep-b8" => Some(
             "report-only: Stab measures the public m2d --sweep packed b8 path using the source-owned M9 sweep fixture; threshold ownership awaits repeated probe evidence",
+        ),
+        "pf7-cli-m2d-sweep-b8" => Some(
+            "report-only: Stab measures the public CLI m2d --sweep packed b8 path for PF7 visible CLI parity using the source-owned M9 sweep fixture",
         ),
         "pf3-detect-sweep-sampling" => Some(
             "report-only: Stab measures the Rust sweep-conditioned detection sampler using omitted all-false sweep bits; no faithful pinned Stim CLI ratio is claimed for this partial PF3 surface",
