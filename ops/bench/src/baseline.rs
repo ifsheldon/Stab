@@ -219,6 +219,7 @@ pub(crate) fn run_stab_compare_row(
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
         "m7-cli-dispatch" => Ok(Some(m7::run_cli_dispatch_row(row)?)),
+        "pf7-cli-legacy-dispatch-startup" => Ok(Some(m7::run_legacy_dispatch_row(row)?)),
         "m7-convert-stim-canonical" => Ok(Some(m7::run_convert_stim_row(row)?)),
         "m4-circuit-parse" => {
             let sparse_fixture = m4_stim_parse_sparse_fixture();
@@ -845,6 +846,9 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
     if row_id == "m7-cli-dispatch" && name == "stab_cli_dispatch_gen_d3_r3" {
         return Some((1.0, "dispatches/s"));
     }
+    if row_id == "pf7-cli-legacy-dispatch-startup" && name == "stab_pf7_cli_legacy_gen_d3_r3" {
+        return Some((1.0, "dispatches/s"));
+    }
     if row_id == "m7-convert-stim-canonical" && name == "stab_convert_stim_canonical" {
         return Some((M4_PARSE_FIXTURE.len() as f64, "bytes/s"));
     }
@@ -936,6 +940,9 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m7-cli-dispatch" => Some(
             "report-only: Stab measures in-process gen dispatch; upstream baseline is sample-heavy main dispatch",
+        ),
+        "pf7-cli-legacy-dispatch-startup" => Some(
+            "report-only: Stab measures accepted legacy --gen dispatch through the public CLI parser for PF7 visible CLI parity",
         ),
         "m7-convert-stim-canonical" => Some(
             "contract-only: Stab measures in-process canonical .stim conversion; pinned Stim has no matching circuit-convert CLI",
