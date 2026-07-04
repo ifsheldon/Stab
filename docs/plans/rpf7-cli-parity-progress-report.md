@@ -15,6 +15,14 @@ The owned negative subcases reject a missing `--circuit` path before creating `-
 The comparator class is structural CLI behavior against the selected Stim `m2d` command contract: accepted path flags, Stim-style open precedence before converter setup, rejected path errors, stdout behavior, stderr class, and exit status.
 No benchmark row changes are needed because this slice tests path-boundary behavior and open precedence rather than a new conversion hot path.
 
+## Implemented Slice: `m2d` Command Contract Evidence
+
+This PFM7 slice promotes source-owned CLI evidence for selected public `stab m2d` command behavior from pinned Stim `command_m2d.test.cc` without claiming full detection-conversion parity.
+The owned positive subcases cover default detector-only `dets` output, `--append_observables`, `--skip_reference_sample`, observable side-output widths for sparse observable ids, and Pauli-target `OBSERVABLE_INCLUDE` annotations that are ignored by measurement-to-detection conversion while record-target observables continue to route to `--obs_out`.
+The owned negative and resource subcases cover unsupported `ptb64` detector output, measurement-width mismatches, invalid `dets` measurement tokens, writer failure propagation, empty stdout on failure where applicable, diagnostic stderr, and exit status.
+The comparator class is structural CLI behavior against the selected Stim `m2d` command contract: accepted flags, output routing, observable-width behavior, selected format rejections, writer errors, stdout behavior, stderr class, and exit status.
+No benchmark row changes are needed because this slice adds contract evidence around already benchmarked or report-only M9/PF7 `m2d` paths; it does not introduce a new hot path.
+
 ## Implemented Slice: `analyze_errors` Path IO Evidence
 
 This PFM7 slice promotes source-owned CLI evidence for `stab analyze_errors --in` and `--out` behavior without changing analyzer semantics.
@@ -53,6 +61,7 @@ Benchmark row:
 Oracle rows:
 
 - `pf7-m2d-path-io-rust` proves `stab m2d --circuit`, `--in`, `--out`, `--sweep`, and `--obs_out` path success, path-error precedence before converter setup, stdout behavior, stderr class, and exit status.
+- `pf7-m2d-command-contract-rust` proves selected `stab m2d` command behavior for append-observables, skip-reference, observable side outputs, Pauli-target observable annotations, format and width failures, writer failure propagation, stdout behavior, stderr class, and exit status.
 - `pf7-analyze-errors-path-io-rust` proves `stab analyze_errors --in` and `--out` success, missing input path rejection, output-open precedence, stdout behavior, stderr class, and exit status.
 - `pf7-analyze-errors-flags-rust` proves selected `stab analyze_errors` flag shapes, flag-value failures, malformed stdin behavior, stdout behavior, stderr class, and exit status.
 - `pf7-legacy-dispatch-accepted-rust` proves selected accepted legacy aliases dispatch to the same command implementation as canonical subcommands for `gen`, `convert`, `sample`, `detect`, `m2d`, and `analyze_errors`.
@@ -64,6 +73,14 @@ Verification for the `m2d` path-IO slice:
 
 ```sh
 cargo test -p stab-cli m2d_path_io --quiet
+cargo test -p stab-oracle fixtures --quiet
+just oracle::run --milestone PF7 --structural
+```
+
+Verification for the `m2d` command-contract slice:
+
+```sh
+cargo test -p stab-cli pf7_m2d_cli --quiet
 cargo test -p stab-oracle fixtures --quiet
 just oracle::run --milestone PF7 --structural
 ```
