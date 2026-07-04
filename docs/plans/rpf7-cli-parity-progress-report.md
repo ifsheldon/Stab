@@ -7,6 +7,14 @@ It also has executable CLI evidence for selected legacy-mode conflicts and expli
 
 This slice reuses source-owned M9 and M10 fixtures or generated workloads and routes through `stab_cli::run_from`, so it measures public CLI behavior instead of lower-level conversion helpers.
 
+## Implemented Slice: `analyze_errors` Path IO Evidence
+
+This PFM7 slice promotes source-owned CLI evidence for `stab analyze_errors --in` and `--out` behavior without changing analyzer semantics.
+The owned positive subcase reads a circuit from `--in`, writes the detector error model to `--out`, leaves stdout and stderr empty, and exits successfully.
+The owned negative subcases reject a nonexistent `--in` path before producing stdout, reject an unwritable `--out` path before parsing malformed input, and truncate a writable `--out` path before reporting a parse failure.
+The comparator class is structural CLI behavior against the selected Stim `analyze_errors` command contract: accepted path flags, rejected path errors, stdout behavior, stderr class, and exit status.
+No benchmark row changes are needed because this slice tests path-boundary behavior rather than a new analyzer hot path.
+
 ## Evidence
 
 Benchmark row:
@@ -20,9 +28,18 @@ Benchmark row:
 
 Oracle rows:
 
+- `pf7-analyze-errors-path-io-rust` proves `stab analyze_errors --in` and `--out` success, missing input path rejection, output-open precedence, stdout behavior, stderr class, and exit status.
 - `pf7-legacy-dispatch-conflicts-rust` runs selected legacy conflict cases for `--convert`, `--sample`, `--detect`, `--m2d`, `--analyze_errors`, and `--gen=...`, checking nonzero status, empty stdout, and diagnostic stderr.
 - `pf7-detector-hypergraph-excluded-rust` proves deprecated `--detector_hypergraph` is not accepted as a mode and is not exposed as a help topic.
 - `pf7-legacy-unselected-modes-rust` proves unselected legacy-style `--diagram`, `--explain_errors`, `--repl`, and `--sample_dem` flags fail closed with nonzero status, empty stdout, and diagnostic stderr.
+
+Verification for the path-IO slice:
+
+```sh
+cargo test -p stab-cli analyze_errors_path --quiet
+cargo test -p stab-oracle fixtures --quiet
+just oracle::run --milestone PF7 --structural
+```
 
 ## Still Open In RPF7
 

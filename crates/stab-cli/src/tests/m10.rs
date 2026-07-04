@@ -167,6 +167,129 @@ fn analyze_errors_rejects_excessive_repeat_nesting() {
 }
 
 #[test]
+fn analyze_errors_path_io_reads_input_path_and_writes_output_path() {
+    let dir = tempdir().expect("tempdir");
+    let input_path = dir.path().join("input.stim");
+    let output_path = dir.path().join("output.dem");
+    std::fs::write(&input_path, "X_ERROR(0.25) 0\nM 0\nDETECTOR rec[-1]\n")
+        .expect("write analyze_errors input");
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("analyze_errors"),
+        OsString::from("--in"),
+        input_path.into_os_string(),
+        OsString::from("--out"),
+        output_path.clone().into_os_string(),
+    ];
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(args, b"ignored stdin".as_slice(), &mut stdout, &mut stderr);
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+    assert_eq!(
+        std::fs::read_to_string(output_path).expect("read analyze_errors output"),
+        "error(0.25) D0\n"
+    );
+}
+
+#[test]
+fn analyze_errors_path_io_reports_input_and_output_path_errors() {
+    let dir = tempdir().expect("tempdir");
+    let missing_input = dir.path().join("missing.stim");
+    let mut missing_stdout = Vec::new();
+    let mut missing_stderr = Vec::new();
+    let missing_status = run_from(
+        vec![
+            OsString::from("stab"),
+            OsString::from("analyze_errors"),
+            OsString::from("--in"),
+            missing_input.clone().into_os_string(),
+        ],
+        b"".as_slice(),
+        &mut missing_stdout,
+        &mut missing_stderr,
+    );
+
+    assert_eq!(missing_status, 1);
+    assert_eq!(String::from_utf8(missing_stdout).unwrap(), "");
+    let missing_error = String::from_utf8(missing_stderr).unwrap();
+    assert!(missing_error.contains("failed to read"), "{missing_error}");
+    assert!(missing_error.contains("missing.stim"), "{missing_error}");
+
+    let unwritable_output = dir.path().join("missing-dir").join("output.dem");
+    let mut output_stdout = Vec::new();
+    let mut output_stderr = Vec::new();
+    let output_status = run_from(
+        vec![
+            OsString::from("stab"),
+            OsString::from("analyze_errors"),
+            OsString::from("--out"),
+            unwritable_output.clone().into_os_string(),
+        ],
+        b"M 0\nDETECTOR rec[-1]\n".as_slice(),
+        &mut output_stdout,
+        &mut output_stderr,
+    );
+
+    assert_eq!(output_status, 1);
+    assert_eq!(String::from_utf8(output_stdout).unwrap(), "");
+    let output_error = String::from_utf8(output_stderr).unwrap();
+    assert!(output_error.contains("failed to write"), "{output_error}");
+    assert!(output_error.contains("output.dem"), "{output_error}");
+}
+
+#[test]
+fn analyze_errors_path_io_opens_output_before_parsing_input() {
+    let dir = tempdir().expect("tempdir");
+    let unwritable_output = dir.path().join("missing-dir").join("output.dem");
+    let mut output_stdout = Vec::new();
+    let mut output_stderr = Vec::new();
+    let output_status = run_from(
+        vec![
+            OsString::from("stab"),
+            OsString::from("analyze_errors"),
+            OsString::from("--out"),
+            unwritable_output.clone().into_os_string(),
+        ],
+        b"NOT_A_GATE\n".as_slice(),
+        &mut output_stdout,
+        &mut output_stderr,
+    );
+
+    assert_eq!(output_status, 1);
+    assert_eq!(String::from_utf8(output_stdout).unwrap(), "");
+    let output_error = String::from_utf8(output_stderr).unwrap();
+    assert!(output_error.contains("failed to write"), "{output_error}");
+    assert!(output_error.contains("output.dem"), "{output_error}");
+
+    let truncated_output = dir.path().join("truncated.dem");
+    std::fs::write(&truncated_output, "old output\n").expect("seed analyze_errors output");
+    let mut parse_stdout = Vec::new();
+    let mut parse_stderr = Vec::new();
+    let parse_status = run_from(
+        vec![
+            OsString::from("stab"),
+            OsString::from("analyze_errors"),
+            OsString::from("--out"),
+            truncated_output.clone().into_os_string(),
+        ],
+        b"NOT_A_GATE\n".as_slice(),
+        &mut parse_stdout,
+        &mut parse_stderr,
+    );
+
+    assert_eq!(parse_status, 1);
+    assert_eq!(String::from_utf8(parse_stdout).unwrap(), "");
+    assert_ne!(String::from_utf8(parse_stderr).unwrap(), "");
+    assert_eq!(
+        std::fs::read_to_string(truncated_output).expect("read truncated analyze_errors output"),
+        ""
+    );
+}
+
+#[test]
 fn analyze_errors_measurement_flip_matches_m10_oracle_golden() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
