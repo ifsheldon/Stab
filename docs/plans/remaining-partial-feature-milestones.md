@@ -319,8 +319,8 @@ Tests:
 - Port owned cases from `vendor/stim/src/stim/dem/detector_error_model.test.cc`, `vendor/stim/src/stim/dem/dem_instruction.test.cc`, and Python DEM tests as semantic-mining sources.
 - Add exact canonical-output tests for `flattened`, `rounded`, `without_tags`, tags, separators, coordinate shifts, detector shifts, and repeats.
 - Add structural tests for all-detector coordinate maps, selected-detector coordinate maps, final coordinate shifts, final detector shifts, and error counts.
-- Add resource-boundary tests for huge repeats, nested repeats, high detector shifts, high observable counts, malformed DEM text, and unsafe transform expansion. The current malformed DEM and invalid constructor subset is implemented with tests, oracle metadata, and progress evidence in `docs/plans/rpf4-dem-transform-progress-report.md`.
-- Add negative tests for invalid probabilities, invalid separator use, invalid coordinate values, and unsupported transform shapes. The current invalid probability, separator, target, repeat-count, tag, and programmatic non-finite coordinate subset is implemented with tests, oracle metadata, and progress evidence in `docs/plans/rpf4-dem-transform-progress-report.md`.
+- Add resource-boundary tests for huge repeats, nested repeats, high detector shifts, high observable counts, malformed DEM text, and unsafe transform expansion. The current malformed DEM, high-id, detector-shift overflow, and invalid constructor subset is implemented with tests, oracle metadata, and progress evidence in `docs/plans/rpf4-dem-transform-progress-report.md`.
+- Add negative tests for invalid probabilities, invalid separator use, invalid coordinate values, and unsupported transform shapes. The current invalid probability, separator, target, repeat-count, tag, programmatic non-finite coordinate, and repeat-block instruction-only range subset is implemented with tests, oracle metadata, and progress evidence in `docs/plans/rpf4-dem-transform-progress-report.md`.
 
 Oracle rows:
 

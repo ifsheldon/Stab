@@ -163,6 +163,47 @@ fn pf4_dem_public_validation_rejects_malformed_inputs() {
 }
 
 #[test]
+fn pf4_dem_public_validation_rejects_high_ids_and_unsupported_ranges() {
+    let detector_error =
+        DemTarget::relative_detector(1_u64 << 62).expect_err("reject high detector id");
+    assert!(
+        detector_error.to_string().contains("detector id"),
+        "{detector_error}"
+    );
+
+    let observable_error =
+        DemTarget::logical_observable(u64::from(u32::MAX) + 1).expect_err("reject high observable");
+    assert!(
+        observable_error.to_string().contains("observable id"),
+        "{observable_error}"
+    );
+
+    let shift_overflow = DetectorErrorModel::from_dem_str(
+        "shift_detectors 18446744073709551615\nshift_detectors 1\n",
+    )
+    .expect("parse high shifts");
+    let error = shift_overflow
+        .total_detector_shift()
+        .expect_err("reject shift overflow")
+        .to_string();
+    assert!(error.contains("detector shift overflowed"), "{error}");
+
+    let repeated =
+        DetectorErrorModel::from_dem_str("error(0.125) D0\nrepeat 2 {\n    detector D0\n}\n")
+            .expect("parse repeat");
+    let error = repeated
+        .instruction_range(..)
+        .err()
+        .map(|error| error.to_string());
+    assert!(
+        error
+            .as_deref()
+            .is_some_and(|error| error.contains("repeat block")),
+        "{error:?}"
+    );
+}
+
+#[test]
 fn dem_final_coordinate_shift_folds_nested_repeats() {
     let dem = DetectorErrorModel::from_dem_str(
         "repeat 1000 {\n\
