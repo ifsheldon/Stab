@@ -57,7 +57,7 @@ If a subcase in this plan turns out to require an excluded surface, stop and log
 Recommended order:
 
 1. Run PFM0 before each new wave if the checklist, inventory, or roadmap has changed.
-2. Run PFM1 and PFM5 before flow-dependent PFM2 work, because `time_reversed_for_flows` and flow-aware decomposition checks need measurement-rich flow semantics.
+2. Run PFM1 and PFM5 before measurement-rich flow-dependent PFM2 work, because measurement-rich `time_reversed_for_flows` and flow-aware decomposition checks need measurement-rich flow semantics.
 3. Run PFM3 before PFM7 when CLI `m2d` or `detect` work depends on core sweep behavior.
 4. Run PFM4 before PFM6 when analyzer or search work depends on DEM folded traversal behavior.
 5. Run PFM8 only after one or more implementation milestones have fresh source-owned evidence.
@@ -176,7 +176,7 @@ Rows covered:
 Tasks:
 
 - Finish flow-semantic checks for `Circuit::decomposed` that depend on PFM5 measurement-rich flows.
-- Implement `time_reversed_for_flows` for the measurement-rich flow cases selected by PFM5, or write an explicit spec-gap entry if the public Rust API shape is still under-specified.
+- Promote `time_reversed_for_flows` beyond the current unitary Rust subset for the measurement-rich flow cases selected by PFM5, or write an explicit spec-gap entry if the public Rust API shape is still under-specified.
 - Decide whether exact feedback loop refolding is active Rust scope; if yes, implement it for the selected repeat-block feedback cases, and if no, preserve precise repeat-block rejection with tests and documentation.
 - Preserve measurement record, detector, observable, coordinate, sweep, and repeat semantics across every transform.
 - Keep materialized transforms capped or folded, and reject excessive expansion before building huge intermediate circuits.
@@ -198,7 +198,7 @@ Oracle rows:
 Benchmarks:
 
 - Refresh existing report-only rows `pf2-circuit-flatten-repeat`, `pf2-circuit-without-noise`, `pf2-circuit-decompose-mpp-spp`, and `pf2-feedback-inline-batch` if implementation changes their hot paths.
-- Implement `pf2-time-reverse-flow` when `time_reversed_for_flows` becomes active.
+- Keep `pf2-time-reverse-flow` synchronized with the scoped unitary `time_reversed_for_flows` runner, and extend or split the row when measurement-rich flow rewrites become active.
 - Use schema-version-2 submeasurement thresholds if a row bundles multiple transform operations.
 
 Acceptance criteria:
@@ -318,7 +318,7 @@ Tasks:
 - Extend `circuit_detecting_regions` for selected Clifford gates, target shapes, tick windows, detector filtering, multi-detector regions, anticommutation behavior, gauge behavior, and repeat traversal.
 - Extend `missing_detectors` for selected generated honeycomb and toric suffix cases, plus any remaining MPP, pair-measurement, observable, gauge, and row-reduction cases that are not already implemented. The pinned honeycomb and toric global-stabilizer suffix cases are implemented; broader generated-code suffix analysis remains active.
 - Implement measurement-rich `Flow`, `has_flow`, `has_all_flows`, `flow_generators`, `solve_for_flow_measurements`, flow multiplication, included observables, measurement indices, and failure diagnostics for the selected Rust scope. The `M`/`MX`/`MY`, `R`/`RX`/`RY`, `MR`/`MRX`/`MRY`, `MXX`/`MYY`/`MZZ`, nonconstant and constant single-instruction `MPP`, `MPAD`, scoped measurement-record feedback, promoted heralded-noise MPP `circuit_flow_generators`, and pinned Stim empty, `MX`, idle-extra-qubit, and repetition-code `solve_for_flow_measurements` examples are implemented; broader composed measurement-rich generators, broader heralded-noise generator synthesis, full generator-table measurement solving, and richer diagnostics remain active.
-- Integrate measurement-rich flow semantics with `time_reversed_for_flows`, flow-aware decomposition checks, and feedback transforms while keeping the resolved gate-flow metadata contract synchronized.
+- Integrate measurement-rich flow semantics with the currently scoped unitary `time_reversed_for_flows` bridge, flow-aware decomposition checks, and feedback transforms while keeping the resolved gate-flow metadata contract synchronized.
 - Add precise errors for unpromoted utility families.
 
 Tests:

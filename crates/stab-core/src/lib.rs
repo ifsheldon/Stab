@@ -49,7 +49,9 @@ pub use circuit_generation::{
     RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
     generate_color_code_circuit, generate_repetition_code_circuit, generate_surface_code_circuit,
 };
-pub use circuit_inverse::{circuit_inverse_qec, circuit_inverse_unitary};
+pub use circuit_inverse::{
+    circuit_inverse_qec, circuit_inverse_unitary, circuit_time_reversed_for_flows,
+};
 pub use circuit_missing_detectors::{MissingDetectorOptions, missing_detectors};
 pub use circuit_simplify::{decomposed_circuit, simplified_circuit};
 pub use circuit_tableau::circuit_to_tableau;

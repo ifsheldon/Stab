@@ -119,6 +119,18 @@ impl Circuit {
         crate::circuit_inverse_qec(self)
     }
 
+    /// Returns the currently supported unitary time-reversal subset for flows.
+    ///
+    /// The scoped Rust API accepts unsigned flows with Pauli input and output
+    /// terms only. Measurement-record and observable flow rewrites are reserved
+    /// for the richer QEC inverse milestone.
+    pub fn time_reversed_for_flows(
+        &self,
+        flows: &[crate::Flow],
+    ) -> CircuitResult<(Self, Vec<crate::Flow>)> {
+        crate::circuit_time_reversed_for_flows(self, flows)
+    }
+
     /// Returns a circuit rewritten into the current base-gate simplification subset.
     ///
     /// M6 decomposes supported single-qubit Clifford gates and selected two-qubit

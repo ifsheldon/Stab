@@ -882,6 +882,10 @@ fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
             "pf2-feedback-inline-batch",
             "stab_circuit_with_inlined_feedback_mpp",
         ),
+        (
+            "pf2-time-reverse-flow",
+            "stab_circuit_time_reversed_for_flows_unitary",
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),

@@ -30,7 +30,10 @@ pub fn check_if_circuit_has_unsigned_stabilizer_flows(
         .collect()
 }
 
-fn check_unsigned_flow_with_sparse_tracker(circuit: &Circuit, flow: &Flow) -> CircuitResult<bool> {
+pub(crate) fn check_unsigned_flow_with_sparse_tracker(
+    circuit: &Circuit,
+    flow: &Flow,
+) -> CircuitResult<bool> {
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
         CircuitError::invalid_detector_error_model(
             "circuit measurement count does not fit usize during flow checking",

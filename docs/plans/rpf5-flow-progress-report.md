@@ -2,8 +2,8 @@
 
 ## Summary
 
-This RPF5 report now covers the promoted unsigned `has_flow` subset for measurement-record and observable dependencies, the scoped measurement-rich `circuit_flow_generators` subset including nonconstant and constant single-instruction `MPP` plus the pinned heralded-noise MPP fixture, and the pinned Stim `solve_for_flow_measurements` empty, `MX`, idle-extra-qubit, and repetition-code examples.
-It does not complete the flow milestone because broader composed measurement-rich flow-generator synthesis, broader heralded-noise generator synthesis, full generator-table measurement solving, failure explanations, `time_reversed_for_flows`, transform integration, and Python flow binding ergonomics remain open.
+This RPF5 report now covers the promoted unsigned `has_flow` subset for measurement-record and observable dependencies, the scoped measurement-rich `circuit_flow_generators` subset including nonconstant and constant single-instruction `MPP` plus the pinned heralded-noise MPP fixture, the pinned Stim `solve_for_flow_measurements` empty, `MX`, idle-extra-qubit, and repetition-code examples, and the scoped unitary `time_reversed_for_flows` transform bridge.
+It does not complete the flow milestone because broader composed measurement-rich flow-generator synthesis, broader heralded-noise generator synthesis, full generator-table measurement solving, failure explanations, measurement-rich `time_reversed_for_flows`, broader transform integration, and Python flow binding ergonomics remain open.
 
 ## Implemented Surfaces
 
@@ -16,6 +16,7 @@ It does not complete the flow milestone because broader composed measurement-ric
 - Unpromoted measurement-rich generator shapes such as duplicate measure-reset targets, unsupported sweep feedback, mixed measured/unitary instruction sequences, repeat-contained measurements, and broader heralded-noise composition fail closed with an explicit unsupported generator error.
 - `solve_for_flow_measurements` is exposed as a Rust helper for the promoted unsigned scope, uses generator rows when the current `circuit_flow_generators` subset applies, and falls back to a bounded checker search for small composed measurement-rich circuits.
 - The promoted solver scope covers empty input, simple `MX`, idle extra-qubit identity flows, repetition-code measurement solving, empty-Pauli query rejection, and fallback resource-limit hardening.
+- `Circuit::time_reversed_for_flows` is exposed for the scoped unitary flow-transform subset, validates unsigned Pauli-only flows against the original unitary circuit with bounded tableau validation or folded sparse validation for supported large repeats, supports idle flow qubits beyond the circuit width, and rejects measurement-record or observable flow terms until the measurement-rich QEC inverse semantics are promoted.
 
 ## Tests
 
@@ -31,8 +32,14 @@ Implemented Rust tests:
 - `solve_for_flow_measurements_matches_stim_empty_and_simple_examples`
 - `solve_for_flow_measurements_matches_stim_repetition_code_example`
 - `solve_for_flow_measurements_has_documented_fallback_resource_limit`
+- `time_reversed_for_flows_unitary_subset_matches_qec_inverse`
+- `time_reversed_for_flows_unitary_subset_supports_flow_past_end`
+- `time_reversed_for_flows_unitary_subset_supports_extra_idle_qubits`
+- `time_reversed_for_flows_unitary_subset_folds_large_repeats`
+- `time_reversed_for_flows_rejects_unsatisfied_flow`
+- `time_reversed_for_flows_rejects_measurement_rich_terms_for_later_slices`
 
-These tests cover measurement-record dependencies, pair-measurement records, observable dependencies from records and Pauli targets, sign-insensitive matching, exact measurement, reset, pair-measurement, nonconstant and constant `MPP`, feedback, `MPAD`, and promoted heralded-noise MPP generators, generated-flow satisfaction checks for the supported checker subset, pinned Stim measurement-solver examples, and negative cases ported from pinned Stim v1.16.0 `has_flow` and `circuit_flow_generators` tests.
+These tests cover measurement-record dependencies, pair-measurement records, observable dependencies from records and Pauli targets, sign-insensitive matching, exact measurement, reset, pair-measurement, nonconstant and constant `MPP`, feedback, `MPAD`, and promoted heralded-noise MPP generators, generated-flow satisfaction checks for the supported checker subset, pinned Stim measurement-solver examples, scoped unitary flow time reversal, and negative cases ported from pinned Stim v1.16.0 `has_flow`, `circuit_flow_generators`, and `circuit_inverse_qec` tests.
 
 ## Oracle Rows
 
@@ -41,6 +48,7 @@ Implemented row:
 - `pf5-has-flow-record-observable-rust`
 - `pf5-flow-generators-measurement-rust`
 - `pf5-flow-solve-measurement-rust`
+- `pf2-time-reverse-flow-unitary-rust`
 
 Still broad and manifest-only:
 
@@ -53,6 +61,7 @@ Report-only runner coverage:
 - `pf5-has-all-flows-batch`
 - `pf5-flow-generators-measurement-rich`
 - `pf5-flow-solve-measurement-rich`
+- `pf2-time-reverse-flow`
 
 The row measures the promoted unsigned has-flow corpus through the Rust public flow checker.
 It reports `stab_pf5_has_flows_batch_cases`, normalized as cases per second, and `stab_pf5_has_flows_batch_flows`, normalized as flows per second.
@@ -64,6 +73,9 @@ It measured `stab_pf5_flow_generators_measurement_cases` at `5.545e5 cases/s` an
 The solver row measures the promoted `solve_for_flow_measurements` corpus through the Rust public helper.
 It reports `stab_pf5_flow_solve_measurement_cases`, normalized as cases per second, and `stab_pf5_flow_solve_measurement_queries`, normalized as queries per second.
 These rows remain `non-primary-report-only` because pinned Stim does not provide a faithful CLI timing ratio for this Rust utility surface, and they are not part of the 1.25x primary threshold file.
+The `pf2-time-reverse-flow` row measures the scoped unitary flow-transform bridge from the RPF2 side and remains report-only for the same reason.
+The current focused report-only probe used `target/benchmarks/rpf2-time-reverse-flow-probe/baseline.json` and `target/benchmarks/rpf2-time-reverse-flow-compare/compare.json`.
+It measured `stab_circuit_time_reversed_for_flows_unitary` at `4.097e5 flows/s`.
 
 ## Verification Evidence
 
@@ -72,6 +84,7 @@ Target checks for this slice:
 ```sh
 cargo test -p stab-core --test circuit_flows --quiet
 cargo test -p stab-core --test circuit_flow_generators --quiet
+cargo test -p stab-core --test circuit_inverse_qec time_reversed_for_flows --quiet
 cargo test -p stab-core sparse_rev_frame_tracker --quiet
 cargo test -p stab-bench pf5::detector_utility_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-oracle fixtures --quiet
@@ -95,6 +108,6 @@ The docs and benchmark reviewer found one stale M6 oracle-manifest note that sti
 
 - `circuit_flow_generators` for broader composed measurement-rich circuits, unsupported feedback shapes, broader heralded-noise synthesis, and all-operation generator checks.
 - Full generator-table `solve_for_flow_measurements` parity for larger composed measurement-rich circuits and richer measurement-set diagnostics.
-- `time_reversed_for_flows` and transform-integration checks.
+- Measurement-rich `time_reversed_for_flows` and broader transform-integration checks.
 - Flow failure explanations beyond boolean unsigned checking.
 - Python binding ergonomics remain deferred.

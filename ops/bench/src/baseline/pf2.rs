@@ -1,6 +1,7 @@
 use std::hint::black_box;
+use std::str::FromStr;
 
-use stab_core::{Circuit, CircuitInstruction, CircuitItem, Target};
+use stab_core::{Circuit, CircuitInstruction, CircuitItem, Flow, Target};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
@@ -39,6 +40,13 @@ const DECOMPOSE_MPP_SPP: &str = "ISWAP 0 1 2 1\n\
                                  MXX 6 7 6 8\n\
                                  X_ERROR(0.25) 0\n\
                                  DETECTOR rec[-1]\n";
+const TIME_REVERSE_FLOW_UNITARY: &str = "H 2\n";
+const TIME_REVERSE_FLOW_TEXTS: [&str; 4] = [
+    "X300 -> X300",
+    "X2*Z301 -> Z2*Z301",
+    "Z2*X301 -> X2*X301",
+    "Y2*Y301 -> Y2*Y301",
+];
 
 pub(super) fn run_circuit_flatten_repeat_row(
     row: &BenchmarkRow,
@@ -108,6 +116,24 @@ pub(super) fn run_circuit_decompose_mpp_spp_row(
     )?])
 }
 
+pub(super) fn run_time_reverse_flow_row(
+    row: &BenchmarkRow,
+) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = parse_circuit(&row.id, TIME_REVERSE_FLOW_UNITARY)?;
+    let flows = parse_flows(&row.id, TIME_REVERSE_FLOW_TEXTS)?;
+    Ok(vec![measure_stab_batched(
+        "stab_circuit_time_reversed_for_flows_unitary",
+        TRANSFORM_REPETITIONS,
+        || {
+            let (reversed, reversed_flows) = circuit
+                .time_reversed_for_flows(&flows)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box((circuit_checksum(&reversed), reversed_flows.len()));
+            Ok(())
+        },
+    )?])
+}
+
 pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     match (row_id, name) {
         ("pf2-circuit-flatten-repeat", "stab_circuit_flatten_repeat_shifted_coords") => {
@@ -124,6 +150,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         }
         ("pf2-circuit-decompose-mpp-spp", "stab_circuit_decompose_mpp_spp") => {
             Some((8.0, "source-instructions/s"))
+        }
+        ("pf2-time-reverse-flow", "stab_circuit_time_reversed_for_flows_unitary") => {
+            Some((TIME_REVERSE_FLOW_TEXTS.len() as f64, "flows/s"))
         }
         _ => None,
     }
@@ -142,6 +171,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf2-circuit-decompose-mpp-spp" => Some(
             "contract-only: Stab measures Rust Circuit::decomposed over ISWAP, MPP, SPP, pair-measurement, noise, and annotation operations; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",
+        ),
+        "pf2-time-reverse-flow" => Some(
+            "contract-only: Stab measures the scoped Rust Circuit::time_reversed_for_flows unitary subset; measurement-rich QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         _ => None,
     }
@@ -181,6 +213,13 @@ DETECTOR rec[-1]
 
 fn parse_circuit(row_id: &str, text: &str) -> Result<Circuit, BenchError> {
     Circuit::from_stim_str(text).map_err(|error| stab_runner_error(row_id, error))
+}
+
+fn parse_flows<const N: usize>(row_id: &str, texts: [&str; N]) -> Result<Vec<Flow>, BenchError> {
+    texts
+        .into_iter()
+        .map(|text| Flow::from_str(text).map_err(|error| stab_runner_error(row_id, error)))
+        .collect()
 }
 
 fn circuit_checksum(circuit: &Circuit) -> u64 {
