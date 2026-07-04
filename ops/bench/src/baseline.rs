@@ -840,17 +840,8 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
     if let Some(work) = pf2::measurement_work(row_id, name) {
         return Some(work);
     }
-    if row_id.starts_with("m7-gen-") && name.starts_with("stab_gen_") {
-        return Some((1.0, "circuits/s"));
-    }
-    if row_id == "m7-cli-dispatch" && name == "stab_cli_dispatch_gen_d3_r3" {
-        return Some((1.0, "dispatches/s"));
-    }
-    if row_id == "pf7-cli-legacy-dispatch-startup" && name == "stab_pf7_cli_legacy_gen_d3_r3" {
-        return Some((1.0, "dispatches/s"));
-    }
-    if row_id == "m7-convert-stim-canonical" && name == "stab_convert_stim_canonical" {
-        return Some((M4_PARSE_FIXTURE.len() as f64, "bytes/s"));
+    if let Some(work) = m7::measurement_work(row_id, name) {
+        return Some(work);
     }
     match (row_id, name) {
         ("m5-simd-bit-table", "stab_bit_matrix_row_xor_128x128_contract") => {
@@ -931,24 +922,12 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
     if let Some(note) = pf2::compare_note(row_id) {
         return Some(note);
     }
+    if let Some(note) = m7::compare_note(row_id) {
+        return Some(note);
+    }
     match row_id {
         "m4-circuit-parse" => Some(
             "direct-match: Stab measures dense and sparse .stim parser cases against the pinned Stim circuit_parse perf filters",
-        ),
-        "m7-perf-harness" => Some(
-            "contract-only: verifies baseline metadata coverage; no Stab runtime workload is expected",
-        ),
-        "m7-cli-dispatch" => Some(
-            "report-only: Stab measures in-process gen dispatch; upstream baseline is sample-heavy main dispatch",
-        ),
-        "pf7-cli-legacy-dispatch-startup" => Some(
-            "report-only: Stab measures accepted legacy --gen dispatch through the public CLI parser for PF7 visible CLI parity",
-        ),
-        "m7-convert-stim-canonical" => Some(
-            "contract-only: Stab measures in-process canonical .stim conversion; pinned Stim has no matching circuit-convert CLI",
-        ),
-        id if id.starts_with("m7-gen-") => Some(
-            "report-only: Stab measures direct Rust generator construction and formatting-independent circuit access",
         ),
         "m5-simd-bit-table" => Some(
             "contract-smoke: Stab transpose/row-xor uses 128x128 until optimized 10k transpose parity is introduced",

@@ -50,6 +50,7 @@ pub(super) fn run_dem_compare_row(
         "m10-analyze-errors-fold-cli" => run_analyze_fold_row(row).map(Some),
         "m10-analyze-errors-high-repeat-contract" => run_analyze_fold_row(row).map(Some),
         "pf3-analyze-errors-sweep" => run_analyze_sweep_row(row).map(Some),
+        "pf7-cli-analyze-errors-generated" => run_analyze_generated_cli_row(row).map(Some),
         "pf7-cli-analyze-errors-decompose" => run_analyze_decompose_cli_row(row).map(Some),
         _ => Ok(None),
     }
@@ -72,6 +73,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         }
         ("pf7-cli-analyze-errors-decompose", "stab_pf7_cli_analyze_errors_decompose") => {
             Some((1.0, "circuits/s"))
+        }
+        ("pf7-cli-analyze-errors-generated", "stab_pf7_cli_analyze_errors_generated") => {
+            Some((error_analyzer_detector_count(), "detectors/s"))
         }
         ("pf3-analyze-errors-sweep", "stab_analyze_errors_sweep_control") => {
             Some((1.0, "circuits/s"))
@@ -111,6 +115,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf7-cli-analyze-errors-decompose" => Some(
             "report-only: Stab measures the public CLI analyze_errors --decompose_errors path for PF7 visible CLI parity using the source-owned M10 basic fixture",
+        ),
+        "pf7-cli-analyze-errors-generated" => Some(
+            "report-only: Stab measures the public CLI analyze_errors path on the source-owned generated d3/r3 rotated-memory-z surface-code analyzer workload",
         ),
         "pf3-analyze-errors-sweep" => Some(
             "report-only: Stab measures in-process analyzer handling for sweep-controlled Clifford gates that are semantically ignored by the error analyzer",
@@ -220,6 +227,37 @@ fn run_analyze_decompose_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
                     row_id: row.id.clone(),
                     message: format!(
                         "stab-cli analyze_errors failed with status {status}: {}",
+                        String::from_utf8_lossy(&stderr)
+                    ),
+                });
+            }
+            black_box(stdout.len());
+            Ok(())
+        },
+    )?])
+}
+
+fn run_analyze_generated_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = error_analyzer_surface_code(&row.id)?;
+    let circuit_text = circuit.to_stim_string();
+    let args = vec![OsString::from("stab"), OsString::from("analyze_errors")];
+    Ok(vec![measure_stab_iterations(
+        "stab_pf7_cli_analyze_errors_generated",
+        ERROR_ANALYZER_COMPARE_ITERATIONS,
+        || {
+            let mut stdout = CountingWriter::default();
+            let mut stderr = Vec::new();
+            let status = stab_cli::run_from(
+                args.clone(),
+                circuit_text.as_bytes(),
+                &mut stdout,
+                &mut stderr,
+            );
+            if status != 0 {
+                return Err(BenchError::StabRunner {
+                    row_id: row.id.clone(),
+                    message: format!(
+                        "stab-cli analyze_errors generated fixture failed with status {status}: {}",
                         String::from_utf8_lossy(&stderr)
                     ),
                 });

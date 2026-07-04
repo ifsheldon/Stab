@@ -132,6 +132,43 @@ pub(super) fn run_generator_compare_row(
     )?]))
 }
 
+pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
+    if row_id.starts_with("m7-gen-") && name.starts_with("stab_gen_") {
+        return Some((1.0, "circuits/s"));
+    }
+    match (row_id, name) {
+        ("m7-cli-dispatch", "stab_cli_dispatch_gen_d3_r3") => Some((1.0, "dispatches/s")),
+        ("pf7-cli-legacy-dispatch-startup", "stab_pf7_cli_legacy_gen_d3_r3") => {
+            Some((1.0, "dispatches/s"))
+        }
+        ("m7-convert-stim-canonical", "stab_convert_stim_canonical") => {
+            Some((CONVERT_STIM_FIXTURE.len() as f64, "bytes/s"))
+        }
+        _ => None,
+    }
+}
+
+pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
+    match row_id {
+        "m7-perf-harness" => Some(
+            "contract-only: verifies baseline metadata coverage; no Stab runtime workload is expected",
+        ),
+        "m7-cli-dispatch" => Some(
+            "report-only: Stab measures in-process gen dispatch; upstream baseline is sample-heavy main dispatch",
+        ),
+        "pf7-cli-legacy-dispatch-startup" => Some(
+            "report-only: Stab measures accepted legacy --gen dispatch through the public CLI parser for PF7 visible CLI parity",
+        ),
+        "m7-convert-stim-canonical" => Some(
+            "contract-only: Stab measures in-process canonical .stim conversion; pinned Stim has no matching circuit-convert CLI",
+        ),
+        id if id.starts_with("m7-gen-") => Some(
+            "report-only: Stab measures direct Rust generator construction and formatting-independent circuit access",
+        ),
+        _ => None,
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 enum GeneratorFamily {
     Repetition,
