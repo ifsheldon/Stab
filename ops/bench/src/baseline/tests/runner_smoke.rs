@@ -57,25 +57,42 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
 
 #[test]
 fn pf6_analyzer_benchmark_rows_have_stab_compare_runners() {
-    let row = BenchmarkRow {
-        id: "pf6-analyze-errors-generated-surface".to_string(),
-        milestone: Milestone::Pf6,
-        threshold_class: "non-primary-report-only".to_string(),
-        runner: Runner::ContractOnly,
-        upstream_source: "src/stim/simulators/error_analyzer.perf.cc".to_string(),
-        stim_perf_filter: String::new(),
-        argv: String::new(),
-        stdin_path: String::new(),
-        phase: "analysis".to_string(),
-        measurement: "analyze-errors-generated".to_string(),
-        description: "test row".to_string(),
-    };
+    for (id, upstream_source, measurement, expected_measurements) in [
+        (
+            "pf6-analyze-errors-generated-surface",
+            "src/stim/simulators/error_analyzer.perf.cc",
+            "analyze-errors-generated",
+            &["stab_pf6_analyze_errors_generated_surface"][..],
+        ),
+        (
+            "pf6-graphlike-search-generated",
+            "src/stim/search/graphlike/algo.perf.cc",
+            "graphlike-search-generated",
+            &["stab_pf6_graphlike_search_generated_surface"][..],
+        ),
+        (
+            "pf6-hypergraph-search-generated",
+            "src/stim/search/hyper/algo.test.cc",
+            "hypergraph-search-generated",
+            &["stab_pf6_hypergraph_search_generated_surface"][..],
+        ),
+    ] {
+        let row = BenchmarkRow {
+            id: id.to_string(),
+            milestone: Milestone::Pf6,
+            threshold_class: "non-primary-report-only".to_string(),
+            runner: Runner::ContractOnly,
+            upstream_source: upstream_source.to_string(),
+            stim_perf_filter: String::new(),
+            argv: String::new(),
+            stdin_path: String::new(),
+            phase: "analysis".to_string(),
+            measurement: measurement.to_string(),
+            description: "test row".to_string(),
+        };
 
-    assert_benchmark_measurements(
-        "pf6-analyze-errors-generated-surface",
-        row,
-        &["stab_pf6_analyze_errors_generated_surface"],
-    );
+        assert_benchmark_measurements(id, row, expected_measurements);
+    }
 }
 
 fn assert_benchmark_measurements(id: &str, row: BenchmarkRow, expected_measurements: &[&str]) {

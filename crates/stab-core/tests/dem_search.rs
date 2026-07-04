@@ -5,7 +5,11 @@
 )]
 
 use stab_core::{
-    DetectorErrorModel, find_undetectable_logical_error, shortest_error_sat_problem,
+    CircuitResult, CodeDistance, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
+    ErrorAnalyzerOptions, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
+    SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
+    find_undetectable_logical_error, generate_repetition_code_circuit,
+    generate_surface_code_circuit, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error,
 };
 
@@ -68,5 +72,122 @@ fn pf4_dem_search_and_sat_repeat_resource_policy_is_source_owned() {
         sat_error
             .contains("DEM SAT problem generation currently supports repeat counts up to 100000"),
         "{sat_error}"
+    );
+}
+
+#[test]
+fn pf6_generated_qec_graphlike_search_matches_upstream_instruction_counts() {
+    let surface = generated_rotated_surface_code_dem().unwrap();
+    assert_search_result_shape(
+        &shortest_graphlike_undetectable_logical_error(&surface, false).unwrap(),
+        5,
+    );
+    assert_search_result_shape(
+        &shortest_graphlike_undetectable_logical_error(&surface, true).unwrap(),
+        5,
+    );
+
+    let repetition = generated_repetition_code_dem().unwrap();
+    assert_search_result_shape(
+        &shortest_graphlike_undetectable_logical_error(&repetition, false).unwrap(),
+        7,
+    );
+
+    let ungraphlike_surface = generated_rotated_surface_code_ungraphlike_dem().unwrap();
+    assert_search_result_shape(
+        &shortest_graphlike_undetectable_logical_error(&ungraphlike_surface, true).unwrap(),
+        5,
+    );
+    let error = shortest_graphlike_undetectable_logical_error(&ungraphlike_surface, false)
+        .expect_err("ungraphlike generated DEM should be rejected without ignore flag")
+        .to_string();
+    assert!(error.contains("non-graphlike error mechanism"), "{error}");
+}
+
+#[test]
+fn pf6_generated_qec_hypergraph_search_matches_upstream_instruction_counts() {
+    let surface = generated_rotated_surface_code_dem().unwrap();
+    assert_search_result_shape(
+        &find_undetectable_logical_error(&surface, 4, 4, true).unwrap(),
+        5,
+    );
+
+    let repetition = generated_repetition_code_dem().unwrap();
+    assert_search_result_shape(
+        &find_undetectable_logical_error(&repetition, 4, 4, false).unwrap(),
+        7,
+    );
+
+    let ungraphlike_surface = generated_rotated_surface_code_ungraphlike_dem().unwrap();
+    assert_search_result_shape(
+        &find_undetectable_logical_error(&ungraphlike_surface, 4, 4, true).unwrap(),
+        5,
+    );
+}
+
+fn generated_rotated_surface_code_dem() -> CircuitResult<DetectorErrorModel> {
+    generated_rotated_surface_code_dem_with_options(ErrorAnalyzerOptions {
+        decompose_errors: true,
+        ..ErrorAnalyzerOptions::default()
+    })
+}
+
+fn generated_rotated_surface_code_ungraphlike_dem() -> CircuitResult<DetectorErrorModel> {
+    generated_rotated_surface_code_dem_with_options(ErrorAnalyzerOptions::default())
+}
+
+fn generated_rotated_surface_code_dem_with_options(
+    options: ErrorAnalyzerOptions,
+) -> CircuitResult<DetectorErrorModel> {
+    let probability = Probability::try_new(0.001)?;
+    let params = SurfaceCodeParams::new(
+        RoundCount::try_new(5)?,
+        CodeDistance::try_new(5)?,
+        SurfaceCodeTask::RotatedMemoryX,
+    )?
+    .with_after_clifford_depolarization(probability)
+    .with_before_measure_flip_probability(probability)
+    .with_after_reset_flip_probability(probability)
+    .with_before_round_data_depolarization(probability);
+    let generated = generate_surface_code_circuit(&params)?;
+    circuit_to_detector_error_model(generated.circuit(), options)
+}
+
+fn generated_repetition_code_dem() -> CircuitResult<DetectorErrorModel> {
+    let params = RepetitionCodeParams::new(
+        RoundCount::try_new(10)?,
+        CodeDistance::try_new(7)?,
+        RepetitionCodeTask::Memory,
+    )?
+    .with_before_round_data_depolarization(Probability::try_new(0.01)?);
+    let generated = generate_repetition_code_circuit(&params)?;
+    circuit_to_detector_error_model(
+        generated.circuit(),
+        ErrorAnalyzerOptions {
+            decompose_errors: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+}
+
+fn assert_search_result_shape(model: &DetectorErrorModel, expected_error_count: usize) {
+    assert_eq!(model.items().len(), expected_error_count);
+    assert!(
+        model.items().iter().all(|item| matches!(
+            item,
+            DemItem::Instruction(instruction)
+                if instruction.kind() == DemInstructionKind::Error
+        )),
+        "search output should contain only error instructions: {}",
+        model.to_dem_string()
+    );
+    assert!(
+        model.items().iter().any(|item| matches!(
+            item,
+            DemItem::Instruction(instruction)
+                if instruction.targets().iter().any(|target| matches!(target, DemTarget::LogicalObservable(_)))
+        )),
+        "search output should include a logical observable: {}",
+        model.to_dem_string()
     );
 }

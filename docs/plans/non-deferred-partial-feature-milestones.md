@@ -386,7 +386,8 @@ Oracle rows:
 Benchmarks:
 
 - Keep or refresh `pf6-analyze-errors-generated-surface`.
-- Implement `pf6-error-decomp-loop-folded`, `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, and `pf6-sparse-rev-frame-loop` when their subcases are implemented.
+- Keep or refresh `pf6-graphlike-search-generated` and `pf6-hypergraph-search-generated`, which have report-only runner coverage for the promoted generated rotated-surface-code search subset.
+- Implement `pf6-error-decomp-loop-folded` and `pf6-sparse-rev-frame-loop` when their subcases are implemented.
 - Use schema-version-2 submeasurement thresholds for bundled analyzer or search rows.
 - Promote only faithful pinned-Stim rows with repeated stable evidence.
 

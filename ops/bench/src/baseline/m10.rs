@@ -6,8 +6,9 @@ use std::time::{Duration, Instant};
 use stab_core::{
     Circuit, CodeDistance, DetectorErrorModel, ErrorAnalyzerOptions, Probability, RoundCount,
     SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
-    generate_surface_code_circuit, independent_to_disjoint_xyz_errors,
-    shortest_graphlike_undetectable_logical_error, try_disjoint_to_independent_xyz_errors,
+    find_undetectable_logical_error, generate_surface_code_circuit,
+    independent_to_disjoint_xyz_errors, shortest_graphlike_undetectable_logical_error,
+    try_disjoint_to_independent_xyz_errors,
 };
 
 use crate::allocations::measure_tracked_memory;
@@ -51,6 +52,8 @@ pub(super) fn run_dem_compare_row(
         "m10-analyze-errors-high-repeat-contract" => run_analyze_fold_row(row).map(Some),
         "pf3-analyze-errors-sweep" => run_analyze_sweep_row(row).map(Some),
         "pf6-analyze-errors-generated-surface" => run_analyze_generated_core_row(row).map(Some),
+        "pf6-graphlike-search-generated" => run_generated_graphlike_search_row(row).map(Some),
+        "pf6-hypergraph-search-generated" => run_generated_hypergraph_search_row(row).map(Some),
         "pf7-cli-analyze-errors-generated" => run_analyze_generated_cli_row(row).map(Some),
         "pf7-cli-analyze-errors-decompose" => run_analyze_decompose_cli_row(row).map(Some),
         _ => Ok(None),
@@ -79,6 +82,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             Some((error_analyzer_detector_count(), "detectors/s"))
         }
         ("pf6-analyze-errors-generated-surface", "stab_pf6_analyze_errors_generated_surface") => {
+            Some((error_analyzer_detector_count(), "detectors/s"))
+        }
+        ("pf6-graphlike-search-generated", "stab_pf6_graphlike_search_generated_surface")
+        | ("pf6-hypergraph-search-generated", "stab_pf6_hypergraph_search_generated_surface") => {
             Some((error_analyzer_detector_count(), "detectors/s"))
         }
         ("pf3-analyze-errors-sweep", "stab_analyze_errors_sweep_control") => {
@@ -125,6 +132,12 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf6-analyze-errors-generated-surface" => Some(
             "report-only: Stab measures the Rust generated d3/r3 rotated-memory-z surface-code analyzer workload without a faithful pinned Stim CLI timing ratio",
+        ),
+        "pf6-graphlike-search-generated" => Some(
+            "report-only: Stab measures generated rotated-surface-code DEM graphlike search after source-owned Rust analysis and decomposition; pinned Stim exposes this as C++ API/perf behavior, not a faithful public CLI baseline",
+        ),
+        "pf6-hypergraph-search-generated" => Some(
+            "report-only: Stab measures generated rotated-surface-code DEM hypergraph search after source-owned Rust analysis and decomposition; pinned Stim exposes this as C++ API behavior, not a faithful public CLI baseline",
         ),
         "pf3-analyze-errors-sweep" => Some(
             "report-only: Stab measures in-process analyzer handling for sweep-controlled Clifford gates that are semantically ignored by the error analyzer",
@@ -284,6 +297,34 @@ fn run_analyze_generated_core_row(row: &BenchmarkRow) -> Result<Vec<Measurement>
             let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(dem.items().len());
+            Ok(())
+        },
+    )?])
+}
+
+fn run_generated_graphlike_search_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let model = generated_search_surface_code_dem(&row.id)?;
+    Ok(vec![measure_stab_iterations(
+        "stab_pf6_graphlike_search_generated_surface",
+        ERROR_ANALYZER_COMPARE_ITERATIONS,
+        || {
+            let shortest = shortest_graphlike_undetectable_logical_error(&model, false)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(shortest.items().len());
+            Ok(())
+        },
+    )?])
+}
+
+fn run_generated_hypergraph_search_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let model = generated_search_surface_code_dem(&row.id)?;
+    Ok(vec![measure_stab_iterations(
+        "stab_pf6_hypergraph_search_generated_surface",
+        ERROR_ANALYZER_COMPARE_ITERATIONS,
+        || {
+            let shortest = find_undetectable_logical_error(&model, 4, 4, true)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(shortest.items().len());
             Ok(())
         },
     )?])
@@ -492,6 +533,18 @@ fn error_analyzer_surface_code(row_id: &str) -> Result<Circuit, BenchError> {
     let generated =
         generate_surface_code_circuit(&params).map_err(|error| stab_runner_error(row_id, error))?;
     Ok(generated.circuit().clone())
+}
+
+fn generated_search_surface_code_dem(row_id: &str) -> Result<DetectorErrorModel, BenchError> {
+    let circuit = error_analyzer_surface_code(row_id)?;
+    circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            decompose_errors: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .map_err(|error| stab_runner_error(row_id, error))
 }
 
 fn error_analyzer_detector_count() -> f64 {
