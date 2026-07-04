@@ -216,7 +216,7 @@ Status key:
 | Upstream test inventory and porting plan | Done | [plans/stim-test-porting-plan.md](plans/stim-test-porting-plan.md) groups upstream tests and planned Rust ports. |
 | Oracle fixture matrix | Done for implemented surfaces | `oracle/fixtures/manifest.csv`, `ops/oracle`, and milestone reports track exact, statistical, structural, and semantic-mining rows. |
 | Benchmark manifest and primary beta gate | Done for current performance infrastructure | `benchmarks/manifest.csv`, `benchmarks/m12-primary-thresholds.json`, `benchmarks/m12-primary-beta-waivers.json`, and M12/post-beta reports provide primary benchmark evidence. |
-| Current beta performance gate | Done for current report state | Post-beta clean reports record 72 comparable rows passing the 1.25x beta gate and 4 checked no-ratio waivers. |
+| Current beta performance gate | Done for current report state | The expanded clean 1.25x beta evidence records 80 comparable rows passing and 5 checked no-ratio waivers across 85 primary rows. |
 | Tests for deferred Python, JS, diagrams, and ecosystem packages | Deferred | These are intentionally future work and should not be used as blockers for the current Rust/CLI beta surface. |
 
 ## 17. Highest-Priority Remaining Feature Gaps

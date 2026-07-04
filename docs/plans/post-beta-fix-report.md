@@ -4,7 +4,8 @@
 
 This report records the implemented post-beta hardening work for already implemented Stab surfaces.
 The implemented work adds source-owned schema-version-2 threshold support, checked timing-regression waivers, mixed-row timing thresholds with submeasurement guards, streaming `sample_dem`, streaming implemented `detect` and `m2d` conversion paths, and the threshold-completion fixes from `docs/plans/post-beta-threshold-completion-plan.md`.
-The intentionally deferred Stim parity and ecosystem surfaces remain Python, JS/WASM, diagrams, `explain_errors`, `repl`, QASM/Quirk, GPU, sweep-conditioned conversion, `m2d --ran_without_feedback`, full ErrorMatcher provenance, and new public graph/vector simulator APIs.
+Historical note: at the time this post-beta hardening report was written, the intentionally deferred Stim parity and ecosystem surfaces included Python, JS/WASM, diagrams, `explain_errors`, `repl`, QASM/Quirk, GPU, sweep-conditioned conversion, `m2d --ran_without_feedback`, full ErrorMatcher provenance, and new public graph/vector simulator APIs.
+Later M9 work added scoped `m2d --sweep`, `--sweep_format`, and `--ran_without_feedback` support, so current scope should be checked against `docs/stab-feature-checklist.md`, `docs/plans/m9-sweep-feedback-progress-report.md`, and `docs/plans/remaining-partial-feature-milestones.md`.
 
 ## Rows Fixed Or Reconciled
 
@@ -33,7 +34,7 @@ The intentionally deferred Stim parity and ecosystem surfaces remain Python, JS/
 - `CompiledDetectionConverter` exposes reusable reference-sample conversion with a per-record visitor.
 - `stab detect` streams sampled detection events through detection writers, including the existing frame-simulator path for supported Pauli-target observable circuits.
 - Implemented `stab m2d` input formats stream text records, `b8`, `r8`, and `ptb64` groups through the compiled converter without materializing all measurement or detection records.
-- Existing explicit rejections for sweep-conditioned circuits and `m2d --ran_without_feedback` are preserved.
+- At the time of this report, explicit rejections for sweep-conditioned circuits and `m2d --ran_without_feedback` were preserved; later M9 work replaced those rejections with the scoped support documented in the current checklist and M9 reports.
 - Existing materialized Rust APIs remain available and retain their in-memory limits.
 
 ## Commands Run
@@ -84,7 +85,7 @@ Final archival acceptance is proven by rerunning the final primary benchmark com
 
 The post-beta clean primary compare and timing-regression reports were regenerated at `target/benchmarks/post-beta-primary-compare/compare.json` and `target/benchmarks/post-beta-primary-regression/compare.json` from committed code with `local_modifications=false`.
 The active beta-125 completion evidence supersedes those paths for the stricter gate: `target/benchmarks/beta-125-primary-compare/compare.json`, `target/benchmarks/m12-primary-beta/compare.json`, `target/benchmarks/beta-125-primary-regression/compare.json`, and `target/benchmarks/m12-primary-memory-regression/compare.json` were regenerated from committed Stab commit `c9c96f80844dc2b4c952ec137d191ce369b2f233` with `local_modifications=false`.
-The active beta report passed 72 comparable rows and 4 checked no-ratio rows, the timing-regression report passed 72 configured threshold rows with 4 checked no-ratio waivers and zero ambiguous `not-configured` rows, and the memory-regression report passed all 76 primary rows.
+The beta report for that post-beta cycle passed 72 comparable rows and 4 no-ratio rows, the timing-regression report passed 72 configured threshold rows with 4 no-ratio waivers and zero ambiguous `not-configured` rows, and the memory-regression report passed all 76 primary rows.
 After the M7 convert benchmark expansion and the current M7/M10/M4 fixes, the final clean primary beta report at `target/benchmarks/m12-primary-beta/compare.json` was regenerated from Stab commit `c5ccd7967130e764d3319d699ed0a9fe680de81a` with `local_modifications=false`, measures 85 primary rows, passes beta with 80 comparable rows and 5 checked `waived-not-comparable` no-ratio rows, reports `m7-convert-b8-to-b8-wide` at `0.00337415937762406x`, reports `m4-circuit-parse` at `1.1185x`, reports `m8-sample-primary-unrotated-surface-contract` at `1.0918461483384692x`, and reports `m10-error-decomp` at `1.25x`.
 The final clean timing-regression report at `target/benchmarks/m10-error-decomp-primary-regression/compare.json` passes with 80 configured threshold rows and 5 checked `waived-not-thresholdable` rows, including `m7-convert-b8-to-b8-wide` at `0.002401335057205131x`.
 The final clean memory-regression report at `target/benchmarks/m12-primary-memory-regression/compare.json` passes all 85 rows using the schema-version-2 resident-delta memory baseline.
