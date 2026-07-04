@@ -740,37 +740,51 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
 
 #[test]
 fn pf5_detector_utility_benchmark_rows_have_stab_compare_runners() {
-    let row = BenchmarkRow {
-        id: "pf5-detecting-regions-repeat".to_string(),
-        milestone: Milestone::Pf5,
-        threshold_class: "non-primary-report-only".to_string(),
-        runner: Runner::ContractOnly,
-        upstream_source: "src/stim/util_top/circuit_to_detecting_regions.test.cc".to_string(),
-        stim_perf_filter: String::new(),
-        argv: String::new(),
-        stdin_path: String::new(),
-        phase: "analysis".to_string(),
-        measurement: "detecting-regions-repeat".to_string(),
-        description: "test row".to_string(),
-    };
-
-    let measurements = run_stab_compare_row(&row)
-        .expect("run compare row")
-        .expect("Stab runner");
-    let names = measurements
-        .iter()
-        .map(|measurement| measurement.name.as_str())
-        .collect::<Vec<_>>();
-
-    assert_eq!(names, ["stab_pf5_detecting_regions_repeat_ticks"]);
-    assert!(compare_note("pf5-detecting-regions-repeat").is_some());
-    assert!(
-        measurement_work(
+    for (id, upstream_source, measurement, expected_measurements) in [
+        (
             "pf5-detecting-regions-repeat",
-            "stab_pf5_detecting_regions_repeat_ticks"
-        )
-        .is_some()
-    );
+            "src/stim/util_top/circuit_to_detecting_regions.test.cc",
+            "detecting-regions-repeat",
+            &["stab_pf5_detecting_regions_repeat_ticks"][..],
+        ),
+        (
+            "pf5-missing-detectors-mpp",
+            "src/stim/util_top/missing_detectors.test.cc",
+            "missing-detectors-mpp",
+            &[
+                "stab_pf5_missing_detectors_mpp_cases",
+                "stab_pf5_missing_detectors_mpp_suggestions",
+            ][..],
+        ),
+    ] {
+        let row = BenchmarkRow {
+            id: id.to_string(),
+            milestone: Milestone::Pf5,
+            threshold_class: "non-primary-report-only".to_string(),
+            runner: Runner::ContractOnly,
+            upstream_source: upstream_source.to_string(),
+            stim_perf_filter: String::new(),
+            argv: String::new(),
+            stdin_path: String::new(),
+            phase: "analysis".to_string(),
+            measurement: measurement.to_string(),
+            description: "test row".to_string(),
+        };
+
+        let measurements = run_stab_compare_row(&row)
+            .expect("run compare row")
+            .expect("Stab runner");
+        let names = measurements
+            .iter()
+            .map(|measurement| measurement.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(names.as_slice(), expected_measurements);
+        assert!(compare_note(id).is_some());
+        for name in names {
+            assert!(measurement_work(id, name).is_some());
+        }
+    }
 }
 
 #[test]

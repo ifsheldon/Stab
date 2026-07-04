@@ -47,6 +47,8 @@ const UTILITY_BATCH: usize = 4096;
 const UTILITY_BATCH: usize = 2;
 const MISSING_DETECTOR_BASIC_CASES: usize = 10;
 const MISSING_DETECTOR_BASIC_SUGGESTIONS: usize = 4;
+const MISSING_DETECTOR_MPP_CASES: usize = 4;
+const MISSING_DETECTOR_MPP_SUGGESTIONS: usize = 3;
 const DETECTING_REGIONS_PER_CASE: usize = 2;
 const DETECTING_REGIONS_SIMPLE: &str = "H 0\n\
                                         TICK\n\
@@ -126,6 +128,7 @@ pub(super) fn run_detection_compare_row(
         "m9-missing-detectors-basic-batch" => run_missing_detectors_basic_batch(row).map(Some),
         "m9-feedback-inline-mpp-batch" => run_feedback_inline_mpp_batch(row).map(Some),
         "pf5-detecting-regions-repeat" => run_detecting_regions_repeat_row(row).map(Some),
+        "pf5-missing-detectors-mpp" => run_missing_detectors_mpp_batch(row).map(Some),
         "m9-detect-primary-matrix-contract" => run_primary_detect_row(row).map(Some),
         "m9-m2d-primary-matrix-contract" => run_primary_m2d_row(row).map(Some),
         "pf3-m2d-sweep-b8" => run_m2d_cli_row(
@@ -195,6 +198,14 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             (UTILITY_BATCH * MISSING_DETECTOR_BASIC_SUGGESTIONS) as f64,
             "suggestions/s",
         )),
+        ("pf5-missing-detectors-mpp", "stab_pf5_missing_detectors_mpp_cases") => Some((
+            (UTILITY_BATCH * MISSING_DETECTOR_MPP_CASES) as f64,
+            "cases/s",
+        )),
+        ("pf5-missing-detectors-mpp", "stab_pf5_missing_detectors_mpp_suggestions") => Some((
+            (UTILITY_BATCH * MISSING_DETECTOR_MPP_SUGGESTIONS) as f64,
+            "suggestions/s",
+        )),
         ("m9-feedback-inline-mpp-batch", "stab_feedback_inline_mpp_transforms") => {
             Some((UTILITY_BATCH as f64, "transforms/s"))
         }
@@ -249,6 +260,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m9-missing-detectors-basic-batch" => Some(
             "report-only: Stab measures the Rust basic missing-detectors utility subset without a faithful pinned Stim CLI timing ratio",
+        ),
+        "pf5-missing-detectors-mpp" => Some(
+            "report-only: Stab measures the Rust missing-detectors MPP and observable row-reduction subset without a faithful pinned Stim CLI timing ratio",
         ),
         "m9-feedback-inline-mpp-batch" => Some(
             "report-only: Stab measures the Rust MPP feedback-inlining utility subset without a faithful pinned Stim CLI timing ratio",
@@ -400,6 +414,89 @@ fn missing_detector_basic_corpus(row_id: &str) -> Result<Vec<(Circuit, bool)>, B
         ("M 0\nDETECTOR rec[-1] rec[-1]\n", false),
         ("MX 0\n", false),
         ("RX 0\nMY 0\n", false),
+    ]
+    .into_iter()
+    .map(|(text, ignore)| parse_circuit(row_id, text).map(|circuit| (circuit, ignore)))
+    .collect()
+}
+
+fn run_missing_detectors_mpp_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    Ok(vec![
+        measure_missing_detectors_mpp(row, "stab_pf5_missing_detectors_mpp_cases")?,
+        measure_missing_detectors_mpp(row, "stab_pf5_missing_detectors_mpp_suggestions")?,
+    ])
+}
+
+fn measure_missing_detectors_mpp(
+    row: &BenchmarkRow,
+    measurement_name: &'static str,
+) -> Result<Measurement, BenchError> {
+    let cases = missing_detector_mpp_corpus(&row.id)?;
+    measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
+        let mut suggestions = 0usize;
+        for _ in 0..UTILITY_BATCH {
+            for (circuit, ignore_non_deterministic_measurements) in &cases {
+                let output = missing_detectors(
+                    circuit,
+                    MissingDetectorOptions {
+                        ignore_non_deterministic_measurements:
+                            *ignore_non_deterministic_measurements,
+                    },
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+                suggestions = suggestions
+                    .checked_add(output.items().len())
+                    .ok_or_else(|| BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: "missing-detectors MPP benchmark suggestion count overflowed"
+                            .to_string(),
+                    })?;
+            }
+        }
+        black_box(suggestions);
+        Ok(())
+    })
+}
+
+fn missing_detector_mpp_corpus(row_id: &str) -> Result<Vec<(Circuit, bool)>, BenchError> {
+    [
+        (
+            "MPP Z0*Z1 X0*X1\n\
+             TICK\n\
+             MPP Z0*Z1 X0*X1\n\
+             DETECTOR rec[-1] rec[-3]\n\
+             DETECTOR rec[-2] rec[-4]\n",
+            false,
+        ),
+        (
+            "MPP Z0*Z1 X0*X1\n\
+             TICK\n\
+             MPP Z0*Z1 X0*X1\n\
+             DETECTOR rec[-1] rec[-3]\n\
+             DETECTOR rec[-2] rec[-4]\n\
+             DETECTOR rec[-1] rec[-3] rec[-2] rec[-4]\n",
+            false,
+        ),
+        (
+            "MPP Z0*Z1 X0*X1\n\
+             TICK\n\
+             MPP Z0*Z1 X0*X1\n\
+             OBSERVABLE_INCLUDE(0) rec[-1]\n\
+             DETECTOR rec[-2] rec[-4]\n\
+             OBSERVABLE_INCLUDE(0) rec[-3]\n",
+            true,
+        ),
+        (
+            "OBSERVABLE_INCLUDE(0) Z0 Z1\n\
+             MPP Z0*Z1 X0*X1\n\
+             TICK\n\
+             MPP Z0*Z1 X0*X1\n\
+             OBSERVABLE_INCLUDE(0) Z0 Z1\n\
+             OBSERVABLE_INCLUDE(0) rec[-1]\n\
+             DETECTOR rec[-2] rec[-4]\n\
+             OBSERVABLE_INCLUDE(0) rec[-3]\n",
+            true,
+        ),
     ]
     .into_iter()
     .map(|(text, ignore)| parse_circuit(row_id, text).map(|circuit| (circuit, ignore)))
