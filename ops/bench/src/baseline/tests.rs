@@ -800,6 +800,11 @@ fn pf7_cli_benchmark_rows_have_stab_compare_runners() {
             "stab_pf7_cli_m2d_feedback_inline",
             "cli-m2d-feedback-inline",
         ),
+        (
+            "pf7-cli-analyze-errors-decompose",
+            "stab_pf7_cli_analyze_errors_decompose",
+            "cli-analyze-errors",
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),

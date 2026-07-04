@@ -1,4 +1,6 @@
+use std::ffi::OsString;
 use std::hint::black_box;
+use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
 use stab_core::{
@@ -48,6 +50,7 @@ pub(super) fn run_dem_compare_row(
         "m10-analyze-errors-fold-cli" => run_analyze_fold_row(row).map(Some),
         "m10-analyze-errors-high-repeat-contract" => run_analyze_fold_row(row).map(Some),
         "pf3-analyze-errors-sweep" => run_analyze_sweep_row(row).map(Some),
+        "pf7-cli-analyze-errors-decompose" => run_analyze_decompose_cli_row(row).map(Some),
         _ => Ok(None),
     }
 }
@@ -65,6 +68,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             Some((1000.0, "folded-rounds/s"))
         }
         ("m10-analyze-errors-decompose-cli", "stab_analyze_errors_decompose_basic") => {
+            Some((1.0, "circuits/s"))
+        }
+        ("pf7-cli-analyze-errors-decompose", "stab_pf7_cli_analyze_errors_decompose") => {
             Some((1.0, "circuits/s"))
         }
         ("pf3-analyze-errors-sweep", "stab_analyze_errors_sweep_control") => {
@@ -102,6 +108,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m10-analyze-errors-decompose-cli" => Some(
             "contract-representative: Stab measures in-process analyze_errors --decompose_errors on the pinned basic CLI fixture; deeper decomposition stress remains covered by the m10-error-decomp contract",
+        ),
+        "pf7-cli-analyze-errors-decompose" => Some(
+            "report-only: Stab measures the public CLI analyze_errors --decompose_errors path for PF7 visible CLI parity using the source-owned M10 basic fixture",
         ),
         "pf3-analyze-errors-sweep" => Some(
             "report-only: Stab measures in-process analyzer handling for sweep-controlled Clifford gates that are semantically ignored by the error analyzer",
@@ -188,6 +197,39 @@ fn run_analyze_decompose_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Ben
     )?])
 }
 
+fn run_analyze_decompose_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let args = vec![
+        OsString::from("stab"),
+        OsString::from("analyze_errors"),
+        OsString::from("--decompose_errors"),
+    ];
+    Ok(vec![measure_stab_iterations(
+        "stab_pf7_cli_analyze_errors_decompose",
+        STAB_COMPARE_ITERATIONS,
+        || {
+            let mut stdout = CountingWriter::default();
+            let mut stderr = Vec::new();
+            let status = stab_cli::run_from(
+                args.clone(),
+                ANALYZE_BASIC_FIXTURE.as_bytes(),
+                &mut stdout,
+                &mut stderr,
+            );
+            if status != 0 {
+                return Err(BenchError::StabRunner {
+                    row_id: row.id.clone(),
+                    message: format!(
+                        "stab-cli analyze_errors failed with status {status}: {}",
+                        String::from_utf8_lossy(&stderr)
+                    ),
+                });
+            }
+            black_box(stdout.len());
+            Ok(())
+        },
+    )?])
+}
+
 fn run_analyze_sweep_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let circuit = Circuit::from_stim_str(ANALYZE_SWEEP_CONTROL_FIXTURE)
         .map_err(|error| stab_runner_error(&row.id, error))?;
@@ -201,6 +243,30 @@ fn run_analyze_sweep_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchEr
             Ok(())
         },
     )?])
+}
+
+#[derive(Default)]
+struct CountingWriter {
+    bytes: usize,
+}
+
+impl CountingWriter {
+    fn len(&self) -> usize {
+        self.bytes
+    }
+}
+
+impl Write for CountingWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.bytes = self.bytes.checked_add(buf.len()).ok_or_else(|| {
+            io::Error::other("analyze_errors benchmark output byte count overflowed")
+        })?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 fn run_error_analyzer_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
