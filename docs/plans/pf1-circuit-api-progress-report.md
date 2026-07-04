@@ -39,7 +39,11 @@ The true streaming parser boundary is logged in `docs/plans/milestone-spec-gaps.
 
 ## Oracle Rows
 
-Implemented row:
+Selected closure row:
+
+- `pf1-circuit-rust-api`
+
+Implemented supporting rows:
 
 - `pf1-circuit-stats-coordinates`
 - `pf1-circuit-append-text`
@@ -51,9 +55,7 @@ Implemented row:
 - `pf1-circuit-reference-determined`
 - `pf1-circuit-detector-coordinates`
 
-Still broad and manifest-only:
-
-- `pf1-circuit-rust-api`
+The selected closure row runs the `cargo test -p stab-core --test circuit_api pf1_circuit_` parent filter and is intentionally scoped to the current Rust API surface. It does not claim Python binding ergonomics, file-like objects, unbounded `.stim` file reads, transform APIs, or exact C++ folded-infinity side effects.
 
 ## Benchmark Rows
 
@@ -61,12 +63,12 @@ Non-primary report-only row:
 
 - `pf1-circuit-coordinate-query`
 
-Probe reports:
+Recorded probe reports from the original PF1 circuit API slice:
 
 - `target/benchmarks/pf1-circuit-api-probe/baseline.json`
 - `target/benchmarks/pf1-circuit-api-compare/compare.json`
 
-Fresh probe rates from the current worktree:
+Recorded probe rates from the original PF1 circuit API slice:
 
 - `stab_circuit_counts_nested_repeat`: `7.634e6 queries/s`.
 - `stab_circuit_final_coordinate_shift_nested_repeat`: `2.564e7 queries/s`.
@@ -84,6 +86,7 @@ Passed during implementation:
 
 ```sh
 cargo test -p stab-core --test circuit_api --quiet
+cargo test -p stab-core --test circuit_api pf1_circuit_ --quiet
 cargo test -p stab-core --test circuit_api pf1_circuit_file_helpers_ --quiet
 cargo test -p stab-core --test circuit_api pf1_circuit_iterators_ --quiet
 cargo test -p stab-core --test circuit_api pf1_circuit_reference_determined_ --quiet
@@ -99,3 +102,8 @@ just bench::compare --only pf1-circuit-coordinate-query --baseline target/benchm
 ## Remaining PF1 Circuit API Work
 
 No active PF1 circuit API subcase remains. Circuit transforms are tracked under PF2, while Python operators, Python bit-packed reference-sample return shapes, Python binding-style indexing, file-like objects, unbounded `.stim` file reads, and exact C++ infinity side-effect parity remain intentionally outside this PF1 Rust API claim.
+
+## PFM0 Refresh
+
+The PFM0 refresh promoted `pf1-circuit-rust-api` from a manifest-only extraction row to executable structural evidence and synchronized the checklist rows for programmatic mutation, core introspection, circuit coordinate queries, and reference samples or determined measurements to `Done for current Rust API surface`.
+It also reclassified public `TableauSimulator` and `FlipSimulator` product rows as deferred because public simulator products are explicitly excluded from the active non-deferred partial-feature goal.

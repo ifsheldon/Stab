@@ -1,6 +1,7 @@
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement, Milestone,
-    RunFilter, RunMode, compare_fixture, is_recordable,
+    RunFilter, RunMode, cargo_test_executed_test_count, check_direct_rust_fixture_executed_tests,
+    compare_fixture, is_recordable,
     outputs::{self, FixtureArgToken},
     run_core_fixture, run_direct_rust_fixture, statistical, validate_fixture_path,
 };
@@ -187,6 +188,40 @@ fn m4_direct_rust_rows_run_cargo_tests() {
 
         assert_eq!(output.status, Some(0), "{id}");
     }
+}
+
+#[test]
+fn direct_rust_fixture_counts_cargo_test_output_across_streams() {
+    let output = process_output(
+        Some(0),
+        b"running 0 tests\n\nrunning 2 tests\n",
+        b"running 1 test\n",
+    );
+
+    assert_eq!(cargo_test_executed_test_count(&output), 3);
+}
+
+#[test]
+fn direct_rust_fixture_rejects_zero_test_cargo_output() {
+    let csv = format!(
+        "{HEADER}bad,M4,src/stim/circuit/gate_target.test.cc,structural,structural,cargo test,cargo-test|-p|stab-core|definitely_no_matching_tests,,,0,any,implemented,Run direct Rust gate target parity tests,hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let row = manifest.rows.first().expect("manifest row");
+    let output = process_output(
+        Some(0),
+        b"running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out\n",
+        b"",
+    );
+
+    let error =
+        check_direct_rust_fixture_executed_tests(row, &output).expect_err("reject zero tests");
+    assert!(
+        error
+            .to_string()
+            .contains("direct Rust fixture matched zero cargo tests"),
+        "{error}"
+    );
 }
 
 #[test]

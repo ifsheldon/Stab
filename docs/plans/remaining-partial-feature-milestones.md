@@ -85,12 +85,12 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | DEM flattening and large repeat traversal | Active | RPF4 and RPF6 | Add public transform APIs and folded traversal for selected consumers, or documented caps with tests. |
 | Gate validation flags and categories | Active | RPF1 and RPF5 | Finish gate decomposition metadata, the resolved measurement-rich and variable-target flow metadata contract, and unsupported accessor errors. |
 | Gate semantic execution | Active | RPF3 and RPF6 | Fill accepted legal-gate execution gaps in sampler, detection, converter, and analyzer paths, or reject unsupported shapes precisely. |
-| Programmatic mutation | Classification | RPF0 | Current Rust helper subset is implemented; remaining Python operator ergonomics stay deferred unless RPF0 extracts a concrete Rust API gap. |
-| Core introspection | Classification | RPF0 | Current Rust iterator/count subset is implemented; remaining Python-style indexing and property parity stay deferred unless RPF0 extracts a concrete Rust API gap. |
-| Circuit coordinate queries | Classification | RPF0 | Current Rust coordinate subset is implemented; exact Python API shape and exact C++ infinity behavior stay deferred or logged. |
+| Programmatic mutation | Implemented for current Rust API surface | RPF0/PF1 | `pf1-circuit-rust-api` now provides executable closure evidence; remaining Python operator ergonomics stay deferred. |
+| Core introspection | Implemented for current Rust API surface | RPF0/PF1 | `pf1-circuit-rust-api` now provides executable closure evidence; remaining Python-style indexing and property parity stay deferred. |
+| Circuit coordinate queries | Implemented for current Rust API surface | RPF0/PF1 | `pf1-circuit-rust-api` now provides executable closure evidence; exact Python API shape and exact C++ infinity behavior stay deferred or logged. |
 | Repeat handling | Active | RPF2, RPF4, RPF6 | Complete folded traversal or caps across transforms, DEM consumers, analyzer, and search. |
 | Circuit transforms | Active | RPF2 and RPF5 | Finish `flattened`, `decomposed`, `without_noise`, feedback inlining, time reversal for flows, and measurement-rich flow transforms. |
-| Reference samples and determined measurements | Classification | RPF0 | Current Rust subset is implemented; remaining Python bit-packed return shapes and Python API parity stay deferred unless RPF0 extracts a concrete Rust API gap. |
+| Reference samples and determined measurements | Implemented for current Rust API surface | RPF0/PF1 | `pf1-circuit-rust-api` now provides executable closure evidence; remaining Python bit-packed return shapes and Python API parity stay deferred. |
 | DEM construction and mutation | Active | RPF4 | Finish useful Rust transform and mutation ergonomics such as materialized `flattened`, `rounded`, copy or concat helpers if selected. |
 | DEM introspection | Active | RPF4 | Finish folded large-repeat traversal and resource behavior across every public DEM query selected for Rust scope. |
 | DEM transforms | Active | RPF4 | Finish public `flattened`, `rounded`, and transform resource boundaries. |

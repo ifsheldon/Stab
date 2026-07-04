@@ -879,6 +879,7 @@ fn run_direct_rust_fixture(
             }
         })?;
     check_expected_process_shape(row, &output)?;
+    check_direct_rust_fixture_executed_tests(row, &output)?;
     match row.comparator {
         FixtureComparator::Property
         | FixtureComparator::Statistical
@@ -891,6 +892,36 @@ fn run_direct_rust_fixture(
             })
         }
     }
+}
+
+fn check_direct_rust_fixture_executed_tests(
+    row: &FixtureRow,
+    output: &crate::ProcessOutput,
+) -> Result<(), FixtureError> {
+    if output.status == Some(0) && cargo_test_executed_test_count(output) == 0 {
+        return Err(FixtureError::CoreFixtureFailed {
+            id: row.id.clone(),
+            reason: "direct Rust fixture matched zero cargo tests; check the cargo-test filter"
+                .to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn cargo_test_executed_test_count(output: &crate::ProcessOutput) -> usize {
+    count_cargo_test_lines(&output.stdout.bytes) + count_cargo_test_lines(&output.stderr.bytes)
+}
+
+fn count_cargo_test_lines(bytes: &[u8]) -> usize {
+    String::from_utf8_lossy(bytes)
+        .lines()
+        .filter_map(|line| {
+            line.trim()
+                .strip_prefix("running ")
+                .and_then(|rest| rest.split_whitespace().next())
+                .and_then(|count| count.parse::<usize>().ok())
+        })
+        .sum()
 }
 
 fn run_core_fixture(

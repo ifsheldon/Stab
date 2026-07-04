@@ -15,7 +15,7 @@ use std::{
 
 use stab_core::{
     Circuit, CircuitDetectorId, CircuitError, CircuitInstruction, CircuitItem, CompiledSampler,
-    QubitId, RepeatBlock,
+    QubitId, RepeatBlock, detection_record_width, measurement_record_count,
 };
 
 const OVERSIZED_CIRCUIT_FILE_BYTES: u64 = 64 * 1024 * 1024 + 1;
@@ -97,6 +97,30 @@ fn pf1_circuit_stats_counts_match_owned_upstream_semantics() {
     assert_eq!(circuit.count_observables().expect("observables"), 3);
     assert_eq!(circuit.count_ticks().expect("ticks"), 100);
     assert_eq!(circuit.count_sweep_bits().expect("sweep bits"), 78);
+}
+
+#[test]
+fn pf1_circuit_stats_detection_width_helpers_match_owned_upstream_semantics() {
+    let circuit = Circuit::from_stim_str(
+        "H 5\n\
+         M 0 1\n\
+         DETECTOR rec[-1]\n\
+         OBSERVABLE_INCLUDE(3) rec[-2]\n",
+    )
+    .expect("parse circuit");
+
+    assert_eq!(circuit.count_qubits(), 6);
+    assert_eq!(circuit.count_measurements().expect("measurements"), 2);
+    assert_eq!(circuit.count_detectors().expect("detectors"), 1);
+    assert_eq!(circuit.count_observables().expect("observables"), 4);
+    assert_eq!(
+        measurement_record_count(&circuit).expect("measurement record count"),
+        2
+    );
+    assert_eq!(
+        detection_record_width(&circuit).expect("detection record width"),
+        5
+    );
 }
 
 #[test]
