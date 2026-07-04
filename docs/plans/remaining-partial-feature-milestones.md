@@ -106,7 +106,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | Sparse reverse detector-frame tracking | Active | RPF6 | Finish optimized loop folding, all-unitary fuzz coverage, and analyzer/search integration where needed. |
 | Flows | Active | RPF1 and RPF5 | Finish measurement-rich flows, variable-target flow metadata decisions, and transform integration. |
 | `stim m2d` | Active | RPF7 | Finish CLI parity for supported formats, sweep, feedback, side outputs, resource behavior, and path errors. |
-| `stim analyze_errors` | Active | RPF7 | Finish visible analyzer CLI parity for supported flags and outputs. |
+| `stim analyze_errors` | Implemented for selected PF7 CLI surface | RPF7 | The selected CLI closure is implemented by `pf7-analyze-errors-cli-parity`; only newly selected CLI cases should reopen this row. Broader analyzer semantics remain active under core analyzer rows. |
 | Legacy top-level command flags | Active | RPF7 | Finish accepted aliases and conflicts; keep `--detector_hypergraph` excluded. |
 | Highest-priority remaining feature gaps | Rollup | RPF8 | Complete only after the named child milestones reach their acceptance criteria. |
 
@@ -444,7 +444,7 @@ Owned checklist rows:
 Implementation tasks:
 
 - Finish `stab m2d` parity for selected `--sweep`, `--sweep_format`, `--ran_without_feedback`, `--skip_reference_sample`, `--append_observables`, `--obs_out`, `--obs_out_format`, input formats, output formats, path errors, writer errors, and resource boundaries.
-- Finish `stab analyze_errors` parity for selected flags, decomposition behavior, gauge behavior, approximate disjoint errors, fold-loop behavior, input and output paths, stdout behavior, stderr class, and exit status.
+- Finish `stab analyze_errors` parity for selected flags, decomposition behavior, gauge behavior, approximate disjoint errors, fold-loop behavior, input and output paths, stdout behavior, stderr class, and exit status. The selected `analyze_errors` CLI closure is now implemented by `pf7-analyze-errors-cli-parity`; only newly selected flags, malformed inputs, or analyzer failure modes should reopen this slice.
 - Finish accepted legacy alias behavior for `--gen`, `--convert`, `--sample`, `--detect`, `--m2d`, and `--analyze_errors`. The selected legacy-dispatch closure is now implemented by `pf7-legacy-dispatch-parity`; only newly selected legacy spellings or failure modes should reopen this slice.
 - Add conflict tests for multiple legacy modes. The selected `--convert`, `--sample`, `--detect`, `--m2d`, `--analyze_errors`, and `--gen=...` conflict subset is implemented with tests and oracle metadata in `pf7-legacy-dispatch-conflicts-rust`.
 - Keep deprecated `--detector_hypergraph` rejected or absent, and document that users should use `stab analyze_errors`. The explicit mode and help-topic exclusion subset is implemented with tests and oracle metadata in `pf7-detector-hypergraph-excluded-rust`, and the selected unimplemented legacy-style `--diagram`, `--explain_errors`, `--repl`, and `--sample_dem` flags fail closed in `pf7-legacy-unselected-modes-rust`.
@@ -460,7 +460,7 @@ Tests:
 
 Oracle rows:
 
-- Supplement `pf7-m2d-cli-parity` and `pf7-analyze-errors-cli-parity`. The selected legacy-dispatch closure is implemented by `pf7-legacy-dispatch-parity`, with supporting evidence from `pf7-legacy-dispatch-accepted-rust`, `pf7-legacy-dispatch-conflicts-rust`, `pf7-detector-hypergraph-excluded-rust`, and `pf7-legacy-unselected-modes-rust`.
+- Supplement `pf7-m2d-cli-parity`. The selected `analyze_errors` CLI closure is implemented by `pf7-analyze-errors-cli-parity`, and the selected legacy-dispatch closure is implemented by `pf7-legacy-dispatch-parity`, with supporting evidence from `pf7-analyze-errors-path-io-rust`, `pf7-analyze-errors-flags-rust`, `pf7-legacy-dispatch-accepted-rust`, `pf7-legacy-dispatch-conflicts-rust`, `pf7-detector-hypergraph-excluded-rust`, and `pf7-legacy-unselected-modes-rust`.
 - Exact-output rows must run against pinned Stim v1.16.0 when the command shape is shared.
 - Stab-only explicit rejections must still have Stab CLI tests or oracle rows.
 

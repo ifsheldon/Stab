@@ -39,6 +39,13 @@ The owned negative subcases cover missing `--approximate_disjoint_errors`, low a
 The comparator class is structural CLI behavior against the selected Stim `analyze_errors` command contract: accepted flags, rejected flag values, malformed input behavior, stdout behavior, stderr class, and exit status.
 No benchmark row changes are needed because this slice tests command contract behavior around existing analyzer hot paths; the existing PF7 analyze-errors benchmark rows remain report-only performance coverage.
 
+## Implemented Slice: Selected `analyze_errors` CLI Closure
+
+This PFM7 slice promotes the broad `pf7-analyze-errors-cli-parity` row from manifest-only to executable structural evidence for the selected Stab `analyze_errors` CLI surface.
+The row is intentionally scoped to accepted flags, decomposition controls, gauge behavior, approximate disjoint behavior, fold-loop behavior, path IO, malformed input behavior, stdout behavior, stderr class, and exit status that are already owned by the PF7 path-IO and flag slices plus the existing M10 analyzer CLI golden coverage.
+It does not close broader generated-loop analyzer behavior, search behavior, full ErrorMatcher provenance, `stim explain_errors`, or deprecated `--detector_hypergraph` support.
+No benchmark row changes are needed because the existing PF7 analyzer benchmark rows remain report-only coverage for public CLI analyzer hot paths.
+
 ## Implemented Slice: Accepted Legacy Alias Dispatch Evidence
 
 This PFM7 slice promotes source-owned CLI evidence that the selected legacy top-level aliases dispatch to the same implementation as their canonical subcommands.
@@ -69,6 +76,7 @@ Oracle rows:
 
 - `pf7-m2d-path-io-rust` proves `stab m2d --circuit`, `--in`, `--out`, `--sweep`, and `--obs_out` path success, path-error precedence before converter setup, stdout behavior, stderr class, and exit status.
 - `pf7-m2d-command-contract-rust` proves selected `stab m2d` command behavior for append-observables, skip-reference, observable side outputs, Pauli-target observable annotations, format and width failures, writer failure propagation, stdout behavior, stderr class, and exit status.
+- `pf7-analyze-errors-cli-parity` now runs the selected PF7 `analyze_errors` CLI closure over path IO, accepted flags, malformed inputs, selected analyzer failures, stdout behavior, stderr class, and exit status.
 - `pf7-analyze-errors-path-io-rust` proves `stab analyze_errors --in` and `--out` success, missing input path rejection, output-open precedence, stdout behavior, stderr class, and exit status.
 - `pf7-analyze-errors-flags-rust` proves selected `stab analyze_errors` flag shapes, flag-value failures, malformed stdin behavior, stdout behavior, stderr class, and exit status.
 - `pf7-legacy-dispatch-parity` now runs the selected PF7 legacy-dispatch closure over the accepted-alias, conflict, deprecated-exclusion, and unselected-mode evidence.
@@ -109,6 +117,19 @@ cargo test -p stab-oracle fixtures --quiet
 just oracle::run --milestone PF7 --structural
 ```
 
+Verification for the selected `analyze_errors` CLI closure:
+
+```sh
+cargo test -p stab-cli analyze_errors --quiet
+cargo test -p stab-oracle fixtures --quiet
+just oracle::run --milestone PF7 --structural
+```
+
+Audit and review for the selected `analyze_errors` CLI closure:
+
+- `milestone-audit` found no implementation, evidence, or blocking spec-loophole findings for this selected closure.
+- `full-code-review` found one P3 historical-plan matrix issue in `docs/plans/remaining-partial-feature-milestones.md`; the stale `stim analyze_errors` RPF7 row now points to the implemented selected CLI closure and keeps broader analyzer semantics under core analyzer rows.
+
 Verification for the accepted-alias slice:
 
 ```sh
@@ -132,4 +153,4 @@ Audit and review for the selected legacy-dispatch closure:
 
 ## Still Open In RPF7
 
-- The broad `pf7-m2d-cli-parity` and `pf7-analyze-errors-cli-parity` oracle rows remain manifest-only until their selected CLI subcases are exhausted.
+- The broad `pf7-m2d-cli-parity` oracle row remains manifest-only until its selected CLI subcases are exhausted.
