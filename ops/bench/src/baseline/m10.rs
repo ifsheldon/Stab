@@ -24,6 +24,10 @@ const ANALYZE_BASIC_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/analyze_errors_basic.stim");
 const ANALYZE_FOLD_REPEAT_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/analyze_errors_fold_repeat.stim");
+const ANALYZE_SWEEP_CONTROL_FIXTURE: &str = "X_ERROR(0.25) 0\n\
+                                            CX sweep[0] 0\n\
+                                            M 0\n\
+                                            DETECTOR rec[-1]\n";
 const ERROR_ANALYZER_COMPARE_ITERATIONS: usize = 16;
 const ERROR_ANALYZER_ROUNDS: u32 = 3;
 const ERROR_ANALYZER_DISTANCE: u32 = 3;
@@ -43,6 +47,7 @@ pub(super) fn run_dem_compare_row(
         "m10-analyze-errors-decompose-cli" => run_analyze_decompose_row(row).map(Some),
         "m10-analyze-errors-fold-cli" => run_analyze_fold_row(row).map(Some),
         "m10-analyze-errors-high-repeat-contract" => run_analyze_fold_row(row).map(Some),
+        "pf3-analyze-errors-sweep" => run_analyze_sweep_row(row).map(Some),
         _ => Ok(None),
     }
 }
@@ -60,6 +65,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             Some((1000.0, "folded-rounds/s"))
         }
         ("m10-analyze-errors-decompose-cli", "stab_analyze_errors_decompose_basic") => {
+            Some((1.0, "circuits/s"))
+        }
+        ("pf3-analyze-errors-sweep", "stab_analyze_errors_sweep_control") => {
             Some((1.0, "circuits/s"))
         }
         ("m10-error-analyzer", "stab_error_analyzer_surface_code") => {
@@ -94,6 +102,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m10-analyze-errors-decompose-cli" => Some(
             "contract-representative: Stab measures in-process analyze_errors --decompose_errors on the pinned basic CLI fixture; deeper decomposition stress remains covered by the m10-error-decomp contract",
+        ),
+        "pf3-analyze-errors-sweep" => Some(
+            "report-only: Stab measures in-process analyzer handling for sweep-controlled Clifford gates that are semantically ignored by the error analyzer",
         ),
         "m10-error-analyzer" => Some(
             "contract-representative: Stab measures in-process generated rotated-memory-z surface-code analysis at d3/r3; the upstream Stim perf row uses d11/r100 and remains the eventual scale target",
@@ -171,6 +182,21 @@ fn run_analyze_decompose_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Ben
                 },
             )
             .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(dem.items().len());
+            Ok(())
+        },
+    )?])
+}
+
+fn run_analyze_sweep_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = Circuit::from_stim_str(ANALYZE_SWEEP_CONTROL_FIXTURE)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(vec![measure_stab_iterations(
+        "stab_analyze_errors_sweep_control",
+        STAB_COMPARE_ITERATIONS,
+        || {
+            let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+                .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(dem.items().len());
             Ok(())
         },

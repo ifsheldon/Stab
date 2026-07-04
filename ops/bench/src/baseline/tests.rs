@@ -747,6 +747,11 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
             "stab_detect_sweep_default_false",
             "detect-sweep",
         ),
+        (
+            "pf3-analyze-errors-sweep",
+            "stab_analyze_errors_sweep_control",
+            "analyze-errors-sweep",
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),

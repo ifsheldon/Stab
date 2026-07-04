@@ -17,6 +17,7 @@ Oracle rows:
 
 - `pf3-detect-default-false-sweep-core` runs `cargo test -p stab-core detection_sampling_uses_all_false_default_sweep_bits`.
 - `pf3-detect-default-false-sweep-cli` runs `cargo test -p stab-cli detect_accepts_default_false_sweep_conditioned_sampling`.
+- `pf3-analyze-errors-sweep-core` runs `cargo test -p stab-core dem_analyzer_ignores_sweep_controls`.
 
 Direct tests:
 
@@ -24,16 +25,18 @@ Direct tests:
 - `detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfaces` now also validates that frame-path sweep-conditioned Pauli-observable detection sampling remains rejected.
 - `detect_accepts_default_false_sweep_conditioned_sampling` proves the public CLI accepts omitted all-false sweep sampling for a non-frame circuit.
 - `detect_still_rejects_frame_path_sweep_conditioned_sampling` proves the public CLI keeps the frame-path rejection.
+- `dem_analyzer_ignores_sweep_controls` ports the pinned Stim v1.16.0 `ErrorAnalyzer, ignores_sweep_controls` case and proves sweep-controlled Clifford gates do not create detector-error mechanisms.
 
 Benchmark row:
 
 - `pf3-m2d-sweep-b8` now has a non-primary report-only public CLI runner named `stab_pf3_m2d_sweep_b8`, normalized as shots per second, using the source-owned M9 packed sweep fixture.
 - `pf3-detect-sweep-sampling` now has a non-primary report-only Rust runner named `stab_detect_sweep_default_false`, normalized as shots per second.
-- Local probe command `just bench::compare --only pf3-m2d-sweep-b8 --only pf3-detect-sweep-sampling --baseline target/benchmarks/pf3-sweep-probe-baseline/baseline.json --report target/benchmarks/pf3-sweep-probe-compare` measured `stab_pf3_m2d_sweep_b8=0.000030576s`, or approximately `1.635e5 shots/s`, and `stab_detect_sweep_default_false=0.000040672s`, or approximately `2.518e7 shots/s`, as report-only evidence on the local machine.
+- `pf3-analyze-errors-sweep` now has a non-primary report-only Rust runner named `stab_analyze_errors_sweep_control`, normalized as circuits per second.
+- Local probe command `just bench::compare --only pf3-m2d-sweep-b8 --only pf3-detect-sweep-sampling --only pf3-analyze-errors-sweep --baseline target/benchmarks/pf3-sweep-analyzer-probe-baseline/baseline.json --report target/benchmarks/pf3-sweep-analyzer-probe-compare` measured `stab_pf3_m2d_sweep_b8=0.000062208s`, or approximately `8.038e4 shots/s`, `stab_detect_sweep_default_false=0.000095184s`, or approximately `1.076e7 shots/s`, and `stab_analyze_errors_sweep_control=0.000001184s`, or approximately `8.446e5 circuits/s`, as report-only evidence on the local machine.
 
 ## Still Open In RPF3
 
 - `pf3-m2d-sweep-ptb64-input` still needs a source-owned sweep-conditioned `ptb64` fixture and benchmark runner extraction if the transposed sweep path is promoted.
-- `pf3-analyze-errors-sweep` remains open for analyzer sweep behavior.
+- Broader `pf3-analyze-errors-sweep` coverage remains open for analyzer sweep behavior beyond the pinned sweep-control no-op case.
 - `pf3-gate-semantic-wide` remains open for systematic legal-gate execution classification across sampler, converter, detection, and analyzer paths.
 - Frame-path sweep-conditioned detector sampling remains unsupported until the frame executor owns typed sweep semantics.
