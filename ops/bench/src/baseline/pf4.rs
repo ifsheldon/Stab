@@ -1,8 +1,9 @@
 use std::hint::black_box;
 
 use stab_core::{
-    CompiledDemSampler, DemDetectorId, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
-    find_undetectable_logical_error, shortest_error_sat_problem,
+    Circuit, CompiledDemSampler, DemDetectorId, DemInstructionKind, DemItem, DemTarget,
+    DetectorErrorModel, ErrorAnalyzerOptions, circuit_to_detector_error_model,
+    explain_errors_from_circuit, find_undetectable_logical_error, shortest_error_sat_problem,
     shortest_graphlike_undetectable_logical_error,
 };
 
@@ -44,12 +45,22 @@ const SEARCH_REPEAT_COUNT: u64 = 2;
 const SAT_REPEAT_COUNT: u64 = 512;
 #[cfg(test)]
 const SAT_REPEAT_COUNT: u64 = 2;
+#[cfg(not(test))]
+const ANALYZER_REPEAT_COUNT: u64 = 1024;
+#[cfg(test)]
+const ANALYZER_REPEAT_COUNT: u64 = 2;
+#[cfg(not(test))]
+const MATCHER_REPEAT_COUNT: u64 = 2048;
+#[cfg(test)]
+const MATCHER_REPEAT_COUNT: u64 = 2;
 
 const FLATTEN_FIXED_INSTRUCTIONS: u64 = 2;
 const FLATTEN_SOURCE_INSTRUCTIONS_PER_REPETITION: u64 = 4;
 const ROUNDED_REPEAT_ERROR_COUNT: usize = 2;
 const SELECTED_COORDINATE_DETECTORS: usize = 2;
 const SEARCH_FIXED_ERRORS: u64 = 2;
+const ANALYZER_INSTRUCTIONS_PER_REPETITION: u64 = 3;
+const MATCHER_INSTRUCTIONS_PER_REPETITION: u64 = 1;
 
 pub(super) fn run_dem_transform_compare_row(
     row: &BenchmarkRow,
@@ -95,6 +106,14 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             search_expanded_errors(SAT_REPEAT_COUNT) as f64,
             "expanded-errors/s",
         )),
+        ("pf4-dem-folded-traversal", "stab_pf4_dem_analyzer_capped_repeat") => Some((
+            analyzer_expanded_instructions() as f64,
+            "expanded-instructions/s",
+        )),
+        ("pf4-dem-folded-traversal", "stab_pf4_error_matcher_capped_repeat") => Some((
+            matcher_expanded_instructions() as f64,
+            "expanded-instructions/s",
+        )),
         ("pf4-dem-folded-graphlike-traversal", "stab_pf4_dem_graphlike_capped_repeat") => Some((
             search_expanded_errors(SEARCH_REPEAT_COUNT) as f64,
             "expanded-errors/s",
@@ -118,7 +137,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures current capped-repeat CompiledDemSampler compile and sample behavior; true folded sampler traversal remains an explicit RPF4 follow-up",
         ),
         "pf4-dem-folded-traversal" => Some(
-            "contract-only: Stab measures current capped-repeat hypergraph search and SAT problem generation behavior; true folded traversal remains an explicit RPF4 follow-up",
+            "contract-only: Stab measures current capped-repeat hypergraph search, SAT problem generation, analyzer, and ErrorMatcher traversal behavior; true folded traversal remains an explicit RPF4 follow-up",
         ),
         "pf4-dem-folded-graphlike-traversal" => Some(
             "contract-only: Stab measures current capped-repeat graphlike search behavior; true folded graphlike traversal remains an explicit RPF4 follow-up",
@@ -236,6 +255,12 @@ fn run_dem_search_sat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
     let sat_fixture = search_repeat_fixture(SAT_REPEAT_COUNT);
     let sat_model = DetectorErrorModel::from_dem_str(&sat_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let analyzer_fixture = analyzer_repeat_fixture(ANALYZER_REPEAT_COUNT);
+    let analyzer_circuit = Circuit::from_stim_str(&analyzer_fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let matcher_fixture = matcher_repeat_fixture(MATCHER_REPEAT_COUNT);
+    let matcher_circuit = Circuit::from_stim_str(&matcher_fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
 
     Ok(vec![
         measure_stab_batched(
@@ -256,6 +281,29 @@ fn run_dem_search_sat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
                 let problem = shortest_error_sat_problem(&sat_model)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(problem.len());
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_analyzer_capped_repeat",
+            TRANSFORM_REPETITIONS,
+            || {
+                let model = circuit_to_detector_error_model(
+                    &analyzer_circuit,
+                    ErrorAnalyzerOptions::default(),
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(dem_model_checksum(&model));
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_error_matcher_capped_repeat",
+            TRANSFORM_REPETITIONS,
+            || {
+                let explained = explain_errors_from_circuit(&matcher_circuit, None, false)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(explained.len());
                 Ok(())
             },
         )?,
@@ -303,6 +351,32 @@ repeat {repeat_count} {{
     shift_detectors 1
 }}
 error(0.1) D0 L0
+"
+    )
+}
+
+fn analyzer_repeat_fixture(repeat_count: u64) -> String {
+    format!(
+        "\
+REPEAT {repeat_count} {{
+    X_ERROR(0.125) 0
+    M 0
+    DETECTOR rec[-1]
+}}
+"
+    )
+}
+
+fn matcher_repeat_fixture(repeat_count: u64) -> String {
+    format!(
+        "\
+R 0
+REPEAT {repeat_count} {{
+    TICK
+}}
+X_ERROR(0.125) 0
+M 0
+DETECTOR rec[-1]
 "
     )
 }
@@ -365,6 +439,14 @@ fn rounded_probability_args() -> usize {
 
 fn search_expanded_errors(repeat_count: u64) -> u64 {
     SEARCH_FIXED_ERRORS + repeat_count
+}
+
+fn analyzer_expanded_instructions() -> u64 {
+    ANALYZER_REPEAT_COUNT * ANALYZER_INSTRUCTIONS_PER_REPETITION
+}
+
+fn matcher_expanded_instructions() -> u64 {
+    MATCHER_REPEAT_COUNT * MATCHER_INSTRUCTIONS_PER_REPETITION
 }
 
 fn dem_model_checksum(model: &DetectorErrorModel) -> u64 {

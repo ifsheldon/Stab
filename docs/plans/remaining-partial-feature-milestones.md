@@ -311,7 +311,7 @@ Implementation tasks:
 - Implement public `rounded` for probability rounding with explicit numerical behavior. The current Rust `DetectorErrorModel::rounded` subset is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-transform-progress-report.md`.
 - Finish useful Rust copy, concat, repetition, or mutation helpers only if RPF0 extracts concrete non-Python Rust API gaps.
 - Finish folded traversal for coordinate maps and final shifts where current APIs still expand large repeats. The current all-detector coordinate-map cap plus selected-query fallback is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-coordinate-progress-report.md`.
-- Add folded or capped traversal behavior for graphlike, hypergraph, SAT, matcher-adjacent, sampler-adjacent, and analyzer-adjacent DEM consumers where owned by RPF4. The current capped graphlike, hypergraph, SAT, and DEM sampler repeat subsets are implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-search-sat-progress-report.md` and `docs/plans/rpf4-dem-sampler-progress-report.md`.
+- Add folded or capped traversal behavior for graphlike, hypergraph, SAT, matcher-adjacent, sampler-adjacent, and analyzer-adjacent DEM consumers where owned by RPF4. The current capped graphlike, hypergraph, SAT, analyzer, ErrorMatcher, and DEM sampler repeat subsets are implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-search-sat-progress-report.md` and `docs/plans/rpf4-dem-sampler-progress-report.md`.
 - Preserve decomposition separators and tags according to the transform contract.
 
 Tests:
@@ -324,7 +324,7 @@ Tests:
 
 Oracle rows:
 
-- Supplement `pf4-dem-introspection-transforms`, `pf4-dem-coordinate-api`, and `pf4-dem-folded-traversal`. The materialized transform subset is supplemented by `pf4-dem-materialized-transforms-rust`; the coordinate resource subset is supplemented by `pf4-dem-coordinate-resource-rust`; the search and SAT repeat-resource subset is supplemented by `pf4-dem-search-sat-repeat-resource-rust`; the sampler repeat-resource subset is supplemented by `pf4-dem-sampler-repeat-resource-rust`.
+- Supplement `pf4-dem-introspection-transforms`, `pf4-dem-coordinate-api`, and `pf4-dem-folded-traversal`. The materialized transform subset is supplemented by `pf4-dem-materialized-transforms-rust`; the coordinate resource subset is supplemented by `pf4-dem-coordinate-resource-rust`; the search and SAT repeat-resource subset is supplemented by `pf4-dem-search-sat-repeat-resource-rust`; the analyzer and matcher repeat-resource subset is supplemented by `pf4-dem-analyzer-matcher-repeat-resource-rust`; the sampler repeat-resource subset is supplemented by `pf4-dem-sampler-repeat-resource-rust`.
 - Exact rows should cover stable `.dem` text outputs.
 - Structural rows should cover resource behavior and large-repeat non-materialization.
 

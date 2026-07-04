@@ -929,6 +929,8 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             &[
                 "stab_pf4_dem_hyper_capped_repeat",
                 "stab_pf4_dem_sat_capped_repeat",
+                "stab_pf4_dem_analyzer_capped_repeat",
+                "stab_pf4_error_matcher_capped_repeat",
             ][..],
         ),
         (
