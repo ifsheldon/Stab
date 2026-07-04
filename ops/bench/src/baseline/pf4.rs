@@ -2,6 +2,8 @@ use std::hint::black_box;
 
 use stab_core::{
     CompiledDemSampler, DemDetectorId, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
+    find_undetectable_logical_error, shortest_error_sat_problem,
+    shortest_graphlike_undetectable_logical_error,
 };
 
 use crate::error::BenchError;
@@ -34,11 +36,20 @@ const SAMPLER_REPEAT_COUNT: u64 = 2;
 const SAMPLER_SHOTS: usize = 64;
 #[cfg(test)]
 const SAMPLER_SHOTS: usize = 2;
+#[cfg(not(test))]
+const SEARCH_REPEAT_COUNT: u64 = 2048;
+#[cfg(test)]
+const SEARCH_REPEAT_COUNT: u64 = 2;
+#[cfg(not(test))]
+const SAT_REPEAT_COUNT: u64 = 512;
+#[cfg(test)]
+const SAT_REPEAT_COUNT: u64 = 2;
 
 const FLATTEN_FIXED_INSTRUCTIONS: u64 = 2;
 const FLATTEN_SOURCE_INSTRUCTIONS_PER_REPETITION: u64 = 4;
 const ROUNDED_REPEAT_ERROR_COUNT: usize = 2;
 const SELECTED_COORDINATE_DETECTORS: usize = 2;
+const SEARCH_FIXED_ERRORS: u64 = 2;
 
 pub(super) fn run_dem_transform_compare_row(
     row: &BenchmarkRow,
@@ -47,6 +58,8 @@ pub(super) fn run_dem_transform_compare_row(
         "pf4-dem-flatten-repeat" => Ok(Some(run_dem_flatten_repeat_row(row)?)),
         "pf4-dem-rounded" => Ok(Some(run_dem_rounded_row(row)?)),
         "pf4-dem-coordinate-map" => Ok(Some(run_dem_coordinate_map_row(row)?)),
+        "pf4-dem-folded-traversal" => Ok(Some(run_dem_search_sat_repeat_row(row)?)),
+        "pf4-dem-folded-graphlike-traversal" => Ok(Some(run_dem_graphlike_repeat_row(row)?)),
         "pf4-dem-sampler-folded-repeat" => Ok(Some(run_dem_sampler_repeat_row(row)?)),
         _ => Ok(None),
     }
@@ -74,6 +87,18 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             (SAMPLER_REPEAT_COUNT as f64) * (SAMPLER_SHOTS as f64),
             "error-applications/s",
         )),
+        ("pf4-dem-folded-traversal", "stab_pf4_dem_hyper_capped_repeat") => Some((
+            search_expanded_errors(SEARCH_REPEAT_COUNT) as f64,
+            "expanded-errors/s",
+        )),
+        ("pf4-dem-folded-traversal", "stab_pf4_dem_sat_capped_repeat") => Some((
+            search_expanded_errors(SAT_REPEAT_COUNT) as f64,
+            "expanded-errors/s",
+        )),
+        ("pf4-dem-folded-graphlike-traversal", "stab_pf4_dem_graphlike_capped_repeat") => Some((
+            search_expanded_errors(SEARCH_REPEAT_COUNT) as f64,
+            "expanded-errors/s",
+        )),
         _ => None,
     }
 }
@@ -91,6 +116,12 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf4-dem-sampler-folded-repeat" => Some(
             "contract-only: Stab measures current capped-repeat CompiledDemSampler compile and sample behavior; true folded sampler traversal remains an explicit RPF4 follow-up",
+        ),
+        "pf4-dem-folded-traversal" => Some(
+            "contract-only: Stab measures current capped-repeat hypergraph search and SAT problem generation behavior; true folded traversal remains an explicit RPF4 follow-up",
+        ),
+        "pf4-dem-folded-graphlike-traversal" => Some(
+            "contract-only: Stab measures current capped-repeat graphlike search behavior; true folded graphlike traversal remains an explicit RPF4 follow-up",
         ),
         _ => None,
     }
@@ -198,6 +229,56 @@ fn run_dem_sampler_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
     ])
 }
 
+fn run_dem_search_sat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let hyper_fixture = search_repeat_fixture(SEARCH_REPEAT_COUNT);
+    let hyper_model = DetectorErrorModel::from_dem_str(&hyper_fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let sat_fixture = search_repeat_fixture(SAT_REPEAT_COUNT);
+    let sat_model = DetectorErrorModel::from_dem_str(&sat_fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+
+    Ok(vec![
+        measure_stab_batched(
+            "stab_pf4_dem_hyper_capped_repeat",
+            TRANSFORM_REPETITIONS,
+            || {
+                let logical_error =
+                    find_undetectable_logical_error(&hyper_model, usize::MAX, usize::MAX, false)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(dem_model_checksum(&logical_error));
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_sat_capped_repeat",
+            TRANSFORM_REPETITIONS,
+            || {
+                let problem = shortest_error_sat_problem(&sat_model)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(problem.len());
+                Ok(())
+            },
+        )?,
+    ])
+}
+
+fn run_dem_graphlike_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let fixture = search_repeat_fixture(SEARCH_REPEAT_COUNT);
+    let model = DetectorErrorModel::from_dem_str(&fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+
+    Ok(vec![measure_stab_batched(
+        "stab_pf4_dem_graphlike_capped_repeat",
+        TRANSFORM_REPETITIONS,
+        || {
+            let logical_error = shortest_graphlike_undetectable_logical_error(&model, false)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(dem_model_checksum(&logical_error));
+            Ok(())
+        },
+    )?])
+}
+
 fn flatten_repeat_fixture() -> String {
     format!(
         "\
@@ -209,6 +290,19 @@ repeat[outer] {FLATTEN_REPETITIONS} {{
     shift_detectors[step](0.5, 1, 0.25) 2
 }}
 detector[end](3, 4) D0
+"
+    )
+}
+
+fn search_repeat_fixture(repeat_count: u64) -> String {
+    format!(
+        "\
+error(0.1) D0
+repeat {repeat_count} {{
+    error(0.1) D0 D1
+    shift_detectors 1
+}}
+error(0.1) D0 L0
 "
     )
 }
@@ -267,6 +361,10 @@ fn flatten_expanded_source_instructions() -> u64 {
 
 fn rounded_probability_args() -> usize {
     ROUNDED_ERROR_COUNT + ROUNDED_REPEAT_ERROR_COUNT
+}
+
+fn search_expanded_errors(repeat_count: u64) -> u64 {
+    SEARCH_FIXED_ERRORS + repeat_count
 }
 
 fn dem_model_checksum(model: &DetectorErrorModel) -> u64 {

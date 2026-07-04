@@ -925,6 +925,17 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             ][..],
         ),
         (
+            "pf4-dem-folded-traversal",
+            &[
+                "stab_pf4_dem_hyper_capped_repeat",
+                "stab_pf4_dem_sat_capped_repeat",
+            ][..],
+        ),
+        (
+            "pf4-dem-folded-graphlike-traversal",
+            &["stab_pf4_dem_graphlike_capped_repeat"][..],
+        ),
+        (
             "pf4-dem-sampler-folded-repeat",
             &[
                 "stab_pf4_dem_sampler_compile_capped_repeat",
