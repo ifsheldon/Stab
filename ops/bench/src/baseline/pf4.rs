@@ -1,6 +1,6 @@
 use std::hint::black_box;
 
-use stab_core::{DemInstructionKind, DemItem, DemTarget, DetectorErrorModel};
+use stab_core::{DemDetectorId, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
@@ -20,10 +20,15 @@ const FLATTEN_REPETITIONS: u64 = 2;
 const ROUNDED_ERROR_COUNT: usize = 4096;
 #[cfg(test)]
 const ROUNDED_ERROR_COUNT: usize = 4;
+#[cfg(not(test))]
+const COORDINATE_MAP_DETECTORS: u64 = 4096;
+#[cfg(test)]
+const COORDINATE_MAP_DETECTORS: u64 = 4;
 
 const FLATTEN_FIXED_INSTRUCTIONS: u64 = 2;
 const FLATTEN_SOURCE_INSTRUCTIONS_PER_REPETITION: u64 = 4;
 const ROUNDED_REPEAT_ERROR_COUNT: usize = 2;
+const SELECTED_COORDINATE_DETECTORS: usize = 2;
 
 pub(super) fn run_dem_transform_compare_row(
     row: &BenchmarkRow,
@@ -31,6 +36,7 @@ pub(super) fn run_dem_transform_compare_row(
     match row.id.as_str() {
         "pf4-dem-flatten-repeat" => Ok(Some(run_dem_flatten_repeat_row(row)?)),
         "pf4-dem-rounded" => Ok(Some(run_dem_rounded_row(row)?)),
+        "pf4-dem-coordinate-map" => Ok(Some(run_dem_coordinate_map_row(row)?)),
         _ => Ok(None),
     }
 }
@@ -44,6 +50,12 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf4-dem-rounded", "stab_pf4_dem_rounded") => {
             Some((rounded_probability_args() as f64, "probability-args/s"))
         }
+        ("pf4-dem-coordinate-map", "stab_pf4_dem_coordinate_map_all_bounded") => {
+            Some((COORDINATE_MAP_DETECTORS as f64, "detectors/s"))
+        }
+        ("pf4-dem-coordinate-map", "stab_pf4_dem_coordinate_map_selected_huge_repeat") => {
+            Some((SELECTED_COORDINATE_DETECTORS as f64, "selected-detectors/s"))
+        }
         _ => None,
     }
 }
@@ -55,6 +67,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf4-dem-rounded" => Some(
             "contract-only: Stab measures the Rust DetectorErrorModel::rounded public API over top-level and nested error probabilities while preserving non-error coordinate args; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
+        ),
+        "pf4-dem-coordinate-map" => Some(
+            "contract-only: Stab measures bounded all-detector DEM coordinate maps and selected detector coordinate lookup through a huge-repeat model; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
         ),
         _ => None,
     }
@@ -94,6 +109,42 @@ fn run_dem_rounded_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchErro
     )?])
 }
 
+fn run_dem_coordinate_map_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let bounded_dem = DetectorErrorModel::from_dem_str(&coordinate_map_fixture())
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let selected_dem = DetectorErrorModel::from_dem_str(COORDINATE_SELECTED_FIXTURE)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let selected_detectors = [
+        DemDetectorId::try_new(0).map_err(|error| stab_runner_error(&row.id, error))?,
+        DemDetectorId::try_new(1).map_err(|error| stab_runner_error(&row.id, error))?,
+    ];
+
+    Ok(vec![
+        measure_stab_batched(
+            "stab_pf4_dem_coordinate_map_all_bounded",
+            TRANSFORM_REPETITIONS,
+            || {
+                let coordinates = bounded_dem
+                    .detector_coordinates()
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(coordinate_map_checksum(&coordinates));
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_coordinate_map_selected_huge_repeat",
+            TRANSFORM_REPETITIONS,
+            || {
+                let coordinates = selected_dem
+                    .detector_coordinates_for(selected_detectors)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(coordinate_map_checksum(&coordinates));
+                Ok(())
+            },
+        )?,
+    ])
+}
+
 fn flatten_repeat_fixture() -> String {
     format!(
         "\
@@ -108,6 +159,24 @@ detector[end](3, 4) D0
 "
     )
 }
+
+fn coordinate_map_fixture() -> String {
+    format!(
+        "\
+repeat {COORDINATE_MAP_DETECTORS} {{
+    detector(1, 2, 3) D0
+    shift_detectors(0.5, 1.5, 2.5) 1
+}}
+"
+    )
+}
+
+const COORDINATE_SELECTED_FIXTURE: &str = "\
+repeat 1000001 {
+    detector(1, 2) D0
+    shift_detectors(3, 4) 1
+}
+";
 
 fn rounded_fixture() -> String {
     let mut text = String::new();
@@ -188,4 +257,20 @@ fn dem_target_checksum(target: &DemTarget) -> u64 {
         DemTarget::Separator => 0x30,
         DemTarget::Numeric(value) => 0x40 ^ *value,
     }
+}
+
+fn coordinate_map_checksum(
+    coordinates: &std::collections::BTreeMap<DemDetectorId, Vec<f64>>,
+) -> u64 {
+    coordinates
+        .iter()
+        .fold(coordinates.len() as u64, |checksum, (detector, values)| {
+            checksum.rotate_left(5) ^ detector.get() ^ float_slice_checksum(values).rotate_left(11)
+        })
+}
+
+fn float_slice_checksum(values: &[f64]) -> u64 {
+    values.iter().fold(values.len() as u64, |checksum, value| {
+        checksum.rotate_left(7) ^ value.to_bits()
+    })
 }

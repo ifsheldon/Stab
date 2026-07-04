@@ -199,6 +199,44 @@ fn dem_counts_errors_and_coordinates_through_repeats() {
 }
 
 #[test]
+fn pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 1000001 {\n\
+             detector(1, 2) D0\n\
+             shift_detectors(3, 4) 1\n\
+         }\n",
+    )
+    .expect("parse huge coordinate DEM");
+
+    let error = dem
+        .detector_coordinates()
+        .expect_err("reject huge all-detector coordinate map");
+
+    assert!(
+        error
+            .to_string()
+            .contains("detector_coordinates currently supports at most 1000000"),
+        "{error}"
+    );
+    assert_eq!(
+        dem.detector_coordinates_for([
+            DemDetectorId::try_new(0).expect("D0"),
+            DemDetectorId::try_new(1).expect("D1"),
+        ])
+        .expect("selected huge-repeat coordinates"),
+        BTreeMap::from([
+            (DemDetectorId::try_new(0).expect("D0"), vec![1.0, 2.0]),
+            (DemDetectorId::try_new(1).expect("D1"), vec![4.0, 6.0]),
+        ])
+    );
+    assert_eq!(
+        dem.coordinates_of_detector(DemDetectorId::try_new(1).expect("D1"))
+            .expect("single detector coordinates"),
+        vec![4.0, 6.0]
+    );
+}
+
+#[test]
 fn dem_item_ranges_and_flattened_iterator_are_typed() {
     let dem = DetectorErrorModel::from_dem_str(
         "error(0.125) D0\n\
@@ -296,7 +334,7 @@ fn dem_item_ranges_and_flattened_iterator_are_typed() {
 }
 
 #[test]
-fn pf4_dem_flattened_matches_pinned_stim_cases() {
+fn pf4_dem_materialized_flattened_matches_pinned_stim_cases() {
     let empty = DetectorErrorModel::new();
     assert_eq!(empty.flattened().expect("flatten empty"), empty);
 
@@ -363,7 +401,7 @@ fn pf4_dem_flattened_matches_pinned_stim_cases() {
 }
 
 #[test]
-fn pf4_dem_flattened_rejects_excessive_materialized_repeat() {
+fn pf4_dem_materialized_flattened_rejects_excessive_repeat() {
     let dem = DetectorErrorModel::from_dem_str(
         "repeat 100001 {\n\
              error(0.125) D0\n\
@@ -382,7 +420,7 @@ fn pf4_dem_flattened_rejects_excessive_materialized_repeat() {
 }
 
 #[test]
-fn pf4_dem_rounded_matches_pinned_stim_probability_cases() {
+fn pf4_dem_materialized_rounded_matches_pinned_stim_probability_cases() {
     let dem = DetectorErrorModel::from_dem_str(
         "error[first](0.01000002) D0 D1\n\
          repeat[outer] 2 {\n\
@@ -431,7 +469,7 @@ fn pf4_dem_rounded_matches_pinned_stim_probability_cases() {
 }
 
 #[test]
-fn pf4_dem_rounded_keeps_zero_probability_errors() {
+fn pf4_dem_materialized_rounded_keeps_zero_probability_errors() {
     let dem = DetectorErrorModel::from_dem_str("error(0.000001) D0 D1\n").expect("parse DEM");
 
     assert_eq!(

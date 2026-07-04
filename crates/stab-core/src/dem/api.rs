@@ -8,6 +8,8 @@ use super::{
     DetectorErrorModel,
 };
 
+const MAX_DEM_COORDINATE_MAP_DETECTORS: u64 = 1_000_000;
+
 #[derive(Clone, Debug)]
 pub struct DemFlattenedInstructionIter<'a> {
     stack: Vec<DemFlattenFrame<'a>>,
@@ -210,6 +212,11 @@ impl DetectorErrorModel {
 
     pub fn detector_coordinates(&self) -> CircuitResult<BTreeMap<DemDetectorId, Vec<f64>>> {
         let count = self.count_detectors()?;
+        if count > MAX_DEM_COORDINATE_MAP_DETECTORS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "DEM detector_coordinates currently supports at most {MAX_DEM_COORDINATE_MAP_DETECTORS} detectors, got {count}; use detector_coordinates_for for selected detectors"
+            )));
+        }
         let detectors = (0..count)
             .map(DemDetectorId::try_new)
             .collect::<CircuitResult<Vec<_>>>()?;

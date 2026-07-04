@@ -911,9 +911,19 @@ fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
 
 #[test]
 fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
-    for (id, expected_measurement) in [
-        ("pf4-dem-flatten-repeat", "stab_pf4_dem_flatten_repeat"),
-        ("pf4-dem-rounded", "stab_pf4_dem_rounded"),
+    for (id, expected_measurements) in [
+        (
+            "pf4-dem-flatten-repeat",
+            &["stab_pf4_dem_flatten_repeat"][..],
+        ),
+        ("pf4-dem-rounded", &["stab_pf4_dem_rounded"][..]),
+        (
+            "pf4-dem-coordinate-map",
+            &[
+                "stab_pf4_dem_coordinate_map_all_bounded",
+                "stab_pf4_dem_coordinate_map_selected_huge_repeat",
+            ][..],
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),
@@ -937,15 +947,17 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             .map(|measurement| measurement.name.as_str())
             .collect::<Vec<_>>();
 
-        assert_eq!(names, [expected_measurement]);
+        assert_eq!(names.as_slice(), expected_measurements);
         assert!(
             compare_note(id).is_some(),
             "{id} should explain benchmark comparability"
         );
-        assert!(
-            measurement_work(id, expected_measurement).is_some(),
-            "{id}/{expected_measurement} should report normalized work"
-        );
+        for name in names {
+            assert!(
+                measurement_work(id, name).is_some(),
+                "{id}/{name} should report normalized work"
+            );
+        }
     }
 }
 
