@@ -22,6 +22,7 @@ Oracle rows:
 
 - `pf7-legacy-dispatch-conflicts-rust` runs selected legacy conflict cases for `--convert`, `--sample`, `--detect`, `--m2d`, `--analyze_errors`, and `--gen=...`, checking nonzero status, empty stdout, and diagnostic stderr.
 - `pf7-detector-hypergraph-excluded-rust` proves deprecated `--detector_hypergraph` is not accepted as a mode and is not exposed as a help topic.
+- `pf7-legacy-unselected-modes-rust` proves unselected legacy-style `--diagram`, `--explain_errors`, `--repl`, and `--sample_dem` flags fail closed with nonzero status, empty stdout, and diagnostic stderr.
 
 ## Still Open In RPF7
 

@@ -79,3 +79,17 @@ fn legacy_dispatch_rejects_detector_hypergraph() {
         "{help_stderr}"
     );
 }
+
+#[test]
+fn legacy_dispatch_rejects_unselected_legacy_modes() {
+    for flag in ["--diagram", "--explain_errors", "--repl", "--sample_dem"] {
+        let (status, stdout, stderr) = run_cli(&["stab", flag], b"");
+
+        assert_eq!(status, 1, "{flag}");
+        assert_eq!(stdout, "", "{flag}");
+        assert!(
+            stderr.contains(flag) || stderr.contains("unexpected argument"),
+            "{flag} stderr should mention the rejected flag or unexpected argument: {stderr}"
+        );
+    }
+}
