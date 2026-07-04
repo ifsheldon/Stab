@@ -2,10 +2,10 @@
 
 ## Summary
 
-This RPF5 report covers bounded repeat traversal, additive detector or logical-observable target filters, and promoted unsigned Clifford propagation in the Rust `circuit_detecting_regions` utility for the currently supported gate subset.
+This RPF5 report covers bounded repeat traversal, additive detector or logical-observable target filters, promoted unsigned Clifford propagation, and ignored-anticommutation mode in the Rust `circuit_detecting_regions` utility for the currently supported gate subset.
 The target-filter slice adds a `DemTarget`-based detecting-region API that can query detector and logical-observable targets, default-like helpers for all detector and logical-observable targets and all ticks, and the pinned Stim `MX` and `MZZ` detecting-region examples.
 The unsigned Clifford slice now adds the full single-qubit Clifford gate set with plain qubit targets plus `CY` and `CZ` controlled-Pauli propagation, with explicit rejection for the remaining promoted-out controlled-Pauli variants and broader two-qubit Clifford shapes.
-It is not an RPF5 completion report because broader two-qubit Clifford gates and target shapes, target shapes beyond the promoted measurement families, multi-detector generated-code cases, anticommutation ignored mode, gauge behavior, missing-detector families, and measurement-rich flow-transform integration remain active work.
+It is not an RPF5 completion report because broader two-qubit Clifford gates and target shapes, target shapes beyond the promoted measurement families, multi-detector generated-code cases, gauge behavior, missing-detector families, and measurement-rich flow-transform integration remain active work.
 
 ## Implemented Surfaces
 
@@ -16,12 +16,13 @@ It is not an RPF5 completion report because broader two-qubit Clifford gates and
 - `circuit_detecting_regions_for_targets` returns detecting regions keyed by `DemTarget` and supports detector and logical-observable target filters while preserving the original detector-id `circuit_detecting_regions` API as a wrapper.
 - `all_detecting_region_targets` returns the currently declared detector and logical-observable targets within the dense helper materialization cap, and `all_detecting_region_ticks` returns all tick indices within the documented helper cap.
 - The supported validation set now includes `R`/`RX`/`RY`, `M`/`MX`/`MY`, `MXX`/`MYY`/`MZZ`, the full single-qubit Clifford gate set with plain qubit targets, `CX`, `CY`, `CZ`, `TICK`, `DETECTOR`, and `OBSERVABLE_INCLUDE`.
+- `ignore_anticommutation_errors=true` now runs the same reverse traversal with sparse-tracker anticommutations recorded instead of returned as errors, while the default false mode still fails closed on the same incompatible collapses.
 
 ## Target-Filter Scope
 
 The target-filter slice promotes a new Rust API that returns regions keyed by `DemTarget` instead of only `DemDetectorId`.
 The owned positive subcases are detector targets, logical-observable targets from measurement records or Pauli targets, duplicate target deduplication, default all-detector/all-observable target selection, `M`/`MX`/`MY`, `MXX`/`MYY`/`MZZ`, `H`, `CX`, `TICK`, `DETECTOR`, and `OBSERVABLE_INCLUDE`.
-The owned negative subcases are out-of-range detector targets, out-of-range observable targets, separator or numeric DEM targets, dense all-target helper requests beyond the materialization cap or representable logical-observable target range, unsupported gates, feedback or sweep-controlled targets, excessive repeat expansion, and unsupported ignored-anticommutation mode.
+The owned negative subcases are out-of-range detector targets, out-of-range observable targets, separator or numeric DEM targets, dense all-target helper requests beyond the materialization cap or representable logical-observable target range, unsupported gates, feedback or sweep-controlled targets, and excessive repeat expansion.
 The comparator class is structural Rust API parity against pinned Stim v1.16.0 Python examples from `circuit_pybind_test.py` and utility failure examples from `circuit_to_detecting_regions_test.py`.
 The existing `circuit_detecting_regions` detector-id API remains as a compatibility wrapper and keeps its current output type.
 
@@ -36,6 +37,14 @@ The owned negative subcases keep `XCX`, `XCY`, `XCZ`, `YCX`, `YCY`, `YCZ`, `SWAP
 The comparator class is structural Rust API parity against pinned Stim detecting-region semantics; the `detslice-text` command is only the pinned-Stim reproduction tool for the expected Pauli regions, and no diagram API parity is claimed.
 The benchmark row for this slice is a non-primary report-only Rust utility workload measuring the promoted Clifford gates through `circuit_detecting_regions_for_targets`.
 Resource behavior continues to use the existing detecting-region repeat and dense-helper caps.
+
+## Anticommutation Scope
+
+The ignored-anticommutation slice promotes the existing option field instead of adding a new public API.
+The owned positive subcases are an in-circuit reset anticommutation and an implicit start-state anticommutation that both return the tick-indexed unsigned region when `ignore_anticommutation_errors=true`, plus empty-output filters under ignored mode.
+The owned negative subcases keep the default false mode failing with an anticommutation error for in-circuit conflicts, implicit start-state conflicts, and empty-output filters.
+The comparator class is structural Rust API parity against pinned Stim v1.16.0 `Circuit.detecting_regions` failure behavior plus the upstream C++ utility's explicit `ignore_anticommutation_errors` switch.
+No separate benchmark row was added because the promoted mode reuses the same sparse reverse traversal and changes only the error policy.
 
 ## Tests
 
@@ -52,8 +61,12 @@ Implemented Rust tests:
 - `detecting_regions_clifford_supports_single_qubit_clifford_gate_set`
 - `detecting_regions_clifford_supports_controlled_pauli_propagation`
 - `detecting_regions_clifford_rejects_unpromoted_controlled_pauli_gate`
+- `detecting_regions_anticommutation_supports_ignored_mode`
+- `detecting_regions_anticommutation_rejects_false_mode`
+- `detecting_regions_anticommutation_rejects_implicit_start_state`
+- `detecting_regions_anticommutation_rejects_false_mode_with_empty_filters`
 
-These tests cover bounded repeat tick traversal, expected tick-indexed detecting regions, resource rejection for repeat expansion beyond the current cap, pinned `MX` and `MZZ` detecting-region examples, detector and logical-observable target filters, default-like all-target and all-tick helpers, duplicate target deduplication, invalid target rejection, dense helper rejection before large allocation, promoted unsigned full single-qubit Clifford propagation, `CY` and `CZ` controlled-Pauli propagation, and unpromoted controlled-Pauli variant rejection.
+These tests cover bounded repeat tick traversal, expected tick-indexed detecting regions, resource rejection for repeat expansion beyond the current cap, pinned `MX` and `MZZ` detecting-region examples, detector and logical-observable target filters, default-like all-target and all-tick helpers, duplicate target deduplication, invalid target rejection, dense helper rejection before large allocation, promoted unsigned full single-qubit Clifford propagation, `CY` and `CZ` controlled-Pauli propagation, unpromoted controlled-Pauli variant rejection, ignored anticommutation output, and default false-mode anticommutation rejection.
 
 ## Oracle Rows
 
@@ -62,6 +75,7 @@ Implemented row:
 - `pf5-detecting-regions-repeat-rust`
 - `pf5-detecting-regions-targets-rust`
 - `pf5-detecting-regions-clifford-rust`
+- `pf5-detecting-regions-anticommutation-rust`
 
 Still broad and manifest-only:
 
@@ -91,11 +105,13 @@ cargo fmt --all --check
 cargo test -p stab-core detecting_regions_repeat_ --quiet
 cargo test -p stab-core detecting_regions_target_api --quiet
 cargo test -p stab-core detecting_regions_clifford --quiet
+cargo test -p stab-core detecting_regions_anticommutation --quiet
+cargo test -p stab-core detecting_regions_anticommutation -- --list
 cargo test -p stab-bench pf5::detector_utility_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-bench --quiet
 cargo test -p stab-oracle fixtures --quiet
 cargo clippy -p stab-core -p stab-bench -p stab-oracle --all-targets -- -D warnings
-just oracle::run --milestone PF5
+just oracle::run --milestone PF5 --structural
 just bench::smoke
 just bench::baseline --only pf5-detecting-regions-targets --out target/benchmarks/rpf5-detecting-region-targets-probe
 just bench::compare --only pf5-detecting-regions-targets --baseline target/benchmarks/rpf5-detecting-region-targets-probe/baseline.json --report target/benchmarks/rpf5-detecting-region-targets-compare
@@ -117,10 +133,12 @@ The slice now rejects all-target helper requests beyond the dense materializatio
 The unsigned Clifford audit found a P2 evidence-provenance gap because the initial report did not preserve the pinned-Stim `detslice-text` reproduction path for the promoted-gate expectations; this report now records the exact command shape and source-owned expected region strings.
 The full-code-review sidecar found no implementation findings for the earlier unsigned Clifford slice and confirmed the promoted-gate tests and fail-closed regression coverage.
 The current single-qubit Clifford refresh review found P2 documentation and evidence overclaims around future two-qubit scope, representative benchmark wording, and repeat-folding coverage; the plan wording now says broader two-qubit Clifford gates and target shapes, the benchmark row is documented as representative, and `unitary_repeat_folding_matches_naive_all_single_qubit_cliffords` covers the full single-qubit Clifford repeat-folding table.
+The ignored-anticommutation refresh review found a P2 false-mode compatibility gap where empty target or tick filters returned before anticommutation validation; the early return was removed and `detecting_regions_anticommutation_rejects_false_mode_with_empty_filters` covers the regression.
+The same review pass found stale or overly broad evidence wording in the PF5 oracle manifest and historical remaining-partials plan; the manifest now narrows the remaining detecting-region placeholder, the anticommutation row uses the tight `detecting_regions_anticommutation` filter, and the historical plan lists the repeat, target, Clifford, and anticommutation rows.
 The remaining review risk is that the report-only benchmark rows exercise promoted helper paths on small fixtures and should not be used as representative scaling evidence for large generated-code workloads.
 
 ## Remaining RPF5 Work
 
-- Broader two-qubit Clifford gates and target-shape support, target-shape support beyond the promoted measurement families, multi-detector generated-code regions, ignored anticommutation mode, and gauge behavior.
+- Broader two-qubit Clifford gates and target-shape support, target-shape support beyond the promoted measurement families, multi-detector generated-code regions, and gauge behavior.
 - Missing-detector generated-code suffix analysis beyond the promoted honeycomb and toric cases, plus broader flow-dependent utility behavior.
 - Measurement-rich flows, `has_flow`, `has_all_flows`, `flow_generators`, diagnostics, and transform integration.

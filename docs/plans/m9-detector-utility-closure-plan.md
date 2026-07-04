@@ -47,7 +47,8 @@ pub fn circuit_detecting_regions(
 The API returns deterministic `BTreeMap` values ordered by detector id and tick.
 The implemented tick contract must match the pinned Stim simple case: for the circuit `H 0; TICK; CX 0 1; TICK; MXX 0 1; DETECTOR rec[-1]`, detector `D0` at tick `0` is `X_` and detector `D0` at tick `1` is `XX`.
 The API supports `ignore_anticommutation_errors = false`.
-For this plan, `ignore_anticommutation_errors = true` must return a precise unsupported-domain error because broader gauge-handling is future scope.
+For the original M9 plan, `ignore_anticommutation_errors = true` returned a precise unsupported-domain error because broader gauge-handling was future scope.
+PF5 later promoted ignored anticommutation mode for the current supported detecting-region subset while leaving gauge behavior future work.
 
 Add a basic missing-detectors API in `stab-core`:
 
@@ -117,7 +118,7 @@ Required tests:
 - Duplicate detector and tick inputs are deduplicated in the returned map.
 - Unknown detector id returns a domain error.
 - Out-of-range tick returns a domain error.
-- Unsupported gauge or anticommutation behavior returns a domain error when `ignore_anticommutation_errors` is false.
+- Unsupported gauge behavior and default false-mode anticommutation conflicts return domain errors.
 - Unsupported gates and repeat blocks return domain errors that make the scoped subset explicit.
 
 Oracle evidence:

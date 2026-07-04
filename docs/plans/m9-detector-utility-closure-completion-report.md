@@ -132,6 +132,6 @@ The manual pre-commit hook reported no staged changes, which is expected because
 - Multi-record missing-detector row reduction and deterministic invariant solving.
 - Observable-interaction missing-detector analysis.
 - Honeycomb-code and toric-code missing-detector suffix analysis.
-- Broader detecting-region repeat-block traversal, gate and target-shape support, gauge handling, and ignored-anticommutation mode.
+- Broader detecting-region repeat-block traversal, gate and target-shape support, and gauge handling.
 - Sweep-aware `detect`, Python bindings, JS/WASM, diagrams, `explain_errors`, `repl`, QASM, Quirk, GPU, and public graph/vector simulator APIs.
 - Deprecated `--detector_hypergraph` support.

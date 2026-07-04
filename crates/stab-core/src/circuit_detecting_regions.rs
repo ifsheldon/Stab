@@ -57,12 +57,7 @@ pub fn circuit_detecting_regions_for_targets(
     circuit: &Circuit,
     options: DetectingRegionTargetOptions,
 ) -> CircuitResult<DetectingRegionTargetMap> {
-    if options.ignore_anticommutation_errors {
-        return Err(CircuitError::invalid_detector_error_model(
-            "detecting regions with ignored anticommutation errors are not implemented",
-        ));
-    }
-
+    let fail_on_anticommute = !options.ignore_anticommutation_errors;
     let targets = options.targets.into_iter().collect::<BTreeSet<_>>();
     let ticks = options.ticks.into_iter().collect::<BTreeSet<_>>();
     validate_supported_subset(circuit)?;
@@ -77,15 +72,12 @@ pub fn circuit_detecting_regions_for_targets(
         .copied()
         .map(|target| (target, BTreeMap::new()))
         .collect::<DetectingRegionTargetMap>();
-    if targets.is_empty() || ticks.is_empty() {
-        return Ok(regions);
-    }
 
     let mut tracker = SparseReverseFrameTracker::new(
         circuit.count_qubits(),
         measurement_record_count(circuit)?,
         detector_count,
-        true,
+        fail_on_anticommute,
     );
     let mut current_tick = tick_count;
     undo_circuit_with_snapshots(
@@ -849,23 +841,57 @@ mod tests {
     }
 
     #[test]
-    fn detecting_regions_rejects_ignored_anticommutation_mode() {
-        let circuit = Circuit::from_stim_str("TICK\nM 0\nDETECTOR rec[-1]\n").unwrap();
-        let error = circuit_detecting_regions(
+    fn detecting_regions_anticommutation_supports_ignored_mode() {
+        let circuit = Circuit::from_stim_str("TICK\nR 0\nTICK\nMX 0\nDETECTOR rec[-1]\n").unwrap();
+        let actual = circuit_detecting_regions(
             &circuit,
+            DetectingRegionOptions {
+                detectors: vec![detector(0)],
+                ticks: vec![0, 1],
+                ignore_anticommutation_errors: true,
+            },
+        )
+        .unwrap();
+        assert!(!actual[&detector(0)].contains_key(&0));
+        assert_eq!(actual[&detector(0)][&1].to_string(), "+X");
+
+        let implicit_start = Circuit::from_stim_str("TICK\nMX 0\nDETECTOR rec[-1]\n").unwrap();
+        let actual = circuit_detecting_regions(
+            &implicit_start,
             DetectingRegionOptions {
                 detectors: vec![detector(0)],
                 ticks: vec![0],
                 ignore_anticommutation_errors: true,
             },
         )
-        .unwrap_err();
+        .unwrap();
+        assert_eq!(actual[&detector(0)][&0].to_string(), "+X");
 
-        assert!(error.to_string().contains("ignored anticommutation"));
+        let empty_ticks = circuit_detecting_regions(
+            &implicit_start,
+            DetectingRegionOptions {
+                detectors: vec![detector(0)],
+                ticks: vec![],
+                ignore_anticommutation_errors: true,
+            },
+        )
+        .unwrap();
+        assert!(empty_ticks[&detector(0)].is_empty());
+
+        let empty_targets = circuit_detecting_regions(
+            &implicit_start,
+            DetectingRegionOptions {
+                detectors: vec![],
+                ticks: vec![0],
+                ignore_anticommutation_errors: true,
+            },
+        )
+        .unwrap();
+        assert!(empty_targets.is_empty());
     }
 
     #[test]
-    fn detecting_regions_rejects_false_mode_anticommutation() {
+    fn detecting_regions_anticommutation_rejects_false_mode() {
         let circuit = Circuit::from_stim_str(
             "MXX 0 1\n\
              DETECTOR rec[-1]\n\
@@ -889,7 +915,7 @@ mod tests {
     }
 
     #[test]
-    fn detecting_regions_rejects_implicit_start_state_anticommutation() {
+    fn detecting_regions_anticommutation_rejects_implicit_start_state() {
         let circuit = Circuit::from_stim_str("TICK\nMXX 0 1\nDETECTOR rec[-1]\n").unwrap();
         let error = circuit_detecting_regions(
             &circuit,
@@ -902,6 +928,24 @@ mod tests {
         .unwrap_err();
 
         assert!(error.to_string().contains("anti-commuted"));
+    }
+
+    #[test]
+    fn detecting_regions_anticommutation_rejects_false_mode_with_empty_filters() {
+        let circuit = Circuit::from_stim_str("TICK\nMX 0\nDETECTOR rec[-1]\n").unwrap();
+        for (detectors, ticks) in [(vec![detector(0)], vec![]), (vec![], vec![0])] {
+            let error = circuit_detecting_regions(
+                &circuit,
+                DetectingRegionOptions {
+                    detectors,
+                    ticks,
+                    ignore_anticommutation_errors: false,
+                },
+            )
+            .unwrap_err();
+
+            assert!(error.to_string().contains("anti-commuted"));
+        }
     }
 
     #[test]
