@@ -817,6 +817,11 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
             "stab_analyze_errors_sweep_control",
             "analyze-errors-sweep",
         ),
+        (
+            "pf3-gate-semantic-wide",
+            "stab_pf3_gate_semantic_tableau_contract",
+            "gate-semantic-wide",
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),

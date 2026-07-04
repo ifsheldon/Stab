@@ -5,12 +5,14 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use stab_core::{
-    Circuit, CircuitError, CodeDistance, CompiledSampler, DemDetectorId, DetectingRegionOptions,
-    DetectionConversionOptions, DetectionObservableOutputMode, Flow, MissingDetectorOptions,
+    Circuit, CircuitError, CodeDistance, CompiledDetectionConverter, CompiledSampler,
+    DemDetectorId, DetectingRegionOptions, DetectionConversionOptions,
+    DetectionObservableOutputMode, ErrorAnalyzerOptions, Flow, Gate, MissingDetectorOptions,
     Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount, SampleFormat,
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_detecting_regions,
-    circuit_with_inlined_feedback, convert_measurements_to_detection_events,
-    generate_repetition_code_circuit, measurement_record_count, missing_detectors,
+    circuit_to_detector_error_model, circuit_with_inlined_feedback,
+    convert_measurements_to_detection_events, generate_repetition_code_circuit,
+    measurement_record_count, missing_detectors,
     result_formats::write_ptb64_records_checked,
     result_formats::{read_records, write_records},
     sample_detection_events, try_for_each_sampled_detection_event, write_detection_records,
@@ -53,6 +55,8 @@ const MISSING_DETECTOR_MPP_CASES: usize = 4;
 const MISSING_DETECTOR_MPP_SUGGESTIONS: usize = 3;
 const FLOW_CHECK_CASES: usize = 4;
 const FLOW_CHECK_FLOWS: usize = 27;
+const GATE_SEMANTIC_FIXED_TABLEAU_GATES: usize = 46;
+const GATE_SEMANTIC_SURFACES_PER_GATE: usize = 3;
 const DETECTING_REGIONS_PER_CASE: usize = 2;
 const DETECTING_REGIONS_SIMPLE: &str = "H 0\n\
                                         TICK\n\
@@ -148,6 +152,7 @@ pub(super) fn run_detection_compare_row(
         .map(Some),
         "pf3-m2d-sweep-ptb64-input" => run_m2d_sweep_ptb64_cli_row(row).map(Some),
         "pf3-detect-sweep-sampling" => run_detect_sweep_sampling_row(row).map(Some),
+        "pf3-gate-semantic-wide" => run_gate_semantic_wide_row(row).map(Some),
         "pf7-cli-m2d-sweep-b8" => run_m2d_cli_row(
             row,
             "stab_pf7_cli_m2d_sweep_b8",
@@ -219,6 +224,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf5-has-all-flows-batch", "stab_pf5_has_flows_batch_flows") => {
             Some(((UTILITY_BATCH * FLOW_CHECK_FLOWS) as f64, "flows/s"))
         }
+        ("pf3-gate-semantic-wide", "stab_pf3_gate_semantic_tableau_contract") => Some((
+            (GATE_SEMANTIC_FIXED_TABLEAU_GATES * GATE_SEMANTIC_SURFACES_PER_GATE) as f64,
+            "surface-checks/s",
+        )),
         ("m9-feedback-inline-mpp-batch", "stab_feedback_inline_mpp_transforms") => {
             Some((UTILITY_BATCH as f64, "transforms/s"))
         }
@@ -300,6 +309,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf3-detect-sweep-sampling" => Some(
             "report-only: Stab measures the Rust sweep-conditioned detection sampler using omitted all-false sweep bits; no faithful pinned Stim CLI ratio is claimed for this partial PF3 surface",
+        ),
+        "pf3-gate-semantic-wide" => Some(
+            "report-only: Stab measures fixed-tableau gate execution contract coverage across sampler compilation, detection-conversion compilation, and analyzer propagation without a faithful pinned Stim CLI timing ratio",
         ),
         _ => None,
     }
@@ -690,6 +702,46 @@ fn run_detect_sweep_sampling_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
     )?])
 }
 
+fn run_gate_semantic_wide_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuits = fixed_tableau_gate_execution_circuits(&row.id)?;
+    Ok(vec![measure_stab_iterations(
+        "stab_pf3_gate_semantic_tableau_contract",
+        super::STAB_COMPARE_ITERATIONS,
+        || {
+            let mut checked = 0usize;
+            for circuit in &circuits {
+                let sampler = CompiledSampler::compile(circuit)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(sampler.sample_zero_one(1));
+                checked = checked
+                    .checked_add(1)
+                    .ok_or_else(|| gate_semantic_count_overflow_error(row, "sampler checks"))?;
+
+                let converter = CompiledDetectionConverter::compile(
+                    circuit,
+                    DetectionConversionOptions {
+                        skip_reference_sample: false,
+                    },
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(converter.detector_count());
+                checked = checked.checked_add(1).ok_or_else(|| {
+                    gate_semantic_count_overflow_error(row, "detection-conversion checks")
+                })?;
+
+                let dem = circuit_to_detector_error_model(circuit, ErrorAnalyzerOptions::default())
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(dem.items().len());
+                checked = checked
+                    .checked_add(1)
+                    .ok_or_else(|| gate_semantic_count_overflow_error(row, "analyzer checks"))?;
+            }
+            black_box(checked);
+            Ok(())
+        },
+    )?])
+}
+
 fn run_m2d_cli_row(
     row: &BenchmarkRow,
     measurement_name: &'static str,
@@ -1068,6 +1120,49 @@ fn primary_repetition_circuit(row_id: &str) -> Result<Circuit, BenchError> {
 
 fn parse_circuit(row_id: &str, text: &str) -> Result<Circuit, BenchError> {
     Circuit::from_stim_str(text).map_err(|error| stab_runner_error(row_id, error))
+}
+
+fn fixed_tableau_gate_execution_circuits(row_id: &str) -> Result<Vec<Circuit>, BenchError> {
+    Gate::all()
+        .filter(|gate| gate.has_tableau())
+        .map(|gate| fixed_tableau_gate_execution_circuit(row_id, gate))
+        .collect()
+}
+
+fn fixed_tableau_gate_execution_circuit(row_id: &str, gate: Gate) -> Result<Circuit, BenchError> {
+    let gate_name = gate.canonical_name();
+    let inverse_name = gate
+        .inverse()
+        .ok_or_else(|| BenchError::StabRunner {
+            row_id: row_id.to_string(),
+            message: format!("{gate_name} has tableau metadata but no inverse"),
+        })?
+        .canonical_name();
+    let arity = gate
+        .tableau()
+        .map_err(|error| stab_runner_error(row_id, error))?
+        .len();
+    let targets = match arity {
+        1 => "0",
+        2 => "0 1",
+        _ => {
+            return Err(BenchError::StabRunner {
+                row_id: row_id.to_string(),
+                message: format!("{gate_name} has unsupported benchmark arity {arity}"),
+            });
+        }
+    };
+    parse_circuit(
+        row_id,
+        &format!("{gate_name} {targets}\n{inverse_name} {targets}\nM 0\nDETECTOR rec[-1]\n"),
+    )
+}
+
+fn gate_semantic_count_overflow_error(row: &BenchmarkRow, context: &str) -> BenchError {
+    BenchError::StabRunner {
+        row_id: row.id.clone(),
+        message: format!("PF3 gate semantic benchmark overflowed while counting {context}"),
+    }
 }
 
 fn repo_path(relative: &str) -> PathBuf {

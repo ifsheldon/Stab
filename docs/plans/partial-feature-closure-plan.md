@@ -156,7 +156,7 @@ Tests:
 
 Benchmarks:
 
-- Add rows `pf3-m2d-sweep-b8`, `pf3-m2d-sweep-ptb64-input`, `pf3-detect-sweep-sampling`, `pf3-analyze-errors-sweep`, and `pf3-gate-semantic-wide`.
+- Add rows `pf3-m2d-sweep-b8`, `pf3-m2d-sweep-ptb64-input`, `pf3-detect-sweep-sampling`, and `pf3-analyze-errors-sweep`, and keep `pf3-gate-semantic-wide` current as fixed-tableau gate execution coverage expands.
 - Classify CLI rows as `cli-baseline` when Stim v1.16.0 exposes the same command shape; classify core-only semantic rows as `contract-representative`.
 
 Acceptance criteria:

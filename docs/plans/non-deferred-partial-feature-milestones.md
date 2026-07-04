@@ -152,7 +152,7 @@ Oracle rows:
 Benchmarks:
 
 - Extend `pf1-gate-metadata-lookup` if metadata accessors change materially.
-- Implement or refresh `pf3-gate-semantic-wide` only when execution support changes.
+- Keep `pf3-gate-semantic-wide` current when execution support changes.
 - Keep metadata rows report-only unless a faithful direct Stim baseline and repeated stable evidence exist.
 
 Acceptance criteria:
@@ -224,7 +224,7 @@ Tasks:
 - Finish or explicitly reject frame-path sweep-conditioned detector sampling for the current public detection surface.
 - Expand analyzer sweep behavior beyond the current no-op sweep-control subset only for selected exact subcases.
 - Keep `m2d --sweep` and `--sweep_format` behavior synchronized with core converter behavior for every accepted input format.
-- Classify legal gate execution support across sampler, converter, detection, and analyzer paths.
+- Classify legal gate execution support across sampler, converter, detection, and analyzer paths. The fixed-tableau gate contract is implemented for current sampler, detection-conversion, and analyzer surfaces; non-tableau legal operations remain active or explicitly rejected.
 - Add precise errors for unsupported sweep target shapes, unsupported gate families, unsupported mixed feedback and sweep cases, and unsupported public output formats.
 - Preserve streaming or documented caps for public inputs and outputs.
 
@@ -244,7 +244,7 @@ Oracle rows:
 Benchmarks:
 
 - Keep or refresh report-only rows `pf3-m2d-sweep-b8`, `pf3-m2d-sweep-ptb64-input`, `pf3-detect-sweep-sampling`, and `pf3-analyze-errors-sweep`.
-- Implement `pf3-gate-semantic-wide` when legal-gate execution coverage changes.
+- Keep the implemented `pf3-gate-semantic-wide` row report-only unless a faithful pinned-Stim comparator is added.
 - Classify CLI rows as `cli-baseline` only when pinned Stim exposes the same command shape.
 
 Acceptance criteria:

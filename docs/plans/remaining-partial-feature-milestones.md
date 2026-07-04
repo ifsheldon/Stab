@@ -187,7 +187,7 @@ Oracle rows:
 Benchmarks:
 
 - Extend `pf1-gate-metadata-lookup` with decomposition and any newly implemented flow metadata submeasurements.
-- Add or update `pf3-gate-semantic-wide` only when gate execution support changes.
+- Keep `pf3-gate-semantic-wide` current when gate execution support changes.
 - Keep these rows report-only unless a faithful direct Stim baseline and stable repeated evidence exist.
 
 Acceptance criteria:
@@ -281,7 +281,7 @@ Oracle rows:
 
 Benchmarks:
 
-- Implement `pf3-m2d-sweep-b8`, `pf3-m2d-sweep-ptb64-input`, `pf3-detect-sweep-sampling`, `pf3-analyze-errors-sweep`, and `pf3-gate-semantic-wide` when their corresponding behavior is active.
+- Implement `pf3-m2d-sweep-b8`, `pf3-m2d-sweep-ptb64-input`, `pf3-detect-sweep-sampling`, and `pf3-analyze-errors-sweep` when their corresponding behavior is active, and keep `pf3-gate-semantic-wide` current as the fixed-tableau gate execution contract expands.
 - Classify CLI rows as `cli-baseline` when Stim v1.16.0 exposes the same public command shape.
 - Keep core-only rows `contract-representative` or `report-only` unless a faithful direct baseline exists.
 
