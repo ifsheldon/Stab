@@ -4,8 +4,10 @@ use crate::{
 };
 
 mod checker;
+mod solver;
 
 pub use checker::check_if_circuit_has_unsigned_stabilizer_flows;
+pub use solver::solve_for_flow_measurements;
 
 /// Returns unsigned stabilizer-flow generators for the supported tableau and measurement subset.
 ///

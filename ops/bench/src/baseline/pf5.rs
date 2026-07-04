@@ -1,6 +1,7 @@
 use std::hint::black_box;
+use std::str::FromStr;
 
-use stab_core::{Circuit, circuit_flow_generators};
+use stab_core::{Circuit, Flow, circuit_flow_generators, solve_for_flow_measurements};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
@@ -14,6 +15,8 @@ const UTILITY_BATCH: usize = 4096;
 const UTILITY_BATCH: usize = 2;
 const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 17;
 const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 52;
+const FLOW_SOLVE_MEASUREMENT_CASES: usize = 2;
+const FLOW_SOLVE_MEASUREMENT_QUERIES: usize = 15;
 
 pub(super) fn run_flow_compare_row(
     row: &BenchmarkRow,
@@ -22,6 +25,7 @@ pub(super) fn run_flow_compare_row(
         "pf5-flow-generators-measurement-rich" => {
             run_flow_generators_measurement_rich(row).map(Some)
         }
+        "pf5-flow-solve-measurement-rich" => run_flow_solve_measurement_rich(row).map(Some),
         _ => Ok(None),
     }
 }
@@ -40,6 +44,14 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
                 "flows/s",
             ))
         }
+        ("pf5-flow-solve-measurement-rich", "stab_pf5_flow_solve_measurement_cases") => Some((
+            (UTILITY_BATCH * FLOW_SOLVE_MEASUREMENT_CASES) as f64,
+            "cases/s",
+        )),
+        ("pf5-flow-solve-measurement-rich", "stab_pf5_flow_solve_measurement_queries") => Some((
+            (UTILITY_BATCH * FLOW_SOLVE_MEASUREMENT_QUERIES) as f64,
+            "queries/s",
+        )),
         _ => None,
     }
 }
@@ -48,6 +60,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "pf5-flow-generators-measurement-rich" => Some(
             "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/pair-measurement/feedback/MPAD subset without a faithful pinned Stim CLI timing ratio",
+        ),
+        "pf5-flow-solve-measurement-rich" => Some(
+            "report-only: Stab measures the Rust solve_for_flow_measurements promoted upstream examples without a faithful pinned Stim CLI timing ratio",
         ),
         _ => None,
     }
@@ -102,6 +117,45 @@ fn measure_flow_generators_measurement_rich(
     })
 }
 
+fn run_flow_solve_measurement_rich(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    Ok(vec![
+        measure_flow_solve_measurement_rich(row, "stab_pf5_flow_solve_measurement_cases")?,
+        measure_flow_solve_measurement_rich(row, "stab_pf5_flow_solve_measurement_queries")?,
+    ])
+}
+
+fn measure_flow_solve_measurement_rich(
+    row: &BenchmarkRow,
+    measurement_name: &'static str,
+) -> Result<Measurement, BenchError> {
+    let cases = flow_solve_measurement_rich_corpus(&row.id)?;
+    measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
+        let mut solved_count = 0usize;
+        for _ in 0..UTILITY_BATCH {
+            for (circuit, flows, expected) in &cases {
+                let actual = solve_for_flow_measurements(circuit, flows)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                if actual != *expected {
+                    return Err(BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: format!(
+                            "flow-solve benchmark expected {expected:?} but got {actual:?}"
+                        ),
+                    });
+                }
+                solved_count = solved_count
+                    .checked_add(actual.iter().filter(|result| result.is_some()).count())
+                    .ok_or_else(|| BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: "flow-solve benchmark solved count overflowed".to_string(),
+                    })?;
+            }
+        }
+        black_box(solved_count);
+        Ok(())
+    })
+}
+
 fn flow_generator_measurement_rich_corpus(
     row_id: &str,
 ) -> Result<Vec<(Circuit, usize)>, BenchError> {
@@ -129,6 +183,71 @@ fn flow_generator_measurement_rich_corpus(
     .collect()
 }
 
+type FlowSolveCase = (Circuit, Vec<Flow>, Vec<Option<Vec<i32>>>);
+
+fn flow_solve_measurement_rich_corpus(row_id: &str) -> Result<Vec<FlowSolveCase>, BenchError> {
+    Ok(vec![
+        (
+            parse_circuit(row_id, "MX 0\n")?,
+            parse_flows(
+                row_id,
+                &["1 -> X0", "Y0 -> Y0", "X0 -> 1", "X0 -> Z0", "Y1 -> Y1"],
+            )?,
+            vec![Some(vec![0]), None, Some(vec![0]), None, Some(vec![])],
+        ),
+        (
+            parse_circuit(
+                row_id,
+                "
+                R 1 3
+                CX 0 1 2 3
+                CX 4 3 2 1
+                M 1 3
+            ",
+            )?,
+            parse_flows(
+                row_id,
+                &[
+                    "Z0*Z2 -> 1",
+                    "1 -> Z2*Z4",
+                    "1 -> Z0*Z4",
+                    "Z0*Z4 -> Z0*Z2",
+                    "Z0 -> Z0",
+                    "Z0 -> Z1",
+                    "Z0 -> Z2",
+                    "X0*X2*X4 -> X0*X2*X4",
+                    "X0 -> X0",
+                    "X0 -> Z0",
+                ],
+            )?,
+            vec![
+                Some(vec![0]),
+                Some(vec![1]),
+                Some(vec![0, 1]),
+                Some(vec![1]),
+                Some(vec![]),
+                None,
+                Some(vec![0]),
+                Some(vec![]),
+                None,
+                None,
+            ],
+        ),
+    ])
+}
+
 fn parse_circuit(row_id: &str, text: &str) -> Result<Circuit, BenchError> {
     Circuit::from_stim_str(text).map_err(|error| stab_runner_error(row_id, error))
+}
+
+fn parse_flows(row_id: &str, texts: &[&str]) -> Result<Vec<Flow>, BenchError> {
+    texts
+        .iter()
+        .map(|text| {
+            Flow::from_str(text).map_err(|error| BenchError::StabRunner {
+                row_id: row_id.to_string(),
+                message: error.to_string(),
+            })
+        })
+        .collect()
 }

@@ -776,6 +776,15 @@ fn pf5_detector_utility_benchmark_rows_have_stab_compare_runners() {
                 "stab_pf5_flow_generators_measurement_flows",
             ][..],
         ),
+        (
+            "pf5-flow-solve-measurement-rich",
+            "src/stim/util_top/circuit_flow_generators.test.cc",
+            "flow-solve",
+            &[
+                "stab_pf5_flow_solve_measurement_cases",
+                "stab_pf5_flow_solve_measurement_queries",
+            ][..],
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),

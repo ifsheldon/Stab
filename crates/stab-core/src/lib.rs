@@ -40,7 +40,10 @@ pub use circuit_detecting_regions::{
     DetectingRegionMap, DetectingRegionOptions, circuit_detecting_regions,
 };
 pub use circuit_feedback::circuit_with_inlined_feedback;
-pub use circuit_flow::{check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators};
+pub use circuit_flow::{
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
+    solve_for_flow_measurements,
+};
 pub use circuit_generation::{
     CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
     RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,

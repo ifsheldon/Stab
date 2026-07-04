@@ -5,7 +5,9 @@
 
 use std::str::FromStr;
 
-use stab_core::{Circuit, Flow, check_if_circuit_has_unsigned_stabilizer_flows};
+use stab_core::{
+    Circuit, Flow, check_if_circuit_has_unsigned_stabilizer_flows, solve_for_flow_measurements,
+};
 
 #[test]
 fn check_if_circuit_has_unsigned_stabilizer_flows_historical_failure() {
@@ -144,6 +146,104 @@ fn check_if_circuit_has_unsigned_stabilizer_flows_folds_unitary_repeats() {
     assert_eq!(
         check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
         vec![true, false]
+    );
+}
+
+#[test]
+fn solve_for_flow_measurements_matches_stim_empty_and_simple_examples() {
+    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators.test.cc.
+    assert_eq!(
+        solve_for_flow_measurements(&circuit(""), &[]).expect("empty solve"),
+        Vec::<Option<Vec<i32>>>::new()
+    );
+
+    let mx_circuit = circuit("MX 0\n");
+    assert_eq!(
+        solve_for_flow_measurements(&mx_circuit, &[flow("1 -> X0")]).expect("solve 1 -> X0"),
+        vec![Some(vec![0])]
+    );
+    assert_eq!(
+        solve_for_flow_measurements(&mx_circuit, &[flow("1 -> Y0")]).expect("solve 1 -> Y0"),
+        vec![None]
+    );
+    assert_eq!(
+        solve_for_flow_measurements(
+            &mx_circuit,
+            &[
+                flow("1 -> X0"),
+                flow("Y0 -> Y0"),
+                flow("X0 -> 1"),
+                flow("X0 -> Z0"),
+                flow("Y1 -> Y1"),
+            ],
+        )
+        .expect("solve simple batch"),
+        vec![Some(vec![0]), None, Some(vec![0]), None, Some(vec![]),]
+    );
+
+    let error = solve_for_flow_measurements(&circuit(""), &[flow("1 -> 1")])
+        .expect_err("empty Pauli flow is unsupported")
+        .to_string();
+    assert!(
+        error.contains("only supports flows with non-empty Pauli input or output"),
+        "{error}"
+    );
+}
+
+#[test]
+fn solve_for_flow_measurements_matches_stim_repetition_code_example() {
+    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators.test.cc.
+    let circuit = circuit(
+        "
+        R 1 3
+        CX 0 1 2 3
+        CX 4 3 2 1
+        M 1 3
+    ",
+    );
+    let flows = [
+        flow("Z0*Z2 -> 1"),
+        flow("1 -> Z2*Z4"),
+        flow("1 -> Z0*Z4"),
+        flow("Z0*Z4 -> Z0*Z2"),
+        flow("Z0 -> Z0"),
+        flow("Z0 -> Z1"),
+        flow("Z0 -> Z2"),
+        flow("X0*X2*X4 -> X0*X2*X4"),
+        flow("X0 -> X0"),
+        flow("X0 -> Z0"),
+    ];
+    assert_eq!(
+        solve_for_flow_measurements(&circuit, &flows).expect("solve rep code"),
+        vec![
+            Some(vec![0]),
+            Some(vec![1]),
+            Some(vec![0, 1]),
+            Some(vec![1]),
+            Some(vec![]),
+            None,
+            Some(vec![0]),
+            Some(vec![]),
+            None,
+            None,
+        ]
+    );
+}
+
+#[test]
+fn solve_for_flow_measurements_has_documented_fallback_resource_limit() {
+    let circuit = circuit(
+        "
+        M 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+        H 0
+    ",
+    );
+    let error = solve_for_flow_measurements(&circuit, &[flow("Z0 -> Z0")])
+        .expect_err("fallback solver is bounded")
+        .to_string();
+    assert!(
+        error.contains("fallback supports at most 16 measurements"),
+        "{error}"
     );
 }
 
