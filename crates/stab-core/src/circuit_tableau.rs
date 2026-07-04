@@ -157,6 +157,15 @@ pub(crate) fn gate_tableau(gate_name: &str) -> CircuitResult<Tableau> {
         .map_err(|error| CircuitError::invalid_tableau_conversion(error.to_string()))
 }
 
+pub(crate) fn gate_has_tableau(gate_name: &str) -> bool {
+    if let Ok(gate) = crate::Gate::from_name(gate_name)
+        && SingleQubitClifford::from_gate(gate).is_ok()
+    {
+        return true;
+    }
+    two_qubit_outputs(gate_name).is_some()
+}
+
 fn two_qubit_outputs(gate_name: &str) -> Option<[&'static str; 4]> {
     match gate_name {
         "II" => Some(["+X_", "+Z_", "+_X", "+_Z"]),

@@ -269,6 +269,16 @@ impl Gate {
         self.best_candidate_inverse()
     }
 
+    /// Returns the local Clifford tableau metadata for gates with known tableau data.
+    pub fn tableau(self) -> crate::CircuitResult<crate::Tableau> {
+        crate::circuit_tableau::gate_tableau(self.info.name)
+    }
+
+    /// Returns true when `tableau` can produce local Clifford tableau metadata for this gate.
+    pub fn has_tableau(self) -> bool {
+        crate::circuit_tableau::gate_has_tableau(self.info.name)
+    }
+
     pub fn can_fuse(self) -> bool {
         self.info.can_fuse
     }

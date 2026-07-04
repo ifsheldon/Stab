@@ -2,7 +2,7 @@ use std::hint::black_box;
 
 use stab_core::{
     Circuit, CircuitDetectorId, DemDetectorId, DemInstructionKind, DemItem, DemTarget,
-    DetectorErrorModel, Gate, GateArgumentRule,
+    DetectorErrorModel, Gate, GateArgumentRule, PauliString, Tableau,
 };
 
 use crate::error::BenchError;
@@ -250,6 +250,11 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
         .iter()
         .flat_map(|gate| gate.aliases().iter().copied())
         .collect::<Vec<_>>();
+    let tableau_gates = gates
+        .iter()
+        .copied()
+        .filter(|gate| gate.has_tableau())
+        .collect::<Vec<_>>();
 
     Ok(vec![
         measure_stab_batched(
@@ -298,6 +303,22 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
             },
         )?,
         measure_stab_batched(
+            "stab_gate_metadata_tableau_supported_gates",
+            TINY_DIRECT_COMPARE_REPETITIONS,
+            || {
+                let mut checksum = 0_u64;
+                for gate in &tableau_gates {
+                    let tableau = gate
+                        .tableau()
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    checksum ^= tableau_checksum(&tableau, &row.id)?;
+                    black_box(tableau);
+                }
+                black_box(checksum);
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
             "stab_gate_metadata_alias_lookup_all_aliases",
             TINY_DIRECT_COMPARE_REPETITIONS,
             || {
@@ -329,6 +350,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         return match name {
             "stab_gate_metadata_flags_all_gates" => Some((Gate::all().len() as f64, "gates/s")),
             "stab_gate_metadata_inverse_all_gates" => Some((Gate::all().len() as f64, "gates/s")),
+            "stab_gate_metadata_tableau_supported_gates" => {
+                Some((gate_tableau_count() as f64, "tableaus/s"))
+            }
             "stab_gate_metadata_alias_lookup_all_aliases" => {
                 Some((gate_alias_count() as f64, "lookups/s"))
             }
@@ -358,7 +382,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures Rust circuit count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
         ),
         "pf1-gate-metadata-lookup" => Some(
-            "contract-only: Stab measures Rust gate metadata accessors and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
+            "contract-only: Stab measures Rust gate metadata accessors, tableau metadata reads, and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
         ),
         "pf1-dem-counts-repeat" => Some(
             "contract-only: Stab measures Rust DEM count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
@@ -430,6 +454,33 @@ fn dem_target_checksum(target: &DemTarget) -> u64 {
 
 fn gate_alias_count() -> usize {
     Gate::all().map(|gate| gate.aliases().len()).sum()
+}
+
+fn gate_tableau_count() -> usize {
+    Gate::all().filter(|gate| gate.has_tableau()).count()
+}
+
+fn tableau_checksum(tableau: &Tableau, row_id: &str) -> Result<u64, BenchError> {
+    let mut checksum = tableau.len() as u64;
+    for index in 0..tableau.len() {
+        let x_output = tableau
+            .x_output(index)
+            .map_err(|error| stab_runner_error(row_id, error))?;
+        let z_output = tableau
+            .z_output(index)
+            .map_err(|error| stab_runner_error(row_id, error))?;
+        checksum ^= pauli_string_checksum(x_output).rotate_left(3);
+        checksum ^= pauli_string_checksum(z_output).rotate_left(7);
+    }
+    Ok(checksum)
+}
+
+fn pauli_string_checksum(pauli: &PauliString) -> u64 {
+    let mut checksum = (pauli.len() as u64) ^ (u64::from(pauli.sign().is_negative()) << 1);
+    for word in pauli.x_bits().iter().chain(pauli.z_bits()) {
+        checksum = checksum.rotate_left(5) ^ *word;
+    }
+    checksum ^ (pauli.weight() as u64)
 }
 
 fn argument_rule_checksum(rule: GateArgumentRule) -> usize {

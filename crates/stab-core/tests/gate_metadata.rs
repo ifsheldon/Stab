@@ -4,6 +4,8 @@
     reason = "PF1 gate metadata compatibility tests use direct assertions for compact diagnostics"
 )]
 
+use std::collections::BTreeSet;
+
 use stab_core::{
     Circuit, CircuitItem, Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
 };
@@ -187,6 +189,112 @@ fn gate_metadata_accessors_match_owned_stim_gatedata_semantics() {
             .canonical_name(),
         "SPP_DAG"
     );
+}
+
+#[test]
+fn gate_tableau_metadata_matches_owned_unitary_gate_data() {
+    // Adapted from Stim v1.16.0 src/stim/gates/gates.test.cc tableau and unitary inverse checks.
+    let h = Gate::from_name("H").expect("H");
+    let h_tableau = h.tableau().expect("H tableau");
+    assert_eq!(h_tableau.x_output(0).expect("H X").to_string(), "+Z");
+    assert_eq!(h_tableau.z_output(0).expect("H Z").to_string(), "+X");
+    assert!(h.has_tableau());
+
+    let cx = Gate::from_name("CX").expect("CX");
+    let cx_tableau = cx.tableau().expect("CX tableau");
+    assert_eq!(cx_tableau.x_output(0).expect("CX X0").to_string(), "+XX");
+    assert_eq!(cx_tableau.z_output(0).expect("CX Z0").to_string(), "+Z_");
+    assert_eq!(cx_tableau.x_output(1).expect("CX X1").to_string(), "+_X");
+    assert_eq!(cx_tableau.z_output(1).expect("CX Z1").to_string(), "+ZZ");
+
+    let expected_tableau_names = BTreeSet::from([
+        "C_NXYZ",
+        "C_NZYX",
+        "C_XNYZ",
+        "C_XYNZ",
+        "C_XYZ",
+        "C_ZNYX",
+        "C_ZYNX",
+        "C_ZYX",
+        "CX",
+        "CXSWAP",
+        "CY",
+        "CZ",
+        "CZSWAP",
+        "H",
+        "H_NXY",
+        "H_NXZ",
+        "H_NYZ",
+        "H_XY",
+        "H_YZ",
+        "I",
+        "II",
+        "ISWAP",
+        "ISWAP_DAG",
+        "S",
+        "S_DAG",
+        "SQRT_XX",
+        "SQRT_XX_DAG",
+        "SQRT_X",
+        "SQRT_X_DAG",
+        "SQRT_YY",
+        "SQRT_YY_DAG",
+        "SQRT_Y",
+        "SQRT_Y_DAG",
+        "SQRT_ZZ",
+        "SQRT_ZZ_DAG",
+        "SWAP",
+        "SWAPCX",
+        "X",
+        "XCX",
+        "XCY",
+        "XCZ",
+        "Y",
+        "YCX",
+        "YCY",
+        "YCZ",
+        "Z",
+    ]);
+    assert_eq!(expected_tableau_names.len(), 46);
+    let actual_tableau_names = Gate::all()
+        .filter(|gate| gate.has_tableau())
+        .map(|gate| gate.canonical_name())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(actual_tableau_names, expected_tableau_names);
+
+    for gate_name in expected_tableau_names {
+        let gate = Gate::from_name(gate_name).expect("gate");
+        let inverse = gate.inverse().expect("unitary inverse");
+        let gate_inverse_tableau = gate
+            .tableau()
+            .expect("gate tableau")
+            .inverse()
+            .expect("inverse tableau");
+        assert_eq!(
+            gate_inverse_tableau,
+            inverse.tableau().expect("inverse gate tableau"),
+            "{gate_name} inverse tableau should match inverse gate metadata"
+        );
+    }
+
+    for gate in Gate::all() {
+        assert_eq!(
+            gate.has_tableau(),
+            gate.tableau().is_ok(),
+            "{} has_tableau should match tableau materialization",
+            gate.canonical_name()
+        );
+    }
+
+    for unsupported in ["M", "R", "DETECTOR", "SPP"] {
+        let gate = Gate::from_name(unsupported).expect("unsupported gate");
+        assert!(!gate.has_tableau(), "{unsupported}");
+        let error = gate.tableau().expect_err("reject missing tableau data");
+        assert!(
+            error.to_string().contains("does not have tableau data"),
+            "{error}"
+        );
+    }
 }
 
 #[test]
