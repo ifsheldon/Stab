@@ -225,10 +225,10 @@ This section is a short triage view of gaps that are visible after mapping the S
 
 | Gap | Status | Why it matters |
 | --- | --- | --- |
-| Full circuit transform API parity | Partial | Rust `flattened`, `flattened_operations`, `without_noise`, and scoped `decomposed` are implemented for the owned RPF2 subset, but full Stim decomposition, full feedback inlining, QASM/Quirk/Crumble export, and richer flow transforms remain absent or scoped. |
+| Full circuit transform API parity | Partial | Rust `flattened`, `flattened_operations`, `without_noise`, scoped `decomposed`, and scoped `with_inlined_feedback` are implemented for the owned RPF2 subset, but full Stim decomposition, exact feedback loop refolding, QASM/Quirk/Crumble export, and richer flow transforms remain absent or scoped. |
 | Full DEM public API parity | Partial | DEM rounded/flattened/coordinate/diagram APIs and full Python-style ergonomics remain absent. |
 | Broader sweep-conditioned simulator and analysis parity | Partial | Public `m2d --sweep` is implemented for current detector conversion, but full sweep-conditioned detector sampling, analyzer behavior, Python APIs, and every sweep target shape remain broader work. |
-| Full feedback-inlining transform parity | Partial | `m2d --ran_without_feedback` now supports the command-level feedback-inlining subset covered by M9 tests, and `circuit_with_inlined_feedback` covers the supported MPP feedback-transform case while rejecting repeat blocks and unsupported classical controlled gates. Full `Circuit.with_inlined_feedback` parity and exact loop refolding remain broader transform work. |
+| Full feedback-inlining transform parity | Partial | `m2d --ran_without_feedback`, `circuit_with_inlined_feedback`, and scoped Rust `Circuit::with_inlined_feedback` cover the supported top-level Pauli and MPP feedback subset while rejecting repeat blocks and unsupported classical controlled gates. Exact loop refolding and broader repeat-block feedback parity remain open. |
 | Full ErrorMatcher provenance and `explain_errors` CLI | Deferred | Core value objects exist, but full stack-frame provenance and CLI UX remain future work. |
 | Public interactive `TableauSimulator` and `FlipSimulator` APIs | Deferred | Current internals support implemented workflows, but public simulator API parity is not exposed. |
 | Diagrams and visualization | Deferred | Stim's diagram command and Python diagram APIs are a large independent rendering surface. |

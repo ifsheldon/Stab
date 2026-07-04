@@ -178,7 +178,7 @@ Implementation tasks:
 - Implement public Rust `flattened` and flattened-operation traversal for repeat blocks, tags, annotations, coordinate shifts, detectors, observables, and measurement references. The Rust `Circuit::flattened` and `Circuit::flattened_operations` subset is implemented with tests, oracle metadata, benchmarks, and progress evidence in `docs/plans/rpf2-circuit-transform-progress-report.md`.
 - Implement `without_noise` while preserving deterministic operations, coordinates, ticks, detectors, observables, and measurement-record semantics. The Rust `Circuit::without_noise` subset is implemented with tests, oracle metadata, benchmarks, and progress evidence in `docs/plans/rpf2-circuit-transform-progress-report.md`.
 - Implement full or explicitly scoped `decomposed` behavior for compound gates, pair measurements, MPP, SPP, target grouping, and base-gate lowering. A scoped Rust `Circuit::decomposed` API now exposes the existing simplification subset and preserves unowned families; full Stim decomposition remains open.
-- Extend `circuit_with_inlined_feedback` into the selected public feedback-inlining surface, including repeat-block behavior or precise rejection.
+- Extend `circuit_with_inlined_feedback` into the selected public feedback-inlining surface, including repeat-block behavior or precise rejection. The scoped Rust `Circuit::with_inlined_feedback` API is implemented for the current top-level Pauli and MPP feedback subset, with explicit rejection for repeat blocks and unsupported classical controlled gates; full loop-refolding parity remains open.
 - Implement `time_reversed_for_flows` only after RPF5 defines required flow semantics.
 - Prefer folded traversal over full expansion for large repeats; when expansion remains necessary, add a documented cap and rejection tests.
 
@@ -192,13 +192,13 @@ Tests:
 
 Oracle rows:
 
-- Replace or supplement `pf2-circuit-flatten-without-noise`, `pf2-circuit-decomposed`, and `pf2-feedback-time-reverse`.
+- Replace or supplement `pf2-circuit-flatten-without-noise`, `pf2-circuit-decomposed`, and `pf2-feedback-time-reverse`. The broad feedback row is now supplemented by `pf2-feedback-inline-scoped-rust`.
 - Exact-output rows should cite pinned Stim examples when canonical text is stable.
 - Structural rows should state why exact text is not a faithful comparator.
 
 Benchmarks:
 
-- Add or implement `pf2-circuit-flatten-repeat`, `pf2-circuit-without-noise`, `pf2-circuit-decompose-mpp-spp`, `pf2-feedback-inline-batch`, and `pf2-time-reverse-flow`.
+- Add or implement `pf2-circuit-flatten-repeat`, `pf2-circuit-without-noise`, `pf2-circuit-decompose-mpp-spp`, `pf2-feedback-inline-batch`, and `pf2-time-reverse-flow`. The feedback-inline batch row now has report-only runner coverage for the scoped method.
 - Use submeasurement thresholds when one row bundles flattening, decomposition, and feedback work.
 - Promote only faithful direct or CLI-comparable rows with stable repeated evidence.
 

@@ -3,7 +3,10 @@
     reason = "RPF2 transform parity tests use compact exact-output assertions"
 )]
 
-use stab_core::{Circuit, CircuitError};
+use stab_core::{
+    Circuit, CircuitError, ErrorAnalyzerOptions, circuit_to_detector_error_model,
+    circuit_with_inlined_feedback,
+};
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
@@ -298,6 +301,112 @@ fn decomposed_preserves_unowned_mpp_spp_and_pair_phasing_families() {
     );
 
     assert_eq!(circuit.decomposed().expect("decompose"), circuit);
+}
+
+#[test]
+fn with_inlined_feedback_exposes_supported_transform_subset() {
+    let circuit = circuit(
+        "
+        MR 0
+        H 0
+        CX sweep[5] 0
+        CY rec[-1] 0 rec[-1] 0 2 3 rec[-1] 0
+        H 0
+        M 0
+        DETECTOR rec[-1]
+        OBSERVABLE_INCLUDE(2) rec[-1]
+    ",
+    );
+
+    let method_output = circuit.with_inlined_feedback().expect("inline feedback");
+    let helper_output = circuit_with_inlined_feedback(&circuit).expect("inline feedback");
+
+    assert_eq!(method_output, helper_output);
+    assert_eq!(
+        method_output.to_stim_string(),
+        "\
+MR 0
+H 0
+CX sweep[5] 0
+OBSERVABLE_INCLUDE(2) rec[-1]
+CY 2 3
+H 0
+M 0
+DETECTOR rec[-2] rec[-1]
+OBSERVABLE_INCLUDE(2) rec[-1]
+"
+    );
+}
+
+#[test]
+fn with_inlined_feedback_preserves_mpp_detector_error_model() {
+    let input = circuit(
+        "
+        RX 0
+        RY 1
+        RZ 2
+        MPP X0*Y1*Z2 Z5
+        CX rec[-2] 3
+        M 3
+        DETECTOR rec[-1]
+    ",
+    );
+
+    let inlined = input.with_inlined_feedback().expect("inline feedback");
+
+    assert_eq!(
+        inlined.to_stim_string(),
+        "\
+RX 0
+RY 1
+R 2
+MPP X0*Y1*Z2 Z5
+M 3
+DETECTOR rec[-3] rec[-1]
+"
+    );
+    let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
+        .expect("input DEM")
+        .to_dem_string();
+    let actual_dem = circuit_to_detector_error_model(&inlined, ErrorAnalyzerOptions::default())
+        .expect("inlined DEM")
+        .to_dem_string();
+    assert_eq!(actual_dem, expected_dem);
+}
+
+#[test]
+fn with_inlined_feedback_rejects_unimplemented_repeat_and_control_shapes() {
+    let repeat_error = circuit(
+        "
+        REPEAT 2 {
+            M 0
+            CX rec[-1] 0
+        }
+    ",
+    )
+    .with_inlined_feedback()
+    .expect_err("reject repeat feedback");
+    assert!(
+        repeat_error
+            .to_string()
+            .contains("does not support repeat blocks"),
+        "{repeat_error}"
+    );
+
+    let gate_error = circuit(
+        "
+        M 0
+        XCZ rec[-1] 1
+        M 1
+        DETECTOR rec[-1]
+    ",
+    )
+    .with_inlined_feedback()
+    .expect_err("reject unsupported feedback gate");
+    assert!(
+        gate_error.to_string().contains("does not support XCZ"),
+        "{gate_error}"
+    );
 }
 
 #[test]

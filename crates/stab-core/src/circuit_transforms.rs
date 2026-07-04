@@ -73,6 +73,16 @@ impl Circuit {
     pub fn decomposed(&self) -> CircuitResult<Self> {
         crate::simplified_circuit(self)
     }
+
+    /// Returns the currently supported transform with measurement feedback inlined.
+    ///
+    /// This is Stab's scoped Rust counterpart to Stim's feedback-removal transform. The current
+    /// implementation handles top-level single-control Pauli feedback, including the supported MPP
+    /// measurement case, and rejects repeat blocks or unsupported classical controlled gates with
+    /// precise domain errors instead of claiming full loop-refolding parity.
+    pub fn with_inlined_feedback(&self) -> CircuitResult<Self> {
+        crate::circuit_with_inlined_feedback(self)
+    }
 }
 
 fn validate_flattened_operation_limit(circuit: &Circuit) -> CircuitResult<()> {

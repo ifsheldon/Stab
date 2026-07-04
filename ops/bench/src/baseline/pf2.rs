@@ -24,6 +24,13 @@ const TRANSFORM_REPETITIONS: usize = 1;
 const FLATTEN_OUTPUTS_PER_REPETITION: u64 = 3;
 const FLATTEN_FIXED_OUTPUTS: u64 = 2;
 const WITHOUT_NOISE_SOURCE_INSTRUCTIONS_PER_GROUP: usize = 5;
+const FEEDBACK_INLINE_MPP: &str = "RX 0\n\
+                                  RY 1\n\
+                                  RZ 2\n\
+                                  MPP X0*Y1*Z2 Z5\n\
+                                  CX rec[-2] 3\n\
+                                  M 3\n\
+                                  DETECTOR rec[-1]\n";
 
 pub(super) fn run_circuit_flatten_repeat_row(
     row: &BenchmarkRow,
@@ -59,6 +66,23 @@ pub(super) fn run_circuit_without_noise_row(
     )?])
 }
 
+pub(super) fn run_feedback_inline_batch_row(
+    row: &BenchmarkRow,
+) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = parse_circuit(&row.id, FEEDBACK_INLINE_MPP)?;
+    Ok(vec![measure_stab_batched(
+        "stab_circuit_with_inlined_feedback_mpp",
+        TRANSFORM_REPETITIONS,
+        || {
+            let inlined = circuit
+                .with_inlined_feedback()
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(circuit_checksum(&inlined));
+            Ok(())
+        },
+    )?])
+}
+
 pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     match (row_id, name) {
         ("pf2-circuit-flatten-repeat", "stab_circuit_flatten_repeat_shifted_coords") => {
@@ -70,6 +94,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             (WITHOUT_NOISE_GROUPS * WITHOUT_NOISE_SOURCE_INSTRUCTIONS_PER_GROUP) as f64,
             "source-instructions/s",
         )),
+        ("pf2-feedback-inline-batch", "stab_circuit_with_inlined_feedback_mpp") => {
+            Some((1.0, "transforms/s"))
+        }
         _ => None,
     }
 }
@@ -81,6 +108,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf2-circuit-without-noise" => Some(
             "contract-only: Stab measures Rust Circuit::without_noise over top-level noisy, heralded, measurement, detector, and annotation instructions; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",
+        ),
+        "pf2-feedback-inline-batch" => Some(
+            "contract-only: Stab measures Rust Circuit::with_inlined_feedback on the scoped MPP feedback subset; pinned Stim has equivalent transform behavior but no faithful Rust direct baseline in this harness",
         ),
         _ => None,
     }

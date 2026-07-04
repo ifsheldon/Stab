@@ -749,6 +749,10 @@ fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
             "pf2-circuit-without-noise",
             "stab_circuit_without_noise_top_level",
         ),
+        (
+            "pf2-feedback-inline-batch",
+            "stab_circuit_with_inlined_feedback_mpp",
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),
