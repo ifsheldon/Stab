@@ -535,6 +535,10 @@ impl ConversionPlan {
         match instruction.gate().canonical_name() {
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
+            "SPP" | "SPP_DAG" => Err(CircuitError::invalid_sampler_compilation(format!(
+                "detection conversion does not yet support {}",
+                instruction.gate().canonical_name()
+            ))),
             _ => self.add_measurements(instruction),
         }
     }

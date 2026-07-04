@@ -1,15 +1,19 @@
 #![allow(
     clippy::expect_used,
+    clippy::panic,
+    clippy::string_slice,
     clippy::unwrap_used,
-    reason = "PF1 gate metadata compatibility tests use direct assertions for compact diagnostics"
+    reason = "PF1 gate metadata compatibility tests use direct assertions and ASCII pinned-source slicing for compact diagnostics"
 )]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use num_complex::Complex32;
 use stab_core::{
-    Circuit, CircuitItem, Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
-    check_if_circuit_has_unsigned_stabilizer_flows, unitary_to_tableau,
+    Circuit, CircuitItem, CompiledDetectionConverter, CompiledSampler, DetectionConversionOptions,
+    Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
+    check_if_circuit_has_unsigned_stabilizer_flows, convert_measurements_to_detection_events,
+    unitary_to_tableau,
 };
 
 #[test]
@@ -418,8 +422,238 @@ fn gate_unitary_matrix_metadata_matches_owned_gate_data() {
     }
 }
 
+#[test]
+fn gate_decomposition_metadata_matches_owned_gate_data() {
+    // Adapted from Stim v1.16.0 src/stim/gates/gates.test.cc and gate_data_*.cc decomposition metadata.
+    let h = Gate::from_name("H").expect("H");
+    assert!(h.has_h_s_cx_m_r_decomposition());
+    assert_eq!(
+        h.h_s_cx_m_r_decomposition()
+            .expect("H decomposition")
+            .as_stim_str(),
+        "\nH 0\n"
+    );
+    assert_eq!(
+        h.h_s_cx_m_r_decomposition()
+            .expect("H decomposition")
+            .to_circuit()
+            .expect("parse H decomposition")
+            .to_stim_string(),
+        "H 0\n"
+    );
+
+    let cx = Gate::from_name("CX").expect("CX");
+    assert_eq!(
+        cx.h_s_cx_m_r_decomposition()
+            .expect("CX decomposition")
+            .as_stim_str(),
+        "\nCNOT 0 1\n"
+    );
+
+    let mxx = Gate::from_name("MXX").expect("MXX");
+    assert_eq!(
+        mxx.h_s_cx_m_r_decomposition()
+            .expect("MXX decomposition")
+            .to_circuit()
+            .expect("parse MXX decomposition")
+            .to_stim_string(),
+        concat!("CX 0 1\n", "H 0\n", "M 0\n", "H 0\n", "CX 0 1\n")
+    );
+
+    let expected_decomposition_names = expected_decomposition_supported_gate_names();
+    assert_eq!(expected_decomposition_names.len(), 61);
+    let actual_decomposition_names = Gate::all()
+        .filter(|gate| gate.has_h_s_cx_m_r_decomposition())
+        .map(|gate| gate.canonical_name())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(actual_decomposition_names, expected_decomposition_names);
+
+    let upstream_texts = upstream_decomposition_texts();
+    assert_eq!(
+        upstream_texts.keys().copied().collect::<BTreeSet<_>>(),
+        expected_decomposition_supported_gate_names()
+    );
+    for gate_name in expected_decomposition_names {
+        let gate = Gate::from_name(gate_name).expect("gate");
+        let decomposition = gate.h_s_cx_m_r_decomposition().expect("gate decomposition");
+        assert_eq!(
+            decomposition.as_stim_str(),
+            *upstream_texts.get(gate_name).expect("upstream text"),
+            "{gate_name} decomposition text should match pinned Stim v1.16.0"
+        );
+        let circuit = decomposition.to_circuit().expect("parse decomposition");
+        assert_h_s_cx_m_r_base(&circuit, gate_name);
+    }
+
+    for gate in Gate::all() {
+        assert_eq!(
+            gate.has_h_s_cx_m_r_decomposition(),
+            gate.h_s_cx_m_r_decomposition().is_ok(),
+            "{} has_h_s_cx_m_r_decomposition should match materialization",
+            gate.canonical_name()
+        );
+    }
+
+    for unsupported in [
+        "DETECTOR",
+        "TICK",
+        "SHIFT_COORDS",
+        "X_ERROR",
+        "HERALDED_ERASE",
+    ] {
+        let gate = Gate::from_name(unsupported).expect("unsupported gate");
+        assert!(!gate.has_h_s_cx_m_r_decomposition(), "{unsupported}");
+        let error = gate
+            .h_s_cx_m_r_decomposition()
+            .expect_err("reject missing decomposition data");
+        assert!(error.to_string().contains("decomposition data"), "{error}");
+    }
+}
+
+#[test]
+fn gate_decomposition_metadata_matches_tableau_where_defined() {
+    // The decomposition strings are gate-table metadata. Full circuit decomposition belongs to RPF2.
+    // For fixed-shape unitary gates with non-empty decompositions, the current tableau comparator is valid.
+    for gate_name in expected_tableau_supported_gate_names() {
+        if matches!(gate_name, "I" | "II") {
+            continue;
+        }
+        let gate = Gate::from_name(gate_name).expect("gate");
+        let decomposition = gate
+            .h_s_cx_m_r_decomposition()
+            .expect("unitary gate should have decomposition")
+            .to_circuit()
+            .expect("parse decomposition");
+        assert_eq!(
+            decomposition
+                .to_tableau(false, false, false)
+                .expect("decomposition tableau"),
+            gate.tableau().expect("gate tableau"),
+            "{gate_name} decomposition should match gate tableau"
+        );
+    }
+
+    for gate_name in ["M", "MR", "MXX", "MPP", "SPP", "SPP_DAG"] {
+        let gate = Gate::from_name(gate_name).expect("non-tableau decomposition gate");
+        assert!(gate.has_h_s_cx_m_r_decomposition(), "{gate_name}");
+        assert!(
+            gate.tableau().is_err(),
+            "{gate_name} decomposition metadata should not imply tableau metadata"
+        );
+    }
+}
+
+#[test]
+fn gate_execution_contract_rejects_variable_target_spp_sampler_execution() {
+    // Parser validation accepts SPP/SPP_DAG targets, but sampler and detector conversion execution are explicit later gate-semantics milestones.
+    for gate_name in ["SPP", "SPP_DAG"] {
+        let circuit =
+            Circuit::from_stim_str(&format!("{gate_name} X0 X1*Y2*Z3\n")).expect("parse SPP");
+        let error = CompiledSampler::compile(&circuit)
+            .expect_err("sampler should reject SPP execution")
+            .to_string();
+        assert!(
+            error.contains("sampler subset does not support"),
+            "{gate_name}: {error}"
+        );
+        for skip_reference_sample in [false, true] {
+            let error = CompiledDetectionConverter::compile(
+                &circuit,
+                DetectionConversionOptions {
+                    skip_reference_sample,
+                },
+            )
+            .expect_err("detection conversion should reject SPP execution")
+            .to_string();
+            assert!(
+                error.contains("detection conversion does not yet support"),
+                "{gate_name}: {error}"
+            );
+        }
+        let error = convert_measurements_to_detection_events(
+            &circuit,
+            &[Vec::new()],
+            DetectionConversionOptions {
+                skip_reference_sample: true,
+            },
+        )
+        .expect_err("public conversion helper should reject SPP execution")
+        .to_string();
+        assert!(
+            error.contains("detection conversion does not yet support"),
+            "{gate_name}: {error}"
+        );
+    }
+}
+
 fn flow_texts(flows: Vec<stab_core::Flow>) -> Vec<String> {
     flows.into_iter().map(|flow| flow.to_string()).collect()
+}
+
+fn assert_h_s_cx_m_r_base(circuit: &Circuit, gate_name: &str) {
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(instruction) => assert!(
+                matches!(
+                    instruction.gate().canonical_name(),
+                    "H" | "S" | "CX" | "M" | "R"
+                ),
+                "{gate_name} decomposition used non-base gate {}",
+                instruction.gate().canonical_name()
+            ),
+            CircuitItem::RepeatBlock(_) => panic!("{gate_name} decomposition should not repeat"),
+        }
+    }
+}
+
+fn upstream_decomposition_texts() -> BTreeMap<&'static str, &'static str> {
+    [
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_annotations.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_blocks.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_collapsing.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_controlled.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_hada.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_heralded.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_noisy.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_pair_measure.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_pauli.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_pauli_product.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_period_3.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_period_4.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_pp.cc"),
+        include_str!("../../../vendor/stim/src/stim/gates/gate_data_swaps.cc"),
+    ]
+    .into_iter()
+    .flat_map(upstream_decompositions_from_file)
+    .collect()
+}
+
+fn upstream_decompositions_from_file(text: &'static str) -> BTreeMap<&'static str, &'static str> {
+    let mut out = BTreeMap::new();
+    let mut rest = text;
+    while let Some(name_start) = rest.find(".name = \"") {
+        rest = &rest[name_start + ".name = \"".len()..];
+        let Some(name_end) = rest.find('"') else {
+            break;
+        };
+        let name = &rest[..name_end];
+        let after_name = &rest[name_end..];
+        let Some(field_start) = after_name.find(".h_s_cx_m_r_decomposition = ") else {
+            break;
+        };
+        rest = &after_name[field_start + ".h_s_cx_m_r_decomposition = ".len()..];
+        let raw_prefix = "R\"CIRCUIT(";
+        if !rest.starts_with(raw_prefix) {
+            continue;
+        }
+        rest = &rest[raw_prefix.len()..];
+        let Some(raw_end) = rest.find(")CIRCUIT\"") else {
+            break;
+        };
+        out.insert(name, &rest[..raw_end]);
+        rest = &rest[raw_end + ")CIRCUIT\"".len()..];
+    }
+    out
 }
 
 fn assert_matrix_close(actual: &[Vec<Complex32>], expected: &[&[(f32, f32)]]) {
@@ -512,6 +746,72 @@ fn expected_tableau_supported_gate_names() -> BTreeSet<&'static str> {
         "ISWAP",
         "ISWAP_DAG",
         "S",
+        "S_DAG",
+        "SQRT_XX",
+        "SQRT_XX_DAG",
+        "SQRT_X",
+        "SQRT_X_DAG",
+        "SQRT_YY",
+        "SQRT_YY_DAG",
+        "SQRT_Y",
+        "SQRT_Y_DAG",
+        "SQRT_ZZ",
+        "SQRT_ZZ_DAG",
+        "SWAP",
+        "SWAPCX",
+        "X",
+        "XCX",
+        "XCY",
+        "XCZ",
+        "Y",
+        "YCX",
+        "YCY",
+        "YCZ",
+        "Z",
+    ])
+}
+
+fn expected_decomposition_supported_gate_names() -> BTreeSet<&'static str> {
+    BTreeSet::from([
+        "C_NXYZ",
+        "C_NZYX",
+        "C_XNYZ",
+        "C_XYNZ",
+        "C_XYZ",
+        "C_ZNYX",
+        "C_ZYNX",
+        "C_ZYX",
+        "CX",
+        "CXSWAP",
+        "CY",
+        "CZ",
+        "CZSWAP",
+        "H",
+        "H_NXY",
+        "H_NXZ",
+        "H_NYZ",
+        "H_XY",
+        "H_YZ",
+        "I",
+        "II",
+        "ISWAP",
+        "ISWAP_DAG",
+        "M",
+        "MPP",
+        "MR",
+        "MRX",
+        "MRY",
+        "MX",
+        "MXX",
+        "MY",
+        "MYY",
+        "MZZ",
+        "R",
+        "RX",
+        "RY",
+        "S",
+        "SPP",
+        "SPP_DAG",
         "S_DAG",
         "SQRT_XX",
         "SQRT_XX_DAG",

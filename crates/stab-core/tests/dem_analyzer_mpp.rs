@@ -82,3 +82,18 @@ fn dem_analyzer_mpp_ordering_rejects_non_deterministic_upstream_subset() {
         assert!(error.contains("D0"));
     }
 }
+
+#[test]
+fn dem_analyzer_rejects_spp_until_variable_target_gate_execution_lands() {
+    for gate_name in ["SPP", "SPP_DAG"] {
+        let parsed =
+            Circuit::from_stim_str(&format!("{gate_name} X0 X1*Y2*Z3\n")).expect("parse SPP");
+        let error = circuit_to_detector_error_model(&parsed, ErrorAnalyzerOptions::default())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("analyze_errors does not yet support"),
+            "{gate_name}: {error}"
+        );
+    }
+}

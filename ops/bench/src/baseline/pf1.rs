@@ -265,6 +265,11 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
         .copied()
         .filter(|gate| gate.has_unitary_matrix())
         .collect::<Vec<_>>();
+    let decomposition_gates = gates
+        .iter()
+        .copied()
+        .filter(|gate| gate.has_h_s_cx_m_r_decomposition())
+        .collect::<Vec<_>>();
 
     Ok(vec![
         measure_stab_batched(
@@ -364,6 +369,41 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
             },
         )?,
         measure_stab_batched(
+            "stab_gate_metadata_decomposition_text_supported_gates",
+            TINY_DIRECT_COMPARE_REPETITIONS,
+            || {
+                let mut checksum = 0_u64;
+                for gate in &decomposition_gates {
+                    let decomposition = gate
+                        .h_s_cx_m_r_decomposition()
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    checksum ^= decomposition_checksum(decomposition.as_stim_str());
+                    black_box(decomposition);
+                }
+                black_box(checksum);
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_gate_metadata_decomposition_parse_supported_gates",
+            TINY_DIRECT_COMPARE_REPETITIONS,
+            || {
+                let mut checksum = 0_u64;
+                for gate in &decomposition_gates {
+                    let decomposition = gate
+                        .h_s_cx_m_r_decomposition()
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    let circuit = decomposition
+                        .to_circuit()
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    checksum ^= circuit.to_stim_string().len() as u64;
+                    black_box(circuit);
+                }
+                black_box(checksum);
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
             "stab_gate_metadata_alias_lookup_all_aliases",
             TINY_DIRECT_COMPARE_REPETITIONS,
             || {
@@ -404,6 +444,13 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             "stab_gate_metadata_unitary_supported_gates" => {
                 Some((gate_unitary_entry_count() as f64, "entries/s"))
             }
+            "stab_gate_metadata_decomposition_text_supported_gates" => {
+                Some((gate_decomposition_byte_count() as f64, "bytes/s"))
+            }
+            "stab_gate_metadata_decomposition_parse_supported_gates" => Some((
+                gate_decomposition_instruction_count() as f64,
+                "instructions/s",
+            )),
             "stab_gate_metadata_alias_lookup_all_aliases" => {
                 Some((gate_alias_count() as f64, "lookups/s"))
             }
@@ -433,7 +480,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures Rust circuit count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
         ),
         "pf1-gate-metadata-lookup" => Some(
-            "contract-only: Stab measures Rust gate metadata accessors, tableau metadata reads, tableau-backed flow metadata reads, fixed-shape unitary matrix reads, and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
+            "contract-only: Stab measures Rust gate metadata accessors, tableau metadata reads, tableau-backed flow metadata reads, fixed-shape unitary matrix reads, H/S/CX/M/R decomposition metadata reads, and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
         ),
         "pf1-dem-counts-repeat" => Some(
             "contract-only: Stab measures Rust DEM count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
@@ -523,6 +570,27 @@ fn gate_unitary_entry_count() -> usize {
         .filter_map(|gate| gate.unitary_matrix().ok())
         .map(GateUnitaryMatrix::entry_count)
         .sum()
+}
+
+fn gate_decomposition_byte_count() -> usize {
+    Gate::all()
+        .filter_map(|gate| gate.h_s_cx_m_r_decomposition().ok())
+        .map(|decomposition| decomposition.as_stim_str().len())
+        .sum()
+}
+
+fn gate_decomposition_instruction_count() -> usize {
+    Gate::all()
+        .filter_map(|gate| gate.h_s_cx_m_r_decomposition().ok())
+        .filter_map(|decomposition| decomposition.to_circuit().ok())
+        .map(|circuit| circuit.items().len())
+        .sum()
+}
+
+fn decomposition_checksum(text: &str) -> u64 {
+    text.bytes().fold(text.len() as u64, |checksum, byte| {
+        checksum.rotate_left(5) ^ u64::from(byte)
+    })
 }
 
 fn unitary_matrix_checksum(matrix: GateUnitaryMatrix) -> u64 {

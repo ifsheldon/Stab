@@ -203,7 +203,7 @@ impl Analyzer {
             name => {
                 if let Ok(clifford) = SingleQubitClifford::from_gate(instruction.gate()) {
                     self.apply_single_qubit_clifford(instruction, clifford)
-                } else if is_noise_instruction(name) {
+                } else if matches!(name, "SPP" | "SPP_DAG") || is_noise_instruction(name) {
                     Err(CircuitError::invalid_detector_error_model(format!(
                         "analyze_errors does not yet support {name}"
                     )))

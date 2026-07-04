@@ -1,6 +1,7 @@
 use super::{ArgRule, Gate, GateCategory, GateUnitaryMatrix, TargetRule};
 use crate::{
-    CircuitError, CircuitResult, Flow, PauliBasis, PauliSign, PauliString, StabilizerError,
+    CircuitError, CircuitResult, Flow, GateDecomposition, PauliBasis, PauliSign, PauliString,
+    StabilizerError,
 };
 
 /// Public argument validation shape for a Stim gate.
@@ -338,6 +339,24 @@ impl Gate {
     /// Returns true when `unitary_matrix` can produce fixed-shape unitary metadata.
     pub fn has_unitary_matrix(self) -> bool {
         crate::gate::unitary::gate_has_unitary_matrix(self.info.name)
+    }
+
+    /// Returns Stim v1.16.0's H/S/CX/M/R decomposition metadata for this gate.
+    ///
+    /// This exposes the static gate-table metadata only. Full circuit decomposition is owned by
+    /// the circuit transform milestones and is not implied by this accessor.
+    pub fn h_s_cx_m_r_decomposition(self) -> CircuitResult<GateDecomposition> {
+        crate::gate::decomposition::gate_decomposition(self.info.name).ok_or_else(|| {
+            CircuitError::invalid_tableau_conversion(format!(
+                "gate {} does not have H/S/CX/M/R decomposition data",
+                self.info.name
+            ))
+        })
+    }
+
+    /// Returns true when `h_s_cx_m_r_decomposition` can produce gate-table metadata.
+    pub fn has_h_s_cx_m_r_decomposition(self) -> bool {
+        crate::gate::decomposition::gate_has_decomposition(self.info.name)
     }
 
     pub fn can_fuse(self) -> bool {

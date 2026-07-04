@@ -1,6 +1,8 @@
+mod decomposition;
 mod metadata;
 mod unitary;
 
+pub use decomposition::GateDecomposition;
 pub use metadata::{GateArgumentRule, GateTargetGroupKind, GateTargetRule};
 pub use unitary::GateUnitaryMatrix;
 
