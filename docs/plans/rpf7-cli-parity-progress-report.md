@@ -15,6 +15,14 @@ The owned negative subcases reject a nonexistent `--in` path before producing st
 The comparator class is structural CLI behavior against the selected Stim `analyze_errors` command contract: accepted path flags, rejected path errors, stdout behavior, stderr class, and exit status.
 No benchmark row changes are needed because this slice tests path-boundary behavior rather than a new analyzer hot path.
 
+## Implemented Slice: Accepted Legacy Alias Dispatch Evidence
+
+This PFM7 slice promotes source-owned CLI evidence that the selected legacy top-level aliases dispatch to the same implementation as their canonical subcommands.
+The owned positive subcases cover `--gen=repetition_code`, `--convert`, `--sample=2`, `--detect=3`, space-separated `--detect 3`, `--m2d`, and `--analyze_errors`.
+Each subcase compares status, stdout bytes, and stderr bytes against the matching canonical `gen`, `convert`, `sample`, `detect`, `m2d`, or `analyze_errors` command.
+The comparator class is structural CLI behavior against the selected Stim legacy-dispatch contract: accepted alias spelling, command normalization, stdout behavior, stderr class, and exit status.
+No benchmark row changes are needed because the existing PF7 startup row samples the accepted legacy dispatch path through `--gen`; this slice adds correctness evidence for the full selected alias set without adding a new hot path.
+
 ## Evidence
 
 Benchmark row:
@@ -29,6 +37,7 @@ Benchmark row:
 Oracle rows:
 
 - `pf7-analyze-errors-path-io-rust` proves `stab analyze_errors --in` and `--out` success, missing input path rejection, output-open precedence, stdout behavior, stderr class, and exit status.
+- `pf7-legacy-dispatch-accepted-rust` proves selected accepted legacy aliases dispatch to the same command implementation as canonical subcommands for `gen`, `convert`, `sample`, `detect`, `m2d`, and `analyze_errors`.
 - `pf7-legacy-dispatch-conflicts-rust` runs selected legacy conflict cases for `--convert`, `--sample`, `--detect`, `--m2d`, `--analyze_errors`, and `--gen=...`, checking nonzero status, empty stdout, and diagnostic stderr.
 - `pf7-detector-hypergraph-excluded-rust` proves deprecated `--detector_hypergraph` is not accepted as a mode and is not exposed as a help topic.
 - `pf7-legacy-unselected-modes-rust` proves unselected legacy-style `--diagram`, `--explain_errors`, `--repl`, and `--sample_dem` flags fail closed with nonzero status, empty stdout, and diagnostic stderr.
@@ -37,6 +46,14 @@ Verification for the path-IO slice:
 
 ```sh
 cargo test -p stab-cli analyze_errors_path --quiet
+cargo test -p stab-oracle fixtures --quiet
+just oracle::run --milestone PF7 --structural
+```
+
+Verification for the accepted-alias slice:
+
+```sh
+cargo test -p stab-cli legacy_dispatch_accepts_selected_aliases --quiet
 cargo test -p stab-oracle fixtures --quiet
 just oracle::run --milestone PF7 --structural
 ```

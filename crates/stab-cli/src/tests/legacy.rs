@@ -1,14 +1,108 @@
 use crate::run_from;
 
-fn run_cli(args: &[&str], input: &[u8]) -> (i32, String, String) {
+fn run_cli_bytes(args: &[&str], input: &[u8]) -> (i32, Vec<u8>, Vec<u8>) {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(args.iter().copied(), input, &mut stdout, &mut stderr);
+    (status, stdout, stderr)
+}
+
+fn run_cli(args: &[&str], input: &[u8]) -> (i32, String, String) {
+    let (status, stdout, stderr) = run_cli_bytes(args, input);
     (
         status,
         String::from_utf8(stdout).expect("stdout is UTF-8"),
         String::from_utf8(stderr).expect("stderr is UTF-8"),
     )
+}
+
+#[test]
+fn legacy_dispatch_accepts_selected_aliases() {
+    for (legacy_args, subcommand_args, input) in [
+        (
+            &[
+                "stab",
+                "--gen=repetition_code",
+                "--task",
+                "memory",
+                "--distance",
+                "3",
+                "--rounds",
+                "2",
+            ][..],
+            &[
+                "stab",
+                "gen",
+                "--code",
+                "repetition_code",
+                "--task",
+                "memory",
+                "--distance",
+                "3",
+                "--rounds",
+                "2",
+            ][..],
+            b"".as_slice(),
+        ),
+        (
+            &["stab", "--convert", "--bits_per_shot", "2"][..],
+            &["stab", "convert", "--bits_per_shot", "2"][..],
+            b"10\n01\n".as_slice(),
+        ),
+        (
+            &["stab", "--sample=2"][..],
+            &["stab", "sample", "--shots", "2"][..],
+            b"M 0\n".as_slice(),
+        ),
+        (
+            &["stab", "--detect=3"][..],
+            &["stab", "detect", "--shots", "3"][..],
+            b"M 0\nDETECTOR rec[-1]\n".as_slice(),
+        ),
+        (
+            &["stab", "--detect", "3"][..],
+            &["stab", "detect", "--shots", "3"][..],
+            b"M 0\nDETECTOR rec[-1]\n".as_slice(),
+        ),
+        (
+            &[
+                "stab",
+                "--m2d",
+                "--in_format=01",
+                "--out_format=dets",
+                concat!(
+                    "--circuit=",
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../oracle/fixtures/inputs/m2d_basic.stim"
+                ),
+            ][..],
+            &[
+                "stab",
+                "m2d",
+                "--in_format=01",
+                "--out_format=dets",
+                concat!(
+                    "--circuit=",
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../oracle/fixtures/inputs/m2d_basic.stim"
+                ),
+            ][..],
+            include_bytes!("../../../../oracle/fixtures/inputs/m2d_basic_measurements.01")
+                .as_slice(),
+        ),
+        (
+            &["stab", "--analyze_errors"][..],
+            &["stab", "analyze_errors"][..],
+            b"M 0\nDETECTOR rec[-1]\n".as_slice(),
+        ),
+    ] {
+        let legacy = run_cli_bytes(legacy_args, input);
+        let subcommand = run_cli_bytes(subcommand_args, input);
+
+        assert_eq!(legacy.0, 0, "{legacy_args:?}");
+        assert_eq!(subcommand.0, 0, "{subcommand_args:?}");
+        assert_eq!(legacy, subcommand, "{legacy_args:?}");
+    }
 }
 
 #[test]
