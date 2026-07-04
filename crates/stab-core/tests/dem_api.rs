@@ -393,6 +393,46 @@ fn pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries() {
 }
 
 #[test]
+fn pf4_dem_coordinates_fold_late_selected_detector_lookup() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 1000000000 {\n\
+             detector(1, 2) D0\n\
+             shift_detectors(3, 4) 1\n\
+         }\n",
+    )
+    .expect("parse huge coordinate DEM");
+    let late_detector = DemDetectorId::try_new(999_999_999).expect("late detector id");
+
+    assert_eq!(
+        dem.detector_coordinates_for([DemDetectorId::try_new(0).expect("D0"), late_detector,])
+            .expect("fold selected detector lookup through huge repeat"),
+        BTreeMap::from([
+            (DemDetectorId::try_new(0).expect("D0"), vec![1.0, 2.0]),
+            (late_detector, vec![2_999_999_998.0, 3_999_999_998.0]),
+        ])
+    );
+}
+
+#[test]
+fn pf4_dem_coordinates_preserve_first_overlapping_repeat_declaration() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 10 {\n\
+             detector(100) D2\n\
+             detector(0) D0\n\
+             shift_detectors(1) 1\n\
+         }\n",
+    )
+    .expect("parse overlapping coordinate DEM");
+    let detector = DemDetectorId::try_new(9).expect("D9");
+
+    assert_eq!(
+        dem.coordinates_of_detector(detector)
+            .expect("fold selected overlapping detector lookup"),
+        vec![107.0]
+    );
+}
+
+#[test]
 fn dem_item_ranges_and_flattened_iterator_are_typed() {
     let dem = DetectorErrorModel::from_dem_str(
         "error(0.125) D0\n\

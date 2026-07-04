@@ -187,7 +187,7 @@ fn run_dem_coordinate_map_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let selected_detectors = [
         DemDetectorId::try_new(0).map_err(|error| stab_runner_error(&row.id, error))?,
-        DemDetectorId::try_new(1).map_err(|error| stab_runner_error(&row.id, error))?,
+        DemDetectorId::try_new(1_000_000).map_err(|error| stab_runner_error(&row.id, error))?,
     ];
 
     Ok(vec![
