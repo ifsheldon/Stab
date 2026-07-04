@@ -19,6 +19,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
+## 2026-07-04 - RPF2: Flow-Time-Reversal Dependency Boundary
+
+Status: Open
+Revealed by: implementation of the RPF2 circuit transform slices.
+Current text: RPF2 asks to implement `time_reversed_for_flows` only after RPF5 defines required flow semantics, while also listing flow-time-reversal under the RPF2 transform objective.
+Gap: RPF2 can finish `flattened`, `without_noise`, public `decomposed`, and scoped feedback inlining, but it cannot specify or test `time_reversed_for_flows` without the RPF5 measurement-rich `Flow`, `has_flow`, flow-generator, included-observable, and measurement-index semantics. Treating the missing method as an RPF2 implementation defect would force agents to invent flow semantics before the owning milestone defines them.
+Proposed amendment: keep `time_reversed_for_flows` manifest-only under RPF2 until RPF5 closes the measurement-rich flow contract, then add a follow-up transform slice with exact public API shape, flow-semantic tests, and benchmark classification.
+Resolution: Pending RPF5 measurement-rich flow semantics.
+
 ## 2026-07-04 - PF1: Path-Based Circuit File Helper Streaming Boundary
 
 Status: Open

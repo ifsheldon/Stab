@@ -18,7 +18,7 @@ Remaining RPF2 work:
 - Flow-dependent decomposition checks remain open where they require the RPF5 measurement-rich flow semantics decision.
 - Full public feedback-inlining transform parity remains open beyond the scoped method, especially exact loop refolding and repeat-block feedback behavior.
 - Exact loop refolding remains open.
-- `time_reversed_for_flows` remains blocked on the RPF5 measurement-rich flow semantics decision.
+- `time_reversed_for_flows` remains blocked on the RPF5 measurement-rich flow semantics decision and is logged in `docs/plans/milestone-spec-gaps.md`.
 - QASM, Quirk, Crumble, diagrams, and Python-specific ergonomics remain explicitly deferred.
 
 ## Tests
