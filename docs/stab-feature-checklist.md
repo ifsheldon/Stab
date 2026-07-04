@@ -2,7 +2,7 @@
 
 This checklist maps the Stim v1.16.0 inventory in [stim-feature-list.md](stim-feature-list.md) onto the current Stab codebase.
 It is a feature-availability document, not a new roadmap.
-Use [plans/rust-stim-drop-in-rewrite.md](plans/rust-stim-drop-in-rewrite.md) and [plans/GOAL.md](plans/GOAL.md) for active implementation goals.
+Use [plans/remaining-partial-feature-milestones.md](plans/remaining-partial-feature-milestones.md), [plans/rust-stim-drop-in-rewrite.md](plans/rust-stim-drop-in-rewrite.md), and [plans/GOAL.md](plans/GOAL.md) for active implementation goals.
 
 Status key:
 

@@ -1,5 +1,8 @@
 # Partial Feature Closure Plan
 
+Historical note: this document is retained as the first post-beta PF planning pass.
+The active execution plan for remaining non-deferred partial rows is `docs/plans/remaining-partial-feature-milestones.md`, and `docs/plans/GOAL.md` now points at that plan.
+
 ## Summary
 
 This plan covers every `Partial` row in `docs/stab-feature-checklist.md` whose remaining work is not intentionally deferred.

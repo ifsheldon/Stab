@@ -1,8 +1,8 @@
-# Goal: Finish The Partial Feature Closure Plan
+# Goal: Finish Remaining Non-Deferred Partial Features
 
 ## Purpose
 
-This document is the active execution contract for finishing `docs/plans/partial-feature-closure-plan.md`.
+This document is the active execution contract for finishing `docs/plans/remaining-partial-feature-milestones.md`.
 The goal is to close every `Partial` feature-checklist row whose remaining work is not intentionally deferred, while keeping deferred Stim surfaces explicitly out of scope.
 Completion means Stab has tested, benchmarked, documented, audited, and reviewed Rust and CLI evidence for the active partial surfaces named in the plan.
 
@@ -13,29 +13,26 @@ The most important lesson is that exact subcases, executable comparators, benchm
 
 Included:
 
-- Classify every `Partial` row in `docs/stab-feature-checklist.md` as a rollup, an active implementation row, or an explicit deferral.
-- Finish non-deferred Rust core API gaps for circuit mutation, introspection, coordinates, reference samples, determined measurements, gate metadata, and basic DEM ergonomics.
-- Finish active circuit transform gaps for flattening, noise removal, decomposition, feedback inlining, time reversal for flows, and repeat traversal where they are selected by the plan.
-- Finish active sweep-conditioned execution and gate-semantic gaps for sampler, converter, detection, and analyzer paths.
-- Finish active DEM API, transform, coordinate, introspection, folded traversal, and analysis gaps.
-- Finish active detector utility and flow gaps for detecting regions, missing detectors, feedback-related transforms, and measurement-rich flows.
-- Finish active analyzer, search, and sparse reverse tracking gaps without taking on deferred `explain_errors` CLI or full provenance work.
-- Finish visible CLI parity gaps for `stab m2d`, `stab analyze_errors`, and accepted legacy aliases.
-- Add or update source-owned tests, oracle rows, benchmarks, profiler notes, reports, checklist entries, roadmap text, and completion evidence in the same change set as behavior changes.
-- Run milestone-audit and full-code-review before claiming completion.
+- Finish the active milestones RPF0 through RPF8 in `docs/plans/remaining-partial-feature-milestones.md`.
+- Classify every `Partial` row in `docs/stab-feature-checklist.md` as a rollup, an active implementation row, a mixed row with active and deferred parts, or a deferred-only row.
+- Finish non-deferred Rust core API, transform, DEM, analyzer, search, flow, sweep-conditioned execution, gate metadata, and gate execution gaps.
+- Finish non-deferred CLI gaps for `stab m2d`, `stab analyze_errors`, and accepted legacy aliases.
+- Add or update source-owned tests, oracle rows, benchmarks, profiler notes, progress reports, completion reports, checklist entries, roadmap text, and spec-gap logs in the same change set as behavior changes.
+- Run milestone-audit and full-code-review before claiming a milestone complete.
 
 Excluded:
 
-- Do not implement Python bindings or Python-style API clone behavior as part of this goal.
+- Do not implement Python bindings or Python API clone behavior as part of this goal.
 - Do not implement JavaScript/WASM, diagrams, `stim explain_errors` CLI, `stim repl`, QASM, Quirk, Crumble, GPU, ecosystem packages, exact random-stream parity, C++ header compatibility, or new public graph/vector simulator APIs.
+- Do not implement public `TableauSimulator` or `FlipSimulator` products under this goal.
 - Do not implement or document deprecated `--detector_hypergraph` as a supported Stab alias.
-- Do not mark public `TableauSimulator` or `FlipSimulator` APIs complete; current simulator internals remain implementation support unless a later plan changes scope.
-- Do not promote report-only, proxy, partial-match, tiny, or no-ratio benchmark rows into the 1.25x primary threshold gate without a separate source-owned rationale and stable repeated evidence.
+- Do not promote report-only, proxy, partial-match, tiny, or no-ratio benchmark rows into the 1.25x primary threshold gate without a source-owned rationale, stable repeated evidence, and matching profiler notes.
 
 ## Sources Of Truth
 
-- Active plan: `docs/plans/partial-feature-closure-plan.md`.
-- PF0 inventory: `docs/plans/partial-feature-inventory.md`.
+- Active plan: `docs/plans/remaining-partial-feature-milestones.md`.
+- Historical PF plan: `docs/plans/partial-feature-closure-plan.md`.
+- PF inventory: `docs/plans/partial-feature-inventory.md`.
 - Planning lessons: `docs/plans/lessons-learned.md`.
 - Feature status: `docs/stab-feature-checklist.md`.
 - Stim inventory: `docs/stim-feature-list.md`.
@@ -48,96 +45,83 @@ Excluded:
 
 If these sources disagree about scope, status, benchmark class, command behavior, report paths, or deferrals, fix the stale source before claiming progress.
 
-## Success State
-
-The goal is complete only when:
-
-- Every active partial row in `docs/stab-feature-checklist.md` is either implemented with evidence or remains explicitly partial with a named deferred subcase.
-- Every rollup partial row has child-row evidence and does not imply broader parity than the implemented surfaces prove.
-- Every implemented feature has tests that were added or ported before or alongside implementation.
-- Every public CLI behavior is covered by CLI tests or oracle rows that prove stdout behavior, stderr class, exit status, accepted flags, rejected flags, path handling, input formats, output formats, and resource behavior.
-- Every public Rust API added by this plan uses typed domain boundaries and clear domain errors.
-- Every benchmarked feature has a source-owned manifest row, runner coverage, measurement work, compare notes, and a comparability class.
-- Every row promoted into the 1.25x primary threshold gate has repeated stable direct or CLI-comparable evidence and matching profiler notes.
-- Report-only rows are labeled as report-only and are not used as release-gate evidence.
-- `docs/stab-feature-checklist.md`, `docs/plans/rust-stim-drop-in-rewrite.md`, oracle metadata, benchmark metadata, and milestone reports agree with current behavior.
-- Milestone-audit and full-code-review findings are fixed, or under-specification findings are logged in `docs/plans/milestone-spec-gaps.md`.
-
 ## Execution Rules
 
-- Start each milestone by extracting exact owned subcases from upstream tests, docs, or current Stab gaps.
+- Start every milestone by extracting exact owned subcases from the checklist, Stim inventory, pinned upstream docs, pinned upstream tests, and current Stab gaps.
+- Split upstream references into owned subcases, semantic-mining references, explicit deferrals, and out-of-scope items.
 - Add or port targeted tests before implementing the behavior they prove.
-- Do not treat an upstream file as an acceptance criterion; split it into owned, semantic-mining, deferred, and out-of-scope subcases.
+- Do not treat an upstream file as an acceptance criterion.
 - Keep unsupported behavior explicit through clear rejections, manifest-only future rows, or documented deferrals.
-- Keep public parser, converter, sampler, analyzer, and writer paths streaming where practical; otherwise document and test a resource cap.
+- Keep public parser, converter, sampler, analyzer, transformer, search, and writer paths streaming where practical; otherwise document and test a resource cap.
 - Use typed identifiers, paths, result formats, probabilities, coordinates, detector ids, observable ids, qubit ids, measurement references, repeat counts, and options after external boundaries.
-- Prefer existing Stab parser, circuit, DEM, stabilizer, sampler, analyzer, oracle, and benchmark infrastructure over parallel implementations.
-- Do not commit unless the user explicitly asks for commits.
+- Prefer existing Stab parser, circuit, DEM, stabilizer, sampler, analyzer, oracle, benchmark, and CLI infrastructure over parallel implementations.
+- Commit only when the user explicitly asks for commits or an active goal explicitly authorizes commits; group commits logically.
 - If final completion is claimed after a requested commit, regenerate final evidence from committed code with `local_modifications=false`.
 
 ## Milestone Work Loop
 
-For every milestone in `docs/plans/partial-feature-closure-plan.md`:
+For every milestone in `docs/plans/remaining-partial-feature-milestones.md`:
 
-1. Confirm the milestone scope against the feature checklist, Stim inventory, roadmap, lessons learned, and spec-gap log.
-2. Split upstream references into exact owned subcases, semantic-mining references, explicit deferrals, and out-of-scope items.
-3. Add or port targeted tests first, including negative tests for unsupported shapes and resource-boundary tests for public inputs and outputs.
+1. Confirm the milestone scope against `docs/stab-feature-checklist.md`, `docs/stim-feature-list.md`, `docs/plans/lessons-learned.md`, and `docs/plans/milestone-spec-gaps.md`.
+2. Extract exact owned upstream subcases and record deferred subcases before coding.
+3. Add or port targeted tests first, including negative tests and resource-boundary tests for public inputs and outputs.
 4. Implement the feature with the narrowest code changes that fit existing Stab patterns.
-5. Run the milestone’s targeted tests and fix failures.
-6. Add or update benchmark rows, benchmark runner coverage, measurement work units, compare notes, profiler notes, and threshold entries when required.
-7. Update docs, oracle metadata, benchmark metadata, feature checklist status, roadmap text, and progress or completion reports in the same change set as behavior changes.
-8. Check the milestone acceptance criteria from `docs/plans/partial-feature-closure-plan.md`.
+5. Run the milestone targeted tests and fix failures.
+6. Add or update oracle rows, benchmark rows, benchmark runner coverage, measurement work units, compare notes, profiler notes, waivers, and threshold entries when required.
+7. Update docs, feature checklist status, roadmap text, oracle metadata, benchmark metadata, and progress or completion reports in the same change set as behavior changes.
+8. Check the milestone acceptance criteria from `docs/plans/remaining-partial-feature-milestones.md`.
 9. Run milestone-audit and fix implementation, evidence, or documentation issues.
-10. Run full-code-review for the touched surfaces and fix findings.
+10. Run full-code-review for the touched surfaces and fix findings; when working in Codex, spawn GPT-5.5/xhigh subagents during the review.
 11. If audit or review exposes under-specified scope, log it in `docs/plans/milestone-spec-gaps.md` and keep the corresponding checklist entry partial or deferred.
 
 ## Milestone Evidence
 
-PF0 evidence:
+RPF0 evidence:
 
-- Every active partial row has an owner milestone, comparator class, planned tests, planned benchmarks if relevant, and explicit exclusions.
-- `docs/plans/partial-feature-inventory.md` maps active partial rows, rollup rows, deferred-only rows, oracle placeholders, benchmark placeholders, tests, and exclusions.
-- `just oracle::list`, `just oracle::matrix --check`, `cargo test -p stab-oracle fixtures --quiet`, and `just bench::list` pass or report only documented future rows.
+- Every partial row has a classification, owner milestone or deferral reason, upstream subcase list, comparator class, oracle status, benchmark status, and exclusion list.
+- `docs/plans/partial-feature-inventory.md` agrees with `docs/plans/remaining-partial-feature-milestones.md`.
+- `just oracle::list`, `just oracle::matrix --check`, `cargo test -p stab-oracle fixtures --quiet`, and `just bench::list` pass.
 
-PF1 evidence:
+RPF1 evidence:
 
-- Core Rust circuit, gate, reference-sample, determined-measurement, coordinate, and basic DEM API gaps selected by the plan have behavior tests and typed API documentation.
-- Report-only or comparable benchmark rows exist for high-volume introspection, coordinate, and metadata paths.
+- Gate decomposition metadata, measurement-rich or variable-target flow metadata decisions, unsupported accessor behavior, and canonical gate execution support are tested and documented.
+- `pf1-gate-metadata-lookup` or its replacement covers every implemented metadata accessor with measurement work and compare notes.
 
-PF2 evidence:
+RPF2 evidence:
 
-- Circuit transform APIs have exact or semantic tests for flattening, noise removal, decomposition, feedback inlining, time reversal for flows, and repeat traversal.
-- Transform benchmarks exist with paired submeasurements for mixed workloads.
+- Circuit `flattened`, `without_noise`, `decomposed`, feedback inlining, repeat traversal, and flow-time-reversal behavior have exact or semantic tests and resource-boundary tests.
+- Transform benchmarks exist for performance-sensitive transforms and are classified before any threshold promotion.
 
-PF3 evidence:
+RPF3 evidence:
 
-- Sweep-conditioned and gate-semantic execution gaps have core and CLI tests across selected result formats and unsupported-shape errors.
-- Sweep and gate execution benchmark rows are classified and smoke-tested.
+- Sweep-conditioned execution and legal-gate execution gaps have core and CLI tests across selected result formats, accepted paths, rejected shapes, and streaming or capped resource behavior.
+- Sweep and gate execution benchmarks are classified and smoke-tested.
 
-PF4 evidence:
+RPF4 evidence:
 
-- DEM introspection, transform, coordinate, folded traversal, and analysis APIs have exact, structural, negative, and resource-boundary tests.
-- DEM transform and folded traversal benchmarks exist and are not promoted to gates without stable comparable evidence.
+- DEM `flattened`, `rounded`, tag stripping, coordinate/count queries, folded traversal, and transform resource boundaries have exact, structural, negative, and resource-boundary tests.
+- DEM transform and folded traversal benchmarks exist and remain report-only unless faithful comparable evidence justifies promotion.
 
-PF5 evidence:
+RPF5 evidence:
 
-- Detector utility and flow APIs have tests for every promoted detecting-region, missing-detector, feedback, and measurement-rich flow subcase.
-- Utility benchmarks are report-only unless a faithful pinned Stim baseline and stable repeated evidence justify promotion.
+- Detecting regions, missing detectors, measurement-rich flows, flow validation, and flow-aware transforms have tests for every promoted subcase and precise errors for unpromoted families.
+- Utility benchmarks are report-only unless faithful pinned Stim comparison and stable ratios justify promotion.
 
-PF6 evidence:
+RPF6 evidence:
 
-- Analyzer, search, and sparse reverse tracker gaps have exact or structural parity tests, generated-circuit coverage, loop-folding evidence, and fuzz or generated tests where useful.
+- Analyzer, search, sparse reverse tracking, and active matched-error value-object gaps have exact or structural parity tests, generated-circuit coverage, loop-folding evidence, and fuzz or generated tests where useful.
 - Analyzer and search benchmarks use submeasurement thresholds when bundled rows could hide slow subcases.
 
-PF7 evidence:
+RPF7 evidence:
 
-- `stab m2d`, `stab analyze_errors`, and accepted legacy aliases have CLI tests and oracle rows for accepted behavior, rejected behavior, path errors, resource limits, and excluded aliases.
+- `stab m2d`, `stab analyze_errors`, and accepted legacy aliases have CLI tests and oracle rows for accepted behavior, rejected behavior, path errors, resource limits, output formats, side outputs, stdout behavior, stderr class, and exit status.
 - `--detector_hypergraph` remains consistently excluded from CLI parity.
 
-PF8 evidence:
+RPF8 evidence:
 
 - Fresh benchmark reports exist for newly gated rows and record metadata, warmup, repeated measurements, local-modification state, and profiler notes.
 - Feature checklist, roadmap, oracle manifest, benchmark manifest, threshold files, waivers, profiler notes, and completion reports agree.
+- Milestone-audit and full-code-review findings are fixed, or under-specification findings are logged in `docs/plans/milestone-spec-gaps.md`.
 
 ## Targeted Test Commands
 
@@ -145,6 +129,7 @@ Use focused checks during implementation, expanding filters as touched code grow
 
 ```sh
 cargo test -p stab-core circuit --quiet
+cargo test -p stab-core gate --quiet
 cargo test -p stab-core dem --quiet
 cargo test -p stab-core flow --quiet
 cargo test -p stab-core detection --quiet
@@ -174,12 +159,28 @@ Before adding or promoting benchmark rows:
 For newly gated rows, run fresh evidence from current `HEAD`:
 
 ```sh
-just bench::baseline --primary --out target/benchmarks/partial-feature-primary-baseline
-just bench::compare --primary --warmup --measurement-runs 3 --require-profiler-notes --baseline target/benchmarks/partial-feature-primary-baseline/baseline.json --report target/benchmarks/partial-feature-primary-compare
-just bench::primary-regression --baseline target/benchmarks/partial-feature-primary-baseline/baseline.json --report target/benchmarks/partial-feature-primary-regression
+just bench::baseline --primary --out target/benchmarks/remaining-partial-primary-baseline
+just bench::compare --primary --warmup --measurement-runs 3 --require-profiler-notes --baseline target/benchmarks/remaining-partial-primary-baseline/baseline.json --report target/benchmarks/remaining-partial-primary-compare
+just bench::primary-regression --baseline target/benchmarks/remaining-partial-primary-baseline/baseline.json --report target/benchmarks/remaining-partial-primary-regression
+just bench::primary-memory-regression --baseline target/benchmarks/remaining-partial-primary-baseline/baseline.json
 ```
 
 Do not cite exploratory probe reports as final release evidence.
+
+## Success State
+
+The goal is complete only when:
+
+- Every active partial row in `docs/stab-feature-checklist.md` is either implemented with evidence or remains explicitly partial with a named deferred subcase.
+- Every rollup partial row has child-row evidence and does not imply broader parity than the implemented surfaces prove.
+- Every implemented feature has tests that were added or ported before or alongside implementation.
+- Every public CLI behavior is covered by CLI tests or oracle rows that prove stdout behavior, stderr class, exit status, accepted flags, rejected flags, path handling, input formats, output formats, and resource behavior.
+- Every public Rust API added by this plan uses typed domain boundaries and clear domain errors.
+- Every benchmarked feature has a source-owned manifest row, runner coverage, measurement work, compare notes, and a comparability class.
+- Every row promoted into the 1.25x primary threshold gate has repeated stable direct or CLI-comparable evidence and matching profiler notes.
+- Report-only rows are labeled as report-only and are not used as release-gate evidence.
+- `docs/stab-feature-checklist.md`, `docs/plans/rust-stim-drop-in-rewrite.md`, oracle metadata, benchmark metadata, and milestone reports agree with current behavior.
+- Milestone-audit and full-code-review findings are fixed, or under-specification findings are logged in `docs/plans/milestone-spec-gaps.md`.
 
 ## Required Final Verification
 
@@ -202,10 +203,10 @@ If a required local tool or oracle binary is missing, install it through the doc
 
 Stop implementation work and write a spec-gap entry when:
 
-- A promoted subcase requires Python bindings, JS/WASM, diagrams, `explain_errors` CLI, `repl`, QASM, Quirk, Crumble, GPU, ecosystem integrations, exact random-stream parity, or public Python-style simulator APIs.
+- A promoted subcase requires Python bindings, JS/WASM, diagrams, `explain_errors` CLI, `repl`, QASM, Quirk, Crumble, GPU, ecosystem integrations, exact random-stream parity, C++ header compatibility, or a public simulator product.
 - A promoted subcase still depends on a whole upstream file instead of exact owned subcases.
-- A public CLI surface cannot define accepted flags, rejected flags, input formats, output formats, stdout behavior, stderr class, exit status, and resource behavior.
+- A public CLI surface cannot define accepted flags, rejected flags, input formats, output formats, stdout behavior, stderr class, exit status, path handling, and resource behavior.
 - A benchmark row cannot be classified or cannot produce faithful comparable evidence.
 - A row would need stale reports, informal waivers, or unrecorded local modifications to pass.
-- A public parser, converter, sampler, analyzer, or writer path has neither streaming behavior nor a documented cap.
+- A public parser, converter, sampler, analyzer, transformer, search, or writer path has neither streaming behavior nor a documented cap.
 - A checklist update would need to overstate implemented behavior to mark a row done.

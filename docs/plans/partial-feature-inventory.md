@@ -2,7 +2,8 @@
 
 ## Purpose
 
-This inventory is the PF0 source-owned map from `docs/stab-feature-checklist.md` partial rows to the post-beta PF milestones in `docs/plans/partial-feature-closure-plan.md`.
+This inventory is the source-owned map from `docs/stab-feature-checklist.md` partial rows to the active remaining partial feature milestones in `docs/plans/remaining-partial-feature-milestones.md`.
+It still records the earlier PF milestone ids because existing oracle rows, benchmark rows, and progress reports use those ids.
 It exists so later implementation agents do not have to infer active scope from broad Stim source files or from checklist prose.
 
 Every active item below has an owner milestone, owner crate or surface, upstream source, first test strategy, oracle status, benchmark plan, and explicit exclusions.
