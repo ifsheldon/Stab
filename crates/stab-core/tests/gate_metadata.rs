@@ -6,9 +6,10 @@
 
 use std::collections::BTreeSet;
 
+use num_complex::Complex32;
 use stab_core::{
     Circuit, CircuitItem, Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
-    check_if_circuit_has_unsigned_stabilizer_flows,
+    check_if_circuit_has_unsigned_stabilizer_flows, unitary_to_tableau,
 };
 
 #[test]
@@ -312,8 +313,169 @@ fn gate_flow_metadata_matches_owned_unitary_gate_data() {
     }
 }
 
+#[test]
+fn gate_unitary_matrix_metadata_matches_owned_gate_data() {
+    // Adapted from Stim v1.16.0 GateData unitary matrix examples and inverse consistency checks.
+    let h = Gate::from_name("H").expect("H");
+    let h_scale = f32::sqrt(0.5);
+    assert!(h.has_unitary_matrix());
+    let h_matrix = h.unitary_matrix().expect("H unitary");
+    assert_matrix_close(
+        &h_matrix.to_vecs(),
+        &[
+            &[(h_scale, 0.0), (h_scale, 0.0)],
+            &[(h_scale, 0.0), (-h_scale, 0.0)],
+        ],
+    );
+
+    let iswap = Gate::from_name("ISWAP").expect("ISWAP");
+    let iswap_matrix = iswap.unitary_matrix().expect("ISWAP unitary");
+    assert_matrix_close(
+        &iswap_matrix.to_vecs(),
+        &[
+            &[(1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)],
+            &[(0.0, 0.0), (0.0, 0.0), (0.0, 1.0), (0.0, 0.0)],
+            &[(0.0, 0.0), (0.0, 1.0), (0.0, 0.0), (0.0, 0.0)],
+            &[(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (1.0, 0.0)],
+        ],
+    );
+
+    let sqrt_xx = Gate::from_name("SQRT_XX").expect("SQRT_XX");
+    let sqrt_xx_matrix = sqrt_xx.unitary_matrix().expect("SQRT_XX unitary");
+    assert_matrix_close(
+        &sqrt_xx_matrix.to_vecs(),
+        &[
+            &[(0.5, 0.5), (0.0, 0.0), (0.0, 0.0), (0.5, -0.5)],
+            &[(0.0, 0.0), (0.5, 0.5), (0.5, -0.5), (0.0, 0.0)],
+            &[(0.0, 0.0), (0.5, -0.5), (0.5, 0.5), (0.0, 0.0)],
+            &[(0.5, -0.5), (0.0, 0.0), (0.0, 0.0), (0.5, 0.5)],
+        ],
+    );
+
+    let expected_unitary_names = expected_tableau_supported_gate_names();
+    let actual_unitary_names = Gate::all()
+        .filter(|gate| gate.has_unitary_matrix())
+        .map(|gate| gate.canonical_name())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(actual_unitary_names, expected_unitary_names);
+
+    for &gate_name in &expected_unitary_names {
+        let gate = Gate::from_name(gate_name).expect("gate");
+        let matrix = gate.unitary_matrix().expect("gate unitary");
+        let matrix_rows = matrix.to_vecs();
+        let dimension = matrix.dimension();
+        assert!(
+            matches!(dimension, 2 | 4),
+            "{gate_name} should have one- or two-qubit unitary metadata"
+        );
+        assert_eq!(
+            matrix.num_qubits(),
+            if dimension == 2 { 1 } else { 2 },
+            "{gate_name} unitary metadata target count"
+        );
+        assert!(
+            matrix_rows.len() == dimension && matrix_rows.iter().all(|row| row.len() == dimension),
+            "{gate_name} should have square unitary metadata"
+        );
+        assert_eq!(
+            matrix.entry_count(),
+            dimension * dimension,
+            "{gate_name} unitary metadata entry count"
+        );
+        assert_eq!(
+            unitary_to_tableau(&matrix_rows, true).expect("unitary tableau"),
+            gate.tableau().expect("gate tableau"),
+            "{gate_name} unitary matrix should convert to the gate tableau"
+        );
+
+        let inverse = gate.inverse().expect("unitary inverse");
+        let inverse_matrix = inverse.unitary_matrix().expect("inverse unitary").to_vecs();
+        let expected_inverse = conjugate_transpose(&matrix_rows);
+        assert_matrix_close_matrix(
+            &inverse_matrix,
+            &expected_inverse,
+            1e-6,
+            &format!("{gate_name} inverse unitary should be the conjugate transpose"),
+        );
+    }
+
+    for gate in Gate::all() {
+        assert_eq!(
+            gate.has_unitary_matrix(),
+            gate.unitary_matrix().is_ok(),
+            "{} has_unitary_matrix should match unitary matrix materialization",
+            gate.canonical_name()
+        );
+    }
+
+    for unsupported in ["MXX", "MPP", "SPP", "SPP_DAG", "M", "DETECTOR", "X_ERROR"] {
+        let gate = Gate::from_name(unsupported).expect("unsupported gate");
+        assert!(!gate.has_unitary_matrix(), "{unsupported}");
+        let error = gate
+            .unitary_matrix()
+            .expect_err("reject unsupported unitary matrix data");
+        assert!(error.to_string().contains("unitary matrix data"), "{error}");
+    }
+}
+
 fn flow_texts(flows: Vec<stab_core::Flow>) -> Vec<String> {
     flows.into_iter().map(|flow| flow.to_string()).collect()
+}
+
+fn assert_matrix_close(actual: &[Vec<Complex32>], expected: &[&[(f32, f32)]]) {
+    assert_eq!(actual.len(), expected.len());
+    for (actual_row, expected_row) in actual.iter().zip(expected) {
+        assert_eq!(actual_row.len(), expected_row.len());
+        for (actual_value, &(expected_real, expected_imag)) in actual_row.iter().zip(*expected_row)
+        {
+            assert_complex_close(
+                *actual_value,
+                Complex32::new(expected_real, expected_imag),
+                1e-6,
+                "matrix entry",
+            );
+        }
+    }
+}
+
+fn conjugate_transpose(matrix: &[Vec<Complex32>]) -> Vec<Vec<Complex32>> {
+    let dimension = matrix.len();
+    (0..dimension)
+        .map(|row| {
+            matrix
+                .iter()
+                .map(|source_row| {
+                    source_row
+                        .get(row)
+                        .copied()
+                        .expect("square matrix entry")
+                        .conj()
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn assert_matrix_close_matrix(
+    actual: &[Vec<Complex32>],
+    expected: &[Vec<Complex32>],
+    tolerance: f32,
+    label: &str,
+) {
+    assert_eq!(actual.len(), expected.len(), "{label}");
+    for (actual_row, expected_row) in actual.iter().zip(expected) {
+        assert_eq!(actual_row.len(), expected_row.len(), "{label}");
+        for (&actual_value, &expected_value) in actual_row.iter().zip(expected_row) {
+            assert_complex_close(actual_value, expected_value, tolerance, label);
+        }
+    }
+}
+
+fn assert_complex_close(actual: Complex32, expected: Complex32, tolerance: f32, label: &str) {
+    assert!(
+        (actual - expected).norm() <= tolerance,
+        "{label}: expected {expected:?}, got {actual:?}"
+    );
 }
 
 fn single_instruction_circuit(gate: Gate, gate_name: &str) -> Circuit {

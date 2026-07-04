@@ -1,4 +1,4 @@
-use super::{ArgRule, Gate, GateCategory, TargetRule};
+use super::{ArgRule, Gate, GateCategory, GateUnitaryMatrix, TargetRule};
 use crate::{
     CircuitError, CircuitResult, Flow, PauliBasis, PauliSign, PauliString, StabilizerError,
 };
@@ -320,6 +320,24 @@ impl Gate {
     /// Returns true when `flows` can produce tableau-backed stabilizer flow metadata.
     pub fn has_flows(self) -> bool {
         self.has_tableau()
+    }
+
+    /// Returns Stim v1.16.0's fixed-shape one- or two-qubit unitary matrix metadata.
+    ///
+    /// Variable-target unitary gate families, such as `SPP` and `SPP_DAG`, do not have fixed
+    /// matrix metadata in Stim's gate table and are rejected here.
+    pub fn unitary_matrix(self) -> CircuitResult<GateUnitaryMatrix> {
+        crate::gate::unitary::gate_unitary_matrix(self.info.name).ok_or_else(|| {
+            CircuitError::invalid_tableau_conversion(format!(
+                "gate {} does not have fixed-shape unitary matrix data",
+                self.info.name
+            ))
+        })
+    }
+
+    /// Returns true when `unitary_matrix` can produce fixed-shape unitary metadata.
+    pub fn has_unitary_matrix(self) -> bool {
+        crate::gate::unitary::gate_has_unitary_matrix(self.info.name)
     }
 
     pub fn can_fuse(self) -> bool {

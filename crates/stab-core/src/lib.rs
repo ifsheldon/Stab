@@ -68,7 +68,9 @@ pub use detection::{
 };
 pub use error::{CircuitError, CircuitResult};
 pub use error_matcher::explain_errors_from_circuit;
-pub use gate::{Gate, GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule};
+pub use gate::{
+    Gate, GateArgumentRule, GateCategory, GateTargetGroupKind, GateTargetRule, GateUnitaryMatrix,
+};
 pub use ids::{
     CircuitDetectorId, MeasureRecordOffset, ObservableId, Probability, QubitId, RepeatCount,
 };

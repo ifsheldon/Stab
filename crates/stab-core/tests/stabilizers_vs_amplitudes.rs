@@ -7,7 +7,7 @@
 use std::collections::BTreeSet;
 
 use num_complex::Complex32;
-use stab_core::{Tableau, unitary_to_tableau};
+use stab_core::{Gate, GateUnitaryMatrix, Tableau, unitary_to_tableau};
 
 #[test]
 fn unitary_to_tableau_matches_known_gate_data_like_stim() {
@@ -31,6 +31,23 @@ fn unitary_to_tableau_matches_known_gate_data_like_stim() {
                 case.name
             );
         }
+    }
+}
+
+#[test]
+fn gate_unitary_matrix_metadata_matches_known_gate_data_like_stim() {
+    // Uses the same Stim v1.16.0 gate_data rows as the unitary-to-tableau parity test, but checks
+    // exact matrix metadata instead of the global-phase-insensitive tableau action.
+    let cases = known_unitary_gate_cases();
+    assert_eq!(cases.len(), 46);
+    for case in cases {
+        let gate = Gate::from_name(case.name).expect("known gate");
+        assert_eq!(
+            gate.unitary_matrix().expect("known gate unitary"),
+            case.expected_gate_unitary_matrix(),
+            "{}",
+            case.name
+        );
     }
 }
 
@@ -286,6 +303,41 @@ impl GateCase {
             GateOutputs::Two([x1, z1, x2, z2]) => {
                 Tableau::gate2(x1, z1, x2, z2).expect("gate2 tableau")
             }
+        }
+    }
+
+    fn expected_gate_unitary_matrix(&self) -> GateUnitaryMatrix {
+        match self.outputs {
+            GateOutputs::One(_) => GateUnitaryMatrix::One([
+                [self.matrix[0][0], self.matrix[0][1]],
+                [self.matrix[1][0], self.matrix[1][1]],
+            ]),
+            GateOutputs::Two(_) => GateUnitaryMatrix::Two([
+                [
+                    self.matrix[0][0],
+                    self.matrix[0][1],
+                    self.matrix[0][2],
+                    self.matrix[0][3],
+                ],
+                [
+                    self.matrix[1][0],
+                    self.matrix[1][1],
+                    self.matrix[1][2],
+                    self.matrix[1][3],
+                ],
+                [
+                    self.matrix[2][0],
+                    self.matrix[2][1],
+                    self.matrix[2][2],
+                    self.matrix[2][3],
+                ],
+                [
+                    self.matrix[3][0],
+                    self.matrix[3][1],
+                    self.matrix[3][2],
+                    self.matrix[3][3],
+                ],
+            ]),
         }
     }
 }

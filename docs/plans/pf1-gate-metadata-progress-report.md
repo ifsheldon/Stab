@@ -4,7 +4,7 @@
 
 This PF1 slice implements the bounded Rust gate-metadata accessor subset from `docs/plans/partial-feature-closure-plan.md`.
 It does not claim Python `GateData` parity.
-Measurement-rich or variable-target flow metadata, arbitrary unitary-matrix metadata, decomposition metadata, Python object shape, Python string or repr output, and Python binding behavior remain partial or deferred according to `docs/stab-feature-checklist.md`.
+Measurement-rich or variable-target flow metadata, decomposition metadata, Python object shape, Python string or repr output, and Python binding behavior remain partial or deferred according to `docs/stab-feature-checklist.md`.
 
 ## Implemented Surfaces
 
@@ -12,10 +12,11 @@ Measurement-rich or variable-target flow metadata, arbitrary unitary-matrix meta
 - Added public `Gate` accessors for aliases, argument rule, target rule, target grouping, fusing, noisy/reset/measurement/unitary/single-qubit/two-qubit/target-capability/symmetry flags, unitary inverse, and generalized inverse.
 - Added public `Gate::tableau` and `Gate::has_tableau` accessors for gates with existing local Clifford tableau metadata, with fail-closed errors for gates without fixed tableau data.
 - Added public `Gate::flows` and `Gate::has_flows` accessors for tableau-backed unitary flow metadata, with fail-closed errors for measurement-rich, variable-target, annotation, and noisy gates that are owned by later flow milestones.
+- Added public `GateUnitaryMatrix`, `Gate::unitary_matrix`, and `Gate::has_unitary_matrix` accessors for fixed-shape one- or two-qubit unitary metadata, with fail-closed errors for variable-target, measurement-rich, annotation, and noisy gates.
 - Fixed parser validation for the owned metadata subset so `I_ERROR` and `II_ERROR` accept any-length disjoint probability lists like Stim v1.16.0, and `XCX`, `XCY`, `YCX`, and `YCY` reject measurement-record and sweep-bit targets instead of inheriting the bit-target-capable controlled-gate rule.
 - Matched the implemented `GateData`-style flags more tightly by removing `MPAD` from `is_noisy`, removing `MPAD` from `is_symmetric_gate`, and using Stim's explicit symmetric two-qubit gate set for the owned accessor subset.
-- Added an executable oracle manifest row for the implemented Rust accessor subset while leaving the broad PF1 gate-metadata manifest row as the remaining extraction contract.
-- Added a report-only PF1 benchmark runner for metadata flag reads, inverse reads, and alias lookup.
+- Added executable oracle manifest rows for the implemented Rust accessor subset while leaving the broad PF1 gate-metadata manifest row as the remaining extraction contract.
+- Added a report-only PF1 benchmark runner for metadata flag reads, inverse reads, tableau reads, tableau-backed flow reads, fixed-shape unitary matrix reads, and alias lookup.
 
 ## Oracle Rows
 
@@ -24,6 +25,7 @@ Implemented row:
 - `pf1-gate-metadata-rust-accessors`
 - `pf1-gate-tableau-metadata`
 - `pf1-gate-flow-metadata`
+- `pf1-gate-unitary-matrix-metadata`
 - `pf1-gate-metadata-identity-error-probabilities`
 - `pf1-gate-metadata-controlled-bit-targets`
 
@@ -42,12 +44,13 @@ Probe reports:
 - `target/benchmarks/pf1-gate-metadata-probe/baseline.json`
 - `target/benchmarks/pf1-gate-metadata-compare/compare.json`
 
-Fresh probe rates from the current worktree after adding tableau and tableau-backed flow metadata accessors:
+Fresh probe rates from the current worktree after adding tableau, tableau-backed flow, and fixed-shape unitary matrix metadata accessors:
 
-- `stab_gate_metadata_flags_all_gates`: `1.394e8 gates/s`.
-- `stab_gate_metadata_inverse_all_gates`: `2.088e8 gates/s`.
-- `stab_gate_metadata_tableau_supported_gates`: `8.413e6 tableaus/s`.
-- `stab_gate_metadata_flows_supported_gates`: `8.355e6 flows/s`.
+- `stab_gate_metadata_flags_all_gates`: `1.424e8 gates/s`.
+- `stab_gate_metadata_inverse_all_gates`: `2.077e8 gates/s`.
+- `stab_gate_metadata_tableau_supported_gates`: `8.347e6 tableaus/s`.
+- `stab_gate_metadata_flows_supported_gates`: `8.698e6 flows/s`.
+- `stab_gate_metadata_unitary_supported_gates`: `3.784e8 entries/s`.
 - `stab_gate_metadata_alias_lookup_all_aliases`: `4.869e8 lookups/s`.
 
 This benchmark remains `non-primary-report-only` because pinned Stim exposes the comparable rich `GateData` surface through Python bindings and C++ internals, not through a faithful Rust direct baseline.
@@ -61,6 +64,7 @@ Passed during implementation:
 cargo test -p stab-core --test gate_metadata --quiet
 cargo test -p stab-core --test gate_metadata gate_tableau_metadata --quiet
 cargo test -p stab-core --test gate_metadata gate_flow_metadata --quiet
+cargo test -p stab-core gate_unitary_matrix --quiet
 cargo test -p stab-core sampling --quiet
 cargo test -p stab-core feedback --quiet
 cargo test -p stab-bench pf1_gate_metadata --quiet
@@ -75,7 +79,7 @@ just bench::compare --only pf1-gate-metadata-lookup --baseline target/benchmarks
 
 ## Audit And Review
 
-Milestone-audit and full-code-review sidecars found eight issues, all fixed before this report was finalized:
+Milestone-audit and full-code-review sidecars found ten issues, all fixed before this report was finalized:
 
 - `I_ERROR` and `II_ERROR` incorrectly used one-probability validation instead of any-length disjoint probability lists.
 - `XCX`, `XCY`, `YCX`, and `YCY` were overclassified as bit-target-capable controlled gates.
@@ -85,11 +89,12 @@ Milestone-audit and full-code-review sidecars found eight issues, all fixed befo
 - The `is_noisy` Rustdoc initially described a broader semantic predicate; it now states that it follows Stim v1.16.0 `GateData.is_noisy_gate`.
 - The broad implemented-oracle sweep initially exposed a stale detection-conversion rejection fixture using invalid `XCX sweep[0] 0`; it now uses valid-but-unsupported `XCZ sweep[0] 0` so parser validation and converter capability are tested at the correct boundaries.
 - The same broad oracle sweep exposed a stale feedback-inlining rejection fixture using invalid `XCX rec[-1] 1`; it now uses valid-but-unsupported `XCZ rec[-1] 1` so parser validation and transformer capability stay separated.
+- The fixed-shape unitary matrix accessor initially relied on tableau conversion for most supported gates, which missed global-phase-sensitive exact matrix drift; it now compares all 46 supported gates against the upstream-derived matrix corpus.
+- The unitary matrix accessor initially returned nested vectors despite documenting a fixed one- or two-qubit shape; it now returns the `GateUnitaryMatrix` enum and materializes nested rows only for generic matrix consumers.
 
 ## Remaining PF1 Gate Metadata Work
 
 - Measurement-rich, non-unitary, or variable-target flow metadata accessors.
-- Public unitary-matrix metadata accessors.
 - Public decomposition metadata accessors.
 - Unsupported metadata error behavior for accessors that cannot be represented by Stab's Rust API.
 - Any Python `GateData` class shape or binding behavior, which remains deferred.

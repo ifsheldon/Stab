@@ -2,7 +2,7 @@ use std::hint::black_box;
 
 use stab_core::{
     Circuit, CircuitDetectorId, DemDetectorId, DemInstructionKind, DemItem, DemTarget,
-    DetectorErrorModel, Flow, Gate, GateArgumentRule, PauliString, Tableau,
+    DetectorErrorModel, Flow, Gate, GateArgumentRule, GateUnitaryMatrix, PauliString, Tableau,
 };
 
 use crate::error::BenchError;
@@ -260,6 +260,11 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
         .copied()
         .filter(|gate| gate.has_flows())
         .collect::<Vec<_>>();
+    let unitary_gates = gates
+        .iter()
+        .copied()
+        .filter(|gate| gate.has_unitary_matrix())
+        .collect::<Vec<_>>();
 
     Ok(vec![
         measure_stab_batched(
@@ -343,6 +348,22 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
             },
         )?,
         measure_stab_batched(
+            "stab_gate_metadata_unitary_supported_gates",
+            TINY_DIRECT_COMPARE_REPETITIONS,
+            || {
+                let mut checksum = 0_u64;
+                for gate in &unitary_gates {
+                    let matrix = gate
+                        .unitary_matrix()
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    checksum ^= unitary_matrix_checksum(matrix);
+                    black_box(matrix);
+                }
+                black_box(checksum);
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
             "stab_gate_metadata_alias_lookup_all_aliases",
             TINY_DIRECT_COMPARE_REPETITIONS,
             || {
@@ -380,6 +401,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             "stab_gate_metadata_flows_supported_gates" => {
                 Some((gate_flow_count() as f64, "flows/s"))
             }
+            "stab_gate_metadata_unitary_supported_gates" => {
+                Some((gate_unitary_entry_count() as f64, "entries/s"))
+            }
             "stab_gate_metadata_alias_lookup_all_aliases" => {
                 Some((gate_alias_count() as f64, "lookups/s"))
             }
@@ -409,7 +433,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures Rust circuit count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
         ),
         "pf1-gate-metadata-lookup" => Some(
-            "contract-only: Stab measures Rust gate metadata accessors, tableau metadata reads, tableau-backed flow metadata reads, and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
+            "contract-only: Stab measures Rust gate metadata accessors, tableau metadata reads, tableau-backed flow metadata reads, fixed-shape unitary matrix reads, and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
         ),
         "pf1-dem-counts-repeat" => Some(
             "contract-only: Stab measures Rust DEM count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
@@ -492,6 +516,36 @@ fn gate_flow_count() -> usize {
         .filter_map(|gate| gate.flows().ok())
         .map(|flows| flows.len())
         .sum()
+}
+
+fn gate_unitary_entry_count() -> usize {
+    Gate::all()
+        .filter_map(|gate| gate.unitary_matrix().ok())
+        .map(GateUnitaryMatrix::entry_count)
+        .sum()
+}
+
+fn unitary_matrix_checksum(matrix: GateUnitaryMatrix) -> u64 {
+    let mut checksum = 0_u64;
+    match matrix {
+        GateUnitaryMatrix::One(rows) => {
+            for row in rows {
+                for value in row {
+                    checksum ^= u64::from(value.re.to_bits());
+                    checksum = checksum.rotate_left(1) ^ u64::from(value.im.to_bits());
+                }
+            }
+        }
+        GateUnitaryMatrix::Two(rows) => {
+            for row in rows {
+                for value in row {
+                    checksum ^= u64::from(value.re.to_bits());
+                    checksum = checksum.rotate_left(1) ^ u64::from(value.im.to_bits());
+                }
+            }
+        }
+    }
+    checksum
 }
 
 fn tableau_checksum(tableau: &Tableau, row_id: &str) -> Result<u64, BenchError> {

@@ -156,7 +156,7 @@ src/stim/gates/gates.test.cc
 
 Small features:
 
-- Gate names, aliases, categories, arity, argument rules, target rules, inverse metadata, local Clifford tableau metadata, tableau-backed unitary flow metadata, generated gate tables, and remaining arbitrary unitary-matrix and decomposition metadata.
+- Gate names, aliases, categories, arity, argument rules, target rules, inverse metadata, local Clifford tableau metadata, tableau-backed unitary flow metadata, fixed-shape unitary matrix metadata, generated gate tables, and remaining decomposition metadata.
 
 ### Circuit Generation
 

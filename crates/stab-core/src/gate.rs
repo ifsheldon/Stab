@@ -1,6 +1,8 @@
 mod metadata;
+mod unitary;
 
 pub use metadata::{GateArgumentRule, GateTargetGroupKind, GateTargetRule};
+pub use unitary::GateUnitaryMatrix;
 
 use crate::{CircuitError, CircuitResult, Probability, Target};
 
