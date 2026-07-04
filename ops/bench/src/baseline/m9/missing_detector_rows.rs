@@ -12,12 +12,19 @@ use super::{parse_circuit, stab_runner_error};
 const UTILITY_BATCH: usize = 4096;
 #[cfg(test)]
 const UTILITY_BATCH: usize = 2;
+#[cfg(not(test))]
+const GENERATED_BATCH: usize = 64;
+#[cfg(test)]
+const GENERATED_BATCH: usize = 1;
 const BASIC_CASES: usize = 10;
 const BASIC_SUGGESTIONS: usize = 4;
 const MPP_CASES: usize = 4;
 const MPP_SUGGESTIONS: usize = 3;
-const GENERATED_CASES: usize = 1;
-const GENERATED_SUGGESTIONS: usize = 1;
+const GENERATED_CASES: usize = 2;
+const GENERATED_SUGGESTIONS: usize = 2;
+const HONEYCOMB_MISSING_DETECTOR: &str = include_str!(
+    "../../../../../crates/stab-core/tests/fixtures/missing_detectors_honeycomb_missing_detector.stim"
+);
 
 pub(super) fn run_basic_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     Ok(vec![
@@ -55,13 +62,13 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             Some(((UTILITY_BATCH * MPP_SUGGESTIONS) as f64, "suggestions/s"))
         }
         ("pf5-missing-detectors-generated-code", "stab_pf5_missing_detectors_generated_cases") => {
-            Some(((UTILITY_BATCH * GENERATED_CASES) as f64, "cases/s"))
+            Some(((GENERATED_BATCH * GENERATED_CASES) as f64, "cases/s"))
         }
         (
             "pf5-missing-detectors-generated-code",
             "stab_pf5_missing_detectors_generated_suggestions",
         ) => Some((
-            (UTILITY_BATCH * GENERATED_SUGGESTIONS) as f64,
+            (GENERATED_BATCH * GENERATED_SUGGESTIONS) as f64,
             "suggestions/s",
         )),
         _ => None,
@@ -77,7 +84,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures the Rust missing-detectors MPP and observable row-reduction subset without a faithful pinned Stim CLI timing ratio",
         ),
         "pf5-missing-detectors-generated-code" => Some(
-            "report-only: Stab measures the Rust missing-detectors generated-code toric suffix subset without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures the Rust missing-detectors generated-code honeycomb and toric suffix subset without a faithful pinned Stim CLI timing ratio",
         ),
         _ => None,
     }
@@ -117,7 +124,7 @@ fn measure_generated_code(
         super::super::STAB_COMPARE_ITERATIONS,
         || {
             let mut suggestions = 0usize;
-            for _ in 0..UTILITY_BATCH {
+            for _ in 0..GENERATED_BATCH {
                 for (circuit, ignore_non_deterministic_measurements, expected) in &cases {
                     let output = missing_detectors(
                         circuit,
@@ -255,28 +262,35 @@ fn mpp_corpus(row_id: &str) -> Result<Vec<(Circuit, bool)>, BenchError> {
 type GeneratedCase = (Circuit, bool, &'static str);
 
 fn generated_code_corpus(row_id: &str) -> Result<Vec<GeneratedCase>, BenchError> {
-    Ok(vec![(
-        parse_circuit(
-            row_id,
-            "R 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15\n\
-             TICK\n\
-             MPP X0*X4*X5*X1 X2*X6*X7*X3 X10*X14*X15*X11 X8*X12*X13*X9\n\
-             TICK\n\
-             MPP X5*X9*X10*X6 X1*X13*X14*X2 X0*X12*X15*X3 X4*X8*X11*X7\n\
-             TICK\n\
-             MPP Z4*Z8*Z9*Z5 Z6*Z10*Z11*Z7 Z2*Z14*Z15*Z3 Z0*Z12*Z13*Z1\n\
-             TICK\n\
-             MPP Z1*Z5*Z6*Z2 Z9*Z13*Z14*Z10 Z8*Z12*Z15*Z11 Z0*Z4*Z7*Z3\n\
-             DETECTOR rec[-1]\n\
-             DETECTOR rec[-2]\n\
-             DETECTOR rec[-3]\n\
-             DETECTOR rec[-4]\n\
-             DETECTOR rec[-5]\n\
-             DETECTOR rec[-6]\n\
-             DETECTOR rec[-7]\n\
-             DETECTOR rec[-8]\n",
-        )?,
-        true,
-        "DETECTOR rec[-16] rec[-15] rec[-14] rec[-13] rec[-12] rec[-11] rec[-10] rec[-9]\n",
-    )])
+    Ok(vec![
+        (
+            parse_circuit(row_id, HONEYCOMB_MISSING_DETECTOR)?,
+            true,
+            "DETECTOR rec[-377] rec[-375] rec[-374] rec[-317] rec[-315] rec[-314]\n",
+        ),
+        (
+            parse_circuit(
+                row_id,
+                "R 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15\n\
+                 TICK\n\
+                 MPP X0*X4*X5*X1 X2*X6*X7*X3 X10*X14*X15*X11 X8*X12*X13*X9\n\
+                 TICK\n\
+                 MPP X5*X9*X10*X6 X1*X13*X14*X2 X0*X12*X15*X3 X4*X8*X11*X7\n\
+                 TICK\n\
+                 MPP Z4*Z8*Z9*Z5 Z6*Z10*Z11*Z7 Z2*Z14*Z15*Z3 Z0*Z12*Z13*Z1\n\
+                 TICK\n\
+                 MPP Z1*Z5*Z6*Z2 Z9*Z13*Z14*Z10 Z8*Z12*Z15*Z11 Z0*Z4*Z7*Z3\n\
+                 DETECTOR rec[-1]\n\
+                 DETECTOR rec[-2]\n\
+                 DETECTOR rec[-3]\n\
+                 DETECTOR rec[-4]\n\
+                 DETECTOR rec[-5]\n\
+                 DETECTOR rec[-6]\n\
+                 DETECTOR rec[-7]\n\
+                 DETECTOR rec[-8]\n",
+            )?,
+            true,
+            "DETECTOR rec[-16] rec[-15] rec[-14] rec[-13] rec[-12] rec[-11] rec[-10] rec[-9]\n",
+        ),
+    ])
 }

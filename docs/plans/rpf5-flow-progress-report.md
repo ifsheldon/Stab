@@ -69,7 +69,7 @@ Target checks for this slice:
 cargo test -p stab-core --test circuit_flows --quiet
 cargo test -p stab-core --test circuit_flow_generators --quiet
 cargo test -p stab-core sparse_rev_frame_tracker --quiet
-cargo test -p stab-bench pf5_detector_utility_benchmark_rows_have_stab_compare_runners --quiet
+cargo test -p stab-bench pf5::detector_utility_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-oracle fixtures --quiet
 cargo clippy -p stab-core -p stab-bench -p stab-oracle --all-targets -- -D warnings
 just oracle::run --milestone PF5
