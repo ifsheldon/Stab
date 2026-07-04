@@ -446,8 +446,8 @@ Implementation tasks:
 - Finish `stab m2d` parity for selected `--sweep`, `--sweep_format`, `--ran_without_feedback`, `--skip_reference_sample`, `--append_observables`, `--obs_out`, `--obs_out_format`, input formats, output formats, path errors, writer errors, and resource boundaries.
 - Finish `stab analyze_errors` parity for selected flags, decomposition behavior, gauge behavior, approximate disjoint errors, fold-loop behavior, input and output paths, stdout behavior, stderr class, and exit status.
 - Finish accepted legacy alias behavior for `--gen`, `--convert`, `--sample`, `--detect`, `--m2d`, and `--analyze_errors`.
-- Add conflict tests for multiple legacy modes.
-- Keep deprecated `--detector_hypergraph` rejected or absent, and document that users should use `stab analyze_errors`.
+- Add conflict tests for multiple legacy modes. The selected `--convert`, `--sample`, `--detect`, `--m2d`, `--analyze_errors`, and `--gen=...` conflict subset is implemented with tests and oracle metadata in `pf7-legacy-dispatch-conflicts-rust`.
+- Keep deprecated `--detector_hypergraph` rejected or absent, and document that users should use `stab analyze_errors`. The explicit mode and help-topic exclusion subset is implemented with tests and oracle metadata in `pf7-detector-hypergraph-excluded-rust`.
 
 Tests:
 
@@ -460,7 +460,7 @@ Tests:
 
 Oracle rows:
 
-- Supplement `pf7-m2d-cli-parity`, `pf7-analyze-errors-cli-parity`, and `pf7-legacy-dispatch-parity`.
+- Supplement `pf7-m2d-cli-parity`, `pf7-analyze-errors-cli-parity`, and `pf7-legacy-dispatch-parity`. The broad legacy row is supplemented by `pf7-legacy-dispatch-conflicts-rust` and `pf7-detector-hypergraph-excluded-rust`.
 - Exact-output rows must run against pinned Stim v1.16.0 when the command shape is shared.
 - Stab-only explicit rejections must still have Stab CLI tests or oracle rows.
 

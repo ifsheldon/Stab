@@ -166,7 +166,7 @@ Status key:
 | `stim explain_errors` | Deferred | No Stab command, despite scoped core matched-error support. |
 | `stim repl` | Deferred | No Stab command. |
 | `stim help` command | Done for Stab-native structural help | `stab help [topic]` and top-level `stab --help [topic]` are normalized to Stab-native help for implemented commands, result formats, and gate names. Exact byte-for-byte pinned-Stim help text remains intentionally out of scope. |
-| Legacy top-level command flags | Partial | `--gen`, `--convert`, `--sample`, `--detect`, `--m2d`, and `--analyze_errors` aliases are normalized in [../crates/stab-cli/src/lib.rs](../crates/stab-cli/src/lib.rs). Other legacy and deprecated Stim spellings are only implemented where explicitly covered; `--detector_hypergraph` is intentionally excluded from Stab CLI parity and should use `stab analyze_errors` instead. |
+| Legacy top-level command flags | Partial | `--gen`, `--convert`, `--sample`, `--detect`, `--m2d`, and `--analyze_errors` aliases are normalized in [../crates/stab-cli/src/lib.rs](../crates/stab-cli/src/lib.rs), with executable coverage for accepted aliases through the command rows plus selected multiple-mode conflicts. Other legacy and deprecated Stim spellings are only implemented where explicitly covered; `--detector_hypergraph` is intentionally rejected and absent from help topics, and users should use `stab analyze_errors` instead. |
 
 ## 12. Python API
 

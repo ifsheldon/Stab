@@ -3,6 +3,7 @@ use tempfile::tempdir;
 
 mod convert;
 mod help;
+mod legacy;
 mod m10;
 mod m11;
 mod m9;
