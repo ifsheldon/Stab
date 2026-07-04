@@ -221,7 +221,7 @@ Acceptance criteria:
 
 - Utility APIs fail closed for unpromoted subfamilies with precise errors.
 - Flow APIs prove both positive and negative cases, including measurement-rich circuits and observable-including flows.
-- If multi-record row reduction, honeycomb suffix analysis, or toric suffix analysis remains unpromoted, it is recorded as deferred in the checklist and spec-gap log.
+- If multi-record row reduction, honeycomb suffix analysis, or broader toric suffix analysis remains unpromoted, it is recorded as deferred in the checklist and spec-gap log.
 
 ## Milestone PF6: Analyzer, Search, And Sparse Reverse Tracking Closure
 

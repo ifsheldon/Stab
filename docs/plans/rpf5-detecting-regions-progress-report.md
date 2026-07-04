@@ -58,5 +58,5 @@ just bench::smoke
 ## Remaining RPF5 Work
 
 - Broader detecting-region Clifford gate support, target-shape support, detector filtering, multi-detector regions, anticommutation modes, and gauge behavior.
-- Missing-detector generated-code suffix analysis for honeycomb and toric cases, plus broader flow-dependent utility behavior.
+- Missing-detector generated-code suffix analysis for honeycomb and broader toric cases beyond the promoted global-stabilizer suffix case, plus broader flow-dependent utility behavior.
 - Measurement-rich flows, `has_flow`, `has_all_flows`, `flow_generators`, diagnostics, and transform integration.
