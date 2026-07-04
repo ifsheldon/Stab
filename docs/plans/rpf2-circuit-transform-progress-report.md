@@ -2,7 +2,7 @@
 
 ## Scope Closed In This Slice
 
-This report records the RPF2 Rust circuit-transform slice implemented for `Circuit::flattened`, `Circuit::flattened_operations`, and `Circuit::without_noise`.
+This report records the RPF2 Rust circuit-transform slice implemented for `Circuit::flattened`, `Circuit::flattened_operations`, `Circuit::without_noise`, and the scoped `Circuit::decomposed` API.
 
 Implemented behavior:
 
@@ -10,10 +10,11 @@ Implemented behavior:
 - `Circuit::flattened_operations` returns owned unfused instructions for the same flattened traversal, matching the structural intent of Stim's deprecated `flattened_operations` API without claiming Python tuple ergonomics.
 - Materialized flattening rejects more than one million output operations with a precise domain error, while shift-only large repeats are folded into a single coordinate shift instead of being iterated.
 - `Circuit::without_noise` drops ordinary noise, strips probability arguments from measurement-producing gates, preserves deterministic operations, annotations, detector and observable declarations, tags, ticks, coordinate shifts, and measurement-record references, and replaces heralded noise with deterministic zero `MPAD` records so measurement-record indexing remains stable.
+- `Circuit::decomposed` now exposes the existing H/S/CX simplification subset under Stim's public transform name while preserving unowned MPP, SPP, and pair-phasing families.
 
 Remaining RPF2 work:
 
-- Full `decomposed` parity for compound gates, MPP, SPP, pair measurements, grouped targets, base-gate lowering, tableau or flow semantic checks, and unsupported decomposition target errors remains open.
+- Full `decomposed` parity for compound gates, MPP, SPP, pair measurements, grouped targets, base-gate lowering, tableau or flow semantic checks, and unsupported decomposition target errors remains open beyond the scoped API.
 - Full public feedback-inlining transform parity remains open beyond the existing scoped `circuit_with_inlined_feedback` helper used by `m2d --ran_without_feedback`.
 - Exact loop refolding remains open.
 - `time_reversed_for_flows` remains blocked on the RPF5 measurement-rich flow semantics decision.
@@ -26,18 +27,19 @@ Implemented source-owned tests:
 - `cargo test -p stab-core --test circuit_transforms --quiet`
 
 The test file ports and adapts pinned Stim v1.16.0 cases from `src/stim/circuit/circuit.test.cc`, `src/stim/circuit/circuit_pybind_test.py`, and tag-specific Python tests.
-Coverage includes empty circuits, dropped `SHIFT_COORDS`, simple repeat unrolling, coordinate shifts through repeats, detector and observable preservation, instruction tags, repeat-tag removal, unfused flattened operations, materialized expansion rejection, folded shift-only repeats, noisy measurement probability stripping, ordinary noise removal, heralded-noise `MPAD` replacement, annotation preservation, and coordinate-overflow rejection.
+Coverage includes empty circuits, dropped `SHIFT_COORDS`, simple repeat unrolling, coordinate shifts through repeats, detector and observable preservation, instruction tags, repeat-tag removal, unfused flattened operations, materialized expansion rejection, folded shift-only repeats, noisy measurement probability stripping, ordinary noise removal, heralded-noise `MPAD` replacement, annotation preservation, coordinate-overflow rejection, scoped `decomposed` API exposure, and preservation of unowned decomposition families.
 
 ## Oracle Rows
 
 Implemented:
 
 - `pf2-circuit-flatten-without-noise-rust`: structural `cargo-test` row for `cargo test -p stab-core --test circuit_transforms`.
+- `pf2-circuit-decomposed-scoped-rust`: structural `cargo-test` row for `cargo test -p stab-core --test circuit_transforms decomposed`.
 
 Still manifest-only:
 
 - `pf2-circuit-flatten-without-noise`: broad umbrella row retained as a planning row.
-- `pf2-circuit-decomposed`: decomposition parity remains open.
+- `pf2-circuit-decomposed`: full decomposition parity remains open.
 - `pf2-feedback-time-reverse`: feedback transform and flow-time-reversal parity remain open.
 
 ## Benchmarks
@@ -64,6 +66,7 @@ Passed for this slice:
 - `cargo fmt --all --check`
 - `cargo clippy -p stab-core -p stab-bench --all-targets -- -D warnings`
 - `cargo test -p stab-core --test circuit_transforms --quiet`
+- `cargo test -p stab-core --test circuit_transforms decomposed --quiet`
 - `cargo test -p stab-core circuit --quiet`
 - `cargo test -p stab-bench pf2_transform --quiet`
 - `cargo test -p stab-bench --quiet`

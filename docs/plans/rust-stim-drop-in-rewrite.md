@@ -560,7 +560,7 @@ Done criteria:
 
 Future work is intentionally outside the M0 through M12 core rewrite sequence. Start any of these only after the Rust library and CLI compatibility surface has passed the first public beta gate or after the roadmap is deliberately revised.
 Non-deferred partial Rust and CLI surfaces after M12 are governed by [remaining-partial-feature-milestones.md](remaining-partial-feature-milestones.md), [partial-feature-inventory.md](partial-feature-inventory.md), and [GOAL.md](GOAL.md). [partial-feature-closure-plan.md](partial-feature-closure-plan.md) is retained as historical PF planning context. The future list below covers intentionally deferred surfaces and any full-parity work that remains outside those RPF milestones.
-Current RPF2 progress implements Rust `Circuit::flattened`, `Circuit::flattened_operations`, and `Circuit::without_noise` with source-owned tests, oracle metadata, and report-only benchmark runners; full `decomposed`, full feedback-inlining transform parity, exact loop refolding, and flow-time-reversal remain governed by the RPF plan.
+Current RPF2 progress implements Rust `Circuit::flattened`, `Circuit::flattened_operations`, `Circuit::without_noise`, and scoped `Circuit::decomposed` with source-owned tests, oracle metadata, and report-only benchmark runners for the performance-sensitive flatten and noise-removal transforms; full Stim `decomposed`, full feedback-inlining transform parity, exact loop refolding, and flow-time-reversal remain governed by the RPF plan.
 
 - Python bindings: add `pyo3` and `maturin` bindings after the Rust API is stable enough to avoid binding-driven churn.
 - JS/WASM: add browser bindings only after the Rust API has settled and the memory model is compatible with WASM constraints.

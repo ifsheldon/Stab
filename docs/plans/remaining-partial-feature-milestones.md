@@ -177,7 +177,7 @@ Implementation tasks:
 
 - Implement public Rust `flattened` and flattened-operation traversal for repeat blocks, tags, annotations, coordinate shifts, detectors, observables, and measurement references. The Rust `Circuit::flattened` and `Circuit::flattened_operations` subset is implemented with tests, oracle metadata, benchmarks, and progress evidence in `docs/plans/rpf2-circuit-transform-progress-report.md`.
 - Implement `without_noise` while preserving deterministic operations, coordinates, ticks, detectors, observables, and measurement-record semantics. The Rust `Circuit::without_noise` subset is implemented with tests, oracle metadata, benchmarks, and progress evidence in `docs/plans/rpf2-circuit-transform-progress-report.md`.
-- Implement full or explicitly scoped `decomposed` behavior for compound gates, pair measurements, MPP, SPP, target grouping, and base-gate lowering.
+- Implement full or explicitly scoped `decomposed` behavior for compound gates, pair measurements, MPP, SPP, target grouping, and base-gate lowering. A scoped Rust `Circuit::decomposed` API now exposes the existing simplification subset and preserves unowned families; full Stim decomposition remains open.
 - Extend `circuit_with_inlined_feedback` into the selected public feedback-inlining surface, including repeat-block behavior or precise rejection.
 - Implement `time_reversed_for_flows` only after RPF5 defines required flow semantics.
 - Prefer folded traversal over full expansion for large repeats; when expansion remains necessary, add a documented cap and rejection tests.

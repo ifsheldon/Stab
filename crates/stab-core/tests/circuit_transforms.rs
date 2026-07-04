@@ -267,6 +267,40 @@ SHIFT_COORDS[test7](5)
 }
 
 #[test]
+fn decomposed_exposes_current_simplified_circuit_subset() {
+    let circuit = circuit(
+        "
+        H_XY 0
+        CZ 0 1
+        CY 1 2
+        SWAP 0 2
+    ",
+    );
+
+    let decomposed = circuit.decomposed().expect("decompose");
+
+    assert_eq!(decomposed, circuit.simplified().expect("simplify"));
+    assert!(!decomposed.to_stim_string().contains("H_XY"));
+    assert!(!decomposed.to_stim_string().contains("CZ"));
+    assert!(!decomposed.to_stim_string().contains("CY"));
+    assert!(!decomposed.to_stim_string().contains("SWAP"));
+}
+
+#[test]
+fn decomposed_preserves_unowned_mpp_spp_and_pair_phasing_families() {
+    let circuit = circuit(
+        "
+        MPP X0*X1
+        SPP X0
+        SPP_DAG !Z1
+        SQRT_XX 0 1
+    ",
+    );
+
+    assert_eq!(circuit.decomposed().expect("decompose"), circuit);
+}
+
+#[test]
 fn flattened_rejects_coordinate_overflow() {
     let error = circuit("SHIFT_COORDS(1e308)\nSHIFT_COORDS(1e308)\nDETECTOR(0) rec[-1]\n")
         .flattened()

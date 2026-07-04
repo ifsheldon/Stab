@@ -63,6 +63,16 @@ impl Circuit {
         }
         Ok(result)
     }
+
+    /// Returns the currently supported H/S/CX/M/R decomposition subset.
+    ///
+    /// This is Stab's scoped Rust counterpart to Stim's `Circuit.decomposed()` surface. It reuses
+    /// the existing simplification engine, which currently decomposes supported single-qubit
+    /// Clifford gates and selected two-qubit Clifford gates while preserving unowned decomposition
+    /// families such as MPP/SPP until their RPF2 semantics are implemented.
+    pub fn decomposed(&self) -> CircuitResult<Self> {
+        crate::simplified_circuit(self)
+    }
 }
 
 fn validate_flattened_operation_limit(circuit: &Circuit) -> CircuitResult<()> {
