@@ -1,6 +1,9 @@
 use std::collections::BTreeSet;
 
-use crate::{Circuit, CircuitError, CircuitItem, CircuitResult, DemTarget, QubitId, RepeatBlock};
+use crate::{
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, QubitId,
+    RepeatBlock, SingleQubitClifford,
+};
 
 use super::{SparseReverseFrameTracker, toggle_targets};
 
@@ -106,12 +109,14 @@ impl SlotTransform {
 
 fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {
     circuit.items().iter().all(|item| match item {
-        CircuitItem::Instruction(instruction) => matches!(
-            instruction.gate().canonical_name(),
-            "H" | "H_XY" | "S" | "S_DAG" | "C_XYZ" | "CX" | "CY" | "CZ"
-        ),
+        CircuitItem::Instruction(instruction) => is_supported_unitary_instruction(instruction),
         CircuitItem::RepeatBlock(repeat) => is_supported_unitary_circuit(repeat.body()),
     })
+}
+
+fn is_supported_unitary_instruction(instruction: &CircuitInstruction) -> bool {
+    SingleQubitClifford::from_gate(instruction.gate()).is_ok()
+        || matches!(instruction.gate().canonical_name(), "CX" | "CY" | "CZ")
 }
 
 fn seed_slot(
@@ -228,9 +233,35 @@ mod tests {
                 CY 2 0
                 CZ 1 2
                 C_XYZ 2
+                SQRT_X 1
+                H_YZ 2
+                C_ZYX 0
             }
             ",
         );
+        let mut folded = tracker_from_pauli_text("XYZ");
+        assert!(try_undo_supported_unitary_repeat(&mut folded, &repeat).unwrap());
+
+        let mut naive = tracker_from_pauli_text("XYZ");
+        for _ in 0..repeat.repeat_count().get() {
+            naive.undo_circuit(repeat.body()).unwrap();
+        }
+        assert_eq!(folded, naive);
+    }
+
+    #[test]
+    fn unitary_repeat_folding_matches_naive_all_single_qubit_cliffords() {
+        let mut text = String::from("REPEAT 11 {\n");
+        for (index, gate) in SingleQubitClifford::all().enumerate() {
+            text.push_str("    ");
+            text.push_str(gate.canonical_name());
+            text.push(' ');
+            text.push_str(&(index % 3).to_string());
+            text.push('\n');
+        }
+        text.push_str("}\n");
+        let repeat = repeat(&text);
+
         let mut folded = tracker_from_pauli_text("XYZ");
         assert!(try_undo_supported_unitary_repeat(&mut folded, &repeat).unwrap());
 

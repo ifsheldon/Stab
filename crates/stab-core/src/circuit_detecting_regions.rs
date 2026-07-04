@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemDetectorId,
-    DemTarget, FlexPauliString, PauliBasis, Target, detection::measurement_record_count,
-    sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    DemTarget, FlexPauliString, PauliBasis, SingleQubitClifford, Target,
+    detection::measurement_record_count, sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
 const MAX_DETECTING_REGION_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
@@ -268,10 +268,11 @@ fn validate_supported_subset_inner(
 }
 
 fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitResult<()> {
+    if SingleQubitClifford::from_gate(instruction.gate()).is_ok() {
+        return validate_single_plain_qubit_targets(instruction);
+    }
     match instruction.gate().canonical_name() {
-        "H" | "H_XY" | "S" | "S_DAG" | "C_XYZ" | "R" | "RX" | "RY" | "M" | "MX" | "MY" => {
-            validate_single_plain_qubit_targets(instruction)
-        }
+        "R" | "RX" | "RY" | "M" | "MX" | "MY" => validate_single_plain_qubit_targets(instruction),
         "CX" | "CY" | "CZ" | "MXX" | "MYY" | "MZZ" => {
             validate_plain_qubit_pair_targets(instruction)
         }
@@ -730,6 +731,42 @@ mod tests {
     }
 
     #[test]
+    fn detecting_regions_clifford_supports_single_qubit_clifford_gate_set() {
+        let cases = [
+            ("I", "RX", "+X"),
+            ("X", "RX", "+X"),
+            ("Y", "RX", "+X"),
+            ("Z", "RX", "+X"),
+            ("H", "R", "+Z"),
+            ("SQRT_Y_DAG", "R", "+Z"),
+            ("H_NXZ", "R", "+Z"),
+            ("SQRT_Y", "R", "+Z"),
+            ("S", "RY", "+Y"),
+            ("H_XY", "RY", "+Y"),
+            ("H_NXY", "RY", "+Y"),
+            ("S_DAG", "RY", "+Y"),
+            ("SQRT_X_DAG", "RX", "+X"),
+            ("SQRT_X", "RX", "+X"),
+            ("H_NYZ", "RX", "+X"),
+            ("H_YZ", "RX", "+X"),
+            ("C_XYZ", "R", "+Z"),
+            ("C_XYNZ", "R", "+Z"),
+            ("C_NXYZ", "R", "+Z"),
+            ("C_XNYZ", "R", "+Z"),
+            ("C_ZYX", "RY", "+Y"),
+            ("C_ZNYX", "RY", "+Y"),
+            ("C_NZYX", "RY", "+Y"),
+            ("C_ZYNX", "RY", "+Y"),
+        ];
+        for (gate, reset, tick0) in cases {
+            let text = format!("{reset} 0\nTICK\n{gate} 0\nTICK\nMX 0\nDETECTOR rec[-1]\n");
+            let actual = regions(&text, vec![detector(0)], vec![0, 1]);
+            assert_eq!(actual[&detector(0)][&0].to_string(), tick0, "{gate}");
+            assert_eq!(actual[&detector(0)][&1].to_string(), "+X", "{gate}");
+        }
+    }
+
+    #[test]
     fn detecting_regions_clifford_supports_controlled_pauli_propagation() {
         let cases = [
             (
@@ -906,7 +943,8 @@ mod tests {
 
     #[test]
     fn detecting_regions_rejects_unsupported_gate() {
-        let circuit = Circuit::from_stim_str("X 0\nTICK\nMXX 0 1\nDETECTOR rec[-1]\n").unwrap();
+        let circuit =
+            Circuit::from_stim_str("SWAP 0 1\nTICK\nMXX 0 1\nDETECTOR rec[-1]\n").unwrap();
         let error = circuit_detecting_regions(
             &circuit,
             DetectingRegionOptions {
@@ -917,7 +955,7 @@ mod tests {
         )
         .unwrap_err();
 
-        assert!(error.to_string().contains("does not support gate X"));
+        assert!(error.to_string().contains("does not support gate SWAP"));
     }
 
     #[test]

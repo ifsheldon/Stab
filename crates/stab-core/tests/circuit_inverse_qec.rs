@@ -133,6 +133,31 @@ fn time_reversed_for_flows_unitary_subset_folds_large_cy_repeats() {
 }
 
 #[test]
+fn time_reversed_for_flows_unitary_subset_folds_large_sqrt_x_repeats() {
+    let input = circuit(
+        "
+        REPEAT 1000001 {
+            SQRT_X 0
+        }
+    ",
+    );
+    let expected_circuit = circuit(
+        "
+        REPEAT 1000001 {
+            SQRT_X_DAG 0
+        }
+    ",
+    );
+    let flows = [flow("Y0 -> Z0")];
+
+    let (actual_circuit, actual_flows) =
+        circuit_time_reversed_for_flows(&input, &flows).expect("time reverse repeated SQRT_X");
+
+    assert_eq!(actual_circuit, expected_circuit);
+    assert_eq!(actual_flows, vec![flow("Z0 -> Y0")]);
+}
+
+#[test]
 fn time_reversed_for_flows_unitary_subset_validates_general_unitaries_with_tableau() {
     let swap = circuit("SWAP 0 1\n");
     let swap_flows = [flow("X0 -> X1"), flow("Z1 -> Z0")];

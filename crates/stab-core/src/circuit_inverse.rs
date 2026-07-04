@@ -1,6 +1,6 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, GateCategory,
-    PauliBasis, PauliSign, PauliString, RepeatBlock, Tableau, Target,
+    PauliBasis, PauliSign, PauliString, RepeatBlock, SingleQubitClifford, Tableau, Target,
     circuit_flow::check_unsigned_flow_with_sparse_tracker,
 };
 
@@ -171,31 +171,28 @@ fn expanded_instruction_count(circuit: &Circuit) -> Option<u64> {
 fn sparse_tracker_can_validate_without_unbounded_unroll(circuit: &Circuit) -> bool {
     circuit.items().iter().all(|item| match item {
         CircuitItem::Instruction(instruction) => {
-            sparse_tracker_supports_top_level_unitary(instruction.gate().canonical_name())
+            sparse_tracker_supports_folded_instruction(instruction)
         }
         CircuitItem::RepeatBlock(repeat) => {
             sparse_tracker_supports_folded_unitary_repeat(repeat.body())
         }
     })
-}
-
-fn sparse_tracker_supports_top_level_unitary(gate_name: &str) -> bool {
-    matches!(
-        gate_name,
-        "H" | "H_XY" | "S" | "S_DAG" | "C_XYZ" | "CX" | "CY" | "CZ"
-    )
 }
 
 fn sparse_tracker_supports_folded_unitary_repeat(circuit: &Circuit) -> bool {
     circuit.items().iter().all(|item| match item {
-        CircuitItem::Instruction(instruction) => matches!(
-            instruction.gate().canonical_name(),
-            "H" | "H_XY" | "S" | "S_DAG" | "C_XYZ" | "CX" | "CY" | "CZ"
-        ),
+        CircuitItem::Instruction(instruction) => {
+            sparse_tracker_supports_folded_instruction(instruction)
+        }
         CircuitItem::RepeatBlock(repeat) => {
             sparse_tracker_supports_folded_unitary_repeat(repeat.body())
         }
     })
+}
+
+fn sparse_tracker_supports_folded_instruction(instruction: &CircuitInstruction) -> bool {
+    SingleQubitClifford::from_gate(instruction.gate()).is_ok()
+        || matches!(instruction.gate().canonical_name(), "CX" | "CY" | "CZ")
 }
 
 fn unitary_flow_is_satisfied_by_tableau(tableau: &Tableau, flow: &Flow) -> CircuitResult<bool> {

@@ -79,31 +79,36 @@ const DETECTING_REGIONS_TARGETS: &str = "R 0\n\
                                          OBSERVABLE_INCLUDE(0) rec[-1]\n\
                                          TICK\n\
                                          OBSERVABLE_INCLUDE(1) Z1\n";
-const DETECTING_REGIONS_CLIFFORD: &str = "R 0\n\
+const DETECTING_REGIONS_CLIFFORD: &str = "RX 0\n\
                                           TICK\n\
-                                          H 0\n\
-                                          S 0\n\
+                                          SQRT_X 0\n\
                                           TICK\n\
-                                          MY 0\n\
+                                          MX 0\n\
                                           DETECTOR rec[-1]\n\
                                           RX 1\n\
                                           TICK\n\
-                                          H_XY 1\n\
+                                          H_YZ 1\n\
                                           TICK\n\
-                                          MY 1\n\
+                                          MX 1\n\
                                           DETECTOR rec[-1]\n\
-                                          R 2\n\
+                                          RY 2\n\
                                           TICK\n\
-                                          C_XYZ 2\n\
+                                          C_ZYX 2\n\
                                           TICK\n\
                                           MX 2\n\
                                           DETECTOR rec[-1]\n\
-                                          R 3 4\n\
+                                          R 3\n\
                                           TICK\n\
-                                          H 3\n\
-                                          CZ 3 4\n\
+                                          C_NXYZ 3\n\
                                           TICK\n\
                                           MX 3\n\
+                                          DETECTOR rec[-1]\n\
+                                          R 4 5\n\
+                                          TICK\n\
+                                          H 4\n\
+                                          CZ 4 5\n\
+                                          TICK\n\
+                                          MX 4\n\
                                           DETECTOR rec[-1]\n";
 const DETECTING_REGIONS_CY: &str = "RX 0\n\
                                     RY 1\n\
@@ -320,7 +325,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures detector and logical-observable target filters in the Rust detecting-regions utility without a faithful pinned Stim CLI timing ratio",
         ),
         "pf5-detecting-regions-clifford" => Some(
-            "report-only: Stab measures promoted unsigned Clifford gate propagation in the Rust detecting-regions utility without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures representative single-qubit Clifford plus CY/CZ propagation in the Rust detecting-regions utility without a faithful pinned Stim CLI timing ratio",
         ),
         "pf5-has-all-flows-batch" => Some(
             "report-only: Stab measures the Rust unsigned has_flow measurement-record and observable-dependency subset without a faithful pinned Stim CLI timing ratio",

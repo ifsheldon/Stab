@@ -2,12 +2,11 @@
     dead_code,
     reason = "M10 lands sparse reverse tracker parity before the error matcher consumes this internal primitive"
 )]
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget,
-    FlexPauliString, Pauli, PauliBasis, PauliPhase, QubitId, Target,
+    FlexPauliString, Pauli, PauliBasis, PauliPhase, QubitId, SingleQubitClifford, Target,
 };
 
 mod pauli_product;
@@ -106,16 +105,16 @@ impl SparseReverseFrameTracker {
             "R" => self.undo_resets(instruction, TrackerBasis::Z),
             "RX" => self.undo_resets(instruction, TrackerBasis::X),
             "RY" => self.undo_resets(instruction, TrackerBasis::Y),
-            "H" => self.undo_h(instruction),
-            "H_XY" | "S" | "S_DAG" => self.undo_s_like(instruction),
-            "C_XYZ" => self.undo_c_xyz(instruction),
             "CX" | "CY" | "CZ" => self.undo_controlled_pauli(instruction),
             "DETECTOR" => self.undo_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
             "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
                 self.undo_heralded_measurements(instruction)
             }
-            _ => Ok(()),
+            _ => match SingleQubitClifford::from_gate(instruction.gate()) {
+                Ok(clifford) => self.undo_single_qubit_clifford(instruction, clifford),
+                Err(_) => Ok(()),
+            },
         }
     }
 
@@ -283,51 +282,55 @@ impl SparseReverseFrameTracker {
         Ok(())
     }
 
-    fn undo_h(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        for qubit in qubits_reversed(instruction)? {
-            let index = self.checked_qubit_index(qubit)?;
-            let xs = self.xs.get_mut(index).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
-                    "H target qubit {} is outside the sparse reverse tracker",
-                    qubit.get()
-                ))
-            })?;
-            let zs = self.zs.get_mut(index).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
-                    "H target qubit {} is outside the sparse reverse tracker",
-                    qubit.get()
-                ))
-            })?;
-            std::mem::swap(xs, zs);
-        }
-        Ok(())
-    }
-
-    fn undo_s_like(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        for qubit in qubits_reversed(instruction)? {
-            let xs = self.xs_for(qubit)?.clone();
-            self.toggle_zs(qubit, &xs)?;
-        }
-        Ok(())
-    }
-
-    fn undo_c_xyz(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+    fn undo_single_qubit_clifford(
+        &mut self,
+        instruction: &CircuitInstruction,
+        clifford: SingleQubitClifford,
+    ) -> CircuitResult<()> {
+        let inverse = clifford.inverse().map_err(|error| {
+            CircuitError::invalid_detector_error_model(format!(
+                "failed to invert single-qubit Clifford {} during sparse reverse tracking: {error}",
+                instruction.gate().canonical_name()
+            ))
+        })?;
         for qubit in qubits_reversed(instruction)? {
             let index = self.checked_qubit_index(qubit)?;
             let old_xs = self.xs_for(qubit)?.clone();
             let old_zs = self.zs_for(qubit)?.clone();
-            let new_xs = old_zs.clone();
-            let new_zs = xor_sets(&old_xs, &old_zs);
+            let mut new_xs = BTreeSet::new();
+            let mut new_zs = BTreeSet::new();
+            for target in old_xs.union(&old_zs) {
+                let old_basis = match (old_xs.contains(target), old_zs.contains(target)) {
+                    (true, true) => PauliBasis::Y,
+                    (true, false) => PauliBasis::X,
+                    (false, true) => PauliBasis::Z,
+                    (false, false) => PauliBasis::I,
+                };
+                let new_basis = inverse.apply_basis(old_basis).map_err(|error| {
+                    CircuitError::invalid_detector_error_model(format!(
+                        "failed to apply inverse single-qubit Clifford {} during sparse reverse tracking: {error}",
+                        instruction.gate().canonical_name()
+                    ))
+                })?;
+                if new_basis.x_bit() {
+                    new_xs.insert(*target);
+                }
+                if new_basis.z_bit() {
+                    new_zs.insert(*target);
+                }
+            }
             let Some(xs) = self.xs.get_mut(index) else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
-                    "C_XYZ target qubit {} is outside the sparse reverse tracker",
+                    "{} target qubit {} is outside the sparse reverse tracker",
+                    instruction.gate().canonical_name(),
                     qubit.get()
                 )));
             };
             *xs = new_xs;
             let Some(zs) = self.zs.get_mut(index) else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
-                    "C_XYZ target qubit {} is outside the sparse reverse tracker",
+                    "{} target qubit {} is outside the sparse reverse tracker",
+                    instruction.gate().canonical_name(),
                     qubit.get()
                 )));
             };
@@ -833,9 +836,8 @@ mod tests {
         reason = "unit tests use direct fixed-width tracker assertions for compact diagnostics"
     )]
 
-    use crate::{Gate, MeasureRecordOffset, measurement_record_count};
-
     use super::*;
+    use crate::{Gate, MeasureRecordOffset, PauliSign, PauliString, measurement_record_count};
 
     fn tracker_from_pauli_text(text: &str) -> SparseReverseFrameTracker {
         let mut tracker = SparseReverseFrameTracker::new(text.len(), 0, 0, true);
@@ -884,18 +886,6 @@ mod tests {
         BTreeSet::from([DemTarget::logical_observable(id).unwrap()])
     }
     #[test]
-    fn sparse_rev_frame_tracker_undo_tableau_h_subset() {
-        assert_undo_tableau("H 0\n", &["I I", "X Z", "Y Y", "Z X"]);
-    }
-    #[test]
-    fn sparse_rev_frame_tracker_undo_tableau_s_subset() {
-        assert_undo_tableau("S 0\n", &["I I", "X Y", "Y X", "Z Z"]);
-    }
-    #[test]
-    fn sparse_rev_frame_tracker_undo_tableau_c_xyz_subset() {
-        assert_undo_tableau("C_XYZ 0\n", &["I I", "X Z", "Y X", "Z Y"]);
-    }
-    #[test]
     fn sparse_rev_frame_tracker_undo_tableau_cx_subset() {
         assert_undo_tableau(
             "CX 0 1\n",
@@ -912,7 +902,35 @@ mod tests {
             ],
         );
     }
-
+    #[test]
+    fn sparse_rev_frame_tracker_undo_single_qubit_cliffords_match_tableau() {
+        let target = DemTarget::logical_observable(0).unwrap();
+        let basis_cases = [
+            ("I", PauliBasis::I),
+            ("X", PauliBasis::X),
+            ("Y", PauliBasis::Y),
+            ("Z", PauliBasis::Z),
+        ];
+        for gate in SingleQubitClifford::all() {
+            let parsed_gate = Gate::from_name(gate.canonical_name()).unwrap();
+            let inverse_gate = parsed_gate.best_candidate_inverse().unwrap();
+            let expected_tableau = circuit(&format!("{} 0\n", inverse_gate.canonical_name()))
+                .to_tableau(false, false, false)
+                .unwrap();
+            let instruction = instruction(&format!("{} 0\n", gate.canonical_name()));
+            for (input_text, input_basis) in basis_cases {
+                let mut actual = tracker_from_pauli_text(input_text);
+                actual.undo_instruction(&instruction).unwrap();
+                let expected = expected_tableau
+                    .apply(&PauliString::from_bases(PauliSign::Plus, [input_basis]))
+                    .unwrap()
+                    .get(0)
+                    .unwrap();
+                let actual = actual.region_for_target(target).unwrap().get(0).unwrap();
+                assert_eq!(actual, expected, "{} {input_text}", gate.canonical_name());
+            }
+        }
+    }
     #[test]
     fn sparse_rev_frame_tracker_measurements_preserve_matching_basis() {
         for (gate, input) in [("MX", "XXX"), ("MY", "YYY"), ("M", "ZZZ")] {
