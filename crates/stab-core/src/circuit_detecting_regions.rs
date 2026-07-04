@@ -272,7 +272,9 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
         "H" | "H_XY" | "S" | "S_DAG" | "C_XYZ" | "R" | "RX" | "RY" | "M" | "MX" | "MY" => {
             validate_single_plain_qubit_targets(instruction)
         }
-        "CX" | "CZ" | "MXX" | "MYY" | "MZZ" => validate_plain_qubit_pair_targets(instruction),
+        "CX" | "CY" | "CZ" | "MXX" | "MYY" | "MZZ" => {
+            validate_plain_qubit_pair_targets(instruction)
+        }
         "TICK" => validate_target_count(instruction, 0),
         "DETECTOR" => validate_detector_targets(instruction),
         "OBSERVABLE_INCLUDE" => validate_observable_include_targets(instruction),
@@ -728,21 +730,36 @@ mod tests {
     }
 
     #[test]
-    fn detecting_regions_clifford_supports_cz_propagation() {
-        let actual = regions(
-            "R 0 1\n\
-             TICK\n\
-             H 0\n\
-             CZ 0 1\n\
-             TICK\n\
-             MX 0\n\
-             DETECTOR rec[-1]\n",
-            vec![detector(0)],
-            vec![0, 1],
-        );
-
-        assert_eq!(actual[&detector(0)][&0].to_string(), "+ZZ");
-        assert_eq!(actual[&detector(0)][&1].to_string(), "+X_");
+    fn detecting_regions_clifford_supports_controlled_pauli_propagation() {
+        let cases = [
+            (
+                "R 0 1\n\
+                 TICK\n\
+                 H 0\n\
+                 CZ 0 1\n\
+                 TICK\n\
+                 MX 0\n\
+                 DETECTOR rec[-1]\n",
+                "+ZZ",
+                "+X_",
+            ),
+            (
+                "RX 0\n\
+                 RY 1\n\
+                 TICK\n\
+                 CY 0 1\n\
+                 TICK\n\
+                 MX 0\n\
+                 DETECTOR rec[-1]\n",
+                "+XY",
+                "+X_",
+            ),
+        ];
+        for (text, tick0, tick1) in cases {
+            let actual = regions(text, vec![detector(0)], vec![0, 1]);
+            assert_eq!(actual[&detector(0)][&0].to_string(), tick0, "{text}");
+            assert_eq!(actual[&detector(0)][&1].to_string(), tick1, "{text}");
+        }
     }
 
     #[test]
@@ -906,7 +923,7 @@ mod tests {
     #[test]
     fn detecting_regions_clifford_rejects_unpromoted_controlled_pauli_gate() {
         let circuit =
-            Circuit::from_stim_str("R 0 1\nTICK\nCY 0 1\nM 0\nDETECTOR rec[-1]\n").unwrap();
+            Circuit::from_stim_str("R 0 1\nTICK\nXCX 0 1\nM 0\nDETECTOR rec[-1]\n").unwrap();
         let error = circuit_detecting_regions(
             &circuit,
             DetectingRegionOptions {
@@ -917,7 +934,7 @@ mod tests {
         )
         .unwrap_err();
 
-        assert!(error.to_string().contains("does not support gate CY"));
+        assert!(error.to_string().contains("does not support gate XCX"));
     }
 
     #[test]

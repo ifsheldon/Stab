@@ -4,7 +4,7 @@
 
 This RPF5 report covers bounded repeat traversal, additive detector or logical-observable target filters, and promoted unsigned Clifford propagation in the Rust `circuit_detecting_regions` utility for the currently supported gate subset.
 The target-filter slice adds a `DemTarget`-based detecting-region API that can query detector and logical-observable targets, default-like helpers for all detector and logical-observable targets and all ticks, and the pinned Stim `MX` and `MZZ` detecting-region examples.
-The unsigned Clifford slice adds `S`, `S_DAG`, `H_XY`, `C_XYZ`, and `CZ` propagation with explicit `CY` rejection.
+The unsigned Clifford slice adds `S`, `S_DAG`, `H_XY`, `C_XYZ`, `CY`, and `CZ` propagation with explicit rejection for the remaining promoted-out controlled-Pauli variants.
 It is not an RPF5 completion report because broader Clifford gates, target shapes beyond the promoted measurement families, multi-detector generated-code cases, anticommutation ignored mode, gauge behavior, missing-detector families, and measurement-rich flow-transform integration remain active work.
 
 ## Implemented Surfaces
@@ -15,7 +15,7 @@ It is not an RPF5 completion report because broader Clifford gates, target shape
 - Detecting-region extraction rejects excessive repeat expansion before unbounded unrolling.
 - `circuit_detecting_regions_for_targets` returns detecting regions keyed by `DemTarget` and supports detector and logical-observable target filters while preserving the original detector-id `circuit_detecting_regions` API as a wrapper.
 - `all_detecting_region_targets` returns the currently declared detector and logical-observable targets within the dense helper materialization cap, and `all_detecting_region_ticks` returns all tick indices within the documented helper cap.
-- The supported validation set now includes `R`/`RX`/`RY`, `M`/`MX`/`MY`, `MXX`/`MYY`/`MZZ`, `H`, `H_XY`, `S`, `S_DAG`, `C_XYZ`, `CX`, `CZ`, `TICK`, `DETECTOR`, and `OBSERVABLE_INCLUDE`.
+- The supported validation set now includes `R`/`RX`/`RY`, `M`/`MX`/`MY`, `MXX`/`MYY`/`MZZ`, `H`, `H_XY`, `S`, `S_DAG`, `C_XYZ`, `CX`, `CY`, `CZ`, `TICK`, `DETECTOR`, and `OBSERVABLE_INCLUDE`.
 
 ## Target-Filter Scope
 
@@ -27,11 +27,11 @@ The existing `circuit_detecting_regions` detector-id API remains as a compatibil
 
 ## Clifford Gate Scope
 
-The unsigned Clifford slice promotes `S`, `S_DAG`, `H_XY`, `C_XYZ`, and `CZ` detecting-region propagation because the existing sparse reverse tracker owns those unsigned transformations.
+The unsigned Clifford slice promotes `S`, `S_DAG`, `H_XY`, `C_XYZ`, `CY`, and `CZ` detecting-region propagation because the sparse reverse tracker owns those unsigned transformations.
 The owned positive subcases are deterministic single-detector circuits whose expected tick-indexed regions were cross-checked against pinned Stim v1.16.0 `detslice-text` output and then encoded as Rust structural tests.
-The source-owned reproduction path is to write each circuit from `detecting_regions_clifford_supports_promoted_single_qubit_gates` and `detecting_regions_clifford_supports_cz_propagation` to a temporary `.stim` file, run `target/oracle/stim-v1.16.0/out/stim diagram --type detslice-text --tick <stim_tick> < file.stim`, and compare Stim diagram tick `n + 1` to Stab detecting-region tick `n` after dropping the diagram sign because this Stab slice intentionally owns unsigned regions.
-The checked unsigned expectations are `S` as tick 0 `+Z` and tick 1 `+Y`, `S_DAG` as tick 0 `+Z` and tick 1 `+Y`, `H_XY` as tick 0 `+X` and tick 1 `+Y`, `C_XYZ` as tick 0 `+Z` and tick 1 `+X`, and `CZ` as tick 0 `+ZZ` and tick 1 `+X_`.
-The owned negative subcases keep `CY`, `XCX`, `XCY`, `XCZ`, `YCX`, `YCY`, `YCZ`, `SWAP`, `ISWAP`, square-root two-qubit gates, and other broader Clifford target shapes fail-closed until their sparse-reverse behavior is fully owned.
+The source-owned reproduction path is to write each circuit from `detecting_regions_clifford_supports_promoted_single_qubit_gates` and `detecting_regions_clifford_supports_controlled_pauli_propagation` to a temporary `.stim` file, run `target/oracle/stim-v1.16.0/out/stim diagram --type detslice-text --tick <stim_tick> < file.stim`, and compare Stim diagram tick `n + 1` to Stab detecting-region tick `n` after dropping the diagram sign because this Stab slice intentionally owns unsigned regions.
+The checked unsigned expectations are `S` as tick 0 `+Z` and tick 1 `+Y`, `S_DAG` as tick 0 `+Z` and tick 1 `+Y`, `H_XY` as tick 0 `+X` and tick 1 `+Y`, `C_XYZ` as tick 0 `+Z` and tick 1 `+X`, `CZ` as tick 0 `+ZZ` and tick 1 `+X_`, and `CY` as tick 0 `+XY` and tick 1 `+X_`.
+The owned negative subcases keep `XCX`, `XCY`, `XCZ`, `YCX`, `YCY`, `YCZ`, `SWAP`, `ISWAP`, square-root two-qubit gates, and other broader Clifford target shapes fail-closed until their sparse-reverse behavior is fully owned.
 The comparator class is structural Rust API parity against pinned Stim detecting-region semantics; the `detslice-text` command is only the pinned-Stim reproduction tool for the expected Pauli regions, and no diagram API parity is claimed.
 The benchmark row for this slice is a non-primary report-only Rust utility workload measuring the promoted Clifford gates through `circuit_detecting_regions_for_targets`.
 Resource behavior continues to use the existing detecting-region repeat and dense-helper caps.
@@ -48,10 +48,10 @@ Implemented Rust tests:
 - `detecting_regions_target_api_rejects_invalid_targets`
 - `detecting_regions_target_api_rejects_dense_helper_expansion`
 - `detecting_regions_clifford_supports_promoted_single_qubit_gates`
-- `detecting_regions_clifford_supports_cz_propagation`
+- `detecting_regions_clifford_supports_controlled_pauli_propagation`
 - `detecting_regions_clifford_rejects_unpromoted_controlled_pauli_gate`
 
-These tests cover bounded repeat tick traversal, expected tick-indexed detecting regions, resource rejection for repeat expansion beyond the current cap, pinned `MX` and `MZZ` detecting-region examples, detector and logical-observable target filters, default-like all-target and all-tick helpers, duplicate target deduplication, invalid target rejection, dense helper rejection before large allocation, promoted unsigned Clifford propagation, and unpromoted `CY` rejection.
+These tests cover bounded repeat tick traversal, expected tick-indexed detecting regions, resource rejection for repeat expansion beyond the current cap, pinned `MX` and `MZZ` detecting-region examples, detector and logical-observable target filters, default-like all-target and all-tick helpers, duplicate target deduplication, invalid target rejection, dense helper rejection before large allocation, promoted unsigned Clifford propagation including `CY`, and unpromoted controlled-Pauli variant rejection.
 
 ## Oracle Rows
 
@@ -74,8 +74,8 @@ Report-only runner coverage:
 - `pf5-detecting-regions-clifford`
 
 The repeat row measures the bounded repeat-tick detecting-region workload through the Rust public utility API.
-The target row measures detector and logical-observable target filters through the additive `DemTarget` API and default-like helper functions.
-The Clifford row measures the promoted unsigned Clifford propagation gates through the additive `DemTarget` API and default-like helper functions.
+The target row uses the default-like helper functions to set up detector, logical-observable, and tick filters, then times detecting-region extraction through the additive `DemTarget` API.
+The Clifford row uses the default-like helper functions to set up filters for the promoted unsigned Clifford fixtures, then times both the existing promoted-gate extraction and the CY extraction through the additive `DemTarget` API.
 These rows remain `non-primary-report-only` because pinned Stim does not provide a faithful CLI timing ratio for this Rust utility surface.
 They are not part of the 1.25x primary threshold file.
 The target row is coverage for the promoted helper path, not a claim that all-target/all-tick scaling is representative for large generated-code workloads.
@@ -97,14 +97,14 @@ just oracle::run --milestone PF5
 just bench::smoke
 just bench::baseline --only pf5-detecting-regions-targets --out target/benchmarks/rpf5-detecting-region-targets-probe
 just bench::compare --only pf5-detecting-regions-targets --baseline target/benchmarks/rpf5-detecting-region-targets-probe/baseline.json --report target/benchmarks/rpf5-detecting-region-targets-compare
-just bench::baseline --only pf5-detecting-regions-clifford --out target/benchmarks/rpf5-detecting-region-clifford-probe
-just bench::compare --only pf5-detecting-regions-clifford --baseline target/benchmarks/rpf5-detecting-region-clifford-probe/baseline.json --report target/benchmarks/rpf5-detecting-region-clifford-compare
-# pinned Stim detslice-text reproduction loop for S, S_DAG, H_XY, C_XYZ, and CZ promoted-gate circuits
+just bench::baseline --only pf5-detecting-regions-clifford --out target/benchmarks/rpf5-detecting-region-clifford-cy-probe
+just bench::compare --only pf5-detecting-regions-clifford --baseline target/benchmarks/rpf5-detecting-region-clifford-cy-probe/baseline.json --report target/benchmarks/rpf5-detecting-region-clifford-cy-compare
+# pinned Stim detslice-text reproduction loop for S, S_DAG, H_XY, C_XYZ, CY, and CZ promoted-gate circuits
 ```
 
-The pinned-Stim `detslice-text` reproduction returned signed regions `-Z` then `-Y` for `S`, signed regions `-Z` then `-Y` for `S_DAG`, signed regions `-X` then `-Y` for `H_XY`, signed regions `-Z` then `-X` for `C_XYZ`, and signed regions `-ZZ` then `-X_` for `CZ`; the Rust slice compares these after dropping the sign because this detecting-region scope is explicitly unsigned.
+The pinned-Stim `detslice-text` reproduction returned signed regions `-Z` then `-Y` for `S`, signed regions `-Z` then `-Y` for `S_DAG`, signed regions `-X` then `-Y` for `H_XY`, signed regions `-Z` then `-X` for `C_XYZ`, signed regions `-XY` then `-X_` for `CY`, and signed regions `-ZZ` then `-X_` for `CZ`; the Rust slice compares these after dropping the sign because this detecting-region scope is explicitly unsigned.
 The target-filter benchmark probe reported `stab_pf5_detecting_regions_target_filters=0.006348216s` and `6.452e5 cases/s`, with output written to `target/benchmarks/rpf5-detecting-region-targets-compare`.
-The Clifford benchmark probe reported `stab_pf5_detecting_regions_clifford_gates=0.013450786s` and `3.045e5 cases/s`, with output written to `target/benchmarks/rpf5-detecting-region-clifford-compare`.
+The CY-inclusive Clifford benchmark probe reported `stab_pf5_detecting_regions_clifford_gates=0.016331756s` and `5.016e5 cases/s`, with output written to `target/benchmarks/rpf5-detecting-region-clifford-cy-compare`.
 Both rows remain report-only with the documented note that this Rust utility workload has no faithful pinned Stim CLI timing ratio.
 
 ## Audit And Review
@@ -113,11 +113,11 @@ Milestone audit status is complete for the target-filter and unsigned Clifford s
 Full-code-review sidecars found one P1 issue in the dense all-target helper, where huge observable ids or detector counts could cause excessive allocation before failure.
 The slice now rejects all-target helper requests beyond the dense materialization cap or representable logical-observable target range before allocation, with `detecting_regions_target_api_rejects_dense_helper_expansion` covering the regression.
 The unsigned Clifford audit found a P2 evidence-provenance gap because the initial report did not preserve the pinned-Stim `detslice-text` reproduction path for the promoted-gate expectations; this report now records the exact command shape and source-owned expected region strings.
-The full-code-review sidecar found no implementation findings for the unsigned Clifford slice and confirmed the promoted-gate tests and `CY` fail-closed regression coverage.
+The full-code-review sidecar found no implementation findings for the earlier unsigned Clifford slice and confirmed the promoted-gate tests and fail-closed regression coverage.
 The remaining review risk is that the report-only benchmark rows exercise promoted helper paths on small fixtures and should not be used as representative scaling evidence for large generated-code workloads.
 
 ## Remaining RPF5 Work
 
-- Broader detecting-region Clifford gate support beyond `S`, `S_DAG`, `H_XY`, `C_XYZ`, and `CZ`, target-shape support beyond the promoted measurement families, multi-detector generated-code regions, ignored anticommutation mode, and gauge behavior.
+- Broader detecting-region Clifford gate support beyond `S`, `S_DAG`, `H_XY`, `C_XYZ`, `CY`, and `CZ`, target-shape support beyond the promoted measurement families, multi-detector generated-code regions, ignored anticommutation mode, and gauge behavior.
 - Missing-detector generated-code suffix analysis beyond the promoted honeycomb and toric cases, plus broader flow-dependent utility behavior.
 - Measurement-rich flows, `has_flow`, `has_all_flows`, `flow_generators`, diagnostics, and transform integration.

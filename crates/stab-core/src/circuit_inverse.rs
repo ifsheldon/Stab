@@ -190,7 +190,7 @@ fn sparse_tracker_supports_folded_unitary_repeat(circuit: &Circuit) -> bool {
     circuit.items().iter().all(|item| match item {
         CircuitItem::Instruction(instruction) => matches!(
             instruction.gate().canonical_name(),
-            "H" | "H_XY" | "S" | "S_DAG" | "C_XYZ" | "CX" | "CZ"
+            "H" | "H_XY" | "S" | "S_DAG" | "C_XYZ" | "CX" | "CY" | "CZ"
         ),
         CircuitItem::RepeatBlock(repeat) => {
             sparse_tracker_supports_folded_unitary_repeat(repeat.body())

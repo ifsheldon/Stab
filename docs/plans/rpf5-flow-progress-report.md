@@ -16,7 +16,7 @@ It does not complete the flow milestone because broader all-operation composed m
 - Unpromoted measurement-rich generator shapes such as duplicate measure-reset targets, unsupported sweep feedback, mixed measured/unitary instruction sequences, repeat-contained measurements, and broader heralded-noise composition fail closed with an explicit unsupported generator error.
 - `solve_for_flow_measurements` is exposed as a Rust helper for the promoted unsigned scope, uses generator rows when the current `circuit_flow_generators` subset applies, and falls back to a bounded checker search for small composed measurement-rich circuits.
 - The promoted solver scope covers empty input, simple `MX`, idle extra-qubit identity flows, repetition-code measurement solving, empty-Pauli query rejection, and fallback resource-limit hardening.
-- `Circuit::time_reversed_for_flows` is exposed for the scoped unitary flow-transform subset, validates unsigned Pauli-only flows against the original unitary circuit with bounded tableau validation or folded sparse validation for supported large repeats, supports idle flow qubits beyond the circuit width, and rejects measurement-record or observable flow terms until the measurement-rich QEC inverse semantics are promoted.
+- `Circuit::time_reversed_for_flows` is exposed for the scoped unitary flow-transform subset, validates unsigned Pauli-only flows against the original unitary circuit with bounded tableau validation or folded sparse validation for supported large repeats including the owned `H` and `CY` regression cases, supports idle flow qubits beyond the circuit width, and rejects measurement-record or observable flow terms until the measurement-rich QEC inverse semantics are promoted.
 
 ## Composed-Measurement Scope
 
@@ -43,6 +43,7 @@ Implemented Rust tests:
 - `time_reversed_for_flows_unitary_subset_supports_flow_past_end`
 - `time_reversed_for_flows_unitary_subset_supports_extra_idle_qubits`
 - `time_reversed_for_flows_unitary_subset_folds_large_repeats`
+- `time_reversed_for_flows_unitary_subset_folds_large_cy_repeats`
 - `time_reversed_for_flows_rejects_unsatisfied_flow`
 - `time_reversed_for_flows_rejects_measurement_rich_terms_for_later_slices`
 

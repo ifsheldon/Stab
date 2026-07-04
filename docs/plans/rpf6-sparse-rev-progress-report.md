@@ -7,7 +7,8 @@ It implements supported-Clifford unitary-repeat folding inside the sparse revers
 
 ## Implemented Surfaces
 
-- `SparseReverseFrameTracker::undo_circuit` now recognizes repeat bodies containing only the currently supported Clifford unitary reverse-tracking gates: `H`, `H_XY`, `S`, `S_DAG`, `C_XYZ`, `CX`, and `CZ`.
+- `SparseReverseFrameTracker::undo_circuit` now recognizes repeat bodies containing only the currently supported Clifford unitary reverse-tracking gates: `H`, `H_XY`, `S`, `S_DAG`, `C_XYZ`, `CX`, `CY`, and `CZ`.
+- Quantum `CY` reverse propagation now uses the same sparse-tracker sensitivity engine as `CX` and `CZ`, so detecting-region extraction and supported-Clifford unitary-repeat folding can use it without a gate-specific fallback.
 - For those repeat bodies, the tracker builds a linear slot transform for X and Z sensitivity slots, exponentiates it by the repeat count, and applies the powered transform to the current detector and observable sensitivity sets.
 - Non-unitary repeat bodies and unsupported unitary gates continue to use the existing traversal path or fail through the existing gate-specific errors, so this slice does not broaden unsupported semantics.
 - `check_if_circuit_has_unsigned_stabilizer_flows` now skips the tableau shortcut when any requested flow depends on measurements or observables, which routes measurement-dependent flow checks directly through the sparse tracker and avoids unrolling huge measured circuits before the tracker can fold their unitary repeats.
@@ -19,9 +20,10 @@ Implemented Rust tests:
 - `unitary_repeat_folding_matches_naive_mixed_clifford_loop`
 - `unitary_repeat_folding_handles_huge_periodic_loop`
 - `unitary_repeat_folding_declines_non_unitary_and_unsupported_gates`
+- `sparse_rev_frame_tracker_undo_tableau_cy_subset`
 - `check_if_circuit_has_unsigned_stabilizer_flows_folds_unitary_repeats`
 
-The sparse tracker tests live in `crates/stab-core/src/sparse_rev_frame_tracker/unitary_repeat.rs`.
+The sparse tracker tests live in `crates/stab-core/src/sparse_rev_frame_tracker.rs` and `crates/stab-core/src/sparse_rev_frame_tracker/unitary_repeat.rs`.
 The public consumption test lives in `crates/stab-core/tests/circuit_flows.rs` and proves measurement-dependent unsigned-flow checking reaches the folded sparse-tracker path.
 
 ## Oracle Rows

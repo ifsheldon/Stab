@@ -57,6 +57,7 @@ const FLOW_CHECK_FLOWS: usize = 27;
 const GATE_SEMANTIC_FIXED_TABLEAU_GATES: usize = 46;
 const GATE_SEMANTIC_SURFACES_PER_GATE: usize = 3;
 const DETECTING_REGIONS_PER_CASE: usize = 2;
+const DETECTING_REGIONS_CLIFFORD_CASES: usize = 2;
 const DETECTING_REGIONS_SIMPLE: &str = "H 0\n\
                                         TICK\n\
                                         CX 0 1\n\
@@ -104,6 +105,13 @@ const DETECTING_REGIONS_CLIFFORD: &str = "R 0\n\
                                           TICK\n\
                                           MX 3\n\
                                           DETECTOR rec[-1]\n";
+const DETECTING_REGIONS_CY: &str = "RX 0\n\
+                                    RY 1\n\
+                                    TICK\n\
+                                    CY 0 1\n\
+                                    TICK\n\
+                                    MX 0\n\
+                                    DETECTOR rec[-1]\n";
 const FEEDBACK_INLINE_MPP: &str = "RX 0\n\
                                   RY 1\n\
                                   RZ 2\n\
@@ -242,9 +250,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf5-detecting-regions-targets", "stab_pf5_detecting_regions_target_filters") => {
             Some((UTILITY_BATCH as f64, "cases/s"))
         }
-        ("pf5-detecting-regions-clifford", "stab_pf5_detecting_regions_clifford_gates") => {
-            Some((UTILITY_BATCH as f64, "cases/s"))
-        }
+        ("pf5-detecting-regions-clifford", "stab_pf5_detecting_regions_clifford_gates") => Some((
+            (UTILITY_BATCH * DETECTING_REGIONS_CLIFFORD_CASES) as f64,
+            "cases/s",
+        )),
         ("pf5-has-all-flows-batch", "stab_pf5_has_flows_batch_cases") => {
             Some(((UTILITY_BATCH * FLOW_CHECK_CASES) as f64, "cases/s"))
         }
@@ -420,10 +429,15 @@ fn run_detecting_regions_targets_row(row: &BenchmarkRow) -> Result<Vec<Measureme
 
 fn run_detecting_regions_clifford_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let circuit = parse_circuit(&row.id, DETECTING_REGIONS_CLIFFORD)?;
+    let cy_circuit = parse_circuit(&row.id, DETECTING_REGIONS_CY)?;
     let targets = all_detecting_region_targets(&circuit)
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let ticks =
         all_detecting_region_ticks(&circuit).map_err(|error| stab_runner_error(&row.id, error))?;
+    let cy_targets = all_detecting_region_targets(&cy_circuit)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let cy_ticks = all_detecting_region_ticks(&cy_circuit)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
     Ok(vec![measure_stab_iterations(
         "stab_pf5_detecting_regions_clifford_gates",
         super::STAB_COMPARE_ITERATIONS,
@@ -439,8 +453,25 @@ fn run_detecting_regions_clifford_row(row: &BenchmarkRow) -> Result<Vec<Measurem
                     },
                 )
                 .map_err(|error| stab_runner_error(&row.id, error))?;
+                let cy_output = circuit_detecting_regions_for_targets(
+                    &cy_circuit,
+                    DetectingRegionTargetOptions {
+                        targets: cy_targets.clone(),
+                        ticks: cy_ticks.clone(),
+                        ignore_anticommutation_errors: false,
+                    },
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
                 regions = regions
                     .checked_add(output.values().map(|regions| regions.len()).sum::<usize>())
+                    .and_then(|count| {
+                        count.checked_add(
+                            cy_output
+                                .values()
+                                .map(|regions| regions.len())
+                                .sum::<usize>(),
+                        )
+                    })
                     .ok_or_else(|| BenchError::StabRunner {
                         row_id: row.id.clone(),
                         message: "detecting-regions Clifford benchmark region count overflowed"

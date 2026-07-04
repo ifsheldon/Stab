@@ -108,7 +108,7 @@ fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {
     circuit.items().iter().all(|item| match item {
         CircuitItem::Instruction(instruction) => matches!(
             instruction.gate().canonical_name(),
-            "H" | "H_XY" | "S" | "S_DAG" | "C_XYZ" | "CX" | "CZ"
+            "H" | "H_XY" | "S" | "S_DAG" | "C_XYZ" | "CX" | "CY" | "CZ"
         ),
         CircuitItem::RepeatBlock(repeat) => is_supported_unitary_circuit(repeat.body()),
     })
@@ -225,6 +225,7 @@ mod tests {
                 H 0
                 S 1
                 CX 0 1
+                CY 2 0
                 CZ 1 2
                 C_XYZ 2
             }
@@ -276,7 +277,7 @@ mod tests {
                 &repeat(
                     "
                     REPEAT 2 {
-                        CY 0 1
+                        SWAP 0 1
                     }
                     "
                 ),

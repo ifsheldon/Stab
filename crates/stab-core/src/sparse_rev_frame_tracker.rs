@@ -425,11 +425,12 @@ impl SparseReverseFrameTracker {
                 self.toggle_zs(target, &control_xs)?;
                 Ok(())
             }
-            "CY" if self.xs_for(control)?.is_empty()
-                && self.zs_for(control)?.is_empty()
-                && self.xs_for(target)?.is_empty()
-                && self.zs_for(target)?.is_empty() =>
-            {
+            "CY" => {
+                let target_anti_y = xor_sets(self.xs_for(target)?, self.zs_for(target)?);
+                self.toggle_zs(control, &target_anti_y)?;
+                let control_xs = self.xs_for(control)?.clone();
+                self.toggle_xs(target, &control_xs)?;
+                self.toggle_zs(target, &control_xs)?;
                 Ok(())
             }
             name => Err(CircuitError::invalid_detector_error_model(format!(
@@ -854,11 +855,9 @@ mod tests {
         }
         tracker
     }
-
     fn circuit(text: &str) -> Circuit {
         Circuit::from_stim_str(text).unwrap()
     }
-
     fn instruction(text: &str) -> CircuitInstruction {
         let parsed = circuit(text);
         let Some(CircuitItem::Instruction(instruction)) = parsed.items().first() else {
@@ -866,60 +865,52 @@ mod tests {
         };
         instruction.clone()
     }
-
+    fn assert_undo_tableau(instruction_text: &str, cases: &[&str]) {
+        let instruction = instruction(instruction_text);
+        for &case in cases {
+            let (input, expected) = case.split_once(' ').unwrap();
+            let mut actual = tracker_from_pauli_text(input);
+            actual.undo_instruction(&instruction).unwrap();
+            assert_eq!(actual, tracker_from_pauli_text(expected), "{input}");
+        }
+    }
     fn q(id: u32) -> Target {
         Target::qubit(QubitId::new(id).unwrap(), false)
     }
-
     fn rec(offset: i32) -> Target {
         Target::measurement_record(MeasureRecordOffset::try_new(offset).unwrap())
     }
-
     fn single_pauli_set(id: u64) -> BTreeSet<DemTarget> {
         BTreeSet::from([DemTarget::logical_observable(id).unwrap()])
     }
-
     #[test]
     fn sparse_rev_frame_tracker_undo_tableau_h_subset() {
-        for (input, expected) in [("I", "I"), ("X", "Z"), ("Y", "Y"), ("Z", "X")] {
-            let mut actual = tracker_from_pauli_text(input);
-            actual.undo_instruction(&instruction("H 0\n")).unwrap();
-            assert_eq!(actual, tracker_from_pauli_text(expected));
-        }
+        assert_undo_tableau("H 0\n", &["I I", "X Z", "Y Y", "Z X"]);
     }
-
     #[test]
     fn sparse_rev_frame_tracker_undo_tableau_s_subset() {
-        for (input, expected) in [("I", "I"), ("X", "Y"), ("Y", "X"), ("Z", "Z")] {
-            let mut actual = tracker_from_pauli_text(input);
-            actual.undo_instruction(&instruction("S 0\n")).unwrap();
-            assert_eq!(actual, tracker_from_pauli_text(expected));
-        }
+        assert_undo_tableau("S 0\n", &["I I", "X Y", "Y X", "Z Z"]);
     }
-
     #[test]
     fn sparse_rev_frame_tracker_undo_tableau_c_xyz_subset() {
-        for (input, expected) in [("I", "I"), ("X", "Z"), ("Y", "X"), ("Z", "Y")] {
-            let mut actual = tracker_from_pauli_text(input);
-            actual.undo_instruction(&instruction("C_XYZ 0\n")).unwrap();
-            assert_eq!(actual, tracker_from_pauli_text(expected));
-        }
+        assert_undo_tableau("C_XYZ 0\n", &["I I", "X Z", "Y X", "Z Y"]);
     }
-
     #[test]
     fn sparse_rev_frame_tracker_undo_tableau_cx_subset() {
-        for (input, expected) in [
-            ("II", "II"),
-            ("IZ", "ZZ"),
-            ("ZI", "ZI"),
-            ("XI", "XX"),
-            ("IX", "IX"),
-            ("YY", "XZ"),
-        ] {
-            let mut actual = tracker_from_pauli_text(input);
-            actual.undo_instruction(&instruction("CX 0 1\n")).unwrap();
-            assert_eq!(actual, tracker_from_pauli_text(expected));
-        }
+        assert_undo_tableau(
+            "CX 0 1\n",
+            &["II II", "IZ ZZ", "ZI ZI", "XI XX", "IX IX", "YY XZ"],
+        );
+    }
+    #[test]
+    fn sparse_rev_frame_tracker_undo_tableau_cy_subset() {
+        assert_undo_tableau(
+            "CY 0 1\n",
+            &[
+                "II II", "IX ZX", "IY IY", "IZ ZZ", "XI XY", "XX YZ", "XY XI", "XZ YX", "YI YY",
+                "YX XZ", "YY YI", "YZ XX", "ZI ZI", "ZX IX", "ZY ZY", "ZZ IZ",
+            ],
+        );
     }
 
     #[test]
