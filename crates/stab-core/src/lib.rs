@@ -48,7 +48,7 @@ pub use circuit_generation::{
 };
 pub use circuit_inverse::{circuit_inverse_qec, circuit_inverse_unitary};
 pub use circuit_missing_detectors::{MissingDetectorOptions, missing_detectors};
-pub use circuit_simplify::simplified_circuit;
+pub use circuit_simplify::{decomposed_circuit, simplified_circuit};
 pub use circuit_tableau::circuit_to_tableau;
 pub use dem::{
     DemDetectorId, DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem,

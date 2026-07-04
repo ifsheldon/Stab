@@ -750,6 +750,10 @@ fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
             "stab_circuit_without_noise_top_level",
         ),
         (
+            "pf2-circuit-decompose-mpp-spp",
+            "stab_circuit_decompose_mpp_spp",
+        ),
+        (
             "pf2-feedback-inline-batch",
             "stab_circuit_with_inlined_feedback_mpp",
         ),

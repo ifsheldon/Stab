@@ -266,6 +266,7 @@ pub(crate) fn run_stab_compare_row(
         "pf1-gate-metadata-lookup" => Ok(Some(pf1::run_gate_metadata_row(row)?)),
         "pf2-circuit-flatten-repeat" => Ok(Some(pf2::run_circuit_flatten_repeat_row(row)?)),
         "pf2-circuit-without-noise" => Ok(Some(pf2::run_circuit_without_noise_row(row)?)),
+        "pf2-circuit-decompose-mpp-spp" => Ok(Some(pf2::run_circuit_decompose_mpp_spp_row(row)?)),
         "pf2-feedback-inline-batch" => Ok(Some(pf2::run_feedback_inline_batch_row(row)?)),
         "m5-simd-bit-table" => {
             let matrix = m5_bit_matrix(&row.id)?;

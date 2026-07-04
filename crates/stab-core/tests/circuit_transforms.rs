@@ -270,37 +270,108 @@ SHIFT_COORDS[test7](5)
 }
 
 #[test]
-fn decomposed_exposes_current_simplified_circuit_subset() {
-    let circuit = circuit(
+fn decomposed_matches_public_stim_iswap_mpp_example() {
+    let decomposed = circuit(
         "
-        H_XY 0
-        CZ 0 1
-        CY 1 2
-        SWAP 0 2
+        ISWAP 0 1 2 1
+        TICK
+        MPP X1*Z2*Y3
     ",
+    )
+    .decomposed()
+    .expect("decompose");
+
+    assert_eq!(
+        decomposed.to_stim_string(),
+        "\
+H 0
+CX 0 1 1 0
+H 1
+S 1 0
+H 2
+CX 2 1 1 2
+H 1
+S 1 2
+TICK
+H 1 3
+S 3
+H 3
+S 3 3
+CX 2 1 3 1
+M 1
+CX 2 1 3 1
+H 3
+S 3
+H 3
+S 3 3
+H 1
+"
     );
-
-    let decomposed = circuit.decomposed().expect("decompose");
-
-    assert_eq!(decomposed, circuit.simplified().expect("simplify"));
-    assert!(!decomposed.to_stim_string().contains("H_XY"));
-    assert!(!decomposed.to_stim_string().contains("CZ"));
-    assert!(!decomposed.to_stim_string().contains("CY"));
-    assert!(!decomposed.to_stim_string().contains("SWAP"));
 }
 
 #[test]
-fn decomposed_preserves_unowned_mpp_spp_and_pair_phasing_families() {
-    let circuit = circuit(
+fn decomposed_preserves_tags_noise_annotations_and_spp_shape() {
+    let decomposed = circuit(
         "
-        MPP X0*X1
-        SPP X0
-        SPP_DAG !Z1
-        SQRT_XX 0 1
+        RX[test1] 0
+        X_ERROR[test2](0.25) 0
+        MPP[test3](0.25) X0*Z1
+        DETECTOR[test4](1, 2) rec[-1]
+        SPP[test5] Y0
     ",
+    )
+    .decomposed()
+    .expect("decompose");
+
+    assert_eq!(
+        decomposed.to_stim_string(),
+        "\
+R[test1] 0
+H[test1] 0
+X_ERROR[test2](0.25) 0
+H[test3] 0
+CX[test3] 1 0
+M[test3] 0
+CX[test3] 1 0
+H[test3] 0
+DETECTOR[test4](1, 2) rec[-1]
+H[test5] 0
+S[test5] 0
+H[test5] 0
+S[test5] 0 0 0
+H[test5] 0
+S[test5] 0
+H[test5] 0
+S[test5] 0 0
+"
+    );
+}
+
+#[test]
+fn decomposed_handles_constant_mpp_products_and_rejects_anti_hermitian_products() {
+    assert_eq!(
+        circuit("MPP X0*X0 X0*!X0\n")
+            .decomposed()
+            .expect("decompose")
+            .to_stim_string(),
+        "MPAD 0 1\n"
     );
 
-    assert_eq!(circuit.decomposed().expect("decompose"), circuit);
+    let mpp_error = circuit("MPP X0*Z0\n")
+        .decomposed()
+        .expect_err("reject anti-Hermitian MPP");
+    assert!(
+        mpp_error.to_string().contains("anti-Hermitian"),
+        "{mpp_error}"
+    );
+
+    let spp_error = circuit("SPP X0*Z0\n")
+        .decomposed()
+        .expect_err("reject anti-Hermitian SPP");
+    assert!(
+        spp_error.to_string().contains("anti-Hermitian"),
+        "{spp_error}"
+    );
 }
 
 #[test]

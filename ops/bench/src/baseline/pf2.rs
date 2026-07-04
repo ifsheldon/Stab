@@ -31,6 +31,14 @@ const FEEDBACK_INLINE_MPP: &str = "RX 0\n\
                                   CX rec[-2] 3\n\
                                   M 3\n\
                                   DETECTOR rec[-1]\n";
+const DECOMPOSE_MPP_SPP: &str = "ISWAP 0 1 2 1\n\
+                                 TICK\n\
+                                 MPP X1*Z2*Y3 X4*!X4\n\
+                                 SPP Y0\n\
+                                 SPP_DAG !Z5\n\
+                                 MXX 6 7 6 8\n\
+                                 X_ERROR(0.25) 0\n\
+                                 DETECTOR rec[-1]\n";
 
 pub(super) fn run_circuit_flatten_repeat_row(
     row: &BenchmarkRow,
@@ -83,6 +91,23 @@ pub(super) fn run_feedback_inline_batch_row(
     )?])
 }
 
+pub(super) fn run_circuit_decompose_mpp_spp_row(
+    row: &BenchmarkRow,
+) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = parse_circuit(&row.id, DECOMPOSE_MPP_SPP)?;
+    Ok(vec![measure_stab_batched(
+        "stab_circuit_decompose_mpp_spp",
+        TRANSFORM_REPETITIONS,
+        || {
+            let decomposed = circuit
+                .decomposed()
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(circuit_checksum(&decomposed));
+            Ok(())
+        },
+    )?])
+}
+
 pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     match (row_id, name) {
         ("pf2-circuit-flatten-repeat", "stab_circuit_flatten_repeat_shifted_coords") => {
@@ -96,6 +121,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         )),
         ("pf2-feedback-inline-batch", "stab_circuit_with_inlined_feedback_mpp") => {
             Some((1.0, "transforms/s"))
+        }
+        ("pf2-circuit-decompose-mpp-spp", "stab_circuit_decompose_mpp_spp") => {
+            Some((8.0, "source-instructions/s"))
         }
         _ => None,
     }
@@ -111,6 +139,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf2-feedback-inline-batch" => Some(
             "contract-only: Stab measures Rust Circuit::with_inlined_feedback on the scoped MPP feedback subset; pinned Stim has equivalent transform behavior but no faithful Rust direct baseline in this harness",
+        ),
+        "pf2-circuit-decompose-mpp-spp" => Some(
+            "contract-only: Stab measures Rust Circuit::decomposed over ISWAP, MPP, SPP, pair-measurement, noise, and annotation operations; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",
         ),
         _ => None,
     }
