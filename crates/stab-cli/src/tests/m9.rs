@@ -4,6 +4,7 @@ use std::path::Path;
 use super::run_from;
 use tempfile::tempdir;
 
+mod path_io;
 mod sweep;
 
 fn ptb64_words(words: &[u64]) -> Vec<u8> {

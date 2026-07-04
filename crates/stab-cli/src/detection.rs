@@ -185,35 +185,42 @@ where
     } else {
         circuit
     };
+    let measurement_input = open_m2d_path_or_stdin(args.input.as_ref(), input)?;
+    let observable_mode = observable_output_mode(args.append_observables);
+    let mut primary_output = OutputSink::create(args.output.as_ref(), stdout)?;
+    let sweep_input = args
+        .sweep
+        .as_ref()
+        .map(|sweep_path| open_m2d_path(sweep_path))
+        .transpose()?;
+    let mut observable_output = args
+        .obs_output
+        .as_ref()
+        .map(FileOutputSink::create)
+        .transpose()?;
     let converter = CompiledDetectionConverter::compile(
         &circuit,
         DetectionConversionOptions {
             skip_reference_sample: args.skip_reference_sample,
         },
     )?;
-    let observable_mode = observable_output_mode(args.append_observables);
-    let mut primary_output = OutputSink::create(args.output.as_ref(), stdout)?;
-    let mut observable_output = args
-        .obs_output
-        .as_ref()
-        .map(FileOutputSink::create)
-        .transpose()?;
-    let mut reference_sample = converter.reusable_reference_sample();
-    let mut detection_record = converter.reusable_detection_record();
-    if let Some(sweep_path) = args.sweep.as_ref() {
-        let mut measurements = M2dRecordStream::from_path_or_stdin(
-            args.input.as_ref(),
-            input,
-            args.in_format,
-            converter.measurement_count(),
-            "m2d measurement input",
-        )?;
-        let mut sweeps = M2dRecordStream::from_path(
-            sweep_path,
+    let mut measurements = M2dRecordStream::from_open_input(
+        measurement_input,
+        args.in_format,
+        converter.measurement_count(),
+        "m2d measurement input",
+    );
+    let mut sweeps = sweep_input.map(|sweep_input| {
+        M2dRecordStream::from_open_input(
+            sweep_input,
             args.sweep_format,
             converter.sweep_bit_count(),
             "m2d sweep input",
-        )?;
+        )
+    });
+    let mut reference_sample = converter.reusable_reference_sample();
+    let mut detection_record = converter.reusable_detection_record();
+    if let Some(sweeps) = sweeps.as_mut() {
         loop {
             match measurements.next_record()? {
                 Some(measurement_record) => {
@@ -252,28 +259,23 @@ where
         }
     }
     let sweep_record = vec![false; converter.sweep_bit_count()];
-    for_each_m2d_measurement_record(
-        args.input.as_ref(),
-        input,
-        args.in_format,
-        converter.measurement_count(),
-        |measurement_record| {
-            converter.convert_record_with_sweep_into(
-                measurement_record,
-                &sweep_record,
-                &mut reference_sample,
-                &mut detection_record,
-            )?;
-            write_m2d_stream_record(
-                &detection_record,
-                observable_mode,
-                args.out_format,
-                args.obs_out_format,
-                &mut primary_output,
-                observable_output.as_mut(),
-            )
-        },
-    )
+    while let Some(measurement_record) = measurements.next_record()? {
+        converter.convert_record_with_sweep_into(
+            &measurement_record,
+            &sweep_record,
+            &mut reference_sample,
+            &mut detection_record,
+        )?;
+        write_m2d_stream_record(
+            &detection_record,
+            observable_mode,
+            args.out_format,
+            args.obs_out_format,
+            &mut primary_output,
+            observable_output.as_mut(),
+        )?;
+    }
+    Ok(())
 }
 
 fn validate_m2d_output_formats(args: &M2dArgs) -> Result<(), CliError> {
@@ -349,57 +351,62 @@ struct M2dRecordStream<'a> {
     empty_b8_zero_width_sweep_checked: bool,
 }
 
-impl<'a> M2dRecordStream<'a> {
-    fn from_path_or_stdin<R>(
-        input_path: Option<&PathBuf>,
-        stdin: &'a mut R,
-        format: RecordFormatArg,
-        bits_per_record: usize,
-        kind: &'static str,
-    ) -> Result<Self, CliError>
-    where
-        R: Read + 'a,
-    {
-        let reader: Box<dyn BufRead + 'a> = if let Some(path) = input_path {
-            Box::new(BufReader::new(File::open(path).map_err(|source| {
-                CliError::ReadPath {
-                    path: path.clone(),
-                    source,
-                }
-            })?))
-        } else {
-            Box::new(BufReader::new(stdin))
-        };
-        Ok(Self {
-            reader,
-            input_path: input_path.cloned(),
-            format,
-            bits_per_record,
-            kind,
-            ptb64_records: VecDeque::new(),
-            empty_b8_zero_width_sweep_checked: false,
-        })
-    }
+struct M2dOpenInput<'a> {
+    reader: Box<dyn BufRead + 'a>,
+    input_path: Option<PathBuf>,
+}
 
-    fn from_path(
-        input_path: &PathBuf,
+fn open_m2d_path_or_stdin<'a, R>(
+    input_path: Option<&PathBuf>,
+    stdin: &'a mut R,
+) -> Result<M2dOpenInput<'a>, CliError>
+where
+    R: Read + 'a,
+{
+    let Some(path) = input_path else {
+        return Ok(M2dOpenInput {
+            reader: Box::new(BufReader::new(stdin)),
+            input_path: None,
+        });
+    };
+    Ok(M2dOpenInput {
+        reader: Box::new(BufReader::new(File::open(path).map_err(|source| {
+            CliError::ReadPath {
+                path: path.clone(),
+                source,
+            }
+        })?)),
+        input_path: Some(path.clone()),
+    })
+}
+
+fn open_m2d_path(input_path: &PathBuf) -> Result<M2dOpenInput<'static>, CliError> {
+    let file = File::open(input_path).map_err(|source| CliError::ReadPath {
+        path: input_path.clone(),
+        source,
+    })?;
+    Ok(M2dOpenInput {
+        reader: Box::new(BufReader::new(file)),
+        input_path: Some(input_path.clone()),
+    })
+}
+
+impl<'a> M2dRecordStream<'a> {
+    fn from_open_input(
+        input: M2dOpenInput<'a>,
         format: RecordFormatArg,
         bits_per_record: usize,
         kind: &'static str,
-    ) -> Result<Self, CliError> {
-        let file = File::open(input_path).map_err(|source| CliError::ReadPath {
-            path: input_path.clone(),
-            source,
-        })?;
-        Ok(Self {
-            reader: Box::new(BufReader::new(file)),
-            input_path: Some(input_path.clone()),
+    ) -> Self {
+        Self {
+            reader: input.reader,
+            input_path: input.input_path,
             format,
             bits_per_record,
             kind,
             ptb64_records: VecDeque::new(),
             empty_b8_zero_width_sweep_checked: false,
-        })
+        }
     }
 
     fn is_b8_zero_width_sweep(&self) -> bool {
@@ -517,30 +524,6 @@ impl<'a> M2dRecordStream<'a> {
             RecordRead::EofBeforeRecord => Ok(None),
         }
     }
-}
-
-fn for_each_m2d_measurement_record<R, F>(
-    input_path: Option<&PathBuf>,
-    stdin: &mut R,
-    format: RecordFormatArg,
-    measurement_width: usize,
-    mut visit: F,
-) -> Result<(), CliError>
-where
-    R: Read,
-    F: FnMut(&[bool]) -> Result<(), CliError>,
-{
-    let mut records = M2dRecordStream::from_path_or_stdin(
-        input_path,
-        stdin,
-        format,
-        measurement_width,
-        "m2d measurement input",
-    )?;
-    while let Some(record) = records.next_record()? {
-        visit(&record)?;
-    }
-    Ok(())
 }
 
 fn read_m2d_line<R>(
