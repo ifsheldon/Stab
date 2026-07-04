@@ -11,6 +11,10 @@ It supersedes `docs/plans/partial-feature-closure-plan.md` as the active milesto
 Use `docs/plans/lessons-learned.md` while executing every milestone.
 The most important lesson for this plan is that a milestone is not actionable until it names exact subcases, executable comparators, resource behavior, benchmark class, and deferred edges.
 
+Each milestone is a work packet for implementation agents.
+A work packet is complete only when it has behavior changes or explicit rejections, targeted tests, oracle or benchmark metadata where relevant, documentation updates, a milestone progress or completion report, milestone-audit closure, and full-code-review closure.
+Rows that are already substantially implemented still need this same closure pass before their checklist status changes because the evidence must prove the exact non-deferred surface, not merely show that some nearby implementation exists.
+
 ## Scope Rules
 
 Included:
@@ -34,6 +38,38 @@ Excluded:
 - Deprecated `--detector_hypergraph` support.
 
 If implementation reveals that an active row actually requires an excluded surface, stop and log the under-specification in `docs/plans/milestone-spec-gaps.md` instead of widening scope silently.
+
+## Execution Order And Milestone Boundaries
+
+Recommended order:
+
+1. Finish or refresh RPF0 before starting new feature work so every `Partial` checklist row has a locked owner milestone, comparator class, oracle status, benchmark status, and explicit exclusion list.
+2. Work on RPF1 through RPF7 in dependency order when possible: gate metadata informs execution contracts, circuit transforms inform feedback and flow work, sweep semantics inform CLI `m2d`, DEM traversal informs analyzer and search work, and flow utilities inform time-reversal and decomposition checks.
+3. Use RPF8 only after one or more implementation milestones have fresh evidence that can be audited, benchmarked, documented, and reflected in rollup checklist rows.
+
+Milestone boundaries:
+
+- RPF1 owns gate metadata and gate execution support contracts, but not public simulator products or full circuit decomposition semantics.
+- RPF2 owns circuit transforms and feedback-inlining transforms, but not QASM, Quirk, Crumble, diagrams, or Python ergonomics.
+- RPF3 owns sweep-conditioned execution and legal-gate execution gaps in existing sampler, converter, detector, and analyzer surfaces, but not exact random-stream parity or public simulator APIs.
+- RPF4 owns DEM Rust APIs, transforms, coordinates, counts, and folded traversal for selected consumers, but not DEM diagrams or Python class shape.
+- RPF5 owns detector utility APIs and measurement-rich flows, including the flow semantics needed by RPF2 transforms.
+- RPF6 owns analyzer, search, sparse reverse tracking, and active matched-error value-object hardening, but not full ErrorMatcher provenance or `stim explain_errors`.
+- RPF7 owns visible CLI parity for `m2d`, `analyze_errors`, and accepted legacy dispatch, while keeping `--detector_hypergraph` excluded.
+- RPF8 owns benchmark-gate, audit, review, and documentation closure for completed milestone slices.
+
+## Required Milestone Packet
+
+Every RPF1 through RPF7 implementation slice must produce the following packet before it can be marked complete:
+
+- Scope note: exact subcases implemented, exact subcases rejected, exact subcases deferred, and upstream Stim files used only as semantic sources.
+- Tests: targeted Rust or CLI tests for positive behavior, negative behavior, malformed inputs, resource boundaries, and compatibility-sensitive edge cases.
+- Oracle evidence: exact, structural, statistical, semantic, or manifest-only rows updated to match the implemented surface.
+- Benchmark evidence: source-owned benchmark rows for performance-sensitive work, including measurement work units, compare notes, runner coverage, and explicit primary-gate or report-only classification.
+- Documentation: updates to `docs/stab-feature-checklist.md`, this plan or a milestone report, and any roadmap, README, CLI, oracle, or benchmark docs touched by the behavior.
+- Closure: milestone-audit findings resolved or logged as under-specification, then full-code-review findings resolved or logged if they are outside the milestone.
+
+If any packet item cannot be completed, leave the checklist row `Partial` and document why.
 
 ## Partial Row Coverage Matrix
 
