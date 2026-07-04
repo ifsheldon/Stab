@@ -38,6 +38,10 @@ fn help_topics_cover_commands_formats_and_gates() {
     for (args, expected) in [
         (&["stab", "help", "convert"][..], "--obs_out_format"),
         (
+            &["stab", "help", "analyze_errors"][..],
+            "--block_decompose_from_introducing_remnant_edges",
+        ),
+        (
             &["stab", "--help", "sample"][..],
             "Samples measurements from a circuit",
         ),

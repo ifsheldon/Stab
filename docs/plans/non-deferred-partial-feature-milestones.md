@@ -411,7 +411,7 @@ Rows covered:
 Tasks:
 
 - Finish `stab m2d` parity for selected `--sweep`, `--sweep_format`, `--ran_without_feedback`, `--skip_reference_sample`, `--append_observables`, `--obs_out`, `--obs_out_format`, input formats, output formats, writer errors, stdout behavior, stderr class, exit status, and resource boundaries. The `--circuit`, `--in`, `--out`, `--sweep`, and `--obs_out` path-IO subset, including path-open precedence before converter setup, is implemented by `pf7-m2d-path-io-rust`; keep adding rows only for newly selected path failure modes.
-- Finish `stab analyze_errors` parity for selected decomposition flags, gauge behavior, approximate disjoint behavior, fold-loop behavior, input paths, output paths, stdout behavior, stderr class, exit status, and malformed input behavior.
+- Finish `stab analyze_errors` parity for selected decomposition flags, gauge behavior, approximate disjoint behavior, fold-loop behavior, input paths, output paths, stdout behavior, stderr class, exit status, and malformed input behavior. The selected flag and malformed-input subset is implemented by `pf7-analyze-errors-flags-rust`; keep adding rows only for newly selected flags, malformed inputs, or analyzer failure modes.
 - Accepted legacy alias behavior for `--gen`, `--convert`, `--sample`, `--detect`, `--m2d`, and `--analyze_errors` is implemented by `pf7-legacy-dispatch-accepted-rust`; keep adding rows only for newly selected legacy spellings or failure modes.
 - Keep deprecated `--detector_hypergraph` rejected, absent from help topics, and excluded from this plan.
 - Keep `diagram`, `explain_errors`, and `repl` commands deferred and fail closed.
@@ -420,13 +420,13 @@ Tests:
 
 - Port owned cases from `vendor/stim/src/stim/cmd/command_m2d.test.cc`, `vendor/stim/src/stim/cmd/command_analyze_errors.test.cc`, `vendor/stim/src/stim/main_namespaced.test.cc`, and selected `vendor/stim/doc/usage_command_line.md` examples.
 - Add exact oracle rows for accepted command shapes that have a faithful pinned Stim CLI comparator.
-- Add Stab CLI tests for explicit rejections, invalid paths, nonexistent input files, unwritable output files, writer failures, malformed inputs, invalid formats, invalid observable side-output formats, unsupported `ptb64` output, feedback-inlining failures, and large input resource behavior; the selected `m2d` path-IO subset, including path-open precedence before converter setup, is covered by `pf7-m2d-path-io-rust`.
+- Add Stab CLI tests for explicit rejections, invalid paths, nonexistent input files, unwritable output files, writer failures, malformed inputs, invalid formats, invalid observable side-output formats, unsupported `ptb64` output, feedback-inlining failures, and large input resource behavior; the selected `m2d` path-IO subset, including path-open precedence before converter setup, is covered by `pf7-m2d-path-io-rust`, and the selected `analyze_errors` flag and malformed-input subset is covered by `pf7-analyze-errors-flags-rust`.
 - Maintain `pf7-legacy-dispatch-accepted-rust` for accepted aliases that dispatch to the same command implementation and `pf7-legacy-dispatch-conflicts-rust` for multiple legacy mode conflicts.
 - Add tests proving `--detector_hypergraph` remains unsupported.
 
 Oracle rows:
 
-- Supplement `pf7-m2d-cli-parity`, `pf7-analyze-errors-cli-parity`, and `pf7-legacy-dispatch-parity`; the `m2d` path-IO subset is covered by `pf7-m2d-path-io-rust` and the accepted legacy alias subset is covered by `pf7-legacy-dispatch-accepted-rust`.
+- Supplement `pf7-m2d-cli-parity`, `pf7-analyze-errors-cli-parity`, and `pf7-legacy-dispatch-parity`; the `m2d` path-IO subset is covered by `pf7-m2d-path-io-rust`, the `analyze_errors` flag and malformed-input subset is covered by `pf7-analyze-errors-flags-rust`, and the accepted legacy alias subset is covered by `pf7-legacy-dispatch-accepted-rust`.
 - Exact rows must prove stdout, stderr class, exit status, accepted flags, rejected flags, path behavior, and resource behavior.
 - Stab-only explicit rejections must have Stab CLI tests or oracle rows even when pinned Stim accepts a deprecated behavior Stab intentionally excludes.
 

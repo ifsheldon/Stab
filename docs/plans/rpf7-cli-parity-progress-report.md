@@ -23,6 +23,14 @@ The owned negative subcases reject a nonexistent `--in` path before producing st
 The comparator class is structural CLI behavior against the selected Stim `analyze_errors` command contract: accepted path flags, rejected path errors, stdout behavior, stderr class, and exit status.
 No benchmark row changes are needed because this slice tests path-boundary behavior rather than a new analyzer hot path.
 
+## Implemented Slice: `analyze_errors` Flag And Malformed-Input Evidence
+
+This PFM7 slice promotes source-owned CLI evidence for selected public `stab analyze_errors` flag shapes and malformed-input behavior without widening analyzer semantics beyond the existing M10 surface.
+The owned positive subcases cover default analysis, `--fold_loops`, `--allow_gauge_detectors`, bare `--approximate_disjoint_errors`, numeric-threshold `--approximate_disjoint_errors`, and the combined `--decompose_errors`, `--block_decompose_from_introducing_remnant_edges`, and `--ignore_decomposition_failures` path.
+The owned negative subcases cover missing `--approximate_disjoint_errors`, low approximation thresholds, default gauge rejection, gauge-observable rejection, blocked decomposition failure, invalid threshold arguments, parse-malformed stdin, analyzer-malformed stdin, empty stdout on failure, diagnostic stderr, and nonzero exit status.
+The comparator class is structural CLI behavior against the selected Stim `analyze_errors` command contract: accepted flags, rejected flag values, malformed input behavior, stdout behavior, stderr class, and exit status.
+No benchmark row changes are needed because this slice tests command contract behavior around existing analyzer hot paths; the existing PF7 analyze-errors benchmark rows remain report-only performance coverage.
+
 ## Implemented Slice: Accepted Legacy Alias Dispatch Evidence
 
 This PFM7 slice promotes source-owned CLI evidence that the selected legacy top-level aliases dispatch to the same implementation as their canonical subcommands.
@@ -46,6 +54,7 @@ Oracle rows:
 
 - `pf7-m2d-path-io-rust` proves `stab m2d --circuit`, `--in`, `--out`, `--sweep`, and `--obs_out` path success, path-error precedence before converter setup, stdout behavior, stderr class, and exit status.
 - `pf7-analyze-errors-path-io-rust` proves `stab analyze_errors --in` and `--out` success, missing input path rejection, output-open precedence, stdout behavior, stderr class, and exit status.
+- `pf7-analyze-errors-flags-rust` proves selected `stab analyze_errors` flag shapes, flag-value failures, malformed stdin behavior, stdout behavior, stderr class, and exit status.
 - `pf7-legacy-dispatch-accepted-rust` proves selected accepted legacy aliases dispatch to the same command implementation as canonical subcommands for `gen`, `convert`, `sample`, `detect`, `m2d`, and `analyze_errors`.
 - `pf7-legacy-dispatch-conflicts-rust` runs selected legacy conflict cases for `--convert`, `--sample`, `--detect`, `--m2d`, `--analyze_errors`, and `--gen=...`, checking nonzero status, empty stdout, and diagnostic stderr.
 - `pf7-detector-hypergraph-excluded-rust` proves deprecated `--detector_hypergraph` is not accepted as a mode and is not exposed as a help topic.
@@ -63,6 +72,14 @@ Verification for the `analyze_errors` path-IO slice:
 
 ```sh
 cargo test -p stab-cli analyze_errors_path --quiet
+cargo test -p stab-oracle fixtures --quiet
+just oracle::run --milestone PF7 --structural
+```
+
+Verification for the `analyze_errors` flag and malformed-input slice:
+
+```sh
+cargo test -p stab-cli pf7_analyze_errors_cli --quiet
 cargo test -p stab-oracle fixtures --quiet
 just oracle::run --milestone PF7 --structural
 ```

@@ -4,6 +4,7 @@ use tempfile::tempdir;
 
 mod channels;
 mod parity_rows;
+mod pf7_cli;
 
 #[test]
 fn analyze_errors_basic_matches_m10_oracle_golden() {
