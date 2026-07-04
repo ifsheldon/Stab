@@ -1,0 +1,191 @@
+use std::hint::black_box;
+
+use stab_core::{DemInstructionKind, DemItem, DemTarget, DetectorErrorModel};
+
+use crate::error::BenchError;
+use crate::manifest::BenchmarkRow;
+use crate::report::Measurement;
+
+use super::{measure_stab_batched, stab_runner_error};
+
+#[cfg(not(test))]
+const TRANSFORM_REPETITIONS: usize = 8;
+#[cfg(test)]
+const TRANSFORM_REPETITIONS: usize = 1;
+#[cfg(not(test))]
+const FLATTEN_REPETITIONS: u64 = 4096;
+#[cfg(test)]
+const FLATTEN_REPETITIONS: u64 = 2;
+#[cfg(not(test))]
+const ROUNDED_ERROR_COUNT: usize = 4096;
+#[cfg(test)]
+const ROUNDED_ERROR_COUNT: usize = 4;
+
+const FLATTEN_FIXED_INSTRUCTIONS: u64 = 2;
+const FLATTEN_SOURCE_INSTRUCTIONS_PER_REPETITION: u64 = 4;
+const ROUNDED_REPEAT_ERROR_COUNT: usize = 2;
+
+pub(super) fn run_dem_transform_compare_row(
+    row: &BenchmarkRow,
+) -> Result<Option<Vec<Measurement>>, BenchError> {
+    match row.id.as_str() {
+        "pf4-dem-flatten-repeat" => Ok(Some(run_dem_flatten_repeat_row(row)?)),
+        "pf4-dem-rounded" => Ok(Some(run_dem_rounded_row(row)?)),
+        _ => Ok(None),
+    }
+}
+
+pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
+    match (row_id, name) {
+        ("pf4-dem-flatten-repeat", "stab_pf4_dem_flatten_repeat") => Some((
+            flatten_expanded_source_instructions() as f64,
+            "expanded-instructions/s",
+        )),
+        ("pf4-dem-rounded", "stab_pf4_dem_rounded") => {
+            Some((rounded_probability_args() as f64, "probability-args/s"))
+        }
+        _ => None,
+    }
+}
+
+pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
+    match row_id {
+        "pf4-dem-flatten-repeat" => Some(
+            "contract-only: Stab measures the Rust DetectorErrorModel::flattened public API over repeat, tag, detector-shift, coordinate-shift, separator, and observable cases; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
+        ),
+        "pf4-dem-rounded" => Some(
+            "contract-only: Stab measures the Rust DetectorErrorModel::rounded public API over top-level and nested error probabilities while preserving non-error coordinate args; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
+        ),
+        _ => None,
+    }
+}
+
+fn run_dem_flatten_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let dem = DetectorErrorModel::from_dem_str(&flatten_repeat_fixture())
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+
+    Ok(vec![measure_stab_batched(
+        "stab_pf4_dem_flatten_repeat",
+        TRANSFORM_REPETITIONS,
+        || {
+            let flattened = dem
+                .flattened()
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(dem_model_checksum(&flattened));
+            Ok(())
+        },
+    )?])
+}
+
+fn run_dem_rounded_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let dem = DetectorErrorModel::from_dem_str(&rounded_fixture())
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+
+    Ok(vec![measure_stab_batched(
+        "stab_pf4_dem_rounded",
+        TRANSFORM_REPETITIONS,
+        || {
+            let rounded = dem
+                .rounded(3)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(dem_model_checksum(&rounded));
+            Ok(())
+        },
+    )?])
+}
+
+fn flatten_repeat_fixture() -> String {
+    format!(
+        "\
+error[root](0.125) D0 L0
+repeat[outer] {FLATTEN_REPETITIONS} {{
+    error[body](0.000123456) D0 D1 ^ D2 L1
+    detector[det](1, 2) D0
+    logical_observable[obs] L2
+    shift_detectors[step](0.5, 1, 0.25) 2
+}}
+detector[end](3, 4) D0
+"
+    )
+}
+
+fn rounded_fixture() -> String {
+    let mut text = String::new();
+    for index in 0..ROUNDED_ERROR_COUNT {
+        let probability = 0.000001 + (index as f64) / 10_000_000.0;
+        text.push_str(&format!("error[p{index}]({probability}) D0 D1 L0\n"));
+    }
+    text.push_str(
+        "\
+repeat[nested] 128 {
+    error[a](0.123456789) D1 D2 L3
+    error[b](0.987654321) D3 ^ D4 L5
+    detector(0.0200000334, 0.12345) D0
+    shift_detectors(5.0300004, 0.12345) 3
+}
+",
+    );
+    text
+}
+
+fn flatten_expanded_source_instructions() -> u64 {
+    FLATTEN_FIXED_INSTRUCTIONS + FLATTEN_REPETITIONS * FLATTEN_SOURCE_INSTRUCTIONS_PER_REPETITION
+}
+
+fn rounded_probability_args() -> usize {
+    ROUNDED_ERROR_COUNT + ROUNDED_REPEAT_ERROR_COUNT
+}
+
+fn dem_model_checksum(model: &DetectorErrorModel) -> u64 {
+    model
+        .items()
+        .iter()
+        .fold(model.items().len() as u64, |checksum, item| {
+            checksum.rotate_left(5) ^ dem_item_checksum(item)
+        })
+}
+
+fn dem_item_checksum(item: &DemItem) -> u64 {
+    match item {
+        DemItem::Instruction(instruction) => {
+            let mut checksum = dem_instruction_kind_checksum(instruction.kind());
+            checksum ^= instruction
+                .tag()
+                .map_or(0, |tag| tag.len() as u64)
+                .rotate_left(3);
+            for arg in instruction.args() {
+                checksum = checksum.rotate_left(7) ^ arg.to_bits();
+            }
+            for target in instruction.targets() {
+                checksum = checksum.rotate_left(11) ^ dem_target_checksum(target);
+            }
+            checksum
+        }
+        DemItem::RepeatBlock(repeat) => {
+            repeat.repeat_count().get()
+                ^ repeat
+                    .tag()
+                    .map_or(0, |tag| tag.len() as u64)
+                    .rotate_left(13)
+                ^ dem_model_checksum(repeat.body()).rotate_left(17)
+        }
+    }
+}
+
+fn dem_instruction_kind_checksum(kind: DemInstructionKind) -> u64 {
+    match kind {
+        DemInstructionKind::Error => 1,
+        DemInstructionKind::Detector => 2,
+        DemInstructionKind::LogicalObservable => 3,
+        DemInstructionKind::ShiftDetectors => 4,
+    }
+}
+
+fn dem_target_checksum(target: &DemTarget) -> u64 {
+    match target {
+        DemTarget::RelativeDetector(id) => 0x10 ^ id.get(),
+        DemTarget::LogicalObservable(id) => 0x20 ^ id.get(),
+        DemTarget::Separator => 0x30,
+        DemTarget::Numeric(value) => 0x40 ^ *value,
+    }
+}

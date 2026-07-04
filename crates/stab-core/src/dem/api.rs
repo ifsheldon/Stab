@@ -177,6 +177,25 @@ impl DetectorErrorModel {
         }
     }
 
+    pub fn flattened(&self) -> CircuitResult<Self> {
+        self.validate_flattening_budget("flattened")?;
+        let mut flattened = Self::new();
+        for instruction in self.iter_flattened_instructions() {
+            flattened.push_instruction(instruction?);
+        }
+        Ok(flattened)
+    }
+
+    pub fn rounded(&self, digits: u8) -> CircuitResult<Self> {
+        Ok(Self {
+            items: self
+                .items
+                .iter()
+                .map(|item| item.rounded(digits))
+                .collect::<CircuitResult<Vec<_>>>()?,
+        })
+    }
+
     pub fn final_coordinate_shift(&self) -> CircuitResult<Vec<f64>> {
         coordinate_shift_of(self)
     }
@@ -289,6 +308,42 @@ impl DemItem {
             }
         }
     }
+
+    fn rounded(&self, digits: u8) -> CircuitResult<Self> {
+        match self {
+            Self::Instruction(instruction) => Ok(Self::Instruction(instruction.rounded(digits)?)),
+            Self::RepeatBlock(repeat) => Ok(Self::RepeatBlock(repeat.rounded(digits)?)),
+        }
+    }
+}
+
+impl DemInstruction {
+    fn rounded(&self, digits: u8) -> CircuitResult<Self> {
+        if self.kind() != DemInstructionKind::Error {
+            return Ok(self.clone());
+        }
+        let args = self
+            .args()
+            .iter()
+            .map(|arg| rounded_probability_arg(*arg, digits))
+            .collect::<Vec<_>>();
+        Self::new(
+            self.kind(),
+            args,
+            self.targets().to_vec(),
+            self.tag().map(ToOwned::to_owned),
+        )
+    }
+}
+
+impl DemRepeatBlock {
+    fn rounded(&self, digits: u8) -> CircuitResult<Self> {
+        Ok(Self {
+            repeat_count: self.repeat_count,
+            body: self.body.rounded(digits)?,
+            tag: self.tag.clone(),
+        })
+    }
 }
 
 fn coordinate_shift_of(model: &DetectorErrorModel) -> CircuitResult<Vec<f64>> {
@@ -315,6 +370,14 @@ fn apply_coordinate_shift_of(
         }
     }
     Ok(())
+}
+
+fn rounded_probability_arg(value: f64, digits: u8) -> f64 {
+    let mut scale = 1.0;
+    for _ in 0..digits {
+        scale *= 10.0;
+    }
+    (value * scale).round() / scale
 }
 
 fn count_errors_in(model: &DetectorErrorModel) -> CircuitResult<u64> {

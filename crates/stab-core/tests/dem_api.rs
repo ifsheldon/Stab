@@ -294,3 +294,148 @@ fn dem_item_ranges_and_flattened_iterator_are_typed() {
             && instruction.targets() == [DemTarget::relative_detector(0).expect("D0")]
     }));
 }
+
+#[test]
+fn pf4_dem_flattened_matches_pinned_stim_cases() {
+    let empty = DetectorErrorModel::new();
+    assert_eq!(empty.flattened().expect("flatten empty"), empty);
+
+    let shifted = DetectorErrorModel::from_dem_str(
+        "shift_detectors 5\n\
+         error(0.125) D0 ^ D1 L0\n",
+    )
+    .expect("parse shifted DEM");
+    assert_eq!(
+        shifted
+            .flattened()
+            .expect("flatten shifted DEM")
+            .to_dem_string(),
+        "error(0.125) D5 ^ D6 L0\n",
+    );
+
+    let coordinates = DetectorErrorModel::from_dem_str(
+        "detector(10, 20) D0\n\
+         detector(10, 20, 30, 40) D1\n\
+         logical_observable L0\n\
+         shift_detectors(1, 2, 3) 5\n\
+         detector(10, 20) D0\n\
+         detector(10, 20, 30, 40) D1\n\
+         logical_observable L1\n",
+    )
+    .expect("parse coordinate DEM");
+    assert_eq!(
+        coordinates
+            .flattened()
+            .expect("flatten coordinate DEM")
+            .to_dem_string(),
+        concat!(
+            "detector(10, 20) D0\n",
+            "detector(10, 20, 30, 40) D1\n",
+            "logical_observable L0\n",
+            "detector(11, 22) D5\n",
+            "detector(11, 22, 33, 40) D6\n",
+            "logical_observable L1\n",
+        )
+    );
+
+    let repeated = DetectorErrorModel::from_dem_str(
+        "repeat[drop-me] 5 {\n\
+             error[tag](0.125) D0\n\
+             shift_detectors(3) 2\n\
+         }\n\
+         detector(10, 20, 30, 40) D0\n",
+    )
+    .expect("parse repeated DEM");
+    assert_eq!(
+        repeated
+            .flattened()
+            .expect("flatten repeated DEM")
+            .to_dem_string(),
+        concat!(
+            "error[tag](0.125) D0\n",
+            "error[tag](0.125) D2\n",
+            "error[tag](0.125) D4\n",
+            "error[tag](0.125) D6\n",
+            "error[tag](0.125) D8\n",
+            "detector(25, 20, 30, 40) D10\n",
+        )
+    );
+}
+
+#[test]
+fn pf4_dem_flattened_rejects_excessive_materialized_repeat() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n\
+             error(0.125) D0\n\
+         }\n",
+    )
+    .expect("parse large repeat DEM");
+
+    let error = dem.flattened().expect_err("reject excessive flattening");
+
+    assert!(
+        error
+            .to_string()
+            .contains("DEM flattened currently supports repeat counts up to 100000"),
+        "{error}"
+    );
+}
+
+#[test]
+fn pf4_dem_rounded_matches_pinned_stim_probability_cases() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "error[first](0.01000002) D0 D1\n\
+         repeat[outer] 2 {\n\
+             error[inner](0.123456789) D1 D2 L3\n\
+         }\n\
+         detector(0.0200000334, 0.12345) D0\n\
+         shift_detectors(5.0300004, 0.12345) 3\n",
+    )
+    .expect("parse DEM");
+
+    assert_eq!(
+        dem.rounded(0).expect("round 0"),
+        DetectorErrorModel::from_dem_str(
+            "error[first](0) D0 D1\n\
+             repeat[outer] 2 {\n\
+                 error[inner](0) D1 D2 L3\n\
+             }\n\
+             detector(0.0200000334, 0.12345) D0\n\
+             shift_detectors(5.0300004, 0.12345) 3\n",
+        )
+        .expect("parse round 0 expected"),
+    );
+    assert_eq!(
+        dem.rounded(2).expect("round 2"),
+        DetectorErrorModel::from_dem_str(
+            "error[first](0.01) D0 D1\n\
+             repeat[outer] 2 {\n\
+                 error[inner](0.12) D1 D2 L3\n\
+             }\n\
+             detector(0.0200000334, 0.12345) D0\n\
+             shift_detectors(5.0300004, 0.12345) 3\n",
+        )
+        .expect("parse round 2 expected"),
+    );
+    assert_eq!(
+        dem.rounded(3)
+            .expect("round 3")
+            .items()
+            .iter()
+            .filter_map(DemItem::as_instruction)
+            .next()
+            .expect("first instruction")
+            .args(),
+        &[0.01],
+    );
+}
+
+#[test]
+fn pf4_dem_rounded_keeps_zero_probability_errors() {
+    let dem = DetectorErrorModel::from_dem_str("error(0.000001) D0 D1\n").expect("parse DEM");
+
+    assert_eq!(
+        dem.rounded(2).expect("round tiny error").to_dem_string(),
+        "error(0) D0 D1\n",
+    );
+}

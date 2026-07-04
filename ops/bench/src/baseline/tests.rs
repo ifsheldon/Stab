@@ -910,6 +910,46 @@ fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
 }
 
 #[test]
+fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
+    for (id, expected_measurement) in [
+        ("pf4-dem-flatten-repeat", "stab_pf4_dem_flatten_repeat"),
+        ("pf4-dem-rounded", "stab_pf4_dem_rounded"),
+    ] {
+        let row = BenchmarkRow {
+            id: id.to_string(),
+            milestone: Milestone::Pf4,
+            threshold_class: "non-primary-report-only".to_string(),
+            runner: Runner::ContractOnly,
+            upstream_source: "src/stim/dem/detector_error_model.test.cc".to_string(),
+            stim_perf_filter: String::new(),
+            argv: String::new(),
+            stdin_path: String::new(),
+            phase: "analysis".to_string(),
+            measurement: "dem-transform".to_string(),
+            description: "test row".to_string(),
+        };
+
+        let measurements = run_stab_compare_row(&row)
+            .expect("run compare row")
+            .expect("Stab runner");
+        let names = measurements
+            .iter()
+            .map(|measurement| measurement.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(names, [expected_measurement]);
+        assert!(
+            compare_note(id).is_some(),
+            "{id} should explain benchmark comparability"
+        );
+        assert!(
+            measurement_work(id, expected_measurement).is_some(),
+            "{id}/{expected_measurement} should report normalized work"
+        );
+    }
+}
+
+#[test]
 fn convert_benchmark_rows_have_stab_cli_runners() {
     for (id, expected_measurement) in [
         ("m7-convert-01-to-b8", "stab_convert_01_to_b8_128"),
