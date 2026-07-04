@@ -2,13 +2,14 @@
 
 ## Summary
 
-This RPF6 slice makes the generated-QEC analyzer subset explicit in the source-owned evidence.
-It does not complete RPF6 because broad generated-loop handling, loop-folded decomposition, graphlike and hypergraph generated search, sparse reverse tracker work beyond supported-Clifford unitary repeats, and active matched-error hardening remain open.
+This RPF6 report makes the generated-QEC analyzer subset and the selected loop-folded error-decomposition subset explicit in the source-owned evidence.
+It does not complete RPF6 because broad generated-loop handling, graphlike and hypergraph generated search beyond the promoted QEC subset, sparse reverse tracker work beyond supported-Clifford unitary repeats, and active matched-error hardening remain open.
 
 ## Implemented Evidence Slice
 
 - `circuit_to_detector_error_model` is covered for noisy generated repetition-code and rotated-surface-code circuits through semantic DEM comparison against pinned Stim v1.16.0 expected output.
 - The semantic comparator normalizes detector shifts, graphlike decomposition separators, repeat traversal, and floating probability drift within tolerance.
+- `circuit_to_detector_error_model` is covered for the selected `fold_loops + decompose_errors + block_decomposition_from_introducing_remnant_edges` cases where repeated composite errors decompose into graphlike components inside a folded DEM repeat and remnant-edge blocking is enforced inside a folded repeat.
 - The promoted evidence is Rust-core analyzer evidence, not public `stab analyze_errors` CLI parity.
 
 ## Tests
@@ -18,38 +19,46 @@ Implemented Rust tests:
 - `generated_qec_dem_repetition_code_semantics_match_pinned_stim`
 - `generated_qec_dem_rotated_surface_code_semantics_match_pinned_stim`
 - `semantic_dem_treats_graphlike_decomposition_as_equivalent`
+- `pf6_dem_analyzer_fold_loops_decomposes_repeat_errors`
+- `pf6_dem_analyzer_fold_loops_respects_remnant_edge_blocking`
 
-These tests run under `cargo test -p stab-core generated_qec_dem`.
+These tests run under `cargo test -p stab-core generated_qec_dem` and `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_loops_`.
 
 ## Oracle Rows
 
-Implemented row:
+Implemented rows:
 
 - `pf6-analyzer-generated-qec-rust`
+- `pf6-error-decomp-loop-folded-rust`
 
 Still broad and manifest-only:
 
 - `pf6-analyzer-generated-looping`
 
-The existing M10 row `coverage-simulators-generated-qec-dem` remains historical M10 evidence for the same generated-QEC analyzer subset.
-The PF6 row exists so RPF6 has explicit source-owned evidence instead of relying on broad roadmap wording or nearby M10 coverage.
+The existing M10 row `coverage-simulators-generated-qec-dem` remains historical M10 evidence for the generated-QEC analyzer subset.
+The PF6 rows exist so RPF6 has explicit source-owned evidence instead of relying on broad roadmap wording or nearby M10 coverage.
 
 ## Benchmark Rows
 
 Report-only runner coverage:
 
 - `pf6-analyze-errors-generated-surface`
+- `pf6-error-decomp-loop-folded`
 
 The row measures the Rust core generated d3/r3 rotated-memory-z analyzer workload through `circuit_to_detector_error_model`.
 It reports `stab_pf6_analyze_errors_generated_surface`, normalized as detectors per second.
 It remains `non-primary-report-only` because this Rust core path does not have a faithful pinned Stim CLI timing ratio, and it is not part of the 1.25x primary threshold file.
+The loop-folded decomposition row measures the Rust core analyzer over a repeated composite-error fixture with `fold_loops`, `decompose_errors`, and remnant-edge blocking enabled.
+It reports `stab_pf6_error_decomp_loop_folded`, normalized as folded rounds per second.
+It remains `non-primary-report-only` because it is a Rust core contract workload, not a faithful pinned Stim public CLI timing ratio.
 
-Still placeholder:
+Related PF6 report-only runner coverage tracked in search and sparse-tracker reports:
 
-- `pf6-error-decomp-loop-folded`
 - `pf6-graphlike-search-generated`
 - `pf6-hypergraph-search-generated`
-- `pf6-sparse-rev-frame-loop` now has report-only runner coverage for the supported-Clifford unitary-repeat sparse-tracker slice; broader sparse-tracker work remains active.
+- `pf6-sparse-rev-frame-loop`
+
+No analyzer benchmark placeholder remains in this report after promoting `pf6-error-decomp-loop-folded`.
 
 ## Verification Evidence
 
@@ -57,18 +66,21 @@ Target checks for this slice:
 
 ```sh
 cargo test -p stab-core generated_qec_dem --quiet
+cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_loops_ --quiet
 cargo test -p stab-bench pf6_analyzer_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-bench --quiet
 cargo test -p stab-oracle fixtures --quiet
 cargo clippy -p stab-core -p stab-bench -p stab-oracle --all-targets -- -D warnings
 just oracle::run --milestone PF6
 just bench::smoke
+just bench::baseline --only pf6-error-decomp-loop-folded --out target/benchmarks/pf6-error-decomp-loop-folded-probe
+just bench::compare --only pf6-error-decomp-loop-folded --baseline target/benchmarks/pf6-error-decomp-loop-folded-probe/baseline.json --report target/benchmarks/pf6-error-decomp-loop-folded-compare
 ```
 
 ## Remaining RPF6 Work
 
 - Generated-loop analyzer behavior beyond the promoted generated-QEC semantic subset.
-- Loop-folded error decomposition evidence and benchmark coverage.
+- Broader loop-folded error decomposition subcases beyond the promoted repeated composite-error and remnant-edge blocking fixtures.
 - Generated-circuit graphlike, hypergraph, shortest-error, SAT, and WCNF search evidence.
 - Sparse reverse detector-frame tracker behavior beyond supported-Clifford unitary-repeat folding, including broader all-unitary fuzz coverage and analyzer/search-specific consumption.
 - Active matched-error value-object hardening required by analyzer or search outputs.

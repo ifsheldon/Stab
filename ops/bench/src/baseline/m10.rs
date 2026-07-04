@@ -39,6 +39,10 @@ const GRAPHLIKE_SEARCH_DETECTORS: u64 = 128;
 const GRAPHLIKE_SEARCH_GRAPH_EDGES: f64 = (GRAPHLIKE_SEARCH_DETECTORS * 2) as f64;
 const ERROR_DECOMP_DIRECT_COMPARE_REPETITIONS: usize = TINY_DIRECT_COMPARE_REPETITIONS * 16;
 #[cfg(not(test))]
+const ERROR_DECOMP_LOOP_REPEAT_COUNT: u64 = 4096;
+#[cfg(test)]
+const ERROR_DECOMP_LOOP_REPEAT_COUNT: u64 = 5;
+#[cfg(not(test))]
 const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 1_000_001;
 #[cfg(test)]
 const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 17;
@@ -57,6 +61,7 @@ pub(super) fn run_dem_compare_row(
         "m10-analyze-errors-high-repeat-contract" => run_analyze_fold_row(row).map(Some),
         "pf3-analyze-errors-sweep" => run_analyze_sweep_row(row).map(Some),
         "pf6-analyze-errors-generated-surface" => run_analyze_generated_core_row(row).map(Some),
+        "pf6-error-decomp-loop-folded" => run_error_decomp_loop_folded_row(row).map(Some),
         "pf6-graphlike-search-generated" => run_generated_graphlike_search_row(row).map(Some),
         "pf6-hypergraph-search-generated" => run_generated_hypergraph_search_row(row).map(Some),
         "pf6-sparse-rev-frame-loop" => run_sparse_reverse_frame_loop_row(row).map(Some),
@@ -89,6 +94,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         }
         ("pf6-analyze-errors-generated-surface", "stab_pf6_analyze_errors_generated_surface") => {
             Some((error_analyzer_detector_count(), "detectors/s"))
+        }
+        ("pf6-error-decomp-loop-folded", "stab_pf6_error_decomp_loop_folded") => {
+            Some((ERROR_DECOMP_LOOP_REPEAT_COUNT as f64, "folded-rounds/s"))
         }
         ("pf6-graphlike-search-generated", "stab_pf6_graphlike_search_generated_surface")
         | ("pf6-hypergraph-search-generated", "stab_pf6_hypergraph_search_generated_surface") => {
@@ -142,6 +150,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf6-analyze-errors-generated-surface" => Some(
             "report-only: Stab measures the Rust generated d3/r3 rotated-memory-z surface-code analyzer workload without a faithful pinned Stim CLI timing ratio",
+        ),
+        "pf6-error-decomp-loop-folded" => Some(
+            "report-only: Stab measures Rust analyze_errors with fold_loops plus decompose_errors over a repeated composite-error fixture; pinned Stim exposes equivalent analyzer behavior but not a faithful Rust direct baseline in this harness",
         ),
         "pf6-graphlike-search-generated" => Some(
             "report-only: Stab measures generated rotated-surface-code DEM graphlike search after source-owned Rust analysis and decomposition; pinned Stim exposes this as C++ API/perf behavior, not a faithful public CLI baseline",
@@ -309,6 +320,29 @@ fn run_analyze_generated_core_row(row: &BenchmarkRow) -> Result<Vec<Measurement>
         || {
             let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
                 .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(dem.items().len());
+            Ok(())
+        },
+    )?])
+}
+
+fn run_error_decomp_loop_folded_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = Circuit::from_stim_str(&error_decomp_loop_folded_fixture())
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(vec![measure_stab_iterations(
+        "stab_pf6_error_decomp_loop_folded",
+        ERROR_ANALYZER_COMPARE_ITERATIONS,
+        || {
+            let dem = circuit_to_detector_error_model(
+                &circuit,
+                ErrorAnalyzerOptions {
+                    fold_loops: true,
+                    decompose_errors: true,
+                    block_decomposition_from_introducing_remnant_edges: true,
+                    ..ErrorAnalyzerOptions::default()
+                },
+            )
+            .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(dem.items().len());
             Ok(())
         },
@@ -612,4 +646,21 @@ fn graphlike_search_model(row_id: &str) -> Result<DetectorErrorModel, BenchError
 
 fn sparse_reverse_frame_loop_fixture() -> String {
     format!("REPEAT {SPARSE_REVERSE_UNITARY_REPEAT_COUNT} {{\n    H 0\n}}\nM 0\n")
+}
+
+fn error_decomp_loop_folded_fixture() -> String {
+    format!(
+        "\
+REPEAT {ERROR_DECOMP_LOOP_REPEAT_COUNT} {{
+    R 0 1 2
+    X_ERROR(0.125) 0
+    X_ERROR(0.25) 1
+    X_ERROR(0.375) 2
+    M 0 1 2
+    DETECTOR rec[-3] rec[-1]
+    DETECTOR rec[-2] rec[-1]
+    DETECTOR rec[-3] rec[-1]
+}}
+"
+    )
 }

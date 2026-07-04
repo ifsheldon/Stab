@@ -377,13 +377,14 @@ Oracle rows:
 
 - Supplement `pf6-analyzer-generated-looping`, `pf6-search-generated`, and `pf6-sparse-rev-tracker`.
 - Keep `pf6-analyzer-generated-qec-rust` as evidence only for the generated-QEC subset it names.
+- Keep `pf6-error-decomp-loop-folded-rust` as evidence only for the selected loop-folded decomposition and remnant-edge blocking subset it names.
 - Use exact `.dem` comparators where output order is stable and structural comparators otherwise.
 
 Benchmarks:
 
 - Keep or refresh `pf6-analyze-errors-generated-surface`.
 - Keep or refresh `pf6-graphlike-search-generated` and `pf6-hypergraph-search-generated`, which have report-only runner coverage for the promoted generated rotated-surface-code search subset.
-- Implement `pf6-error-decomp-loop-folded` when its subcases are implemented; keep the implemented `pf6-sparse-rev-frame-loop` row report-only unless a faithful pinned-Stim comparator is added.
+- Keep `pf6-error-decomp-loop-folded` synchronized with the promoted repeated composite-error loop-folded decomposition subset, and extend or split it if broader decomposition families become active; keep the implemented `pf6-sparse-rev-frame-loop` row report-only unless a faithful pinned-Stim comparator is added.
 - Use schema-version-2 submeasurement thresholds for bundled analyzer or search rows.
 - Promote only faithful pinned-Stim rows with repeated stable evidence.
 

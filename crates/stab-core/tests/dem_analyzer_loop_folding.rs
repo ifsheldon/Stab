@@ -18,6 +18,24 @@ fn analyze_folding_loops(text: &str) -> String {
     .to_dem_string()
 }
 
+fn analyze_folding_and_decomposing_errors(
+    text: &str,
+    block_remnant_edges: bool,
+) -> Result<String, String> {
+    let circuit = Circuit::from_stim_str(text).expect("circuit");
+    circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            decompose_errors: true,
+            block_decomposition_from_introducing_remnant_edges: block_remnant_edges,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .map(|dem| dem.to_dem_string())
+    .map_err(|error| error.to_string())
+}
+
 #[test]
 fn dem_analyzer_fold_loops_preserves_simple_nested_repeat_like_stim() {
     let dem = analyze_folding_loops(
@@ -57,4 +75,55 @@ fn dem_analyzer_rejects_nested_repeat_expansion_budget() {
         .expect_err("reject nested expansion");
 
     assert!(error.to_string().contains("expanded repeat iterations"));
+}
+
+#[test]
+fn pf6_dem_analyzer_fold_loops_decomposes_repeat_errors() {
+    let dem = analyze_folding_and_decomposing_errors(
+        "
+        REPEAT 5 {
+            R 0 1 2
+            X_ERROR(0.125) 0
+            X_ERROR(0.25) 1
+            X_ERROR(0.375) 2
+            M 0 1 2
+            DETECTOR rec[-3] rec[-1]
+            DETECTOR rec[-2] rec[-1]
+            DETECTOR rec[-3] rec[-1]
+        }
+        ",
+        true,
+    )
+    .expect("analyze");
+
+    assert_eq!(
+        dem,
+        "repeat 5 {\n    error(0.125) D0 D2\n    error(0.375) D0 D2 ^ D1\n    error(0.25) D1\n    shift_detectors 3\n}\n"
+    );
+}
+
+#[test]
+fn pf6_dem_analyzer_fold_loops_respects_remnant_edge_blocking() {
+    let fixture = "
+        REPEAT 5 {
+            R 0 1
+            X_ERROR(0.125) 0
+            CORRELATED_ERROR(0.25) X0 X1
+            M 0 1
+            DETECTOR rec[-1]
+            DETECTOR rec[-1]
+            DETECTOR rec[-2]
+            DETECTOR rec[-2]
+        }
+        ";
+
+    let error = analyze_folding_and_decomposing_errors(fixture, true).expect_err("block remnant");
+    assert!(error.contains("Failed to decompose errors into graphlike components"));
+    assert!(error.contains("block_decomposition_from_introducing_remnant_edges"));
+
+    let dem = analyze_folding_and_decomposing_errors(fixture, false).expect("analyze");
+    assert_eq!(
+        dem,
+        "repeat 5 {\n    error(0.125) D2 D3\n    error(0.25) D2 D3 ^ D0 D1\n    shift_detectors 4\n}\n"
+    );
 }
