@@ -8,6 +8,7 @@ use std::{
     collections::BTreeMap,
     fs,
     io::ErrorKind,
+    ops::Bound,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -50,6 +51,29 @@ fn temp_test_dir(name: &str) -> PathBuf {
     ));
     fs::create_dir(&dir).expect("create temp test dir");
     dir
+}
+
+fn circuit_item_names<'a>(items: impl Iterator<Item = &'a CircuitItem>) -> Vec<String> {
+    items
+        .map(|item| match item {
+            CircuitItem::Instruction(instruction) => {
+                instruction.gate().canonical_name().to_string()
+            }
+            CircuitItem::RepeatBlock(_) => "REPEAT".to_string(),
+        })
+        .collect()
+}
+
+fn circuit_instruction_lines<'a>(
+    instructions: impl Iterator<Item = &'a CircuitInstruction>,
+) -> Vec<String> {
+    instructions
+        .map(|instruction| {
+            let mut circuit = Circuit::new();
+            circuit.append_instruction(instruction.clone());
+            circuit.to_stim_string().trim_end().to_string()
+        })
+        .collect()
 }
 
 #[test]
@@ -194,6 +218,133 @@ fn pf1_circuit_stats_clear_resets_items_and_counts() {
     assert_eq!(circuit.to_stim_string(), "");
     assert_eq!(circuit.count_measurements().expect("measurements"), 0);
     assert_eq!(circuit.count_detectors().expect("detectors"), 0);
+}
+
+#[test]
+fn pf1_circuit_iterators_top_level_range_views_are_typed() {
+    let circuit = Circuit::from_stim_str(
+        "H 0\n\
+         REPEAT[tag] 2 {\n\
+             M 0\n\
+         }\n\
+         S 1\n",
+    )
+    .expect("parse circuit");
+
+    assert_eq!(
+        circuit_item_names(circuit.iter_items()),
+        vec!["H", "REPEAT", "S"]
+    );
+    assert_eq!(
+        circuit_item_names(circuit.item_range(1..).expect("item range")),
+        vec!["REPEAT", "S"]
+    );
+    assert_eq!(
+        circuit_item_names(circuit.item_range(..=0).expect("inclusive item range")),
+        vec!["H"]
+    );
+    assert!(
+        circuit
+            .items()
+            .get(1)
+            .and_then(CircuitItem::as_repeat_block)
+            .is_some()
+    );
+    assert!(
+        circuit
+            .items()
+            .first()
+            .and_then(CircuitItem::as_instruction)
+            .is_some()
+    );
+
+    assert_eq!(
+        circuit_instruction_lines(
+            circuit
+                .instruction_range(0..1)
+                .expect("instruction-only range")
+        ),
+        vec!["H 0"]
+    );
+    assert_eq!(
+        circuit_instruction_lines(
+            circuit
+                .instruction_range(2..3)
+                .expect("instruction-only range")
+        ),
+        vec!["S 1"]
+    );
+
+    let repeat_error = circuit
+        .instruction_range(0..2)
+        .err()
+        .expect("repeat block is not an instruction");
+    assert!(
+        repeat_error
+            .to_string()
+            .contains("circuit instruction range")
+            && repeat_error.to_string().contains("repeat block"),
+        "{repeat_error}"
+    );
+
+    let range_error = circuit
+        .item_range(2..5)
+        .err()
+        .expect("reject out-of-range item view");
+    assert!(
+        range_error.to_string().contains("circuit item range"),
+        "{range_error}"
+    );
+
+    let overflow_error = circuit
+        .item_range((Bound::Excluded(usize::MAX), Bound::Unbounded))
+        .err()
+        .expect("reject overflowing range bound");
+    assert!(
+        overflow_error
+            .to_string()
+            .contains("excluded start index overflowed"),
+        "{overflow_error}"
+    );
+}
+
+#[test]
+fn pf1_circuit_iterators_flatten_nested_repeats_in_stim_order() {
+    let circuit = Circuit::from_stim_str(
+        "H 0\n\
+         M 0 1\n\
+         REPEAT 2 {\n\
+             X 1\n\
+             REPEAT 3 {\n\
+                 Y 2\n\
+             }\n\
+         }\n",
+    )
+    .expect("parse circuit");
+
+    assert_eq!(
+        circuit_instruction_lines(circuit.iter_flattened_instructions()),
+        vec![
+            "H 0", "M 0 1", "X 1", "Y 2", "Y 2", "Y 2", "X 1", "Y 2", "Y 2", "Y 2",
+        ]
+    );
+    assert_eq!(
+        circuit_instruction_lines(circuit.iter_flattened_instructions_reverse()),
+        vec![
+            "Y 2", "Y 2", "Y 2", "X 1", "Y 2", "Y 2", "Y 2", "X 1", "M 0 1", "H 0",
+        ]
+    );
+
+    let huge_repeat =
+        Circuit::from_stim_str("REPEAT 1000000000000 {\n    H 0\n}\n").expect("parse repeat");
+    assert_eq!(
+        circuit_instruction_lines(huge_repeat.iter_flattened_instructions().take(3)),
+        vec!["H 0", "H 0", "H 0"]
+    );
+    assert_eq!(
+        circuit_instruction_lines(huge_repeat.iter_flattened_instructions_reverse().take(3)),
+        vec!["H 0", "H 0", "H 0"]
+    );
 }
 
 #[test]

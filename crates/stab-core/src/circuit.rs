@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use std::io::{self, Write};
+use std::ops::RangeBounds;
 use std::str::Lines;
 
 use crate::gate::{ArgRule, GateTargetGroupKind};
@@ -10,6 +11,11 @@ const MAX_CIRCUIT_PARSE_LINES: usize = 1_000_000;
 const MAX_CIRCUIT_REPEAT_NESTING: usize = 256;
 
 mod api;
+mod iter;
+
+pub use iter::{CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter};
+
+use self::iter::{checked_item_range, circuit_item_range_error};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Circuit {
@@ -33,6 +39,45 @@ impl Circuit {
 
     pub fn items(&self) -> &[CircuitItem] {
         &self.items
+    }
+
+    pub fn iter_items(&self) -> impl DoubleEndedIterator<Item = &CircuitItem> + ExactSizeIterator {
+        self.items.iter()
+    }
+
+    pub fn item_range(
+        &self,
+        range: impl RangeBounds<usize>,
+    ) -> CircuitResult<impl DoubleEndedIterator<Item = &CircuitItem> + ExactSizeIterator> {
+        Ok(self.item_slice(range)?.iter())
+    }
+
+    pub fn instruction_range(
+        &self,
+        range: impl RangeBounds<usize>,
+    ) -> CircuitResult<impl DoubleEndedIterator<Item = &CircuitInstruction>> {
+        let range = checked_item_range(range, self.items.len())?;
+        let items = self.item_slice(range.clone())?;
+        for (offset, item) in items.iter().enumerate() {
+            if matches!(item, CircuitItem::RepeatBlock(_)) {
+                return Err(CircuitError::invalid_domain_value(
+                    "circuit instruction range",
+                    format!(
+                        "repeat block at top-level item index {}",
+                        range.start + offset
+                    ),
+                ));
+            }
+        }
+        Ok(items.iter().filter_map(CircuitItem::as_instruction))
+    }
+
+    pub fn iter_flattened_instructions(&self) -> CircuitFlattenedInstructionIter<'_> {
+        CircuitFlattenedInstructionIter::new(self)
+    }
+
+    pub fn iter_flattened_instructions_reverse(&self) -> CircuitFlattenedInstructionRevIter<'_> {
+        CircuitFlattenedInstructionRevIter::new(self)
     }
 
     pub fn count_qubits(&self) -> usize {
@@ -134,6 +179,13 @@ impl Circuit {
         }
         Ok(())
     }
+
+    fn item_slice(&self, range: impl RangeBounds<usize>) -> CircuitResult<&[CircuitItem]> {
+        let range = checked_item_range(range, self.items.len())?;
+        self.items
+            .get(range)
+            .ok_or_else(|| circuit_item_range_error("computed range was outside item list"))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -143,6 +195,20 @@ pub enum CircuitItem {
 }
 
 impl CircuitItem {
+    pub fn as_instruction(&self) -> Option<&CircuitInstruction> {
+        match self {
+            Self::Instruction(instruction) => Some(instruction),
+            Self::RepeatBlock(_) => None,
+        }
+    }
+
+    pub fn as_repeat_block(&self) -> Option<&RepeatBlock> {
+        match self {
+            Self::Instruction(_) => None,
+            Self::RepeatBlock(repeat) => Some(repeat),
+        }
+    }
+
     fn count_qubits(&self) -> usize {
         match self {
             Self::Instruction(instruction) => instruction.count_qubits(),

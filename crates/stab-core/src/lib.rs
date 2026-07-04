@@ -31,7 +31,10 @@ pub mod stabilizers;
 mod target;
 
 pub use bits::{BitBlock, BitError, BitLen, BitMatrix, BitResult, BitSlice, BitVec, SparseXorVec};
-pub use circuit::{Circuit, CircuitInstruction, CircuitItem, RepeatBlock};
+pub use circuit::{
+    Circuit, CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter,
+    CircuitInstruction, CircuitItem, RepeatBlock,
+};
 pub use circuit_detecting_regions::{
     DetectingRegionMap, DetectingRegionOptions, circuit_detecting_regions,
 };

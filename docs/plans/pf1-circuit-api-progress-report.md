@@ -2,9 +2,9 @@
 
 ## Summary
 
-This PF1 slice implements the bounded Rust circuit stats, final-coordinate query, file-helper, reference-sample, determined-measurement, and Rust mutation-helper subset from `docs/plans/partial-feature-closure-plan.md`.
+This PF1 slice implements the bounded Rust circuit stats, final-coordinate query, file-helper, iterator/range, reference-sample, determined-measurement, and Rust mutation-helper subset from `docs/plans/partial-feature-closure-plan.md`.
 It does not claim full Python `stim.Circuit` API parity.
-Instruction-range views and stable typed iterators remain active PF1 circuit API work.
+No active PF1 circuit API subcase remains in this report; PF2 circuit transforms and intentionally deferred Python/file-like surfaces remain outside this claim.
 
 ## Implemented Surfaces
 
@@ -19,6 +19,8 @@ Instruction-range views and stable typed iterators remain active PF1 circuit API
 - Added public `Circuit::insert_item`, `Circuit::insert_instruction`, `Circuit::insert_repeat_block`, `Circuit::insert_circuit`, `Circuit::pop_item`, and `Circuit::pop_last_item`.
 - Insert helpers fuse compatible instruction boundaries around the insertion range, matching Stim's owned insertion semantics for the tested Rust subset, while pop helpers remove top-level items without fusing neighbors after removal.
 - Added public folded count methods for measurements, detectors, observables, ticks, and sweep bits.
+- Added public `Circuit::iter_items`, `Circuit::item_range`, `Circuit::instruction_range`, `Circuit::iter_flattened_instructions`, `Circuit::iter_flattened_instructions_reverse`, `CircuitItem::as_instruction`, and `CircuitItem::as_repeat_block`.
+- Item and instruction range views validate top-level ranges, instruction-only ranges reject repeat blocks instead of silently skipping them, and flattened iterators traverse nested repeat blocks lazily without materializing all operations.
 - Added public `Circuit::final_coordinate_shift` and `Circuit::final_qubit_coordinates`.
 - Added public `CircuitDetectorId`, `Circuit::detector_coordinates`, `Circuit::detector_coordinates_for`, and `Circuit::coordinates_of_detector`.
 - Detector-coordinate lookup uses folded repeat skipping for requested detectors and preserves Stim semantics for empty detector coordinates.
@@ -45,6 +47,7 @@ Implemented row:
 - `pf1-circuit-concat`
 - `pf1-circuit-repeat`
 - `pf1-circuit-insert-pop`
+- `pf1-circuit-iterators`
 - `pf1-circuit-reference-determined`
 - `pf1-circuit-detector-coordinates`
 
@@ -73,7 +76,7 @@ Fresh probe rates from the current worktree:
 
 This benchmark remains `non-primary-report-only` because pinned Stim exposes comparable behavior through C++ and Python APIs but not through a faithful Rust direct baseline.
 It was not added to `benchmarks/m12-primary-thresholds.json`.
-No separate benchmark row was added for append-from-text, file helpers, concatenation, repetition, insert, pop, reference-sample wrappers, or determined-measurement wrappers because these are structural mutation, file-bound, or thin delegating APIs rather than the PF1 high-volume query workload; parser-backed text handling already has behavior coverage, while the PF1 coordinate-query row covers the PF1 query workload.
+No separate benchmark row was added for append-from-text, file helpers, concatenation, repetition, insert, pop, iterator/range views, reference-sample wrappers, or determined-measurement wrappers because these are structural mutation, traversal API, file-bound, or thin delegating APIs rather than the PF1 high-volume query workload; parser-backed text handling already has behavior coverage, while the PF1 coordinate-query row covers the PF1 query workload.
 
 ## Verification Evidence
 
@@ -82,6 +85,7 @@ Passed during implementation:
 ```sh
 cargo test -p stab-core --test circuit_api --quiet
 cargo test -p stab-core --test circuit_api pf1_circuit_file_helpers_ --quiet
+cargo test -p stab-core --test circuit_api pf1_circuit_iterators_ --quiet
 cargo test -p stab-core --test circuit_api pf1_circuit_reference_determined_ --quiet
 cargo test -p stab-core count_determined --quiet
 cargo test -p stab-bench pf1_circuit_coordinate --quiet
@@ -94,4 +98,4 @@ just bench::compare --only pf1-circuit-coordinate-query --baseline target/benchm
 
 ## Remaining PF1 Circuit API Work
 
-- Instruction-range views and stable typed iterators.
+No active PF1 circuit API subcase remains. Circuit transforms are tracked under PF2, while Python operators, Python bit-packed reference-sample return shapes, Python binding-style indexing, file-like objects, unbounded `.stim` file reads, and exact C++ infinity side-effect parity remain intentionally outside this PF1 Rust API claim.
