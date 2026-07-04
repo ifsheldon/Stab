@@ -83,7 +83,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | DEM parser and canonical printer | Active | RPF4 | Parser/printer rows close only after DEM API transform and folded traversal limits are resolved for non-deferred paths. |
 | DEM detector shifts, observables, coordinates, and counts | Active | RPF4 | Finish folded coordinate/count behavior and large-repeat resource policy. |
 | DEM flattening and large repeat traversal | Active | RPF4 and RPF6 | Add public transform APIs and folded traversal for selected consumers, or documented caps with tests. |
-| Gate validation flags and categories | Active | RPF1 and RPF5 | Finish gate decomposition metadata, the resolved measurement-rich and variable-target flow metadata contract, and unsupported accessor errors. |
+| Gate validation flags and categories | Implemented for current Rust metadata surface | RPF0/PF1 | `pf1-gate-metadata-api` now provides executable closure evidence; Python `GateData` shape stays deferred and execution support remains separately tracked. |
 | Gate semantic execution | Active | RPF3 and RPF6 | Fill accepted legal-gate execution gaps in sampler, detection, converter, and analyzer paths, or reject unsupported shapes precisely. |
 | Programmatic mutation | Implemented for current Rust API surface | RPF0/PF1 | `pf1-circuit-rust-api` now provides executable closure evidence; remaining Python operator ergonomics stay deferred. |
 | Core introspection | Implemented for current Rust API surface | RPF0/PF1 | `pf1-circuit-rust-api` now provides executable closure evidence; remaining Python-style indexing and property parity stay deferred. |
@@ -153,22 +153,19 @@ Acceptance criteria:
 
 ## Milestone RPF1: Gate Metadata And Gate Execution Contract
 
-Objective: finish active gate metadata gaps and make parser acceptance versus execution support explicit.
+Objective: keep parser acceptance versus execution support explicit after the current Rust gate metadata surface has closed.
 
 Owned checklist rows:
 
-- Gate validation flags and categories.
 - Gate semantic execution.
 - Full semantic execution of every legal circuit operation, for the gate-table and metadata portions.
-- Flows, for gate-level flow metadata only.
+- Flows, for execution and transform integration beyond gate-level metadata.
 
 Implementation tasks:
 
-- Add a Rust accessor for H/S/CX/M/R-style gate decomposition metadata, or explicitly split it into a transform milestone if the accessor would require full `Circuit::decomposed` semantics.
+- Treat current Rust gate metadata accessors, unsupported-accessor errors, and metadata-column support-contract synchronization as closed by `pf1-gate-metadata-api`.
 - Keep the resolved decision that measurement-rich and variable-target gate flow metadata belongs in `Gate::flows` for Stim v1.16.0 `GateData.flows` shapes, while execution support remains tracked separately.
-- Add unsupported-accessor errors for metadata that cannot be represented by the current Rust API.
-- Build a source-owned table that states, for each canonical gate, whether Stab supports validation only, tableau metadata, unitary matrix metadata, flow metadata, decomposition metadata, sampler execution, detector conversion, analyzer propagation, or explicit rejection.
-- Update `docs/stab-feature-checklist.md` and `docs/plans/pf1-gate-metadata-progress-report.md` so the remaining gate row is not overstated.
+- Keep `docs/plans/rpf1-gate-execution-support-contract.md`, `docs/stab-feature-checklist.md`, and `docs/plans/pf1-gate-metadata-progress-report.md` synchronized whenever execution support changes.
 
 Tests:
 
@@ -181,7 +178,7 @@ Tests:
 
 Oracle rows:
 
-- Replace or supplement `pf1-gate-metadata-api` with executable rows for decomposition metadata and unsupported accessor behavior.
+- Keep `pf1-gate-metadata-api` current if public metadata API names or behavior change.
 - Keep rows for gate execution support structural unless there is a faithful pinned Stim CLI or exact-output comparator.
 
 Benchmarks:

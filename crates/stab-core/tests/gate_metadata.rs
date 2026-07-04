@@ -642,8 +642,107 @@ fn gate_execution_contract_rejects_variable_target_spp_sampler_execution() {
     }
 }
 
+#[test]
+fn gate_metadata_api_contract_table_matches_rust_accessors() {
+    let support_rows = parse_gate_support_contract_table();
+    assert_eq!(
+        support_rows.len(),
+        support_rows
+            .iter()
+            .map(|(gate, _row)| *gate)
+            .collect::<BTreeSet<_>>()
+            .len(),
+        "support contract should not duplicate canonical gate rows"
+    );
+    let support_table = support_rows.into_iter().collect::<BTreeMap<_, _>>();
+    let actual_gate_names = Gate::all()
+        .map(|gate| gate.canonical_name())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        support_table.keys().copied().collect::<BTreeSet<_>>(),
+        actual_gate_names,
+        "support contract should mention every canonical gate exactly once"
+    );
+
+    for gate in Gate::all() {
+        let gate_name = gate.canonical_name();
+        let row = support_table.get(gate_name).expect("contract row");
+        assert!(row.validation, "{gate_name} validation column");
+        assert_eq!(row.tableau, gate.has_tableau(), "{gate_name} tableau");
+        assert_eq!(
+            row.unitary,
+            gate.has_unitary_matrix(),
+            "{gate_name} unitary"
+        );
+        assert_eq!(row.flow, gate.has_flows(), "{gate_name} flow");
+        assert_eq!(
+            row.decomposition,
+            gate.has_h_s_cx_m_r_decomposition(),
+            "{gate_name} decomposition"
+        );
+    }
+}
+
 fn flow_texts(flows: Vec<stab_core::Flow>) -> Vec<String> {
     flows.into_iter().map(|flow| flow.to_string()).collect()
+}
+
+#[derive(Debug)]
+struct GateSupportContractRow {
+    validation: bool,
+    tableau: bool,
+    unitary: bool,
+    flow: bool,
+    decomposition: bool,
+}
+
+fn parse_gate_support_contract_table() -> Vec<(&'static str, GateSupportContractRow)> {
+    include_str!("../../../docs/plans/rpf1-gate-execution-support-contract.md")
+        .lines()
+        .filter_map(|line| {
+            if !line.starts_with("| `") {
+                return None;
+            }
+            let cells = line
+                .trim_matches('|')
+                .split('|')
+                .map(str::trim)
+                .collect::<Vec<_>>();
+            let [
+                gate_cell,
+                validation,
+                tableau,
+                unitary,
+                flow,
+                decomposition,
+                _sampler,
+                _detection_conversion,
+                _analyzer,
+            ] = cells.as_slice()
+            else {
+                panic!("support contract row shape: {line}");
+            };
+            let gate = gate_cell.trim_matches('`');
+            Some((
+                gate,
+                GateSupportContractRow {
+                    validation: support_contract_bool(gate, "Validation", validation),
+                    tableau: support_contract_bool(gate, "Tableau", tableau),
+                    unitary: support_contract_bool(gate, "Unitary", unitary),
+                    flow: support_contract_bool(gate, "Flow", flow),
+                    decomposition: support_contract_bool(gate, "Decomposition", decomposition),
+                },
+            ))
+        })
+        .collect()
+}
+
+fn support_contract_bool(gate: &str, column: &str, value: &str) -> bool {
+    match value {
+        "Yes" => true,
+        "No" => false,
+        _ => panic!("{gate} {column} support cell must be Yes or No, got {value:?}"),
+    }
 }
 
 fn assert_h_s_cx_m_r_base(circuit: &Circuit, gate_name: &str) {

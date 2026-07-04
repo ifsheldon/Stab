@@ -43,7 +43,7 @@ If a subcase in this plan turns out to require an excluded surface, stop and log
 | Plan milestone | Checklist rows covered | Notes |
 | --- | --- | --- |
 | PFM0 | Rollup rows and future checklist drift | Reconcile rows that are partial mostly because deferred Python or product surfaces are absent, and split any remaining active Rust subcases before implementation. The selected PF1 circuit Rust API rows for programmatic mutation, core introspection, circuit coordinate queries, and reference samples or determined measurements are already closed by `pf1-circuit-rust-api`; the selected PF1 DEM construction and mutation row is closed by `pf1-dem-rust-api`; public simulator-product rows are deferred. |
-| PFM1 | Gate validation flags and categories, gate semantic execution, full semantic execution of every legal circuit operation, flows | Close metadata and execution-support contract gaps, including the resolved measurement-rich and variable-target flow metadata contract. |
+| PFM1 | Gate semantic execution, full semantic execution of every legal circuit operation, flows | Keep metadata and execution-support contracts synchronized after the current Rust gate metadata surface closed under `pf1-gate-metadata-api`. Finish remaining execution and flow-integration gaps without reopening Python `GateData` shape. |
 | PFM2 | Repeat handling, circuit transforms, measurement-to-detection conversion, full circuit transform API parity, full feedback-inlining transform parity | Finish flow-aware transforms, feedback-loop decisions, repeat traversal behavior, and transform resource boundaries. |
 | PFM3 | Target kinds, gate semantic execution, measurement-to-detection conversion, broader sweep-conditioned simulator and analysis parity | Finish or precisely reject remaining sweep-conditioned execution and analyzer subcases. |
 | PFM4 | DEM parser and canonical printer, DEM detector shifts, DEM introspection, DEM transforms, DEM flattening and large repeat traversal, full DEM public API parity | Finish DEM API gaps and folded or capped traversal behavior for selected consumers. DEM construction and mutation for the current Rust API surface is already closed by `pf1-dem-rust-api`; Python ergonomics remain deferred. |
@@ -122,35 +122,30 @@ Acceptance criteria:
 
 ## PFM1: Gate Metadata And Execution-Support Contract
 
-Objective: finish active gate metadata gaps and make parser acceptance, metadata availability, and execution support impossible to confuse.
+Objective: keep parser acceptance, metadata availability, and execution support impossible to confuse while active execution and flow-integration gaps close.
 
 Rows covered:
 
-- Gate validation flags and categories.
 - Gate semantic execution.
 - Full semantic execution of every legal circuit operation, for gate-table and execution-support bookkeeping.
-- Flows, for gate-level flow metadata decisions.
+- Flows, for execution and transform integration beyond gate-level flow metadata.
 
 Tasks:
 
-- Refresh `docs/plans/rpf1-gate-execution-support-contract.md` so every canonical Stim v1.16.0 gate records validation support, tableau metadata, unitary metadata, flow metadata, decomposition metadata, sampler execution, detector conversion, analyzer propagation, and explicit rejection behavior.
+- Treat current Rust gate metadata accessors, unsupported-accessor errors, and metadata-column support-contract synchronization as closed by `pf1-gate-metadata-api`.
 - Keep the resolved decision that measurement-rich and variable-target `GateData.flows` metadata belongs in `Gate::flows`, while sampler, detector-conversion, analyzer, and full circuit flow execution support remain separate milestone surfaces.
-- Implement typed accessors or precise unsupported-accessor errors for any active metadata shape.
 - Keep `SPP` and `SPP_DAG` parser, decomposition metadata, sampler execution, detection-conversion execution, and analyzer execution behavior synchronized.
-- Document parser acceptance separately from execution support in the checklist and support contract.
+- Update `docs/plans/rpf1-gate-execution-support-contract.md`, the checklist, and milestone reports whenever execution support changes so parser acceptance remains separate from execution support.
 
 Tests:
 
-- Add table-driven tests that compare every canonical gate against the support contract.
+- Keep the table-driven metadata-column support-contract test current when metadata columns change, and add execution-column checks when an implementation slice changes execution support.
 - Port owned metadata cases from `vendor/stim/src/stim/gates/gates.test.cc`, `vendor/stim/src/stim/gates/gates_test.py`, and gate data tests as semantic sources.
-- Add positive tests for decomposition metadata, tableau metadata, unitary metadata, flow metadata, aliases, inverses, and target-grouping accessors.
-- Add negative tests for unsupported metadata on noisy, annotation, `MPAD`, and shape-dependent gates, and execution-boundary tests for parser-accepted metadata gates whose execution remains unsupported.
 - Add execution-boundary tests proving parser-accepted but unsupported execution gates fail with precise domain errors in sampler, detector conversion, and analyzer paths.
 
 Oracle rows:
 
-- Keep implemented rows such as `pf1-gate-decomposition-metadata` current if public API names or behavior change.
-- Add a structural row for the canonical execution-support table if the table gains executable validation beyond ordinary unit tests.
+- Keep implemented rows such as `pf1-gate-metadata-api`, `pf1-gate-decomposition-metadata`, and `pf3-gate-semantic-wide-rust` current if public API names, metadata behavior, or execution behavior change.
 
 Benchmarks:
 

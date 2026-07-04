@@ -6,7 +6,7 @@ This PF1 slice implements the bounded Rust gate-metadata accessor subset from `d
 It does not claim Python `GateData` parity.
 H/S/CX/M/R decomposition metadata is now implemented as Rust gate-table metadata.
 Measurement-rich and variable-target gate-table flow metadata is now implemented for Stim v1.16.0 `GateData.flows` shapes.
-Python object shape, Python string or repr output, and Python binding behavior remain deferred according to `docs/stab-feature-checklist.md`.
+Python object shape, Python string or repr output, Python binding behavior, and unpromoted execution semantics remain deferred or owned by later execution milestones according to `docs/stab-feature-checklist.md`.
 
 ## Implemented Surfaces
 
@@ -17,14 +17,19 @@ Python object shape, Python string or repr output, and Python binding behavior r
 - Added public `GateUnitaryMatrix`, `Gate::unitary_matrix`, and `Gate::has_unitary_matrix` accessors for fixed-shape one- or two-qubit unitary metadata, with fail-closed errors for variable-target, measurement-rich, annotation, and noisy gates.
 - Added public `GateDecomposition`, `Gate::h_s_cx_m_r_decomposition`, and `Gate::has_h_s_cx_m_r_decomposition` accessors for Stim v1.16.0 H/S/CX/M/R gate-table decomposition metadata, with fail-closed errors for gates without decomposition metadata.
 - Added `docs/plans/rpf1-gate-execution-support-contract.md` to separate parser validation, metadata accessors, sampler support, detection-conversion support, analyzer support, and explicit `SPP` or `SPP_DAG` rejections for every canonical gate.
+- Added a metadata-column support-contract regression test so the table's validation, tableau, unitary, flow, and decomposition columns stay synchronized with Rust accessors and every canonical gate appears exactly once.
 - Fixed parser validation for the owned metadata subset so `I_ERROR` and `II_ERROR` accept any-length disjoint probability lists like Stim v1.16.0, and `XCX`, `XCY`, `YCX`, and `YCY` reject measurement-record and sweep-bit targets instead of inheriting the bit-target-capable controlled-gate rule.
 - Matched the implemented `GateData`-style flags more tightly by removing `MPAD` from `is_noisy`, removing `MPAD` from `is_symmetric_gate`, and using Stim's explicit symmetric two-qubit gate set for the owned accessor subset.
-- Added executable oracle manifest rows for the implemented Rust accessor subset while leaving the broad PF1 gate-metadata manifest row as the remaining extraction contract.
+- Added executable oracle manifest rows for the implemented Rust accessor subset, including a selected closure row for the current PF1 Rust gate metadata surface.
 - Added a report-only PF1 benchmark runner for metadata flag reads, inverse reads, tableau reads, gate-table flow reads, fixed-shape unitary matrix reads, H/S/CX/M/R decomposition reads, and alias lookup.
 
 ## Oracle Rows
 
-Implemented row:
+Selected closure row:
+
+- `pf1-gate-metadata-api`
+
+Implemented supporting rows:
 
 - `pf1-gate-metadata-rust-accessors`
 - `pf1-gate-tableau-metadata`
@@ -34,9 +39,7 @@ Implemented row:
 - `pf1-gate-metadata-identity-error-probabilities`
 - `pf1-gate-metadata-controlled-bit-targets`
 
-Still broad and manifest-only:
-
-- `pf1-gate-metadata-api`
+The selected closure row runs `cargo test -p stab-core --test gate_metadata` and is intentionally scoped to Rust metadata accessors, metadata-column support-contract synchronization, validation regressions, and parser-versus-execution rejection boundaries for the owned `SPP` and `SPP_DAG` cases. It does not claim Python `GateData` object shape, execution-column support-contract synchronization, or promotion of `SPP` and `SPP_DAG` execution support.
 
 ## Benchmark Rows
 
@@ -44,12 +47,12 @@ Non-primary report-only row:
 
 - `pf1-gate-metadata-lookup`
 
-Probe reports:
+Recorded probe reports from the original PF1 gate metadata slice:
 
 - `target/benchmarks/pf1-gate-flow-metadata-probe/baseline.json`
 - `target/benchmarks/pf1-gate-flow-metadata-compare/compare.json`
 
-Fresh probe rates from the current worktree after expanding `Gate::flows` to Stim v1.16.0 `GateData.flows` metadata:
+Recorded probe rates from the original PF1 gate metadata slice after expanding `Gate::flows` to Stim v1.16.0 `GateData.flows` metadata:
 
 - `stab_gate_metadata_flags_all_gates`: `1.441e8 gates/s`.
 - `stab_gate_metadata_inverse_all_gates`: `2.093e8 gates/s`.
@@ -69,6 +72,7 @@ Passed during implementation:
 
 ```sh
 cargo test -p stab-core --test gate_metadata --quiet
+cargo test -p stab-core --test gate_metadata gate_metadata_api_contract --quiet
 cargo test -p stab-core --test gate_metadata gate_tableau_metadata --quiet
 cargo test -p stab-core --test gate_metadata gate_flow_metadata --quiet
 cargo test -p stab-core gate_unitary_matrix --quiet
@@ -109,6 +113,11 @@ Milestone-audit and full-code-review sidecars found the following issues, all fi
 
 ## Remaining PF1 Gate Metadata Work
 
+- No active PF1 Rust metadata accessor subcase remains for the current Rust metadata surface.
 - Implementation of `SPP` and `SPP_DAG` sampler, detector conversion, and analyzer semantics if later RPF3 or RPF6 milestones promote those gates from explicit rejection to supported execution.
-- Unsupported metadata error behavior for any additional accessors that cannot be represented by Stab's Rust API.
 - Any Python `GateData` class shape or binding behavior, which remains deferred.
+
+## PFM0 Refresh
+
+The PFM0 refresh promoted `pf1-gate-metadata-api` from a manifest-only extraction row to executable structural evidence and synchronized the checklist row for gate validation flags and categories to `Done for current Rust metadata surface`.
+Gate semantic execution remains partial and separately owned by PFM3, PFM5, and PFM6 surfaces where unpromoted execution semantics are still active.
