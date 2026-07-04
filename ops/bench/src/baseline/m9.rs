@@ -133,6 +133,14 @@ pub(super) fn run_detection_compare_row(
             None,
         )
         .map(Some),
+        "pf7-cli-m2d-feedback-inline" => run_m2d_cli_row(
+            row,
+            "stab_pf7_cli_m2d_feedback_inline",
+            m2d_ran_without_feedback_args(),
+            M2D_RAN_WITHOUT_FEEDBACK_MEASUREMENTS,
+            None,
+        )
+        .map(Some),
         _ => Ok(None),
     }
 }
@@ -148,6 +156,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf3-m2d-sweep-b8", "stab_pf3_m2d_sweep_b8") => Some((5.0, "shots/s")),
         ("pf7-cli-m2d-sweep-b8", "stab_pf7_cli_m2d_sweep_b8") => Some((5.0, "shots/s")),
         ("m9-m2d-ran-without-feedback-cli", "stab_m2d_ran_without_feedback") => {
+            Some((6.0, "shots/s"))
+        }
+        ("pf7-cli-m2d-feedback-inline", "stab_pf7_cli_m2d_feedback_inline") => {
             Some((6.0, "shots/s"))
         }
         ("m9-detecting-regions-basic-batch", "stab_detecting_regions_basic_cases") => {
@@ -207,6 +218,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m9-m2d-ran-without-feedback-cli" => Some(
             "report-only: Stab measures in-process public m2d --ran_without_feedback conversion; threshold ownership awaits repeated probe evidence",
+        ),
+        "pf7-cli-m2d-feedback-inline" => Some(
+            "report-only: Stab measures the public CLI m2d --ran_without_feedback path for PF7 visible CLI parity using the source-owned M9 feedback fixture",
         ),
         "m9-detecting-regions-basic-batch" => Some(
             "report-only: Stab measures the Rust detecting-regions utility subset without a faithful pinned Stim CLI timing ratio",

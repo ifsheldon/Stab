@@ -789,39 +789,50 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
 
 #[test]
 fn pf7_cli_benchmark_rows_have_stab_compare_runners() {
-    let id = "pf7-cli-m2d-sweep-b8";
-    let expected_measurement = "stab_pf7_cli_m2d_sweep_b8";
-    let row = BenchmarkRow {
-        id: id.to_string(),
-        milestone: Milestone::Pf7,
-        threshold_class: "non-primary-report-only".to_string(),
-        runner: Runner::ContractOnly,
-        upstream_source: "src/stim/cmd/command_m2d.test.cc".to_string(),
-        stim_perf_filter: String::new(),
-        argv: String::new(),
-        stdin_path: String::new(),
-        phase: "throughput".to_string(),
-        measurement: "cli-m2d-sweep".to_string(),
-        description: "test row".to_string(),
-    };
+    for (id, expected_measurement, measurement) in [
+        (
+            "pf7-cli-m2d-sweep-b8",
+            "stab_pf7_cli_m2d_sweep_b8",
+            "cli-m2d-sweep",
+        ),
+        (
+            "pf7-cli-m2d-feedback-inline",
+            "stab_pf7_cli_m2d_feedback_inline",
+            "cli-m2d-feedback-inline",
+        ),
+    ] {
+        let row = BenchmarkRow {
+            id: id.to_string(),
+            milestone: Milestone::Pf7,
+            threshold_class: "non-primary-report-only".to_string(),
+            runner: Runner::ContractOnly,
+            upstream_source: "src/stim/cmd/command_m2d.test.cc".to_string(),
+            stim_perf_filter: String::new(),
+            argv: String::new(),
+            stdin_path: String::new(),
+            phase: "throughput".to_string(),
+            measurement: measurement.to_string(),
+            description: "test row".to_string(),
+        };
 
-    let measurements = run_stab_compare_row(&row)
-        .expect("run compare row")
-        .expect("Stab runner");
-    let names = measurements
-        .iter()
-        .map(|measurement| measurement.name.as_str())
-        .collect::<Vec<_>>();
+        let measurements = run_stab_compare_row(&row)
+            .expect("run compare row")
+            .expect("Stab runner");
+        let names = measurements
+            .iter()
+            .map(|measurement| measurement.name.as_str())
+            .collect::<Vec<_>>();
 
-    assert_eq!(names.as_slice(), &[expected_measurement]);
-    assert!(
-        compare_note(id).is_some(),
-        "{id} should explain benchmark comparability"
-    );
-    assert!(
-        measurement_work(id, expected_measurement).is_some(),
-        "{id}/{expected_measurement} should report normalized work"
-    );
+        assert_eq!(names.as_slice(), &[expected_measurement]);
+        assert!(
+            compare_note(id).is_some(),
+            "{id} should explain benchmark comparability"
+        );
+        assert!(
+            measurement_work(id, expected_measurement).is_some(),
+            "{id}/{expected_measurement} should report normalized work"
+        );
+    }
 }
 
 #[test]
