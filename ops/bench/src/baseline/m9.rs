@@ -2,11 +2,13 @@ use std::ffi::OsString;
 use std::hint::black_box;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 use stab_core::{
     Circuit, CircuitError, CodeDistance, CompiledSampler, DemDetectorId, DetectingRegionOptions,
-    DetectionConversionOptions, DetectionObservableOutputMode, MissingDetectorOptions, Probability,
-    RepetitionCodeParams, RepetitionCodeTask, RoundCount, SampleFormat, circuit_detecting_regions,
+    DetectionConversionOptions, DetectionObservableOutputMode, Flow, MissingDetectorOptions,
+    Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount, SampleFormat,
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_detecting_regions,
     circuit_with_inlined_feedback, convert_measurements_to_detection_events,
     generate_repetition_code_circuit, measurement_record_count, missing_detectors,
     result_formats::write_ptb64_records_checked,
@@ -49,6 +51,8 @@ const MISSING_DETECTOR_BASIC_CASES: usize = 10;
 const MISSING_DETECTOR_BASIC_SUGGESTIONS: usize = 4;
 const MISSING_DETECTOR_MPP_CASES: usize = 4;
 const MISSING_DETECTOR_MPP_SUGGESTIONS: usize = 3;
+const FLOW_CHECK_CASES: usize = 4;
+const FLOW_CHECK_FLOWS: usize = 27;
 const DETECTING_REGIONS_PER_CASE: usize = 2;
 const DETECTING_REGIONS_SIMPLE: &str = "H 0\n\
                                         TICK\n\
@@ -77,6 +81,8 @@ const DETECT_SWEEP_DEFAULT_FALSE: &str = "H 0\n\
                                          DETECTOR rec[-1]\n";
 const SWEEP_PTB64_SHOTS: usize = 64;
 const SWEEP_PTB64_WIDTH: usize = 8;
+
+type FlowCheckCase = (Circuit, Vec<Flow>, Vec<bool>);
 
 pub(super) fn run_detection_compare_row(
     row: &BenchmarkRow,
@@ -129,6 +135,7 @@ pub(super) fn run_detection_compare_row(
         "m9-feedback-inline-mpp-batch" => run_feedback_inline_mpp_batch(row).map(Some),
         "pf5-detecting-regions-repeat" => run_detecting_regions_repeat_row(row).map(Some),
         "pf5-missing-detectors-mpp" => run_missing_detectors_mpp_batch(row).map(Some),
+        "pf5-has-all-flows-batch" => run_has_flows_batch(row).map(Some),
         "m9-detect-primary-matrix-contract" => run_primary_detect_row(row).map(Some),
         "m9-m2d-primary-matrix-contract" => run_primary_m2d_row(row).map(Some),
         "pf3-m2d-sweep-b8" => run_m2d_cli_row(
@@ -206,6 +213,12 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             (UTILITY_BATCH * MISSING_DETECTOR_MPP_SUGGESTIONS) as f64,
             "suggestions/s",
         )),
+        ("pf5-has-all-flows-batch", "stab_pf5_has_flows_batch_cases") => {
+            Some(((UTILITY_BATCH * FLOW_CHECK_CASES) as f64, "cases/s"))
+        }
+        ("pf5-has-all-flows-batch", "stab_pf5_has_flows_batch_flows") => {
+            Some(((UTILITY_BATCH * FLOW_CHECK_FLOWS) as f64, "flows/s"))
+        }
         ("m9-feedback-inline-mpp-batch", "stab_feedback_inline_mpp_transforms") => {
             Some((UTILITY_BATCH as f64, "transforms/s"))
         }
@@ -263,6 +276,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf5-missing-detectors-mpp" => Some(
             "report-only: Stab measures the Rust missing-detectors MPP and observable row-reduction subset without a faithful pinned Stim CLI timing ratio",
+        ),
+        "pf5-has-all-flows-batch" => Some(
+            "report-only: Stab measures the Rust unsigned has_flow measurement-record and observable-dependency subset without a faithful pinned Stim CLI timing ratio",
         ),
         "m9-feedback-inline-mpp-batch" => Some(
             "report-only: Stab measures the Rust MPP feedback-inlining utility subset without a faithful pinned Stim CLI timing ratio",
@@ -501,6 +517,130 @@ fn missing_detector_mpp_corpus(row_id: &str) -> Result<Vec<(Circuit, bool)>, Ben
     .into_iter()
     .map(|(text, ignore)| parse_circuit(row_id, text).map(|circuit| (circuit, ignore)))
     .collect()
+}
+
+fn run_has_flows_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    Ok(vec![
+        measure_has_flows(row, "stab_pf5_has_flows_batch_cases")?,
+        measure_has_flows(row, "stab_pf5_has_flows_batch_flows")?,
+    ])
+}
+
+fn measure_has_flows(
+    row: &BenchmarkRow,
+    measurement_name: &'static str,
+) -> Result<Measurement, BenchError> {
+    let cases = flow_check_corpus(&row.id)?;
+    measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
+        let mut true_count = 0usize;
+        for _ in 0..UTILITY_BATCH {
+            for (circuit, flows, expected) in &cases {
+                let actual = check_if_circuit_has_unsigned_stabilizer_flows(circuit, flows);
+                if actual != *expected {
+                    return Err(BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: format!(
+                            "has-flow benchmark expected {expected:?} but got {actual:?}"
+                        ),
+                    });
+                }
+                true_count = true_count
+                    .checked_add(actual.iter().filter(|value| **value).count())
+                    .ok_or_else(|| BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: "has-flow benchmark true count overflowed".to_string(),
+                    })?;
+            }
+        }
+        black_box(true_count);
+        Ok(())
+    })
+}
+
+fn flow_check_corpus(row_id: &str) -> Result<Vec<FlowCheckCase>, BenchError> {
+    Ok(vec![
+        (
+            parse_circuit(
+                row_id,
+                "R 4\n\
+                 CX 0 4 1 4 2 4 3 4\n\
+                 M 4\n",
+            )?,
+            parse_flows(
+                row_id,
+                &[
+                    "Z___ -> Z____",
+                    "_Z__ -> _Z__",
+                    "__Z_ -> __Z_",
+                    "___Z -> ___Z",
+                    "XX__ -> XX__",
+                    "XXXX -> XXXX",
+                    "XYZ_ -> XYZ_",
+                    "XXX_ -> XXX_",
+                    "ZZZZ -> ____ xor rec[-1]",
+                    "+___Z -> -___Z",
+                    "-___Z -> -___Z",
+                    "-___Z -> +___Z",
+                ],
+            )?,
+            vec![
+                true, true, true, true, true, true, true, false, true, true, true, true,
+            ],
+        ),
+        (
+            parse_circuit(row_id, "MZZ 0 1\n")?,
+            parse_flows(
+                row_id,
+                &[
+                    "X0*X1 -> Y0*Y1 xor rec[-1]",
+                    "X0*X1 -> Z0*Z1 xor rec[-1]",
+                    "X0*X1 -> X0*X1",
+                    "Z0 -> Z1 xor rec[-1]",
+                    "Z0 -> Z0",
+                ],
+            )?,
+            vec![true, false, true, true, true],
+        ),
+        (
+            parse_circuit(row_id, "MZZ 0 1\nOBSERVABLE_INCLUDE(2) rec[-1]\n")?,
+            parse_flows(
+                row_id,
+                &[
+                    "Z0*Z1 -> obs[2]",
+                    "1 -> Z0*Z1 xor obs[2]",
+                    "X0*X1 -> X0*X1 xor obs[0]",
+                    "X0*X1 -> Y0*Y1 xor obs[2]",
+                    "X0*X1 -> Y0*Y1 xor obs[1]",
+                    "X0*X1 -> Y0*Y1 xor rec[-1]",
+                ],
+            )?,
+            vec![true, true, true, true, false, true],
+        ),
+        (
+            parse_circuit(
+                row_id,
+                "OBSERVABLE_INCLUDE(3) X0 Y1 Z2\n\
+                 OBSERVABLE_INCLUDE(2) Y0\n",
+            )?,
+            parse_flows(
+                row_id,
+                &[
+                    "X0*Y1*Z2 -> obs[3]",
+                    "-Y0 -> obs[2]",
+                    "Y0 -> obs[3]",
+                    "1 -> X0*Y1*Z2 xor obs[3]",
+                ],
+            )?,
+            vec![true, true, false, true],
+        ),
+    ])
+}
+
+fn parse_flows(row_id: &str, flows: &[&str]) -> Result<Vec<Flow>, BenchError> {
+    flows
+        .iter()
+        .map(|flow| Flow::from_str(flow).map_err(|error| stab_runner_error(row_id, error)))
+        .collect()
 }
 
 fn run_feedback_inline_mpp_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {

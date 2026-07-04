@@ -758,6 +758,15 @@ fn pf5_detector_utility_benchmark_rows_have_stab_compare_runners() {
                 "stab_pf5_missing_detectors_mpp_suggestions",
             ][..],
         ),
+        (
+            "pf5-has-all-flows-batch",
+            "src/stim/util_top/has_flow.test.cc",
+            "has-all-flows",
+            &[
+                "stab_pf5_has_flows_batch_cases",
+                "stab_pf5_has_flows_batch_flows",
+            ][..],
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),

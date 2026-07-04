@@ -57,6 +57,32 @@ impl SparseReverseFrameTracker {
         Ok(())
     }
 
+    pub(crate) fn toggle_pauli_target(
+        &mut self,
+        qubit: QubitId,
+        basis: PauliBasis,
+        target: DemTarget,
+    ) -> CircuitResult<()> {
+        let Some(basis) = TrackerBasis::from_pauli_basis(basis) else {
+            return Ok(());
+        };
+        self.toggle_product_sensitivity(&[(qubit, basis)], &BTreeSet::from([target]))
+    }
+
+    pub(crate) fn toggle_record_target_absolute(
+        &mut self,
+        index: usize,
+        target: DemTarget,
+    ) -> CircuitResult<()> {
+        if index >= self.measurement_count {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "measurement record index {index} is outside the sparse reverse tracker history"
+            )));
+        }
+        self.toggle_record_target(index, target);
+        Ok(())
+    }
+
     pub(crate) fn undo_instruction(
         &mut self,
         instruction: &CircuitInstruction,
@@ -700,6 +726,15 @@ enum TrackerBasis {
 }
 
 impl TrackerBasis {
+    fn from_pauli_basis(basis: PauliBasis) -> Option<Self> {
+        match basis {
+            PauliBasis::I => None,
+            PauliBasis::X => Some(Self::X),
+            PauliBasis::Y => Some(Self::Y),
+            PauliBasis::Z => Some(Self::Z),
+        }
+    }
+
     fn from_pauli(pauli: crate::Pauli) -> Self {
         match pauli {
             crate::Pauli::X => Self::X,

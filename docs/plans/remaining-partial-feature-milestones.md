@@ -355,7 +355,7 @@ Implementation tasks:
 
 - Extend `circuit_detecting_regions` for selected repeat traversal, Clifford gates, target shapes, tick windows, detector filtering, multi-detector regions, anticommutation behavior, and gauge behavior. The bounded repeat-tick traversal subset is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf5-detecting-regions-progress-report.md`.
 - Extend `missing_detectors` for selected multi-record row reduction, repeated MPP stabilizer products, observable interaction, honeycomb suffix, and toric suffix cases. The Gaussian row-reduction, repeated MPP and pair-measurement stabilizer-product, record-only observable-row, and ignored Pauli observable-row subset is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf5-missing-detectors-progress-report.md`.
-- Implement measurement-rich flow solving for `Flow`, `has_flow`, `has_all_flows`, `flow_generators`, and failure explanations.
+- Implement measurement-rich flow solving for `Flow`, `has_flow`, `has_all_flows`, `flow_generators`, and failure explanations. The unsigned `has_flow` subset with measurement-record and observable dependencies is implemented and tracked in [rpf5-flow-progress-report.md](rpf5-flow-progress-report.md).
 - Integrate flow semantics with `time_reversed_for_flows`, feedback inlining, and gate metadata where selected.
 - Add precise errors for unpromoted utility families.
 
@@ -369,19 +369,19 @@ Tests:
 
 Oracle rows:
 
-- Supplement `pf5-detecting-regions-extended`, `pf5-missing-detectors-extended`, and `pf5-measurement-rich-flows`. The bounded repeat traversal subset is supplemented by `pf5-detecting-regions-repeat-rust`; the promoted missing-detectors subset is supplemented by `pf5-missing-detectors-row-reduction-rust` and `pf5-missing-detectors-mpp-observable-rust`.
+- Supplement `pf5-detecting-regions-extended`, `pf5-missing-detectors-extended`, and `pf5-measurement-rich-flows`. The bounded repeat traversal subset is supplemented by `pf5-detecting-regions-repeat-rust`; the promoted missing-detectors subset is supplemented by `pf5-missing-detectors-row-reduction-rust` and `pf5-missing-detectors-mpp-observable-rust`; the unsigned has-flow record and observable subset is supplemented by `pf5-has-flow-record-observable-rust`.
 - Use structural comparators when exact text is unstable or when result ordering is intentionally set-like.
 
 Benchmarks:
 
-- Implement `pf5-detecting-regions-repeat`, `pf5-missing-detectors-mpp`, `pf5-missing-detectors-generated-code`, `pf5-flow-solve-measurement-rich`, and `pf5-has-all-flows-batch`. The `pf5-detecting-regions-repeat` row now has report-only runner coverage for the bounded repeat-tick subset, and `pf5-missing-detectors-mpp` has report-only runner coverage for the promoted MPP and observable-row subset.
+- Implement `pf5-detecting-regions-repeat`, `pf5-missing-detectors-mpp`, `pf5-missing-detectors-generated-code`, `pf5-flow-solve-measurement-rich`, and `pf5-has-all-flows-batch`. The `pf5-detecting-regions-repeat` row now has report-only runner coverage for the bounded repeat-tick subset, `pf5-missing-detectors-mpp` has report-only runner coverage for the promoted MPP and observable-row subset, and `pf5-has-all-flows-batch` has report-only runner coverage for the promoted unsigned has-flow record and observable subset.
 - Keep complex utility rows report-only unless faithful Stim comparison and repeated stable ratios exist.
 
 Acceptance criteria:
 
 - Every promoted utility subfamily has positive, negative, and resource-boundary tests.
 - Unpromoted utility subfamilies are rejected precisely or documented as deferred.
-- Measurement-rich flows include observables and measurement records in both success and failure tests.
+- Measurement-rich flows include observables and measurement records in both success and failure tests. The promoted unsigned has-flow subset satisfies this criterion only for the checker cases listed in [rpf5-flow-progress-report.md](rpf5-flow-progress-report.md).
 
 ## Milestone RPF6: Analyzer, Search, And Sparse Reverse Tracking
 
