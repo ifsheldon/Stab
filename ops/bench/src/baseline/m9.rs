@@ -116,6 +116,14 @@ pub(super) fn run_detection_compare_row(
         "m9-feedback-inline-mpp-batch" => run_feedback_inline_mpp_batch(row).map(Some),
         "m9-detect-primary-matrix-contract" => run_primary_detect_row(row).map(Some),
         "m9-m2d-primary-matrix-contract" => run_primary_m2d_row(row).map(Some),
+        "pf3-m2d-sweep-b8" => run_m2d_cli_row(
+            row,
+            "stab_pf3_m2d_sweep_b8",
+            m2d_sweep_b8_args(),
+            M2D_SWEEP_B8_MEASUREMENTS,
+            None,
+        )
+        .map(Some),
         "pf3-detect-sweep-sampling" => run_detect_sweep_sampling_row(row).map(Some),
         _ => Ok(None),
     }
@@ -129,6 +137,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("m9-m2d-sweep-01-cli", "stab_m2d_sweep_01_dets")
         | ("m9-m2d-sweep-obs-out-cli", "stab_m2d_sweep_obs_out") => Some((4.0, "shots/s")),
         ("m9-m2d-sweep-b8-cli", "stab_m2d_sweep_b8") => Some((5.0, "shots/s")),
+        ("pf3-m2d-sweep-b8", "stab_pf3_m2d_sweep_b8") => Some((5.0, "shots/s")),
         ("m9-m2d-ran-without-feedback-cli", "stab_m2d_ran_without_feedback") => {
             Some((6.0, "shots/s"))
         }
@@ -204,6 +213,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m9-m2d-primary-matrix-contract" => Some(
             "cli-baseline: Stab converts source-owned generated repetition-code d3/r3 measurement records to b8 detection events against pinned Stim m2d on the same fixture",
+        ),
+        "pf3-m2d-sweep-b8" => Some(
+            "report-only: Stab measures the public m2d --sweep packed b8 path using the source-owned M9 sweep fixture; threshold ownership awaits repeated probe evidence",
         ),
         "pf3-detect-sweep-sampling" => Some(
             "report-only: Stab measures the Rust sweep-conditioned detection sampler using omitted all-false sweep bits; no faithful pinned Stim CLI ratio is claimed for this partial PF3 surface",
