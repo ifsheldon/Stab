@@ -7,8 +7,9 @@ use crate::{
 /// Returns unsigned stabilizer-flow generators for the supported tableau and measurement subset.
 ///
 /// The current implementation supports unitary tableau circuits and the PFM5 single-instruction
-/// measurement/reset/pair-measurement/MPAD subset. Richer measured-circuit composition,
-/// Pauli-product measurements, feedback, and noisy-flow semantics remain fail-closed.
+/// measurement/reset/pair-measurement/MPAD subset, plus scoped measurement-record feedback after
+/// those measurements. Richer measured-circuit composition, Pauli-product measurements, sweep
+/// feedback, and noisy-flow semantics remain fail-closed.
 pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
     if circuit_needs_measurement_rich_generators(circuit) {
         return simple_measurement_rich_flow_generators(circuit)?
@@ -59,25 +60,25 @@ fn circuit_needs_measurement_rich_generators(circuit: &Circuit) -> bool {
 }
 
 fn simple_measurement_rich_flow_generators(circuit: &Circuit) -> CircuitResult<Option<Vec<Flow>>> {
-    let [CircuitItem::Instruction(instruction)] = circuit.items() else {
-        return Ok(None);
-    };
-    Ok(match instruction.gate().canonical_name() {
-        "M" => simple_measurement_flows(instruction, PauliBasis::Z)?,
-        "MX" => simple_measurement_flows(instruction, PauliBasis::X)?,
-        "MY" => simple_measurement_flows(instruction, PauliBasis::Y)?,
-        "R" => simple_reset_flows(instruction, PauliBasis::Z),
-        "RX" => simple_reset_flows(instruction, PauliBasis::X),
-        "RY" => simple_reset_flows(instruction, PauliBasis::Y),
-        "MR" => simple_measure_reset_flows(instruction, PauliBasis::Z)?,
-        "MRX" => simple_measure_reset_flows(instruction, PauliBasis::X)?,
-        "MRY" => simple_measure_reset_flows(instruction, PauliBasis::Y)?,
-        "MXX" => simple_pair_measurement_flows(instruction, PauliBasis::X)?,
-        "MYY" => simple_pair_measurement_flows(instruction, PauliBasis::Y)?,
-        "MZZ" => simple_pair_measurement_flows(instruction, PauliBasis::Z)?,
-        "MPAD" => Some(measurement_pad_flows(instruction)?),
-        _ => None,
-    })
+    if let [CircuitItem::Instruction(instruction)] = circuit.items() {
+        return Ok(match instruction.gate().canonical_name() {
+            "M" => simple_measurement_flows(instruction, PauliBasis::Z)?,
+            "MX" => simple_measurement_flows(instruction, PauliBasis::X)?,
+            "MY" => simple_measurement_flows(instruction, PauliBasis::Y)?,
+            "R" => simple_reset_flows(instruction, PauliBasis::Z),
+            "RX" => simple_reset_flows(instruction, PauliBasis::X),
+            "RY" => simple_reset_flows(instruction, PauliBasis::Y),
+            "MR" => simple_measure_reset_flows(instruction, PauliBasis::Z)?,
+            "MRX" => simple_measure_reset_flows(instruction, PauliBasis::X)?,
+            "MRY" => simple_measure_reset_flows(instruction, PauliBasis::Y)?,
+            "MXX" => simple_pair_measurement_flows(instruction, PauliBasis::X)?,
+            "MYY" => simple_pair_measurement_flows(instruction, PauliBasis::Y)?,
+            "MZZ" => simple_pair_measurement_flows(instruction, PauliBasis::Z)?,
+            "MPAD" => Some(measurement_pad_flows(instruction)?),
+            _ => None,
+        });
+    }
+    scoped_measurement_feedback_flow_generators(circuit)
 }
 
 fn simple_measurement_flows(
@@ -222,6 +223,283 @@ fn measurement_pad_flows(instruction: &CircuitInstruction) -> CircuitResult<Vec<
     Ok(flows)
 }
 
+fn scoped_measurement_feedback_flow_generators(
+    circuit: &Circuit,
+) -> CircuitResult<Option<Vec<Flow>>> {
+    let mut instructions = Vec::with_capacity(circuit.items().len());
+    for item in circuit.items() {
+        let CircuitItem::Instruction(instruction) = item else {
+            return Ok(None);
+        };
+        instructions.push(instruction);
+    }
+    if !instructions.iter().any(|instruction| {
+        instruction.gate().produces_measurements()
+            || matches!(
+                instruction.gate().category(),
+                GateCategory::Collapsing | GateCategory::PairMeasurement
+            )
+    }) || !instructions
+        .iter()
+        .any(|instruction| feedback_measurement_basis(instruction).is_some())
+    {
+        return Ok(None);
+    }
+
+    let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
+        CircuitError::invalid_tableau_conversion(
+            "circuit measurement count does not fit usize during flow generation",
+        )
+    })?;
+    let mut solver = MeasurementFeedbackFlowSolver::new(circuit.count_qubits(), measurement_count);
+    for instruction in instructions.into_iter().rev() {
+        if !solver.undo_instruction(instruction)? {
+            return Ok(None);
+        }
+    }
+    solver.finalize().map(Some)
+}
+
+struct MeasurementFeedbackFlowSolver {
+    flows: Vec<Flow>,
+    qubit_count: usize,
+    measurement_count: usize,
+    measurements_in_past: usize,
+}
+
+impl MeasurementFeedbackFlowSolver {
+    fn new(qubit_count: usize, measurement_count: usize) -> Self {
+        Self {
+            flows: identity_flow_rows(qubit_count),
+            qubit_count,
+            measurement_count,
+            measurements_in_past: measurement_count,
+        }
+    }
+
+    fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<bool> {
+        match instruction.gate().canonical_name() {
+            "M" => self.undo_measurement(instruction, PauliBasis::Z),
+            "MX" => self.undo_measurement(instruction, PauliBasis::X),
+            "MY" => self.undo_measurement(instruction, PauliBasis::Y),
+            "R" => self.undo_reset(instruction, PauliBasis::Z),
+            "RX" => self.undo_reset(instruction, PauliBasis::X),
+            "RY" => self.undo_reset(instruction, PauliBasis::Y),
+            "MR" => self.undo_measure_reset(instruction, PauliBasis::Z),
+            "MRX" => self.undo_measure_reset(instruction, PauliBasis::X),
+            "MRY" => self.undo_measure_reset(instruction, PauliBasis::Y),
+            "MXX" => self.undo_pair_measurement(instruction, PauliBasis::X),
+            "MYY" => self.undo_pair_measurement(instruction, PauliBasis::Y),
+            "MZZ" => self.undo_pair_measurement(instruction, PauliBasis::Z),
+            "MPAD" => self.undo_measurement_pad(instruction),
+            _ if feedback_measurement_basis(instruction).is_some() => {
+                self.undo_measurement_feedback(instruction)
+            }
+            _ => Ok(false),
+        }
+    }
+
+    fn undo_measurement(
+        &mut self,
+        instruction: &CircuitInstruction,
+        basis: PauliBasis,
+    ) -> CircuitResult<bool> {
+        let mut targets = Vec::with_capacity(instruction.targets().len());
+        for target in instruction.targets() {
+            targets.push(pair_measurement_target_index(target)?);
+        }
+        for (&(qubit, inverted), record_index) in targets.iter().rev().zip(
+            measurement_indices_reversed(&mut self.measurements_in_past, targets.len())?,
+        ) {
+            remove_single_anticommutations(&mut self.flows, qubit, basis)?;
+            self.flows.push(Flow::new(
+                single_pauli_with_sign(
+                    self.qubit_count,
+                    qubit,
+                    basis,
+                    if inverted {
+                        PauliSign::Minus
+                    } else {
+                        PauliSign::Plus
+                    },
+                ),
+                PauliString::identity(self.qubit_count),
+                [record_index],
+                [],
+            ));
+        }
+        Ok(true)
+    }
+
+    fn undo_reset(
+        &mut self,
+        instruction: &CircuitInstruction,
+        basis: PauliBasis,
+    ) -> CircuitResult<bool> {
+        let qubits = match unique_plain_target_indices(instruction) {
+            Some(qubits) => qubits,
+            None => return Ok(false),
+        };
+        for qubit in qubits {
+            remove_single_anticommutations(&mut self.flows, qubit, basis)?;
+            clear_input_term(&mut self.flows, qubit)?;
+        }
+        Ok(true)
+    }
+
+    fn undo_measure_reset(
+        &mut self,
+        instruction: &CircuitInstruction,
+        basis: PauliBasis,
+    ) -> CircuitResult<bool> {
+        let qubits = match unique_plain_target_indices(instruction) {
+            Some(qubits) => qubits,
+            None => return Ok(false),
+        };
+        for (&qubit, record_index) in qubits.iter().rev().zip(measurement_indices_reversed(
+            &mut self.measurements_in_past,
+            qubits.len(),
+        )?) {
+            remove_single_anticommutations(&mut self.flows, qubit, basis)?;
+            clear_input_term(&mut self.flows, qubit)?;
+            self.flows.push(Flow::new(
+                single_pauli(self.qubit_count, qubit, basis),
+                PauliString::identity(self.qubit_count),
+                [record_index],
+                [],
+            ));
+        }
+        Ok(true)
+    }
+
+    fn undo_pair_measurement(
+        &mut self,
+        instruction: &CircuitInstruction,
+        basis: PauliBasis,
+    ) -> CircuitResult<bool> {
+        let groups = instruction.target_groups();
+        let mut pairs = Vec::with_capacity(groups.len());
+        for group in &groups {
+            let [left, right] = *group else {
+                return Ok(false);
+            };
+            pairs.push((
+                pair_measurement_target_index(left)?,
+                pair_measurement_target_index(right)?,
+            ));
+        }
+        for (&((left, left_inverted), (right, right_inverted)), record_index) in
+            pairs.iter().rev().zip(measurement_indices_reversed(
+                &mut self.measurements_in_past,
+                pairs.len(),
+            )?)
+        {
+            remove_pair_anticommutations(&mut self.flows, left, right, basis)?;
+            self.flows.push(Flow::new(
+                pair_pauli(
+                    self.qubit_count,
+                    left,
+                    right,
+                    basis,
+                    if left_inverted ^ right_inverted {
+                        PauliSign::Minus
+                    } else {
+                        PauliSign::Plus
+                    },
+                ),
+                PauliString::identity(self.qubit_count),
+                [record_index],
+                [],
+            ));
+        }
+        Ok(true)
+    }
+
+    fn undo_measurement_pad(&mut self, instruction: &CircuitInstruction) -> CircuitResult<bool> {
+        for (target, record_index) in
+            instruction
+                .targets()
+                .iter()
+                .rev()
+                .zip(measurement_indices_reversed(
+                    &mut self.measurements_in_past,
+                    instruction.targets().len(),
+                )?)
+        {
+            match target.qubit_id().map(|id| id.get()) {
+                Some(0) => self.flows.push(Flow::new(
+                    PauliString::identity(self.qubit_count),
+                    PauliString::identity(self.qubit_count),
+                    [record_index],
+                    [],
+                )),
+                Some(1) => self.flows.push(Flow::new(
+                    PauliString::identity(self.qubit_count),
+                    PauliString::from_bases(
+                        PauliSign::Minus,
+                        vec![PauliBasis::I; self.qubit_count],
+                    ),
+                    [record_index],
+                    [],
+                )),
+                _ => return Ok(false),
+            }
+        }
+        Ok(true)
+    }
+
+    fn undo_measurement_feedback(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<bool> {
+        let basis = feedback_measurement_basis(instruction)
+            .ok_or_else(|| internal_flow_error("missing feedback basis"))?;
+        for group in instruction.target_groups().into_iter().rev() {
+            let [left, right] = group else {
+                return Ok(false);
+            };
+            let feedback = match (
+                left.measurement_record_offset(),
+                right.measurement_record_offset(),
+            ) {
+                (Some(record), None) => Some((record.get(), right)),
+                (None, Some(record)) => Some((record.get(), left)),
+                _ => None,
+            };
+            let Some((record_offset, target)) = feedback else {
+                return Ok(false);
+            };
+            let Some(qubit) = target.qubit_id().map(|qubit| qubit.get() as usize) else {
+                return Ok(false);
+            };
+            let record_index = absolute_record_index(self.measurements_in_past, record_offset)?;
+            for row in rows_matching(&self.flows, |flow| {
+                anticommutes_with_single_measurement(flow.input(), qubit, basis)
+            }) {
+                let updated = flow_with_toggled_measurement(
+                    self.flows
+                        .get(row)
+                        .ok_or_else(|| internal_flow_error("feedback row is out of bounds"))?,
+                    record_index,
+                );
+                if let Some(slot) = self.flows.get_mut(row) {
+                    *slot = updated;
+                }
+            }
+        }
+        Ok(true)
+    }
+
+    fn finalize(mut self) -> CircuitResult<Vec<Flow>> {
+        final_canonicalize_measurement_generators(
+            &mut self.flows,
+            self.qubit_count,
+            self.measurement_count,
+        )?;
+        Ok(self.flows)
+    }
+}
+
 fn instruction_qubit_count(instruction: &CircuitInstruction) -> usize {
     instruction
         .targets()
@@ -249,6 +527,22 @@ fn unique_plain_target_indices(instruction: &CircuitInstruction) -> Option<Vec<u
         qubits.push(qubit);
     }
     Some(qubits)
+}
+
+fn measurement_indices_reversed(
+    measurements_in_past: &mut usize,
+    count: usize,
+) -> CircuitResult<Vec<i32>> {
+    let mut indices = Vec::with_capacity(count);
+    for _ in 0..count {
+        *measurements_in_past = measurements_in_past.checked_sub(1).ok_or_else(|| {
+            CircuitError::invalid_tableau_conversion(
+                "measurement count underflowed during flow generation",
+            )
+        })?;
+        indices.push(record_index_i32(*measurements_in_past)?);
+    }
+    Ok(indices)
 }
 
 fn pair_measurement_target_index(target: &Target) -> CircuitResult<(usize, bool)> {
@@ -279,6 +573,36 @@ fn identity_flow_rows(qubit_count: usize) -> Vec<Flow> {
     flows
 }
 
+fn remove_single_anticommutations(
+    flows: &mut Vec<Flow>,
+    qubit: usize,
+    basis: PauliBasis,
+) -> CircuitResult<()> {
+    let anticommuting_rows = rows_matching(flows, |flow| {
+        anticommutes_with_single_measurement(flow.input(), qubit, basis)
+    });
+    let Some((&pivot, rest)) = anticommuting_rows.split_first() else {
+        return Ok(());
+    };
+    let pivot_flow = flows
+        .get(pivot)
+        .cloned()
+        .ok_or_else(|| internal_flow_error("single-measurement pivot row is out of bounds"))?;
+    for &row in rest {
+        let target = flows
+            .get(row)
+            .ok_or_else(|| internal_flow_error("single-measurement target row is out of bounds"))?;
+        let multiplied = target
+            .multiply(&pivot_flow)
+            .map_err(stabilizer_to_circuit_error)?;
+        if let Some(slot) = flows.get_mut(row) {
+            *slot = multiplied;
+        }
+    }
+    flows.remove(pivot);
+    Ok(())
+}
+
 fn remove_pair_anticommutations(
     flows: &mut Vec<Flow>,
     left: usize,
@@ -307,6 +631,24 @@ fn remove_pair_anticommutations(
         }
     }
     flows.remove(pivot);
+    Ok(())
+}
+
+fn clear_input_term(flows: &mut [Flow], qubit: usize) -> CircuitResult<()> {
+    for flow in flows {
+        let mut input = flow.input().clone();
+        if qubit < input.len() {
+            input
+                .set(qubit, PauliBasis::I)
+                .map_err(stabilizer_to_circuit_error)?;
+        }
+        *flow = Flow::new(
+            input,
+            flow.output().clone(),
+            flow.measurements(),
+            flow.observables(),
+        );
+    }
     Ok(())
 }
 
@@ -406,6 +748,15 @@ fn anticommutes_with_pair_measurement(
     anticommutes
 }
 
+fn anticommutes_with_single_measurement(
+    input: &PauliString,
+    qubit: usize,
+    measured_basis: PauliBasis,
+) -> bool {
+    let basis = input.get(qubit).unwrap_or(PauliBasis::I);
+    (basis.x_bit() & measured_basis.z_bit()) ^ (basis.z_bit() & measured_basis.x_bit())
+}
+
 fn pair_pauli(
     qubit_count: usize,
     left: usize,
@@ -422,6 +773,67 @@ fn pair_pauli(
                 PauliBasis::I
             }
         }),
+    )
+}
+
+fn single_pauli_with_sign(
+    len: usize,
+    index: usize,
+    basis: PauliBasis,
+    sign: PauliSign,
+) -> PauliString {
+    PauliString::from_bases(
+        sign,
+        (0..len).map(|candidate| {
+            if candidate == index {
+                basis
+            } else {
+                PauliBasis::I
+            }
+        }),
+    )
+}
+
+fn feedback_measurement_basis(instruction: &CircuitInstruction) -> Option<PauliBasis> {
+    match instruction.gate().canonical_name() {
+        "CX" | "XCZ" => Some(PauliBasis::X),
+        "CY" | "YCZ" => Some(PauliBasis::Y),
+        "CZ" => Some(PauliBasis::Z),
+        _ => None,
+    }
+}
+
+fn absolute_record_index(measurements_in_past: usize, record_offset: i32) -> CircuitResult<i32> {
+    let measurements_in_past = i64::try_from(measurements_in_past).map_err(|_| {
+        CircuitError::invalid_tableau_conversion(
+            "measurement count does not fit i64 during feedback flow generation",
+        )
+    })?;
+    let index = measurements_in_past
+        .checked_add(i64::from(record_offset))
+        .ok_or_else(|| {
+            CircuitError::invalid_tableau_conversion(
+                "measurement record index overflowed during feedback flow generation",
+            )
+        })?;
+    if index < 0 || index >= measurements_in_past {
+        return Err(CircuitError::invalid_tableau_conversion(format!(
+            "measurement record offset {record_offset} is outside the flow generation history"
+        )));
+    }
+    i32::try_from(index).map_err(|_| {
+        CircuitError::invalid_tableau_conversion(format!(
+            "flow measurement record index {index} does not fit i32"
+        ))
+    })
+}
+
+fn flow_with_toggled_measurement(flow: &Flow, record_index: i32) -> Flow {
+    Flow::new(
+        flow.input().clone(),
+        flow.output().clone(),
+        flow.measurements().chain([record_index]),
+        flow.observables(),
     )
 }
 
