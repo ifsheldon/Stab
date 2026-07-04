@@ -79,6 +79,43 @@ fn circuit_flow_generators_promotes_single_instruction_measurement_subset() {
         generator_strings("MPAD 0 1 1 0\n"),
         vec!["1 -> rec[0]", "1 -> rec[3]", "1 -> -rec[1]", "1 -> -rec[2]"]
     );
+    assert_eq!(
+        generator_strings("MXX 2 0\n"),
+        vec![
+            "1 -> X_X xor rec[0]",
+            "__X -> __X",
+            "_X_ -> _X_",
+            "_Z_ -> _Z_",
+            "X__ -> __X xor rec[0]",
+            "Z_Z -> Z_Z",
+        ]
+    );
+    assert_eq!(
+        generator_strings("MYY 3 1 2 3\n"),
+        vec![
+            "1 -> __YY xor rec[1]",
+            "1 -> _Y_Y xor rec[0]",
+            "___Y -> ___Y",
+            "__Y_ -> ___Y xor rec[1]",
+            "_XZZ -> _ZZX xor rec[0]",
+            "_ZZZ -> _ZZZ",
+            "X___ -> X___",
+            "Z___ -> Z___",
+        ]
+    );
+    assert_eq!(
+        generator_strings("MZZ 3 1 2 3\n"),
+        vec![
+            "1 -> __ZZ xor rec[1]",
+            "1 -> _Z_Z xor rec[0]",
+            "___Z -> ___Z",
+            "__Z_ -> ___Z xor rec[1]",
+            "_XXX -> _XXX",
+            "_Z__ -> ___Z xor rec[0]",
+            "X___ -> X___",
+            "Z___ -> Z___",
+        ]
+    );
 }
 
 #[test]
@@ -94,6 +131,10 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
         "MR 0\n",
         "MRX 0\n",
         "MRY 0\n",
+        "MXX 2 0\n",
+        "MXX !0 1\n",
+        "MYY 3 1 2 3\n",
+        "MZZ 3 1 2 3\n",
         "MPAD 0 1 1 0\n",
     ] {
         let circuit = circuit(text);
@@ -109,9 +150,9 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
 #[test]
 fn circuit_flow_generators_rejects_unpromoted_measurement_rich_shapes() {
     for text in [
-        "MXX 0 1\n",
         "MPP X0*X1\n",
         "MR 0 0\n",
+        "MXX 0 1\nH 0\n",
         "M 0\nH 0\n",
         "M 0\nCX rec[-1] 0\n",
         "REPEAT 2 {\n    M 0\n}\n",
