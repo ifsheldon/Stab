@@ -50,6 +50,7 @@ pub(super) fn run_dem_compare_row(
         "m10-analyze-errors-fold-cli" => run_analyze_fold_row(row).map(Some),
         "m10-analyze-errors-high-repeat-contract" => run_analyze_fold_row(row).map(Some),
         "pf3-analyze-errors-sweep" => run_analyze_sweep_row(row).map(Some),
+        "pf6-analyze-errors-generated-surface" => run_analyze_generated_core_row(row).map(Some),
         "pf7-cli-analyze-errors-generated" => run_analyze_generated_cli_row(row).map(Some),
         "pf7-cli-analyze-errors-decompose" => run_analyze_decompose_cli_row(row).map(Some),
         _ => Ok(None),
@@ -75,6 +76,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             Some((1.0, "circuits/s"))
         }
         ("pf7-cli-analyze-errors-generated", "stab_pf7_cli_analyze_errors_generated") => {
+            Some((error_analyzer_detector_count(), "detectors/s"))
+        }
+        ("pf6-analyze-errors-generated-surface", "stab_pf6_analyze_errors_generated_surface") => {
             Some((error_analyzer_detector_count(), "detectors/s"))
         }
         ("pf3-analyze-errors-sweep", "stab_analyze_errors_sweep_control") => {
@@ -118,6 +122,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf7-cli-analyze-errors-generated" => Some(
             "report-only: Stab measures the public CLI analyze_errors path on the source-owned generated d3/r3 rotated-memory-z surface-code analyzer workload",
+        ),
+        "pf6-analyze-errors-generated-surface" => Some(
+            "report-only: Stab measures the Rust generated d3/r3 rotated-memory-z surface-code analyzer workload without a faithful pinned Stim CLI timing ratio",
         ),
         "pf3-analyze-errors-sweep" => Some(
             "report-only: Stab measures in-process analyzer handling for sweep-controlled Clifford gates that are semantically ignored by the error analyzer",
@@ -263,6 +270,20 @@ fn run_analyze_generated_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
                 });
             }
             black_box(stdout.len());
+            Ok(())
+        },
+    )?])
+}
+
+fn run_analyze_generated_core_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = error_analyzer_surface_code(&row.id)?;
+    Ok(vec![measure_stab_iterations(
+        "stab_pf6_analyze_errors_generated_surface",
+        ERROR_ANALYZER_COMPARE_ITERATIONS,
+        || {
+            let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(dem.items().len());
             Ok(())
         },
     )?])

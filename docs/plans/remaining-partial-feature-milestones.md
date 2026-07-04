@@ -398,7 +398,7 @@ Owned checklist rows:
 
 Implementation tasks:
 
-- Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures.
+- Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures. The generated-QEC semantic subset for noisy repetition-code and rotated-surface-code circuits is implemented and tracked in [rpf6-analyzer-progress-report.md](rpf6-analyzer-progress-report.md).
 - Extend graphlike, hypergraph, shortest-error, SAT, and WCNF search behavior for selected generated-circuit and DEM cases.
 - Improve sparse reverse detector-frame tracking for optimized loop folding and all-unitary fuzz coverage where it affects analyzer or search correctness.
 - Harden matched-error value objects only when required by active analyzer/search outputs.
@@ -414,18 +414,18 @@ Tests:
 
 Oracle rows:
 
-- Supplement `pf6-analyzer-generated-looping`, `pf6-search-generated`, and `pf6-sparse-rev-tracker`.
+- Supplement `pf6-analyzer-generated-looping`, `pf6-search-generated`, and `pf6-sparse-rev-tracker`. The generated-QEC analyzer subset is supplemented by `pf6-analyzer-generated-qec-rust`; the broader generated-looping row remains manifest-only.
 - Use exact `.dem` comparators where output order is stable and structural comparators otherwise.
 
 Benchmarks:
 
-- Implement or extend `pf6-analyze-errors-generated-surface`, `pf6-error-decomp-loop-folded`, `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, and `pf6-sparse-rev-frame-loop`.
+- Implement or extend `pf6-analyze-errors-generated-surface`, `pf6-error-decomp-loop-folded`, `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, and `pf6-sparse-rev-frame-loop`. The generated-surface analyzer row has a report-only Rust core runner; the remaining PF6 rows are still placeholders.
 - Use schema-version-2 submeasurement thresholds for bundled analyzer or search rows.
 - Promote only rows with faithful pinned Stim evidence and repeated stable ratios.
 
 Acceptance criteria:
 
-- Analyzer and search outputs match pinned Stim for owned exact cases and satisfy structural comparators for allowed-ordering cases.
+- Analyzer and search outputs match pinned Stim for owned exact cases and satisfy structural comparators for allowed-ordering cases. The generated-QEC semantic subset satisfies this for the promoted noisy repetition-code and rotated-surface-code cases only.
 - Loop folding is proven by tests and benchmarks, not only by small-output equality.
 - Deferred provenance and CLI explanation surfaces stay explicitly outside the claim.
 
