@@ -76,6 +76,12 @@ fn pf6_analyzer_benchmark_rows_have_stab_compare_runners() {
             "hypergraph-search-generated",
             &["stab_pf6_hypergraph_search_generated_surface"][..],
         ),
+        (
+            "pf6-sparse-rev-frame-loop",
+            "src/stim/simulators/sparse_rev_frame_tracker.test.cc",
+            "sparse-rev-frame",
+            &["stab_pf6_sparse_rev_unitary_repeat_flow"][..],
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),

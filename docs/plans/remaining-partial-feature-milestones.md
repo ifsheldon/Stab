@@ -419,7 +419,7 @@ Oracle rows:
 
 Benchmarks:
 
-- Implement or extend `pf6-analyze-errors-generated-surface`, `pf6-error-decomp-loop-folded`, `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, and `pf6-sparse-rev-frame-loop`. The generated-surface analyzer row has a report-only Rust core runner; the remaining PF6 rows are still placeholders.
+- Implement or extend `pf6-analyze-errors-generated-surface`, `pf6-error-decomp-loop-folded`, `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, and `pf6-sparse-rev-frame-loop`. The generated-surface analyzer, generated graphlike search, generated hypergraph search, and supported-Clifford sparse reverse frame loop rows have report-only Rust runners; `pf6-error-decomp-loop-folded` remains a placeholder.
 - Use schema-version-2 submeasurement thresholds for bundled analyzer or search rows.
 - Promote only rows with faithful pinned Stim evidence and repeated stable ratios.
 

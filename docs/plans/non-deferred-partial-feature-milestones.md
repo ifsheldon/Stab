@@ -365,7 +365,7 @@ Tasks:
 - Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures.
 - Extend graphlike, hypergraph, shortest-error, SAT, and WCNF behavior for selected generated-circuit and direct DEM cases.
 - Add ordering-insensitive structural comparators for search outputs where exact target order is not stable.
-- Improve sparse reverse detector-frame tracking for optimized loop folding and all-unitary fuzz coverage where that affects analyzer or search correctness.
+- Improve sparse reverse detector-frame tracking for optimized loop folding and all-unitary fuzz coverage where that affects analyzer or search correctness. The supported-Clifford unitary-repeat folding subset is implemented; broader all-unitary fuzzing and analyzer/search-specific consumption remain active.
 - Harden matched-error value objects only where active analyzer/search outputs require them.
 - Keep full stack-frame provenance, heralded matching, repeat-contained noise provenance, and `explain_errors` CLI deferred.
 
@@ -387,7 +387,7 @@ Benchmarks:
 
 - Keep or refresh `pf6-analyze-errors-generated-surface`.
 - Keep or refresh `pf6-graphlike-search-generated` and `pf6-hypergraph-search-generated`, which have report-only runner coverage for the promoted generated rotated-surface-code search subset.
-- Implement `pf6-error-decomp-loop-folded` and `pf6-sparse-rev-frame-loop` when their subcases are implemented.
+- Implement `pf6-error-decomp-loop-folded` when its subcases are implemented; keep the implemented `pf6-sparse-rev-frame-loop` row report-only unless a faithful pinned-Stim comparator is added.
 - Use schema-version-2 submeasurement thresholds for bundled analyzer or search rows.
 - Promote only faithful pinned-Stim rows with repeated stable evidence.
 

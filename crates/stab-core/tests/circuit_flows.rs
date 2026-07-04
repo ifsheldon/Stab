@@ -130,6 +130,23 @@ fn check_if_circuit_has_unsigned_stabilizer_flows_supports_observable_dependenci
     );
 }
 
+#[test]
+fn check_if_circuit_has_unsigned_stabilizer_flows_folds_unitary_repeats() {
+    let circuit = circuit(
+        "
+        REPEAT 1000001 {
+            H 0
+        }
+        M 0
+        ",
+    );
+    let flows = [flow("X -> rec[-1]"), flow("Z -> rec[-1]")];
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+        vec![true, false]
+    );
+}
+
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
 }

@@ -48,5 +48,5 @@ They were not added to `benchmarks/m12-primary-thresholds.json`.
 - Exact or structural comparators for ordering-insensitive search outputs beyond result instruction counts.
 - Generated SAT or WCNF encoding evidence.
 - Loop-folded generated search behavior.
-- Sparse reverse detector-frame tracker optimization and analyzer/search integration beyond the existing staged subset.
+- Sparse reverse detector-frame tracker analyzer/search integration beyond the promoted supported-Clifford unitary-repeat folding subset.
 - Full ErrorMatcher provenance, heralded matching, repeat-contained noise stack frames, and `stim explain_errors` CLI remain deferred.

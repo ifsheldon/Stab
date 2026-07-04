@@ -1,14 +1,15 @@
 use std::ffi::OsString;
 use std::hint::black_box;
 use std::io::{self, Write};
+use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 use stab_core::{
-    Circuit, CodeDistance, DetectorErrorModel, ErrorAnalyzerOptions, Probability, RoundCount,
-    SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
-    find_undetectable_logical_error, generate_surface_code_circuit,
-    independent_to_disjoint_xyz_errors, shortest_graphlike_undetectable_logical_error,
-    try_disjoint_to_independent_xyz_errors,
+    Circuit, CodeDistance, DetectorErrorModel, ErrorAnalyzerOptions, Flow, Probability, RoundCount,
+    SurfaceCodeParams, SurfaceCodeTask, check_if_circuit_has_unsigned_stabilizer_flows,
+    circuit_to_detector_error_model, find_undetectable_logical_error,
+    generate_surface_code_circuit, independent_to_disjoint_xyz_errors,
+    shortest_graphlike_undetectable_logical_error, try_disjoint_to_independent_xyz_errors,
 };
 
 use crate::allocations::measure_tracked_memory;
@@ -37,6 +38,10 @@ const ERROR_ANALYZER_DISTANCE: u32 = 3;
 const GRAPHLIKE_SEARCH_DETECTORS: u64 = 128;
 const GRAPHLIKE_SEARCH_GRAPH_EDGES: f64 = (GRAPHLIKE_SEARCH_DETECTORS * 2) as f64;
 const ERROR_DECOMP_DIRECT_COMPARE_REPETITIONS: usize = TINY_DIRECT_COMPARE_REPETITIONS * 16;
+#[cfg(not(test))]
+const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 1_000_001;
+#[cfg(test)]
+const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 17;
 
 pub(super) fn run_dem_compare_row(
     row: &BenchmarkRow,
@@ -54,6 +59,7 @@ pub(super) fn run_dem_compare_row(
         "pf6-analyze-errors-generated-surface" => run_analyze_generated_core_row(row).map(Some),
         "pf6-graphlike-search-generated" => run_generated_graphlike_search_row(row).map(Some),
         "pf6-hypergraph-search-generated" => run_generated_hypergraph_search_row(row).map(Some),
+        "pf6-sparse-rev-frame-loop" => run_sparse_reverse_frame_loop_row(row).map(Some),
         "pf7-cli-analyze-errors-generated" => run_analyze_generated_cli_row(row).map(Some),
         "pf7-cli-analyze-errors-decompose" => run_analyze_decompose_cli_row(row).map(Some),
         _ => Ok(None),
@@ -88,6 +94,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         | ("pf6-hypergraph-search-generated", "stab_pf6_hypergraph_search_generated_surface") => {
             Some((error_analyzer_detector_count(), "detectors/s"))
         }
+        ("pf6-sparse-rev-frame-loop", "stab_pf6_sparse_rev_unitary_repeat_flow") => Some((
+            SPARSE_REVERSE_UNITARY_REPEAT_COUNT as f64,
+            "folded-rounds/s",
+        )),
         ("pf3-analyze-errors-sweep", "stab_analyze_errors_sweep_control") => {
             Some((1.0, "circuits/s"))
         }
@@ -138,6 +148,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf6-hypergraph-search-generated" => Some(
             "report-only: Stab measures generated rotated-surface-code DEM hypergraph search after source-owned Rust analysis and decomposition; pinned Stim exposes this as C++ API behavior, not a faithful public CLI baseline",
+        ),
+        "pf6-sparse-rev-frame-loop" => Some(
+            "report-only: Stab measures public unsigned-flow checking over a measurement-dependent supported-Clifford unitary repeat so the sparse reverse frame tracker must use loop folding; broader sparse tracker parity and provenance remain outside this row",
         ),
         "pf3-analyze-errors-sweep" => Some(
             "report-only: Stab measures in-process analyzer handling for sweep-controlled Clifford gates that are semantically ignored by the error analyzer",
@@ -340,6 +353,34 @@ fn run_analyze_sweep_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchEr
             let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
                 .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(dem.items().len());
+            Ok(())
+        },
+    )?])
+}
+
+fn run_sparse_reverse_frame_loop_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = Circuit::from_stim_str(&sparse_reverse_frame_loop_fixture())
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let flows = [
+        Flow::from_str("X -> rec[-1]").map_err(|error| BenchError::StabRunner {
+            row_id: row.id.clone(),
+            message: format!("failed to parse sparse reverse flow benchmark fixture: {error}"),
+        })?,
+    ];
+    Ok(vec![measure_stab_iterations(
+        "stab_pf6_sparse_rev_unitary_repeat_flow",
+        ERROR_ANALYZER_COMPARE_ITERATIONS,
+        || {
+            let result = check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows);
+            if result != [true] {
+                return Err(BenchError::StabRunner {
+                    row_id: row.id.clone(),
+                    message: format!(
+                        "sparse reverse flow benchmark expected [true], got {result:?}"
+                    ),
+                });
+            }
+            black_box(result);
             Ok(())
         },
     )?])
@@ -567,4 +608,8 @@ fn graphlike_search_model(row_id: &str) -> Result<DetectorErrorModel, BenchError
     text.push_str(&(GRAPHLIKE_SEARCH_DETECTORS - 1).to_string());
     text.push_str(" L0\n");
     DetectorErrorModel::from_dem_str(&text).map_err(|error| stab_runner_error(row_id, error))
+}
+
+fn sparse_reverse_frame_loop_fixture() -> String {
+    format!("REPEAT {SPARSE_REVERSE_UNITARY_REPEAT_COUNT} {{\n    H 0\n}}\nM 0\n")
 }

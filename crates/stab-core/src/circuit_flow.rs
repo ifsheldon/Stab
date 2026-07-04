@@ -38,7 +38,12 @@ pub fn check_if_circuit_has_unsigned_stabilizer_flows(
     circuit: &Circuit,
     flows: &[Flow],
 ) -> Vec<bool> {
-    let tableau = circuit.to_tableau(false, false, false).ok();
+    let all_flows_are_unitary = flows
+        .iter()
+        .all(|flow| flow.measurements().next().is_none() && flow.observables().next().is_none());
+    let tableau = all_flows_are_unitary
+        .then(|| circuit.to_tableau(false, false, false).ok())
+        .flatten();
     flows
         .iter()
         .map(|flow| {

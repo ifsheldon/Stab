@@ -116,7 +116,7 @@ Status key:
 | `stim explain_errors` CLI | Deferred | Explicitly deferred in [plans/rust-stim-drop-in-rewrite.md](plans/rust-stim-drop-in-rewrite.md) and [plans/post-beta-fix-report.md](plans/post-beta-fix-report.md). |
 | Shortest graphlike and hypergraph logical-error search | Partial | Scoped direct DEM graphlike and hypergraph search are implemented and tested under M10. The PF6 generated-QEC search subset covers rotated-surface-code and repetition-code graphlike and hypergraph search instruction counts plus ungraphlike generated DEM rejection. Broader generated-circuit search families, generated SAT or WCNF encoding, loop-folded generated search, ordering-insensitive result comparators beyond instruction counts, and full provenance remain future work. |
 | SAT or WCNF encoding | Done for scoped API | `shortest_error_sat_problem` and `likeliest_error_sat_problem` are exposed through [../crates/stab-core/src/lib.rs](../crates/stab-core/src/lib.rs) and covered by M10. |
-| Sparse reverse detector-frame tracking | Partial | A staged internal subset is implemented for M10; optimized loop folding, all-unitary fuzzing, and full ErrorMatcher consumption remain future work. |
+| Sparse reverse detector-frame tracking | Partial | A staged internal subset is implemented for M10, and the PF6 supported-Clifford unitary-repeat folding subset is covered by `pf6-sparse-rev-unitary-repeat-rust` plus the report-only `pf6-sparse-rev-frame-loop` benchmark. Broader all-unitary fuzzing, analyzer/search consumption beyond the promoted unsigned-flow path, active matched-error hardening, and full ErrorMatcher provenance remain future work. |
 
 ## 8. Stabilizer Algebra Features
 

@@ -3,7 +3,7 @@
 ## Summary
 
 This RPF6 slice makes the generated-QEC analyzer subset explicit in the source-owned evidence.
-It does not complete RPF6 because broad generated-loop handling, loop-folded decomposition, graphlike and hypergraph generated search, sparse reverse tracker loop optimization, and active matched-error hardening remain open.
+It does not complete RPF6 because broad generated-loop handling, loop-folded decomposition, graphlike and hypergraph generated search, sparse reverse tracker work beyond supported-Clifford unitary repeats, and active matched-error hardening remain open.
 
 ## Implemented Evidence Slice
 
@@ -49,7 +49,7 @@ Still placeholder:
 - `pf6-error-decomp-loop-folded`
 - `pf6-graphlike-search-generated`
 - `pf6-hypergraph-search-generated`
-- `pf6-sparse-rev-frame-loop`
+- `pf6-sparse-rev-frame-loop` now has report-only runner coverage for the supported-Clifford unitary-repeat sparse-tracker slice; broader sparse-tracker work remains active.
 
 ## Verification Evidence
 
@@ -70,6 +70,6 @@ just bench::smoke
 - Generated-loop analyzer behavior beyond the promoted generated-QEC semantic subset.
 - Loop-folded error decomposition evidence and benchmark coverage.
 - Generated-circuit graphlike, hypergraph, shortest-error, SAT, and WCNF search evidence.
-- Sparse reverse detector-frame tracker optimized loop folding and all-unitary fuzz coverage.
+- Sparse reverse detector-frame tracker behavior beyond supported-Clifford unitary-repeat folding, including broader all-unitary fuzz coverage and analyzer/search-specific consumption.
 - Active matched-error value-object hardening required by analyzer or search outputs.
 - Full ErrorMatcher provenance, heralded matching, repeat-contained noise provenance, and `stim explain_errors` remain deferred unless the roadmap deliberately promotes them.
