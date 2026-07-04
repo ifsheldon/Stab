@@ -743,6 +743,11 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
     for (id, expected_measurement, measurement) in [
         ("pf3-m2d-sweep-b8", "stab_pf3_m2d_sweep_b8", "m2d-sweep"),
         (
+            "pf3-m2d-sweep-ptb64-input",
+            "stab_pf3_m2d_sweep_ptb64",
+            "m2d-sweep-ptb64",
+        ),
+        (
             "pf3-detect-sweep-sampling",
             "stab_detect_sweep_default_false",
             "detect-sweep",

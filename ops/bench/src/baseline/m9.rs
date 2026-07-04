@@ -9,6 +9,7 @@ use stab_core::{
     RepetitionCodeParams, RepetitionCodeTask, RoundCount, SampleFormat, circuit_detecting_regions,
     circuit_with_inlined_feedback, convert_measurements_to_detection_events,
     generate_repetition_code_circuit, measurement_record_count, missing_detectors,
+    result_formats::write_ptb64_records_checked,
     result_formats::{read_records, write_records},
     sample_detection_events, try_for_each_sampled_detection_event, write_detection_records,
 };
@@ -64,6 +65,8 @@ const DETECT_SWEEP_DEFAULT_FALSE: &str = "H 0\n\
                                          CX sweep[0] 0\n\
                                          M 0\n\
                                          DETECTOR rec[-1]\n";
+const SWEEP_PTB64_SHOTS: usize = 64;
+const SWEEP_PTB64_WIDTH: usize = 8;
 
 pub(super) fn run_detection_compare_row(
     row: &BenchmarkRow,
@@ -124,6 +127,7 @@ pub(super) fn run_detection_compare_row(
             None,
         )
         .map(Some),
+        "pf3-m2d-sweep-ptb64-input" => run_m2d_sweep_ptb64_cli_row(row).map(Some),
         "pf3-detect-sweep-sampling" => run_detect_sweep_sampling_row(row).map(Some),
         "pf7-cli-m2d-sweep-b8" => run_m2d_cli_row(
             row,
@@ -154,6 +158,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         | ("m9-m2d-sweep-obs-out-cli", "stab_m2d_sweep_obs_out") => Some((4.0, "shots/s")),
         ("m9-m2d-sweep-b8-cli", "stab_m2d_sweep_b8") => Some((5.0, "shots/s")),
         ("pf3-m2d-sweep-b8", "stab_pf3_m2d_sweep_b8") => Some((5.0, "shots/s")),
+        ("pf3-m2d-sweep-ptb64-input", "stab_pf3_m2d_sweep_ptb64") => {
+            Some((SWEEP_PTB64_SHOTS as f64, "shots/s"))
+        }
         ("pf7-cli-m2d-sweep-b8", "stab_pf7_cli_m2d_sweep_b8") => Some((5.0, "shots/s")),
         ("m9-m2d-ran-without-feedback-cli", "stab_m2d_ran_without_feedback") => {
             Some((6.0, "shots/s"))
@@ -239,6 +246,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf3-m2d-sweep-b8" => Some(
             "report-only: Stab measures the public m2d --sweep packed b8 path using the source-owned M9 sweep fixture; threshold ownership awaits repeated probe evidence",
+        ),
+        "pf3-m2d-sweep-ptb64-input" => Some(
+            "report-only: Stab measures public m2d --sweep with ptb64 measurement and sweep inputs generated from source-owned deterministic records",
         ),
         "pf7-cli-m2d-sweep-b8" => Some(
             "report-only: Stab measures the public CLI m2d --sweep packed b8 path for PF7 visible CLI parity using the source-owned M9 sweep fixture",
@@ -400,7 +410,7 @@ fn run_m2d_cli_row(
     row: &BenchmarkRow,
     measurement_name: &'static str,
     args: Vec<OsString>,
-    input: &'static [u8],
+    input: &[u8],
     side_output: Option<PathBuf>,
 ) -> Result<Vec<Measurement>, BenchError> {
     if let Some(path) = side_output.as_ref() {
@@ -437,6 +447,44 @@ fn run_m2d_cli_row(
             Ok(())
         },
     )?])
+}
+
+fn run_m2d_sweep_ptb64_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let measurement_input = sweep_ptb64_records(row, false)?;
+    let sweep_input = sweep_ptb64_records(row, true)?;
+    let sweep_path = sweep_ptb64_path();
+    create_parent_dir(row, &sweep_path)?;
+    std::fs::write(&sweep_path, &sweep_input).map_err(|source| BenchError::StabRunner {
+        row_id: row.id.clone(),
+        message: format!(
+            "failed to write ptb64 sweep input {}: {source}",
+            sweep_path.display()
+        ),
+    })?;
+    run_m2d_cli_row(
+        row,
+        "stab_pf3_m2d_sweep_ptb64",
+        m2d_sweep_ptb64_args(&sweep_path),
+        &measurement_input,
+        None,
+    )
+}
+
+fn sweep_ptb64_records(row: &BenchmarkRow, sweep: bool) -> Result<Vec<u8>, BenchError> {
+    let records = (0..SWEEP_PTB64_SHOTS)
+        .map(|shot| {
+            (0..SWEEP_PTB64_WIDTH)
+                .map(|bit| {
+                    if sweep {
+                        (shot * 3 + bit) % 5 == 0
+                    } else {
+                        (shot + bit * 2) % 3 == 0
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    write_ptb64_records_checked(&records).map_err(|error| stab_runner_error(&row.id, error))
 }
 
 #[derive(Default)]
@@ -499,6 +547,20 @@ fn m2d_sweep_b8_args() -> Vec<OsString> {
         OsString::from("--sweep"),
         repo_path("benchmarks/fixtures/m9_m2d_sweep_b8_sweep.b8").into_os_string(),
         OsString::from("--sweep_format=b8"),
+        OsString::from("--circuit"),
+        repo_path("benchmarks/fixtures/m9_m2d_sweep_b8.stim").into_os_string(),
+    ]
+}
+
+fn m2d_sweep_ptb64_args(sweep_path: &Path) -> Vec<OsString> {
+    vec![
+        OsString::from("stab"),
+        OsString::from("m2d"),
+        OsString::from("--in_format=ptb64"),
+        OsString::from("--out_format=b8"),
+        OsString::from("--sweep"),
+        sweep_path.as_os_str().to_os_string(),
+        OsString::from("--sweep_format=ptb64"),
         OsString::from("--circuit"),
         repo_path("benchmarks/fixtures/m9_m2d_sweep_b8.stim").into_os_string(),
     ]
@@ -732,6 +794,10 @@ fn repo_path(relative: &str) -> PathBuf {
 
 fn obs_out_path() -> PathBuf {
     repo_path("target/benchmarks/cli-scratch/m9-m2d-sweep-obs-out.b8")
+}
+
+fn sweep_ptb64_path() -> PathBuf {
+    repo_path("target/benchmarks/cli-scratch/pf3-m2d-sweep-ptb64.sweep")
 }
 
 fn create_parent_dir(row: &BenchmarkRow, path: &Path) -> Result<(), BenchError> {
