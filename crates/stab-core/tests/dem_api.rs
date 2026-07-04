@@ -50,6 +50,61 @@ fn dem_basic_mutation_append_and_tag_stripping() {
 }
 
 #[test]
+fn pf4_dem_introspection_transform_queries_cover_without_tags_and_final_counts() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "error[first](0.125) D0 ^ D1 L2\n\
+         repeat[outer] 3 {\n\
+             detector[inside](5, 6) D0\n\
+             logical_observable[log] L4\n\
+             shift_detectors[step](1, 2) 2\n\
+         }\n\
+         shift_detectors[tail](10, 20, 30) 5\n",
+    )
+    .expect("parse DEM");
+
+    let stripped = dem.without_tags();
+    assert_eq!(
+        stripped.to_dem_string(),
+        concat!(
+            "error(0.125) D0 ^ D1 L2\n",
+            "repeat 3 {\n",
+            "    detector(5, 6) D0\n",
+            "    logical_observable L4\n",
+            "    shift_detectors(1, 2) 2\n",
+            "}\n",
+            "shift_detectors(10, 20, 30) 5\n",
+        )
+    );
+    assert!(
+        dem.to_dem_string().contains("error[first]"),
+        "without_tags must leave the source model tagged"
+    );
+
+    assert_eq!(dem.count_errors().expect("error count"), 1);
+    assert_eq!(dem.count_detectors().expect("detector count"), 5);
+    assert_eq!(dem.count_observables().expect("observable count"), 5);
+    assert_eq!(dem.total_detector_shift().expect("detector shift"), 11);
+    assert_eq!(
+        dem.final_coordinate_shift()
+            .expect("final coordinate shift"),
+        vec![13.0, 26.0, 30.0]
+    );
+    assert_eq!(
+        dem.detector_coordinates_for([
+            DemDetectorId::try_new(0).expect("D0"),
+            DemDetectorId::try_new(2).expect("D2"),
+            DemDetectorId::try_new(4).expect("D4"),
+        ])
+        .expect("selected detector coordinates"),
+        BTreeMap::from([
+            (DemDetectorId::try_new(0).expect("D0"), vec![5.0, 6.0]),
+            (DemDetectorId::try_new(2).expect("D2"), vec![6.0, 8.0]),
+            (DemDetectorId::try_new(4).expect("D4"), vec![7.0, 10.0]),
+        ])
+    );
+}
+
+#[test]
 fn dem_append_from_text_is_atomic_on_parse_error() {
     let mut dem = DetectorErrorModel::from_dem_str("error(0.125) D0\n").expect("parse DEM");
     let before = dem.clone();

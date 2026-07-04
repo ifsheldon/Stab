@@ -2,7 +2,7 @@
 
 ## Summary
 
-This RPF4 slice adds the current Rust public materialized `DetectorErrorModel::flattened` and `DetectorErrorModel::rounded` transform subset.
+This RPF4 slice adds the current Rust public materialized `DetectorErrorModel::flattened` and `DetectorErrorModel::rounded` transform subset, plus source-owned evidence for recursive tag stripping and final count or shift introspection.
 It is not an RPF4 completion report because folded traversal across every DEM consumer, late selected-coordinate traversal optimization, diagram APIs, and Python binding shape remain outside this slice or still active.
 
 ## Implemented Surfaces
@@ -11,6 +11,7 @@ It is not an RPF4 completion report because folded traversal across every DEM co
 - `flattened` preserves instruction tags, drops repeat tags, drops materialized `shift_detectors` instructions, shifts detector ids, applies coordinate shifts, preserves decomposition separators, and preserves logical observable targets.
 - `flattened` rejects excessive materialized repeat expansion using the existing DEM flattening cap instead of trying to allocate unbounded output.
 - Added `DetectorErrorModel::rounded`, which recursively rounds only `error` instruction probability arguments and preserves non-error coordinate arguments, targets, tags, repeat structure, and zero-probability errors.
+- Added PF4 evidence for the existing `DetectorErrorModel::without_tags`, `count_errors`, `count_detectors`, `count_observables`, `total_detector_shift`, `final_coordinate_shift`, and selected coordinate-query behavior through shifted repeats.
 
 ## Tests
 
@@ -20,16 +21,18 @@ Implemented Rust tests:
 - `pf4_dem_materialized_flattened_rejects_excessive_repeat`
 - `pf4_dem_materialized_rounded_matches_pinned_stim_probability_cases`
 - `pf4_dem_materialized_rounded_keeps_zero_probability_errors`
+- `pf4_dem_introspection_transform_queries_cover_without_tags_and_final_counts`
 - `pf4_dem_public_validation_rejects_malformed_inputs`
 - `pf4_dem_public_validation_rejects_high_ids_and_unsupported_ranges`
 
-These tests cover empty models, detector shifts, coordinate shifts, repeat blocks, instruction tags, repeat-tag dropping, logical observables, probability rounding, unchanged non-error coordinate arguments, zero-probability rounded errors, materialized repeat rejection, malformed DEM text, invalid probabilities, invalid separators, invalid targets, invalid repeat counts, invalid tags, high detector ids, high observable ids, detector-shift overflow, programmatic non-finite coordinate rejection, and repeat-block rejection from instruction-only ranges.
+These tests cover empty models, detector shifts, coordinate shifts, repeat blocks, instruction tags, repeat-tag dropping, logical observables, recursive `without_tags`, final detector shifts, final coordinate shifts, error counts, detector counts, observable counts, selected coordinates through shifted repeats, probability rounding, unchanged non-error coordinate arguments, zero-probability rounded errors, materialized repeat rejection, malformed DEM text, invalid probabilities, invalid separators, invalid targets, invalid repeat counts, invalid tags, high detector ids, high observable ids, detector-shift overflow, programmatic non-finite coordinate rejection, and repeat-block rejection from instruction-only ranges.
 
 ## Oracle Rows
 
 Implemented row:
 
 - `pf4-dem-materialized-transforms-rust`
+- `pf4-dem-introspection-query-rust`
 - `pf4-dem-validation-negative-rust`
 
 Still broad and manifest-only:
@@ -61,6 +64,7 @@ Target checks for this slice:
 
 ```sh
 cargo test -p stab-core --test dem_api pf4_dem_materialized_ --quiet
+cargo test -p stab-core --test dem_api pf4_dem_introspection_transform_ --quiet
 cargo test -p stab-core --test dem_api pf4_dem_public_validation_ --quiet
 cargo test -p stab-bench pf4_dem_transform_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-bench --quiet
@@ -72,7 +76,7 @@ just bench::smoke
 
 ## Remaining RPF4 Work
 
-- Finish folded coordinate-map and final-shift resource policy where current APIs still require caps or do not prove large nested repeat behavior; the all-coordinate map cap and selected-query fallback are tracked separately in `docs/plans/rpf4-dem-coordinate-progress-report.md`.
+- Finish folded coordinate-map resource policy where current APIs still require caps or do not prove late selected-coordinate lookup through very large repeats; the all-coordinate map cap and selected-query fallback are tracked separately in `docs/plans/rpf4-dem-coordinate-progress-report.md`.
 - Finish folded or capped traversal evidence for graphlike search, hypergraph search, SAT or WCNF encoding, matcher-adjacent operations, sampler-adjacent operations, and analyzer-adjacent operations.
 - Decide whether any Rust-specific copy, concat, repetition, or mutation helpers beyond existing `Clone`, `push_instruction`, `push_repeat_block`, and `append_from_dem_text` are still worth adding.
-- Add remaining resource-boundary cases for any high-detector or high-observable behavior not covered by the current public validation and coordinate-resource subsets.
+- Add remaining resource-boundary cases only if later RPF4 work promotes high-detector or high-observable behavior beyond the current public validation and coordinate-resource subsets.

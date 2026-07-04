@@ -11,6 +11,7 @@ It is not an RPF4 completion report because folded traversal across every DEM co
 - The cap rejects huge materialized coordinate maps before constructing the list of every detector id.
 - The error points callers to `DetectorErrorModel::detector_coordinates_for`, which accepts typed `DemDetectorId` values for selected lookups.
 - Selected-detector and single-detector coordinate lookups remain available for huge-repeat models when the requested detectors are reachable without materializing the full coordinate map.
+- PF4 transform evidence now separately covers final detector shifts, final coordinate shifts, detector counts, observable counts, error counts, and selected coordinate lookups through shifted repeats.
 
 ## Tests
 
@@ -61,4 +62,4 @@ just bench::smoke
 - Finish folded traversal or explicit caps for graphlike search, hypergraph search, SAT or WCNF encoding, matcher-adjacent operations, sampler-adjacent operations, and analyzer-adjacent operations.
 - Decide whether late selected-coordinate lookup through very large repeat blocks needs a folded skip-ahead algorithm or should remain a documented linear traversal.
 - Decide whether any Rust-specific copy, concat, repetition, or mutation helpers beyond existing `Clone`, `push_instruction`, `push_repeat_block`, and `append_from_dem_text` are still worth adding.
-- Add remaining malformed-input and resource-boundary cases for high detector shifts, high observable counts, invalid separator use, invalid coordinate values, and unsupported transform shapes.
+- Add remaining malformed-input or resource-boundary cases only if later RPF4 work promotes behavior beyond the current validation, introspection, and coordinate-resource subsets.
