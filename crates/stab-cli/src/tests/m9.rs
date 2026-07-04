@@ -46,6 +46,42 @@ fn detect_basic_matches_m9_oracle_golden() {
 }
 
 #[test]
+fn detect_accepts_default_false_sweep_conditioned_sampling() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "detect", "--shots", "3"],
+        b"CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "0\n0\n0\n");
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn detect_still_rejects_frame_path_sweep_conditioned_sampling() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "detect"],
+        b"RX 0\nCX sweep[0] 0\nOBSERVABLE_INCLUDE(0) X0\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    assert!(
+        String::from_utf8(stderr)
+            .unwrap()
+            .contains("sweep-conditioned detection conversion requires sweep input support")
+    );
+}
+
+#[test]
 fn detect_streams_huge_output_until_writer_failure() {
     let mut stdout = FailingWriter;
     let mut stderr = Vec::new();

@@ -343,14 +343,14 @@ pub fn sample_detection_events(
     shots: usize,
     seed: Option<u64>,
 ) -> CircuitResult<DetectionConversionOutput> {
-    validate_no_sweep_targets(circuit)?;
     if circuit_has_pauli_observable_targets(circuit) {
+        validate_no_sweep_targets(circuit)?;
         return sample_detection_events_with_frame(circuit, shots, seed);
     }
     validate_detection_sampling_circuit(circuit)?;
     let plan = ConversionPlan::from_circuit(circuit)?;
     plan.validate_shot_count(shots)?;
-    let sampler = CompiledSampler::compile(circuit)?;
+    let sampler = CompiledSampler::compile_allowing_sweep(circuit)?;
     let reference_sample = sampler.reference_sample();
     let converter = CompiledDetectionConverter::from_plan_and_reference_sample(
         plan,
@@ -379,13 +379,13 @@ where
     E: From<CircuitError>,
     F: FnMut(&DetectionEventRecord) -> Result<(), E>,
 {
-    validate_no_sweep_targets(circuit)?;
     if circuit_has_pauli_observable_targets(circuit) {
+        validate_no_sweep_targets(circuit)?;
         return try_for_each_detection_event_with_frame(circuit, shots, seed, visit);
     }
     validate_detection_sampling_circuit(circuit)?;
     let plan = ConversionPlan::from_circuit(circuit)?;
-    let sampler = CompiledSampler::compile(circuit)?;
+    let sampler = CompiledSampler::compile_allowing_sweep(circuit)?;
     let reference_sample = sampler.reference_sample();
     let converter = CompiledDetectionConverter::from_plan_and_reference_sample(
         plan,
@@ -415,10 +415,12 @@ pub fn detection_record_width(circuit: &Circuit) -> CircuitResult<usize> {
 }
 
 pub fn validate_detection_sampling_circuit(circuit: &Circuit) -> CircuitResult<()> {
-    validate_no_sweep_targets(circuit)?;
     if circuit_has_pauli_observable_targets(circuit) {
+        validate_no_sweep_targets(circuit)?;
         validate_frame_detection_circuit(circuit)
     } else {
+        ConversionPlan::from_circuit(circuit)?;
+        CompiledSampler::compile_allowing_sweep(circuit)?;
         Ok(())
     }
 }

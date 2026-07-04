@@ -112,6 +112,31 @@ fn sampled_detection_streams_like_materialized_sampling() {
 }
 
 #[test]
+fn detection_sampling_uses_all_false_default_sweep_bits() {
+    let sweep_circuit = Circuit::from_stim_str("H 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n")
+        .expect("parse sweep-conditioned circuit");
+    let explicit_false_circuit =
+        Circuit::from_stim_str("H 0\nM 0\nDETECTOR rec[-1]\n").expect("parse explicit circuit");
+
+    validate_detection_sampling_circuit(&sweep_circuit).expect("validate non-frame sweep sampling");
+    let sweep_output =
+        sample_detection_events(&sweep_circuit, 32, Some(17)).expect("sample sweep circuit");
+    let explicit_false_output = sample_detection_events(&explicit_false_circuit, 32, Some(17))
+        .expect("sample explicit false circuit");
+
+    assert_eq!(sweep_output.records, explicit_false_output.records);
+
+    let mut streamed = Vec::new();
+    try_for_each_sampled_detection_event(&sweep_circuit, 32, Some(17), |record| {
+        streamed.push(record.clone());
+        Ok::<(), CircuitError>(())
+    })
+    .expect("stream sweep sampling");
+
+    assert_eq!(streamed, sweep_output.records);
+}
+
+#[test]
 fn detection_conversion_uses_reference_sample_for_detectors_and_observables() {
     let output = convert(
         "X 0\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-1]\n",
@@ -442,6 +467,14 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
 
     let frame_circuit = Circuit::from_stim_str("RX 0\nCX sweep[0] 0\nOBSERVABLE_INCLUDE(0) X0\n")
         .expect("parse frame-path sweep-conditioned circuit");
+    let validation_error =
+        validate_detection_sampling_circuit(&frame_circuit).expect_err("reject frame validation");
+    assert!(
+        validation_error
+            .to_string()
+            .contains(UNSUPPORTED_SWEEP_DETECTION_MESSAGE),
+        "{validation_error}"
+    );
     let frame_error =
         sample_detection_events(&frame_circuit, 1, Some(5)).expect_err("reject frame sweep");
     assert!(

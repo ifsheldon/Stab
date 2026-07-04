@@ -739,6 +739,43 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
 }
 
 #[test]
+fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
+    let id = "pf3-detect-sweep-sampling";
+    let expected_measurement = "stab_detect_sweep_default_false";
+    let row = BenchmarkRow {
+        id: id.to_string(),
+        milestone: Milestone::Pf3,
+        threshold_class: "non-primary-report-only".to_string(),
+        runner: Runner::ContractOnly,
+        upstream_source: "src/stim/simulators/frame_simulator.perf.cc".to_string(),
+        stim_perf_filter: String::new(),
+        argv: String::new(),
+        stdin_path: String::new(),
+        phase: "throughput".to_string(),
+        measurement: "detect-sweep".to_string(),
+        description: "test row".to_string(),
+    };
+
+    let measurements = run_stab_compare_row(&row)
+        .expect("run compare row")
+        .expect("Stab runner");
+    let names = measurements
+        .iter()
+        .map(|measurement| measurement.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(names.as_slice(), &[expected_measurement]);
+    assert!(
+        compare_note(id).is_some(),
+        "{id} should explain benchmark comparability"
+    );
+    assert!(
+        measurement_work(id, expected_measurement).is_some(),
+        "{id}/{expected_measurement} should report normalized work"
+    );
+}
+
+#[test]
 fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
     for (id, expected_measurement) in [
         (

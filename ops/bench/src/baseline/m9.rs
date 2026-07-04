@@ -4,13 +4,13 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use stab_core::{
-    Circuit, CodeDistance, CompiledSampler, DemDetectorId, DetectingRegionOptions,
+    Circuit, CircuitError, CodeDistance, CompiledSampler, DemDetectorId, DetectingRegionOptions,
     DetectionConversionOptions, DetectionObservableOutputMode, MissingDetectorOptions, Probability,
     RepetitionCodeParams, RepetitionCodeTask, RoundCount, SampleFormat, circuit_detecting_regions,
     circuit_with_inlined_feedback, convert_measurements_to_detection_events,
     generate_repetition_code_circuit, measurement_record_count, missing_detectors,
     result_formats::{read_records, write_records},
-    sample_detection_events, write_detection_records,
+    sample_detection_events, try_for_each_sampled_detection_event, write_detection_records,
 };
 
 use crate::error::BenchError;
@@ -60,6 +60,10 @@ const FEEDBACK_INLINE_MPP: &str = "RX 0\n\
                                   CX rec[-2] 3\n\
                                   M 3\n\
                                   DETECTOR rec[-1]\n";
+const DETECT_SWEEP_DEFAULT_FALSE: &str = "H 0\n\
+                                         CX sweep[0] 0\n\
+                                         M 0\n\
+                                         DETECTOR rec[-1]\n";
 
 pub(super) fn run_detection_compare_row(
     row: &BenchmarkRow,
@@ -112,6 +116,7 @@ pub(super) fn run_detection_compare_row(
         "m9-feedback-inline-mpp-batch" => run_feedback_inline_mpp_batch(row).map(Some),
         "m9-detect-primary-matrix-contract" => run_primary_detect_row(row).map(Some),
         "m9-m2d-primary-matrix-contract" => run_primary_m2d_row(row).map(Some),
+        "pf3-detect-sweep-sampling" => run_detect_sweep_sampling_row(row).map(Some),
         _ => Ok(None),
     }
 }
@@ -147,6 +152,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         }
         ("m9-detect-text-cli", "stab_detect_1024_dets")
         | ("m9-detect-bitpacked-cli", "stab_detect_1024_b8") => {
+            Some((DETECT_SHOTS as f64, "shots/s"))
+        }
+        ("pf3-detect-sweep-sampling", "stab_detect_sweep_default_false") => {
             Some((DETECT_SHOTS as f64, "shots/s"))
         }
         ("m9-detect-primary-matrix-contract", "stab_detect_primary_repetition_d3_r3_dets")
@@ -196,6 +204,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "m9-m2d-primary-matrix-contract" => Some(
             "cli-baseline: Stab converts source-owned generated repetition-code d3/r3 measurement records to b8 detection events against pinned Stim m2d on the same fixture",
+        ),
+        "pf3-detect-sweep-sampling" => Some(
+            "report-only: Stab measures the Rust sweep-conditioned detection sampler using omitted all-false sweep bits; no faithful pinned Stim CLI ratio is claimed for this partial PF3 surface",
         ),
         _ => None,
     }
@@ -319,6 +330,29 @@ fn run_feedback_inline_mpp_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>,
                     })?;
             }
             black_box(instructions);
+            Ok(())
+        },
+    )?])
+}
+
+fn run_detect_sweep_sampling_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = parse_circuit(&row.id, DETECT_SWEEP_DEFAULT_FALSE)?;
+    Ok(vec![measure_stab_iterations(
+        "stab_detect_sweep_default_false",
+        super::STAB_COMPARE_ITERATIONS,
+        || {
+            let mut bits = 0usize;
+            try_for_each_sampled_detection_event::<CircuitError, _>(
+                &circuit,
+                DETECT_SHOTS,
+                Some(17),
+                |record| {
+                    bits += record.detectors.len() + record.observables.len();
+                    Ok(())
+                },
+            )
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(bits);
             Ok(())
         },
     )?])

@@ -134,6 +134,7 @@ cargo test -p stab-core dem --quiet
 cargo test -p stab-core flow --quiet
 cargo test -p stab-core detection --quiet
 cargo test -p stab-core analyze --quiet
+cargo test -p stab-cli detect --quiet
 cargo test -p stab-cli m2d --quiet
 cargo test -p stab-cli analyze_errors --quiet
 cargo test -p stab-oracle fixtures --quiet

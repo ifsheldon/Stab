@@ -212,6 +212,8 @@ Acceptance criteria:
 
 Objective: close active sweep-conditioned behavior and legal gate execution gaps in sampler, detector conversion, detection sampling, and analyzer paths.
 
+Progress: non-frame `detect` sampling with omitted all-false sweep bits is implemented and tracked in [rpf3-sweep-gate-progress-report.md](rpf3-sweep-gate-progress-report.md). Frame-path sweep sampling, analyzer sweep behavior, and broad gate execution classification remain active.
+
 Owned checklist rows:
 
 - Target kinds.
