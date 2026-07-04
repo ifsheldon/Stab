@@ -1,4 +1,5 @@
 mod decomposition;
+mod flows;
 mod metadata;
 mod unitary;
 

@@ -480,7 +480,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures Rust circuit count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
         ),
         "pf1-gate-metadata-lookup" => Some(
-            "contract-only: Stab measures Rust gate metadata accessors, tableau metadata reads, tableau-backed flow metadata reads, fixed-shape unitary matrix reads, H/S/CX/M/R decomposition metadata reads, and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
+            "contract-only: Stab measures Rust gate metadata accessors, tableau metadata reads, GateData flow metadata reads, fixed-shape unitary matrix reads, H/S/CX/M/R decomposition metadata reads, and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
         ),
         "pf1-dem-counts-repeat" => Some(
             "contract-only: Stab measures Rust DEM count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",

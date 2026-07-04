@@ -283,13 +283,19 @@ impl Gate {
         crate::circuit_tableau::gate_has_tableau(self.info.name)
     }
 
-    /// Returns tableau-backed stabilizer flow generators for fixed-shape local Clifford gates.
+    /// Returns Stim v1.16.0 gate-table stabilizer flow metadata.
     ///
-    /// Measurement-rich and variable-target flow metadata, such as `MXX` and `MPP`, is owned by later flow milestones.
+    /// This includes tableau-backed unitary gates plus the representative measurement-rich and
+    /// variable-target metadata that Stim exposes through `GateData.flows`.
+    /// Execution support is still tracked separately; metadata for gates such as `SPP` does not
+    /// imply sampler, detector-conversion, or analyzer execution support.
     pub fn flows(self) -> CircuitResult<Vec<Flow>> {
+        if let Some(flows) = crate::gate::flows::gate_flow_metadata(self.info.name) {
+            return flows;
+        }
         if !self.has_flows() {
             return Err(CircuitError::invalid_tableau_conversion(format!(
-                "gate {} does not have tableau-backed flow data",
+                "gate {} does not have flow metadata",
                 self.info.name
             )));
         }
@@ -318,9 +324,9 @@ impl Gate {
         Ok(flows)
     }
 
-    /// Returns true when `flows` can produce tableau-backed stabilizer flow metadata.
+    /// Returns true when `flows` can produce Stim v1.16.0 gate-table flow metadata.
     pub fn has_flows(self) -> bool {
-        self.has_tableau()
+        self.has_tableau() || crate::gate::flows::gate_has_flow_metadata(self.info.name)
     }
 
     /// Returns Stim v1.16.0's fixed-shape one- or two-qubit unitary matrix metadata.

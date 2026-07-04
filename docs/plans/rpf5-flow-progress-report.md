@@ -3,7 +3,7 @@
 ## Summary
 
 This RPF5 report now covers the promoted unsigned `has_flow` subset for measurement-record and observable dependencies, the scoped measurement-rich `circuit_flow_generators` subset including nonconstant and constant single-instruction `MPP`, and the pinned Stim `solve_for_flow_measurements` empty, `MX`, idle-extra-qubit, and repetition-code examples.
-It does not complete the flow milestone because broader composed measurement-rich flow-generator synthesis, heralded-noise generators, full generator-table measurement solving, failure explanations, `time_reversed_for_flows`, transform integration, variable-target gate flow metadata, and Python flow binding ergonomics remain open.
+It does not complete the flow milestone because broader composed measurement-rich flow-generator synthesis, heralded-noise generators, full generator-table measurement solving, failure explanations, `time_reversed_for_flows`, transform integration, and Python flow binding ergonomics remain open.
 
 ## Implemented Surfaces
 
@@ -83,6 +83,5 @@ just bench::smoke
 - `circuit_flow_generators` for broader composed measurement-rich circuits, unsupported feedback shapes, heralded-noise, and all-operation generator checks.
 - Full generator-table `solve_for_flow_measurements` parity for larger composed measurement-rich circuits and richer measurement-set diagnostics.
 - `time_reversed_for_flows` and transform-integration checks.
-- Variable-target or measurement-rich gate flow metadata decisions.
 - Flow failure explanations beyond boolean unsigned checking.
 - Python binding ergonomics remain deferred.

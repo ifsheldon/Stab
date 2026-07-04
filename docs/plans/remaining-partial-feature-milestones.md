@@ -83,7 +83,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | DEM parser and canonical printer | Active | RPF4 | Parser/printer rows close only after DEM API transform and folded traversal limits are resolved for non-deferred paths. |
 | DEM detector shifts, observables, coordinates, and counts | Active | RPF4 | Finish folded coordinate/count behavior and large-repeat resource policy. |
 | DEM flattening and large repeat traversal | Active | RPF4 and RPF6 | Add public transform APIs and folded traversal for selected consumers, or documented caps with tests. |
-| Gate validation flags and categories | Active | RPF1 and RPF5 | Finish gate decomposition metadata, measurement-rich or variable-target flow metadata decisions, and unsupported accessor errors. |
+| Gate validation flags and categories | Active | RPF1 and RPF5 | Finish gate decomposition metadata, the resolved measurement-rich and variable-target flow metadata contract, and unsupported accessor errors. |
 | Gate semantic execution | Active | RPF3 and RPF6 | Fill accepted legal-gate execution gaps in sampler, detection, converter, and analyzer paths, or reject unsupported shapes precisely. |
 | Programmatic mutation | Classification | RPF0 | Current Rust helper subset is implemented; remaining Python operator ergonomics stay deferred unless RPF0 extracts a concrete Rust API gap. |
 | Core introspection | Classification | RPF0 | Current Rust iterator/count subset is implemented; remaining Python-style indexing and property parity stay deferred unless RPF0 extracts a concrete Rust API gap. |
@@ -165,7 +165,7 @@ Owned checklist rows:
 Implementation tasks:
 
 - Add a Rust accessor for H/S/CX/M/R-style gate decomposition metadata, or explicitly split it into a transform milestone if the accessor would require full `Circuit::decomposed` semantics.
-- Decide whether measurement-rich and variable-target gate flow metadata belongs in gate metadata or in RPF5 flow solving, then implement or document fail-closed behavior.
+- Keep the resolved decision that measurement-rich and variable-target gate flow metadata belongs in `Gate::flows` for Stim v1.16.0 `GateData.flows` shapes, while execution support remains tracked separately.
 - Add unsupported-accessor errors for metadata that cannot be represented by the current Rust API.
 - Build a source-owned table that states, for each canonical gate, whether Stab supports validation only, tableau metadata, unitary matrix metadata, flow metadata, decomposition metadata, sampler execution, detector conversion, analyzer propagation, or explicit rejection.
 - Update `docs/stab-feature-checklist.md` and `docs/plans/pf1-gate-metadata-progress-report.md` so the remaining gate row is not overstated.
@@ -349,7 +349,7 @@ Owned checklist rows:
 - Detector-analysis utility APIs.
 - Flows.
 - Circuit transforms, for flow-aware transforms.
-- Gate validation flags and categories, for measurement-rich or variable-target flow metadata if RPF1 assigns it here.
+- Gate validation flags and categories, only when flow execution or transform integration reveals a metadata-contract drift.
 
 Implementation tasks:
 

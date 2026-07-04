@@ -282,14 +282,62 @@ fn gate_flow_metadata_matches_owned_unitary_gate_data() {
             .to_vec()
     );
 
-    let expected_flow_names = expected_tableau_supported_gate_names();
+    let measurement = Gate::from_name("M").expect("M");
+    assert_eq!(
+        flow_texts(measurement.flows().expect("M flows")),
+        ["Z -> rec[-1]", "Z -> Z"].map(String::from).to_vec()
+    );
+
+    let pair_measurement = Gate::from_name("MXX").expect("MXX");
+    assert_eq!(
+        flow_texts(pair_measurement.flows().expect("MXX flows")),
+        ["X_ -> X_", "_X -> _X", "ZZ -> ZZ", "XX -> rec[-1]"]
+            .map(String::from)
+            .to_vec()
+    );
+
+    let pauli_product_measurement = Gate::from_name("MPP").expect("MPP");
+    assert_eq!(
+        flow_texts(pauli_product_measurement.flows().expect("MPP flows")),
+        [
+            "XYZ__ -> rec[-2]",
+            "___XX -> rec[-1]",
+            "X____ -> X____",
+            "_Y___ -> _Y___",
+            "__Z__ -> __Z__",
+            "___X_ -> ___X_",
+            "____X -> ____X",
+            "ZZ___ -> ZZ___",
+            "_XX__ -> _XX__",
+            "___ZZ -> ___ZZ",
+        ]
+        .map(String::from)
+        .to_vec()
+    );
+
+    let pauli_product = Gate::from_name("SPP").expect("SPP");
+    assert_eq!(
+        flow_texts(pauli_product.flows().expect("SPP flows")),
+        [
+            "X__ -> X__",
+            "Z__ -> -YYZ",
+            "_X_ -> -XZZ",
+            "_Z_ -> XXZ",
+            "__X -> XYY",
+            "__Z -> __Z",
+        ]
+        .map(String::from)
+        .to_vec()
+    );
+
+    let expected_flow_names = expected_flow_supported_gate_names();
     let actual_flow_names = Gate::all()
         .filter(|gate| gate.has_flows())
         .map(|gate| gate.canonical_name())
         .collect::<BTreeSet<_>>();
     assert_eq!(actual_flow_names, expected_flow_names);
 
-    for gate_name in expected_flow_names {
+    for gate_name in expected_tableau_supported_gate_names() {
         let gate = Gate::from_name(gate_name).expect("gate");
         let flows = gate.flows().expect("gate flows");
         assert_eq!(
@@ -306,14 +354,22 @@ fn gate_flow_metadata_matches_owned_unitary_gate_data() {
         );
     }
 
-    for unsupported in ["MXX", "MPP", "SPP", "SPP_DAG", "M", "DETECTOR", "X_ERROR"] {
+    for (gate_name, circuit) in measurement_rich_flow_metadata_circuits() {
+        let gate = Gate::from_name(gate_name).expect("gate");
+        let flows = gate.flows().expect("gate flows");
+        assert!(
+            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows)
+                .into_iter()
+                .all(|ok| ok),
+            "{gate_name} flows should be satisfied by the representative circuit"
+        );
+    }
+
+    for unsupported in ["MPAD", "DETECTOR", "X_ERROR", "PAULI_CHANNEL_1"] {
         let gate = Gate::from_name(unsupported).expect("unsupported gate");
         assert!(!gate.has_flows(), "{unsupported}");
         let error = gate.flows().expect_err("reject unsupported flow data");
-        assert!(
-            error.to_string().contains("tableau-backed flow data"),
-            "{error}"
-        );
+        assert!(error.to_string().contains("flow metadata"), "{error}");
     }
 }
 
@@ -718,6 +774,41 @@ fn single_instruction_circuit(gate: Gate, gate_name: &str) -> Circuit {
         .copied()
         .expect("supported flow target count");
     Circuit::from_stim_str(&format!("{gate_name} {targets}\n")).expect("gate circuit")
+}
+
+fn measurement_rich_flow_metadata_circuits() -> Vec<(&'static str, Circuit)> {
+    [
+        ("M", "M 0\n"),
+        ("MX", "MX 0\n"),
+        ("MY", "MY 0\n"),
+        ("R", "R 0\n"),
+        ("RX", "RX 0\n"),
+        ("RY", "RY 0\n"),
+        ("MR", "MR 0\n"),
+        ("MRX", "MRX 0\n"),
+        ("MRY", "MRY 0\n"),
+        ("MXX", "MXX 0 1\n"),
+        ("MYY", "MYY 0 1\n"),
+        ("MZZ", "MZZ 0 1\n"),
+        ("MPP", "MPP X0*Y1*Z2 X3*X4\n"),
+    ]
+    .into_iter()
+    .map(|(name, text)| {
+        (
+            name,
+            Circuit::from_stim_str(text).expect("representative flow metadata circuit"),
+        )
+    })
+    .collect()
+}
+
+fn expected_flow_supported_gate_names() -> BTreeSet<&'static str> {
+    let mut names = expected_tableau_supported_gate_names();
+    names.extend([
+        "M", "MX", "MY", "R", "RX", "RY", "MR", "MRX", "MRY", "MXX", "MYY", "MZZ", "MPP", "SPP",
+        "SPP_DAG",
+    ]);
+    names
 }
 
 fn expected_tableau_supported_gate_names() -> BTreeSet<&'static str> {

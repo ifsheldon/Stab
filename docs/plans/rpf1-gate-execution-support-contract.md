@@ -25,15 +25,15 @@ It prevents parser acceptance from being mistaken for sampler, detection-convers
 | `SHIFT_COORDS` | Yes | No | No | No | No | No-op | Metadata | Metadata |
 | `REPEAT` | Yes | No | No | No | No | Repeat | Repeat | Capped/folded |
 | `MPAD` | Yes | No | No | No | No | Yes | Sampler-backed | Yes |
-| `MX` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
-| `MY` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
-| `M` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
-| `MRX` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
-| `MRY` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
-| `MR` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
-| `RX` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
-| `RY` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
-| `R` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
+| `MX` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
+| `MY` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
+| `M` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
+| `MRX` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
+| `MRY` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
+| `MR` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
+| `RX` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
+| `RY` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
+| `R` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
 | `XCX` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `XCY` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `XCZ` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
@@ -87,21 +87,20 @@ It prevents parser acceptance from being mistaken for sampler, detection-convers
 | `SQRT_YY_DAG` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `SQRT_ZZ` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `SQRT_ZZ_DAG` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
-| `MPP` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
-| `SPP` | Yes | No | No | No | Yes | Reject | Reject | Reject |
-| `SPP_DAG` | Yes | No | No | No | Yes | Reject | Reject | Reject |
+| `MPP` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
+| `SPP` | Yes | No | No | Yes | Yes | Reject | Reject | Reject |
+| `SPP_DAG` | Yes | No | No | Yes | Yes | Reject | Reject | Reject |
 | `SWAP` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `ISWAP` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `CXSWAP` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `SWAPCX` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `CZSWAP` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `ISWAP_DAG` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
-| `MXX` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
-| `MYY` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
-| `MZZ` | Yes | No | No | No | Yes | Yes | Sampler-backed | Yes |
+| `MXX` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
+| `MYY` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
+| `MZZ` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
 
 ## Open Follow-Ups
 
 - RPF3 owns deciding whether `SPP` and `SPP_DAG` execution should be implemented in the sampler and detection conversion paths or remain explicit rejections for the current Rust/CLI scope.
-- RPF5 owns measurement-rich and variable-target flow metadata beyond tableau-backed unitary flows.
 - RPF6 owns analyzer parity for `SPP`, `SPP_DAG`, generated-circuit coverage, and loop-folding evidence.

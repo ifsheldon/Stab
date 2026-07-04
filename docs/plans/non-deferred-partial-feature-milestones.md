@@ -43,7 +43,7 @@ If a subcase in this plan turns out to require an excluded surface, stop and log
 | Plan milestone | Checklist rows covered | Notes |
 | --- | --- | --- |
 | PFM0 | Programmatic mutation, core introspection, circuit coordinate queries, reference samples and determined measurements, DEM construction and mutation, rollup rows | Reconcile rows that are partial mostly because deferred Python or product surfaces are absent, and split any remaining active Rust subcases before implementation. |
-| PFM1 | Gate validation flags and categories, gate semantic execution, full semantic execution of every legal circuit operation, flows | Close metadata and execution-support contract gaps, especially measurement-rich or variable-target flow metadata decisions. |
+| PFM1 | Gate validation flags and categories, gate semantic execution, full semantic execution of every legal circuit operation, flows | Close metadata and execution-support contract gaps, including the resolved measurement-rich and variable-target flow metadata contract. |
 | PFM2 | Repeat handling, circuit transforms, measurement-to-detection conversion, full circuit transform API parity, full feedback-inlining transform parity | Finish flow-aware transforms, feedback-loop decisions, repeat traversal behavior, and transform resource boundaries. |
 | PFM3 | Target kinds, gate semantic execution, measurement-to-detection conversion, broader sweep-conditioned simulator and analysis parity | Finish or precisely reject remaining sweep-conditioned execution and analyzer subcases. |
 | PFM4 | DEM parser and canonical printer, DEM detector shifts, DEM introspection, DEM transforms, DEM flattening and large repeat traversal, full DEM public API parity | Finish DEM API gaps and folded or capped traversal behavior for selected consumers. |
@@ -131,7 +131,7 @@ Rows covered:
 Tasks:
 
 - Refresh `docs/plans/rpf1-gate-execution-support-contract.md` so every canonical Stim v1.16.0 gate records validation support, tableau metadata, unitary metadata, flow metadata, decomposition metadata, sampler execution, detector conversion, analyzer propagation, and explicit rejection behavior.
-- Decide whether measurement-rich or variable-target flow metadata belongs in `Gate` metadata or only in PFM5 flow solving.
+- Keep the resolved decision that measurement-rich and variable-target `GateData.flows` metadata belongs in `Gate::flows`, while sampler, detector-conversion, analyzer, and full circuit flow execution support remain separate milestone surfaces.
 - Implement typed accessors or precise unsupported-accessor errors for any active metadata shape.
 - Keep `SPP` and `SPP_DAG` parser, decomposition metadata, sampler execution, detection-conversion execution, and analyzer execution behavior synchronized.
 - Document parser acceptance separately from execution support in the checklist and support contract.
@@ -141,7 +141,7 @@ Tests:
 - Add table-driven tests that compare every canonical gate against the support contract.
 - Port owned metadata cases from `vendor/stim/src/stim/gates/gates.test.cc`, `vendor/stim/src/stim/gates/gates_test.py`, and gate data tests as semantic sources.
 - Add positive tests for decomposition metadata, tableau metadata, unitary metadata, flow metadata, aliases, inverses, and target-grouping accessors.
-- Add negative tests for unsupported metadata on noisy, annotation, measurement-rich, variable-target, and shape-dependent gates.
+- Add negative tests for unsupported metadata on noisy, annotation, `MPAD`, and shape-dependent gates, and execution-boundary tests for parser-accepted metadata gates whose execution remains unsupported.
 - Add execution-boundary tests proving parser-accepted but unsupported execution gates fail with precise domain errors in sampler, detector conversion, and analyzer paths.
 
 Oracle rows:
@@ -311,14 +311,14 @@ Rows covered:
 - Detector-analysis utility APIs.
 - Flows.
 - Circuit transforms, for flow-aware transforms.
-- Gate validation flags and categories, for measurement-rich or variable-target flow metadata if PFM1 assigns that work here.
+- Gate validation flags and categories, only when flow execution or transform integration reveals a metadata-contract drift.
 
 Tasks:
 
 - Extend `circuit_detecting_regions` for selected Clifford gates, target shapes, tick windows, detector filtering, multi-detector regions, anticommutation behavior, gauge behavior, and repeat traversal.
 - Extend `missing_detectors` for selected generated honeycomb and toric suffix cases, plus any remaining MPP, pair-measurement, observable, gauge, and row-reduction cases that are not already implemented. The pinned honeycomb and toric global-stabilizer suffix cases are implemented; broader generated-code suffix analysis remains active.
 - Implement measurement-rich `Flow`, `has_flow`, `has_all_flows`, `flow_generators`, `solve_for_flow_measurements`, flow multiplication, included observables, measurement indices, and failure diagnostics for the selected Rust scope. The `M`/`MX`/`MY`, `R`/`RX`/`RY`, `MR`/`MRX`/`MRY`, `MXX`/`MYY`/`MZZ`, nonconstant and constant single-instruction `MPP`, `MPAD`, scoped measurement-record feedback `circuit_flow_generators`, and pinned Stim empty, `MX`, idle-extra-qubit, and repetition-code `solve_for_flow_measurements` examples are implemented; broader composed measurement-rich generators, heralded-noise generator synthesis, full generator-table measurement solving, and richer diagnostics remain active.
-- Integrate measurement-rich flow semantics with `time_reversed_for_flows`, flow-aware decomposition checks, feedback transforms, and gate metadata decisions.
+- Integrate measurement-rich flow semantics with `time_reversed_for_flows`, flow-aware decomposition checks, and feedback transforms while keeping the resolved gate-flow metadata contract synchronized.
 - Add precise errors for unpromoted utility families.
 
 Tests:
