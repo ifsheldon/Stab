@@ -15,6 +15,7 @@ pub use analyze::{
     circuit_to_detector_error_model, independent_to_disjoint_xyz_errors,
     try_disjoint_to_independent_xyz_errors,
 };
+pub use api::DemFlattenedInstructionIter;
 pub use sat::{likeliest_error_sat_problem, shortest_error_sat_problem};
 
 use crate::{CircuitError, CircuitResult, Probability, RepeatCount};

@@ -1,8 +1,8 @@
 use std::hint::black_box;
 
 use stab_core::{
-    Circuit, CircuitDetectorId, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel, Gate,
-    GateArgumentRule,
+    Circuit, CircuitDetectorId, DemDetectorId, DemInstructionKind, DemItem, DemTarget,
+    DetectorErrorModel, Gate, GateArgumentRule,
 };
 
 use crate::error::BenchError;
@@ -63,6 +63,18 @@ repeat 1000000 {
         shift_detectors(3, 0, 1) 4
     }
 }
+"#;
+
+const DEM_COORDINATE_FIXTURE: &str = r#"
+repeat 200 {
+    repeat 100 {
+        detector(0, 0, 0, 4) D1
+        shift_detectors(1, 0, 0) 10
+    }
+    detector(0, 0, 0, 3) D2
+    shift_detectors(0, 1, 0) 0
+}
+detector(0, 0, 0, 2) D3
 "#;
 
 const DEM_TAGS_FIXTURE: &str = r#"
@@ -165,6 +177,10 @@ pub(super) fn run_dem_counts_repeat_row(
 ) -> Result<Vec<Measurement>, BenchError> {
     let dem = DetectorErrorModel::from_dem_str(DEM_COUNTS_FIXTURE)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let coordinate_dem = DetectorErrorModel::from_dem_str(DEM_COORDINATE_FIXTURE)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let coordinate_detector =
+        DemDetectorId::try_new(1021).map_err(|error| stab_runner_error(&row.id, error))?;
 
     Ok(vec![
         measure_stab_batched(
@@ -181,6 +197,9 @@ pub(super) fn run_dem_counts_repeat_row(
                 checksum ^= dem
                     .total_detector_shift()
                     .map_err(|error| stab_runner_error(&row.id, error))?;
+                checksum ^= dem
+                    .count_errors()
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(checksum);
                 Ok(())
             },
@@ -193,6 +212,17 @@ pub(super) fn run_dem_counts_repeat_row(
                     .final_coordinate_shift()
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(float_slice_checksum(&shift));
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_dem_detector_coordinates_nested_repeat",
+            TINY_DIRECT_COMPARE_REPETITIONS,
+            || {
+                let coordinates = coordinate_dem
+                    .coordinates_of_detector(coordinate_detector)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(float_slice_checksum(&coordinates));
                 Ok(())
             },
         )?,
@@ -307,9 +337,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
     }
     if row_id == "pf1-dem-counts-repeat" {
         return match name {
-            "stab_dem_counts_nested_repeat" | "stab_dem_final_coordinate_shift_nested_repeat" => {
-                Some((1.0, "queries/s"))
-            }
+            "stab_dem_counts_nested_repeat"
+            | "stab_dem_final_coordinate_shift_nested_repeat"
+            | "stab_dem_detector_coordinates_nested_repeat" => Some((1.0, "queries/s")),
             _ => None,
         };
     }
@@ -331,7 +361,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures Rust gate metadata accessors and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
         ),
         "pf1-dem-counts-repeat" => Some(
-            "contract-only: Stab measures Rust DEM count and final-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
+            "contract-only: Stab measures Rust DEM count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
         ),
         "pf1-dem-without-tags" => Some(
             "contract-only: Stab measures Rust DEM recursive tag-stripping public API queries; pinned Stim exposes similar behavior through Python APIs but not a faithful Rust direct baseline",

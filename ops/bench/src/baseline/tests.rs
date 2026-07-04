@@ -349,6 +349,7 @@ fn pf1_dem_counts_benchmark_reports_public_query_surfaces() {
         [
             "stab_dem_counts_nested_repeat",
             "stab_dem_final_coordinate_shift_nested_repeat",
+            "stab_dem_detector_coordinates_nested_repeat",
         ]
     );
     assert!(compare_note("pf1-dem-counts-repeat").is_some());
