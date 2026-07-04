@@ -12,6 +12,7 @@ mod circuit_inverse;
 mod circuit_missing_detectors;
 mod circuit_simplify;
 mod circuit_tableau;
+mod circuit_transforms;
 mod dem;
 mod dem_sampler;
 mod detection;

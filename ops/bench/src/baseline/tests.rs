@@ -739,6 +739,52 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
 }
 
 #[test]
+fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
+    for (id, expected_measurement) in [
+        (
+            "pf2-circuit-flatten-repeat",
+            "stab_circuit_flatten_repeat_shifted_coords",
+        ),
+        (
+            "pf2-circuit-without-noise",
+            "stab_circuit_without_noise_top_level",
+        ),
+    ] {
+        let row = BenchmarkRow {
+            id: id.to_string(),
+            milestone: Milestone::Pf2,
+            threshold_class: "report-only".to_string(),
+            runner: Runner::ContractOnly,
+            upstream_source: "src/stim/circuit/circuit.test.cc".to_string(),
+            stim_perf_filter: String::new(),
+            argv: String::new(),
+            stdin_path: String::new(),
+            phase: "analysis".to_string(),
+            measurement: "circuit-transform".to_string(),
+            description: "test row".to_string(),
+        };
+
+        let measurements = run_stab_compare_row(&row)
+            .expect("run compare row")
+            .expect("Stab runner");
+        let names = measurements
+            .iter()
+            .map(|measurement| measurement.name.as_str())
+            .collect::<Vec<_>>();
+
+        assert_eq!(names, [expected_measurement]);
+        assert!(
+            compare_note(id).is_some(),
+            "{id} should explain benchmark comparability"
+        );
+        assert!(
+            measurement_work(id, expected_measurement).is_some(),
+            "{id}/{expected_measurement} should report normalized work"
+        );
+    }
+}
+
+#[test]
 fn convert_benchmark_rows_have_stab_cli_runners() {
     for (id, expected_measurement) in [
         ("m7-convert-01-to-b8", "stab_convert_01_to_b8_128"),

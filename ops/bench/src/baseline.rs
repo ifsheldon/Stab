@@ -28,6 +28,7 @@ mod m7;
 mod m8;
 mod m9;
 mod pf1;
+mod pf2;
 #[cfg(test)]
 mod tests;
 
@@ -263,6 +264,8 @@ pub(crate) fn run_stab_compare_row(
         "pf1-dem-counts-repeat" => Ok(Some(pf1::run_dem_counts_repeat_row(row)?)),
         "pf1-dem-without-tags" => Ok(Some(pf1::run_dem_without_tags_row(row)?)),
         "pf1-gate-metadata-lookup" => Ok(Some(pf1::run_gate_metadata_row(row)?)),
+        "pf2-circuit-flatten-repeat" => Ok(Some(pf2::run_circuit_flatten_repeat_row(row)?)),
+        "pf2-circuit-without-noise" => Ok(Some(pf2::run_circuit_without_noise_row(row)?)),
         "m5-simd-bit-table" => {
             let matrix = m5_bit_matrix(&row.id)?;
             Ok(Some(vec![
@@ -831,6 +834,9 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
     if let Some(work) = pf1::measurement_work(row_id, name) {
         return Some(work);
     }
+    if let Some(work) = pf2::measurement_work(row_id, name) {
+        return Some(work);
+    }
     if row_id.starts_with("m7-gen-") && name.starts_with("stab_gen_") {
         return Some((1.0, "circuits/s"));
     }
@@ -914,6 +920,9 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
         return Some(note);
     }
     if let Some(note) = pf1::compare_note(row_id) {
+        return Some(note);
+    }
+    if let Some(note) = pf2::compare_note(row_id) {
         return Some(note);
     }
     match row_id {
