@@ -238,6 +238,43 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
 }
 
 #[test]
+fn circuit_flow_generators_promotes_composed_measurement_subset() {
+    assert_eq!(
+        generator_strings("M 0\nTICK\nM 0\n"),
+        vec!["1 -> rec[0] xor rec[1]", "1 -> Z xor rec[1]", "Z -> rec[1]",]
+    );
+    assert_eq!(
+        generator_strings("R 0\nM 0\n"),
+        vec!["1 -> rec[0]", "1 -> Z"]
+    );
+    assert_eq!(
+        generator_strings("M 0\nR 0\n"),
+        vec!["1 -> Z", "Z -> rec[0]"]
+    );
+
+    for text in [
+        "M 0\nMX 1\nMY 2\n",
+        "MXX 0 1\nMZZ 0 1\n",
+        "MPP X0*Y1\nMPAD 0 1\n",
+        "
+        R 0
+        M 0
+        MR 1
+        MPP Z0*X1
+        MPAD 0 1
+        ",
+    ] {
+        let circuit = circuit(text);
+        let flows = circuit_flow_generators(&circuit).expect(text);
+        assert_eq!(
+            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+            vec![true; flows.len()],
+            "{text}"
+        );
+    }
+}
+
+#[test]
 fn circuit_flow_generators_rejects_unpromoted_measurement_rich_shapes() {
     for text in [
         "MR 0 0\n",
