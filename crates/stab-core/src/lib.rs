@@ -37,7 +37,9 @@ pub use circuit::{
     CircuitInstruction, CircuitItem, RepeatBlock,
 };
 pub use circuit_detecting_regions::{
-    DetectingRegionMap, DetectingRegionOptions, circuit_detecting_regions,
+    DetectingRegionMap, DetectingRegionOptions, DetectingRegionTargetMap,
+    DetectingRegionTargetOptions, all_detecting_region_targets, all_detecting_region_ticks,
+    circuit_detecting_regions, circuit_detecting_regions_for_targets,
 };
 pub use circuit_feedback::circuit_with_inlined_feedback;
 pub use circuit_flow::{

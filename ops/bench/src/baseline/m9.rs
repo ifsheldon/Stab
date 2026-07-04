@@ -6,13 +6,14 @@ use std::str::FromStr;
 
 use stab_core::{
     Circuit, CircuitError, CodeDistance, CompiledDetectionConverter, CompiledSampler,
-    DemDetectorId, DetectingRegionOptions, DetectionConversionOptions,
-    DetectionObservableOutputMode, ErrorAnalyzerOptions, Flow, Gate, Probability,
-    RepetitionCodeParams, RepetitionCodeTask, RoundCount, SampleFormat,
+    DemDetectorId, DetectingRegionOptions, DetectingRegionTargetOptions,
+    DetectionConversionOptions, DetectionObservableOutputMode, ErrorAnalyzerOptions, Flow, Gate,
+    Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount, SampleFormat,
+    all_detecting_region_targets, all_detecting_region_ticks,
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_detecting_regions,
-    circuit_to_detector_error_model, circuit_with_inlined_feedback,
-    convert_measurements_to_detection_events, generate_repetition_code_circuit,
-    measurement_record_count,
+    circuit_detecting_regions_for_targets, circuit_to_detector_error_model,
+    circuit_with_inlined_feedback, convert_measurements_to_detection_events,
+    generate_repetition_code_circuit, measurement_record_count,
     result_formats::write_ptb64_records_checked,
     result_formats::{read_records, write_records},
     sample_detection_events, try_for_each_sampled_detection_event, write_detection_records,
@@ -70,6 +71,13 @@ const DETECTING_REGIONS_REPEAT: &str = "H 0\n\
                                         TICK\n\
                                         MXX 0 1\n\
                                         DETECTOR rec[-1]\n";
+const DETECTING_REGIONS_TARGETS: &str = "R 0\n\
+                                         TICK\n\
+                                         M 0\n\
+                                         DETECTOR rec[-1]\n\
+                                         OBSERVABLE_INCLUDE(0) rec[-1]\n\
+                                         TICK\n\
+                                         OBSERVABLE_INCLUDE(1) Z1\n";
 const FEEDBACK_INLINE_MPP: &str = "RX 0\n\
                                   RY 1\n\
                                   RZ 2\n\
@@ -136,6 +144,7 @@ pub(super) fn run_detection_compare_row(
         "m9-missing-detectors-basic-batch" => missing_detector_rows::run_basic_batch(row).map(Some),
         "m9-feedback-inline-mpp-batch" => run_feedback_inline_mpp_batch(row).map(Some),
         "pf5-detecting-regions-repeat" => run_detecting_regions_repeat_row(row).map(Some),
+        "pf5-detecting-regions-targets" => run_detecting_regions_targets_row(row).map(Some),
         "pf5-missing-detectors-mpp" => missing_detector_rows::run_mpp_batch(row).map(Some),
         "pf5-missing-detectors-generated-code" => {
             missing_detector_rows::run_generated_code_batch(row).map(Some)
@@ -203,6 +212,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf5-detecting-regions-repeat", "stab_pf5_detecting_regions_repeat_ticks") => {
             Some((UTILITY_BATCH as f64, "cases/s"))
         }
+        ("pf5-detecting-regions-targets", "stab_pf5_detecting_regions_target_filters") => {
+            Some((UTILITY_BATCH as f64, "cases/s"))
+        }
         ("pf5-has-all-flows-batch", "stab_pf5_has_flows_batch_cases") => {
             Some(((UTILITY_BATCH * FLOW_CHECK_CASES) as f64, "cases/s"))
         }
@@ -265,6 +277,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "pf5-detecting-regions-repeat" => Some(
             "report-only: Stab measures bounded repeat traversal in the Rust detecting-regions utility without a faithful pinned Stim CLI timing ratio",
         ),
+        "pf5-detecting-regions-targets" => Some(
+            "report-only: Stab measures detector and logical-observable target filters in the Rust detecting-regions utility without a faithful pinned Stim CLI timing ratio",
+        ),
         "pf5-has-all-flows-batch" => Some(
             "report-only: Stab measures the Rust unsigned has_flow measurement-record and observable-dependency subset without a faithful pinned Stim CLI timing ratio",
         ),
@@ -326,6 +341,41 @@ fn run_detecting_regions_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
                     .ok_or_else(|| BenchError::StabRunner {
                         row_id: row.id.clone(),
                         message: "detecting-regions repeat benchmark region count overflowed"
+                            .to_string(),
+                    })?;
+            }
+            black_box(regions);
+            Ok(())
+        },
+    )?])
+}
+
+fn run_detecting_regions_targets_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = parse_circuit(&row.id, DETECTING_REGIONS_TARGETS)?;
+    let targets = all_detecting_region_targets(&circuit)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let ticks =
+        all_detecting_region_ticks(&circuit).map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(vec![measure_stab_iterations(
+        "stab_pf5_detecting_regions_target_filters",
+        super::STAB_COMPARE_ITERATIONS,
+        || {
+            let mut regions = 0usize;
+            for _ in 0..UTILITY_BATCH {
+                let output = circuit_detecting_regions_for_targets(
+                    &circuit,
+                    DetectingRegionTargetOptions {
+                        targets: targets.clone(),
+                        ticks: ticks.clone(),
+                        ignore_anticommutation_errors: false,
+                    },
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+                regions = regions
+                    .checked_add(output.values().map(|regions| regions.len()).sum::<usize>())
+                    .ok_or_else(|| BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: "detecting-regions target benchmark region count overflowed"
                             .to_string(),
                     })?;
             }

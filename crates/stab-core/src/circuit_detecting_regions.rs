@@ -8,6 +8,8 @@ use crate::{
 
 const MAX_DETECTING_REGION_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
 const MAX_DETECTING_REGION_REPEAT_ITERATIONS: u64 = 1_000_000;
+const MAX_DETECTING_REGION_HELPER_TARGETS: u64 = MAX_DETECTING_REGION_EXPANDED_INSTRUCTIONS;
+const MAX_DETECTING_REGION_OBSERVABLE_TARGETS: u64 = u32::MAX as u64 + 1;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DetectingRegionOptions {
@@ -16,32 +18,66 @@ pub struct DetectingRegionOptions {
     pub ignore_anticommutation_errors: bool,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DetectingRegionTargetOptions {
+    pub targets: Vec<DemTarget>,
+    pub ticks: Vec<u64>,
+    pub ignore_anticommutation_errors: bool,
+}
+
 pub type DetectingRegionMap = BTreeMap<DemDetectorId, BTreeMap<u64, FlexPauliString>>;
+pub type DetectingRegionTargetMap = BTreeMap<DemTarget, BTreeMap<u64, FlexPauliString>>;
 
 pub fn circuit_detecting_regions(
     circuit: &Circuit,
     options: DetectingRegionOptions,
 ) -> CircuitResult<DetectingRegionMap> {
+    let target_regions = circuit_detecting_regions_for_targets(
+        circuit,
+        DetectingRegionTargetOptions {
+            targets: options
+                .detectors
+                .into_iter()
+                .map(DemTarget::RelativeDetector)
+                .collect(),
+            ticks: options.ticks,
+            ignore_anticommutation_errors: options.ignore_anticommutation_errors,
+        },
+    )?;
+    Ok(target_regions
+        .into_iter()
+        .filter_map(|(target, regions)| match target {
+            DemTarget::RelativeDetector(detector) => Some((detector, regions)),
+            DemTarget::LogicalObservable(_) | DemTarget::Separator | DemTarget::Numeric(_) => None,
+        })
+        .collect())
+}
+
+pub fn circuit_detecting_regions_for_targets(
+    circuit: &Circuit,
+    options: DetectingRegionTargetOptions,
+) -> CircuitResult<DetectingRegionTargetMap> {
     if options.ignore_anticommutation_errors {
         return Err(CircuitError::invalid_detector_error_model(
             "detecting regions with ignored anticommutation errors are not implemented",
         ));
     }
 
-    let detectors = options.detectors.into_iter().collect::<BTreeSet<_>>();
+    let targets = options.targets.into_iter().collect::<BTreeSet<_>>();
     let ticks = options.ticks.into_iter().collect::<BTreeSet<_>>();
     validate_supported_subset(circuit)?;
     let detector_count = detector_count(circuit)?;
+    let observable_count = observable_count(circuit)?;
     let tick_count = tick_count(circuit)?;
-    validate_detector_ids(&detectors, detector_count)?;
+    validate_targets(&targets, detector_count, observable_count)?;
     validate_ticks(&ticks, tick_count)?;
 
-    let mut regions = detectors
+    let mut regions = targets
         .iter()
         .copied()
-        .map(|detector| (detector, BTreeMap::new()))
-        .collect::<DetectingRegionMap>();
-    if detectors.is_empty() || ticks.is_empty() {
+        .map(|target| (target, BTreeMap::new()))
+        .collect::<DetectingRegionTargetMap>();
+    if targets.is_empty() || ticks.is_empty() {
         return Ok(regions);
     }
 
@@ -55,7 +91,7 @@ pub fn circuit_detecting_regions(
     undo_circuit_with_snapshots(
         circuit,
         &mut tracker,
-        &detectors,
+        &targets,
         &ticks,
         &mut current_tick,
         &mut regions,
@@ -64,13 +100,65 @@ pub fn circuit_detecting_regions(
     Ok(regions)
 }
 
+pub fn all_detecting_region_targets(circuit: &Circuit) -> CircuitResult<Vec<DemTarget>> {
+    let detector_count = detector_count(circuit)?;
+    let observable_count = observable_count(circuit)?;
+    let target_capacity = dense_target_helper_capacity(detector_count, observable_count)?;
+    let mut targets = Vec::with_capacity(target_capacity);
+    for detector in 0..detector_count {
+        targets.push(DemTarget::relative_detector(detector)?);
+    }
+    for observable in 0..observable_count {
+        targets.push(DemTarget::logical_observable(observable)?);
+    }
+    Ok(targets)
+}
+
+fn dense_target_helper_capacity(
+    detector_count: u64,
+    observable_count: u64,
+) -> CircuitResult<usize> {
+    if observable_count > MAX_DETECTING_REGION_OBSERVABLE_TARGETS {
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "detecting-region all-target helper cannot materialize {observable_count} observable target(s); logical-observable targets are limited to {MAX_DETECTING_REGION_OBSERVABLE_TARGETS}"
+        )));
+    }
+    let target_count = detector_count
+        .checked_add(observable_count)
+        .ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "detecting-region all-target helper target count overflowed",
+            )
+        })?;
+    if target_count > MAX_DETECTING_REGION_HELPER_TARGETS {
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "detecting-region all-target helper currently supports at most {MAX_DETECTING_REGION_HELPER_TARGETS} materialized target(s), got {target_count}"
+        )));
+    }
+    usize::try_from(target_count).map_err(|_| {
+        CircuitError::invalid_detector_error_model(format!(
+            "detecting-region all-target helper target count {target_count} does not fit in memory on this platform"
+        ))
+    })
+}
+
+pub fn all_detecting_region_ticks(circuit: &Circuit) -> CircuitResult<Vec<u64>> {
+    let tick_count = tick_count(circuit)?;
+    if tick_count > MAX_DETECTING_REGION_REPEAT_ITERATIONS {
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "detecting-region all-tick helper currently supports at most {MAX_DETECTING_REGION_REPEAT_ITERATIONS} ticks, got {tick_count}"
+        )));
+    }
+    Ok((0..tick_count).collect())
+}
+
 fn undo_circuit_with_snapshots(
     circuit: &Circuit,
     tracker: &mut SparseReverseFrameTracker,
-    detectors: &BTreeSet<DemDetectorId>,
+    targets: &BTreeSet<DemTarget>,
     ticks: &BTreeSet<u64>,
     current_tick: &mut u64,
-    regions: &mut DetectingRegionMap,
+    regions: &mut DetectingRegionTargetMap,
 ) -> CircuitResult<()> {
     for item in circuit.items().iter().rev() {
         match item {
@@ -78,7 +166,7 @@ fn undo_circuit_with_snapshots(
                 undo_instruction_with_snapshots(
                     instruction,
                     tracker,
-                    detectors,
+                    targets,
                     ticks,
                     current_tick,
                     regions,
@@ -89,7 +177,7 @@ fn undo_circuit_with_snapshots(
                     undo_circuit_with_snapshots(
                         repeat.body(),
                         tracker,
-                        detectors,
+                        targets,
                         ticks,
                         current_tick,
                         regions,
@@ -104,10 +192,10 @@ fn undo_circuit_with_snapshots(
 fn undo_instruction_with_snapshots(
     instruction: &CircuitInstruction,
     tracker: &mut SparseReverseFrameTracker,
-    detectors: &BTreeSet<DemDetectorId>,
+    targets: &BTreeSet<DemTarget>,
     ticks: &BTreeSet<u64>,
     current_tick: &mut u64,
-    regions: &mut DetectingRegionMap,
+    regions: &mut DetectingRegionTargetMap,
 ) -> CircuitResult<()> {
     if instruction.gate().canonical_name() == "TICK" {
         *current_tick = current_tick.checked_sub(1).ok_or_else(|| {
@@ -116,7 +204,7 @@ fn undo_instruction_with_snapshots(
             )
         })?;
         if ticks.contains(current_tick) {
-            snapshot_regions(*current_tick, tracker, detectors, regions)?;
+            snapshot_regions(*current_tick, tracker, targets, regions)?;
         }
     }
     tracker.undo_instruction(instruction)
@@ -125,22 +213,20 @@ fn undo_instruction_with_snapshots(
 fn snapshot_regions(
     tick: u64,
     tracker: &SparseReverseFrameTracker,
-    detectors: &BTreeSet<DemDetectorId>,
-    regions: &mut DetectingRegionMap,
+    targets: &BTreeSet<DemTarget>,
+    regions: &mut DetectingRegionTargetMap,
 ) -> CircuitResult<()> {
-    for detector in detectors {
-        let target = DemTarget::RelativeDetector(*detector);
-        let region = tracker.region_for_target(target)?;
+    for target in targets {
+        let region = tracker.region_for_target(*target)?;
         if is_identity_region(&region) {
             continue;
         }
-        let Some(detector_regions) = regions.get_mut(detector) else {
+        let Some(target_regions) = regions.get_mut(target) else {
             return Err(CircuitError::invalid_detector_error_model(format!(
-                "detector D{} was not initialized in detecting-region output",
-                detector.get()
+                "target {target} was not initialized in detecting-region output",
             )));
         };
-        detector_regions.insert(tick, region);
+        target_regions.insert(tick, region);
     }
     Ok(())
 }
@@ -183,10 +269,13 @@ fn validate_supported_subset_inner(
 
 fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitResult<()> {
     match instruction.gate().canonical_name() {
-        "H" => validate_single_plain_qubit_targets(instruction),
-        "CX" | "MXX" => validate_plain_qubit_pair_targets(instruction),
+        "H" | "R" | "RX" | "RY" | "M" | "MX" | "MY" => {
+            validate_single_plain_qubit_targets(instruction)
+        }
+        "CX" | "MXX" | "MYY" | "MZZ" => validate_plain_qubit_pair_targets(instruction),
         "TICK" => validate_target_count(instruction, 0),
         "DETECTOR" => validate_detector_targets(instruction),
+        "OBSERVABLE_INCLUDE" => validate_observable_include_targets(instruction),
         name => Err(CircuitError::invalid_detector_error_model(format!(
             "simple detecting-region extraction does not support gate {name}"
         ))),
@@ -251,6 +340,23 @@ fn validate_detector_targets(instruction: &CircuitInstruction) -> CircuitResult<
     Ok(())
 }
 
+fn validate_observable_include_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
+    instruction.observable_id_argument()?.ok_or_else(|| {
+        CircuitError::invalid_detector_error_model(
+            "simple detecting-region extraction requires OBSERVABLE_INCLUDE to have an observable id",
+        )
+    })?;
+    for target in instruction.targets() {
+        if target.is_measurement_record_target() || target.pauli_type().is_some() {
+            continue;
+        }
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "simple detecting-region extraction only supports OBSERVABLE_INCLUDE measurement-record or Pauli targets, got {target}"
+        )));
+    }
+    Ok(())
+}
+
 fn detector_count(circuit: &Circuit) -> CircuitResult<u64> {
     let mut count = 0u64;
     for item in circuit.items() {
@@ -280,6 +386,29 @@ fn detector_count(circuit: &Circuit) -> CircuitResult<u64> {
     Ok(count)
 }
 
+fn observable_count(circuit: &Circuit) -> CircuitResult<u64> {
+    let mut max_observable = None;
+    visit_observables(circuit, &mut max_observable)?;
+    Ok(max_observable.map_or(0, |id| id.saturating_add(1)))
+}
+
+fn visit_observables(circuit: &Circuit, max_observable: &mut Option<u64>) -> CircuitResult<()> {
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(instruction) => {
+                if let Some(observable) = instruction.observable_id_argument()? {
+                    *max_observable = Some(
+                        max_observable
+                            .map_or(observable.get(), |current| current.max(observable.get())),
+                    );
+                }
+            }
+            CircuitItem::RepeatBlock(repeat) => visit_observables(repeat.body(), max_observable)?,
+        }
+    }
+    Ok(())
+}
+
 fn tick_count(circuit: &Circuit) -> CircuitResult<u64> {
     let mut count = 0u64;
     for item in circuit.items() {
@@ -307,16 +436,34 @@ fn tick_count(circuit: &Circuit) -> CircuitResult<u64> {
     Ok(count)
 }
 
-fn validate_detector_ids(
-    detectors: &BTreeSet<DemDetectorId>,
+fn validate_targets(
+    targets: &BTreeSet<DemTarget>,
     detector_count: u64,
+    observable_count: u64,
 ) -> CircuitResult<()> {
-    for detector in detectors {
-        if detector.get() >= detector_count {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "requested detector D{} but circuit only has {detector_count} detector(s)",
-                detector.get()
-            )));
+    for target in targets {
+        match target {
+            DemTarget::RelativeDetector(detector) => {
+                if detector.get() >= detector_count {
+                    return Err(CircuitError::invalid_detector_error_model(format!(
+                        "requested detector D{} but circuit only has {detector_count} detector(s)",
+                        detector.get()
+                    )));
+                }
+            }
+            DemTarget::LogicalObservable(observable) => {
+                if observable.get() >= observable_count {
+                    return Err(CircuitError::invalid_detector_error_model(format!(
+                        "requested observable L{} but circuit only has {observable_count} observable(s)",
+                        observable.get()
+                    )));
+                }
+            }
+            DemTarget::Separator | DemTarget::Numeric(_) => {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "detecting-region target filters only supports detector and logical-observable targets, got {target}",
+                )));
+            }
         }
     }
     Ok(())
@@ -416,6 +563,137 @@ mod tests {
 
         assert_eq!(actual[&detector(0)][&0].to_string(), "+X_");
         assert_eq!(actual[&detector(0)][&1].to_string(), "+XX");
+    }
+
+    #[test]
+    fn detecting_regions_target_api_matches_mx_python_example() {
+        let circuit = Circuit::from_stim_str(
+            "R 0\n\
+             TICK\n\
+             H 0\n\
+             TICK\n\
+             CX 0 1\n\
+             TICK\n\
+             MX 0 1\n\
+             DETECTOR rec[-1] rec[-2]\n",
+        )
+        .unwrap();
+        let actual = circuit_detecting_regions_for_targets(
+            &circuit,
+            DetectingRegionTargetOptions {
+                targets: all_detecting_region_targets(&circuit).unwrap(),
+                ticks: all_detecting_region_ticks(&circuit).unwrap(),
+                ignore_anticommutation_errors: false,
+            },
+        )
+        .unwrap();
+        let detector = DemTarget::relative_detector(0).unwrap();
+
+        assert_eq!(actual[&detector][&0].to_string(), "+Z_");
+        assert_eq!(actual[&detector][&1].to_string(), "+X_");
+        assert_eq!(actual[&detector][&2].to_string(), "+XX");
+    }
+
+    #[test]
+    fn detecting_regions_target_api_supports_mzz_example() {
+        let circuit = Circuit::from_stim_str(
+            "TICK\n\
+             MZZ 0 1 1 2\n\
+             TICK\n\
+             M 2\n\
+             DETECTOR rec[-1]\n",
+        )
+        .unwrap();
+        let actual = circuit_detecting_regions_for_targets(
+            &circuit,
+            DetectingRegionTargetOptions {
+                targets: vec![DemTarget::relative_detector(0).unwrap()],
+                ticks: all_detecting_region_ticks(&circuit).unwrap(),
+                ignore_anticommutation_errors: false,
+            },
+        )
+        .unwrap();
+        let detector = DemTarget::relative_detector(0).unwrap();
+
+        assert_eq!(actual[&detector][&0].to_string(), "+__Z");
+        assert_eq!(actual[&detector][&1].to_string(), "+__Z");
+    }
+
+    #[test]
+    fn detecting_regions_target_api_supports_logical_observable_targets() {
+        let circuit = Circuit::from_stim_str(
+            "TICK\n\
+             M 0\n\
+             OBSERVABLE_INCLUDE(0) rec[-1]\n\
+             TICK\n\
+             H 1\n\
+             OBSERVABLE_INCLUDE(1) X1\n",
+        )
+        .unwrap();
+        let actual = circuit_detecting_regions_for_targets(
+            &circuit,
+            DetectingRegionTargetOptions {
+                targets: vec![
+                    DemTarget::logical_observable(0).unwrap(),
+                    DemTarget::logical_observable(1).unwrap(),
+                    DemTarget::logical_observable(1).unwrap(),
+                ],
+                ticks: vec![0, 1],
+                ignore_anticommutation_errors: false,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            actual[&DemTarget::logical_observable(0).unwrap()][&0].to_string(),
+            "+Z_"
+        );
+        assert_eq!(
+            actual[&DemTarget::logical_observable(1).unwrap()][&1].to_string(),
+            "+_Z"
+        );
+        assert_eq!(actual.len(), 2);
+    }
+
+    #[test]
+    fn detecting_regions_target_api_rejects_invalid_targets() {
+        let circuit = Circuit::from_stim_str("TICK\nM 0\nDETECTOR rec[-1]\n").unwrap();
+        for (target, message) in [
+            (
+                DemTarget::relative_detector(1).unwrap(),
+                "requested detector D1",
+            ),
+            (
+                DemTarget::logical_observable(0).unwrap(),
+                "requested observable L0",
+            ),
+            (DemTarget::separator(), "only supports detector"),
+            (DemTarget::numeric(5), "only supports detector"),
+        ] {
+            let error = circuit_detecting_regions_for_targets(
+                &circuit,
+                DetectingRegionTargetOptions {
+                    targets: vec![target],
+                    ticks: vec![0],
+                    ignore_anticommutation_errors: false,
+                },
+            )
+            .unwrap_err();
+            assert!(error.to_string().contains(message), "{target}: {error}");
+        }
+    }
+
+    #[test]
+    fn detecting_regions_target_api_rejects_dense_helper_expansion() {
+        let high_observable =
+            Circuit::from_stim_str("OBSERVABLE_INCLUDE(4294967296) Z0\n").unwrap();
+        let error = all_detecting_region_targets(&high_observable).unwrap_err();
+        assert!(error.to_string().contains("observable target"));
+
+        let many_detectors =
+            Circuit::from_stim_str("M 0\nREPEAT 1000001 {\n    DETECTOR rec[-1]\n}\n").unwrap();
+        let error = all_detecting_region_targets(&many_detectors).unwrap_err();
+        assert!(error.to_string().contains("materialized target"));
     }
 
     #[test]
@@ -562,7 +840,7 @@ mod tests {
 
     #[test]
     fn detecting_regions_rejects_unsupported_gate() {
-        let circuit = Circuit::from_stim_str("R 0\nTICK\nMXX 0 1\nDETECTOR rec[-1]\n").unwrap();
+        let circuit = Circuit::from_stim_str("X 0\nTICK\nMXX 0 1\nDETECTOR rec[-1]\n").unwrap();
         let error = circuit_detecting_regions(
             &circuit,
             DetectingRegionOptions {
@@ -573,7 +851,7 @@ mod tests {
         )
         .unwrap_err();
 
-        assert!(error.to_string().contains("does not support gate R"));
+        assert!(error.to_string().contains("does not support gate X"));
     }
 
     #[test]

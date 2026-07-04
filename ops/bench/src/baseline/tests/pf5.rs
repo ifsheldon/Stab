@@ -11,6 +11,12 @@ fn detector_utility_benchmark_rows_have_stab_compare_runners() {
             &["stab_pf5_detecting_regions_repeat_ticks"][..],
         ),
         (
+            "pf5-detecting-regions-targets",
+            "src/stim/circuit/circuit_pybind_test.py",
+            "detecting-regions-targets",
+            &["stab_pf5_detecting_regions_target_filters"][..],
+        ),
+        (
             "pf5-missing-detectors-mpp",
             "src/stim/util_top/missing_detectors.test.cc",
             "missing-detectors-mpp",
