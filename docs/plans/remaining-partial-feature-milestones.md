@@ -91,7 +91,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | Repeat handling | Active | RPF2, RPF4, RPF6 | Complete folded traversal or caps across transforms, DEM consumers, analyzer, and search. |
 | Circuit transforms | Active | RPF2 and RPF5 | Finish `flattened`, `decomposed`, `without_noise`, feedback inlining, time reversal for flows, and measurement-rich flow transforms. |
 | Reference samples and determined measurements | Implemented for current Rust API surface | RPF0/PF1 | `pf1-circuit-rust-api` now provides executable closure evidence; remaining Python bit-packed return shapes and Python API parity stay deferred. |
-| DEM construction and mutation | Active | RPF4 | Finish useful Rust transform and mutation ergonomics such as materialized `flattened`, `rounded`, copy or concat helpers if selected. |
+| DEM construction and mutation | Implemented for current Rust API surface | RPF0/PF1 | `pf1-dem-rust-api` now provides executable closure evidence; Python-style list operations, operators, and exact Python API shape stay deferred. |
 | DEM introspection | Active | RPF4 | Finish folded large-repeat traversal and resource behavior across every public DEM query selected for Rust scope. |
 | DEM transforms | Active | RPF4 | Finish public `flattened`, `rounded`, and transform resource boundaries. |
 | DEM analysis and shortest graphlike error | Active | RPF4 and RPF6 | Finish folded traversal and generated-circuit evidence for graphlike, hypergraph, SAT, sampler-adjacent, and analyzer-adjacent consumers. |
@@ -300,16 +300,15 @@ Owned checklist rows:
 - DEM parser and canonical printer.
 - DEM detector shifts, observables, coordinates, and counts.
 - DEM flattening and large repeat traversal.
-- DEM construction and mutation.
 - DEM introspection.
 - DEM transforms.
-- Full DEM public API parity, except diagrams and Python ergonomics.
+- Full DEM public API parity, except diagrams, Python ergonomics, and the already closed current Rust construction and mutation helper subset.
 
 Implementation tasks:
 
 - Implement public materialized `flattened` for selected DEM cases with tags, separators, detector shifts, coordinate shifts, logical observables, and repeats. The current Rust `DetectorErrorModel::flattened` subset is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-transform-progress-report.md`.
 - Implement public `rounded` for probability rounding with explicit numerical behavior. The current Rust `DetectorErrorModel::rounded` subset is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-transform-progress-report.md`.
-- Finish useful Rust copy, concat, repetition, or mutation helpers only if RPF0 extracts concrete non-Python Rust API gaps.
+- Treat the current Rust construction and mutation helper subset as closed by `pf1-dem-rust-api`; add copy, concat, repetition, or mutation helpers only if a later plan extracts a concrete non-Python Rust API gap.
 - Finish folded traversal for coordinate maps where current APIs still require caps or do not prove ambiguous overlapping selected-coordinate lookup through very large repeats. The current all-detector coordinate-map cap plus folded non-overlapping selected-query lookup is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-coordinate-progress-report.md`; final shifts, final detector shifts, counts, recursive `without_tags`, and selected coordinates through shifted repeats have PF4 query evidence in `docs/plans/rpf4-dem-transform-progress-report.md`.
 - Add folded or capped traversal behavior for graphlike, hypergraph, SAT, matcher-adjacent, sampler-adjacent, and analyzer-adjacent DEM consumers where owned by RPF4. The current capped graphlike, hypergraph, SAT, analyzer, ErrorMatcher, and DEM sampler repeat subsets are implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-search-sat-progress-report.md` and `docs/plans/rpf4-dem-sampler-progress-report.md`.
 - Preserve decomposition separators and tags according to the transform contract.

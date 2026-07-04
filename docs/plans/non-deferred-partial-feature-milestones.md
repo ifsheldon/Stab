@@ -42,11 +42,11 @@ If a subcase in this plan turns out to require an excluded surface, stop and log
 
 | Plan milestone | Checklist rows covered | Notes |
 | --- | --- | --- |
-| PFM0 | DEM construction and mutation, rollup rows, and future checklist drift | Reconcile rows that are partial mostly because deferred Python or product surfaces are absent, and split any remaining active Rust subcases before implementation. The selected PF1 circuit Rust API rows for programmatic mutation, core introspection, circuit coordinate queries, and reference samples or determined measurements are already closed by `pf1-circuit-rust-api`; public simulator-product rows are deferred. |
+| PFM0 | Rollup rows and future checklist drift | Reconcile rows that are partial mostly because deferred Python or product surfaces are absent, and split any remaining active Rust subcases before implementation. The selected PF1 circuit Rust API rows for programmatic mutation, core introspection, circuit coordinate queries, and reference samples or determined measurements are already closed by `pf1-circuit-rust-api`; the selected PF1 DEM construction and mutation row is closed by `pf1-dem-rust-api`; public simulator-product rows are deferred. |
 | PFM1 | Gate validation flags and categories, gate semantic execution, full semantic execution of every legal circuit operation, flows | Close metadata and execution-support contract gaps, including the resolved measurement-rich and variable-target flow metadata contract. |
 | PFM2 | Repeat handling, circuit transforms, measurement-to-detection conversion, full circuit transform API parity, full feedback-inlining transform parity | Finish flow-aware transforms, feedback-loop decisions, repeat traversal behavior, and transform resource boundaries. |
 | PFM3 | Target kinds, gate semantic execution, measurement-to-detection conversion, broader sweep-conditioned simulator and analysis parity | Finish or precisely reject remaining sweep-conditioned execution and analyzer subcases. |
-| PFM4 | DEM parser and canonical printer, DEM detector shifts, DEM introspection, DEM transforms, DEM flattening and large repeat traversal, full DEM public API parity | Finish DEM API gaps and folded or capped traversal behavior for selected consumers. |
+| PFM4 | DEM parser and canonical printer, DEM detector shifts, DEM introspection, DEM transforms, DEM flattening and large repeat traversal, full DEM public API parity | Finish DEM API gaps and folded or capped traversal behavior for selected consumers. DEM construction and mutation for the current Rust API surface is already closed by `pf1-dem-rust-api`; Python ergonomics remain deferred. |
 | PFM5 | Detector-analysis utility APIs, flows, circuit transforms, gate validation flags and categories | Finish detecting regions, missing detectors, measurement-rich flow solving, and flow-driven transform integration. |
 | PFM6 | Circuit-to-DEM analysis, `analyze_errors --decompose_errors`, DEM analysis and shortest graphlike error, shortest graphlike and hypergraph search, sparse reverse detector-frame tracking, active matched-error value objects | Finish analyzer/search/sparse-tracker gaps without taking on full ErrorMatcher provenance or `explain_errors` CLI. |
 | PFM7 | `stim m2d`, `stim analyze_errors`, legacy top-level command flags, CLI binary | Finish visible CLI parity for selected commands and accepted legacy aliases, with `--detector_hypergraph` remaining excluded. |
@@ -85,8 +85,9 @@ Objective: lock the exact active subcases before implementation resumes and prev
 Rows covered:
 
 - All `Partial` rows in `docs/stab-feature-checklist.md`.
-- Classification-heavy active rows such as DEM construction and mutation, DEM introspection, rollup rows, and any future checklist drift introduced after child milestones land.
+- Classification-heavy active rows such as DEM introspection, rollup rows, and any future checklist drift introduced after child milestones land.
 - Closed PF1 circuit Rust API rows only for evidence-lock regression checks, not for new implementation work.
+- Closed PF1 DEM construction and mutation rows only for evidence-lock regression checks, not for new implementation work.
 - Rollup rows that depend on active child rows.
 - Deferred simulator-product rows only to confirm that the deferral reason remains explicit, not to reopen `TableauSimulator` or `FlipSimulator` work.
 
@@ -264,15 +265,14 @@ Rows covered:
 - DEM parser and canonical printer.
 - DEM detector shifts, observables, coordinates, and counts.
 - DEM flattening and large repeat traversal.
-- DEM construction and mutation.
 - DEM introspection.
 - DEM transforms.
 - DEM analysis and shortest graphlike error, for traversal behavior shared with PFM6.
-- Full DEM public API parity, excluding diagrams and Python ergonomics.
+- Full DEM public API parity, excluding diagrams, Python ergonomics, and the already closed current Rust construction and mutation helper subset.
 
 Tasks:
 
-- Decide whether any non-Python DEM mutation ergonomics remain active beyond `Clone`, constructors, append helpers, and push helpers.
+- Treat current Rust DEM construction and mutation helpers as closed by `pf1-dem-rust-api`; do not add more non-Python mutation ergonomics unless a concrete active Rust consumer needs them and the plan is updated first.
 - Finish selected folded coordinate behavior for large, nested, and ambiguous overlapping repeats, or keep documented caps with exact rejection tests.
 - Finish folded or capped traversal behavior for DEM sampler, graphlike search, hypergraph search, SAT/WCNF generation, matcher-adjacent operations, and analyzer-adjacent operations where PFM4 owns the resource boundary.
 - Preserve tags, separators, detector shifts, coordinate shifts, logical observables, repeat structure, and probability rounding contracts across public transforms.

@@ -7,12 +7,12 @@ use std::collections::BTreeMap;
 use std::ops::Bound;
 
 use stab_core::{
-    CircuitResult, DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemTarget,
-    DetectorErrorModel,
+    CircuitResult, DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock,
+    DemTarget, DetectorErrorModel, Probability, RepeatCount,
 };
 
 #[test]
-fn dem_basic_mutation_append_and_tag_stripping() {
+fn pf1_dem_basic_mutation_append_and_tag_stripping() {
     let mut dem = DetectorErrorModel::new();
     assert!(dem.is_empty());
     assert_eq!(dem.len(), 0);
@@ -47,6 +47,125 @@ fn dem_basic_mutation_append_and_tag_stripping() {
     dem.clear();
     assert!(dem.is_empty());
     assert_eq!(dem.to_dem_string(), "");
+}
+
+#[test]
+fn pf1_dem_basic_programmatic_constructors_push_and_clone() {
+    let mut body = DetectorErrorModel::new();
+    body.push_instruction(
+        DemInstruction::detector(
+            vec![1.0, 2.0],
+            DemTarget::relative_detector(0).expect("D0"),
+            Some("inner".to_string()),
+        )
+        .expect("detector instruction"),
+    );
+    body.push_instruction(
+        DemInstruction::shift_detectors(vec![3.0], 2, Some("step".to_string()))
+            .expect("shift instruction"),
+    );
+
+    let mut dem = DetectorErrorModel::new();
+    dem.push_instruction(
+        DemInstruction::error(
+            Probability::try_new(0.125).expect("probability"),
+            vec![
+                DemTarget::relative_detector(0).expect("D0"),
+                DemTarget::separator(),
+                DemTarget::relative_detector(1).expect("D1"),
+                DemTarget::logical_observable(2).expect("L2"),
+            ],
+            Some("err".to_string()),
+        )
+        .expect("error instruction"),
+    );
+    dem.push_repeat_block(DemRepeatBlock::new(
+        RepeatCount::try_new(2).expect("repeat count"),
+        body,
+        Some("loop".to_string()),
+    ));
+    dem.push_instruction(
+        DemInstruction::logical_observable(
+            DemTarget::logical_observable(4).expect("L4"),
+            Some("obs".to_string()),
+        )
+        .expect("logical observable"),
+    );
+
+    assert_eq!(
+        dem.to_dem_string(),
+        concat!(
+            "error[err](0.125) D0 ^ D1 L2\n",
+            "repeat[loop] 2 {\n",
+            "    detector[inner](1, 2) D0\n",
+            "    shift_detectors[step](3) 2\n",
+            "}\n",
+            "logical_observable[obs] L4\n",
+        )
+    );
+    assert_eq!(dem.clone(), dem);
+    assert_eq!(dem.len(), 3);
+    assert!(
+        dem.items()
+            .get(1)
+            .and_then(DemItem::as_repeat_block)
+            .is_some()
+    );
+    assert_eq!(dem.count_detectors().expect("detectors"), 3);
+    assert_eq!(dem.count_observables().expect("observables"), 5);
+}
+
+#[test]
+fn pf1_dem_basic_append_from_text_is_atomic_on_parse_error() {
+    let mut dem = DetectorErrorModel::from_dem_str("error(0.125) D0\n").expect("parse DEM");
+    let before = dem.clone();
+
+    let error = dem
+        .append_from_dem_text("detector L0\n")
+        .expect_err("reject invalid append");
+
+    assert!(
+        error.to_string().contains("detector"),
+        "unexpected error: {error}"
+    );
+    assert_eq!(dem, before);
+}
+
+#[test]
+fn pf1_dem_basic_rejects_multi_target_detector_and_logical_observable() {
+    for text in ["detector D0 D1\n", "logical_observable L0 L1\n"] {
+        let error =
+            DetectorErrorModel::from_dem_str(text).expect_err("reject invalid target count");
+        assert!(
+            error.to_string().contains("exactly one target"),
+            "unexpected error for {text:?}: {error}"
+        );
+    }
+
+    assert!(
+        DemInstruction::new(
+            DemInstructionKind::Detector,
+            Vec::new(),
+            vec![
+                DemTarget::relative_detector(0).expect("D0"),
+                DemTarget::relative_detector(1).expect("D1"),
+            ],
+            None,
+        )
+        .is_err()
+    );
+    assert!(
+        DemInstruction::new(
+            DemInstructionKind::LogicalObservable,
+            Vec::new(),
+            vec![
+                DemTarget::logical_observable(0).expect("L0"),
+                DemTarget::logical_observable(1).expect("L1"),
+            ],
+            None,
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -101,59 +220,6 @@ fn pf4_dem_introspection_transform_queries_cover_without_tags_and_final_counts()
             (DemDetectorId::try_new(2).expect("D2"), vec![6.0, 8.0]),
             (DemDetectorId::try_new(4).expect("D4"), vec![7.0, 10.0]),
         ])
-    );
-}
-
-#[test]
-fn dem_append_from_text_is_atomic_on_parse_error() {
-    let mut dem = DetectorErrorModel::from_dem_str("error(0.125) D0\n").expect("parse DEM");
-    let before = dem.clone();
-
-    let error = dem
-        .append_from_dem_text("detector L0\n")
-        .expect_err("reject invalid append");
-
-    assert!(
-        error.to_string().contains("detector"),
-        "unexpected error: {error}"
-    );
-    assert_eq!(dem, before);
-}
-
-#[test]
-fn dem_rejects_multi_target_detector_and_logical_observable() {
-    for text in ["detector D0 D1\n", "logical_observable L0 L1\n"] {
-        let error =
-            DetectorErrorModel::from_dem_str(text).expect_err("reject invalid target count");
-        assert!(
-            error.to_string().contains("exactly one target"),
-            "unexpected error for {text:?}: {error}"
-        );
-    }
-
-    assert!(
-        DemInstruction::new(
-            DemInstructionKind::Detector,
-            Vec::new(),
-            vec![
-                DemTarget::relative_detector(0).expect("D0"),
-                DemTarget::relative_detector(1).expect("D1"),
-            ],
-            None,
-        )
-        .is_err()
-    );
-    assert!(
-        DemInstruction::new(
-            DemInstructionKind::LogicalObservable,
-            Vec::new(),
-            vec![
-                DemTarget::logical_observable(0).expect("L0"),
-                DemTarget::logical_observable(1).expect("L1"),
-            ],
-            None,
-        )
-        .is_err()
     );
 }
 
@@ -259,7 +325,7 @@ fn pf4_dem_public_validation_rejects_high_ids_and_unsupported_ranges() {
 }
 
 #[test]
-fn dem_final_coordinate_shift_folds_nested_repeats() {
+fn pf1_dem_counts_final_coordinate_shift_folds_nested_repeats() {
     let dem = DetectorErrorModel::from_dem_str(
         "repeat 1000 {\n\
              repeat 2000 {\n\
@@ -279,7 +345,7 @@ fn dem_final_coordinate_shift_folds_nested_repeats() {
 }
 
 #[test]
-fn dem_final_coordinate_shift_rejects_non_finite_folded_shift() {
+fn pf1_dem_counts_final_coordinate_shift_rejects_non_finite_folded_shift() {
     let dem = DetectorErrorModel::from_dem_str(
         "repeat 1000000000000 {\n\
              shift_detectors(1e308) 0\n\
@@ -298,7 +364,7 @@ fn dem_final_coordinate_shift_rejects_non_finite_folded_shift() {
 }
 
 #[test]
-fn dem_counts_errors_and_coordinates_through_repeats() {
+fn pf1_dem_counts_errors_and_coordinates_through_repeats() {
     let dem = DetectorErrorModel::from_dem_str(
         "logical_observable L100\n\
          detector D100\n\
@@ -433,7 +499,7 @@ fn pf4_dem_coordinates_preserve_first_overlapping_repeat_declaration() {
 }
 
 #[test]
-fn dem_item_ranges_and_flattened_iterator_are_typed() {
+fn pf1_dem_iterators_item_ranges_and_flattened_iterator_are_typed() {
     let dem = DetectorErrorModel::from_dem_str(
         "error(0.125) D0\n\
          repeat[tag] 2 {\n\

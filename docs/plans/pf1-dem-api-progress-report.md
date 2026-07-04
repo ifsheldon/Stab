@@ -4,12 +4,13 @@
 
 This PF1 slice implements a bounded Rust `DetectorErrorModel` basic and introspection API subset from `docs/plans/partial-feature-closure-plan.md`.
 It does not claim full Python `stim.DetectorErrorModel` API parity.
-Public materialized `flattened`, `rounded`, copy ergonomics beyond `Clone`, exact Python API shape, and transform resource-boundary closure remain active PF4 work.
+Public materialized `flattened`, `rounded`, exact Python API shape, and transform resource-boundary closure remain active PF4 work.
 
 ## Implemented Surfaces
 
 - Added public `DetectorErrorModel::len`, `DetectorErrorModel::is_empty`, and `DetectorErrorModel::clear`.
 - Added public `DetectorErrorModel::append_from_dem_text`, which parses a full DEM snippet before mutating the receiver so parse failures are atomic.
+- Covered public programmatic construction through `DemInstruction` convenience constructors, `DemRepeatBlock::new`, `DetectorErrorModel::push_instruction`, `DetectorErrorModel::push_repeat_block`, typed `Probability`, typed `RepeatCount`, and derived `Clone`.
 - Added public `DetectorErrorModel::without_tags`, recursively removing instruction and repeat-block tags.
 - Added public `DetectorErrorModel::final_coordinate_shift`, folding nested `shift_detectors` coordinate shifts through repeat blocks.
 - Added public `DetectorErrorModel::count_errors`, folding nested repeat blocks without materializing repeated instructions.
@@ -21,15 +22,17 @@ Public materialized `flattened`, `rounded`, copy ergonomics beyond `Clone`, exac
 
 ## Oracle Rows
 
-Implemented row:
+Selected closure row:
+
+- `pf1-dem-rust-api`
+
+Implemented supporting rows:
 
 - `pf1-dem-basic-rust-api`
 - `pf1-dem-counts-coordinates`
 - `pf1-dem-iterators`
 
-Still broad and manifest-only:
-
-- `pf1-dem-rust-api`
+The selected closure row runs `cargo test -p stab-core --test dem_api pf1_dem_` and is intentionally scoped to the current Rust DEM API surface. It does not claim materialized transform parity, folded traversal across every DEM consumer, Python operator ergonomics, Python list operations, or exact Python API shape.
 
 ## Benchmark Rows
 
@@ -38,14 +41,14 @@ Non-primary report-only rows:
 - `pf1-dem-counts-repeat`
 - `pf1-dem-without-tags`
 
-Probe reports:
+Recorded probe reports from the original PF1 DEM API slice:
 
 - `target/benchmarks/pf1-dem-counts-probe/baseline.json`
 - `target/benchmarks/pf1-dem-counts-compare/compare.json`
 - `target/benchmarks/pf1-dem-without-tags-probe/baseline.json`
 - `target/benchmarks/pf1-dem-without-tags-compare/compare.json`
 
-Fresh probe rates from the current worktree:
+Recorded probe rates from the original PF1 DEM API slice:
 
 - `stab_dem_counts_nested_repeat`: `1.042e7 queries/s`.
 - `stab_dem_final_coordinate_shift_nested_repeat`: `1.695e7 queries/s`.
@@ -61,8 +64,9 @@ Target checks for this slice:
 
 ```sh
 cargo test -p stab-core --test dem_api --quiet
-cargo test -p stab-core --test dem_api dem_counts_errors_and_coordinates --quiet
-cargo test -p stab-core --test dem_api dem_item_ranges_and_flattened_iterator --quiet
+cargo test -p stab-core --test dem_api pf1_dem_ --quiet
+cargo test -p stab-core --test dem_api pf1_dem_counts_ --quiet
+cargo test -p stab-core --test dem_api pf1_dem_iterators_ --quiet
 cargo test -p stab-bench pf1_dem_counts --quiet
 cargo test -p stab-bench manifest --quiet
 cargo test -p stab-oracle fixtures --quiet
@@ -77,5 +81,9 @@ just bench::compare --only pf1-dem-without-tags --baseline target/benchmarks/pf1
 ## Remaining PF1/PF4 DEM API Work
 
 - Public `flattened`, `rounded`, and complete transform APIs.
-- Copy ergonomics beyond the existing `Clone` implementation if a Rust-specific helper is still useful.
 - Resource-boundary tests and folded traversal for materialized transform operations and coordinate-map cases that can produce very large outputs.
+
+## PFM0 Refresh
+
+The PFM0 refresh promoted `pf1-dem-rust-api` from a manifest-only extraction row to executable structural evidence and synchronized the checklist row for DEM construction and mutation to `Done for current Rust API surface`.
+No additional non-Python mutation ergonomics are selected beyond the existing constructors, push helpers, append helper, clear, and derived `Clone`; Python-style operators and list ergonomics remain deferred.
