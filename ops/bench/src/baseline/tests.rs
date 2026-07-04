@@ -425,6 +425,7 @@ fn pf1_gate_metadata_benchmark_reports_public_metadata_surfaces() {
             "stab_gate_metadata_flags_all_gates",
             "stab_gate_metadata_inverse_all_gates",
             "stab_gate_metadata_tableau_supported_gates",
+            "stab_gate_metadata_flows_supported_gates",
             "stab_gate_metadata_alias_lookup_all_aliases",
         ]
     );

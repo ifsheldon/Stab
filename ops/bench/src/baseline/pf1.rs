@@ -2,7 +2,7 @@ use std::hint::black_box;
 
 use stab_core::{
     Circuit, CircuitDetectorId, DemDetectorId, DemInstructionKind, DemItem, DemTarget,
-    DetectorErrorModel, Gate, GateArgumentRule, PauliString, Tableau,
+    DetectorErrorModel, Flow, Gate, GateArgumentRule, PauliString, Tableau,
 };
 
 use crate::error::BenchError;
@@ -255,6 +255,11 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
         .copied()
         .filter(|gate| gate.has_tableau())
         .collect::<Vec<_>>();
+    let flow_gates = gates
+        .iter()
+        .copied()
+        .filter(|gate| gate.has_flows())
+        .collect::<Vec<_>>();
 
     Ok(vec![
         measure_stab_batched(
@@ -319,6 +324,25 @@ pub(super) fn run_gate_metadata_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
             },
         )?,
         measure_stab_batched(
+            "stab_gate_metadata_flows_supported_gates",
+            TINY_DIRECT_COMPARE_REPETITIONS,
+            || {
+                let mut checksum = 0_u64;
+                for gate in &flow_gates {
+                    let flows = gate
+                        .flows()
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                    checksum ^= flows.len() as u64;
+                    for flow in &flows {
+                        checksum ^= flow_checksum(flow).rotate_left(3);
+                    }
+                    black_box(flows);
+                }
+                black_box(checksum);
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
             "stab_gate_metadata_alias_lookup_all_aliases",
             TINY_DIRECT_COMPARE_REPETITIONS,
             || {
@@ -353,6 +377,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             "stab_gate_metadata_tableau_supported_gates" => {
                 Some((gate_tableau_count() as f64, "tableaus/s"))
             }
+            "stab_gate_metadata_flows_supported_gates" => {
+                Some((gate_flow_count() as f64, "flows/s"))
+            }
             "stab_gate_metadata_alias_lookup_all_aliases" => {
                 Some((gate_alias_count() as f64, "lookups/s"))
             }
@@ -382,7 +409,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures Rust circuit count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
         ),
         "pf1-gate-metadata-lookup" => Some(
-            "contract-only: Stab measures Rust gate metadata accessors, tableau metadata reads, and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
+            "contract-only: Stab measures Rust gate metadata accessors, tableau metadata reads, tableau-backed flow metadata reads, and alias lookup against the PF1 public API; pinned Stim GateData is a Python binding surface without a faithful Rust direct baseline",
         ),
         "pf1-dem-counts-repeat" => Some(
             "contract-only: Stab measures Rust DEM count, final-coordinate, and detector-coordinate public API queries; pinned Stim exposes similar behavior through C++ and Python APIs but not a faithful Rust direct baseline",
@@ -460,6 +487,13 @@ fn gate_tableau_count() -> usize {
     Gate::all().filter(|gate| gate.has_tableau()).count()
 }
 
+fn gate_flow_count() -> usize {
+    Gate::all()
+        .filter_map(|gate| gate.flows().ok())
+        .map(|flows| flows.len())
+        .sum()
+}
+
 fn tableau_checksum(tableau: &Tableau, row_id: &str) -> Result<u64, BenchError> {
     let mut checksum = tableau.len() as u64;
     for index in 0..tableau.len() {
@@ -481,6 +515,18 @@ fn pauli_string_checksum(pauli: &PauliString) -> u64 {
         checksum = checksum.rotate_left(5) ^ *word;
     }
     checksum ^ (pauli.weight() as u64)
+}
+
+fn flow_checksum(flow: &Flow) -> u64 {
+    let mut checksum = pauli_string_checksum(flow.input());
+    checksum ^= pauli_string_checksum(flow.output()).rotate_left(7);
+    for measurement in flow.measurements() {
+        checksum = checksum.rotate_left(11) ^ u64::from(measurement.cast_unsigned());
+    }
+    for observable in flow.observables() {
+        checksum = checksum.rotate_left(13) ^ u64::from(observable);
+    }
+    checksum
 }
 
 fn argument_rule_checksum(rule: GateArgumentRule) -> usize {

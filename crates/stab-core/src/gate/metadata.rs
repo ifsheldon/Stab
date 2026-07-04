@@ -1,4 +1,7 @@
 use super::{ArgRule, Gate, GateCategory, TargetRule};
+use crate::{
+    CircuitError, CircuitResult, Flow, PauliBasis, PauliSign, PauliString, StabilizerError,
+};
 
 /// Public argument validation shape for a Stim gate.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -279,9 +282,66 @@ impl Gate {
         crate::circuit_tableau::gate_has_tableau(self.info.name)
     }
 
+    /// Returns tableau-backed stabilizer flow generators for fixed-shape local Clifford gates.
+    ///
+    /// Measurement-rich and variable-target flow metadata, such as `MXX` and `MPP`, is owned by later flow milestones.
+    pub fn flows(self) -> CircuitResult<Vec<Flow>> {
+        if !self.has_flows() {
+            return Err(CircuitError::invalid_tableau_conversion(format!(
+                "gate {} does not have tableau-backed flow data",
+                self.info.name
+            )));
+        }
+        let tableau = self.tableau()?;
+        let mut flows = Vec::with_capacity(tableau.len() * 2);
+        for index in 0..tableau.len() {
+            flows.push(Flow::new(
+                single_pauli(tableau.len(), index, PauliBasis::X),
+                tableau
+                    .x_output(index)
+                    .map_err(stabilizer_to_circuit_error)?
+                    .clone(),
+                [],
+                [],
+            ));
+            flows.push(Flow::new(
+                single_pauli(tableau.len(), index, PauliBasis::Z),
+                tableau
+                    .z_output(index)
+                    .map_err(stabilizer_to_circuit_error)?
+                    .clone(),
+                [],
+                [],
+            ));
+        }
+        Ok(flows)
+    }
+
+    /// Returns true when `flows` can produce tableau-backed stabilizer flow metadata.
+    pub fn has_flows(self) -> bool {
+        self.has_tableau()
+    }
+
     pub fn can_fuse(self) -> bool {
         self.info.can_fuse
     }
+}
+
+fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> PauliString {
+    PauliString::from_bases(
+        PauliSign::Plus,
+        (0..len).map(|candidate| {
+            if candidate == index {
+                basis
+            } else {
+                PauliBasis::I
+            }
+        }),
+    )
+}
+
+fn stabilizer_to_circuit_error(error: StabilizerError) -> CircuitError {
+    CircuitError::invalid_tableau_conversion(error.to_string())
 }
 
 impl From<ArgRule> for GateArgumentRule {

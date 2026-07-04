@@ -8,6 +8,7 @@ use std::collections::BTreeSet;
 
 use stab_core::{
     Circuit, CircuitItem, Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
+    check_if_circuit_has_unsigned_stabilizer_flows,
 };
 
 #[test]
@@ -207,7 +208,124 @@ fn gate_tableau_metadata_matches_owned_unitary_gate_data() {
     assert_eq!(cx_tableau.x_output(1).expect("CX X1").to_string(), "+_X");
     assert_eq!(cx_tableau.z_output(1).expect("CX Z1").to_string(), "+ZZ");
 
-    let expected_tableau_names = BTreeSet::from([
+    let expected_tableau_names = expected_tableau_supported_gate_names();
+    assert_eq!(expected_tableau_names.len(), 46);
+    let actual_tableau_names = Gate::all()
+        .filter(|gate| gate.has_tableau())
+        .map(|gate| gate.canonical_name())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(actual_tableau_names, expected_tableau_names);
+
+    for gate_name in expected_tableau_names {
+        let gate = Gate::from_name(gate_name).expect("gate");
+        let inverse = gate.inverse().expect("unitary inverse");
+        let gate_inverse_tableau = gate
+            .tableau()
+            .expect("gate tableau")
+            .inverse()
+            .expect("inverse tableau");
+        assert_eq!(
+            gate_inverse_tableau,
+            inverse.tableau().expect("inverse gate tableau"),
+            "{gate_name} inverse tableau should match inverse gate metadata"
+        );
+    }
+
+    for gate in Gate::all() {
+        assert_eq!(
+            gate.has_tableau(),
+            gate.tableau().is_ok(),
+            "{} has_tableau should match tableau materialization",
+            gate.canonical_name()
+        );
+    }
+
+    for unsupported in ["M", "R", "DETECTOR", "SPP"] {
+        let gate = Gate::from_name(unsupported).expect("unsupported gate");
+        assert!(!gate.has_tableau(), "{unsupported}");
+        let error = gate.tableau().expect_err("reject missing tableau data");
+        assert!(
+            error.to_string().contains("does not have tableau data"),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn gate_flow_metadata_matches_owned_unitary_gate_data() {
+    // Adapted from Stim v1.16.0 GateData flow examples and gate_data stabilizer-flow checks.
+    let h = Gate::from_name("H").expect("H");
+    assert!(h.has_flows());
+    assert_eq!(
+        flow_texts(h.flows().expect("H flows")),
+        ["X -> Z", "Z -> X"].map(String::from).to_vec()
+    );
+
+    let iswap = Gate::from_name("ISWAP").expect("ISWAP");
+    assert_eq!(
+        flow_texts(iswap.flows().expect("ISWAP flows")),
+        ["X_ -> ZY", "Z_ -> _Z", "_X -> YZ", "_Z -> Z_"]
+            .map(String::from)
+            .to_vec()
+    );
+
+    let sqrt_xx = Gate::from_name("SQRT_XX").expect("SQRT_XX");
+    assert_eq!(
+        flow_texts(sqrt_xx.flows().expect("SQRT_XX flows")),
+        ["X_ -> X_", "Z_ -> -YX", "_X -> _X", "_Z -> -XY"]
+            .map(String::from)
+            .to_vec()
+    );
+
+    let expected_flow_names = expected_tableau_supported_gate_names();
+    let actual_flow_names = Gate::all()
+        .filter(|gate| gate.has_flows())
+        .map(|gate| gate.canonical_name())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(actual_flow_names, expected_flow_names);
+
+    for gate_name in expected_flow_names {
+        let gate = Gate::from_name(gate_name).expect("gate");
+        let flows = gate.flows().expect("gate flows");
+        assert_eq!(
+            flows.len(),
+            gate.tableau().expect("gate tableau").len() * 2,
+            "{gate_name} should produce X and Z flow generators for each target"
+        );
+        let circuit = single_instruction_circuit(gate, gate_name);
+        assert!(
+            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows)
+                .into_iter()
+                .all(|ok| ok),
+            "{gate_name} flows should be satisfied by the gate"
+        );
+    }
+
+    for unsupported in ["MXX", "MPP", "SPP", "SPP_DAG", "M", "DETECTOR", "X_ERROR"] {
+        let gate = Gate::from_name(unsupported).expect("unsupported gate");
+        assert!(!gate.has_flows(), "{unsupported}");
+        let error = gate.flows().expect_err("reject unsupported flow data");
+        assert!(
+            error.to_string().contains("tableau-backed flow data"),
+            "{error}"
+        );
+    }
+}
+
+fn flow_texts(flows: Vec<stab_core::Flow>) -> Vec<String> {
+    flows.into_iter().map(|flow| flow.to_string()).collect()
+}
+
+fn single_instruction_circuit(gate: Gate, gate_name: &str) -> Circuit {
+    let targets = ["", "0", "0 1"]
+        .get(gate.tableau().expect("gate tableau").len())
+        .copied()
+        .expect("supported flow target count");
+    Circuit::from_stim_str(&format!("{gate_name} {targets}\n")).expect("gate circuit")
+}
+
+fn expected_tableau_supported_gate_names() -> BTreeSet<&'static str> {
+    BTreeSet::from([
         "C_NXYZ",
         "C_NZYX",
         "C_XNYZ",
@@ -254,47 +372,7 @@ fn gate_tableau_metadata_matches_owned_unitary_gate_data() {
         "YCY",
         "YCZ",
         "Z",
-    ]);
-    assert_eq!(expected_tableau_names.len(), 46);
-    let actual_tableau_names = Gate::all()
-        .filter(|gate| gate.has_tableau())
-        .map(|gate| gate.canonical_name())
-        .collect::<BTreeSet<_>>();
-    assert_eq!(actual_tableau_names, expected_tableau_names);
-
-    for gate_name in expected_tableau_names {
-        let gate = Gate::from_name(gate_name).expect("gate");
-        let inverse = gate.inverse().expect("unitary inverse");
-        let gate_inverse_tableau = gate
-            .tableau()
-            .expect("gate tableau")
-            .inverse()
-            .expect("inverse tableau");
-        assert_eq!(
-            gate_inverse_tableau,
-            inverse.tableau().expect("inverse gate tableau"),
-            "{gate_name} inverse tableau should match inverse gate metadata"
-        );
-    }
-
-    for gate in Gate::all() {
-        assert_eq!(
-            gate.has_tableau(),
-            gate.tableau().is_ok(),
-            "{} has_tableau should match tableau materialization",
-            gate.canonical_name()
-        );
-    }
-
-    for unsupported in ["M", "R", "DETECTOR", "SPP"] {
-        let gate = Gate::from_name(unsupported).expect("unsupported gate");
-        assert!(!gate.has_tableau(), "{unsupported}");
-        let error = gate.tableau().expect_err("reject missing tableau data");
-        assert!(
-            error.to_string().contains("does not have tableau data"),
-            "{error}"
-        );
-    }
+    ])
 }
 
 #[test]
