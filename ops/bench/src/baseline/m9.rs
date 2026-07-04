@@ -54,6 +54,14 @@ const DETECTING_REGIONS_SIMPLE: &str = "H 0\n\
                                         TICK\n\
                                         MXX 0 1\n\
                                         DETECTOR rec[-1]\n";
+const DETECTING_REGIONS_REPEAT: &str = "H 0\n\
+                                        REPEAT 2 {\n\
+                                            TICK\n\
+                                        }\n\
+                                        CX 0 1\n\
+                                        TICK\n\
+                                        MXX 0 1\n\
+                                        DETECTOR rec[-1]\n";
 const FEEDBACK_INLINE_MPP: &str = "RX 0\n\
                                   RY 1\n\
                                   RZ 2\n\
@@ -117,6 +125,7 @@ pub(super) fn run_detection_compare_row(
         "m9-detecting-regions-basic-batch" => run_detecting_regions_basic_batch(row).map(Some),
         "m9-missing-detectors-basic-batch" => run_missing_detectors_basic_batch(row).map(Some),
         "m9-feedback-inline-mpp-batch" => run_feedback_inline_mpp_batch(row).map(Some),
+        "pf5-detecting-regions-repeat" => run_detecting_regions_repeat_row(row).map(Some),
         "m9-detect-primary-matrix-contract" => run_primary_detect_row(row).map(Some),
         "m9-m2d-primary-matrix-contract" => run_primary_m2d_row(row).map(Some),
         "pf3-m2d-sweep-b8" => run_m2d_cli_row(
@@ -175,6 +184,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             (UTILITY_BATCH * DETECTING_REGIONS_PER_CASE) as f64,
             "regions/s",
         )),
+        ("pf5-detecting-regions-repeat", "stab_pf5_detecting_regions_repeat_ticks") => {
+            Some((UTILITY_BATCH as f64, "cases/s"))
+        }
         ("m9-missing-detectors-basic-batch", "stab_missing_detectors_basic_cases") => Some((
             (UTILITY_BATCH * MISSING_DETECTOR_BASIC_CASES) as f64,
             "cases/s",
@@ -232,6 +244,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "m9-detecting-regions-basic-batch" => Some(
             "report-only: Stab measures the Rust detecting-regions utility subset without a faithful pinned Stim CLI timing ratio",
         ),
+        "pf5-detecting-regions-repeat" => Some(
+            "report-only: Stab measures bounded repeat traversal in the Rust detecting-regions utility without a faithful pinned Stim CLI timing ratio",
+        ),
         "m9-missing-detectors-basic-batch" => Some(
             "report-only: Stab measures the Rust basic missing-detectors utility subset without a faithful pinned Stim CLI timing ratio",
         ),
@@ -265,6 +280,38 @@ fn run_detecting_regions_basic_batch(row: &BenchmarkRow) -> Result<Vec<Measureme
         measure_detecting_regions_basic(row, "stab_detecting_regions_basic_cases")?,
         measure_detecting_regions_basic(row, "stab_detecting_regions_basic_regions")?,
     ])
+}
+
+fn run_detecting_regions_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = parse_circuit(&row.id, DETECTING_REGIONS_REPEAT)?;
+    let detector = DemDetectorId::try_new(0).map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(vec![measure_stab_iterations(
+        "stab_pf5_detecting_regions_repeat_ticks",
+        super::STAB_COMPARE_ITERATIONS,
+        || {
+            let mut regions = 0usize;
+            for _ in 0..UTILITY_BATCH {
+                let output = circuit_detecting_regions(
+                    &circuit,
+                    DetectingRegionOptions {
+                        detectors: vec![detector],
+                        ticks: vec![0, 1, 2],
+                        ignore_anticommutation_errors: false,
+                    },
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+                regions = regions
+                    .checked_add(output.get(&detector).map_or(0, |regions| regions.len()))
+                    .ok_or_else(|| BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: "detecting-regions repeat benchmark region count overflowed"
+                            .to_string(),
+                    })?;
+            }
+            black_box(regions);
+            Ok(())
+        },
+    )?])
 }
 
 fn measure_detecting_regions_basic(

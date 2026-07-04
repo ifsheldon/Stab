@@ -739,6 +739,41 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
 }
 
 #[test]
+fn pf5_detector_utility_benchmark_rows_have_stab_compare_runners() {
+    let row = BenchmarkRow {
+        id: "pf5-detecting-regions-repeat".to_string(),
+        milestone: Milestone::Pf5,
+        threshold_class: "non-primary-report-only".to_string(),
+        runner: Runner::ContractOnly,
+        upstream_source: "src/stim/util_top/circuit_to_detecting_regions.test.cc".to_string(),
+        stim_perf_filter: String::new(),
+        argv: String::new(),
+        stdin_path: String::new(),
+        phase: "analysis".to_string(),
+        measurement: "detecting-regions-repeat".to_string(),
+        description: "test row".to_string(),
+    };
+
+    let measurements = run_stab_compare_row(&row)
+        .expect("run compare row")
+        .expect("Stab runner");
+    let names = measurements
+        .iter()
+        .map(|measurement| measurement.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(names, ["stab_pf5_detecting_regions_repeat_ticks"]);
+    assert!(compare_note("pf5-detecting-regions-repeat").is_some());
+    assert!(
+        measurement_work(
+            "pf5-detecting-regions-repeat",
+            "stab_pf5_detecting_regions_repeat_ticks"
+        )
+        .is_some()
+    );
+}
+
+#[test]
 fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
     for (id, expected_measurement, measurement) in [
         ("pf3-m2d-sweep-b8", "stab_pf3_m2d_sweep_b8", "m2d-sweep"),

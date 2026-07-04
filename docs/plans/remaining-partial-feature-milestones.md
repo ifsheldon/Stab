@@ -353,7 +353,7 @@ Owned checklist rows:
 
 Implementation tasks:
 
-- Extend `circuit_detecting_regions` for selected repeat traversal, Clifford gates, target shapes, tick windows, detector filtering, multi-detector regions, anticommutation behavior, and gauge behavior.
+- Extend `circuit_detecting_regions` for selected repeat traversal, Clifford gates, target shapes, tick windows, detector filtering, multi-detector regions, anticommutation behavior, and gauge behavior. The bounded repeat-tick traversal subset is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf5-detecting-regions-progress-report.md`.
 - Extend `missing_detectors` for selected multi-record row reduction, repeated MPP stabilizer products, observable interaction, honeycomb suffix, and toric suffix cases.
 - Implement measurement-rich flow solving for `Flow`, `has_flow`, `has_all_flows`, `flow_generators`, and failure explanations.
 - Integrate flow semantics with `time_reversed_for_flows`, feedback inlining, and gate metadata where selected.
@@ -369,12 +369,12 @@ Tests:
 
 Oracle rows:
 
-- Supplement `pf5-detecting-regions-extended`, `pf5-missing-detectors-extended`, and `pf5-measurement-rich-flows`.
+- Supplement `pf5-detecting-regions-extended`, `pf5-missing-detectors-extended`, and `pf5-measurement-rich-flows`. The bounded repeat traversal subset is supplemented by `pf5-detecting-regions-repeat-rust`.
 - Use structural comparators when exact text is unstable or when result ordering is intentionally set-like.
 
 Benchmarks:
 
-- Implement `pf5-detecting-regions-repeat`, `pf5-missing-detectors-mpp`, `pf5-missing-detectors-generated-code`, `pf5-flow-solve-measurement-rich`, and `pf5-has-all-flows-batch`.
+- Implement `pf5-detecting-regions-repeat`, `pf5-missing-detectors-mpp`, `pf5-missing-detectors-generated-code`, `pf5-flow-solve-measurement-rich`, and `pf5-has-all-flows-batch`. The `pf5-detecting-regions-repeat` row now has report-only runner coverage for the bounded repeat-tick subset.
 - Keep complex utility rows report-only unless faithful Stim comparison and repeated stable ratios exist.
 
 Acceptance criteria:

@@ -6,6 +6,9 @@ use crate::{
     sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
+const MAX_DETECTING_REGION_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
+const MAX_DETECTING_REGION_REPEAT_ITERATIONS: u64 = 1_000_000;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DetectingRegionOptions {
     pub detectors: Vec<DemDetectorId>,
@@ -82,7 +85,16 @@ fn undo_circuit_with_snapshots(
                 )?;
             }
             CircuitItem::RepeatBlock(repeat) => {
-                return Err(unsupported_repeat_block_error(repeat.repeat_count().get()));
+                for _ in 0..repeat.repeat_count().get() {
+                    undo_circuit_with_snapshots(
+                        repeat.body(),
+                        tracker,
+                        detectors,
+                        ticks,
+                        current_tick,
+                        regions,
+                    )?;
+                }
             }
         }
     }
@@ -138,13 +150,31 @@ fn is_identity_region(region: &FlexPauliString) -> bool {
 }
 
 fn validate_supported_subset(circuit: &Circuit) -> CircuitResult<()> {
+    let mut budget = DetectingRegionBudget::default();
+    validate_supported_subset_inner(circuit, 1, &mut budget)
+}
+
+fn validate_supported_subset_inner(
+    circuit: &Circuit,
+    multiplier: u64,
+    budget: &mut DetectingRegionBudget,
+) -> CircuitResult<()> {
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction) => {
+                budget.add_expanded_instructions(multiplier)?;
                 validate_supported_instruction(instruction)?;
             }
             CircuitItem::RepeatBlock(repeat) => {
-                return Err(unsupported_repeat_block_error(repeat.repeat_count().get()));
+                let repeat_count = repeat.repeat_count().get();
+                let repeated_multiplier =
+                    multiplier.checked_mul(repeat_count).ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "detecting-region repeat expansion count overflowed",
+                        )
+                    })?;
+                budget.add_repeat_iterations(repeated_multiplier)?;
+                validate_supported_subset_inner(repeat.body(), repeated_multiplier, budget)?;
             }
         }
     }
@@ -161,12 +191,6 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
             "simple detecting-region extraction does not support gate {name}"
         ))),
     }
-}
-
-fn unsupported_repeat_block_error(repeat_count: u64) -> CircuitError {
-    CircuitError::invalid_detector_error_model(format!(
-        "simple detecting-region extraction does not support repeat blocks with count {repeat_count}"
-    ))
 }
 
 fn validate_single_plain_qubit_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
@@ -239,7 +263,17 @@ fn detector_count(circuit: &Circuit) -> CircuitResult<u64> {
                 }
             }
             CircuitItem::RepeatBlock(repeat) => {
-                return Err(unsupported_repeat_block_error(repeat.repeat_count().get()));
+                let body_count = detector_count(repeat.body())?;
+                let repeated = body_count
+                    .checked_mul(repeat.repeat_count().get())
+                    .ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "repeat detector count overflowed",
+                        )
+                    })?;
+                count = count.checked_add(repeated).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model("detector count overflowed")
+                })?;
             }
         }
     }
@@ -258,7 +292,15 @@ fn tick_count(circuit: &Circuit) -> CircuitResult<u64> {
                 }
             }
             CircuitItem::RepeatBlock(repeat) => {
-                return Err(unsupported_repeat_block_error(repeat.repeat_count().get()));
+                let body_count = tick_count(repeat.body())?;
+                let repeated = body_count
+                    .checked_mul(repeat.repeat_count().get())
+                    .ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model("repeat tick count overflowed")
+                    })?;
+                count = count.checked_add(repeated).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model("tick count overflowed")
+                })?;
             }
         }
     }
@@ -289,6 +331,47 @@ fn validate_ticks(ticks: &BTreeSet<u64>, tick_count: u64) -> CircuitResult<()> {
         }
     }
     Ok(())
+}
+
+#[derive(Default)]
+struct DetectingRegionBudget {
+    expanded_instructions: u64,
+    repeat_iterations: u64,
+}
+
+impl DetectingRegionBudget {
+    fn add_expanded_instructions(&mut self, count: u64) -> CircuitResult<()> {
+        self.expanded_instructions =
+            self.expanded_instructions
+                .checked_add(count)
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "detecting-region expanded instruction count overflowed",
+                    )
+                })?;
+        if self.expanded_instructions > MAX_DETECTING_REGION_EXPANDED_INSTRUCTIONS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "detecting-region extraction currently supports at most {MAX_DETECTING_REGION_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
+                self.expanded_instructions
+            )));
+        }
+        Ok(())
+    }
+
+    fn add_repeat_iterations(&mut self, count: u64) -> CircuitResult<()> {
+        self.repeat_iterations = self.repeat_iterations.checked_add(count).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "detecting-region repeat iteration count overflowed",
+            )
+        })?;
+        if self.repeat_iterations > MAX_DETECTING_REGION_REPEAT_ITERATIONS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "detecting-region extraction currently supports at most {MAX_DETECTING_REGION_REPEAT_ITERATIONS} expanded repeat iterations, got at least {}",
+                self.repeat_iterations
+            )));
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -458,6 +541,26 @@ mod tests {
     }
 
     #[test]
+    fn detecting_regions_repeat_supports_bounded_ticks() {
+        let actual = regions(
+            "H 0\n\
+             REPEAT 2 {\n\
+                 TICK\n\
+             }\n\
+             CX 0 1\n\
+             TICK\n\
+             MXX 0 1\n\
+             DETECTOR rec[-1]\n",
+            vec![detector(0)],
+            vec![0, 1, 2],
+        );
+
+        assert_eq!(actual[&detector(0)][&0].to_string(), "+X_");
+        assert_eq!(actual[&detector(0)][&1].to_string(), "+X_");
+        assert_eq!(actual[&detector(0)][&2].to_string(), "+XX");
+    }
+
+    #[test]
     fn detecting_regions_rejects_unsupported_gate() {
         let circuit = Circuit::from_stim_str("R 0\nTICK\nMXX 0 1\nDETECTOR rec[-1]\n").unwrap();
         let error = circuit_detecting_regions(
@@ -509,9 +612,9 @@ mod tests {
     }
 
     #[test]
-    fn detecting_regions_rejects_repeat_blocks() {
+    fn detecting_regions_repeat_rejects_excessive_expansion() {
         let circuit =
-            Circuit::from_stim_str("REPEAT 2 {\n    H 0\n    TICK\n}\nMXX 0 1\nDETECTOR rec[-1]\n")
+            Circuit::from_stim_str("REPEAT 1000001 {\n    TICK\n}\nMXX 0 1\nDETECTOR rec[-1]\n")
                 .unwrap();
         let error = circuit_detecting_regions(
             &circuit,
@@ -523,6 +626,6 @@ mod tests {
         )
         .unwrap_err();
 
-        assert!(error.to_string().contains("does not support repeat blocks"));
+        assert!(error.to_string().contains("expanded repeat iterations"));
     }
 }
