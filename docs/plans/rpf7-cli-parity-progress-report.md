@@ -23,6 +23,14 @@ The owned negative and resource subcases cover unsupported `ptb64` detector outp
 The comparator class is structural CLI behavior against the selected Stim `m2d` command contract: accepted flags, output routing, observable-width behavior, selected format rejections, writer errors, stdout behavior, stderr class, and exit status.
 No benchmark row changes are needed because this slice adds contract evidence around already benchmarked or report-only M9/PF7 `m2d` paths; it does not introduce a new hot path.
 
+## Implemented Slice: Selected `m2d` CLI Closure
+
+This PFM7 slice promotes the broad `pf7-m2d-cli-parity` row from manifest-only to executable structural evidence for the selected Stab `m2d` CLI surface.
+The row is intentionally scoped to accepted flags, sweep input, feedback inlining, skip-reference behavior, append-observables behavior, observable side outputs, supported input formats, supported output formats, path IO, writer failures, stdout behavior, stderr class, exit status, and resource boundaries that are already owned by the PF7 path-IO and command-contract slices plus the existing M9 sweep, feedback, format, and resource tests.
+The closure includes focused `r8` and `hits` input, detector-output, and observable-side-output coverage plus oversized text measurement-record and sweep-record rejection tests, so the parent row no longer relies on nearby result-format support without direct `m2d` CLI evidence.
+It does not close broader detector-converter API parity, exact feedback loop refolding, frame-path sweep-conditioned simulator surfaces, deprecated `--detector_hypergraph`, or any Python binding surface.
+No benchmark row changes are needed because the existing PF7 `m2d` benchmark rows remain report-only public CLI coverage for the sweep and feedback hot paths.
+
 ## Implemented Slice: `analyze_errors` Path IO Evidence
 
 This PFM7 slice promotes source-owned CLI evidence for `stab analyze_errors --in` and `--out` behavior without changing analyzer semantics.
@@ -74,6 +82,7 @@ Benchmark row:
 
 Oracle rows:
 
+- `pf7-m2d-cli-parity` now runs the selected PF7 `m2d` CLI closure over accepted flags, sweep input, feedback inlining, skip-reference behavior, append-observables behavior, side outputs, supported formats, path IO, writer failures, stdout behavior, stderr class, exit status, and resource boundaries.
 - `pf7-m2d-path-io-rust` proves `stab m2d --circuit`, `--in`, `--out`, `--sweep`, and `--obs_out` path success, path-error precedence before converter setup, stdout behavior, stderr class, and exit status.
 - `pf7-m2d-command-contract-rust` proves selected `stab m2d` command behavior for append-observables, skip-reference, observable side outputs, Pauli-target observable annotations, format and width failures, writer failure propagation, stdout behavior, stderr class, and exit status.
 - `pf7-analyze-errors-cli-parity` now runs the selected PF7 `analyze_errors` CLI closure over path IO, accepted flags, malformed inputs, selected analyzer failures, stdout behavior, stderr class, and exit status.
@@ -100,6 +109,20 @@ cargo test -p stab-cli pf7_m2d_cli --quiet
 cargo test -p stab-oracle fixtures --quiet
 just oracle::run --milestone PF7 --structural
 ```
+
+Verification for the selected `m2d` CLI closure:
+
+```sh
+cargo test -p stab-cli m2d --quiet
+cargo test -p stab-oracle fixtures --quiet
+just oracle::run --milestone PF7 --structural
+just oracle::list --milestone PF7
+```
+
+Audit and review for the selected `m2d` CLI closure:
+
+- `milestone-audit` and `full-code-review` initially found that the promoted parent row overclaimed supported-format and resource-boundary evidence because `r8`, `hits`, oversized text measurement records, and oversized text sweep records did not have direct `m2d` CLI tests.
+- The closure now fixes those findings with `pf7_m2d_cli_round_trips_sparse_text_formats` and `pf7_m2d_cli_rejects_oversized_text_records`; the parent `cargo test -p stab-cli m2d` filter now includes 34 selected `m2d` tests.
 
 Verification for the `analyze_errors` path-IO slice:
 
@@ -153,4 +176,5 @@ Audit and review for the selected legacy-dispatch closure:
 
 ## Still Open In RPF7
 
-- The broad `pf7-m2d-cli-parity` oracle row remains manifest-only until its selected CLI subcases are exhausted.
+- No selected PF7 CLI parent row remains manifest-only.
+- Newly selected `m2d`, `analyze_errors`, or legacy-dispatch command shapes should reopen this report with a fresh exact subcase list instead of relying on the broad parent rows.

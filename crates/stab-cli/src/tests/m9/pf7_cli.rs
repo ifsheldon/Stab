@@ -132,6 +132,66 @@ fn pf7_m2d_cli_writes_sparse_observable_side_output_widths() {
 }
 
 #[test]
+fn pf7_m2d_cli_round_trips_sparse_text_formats() {
+    let dir = tempdir().expect("temp dir");
+    let circuit_path = dir.path().join("input.stim");
+    std::fs::write(
+        &circuit_path,
+        "M 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .expect("write circuit");
+
+    let obs_r8_path = dir.path().join("obs.r8");
+    let obs_r8_arg = obs_r8_path.to_str().expect("utf-8 path");
+    let hits_to_r8 = run_m2d(
+        m2d_args(
+            &[
+                "--in_format=hits",
+                "--out_format=r8",
+                "--obs_out",
+                obs_r8_arg,
+                "--obs_out_format=r8",
+            ],
+            circuit_path.as_os_str().to_os_string(),
+        ),
+        b"\n0\n1\n0,1\n",
+    );
+    assert_eq!(hits_to_r8.status, 0);
+    assert_eq!(hits_to_r8.stdout, [2, 0, 1, 1, 0, 0, 0, 0]);
+    assert_eq!(
+        std::fs::read(obs_r8_path).expect("read r8 obs"),
+        [1, 1, 0, 0, 0, 0]
+    );
+    assert_eq!(hits_to_r8.stderr, "");
+
+    let obs_hits_path = dir.path().join("obs.hits");
+    let obs_hits_arg = obs_hits_path.to_str().expect("utf-8 path");
+    let r8_to_hits = run_m2d(
+        m2d_args(
+            &[
+                "--in_format=r8",
+                "--out_format=hits",
+                "--obs_out",
+                obs_hits_arg,
+                "--obs_out_format=hits",
+            ],
+            circuit_path.into_os_string(),
+        ),
+        &[2, 0, 1, 1, 0, 0, 0, 0],
+    );
+    assert_eq!(r8_to_hits.status, 0);
+    assert_eq!(
+        String::from_utf8(r8_to_hits.stdout).expect("stdout is UTF-8"),
+        "\n0\n1\n0,1\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(obs_hits_path).expect("read hits obs"),
+        "\n\n0\n0\n"
+    );
+    assert_eq!(r8_to_hits.stderr, "");
+}
+
+#[test]
 fn pf7_m2d_cli_ignores_pauli_target_observable_annotations() {
     let dir = tempdir().expect("temp dir");
     let circuit_path = dir.path().join("input.stim");
@@ -178,6 +238,51 @@ OBSERVABLE_INCLUDE(1) Z0 Z2
     assert_eq!(
         std::fs::read_to_string(obs_path).expect("read obs output"),
         "00\n00\n00\n"
+    );
+}
+
+#[test]
+fn pf7_m2d_cli_rejects_oversized_text_records() {
+    let dir = tempdir().expect("temp dir");
+    let circuit_path = dir.path().join("input.stim");
+    std::fs::write(&circuit_path, "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").expect("write circuit");
+
+    let mut oversized_measurement = vec![b'0'; 1_048_577];
+    oversized_measurement.push(b'\n');
+    let measurement_run = run_m2d(
+        m2d_args(&["--in_format=01"], circuit_path.as_os_str().to_os_string()),
+        oversized_measurement.as_slice(),
+    );
+    assert_eq!(measurement_run.status, 1);
+    assert_eq!(measurement_run.stdout, b"");
+    assert!(
+        measurement_run
+            .stderr
+            .contains("m2d measurement input is too large; limit is 1048576 bytes"),
+        "{}",
+        measurement_run.stderr
+    );
+
+    let sweep_path = dir.path().join("oversized_sweep.01");
+    let mut oversized_sweep = vec![b'0'; 1_048_577];
+    oversized_sweep.push(b'\n');
+    std::fs::write(&sweep_path, oversized_sweep).expect("write sweep input");
+    let sweep_arg = sweep_path.to_str().expect("utf-8 path");
+    let sweep_run = run_m2d(
+        m2d_args(
+            &["--in_format=01", "--sweep", sweep_arg, "--sweep_format=01"],
+            circuit_path.into_os_string(),
+        ),
+        b"0\n",
+    );
+    assert_eq!(sweep_run.status, 1);
+    assert_eq!(sweep_run.stdout, b"");
+    assert!(
+        sweep_run
+            .stderr
+            .contains("m2d sweep input is too large; limit is 1048576 bytes"),
+        "{}",
+        sweep_run.stderr
     );
 }
 
