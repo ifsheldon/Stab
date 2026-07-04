@@ -924,6 +924,13 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
                 "stab_pf4_dem_coordinate_map_selected_huge_repeat",
             ][..],
         ),
+        (
+            "pf4-dem-sampler-folded-repeat",
+            &[
+                "stab_pf4_dem_sampler_compile_capped_repeat",
+                "stab_pf4_dem_sampler_sample_capped_repeat",
+            ][..],
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),

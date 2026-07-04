@@ -42,12 +42,12 @@ Report-only runner coverage:
 - `pf4-dem-flatten-repeat`
 - `pf4-dem-rounded`
 - `pf4-dem-coordinate-map`, tracked in `docs/plans/rpf4-dem-coordinate-progress-report.md`
+- `pf4-dem-sampler-folded-repeat`, tracking current capped behavior in `docs/plans/rpf4-dem-sampler-progress-report.md`
 
 Still placeholder rows:
 
 - `pf4-dem-folded-traversal`
 - `pf4-dem-folded-graphlike-traversal`
-- `pf4-dem-sampler-folded-repeat`
 
 The implemented rows remain `non-primary-report-only` because they measure Rust public APIs and pinned Stim does not provide a faithful Rust direct timing baseline in this harness.
 They are not part of the 1.25x primary threshold file.

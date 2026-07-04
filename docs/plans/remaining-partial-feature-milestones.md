@@ -311,7 +311,7 @@ Implementation tasks:
 - Implement public `rounded` for probability rounding with explicit numerical behavior. The current Rust `DetectorErrorModel::rounded` subset is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-transform-progress-report.md`.
 - Finish useful Rust copy, concat, repetition, or mutation helpers only if RPF0 extracts concrete non-Python Rust API gaps.
 - Finish folded traversal for coordinate maps and final shifts where current APIs still expand large repeats. The current all-detector coordinate-map cap plus selected-query fallback is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-coordinate-progress-report.md`.
-- Add folded or capped traversal behavior for graphlike, hypergraph, SAT, matcher-adjacent, sampler-adjacent, and analyzer-adjacent DEM consumers where owned by RPF4.
+- Add folded or capped traversal behavior for graphlike, hypergraph, SAT, matcher-adjacent, sampler-adjacent, and analyzer-adjacent DEM consumers where owned by RPF4. The current capped DEM sampler repeat subset is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-sampler-progress-report.md`.
 - Preserve decomposition separators and tags according to the transform contract.
 
 Tests:
@@ -324,13 +324,13 @@ Tests:
 
 Oracle rows:
 
-- Supplement `pf4-dem-introspection-transforms`, `pf4-dem-coordinate-api`, and `pf4-dem-folded-traversal`. The materialized transform subset is supplemented by `pf4-dem-materialized-transforms-rust`; the coordinate resource subset is supplemented by `pf4-dem-coordinate-resource-rust`.
+- Supplement `pf4-dem-introspection-transforms`, `pf4-dem-coordinate-api`, and `pf4-dem-folded-traversal`. The materialized transform subset is supplemented by `pf4-dem-materialized-transforms-rust`; the coordinate resource subset is supplemented by `pf4-dem-coordinate-resource-rust`; the sampler repeat-resource subset is supplemented by `pf4-dem-sampler-repeat-resource-rust`.
 - Exact rows should cover stable `.dem` text outputs.
 - Structural rows should cover resource behavior and large-repeat non-materialization.
 
 Benchmarks:
 
-- Implement `pf4-dem-flatten-repeat`, `pf4-dem-rounded`, `pf4-dem-coordinate-map`, `pf4-dem-folded-graphlike-traversal`, and `pf4-dem-sampler-folded-repeat`. `pf4-dem-flatten-repeat`, `pf4-dem-rounded`, and `pf4-dem-coordinate-map` have report-only runner coverage; the folded-consumer rows remain placeholders.
+- Implement `pf4-dem-flatten-repeat`, `pf4-dem-rounded`, `pf4-dem-coordinate-map`, `pf4-dem-folded-graphlike-traversal`, and `pf4-dem-sampler-folded-repeat`. `pf4-dem-flatten-repeat`, `pf4-dem-rounded`, `pf4-dem-coordinate-map`, and `pf4-dem-sampler-folded-repeat` have report-only runner coverage; the graphlike and generic folded-consumer rows remain placeholders.
 - Use `direct-match` only when Stim v1.16.0 exposes a faithful timing surface.
 - Keep rows report-only when they prove Stab resource behavior without a faithful Stim ratio.
 

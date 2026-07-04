@@ -1,6 +1,8 @@
 use std::hint::black_box;
 
-use stab_core::{DemDetectorId, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel};
+use stab_core::{
+    CompiledDemSampler, DemDetectorId, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
+};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
@@ -24,6 +26,14 @@ const ROUNDED_ERROR_COUNT: usize = 4;
 const COORDINATE_MAP_DETECTORS: u64 = 4096;
 #[cfg(test)]
 const COORDINATE_MAP_DETECTORS: u64 = 4;
+#[cfg(not(test))]
+const SAMPLER_REPEAT_COUNT: u64 = 4096;
+#[cfg(test)]
+const SAMPLER_REPEAT_COUNT: u64 = 2;
+#[cfg(not(test))]
+const SAMPLER_SHOTS: usize = 64;
+#[cfg(test)]
+const SAMPLER_SHOTS: usize = 2;
 
 const FLATTEN_FIXED_INSTRUCTIONS: u64 = 2;
 const FLATTEN_SOURCE_INSTRUCTIONS_PER_REPETITION: u64 = 4;
@@ -37,6 +47,7 @@ pub(super) fn run_dem_transform_compare_row(
         "pf4-dem-flatten-repeat" => Ok(Some(run_dem_flatten_repeat_row(row)?)),
         "pf4-dem-rounded" => Ok(Some(run_dem_rounded_row(row)?)),
         "pf4-dem-coordinate-map" => Ok(Some(run_dem_coordinate_map_row(row)?)),
+        "pf4-dem-sampler-folded-repeat" => Ok(Some(run_dem_sampler_repeat_row(row)?)),
         _ => Ok(None),
     }
 }
@@ -56,6 +67,13 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf4-dem-coordinate-map", "stab_pf4_dem_coordinate_map_selected_huge_repeat") => {
             Some((SELECTED_COORDINATE_DETECTORS as f64, "selected-detectors/s"))
         }
+        ("pf4-dem-sampler-folded-repeat", "stab_pf4_dem_sampler_compile_capped_repeat") => {
+            Some((SAMPLER_REPEAT_COUNT as f64, "expanded-errors/s"))
+        }
+        ("pf4-dem-sampler-folded-repeat", "stab_pf4_dem_sampler_sample_capped_repeat") => Some((
+            (SAMPLER_REPEAT_COUNT as f64) * (SAMPLER_SHOTS as f64),
+            "error-applications/s",
+        )),
         _ => None,
     }
 }
@@ -70,6 +88,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf4-dem-coordinate-map" => Some(
             "contract-only: Stab measures bounded all-detector DEM coordinate maps and selected detector coordinate lookup through a huge-repeat model; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
+        ),
+        "pf4-dem-sampler-folded-repeat" => Some(
+            "contract-only: Stab measures current capped-repeat CompiledDemSampler compile and sample behavior; true folded sampler traversal remains an explicit RPF4 follow-up",
         ),
         _ => None,
     }
@@ -145,6 +166,38 @@ fn run_dem_coordinate_map_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
     ])
 }
 
+fn run_dem_sampler_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let fixture = sampler_repeat_fixture();
+    let model = DetectorErrorModel::from_dem_str(&fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let sampler =
+        CompiledDemSampler::compile(&model).map_err(|error| stab_runner_error(&row.id, error))?;
+
+    Ok(vec![
+        measure_stab_batched(
+            "stab_pf4_dem_sampler_compile_capped_repeat",
+            TRANSFORM_REPETITIONS,
+            || {
+                let compiled = CompiledDemSampler::compile(&model)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(compiled.error_count());
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_sampler_sample_capped_repeat",
+            TRANSFORM_REPETITIONS,
+            || {
+                let output = sampler
+                    .sample_detection_events_with_seed(SAMPLER_SHOTS, Some(5))
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(output.records.len());
+                Ok(())
+            },
+        )?,
+    ])
+}
+
 fn flatten_repeat_fixture() -> String {
     format!(
         "\
@@ -177,6 +230,17 @@ repeat 1000001 {
     shift_detectors(3, 4) 1
 }
 ";
+
+fn sampler_repeat_fixture() -> String {
+    format!(
+        "\
+repeat {SAMPLER_REPEAT_COUNT} {{
+    error(0.25) D0 L0
+    shift_detectors 1
+}}
+"
+    )
+}
 
 fn rounded_fixture() -> String {
     let mut text = String::new();
