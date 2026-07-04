@@ -12,9 +12,9 @@ pub use solver::solve_for_flow_measurements;
 /// Returns unsigned stabilizer-flow generators for the supported tableau and measurement subset.
 ///
 /// The current implementation supports unitary tableau circuits and the PFM5 single-instruction
-/// measurement/reset/pair-measurement/MPP/MPAD subset, plus scoped measurement-record feedback after
-/// those measurements. Richer measured-circuit composition, sweep feedback, and noisy-flow semantics
-/// remain fail-closed.
+/// measurement/reset/pair-measurement/MPP/MPAD subset, plus scoped measurement-record feedback and
+/// heralded-noise record generators around those measurements. Richer measured-circuit composition,
+/// sweep feedback, and noisy-flow semantics remain fail-closed.
 pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
     if circuit_needs_measurement_rich_generators(circuit) {
         return simple_measurement_rich_flow_generators(circuit)?
@@ -84,7 +84,7 @@ fn simple_measurement_rich_flow_generators(circuit: &Circuit) -> CircuitResult<O
             _ => None,
         });
     }
-    scoped_measurement_feedback_flow_generators(circuit)
+    scoped_composed_measurement_flow_generators(circuit)
 }
 
 fn simple_measurement_flows(
@@ -248,7 +248,7 @@ fn measurement_pad_flows(instruction: &CircuitInstruction) -> CircuitResult<Vec<
     Ok(flows)
 }
 
-fn scoped_measurement_feedback_flow_generators(
+fn scoped_composed_measurement_flow_generators(
     circuit: &Circuit,
 ) -> CircuitResult<Option<Vec<Flow>>> {
     let mut instructions = Vec::with_capacity(circuit.items().len());
@@ -264,10 +264,10 @@ fn scoped_measurement_feedback_flow_generators(
                 instruction.gate().category(),
                 GateCategory::Collapsing | GateCategory::PairMeasurement
             )
-    }) || !instructions
-        .iter()
-        .any(|instruction| feedback_measurement_basis(instruction).is_some())
-    {
+    }) || !instructions.iter().any(|instruction| {
+        feedback_measurement_basis(instruction).is_some()
+            || is_heralded_flow_record_instruction(instruction)
+    }) {
         return Ok(None);
     }
 
@@ -318,6 +318,10 @@ impl MeasurementFeedbackFlowSolver {
             "MZZ" => self.undo_pair_measurement(instruction, PauliBasis::Z),
             "MPP" => self.undo_pauli_product_measurement(instruction),
             "MPAD" => self.undo_measurement_pad(instruction),
+            "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
+                self.undo_heralded_flow_records(instruction)
+            }
+            "TICK" => Ok(true),
             _ if feedback_measurement_basis(instruction).is_some() => {
                 self.undo_measurement_feedback(instruction)
             }
@@ -497,6 +501,33 @@ impl MeasurementFeedbackFlowSolver {
                 )),
                 _ => return Ok(false),
             }
+        }
+        Ok(true)
+    }
+
+    fn undo_heralded_flow_records(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<bool> {
+        for (target, record_index) in
+            instruction
+                .targets()
+                .iter()
+                .rev()
+                .zip(measurement_indices_reversed(
+                    &mut self.measurements_in_past,
+                    instruction.targets().len(),
+                )?)
+        {
+            if target.qubit_id().is_none() || target.is_inverted_result_target() {
+                return Ok(false);
+            }
+            self.flows.push(Flow::new(
+                PauliString::identity(self.qubit_count),
+                PauliString::identity(self.qubit_count),
+                [record_index],
+                [],
+            ));
         }
         Ok(true)
     }
@@ -958,6 +989,13 @@ fn feedback_measurement_basis(instruction: &CircuitInstruction) -> Option<PauliB
     }
 }
 
+fn is_heralded_flow_record_instruction(instruction: &CircuitInstruction) -> bool {
+    matches!(
+        instruction.gate().canonical_name(),
+        "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
+    )
+}
+
 fn absolute_record_index(measurements_in_past: usize, record_offset: i32) -> CircuitResult<i32> {
     let measurements_in_past = i64::try_from(measurements_in_past).map_err(|_| {
         CircuitError::invalid_tableau_conversion(
@@ -1103,7 +1141,7 @@ fn record_index_i32(record_index: usize) -> CircuitResult<i32> {
 
 fn unsupported_flow_generator_error(circuit: &Circuit) -> CircuitError {
     CircuitError::invalid_tableau_conversion(format!(
-        "circuit_flow_generators only supports unitary tableau circuits, supported measurement/reset/pair-measurement/MPP/MPAD circuits, and scoped measurement-record feedback circuits; got {} top-level item(s)",
+        "circuit_flow_generators only supports unitary tableau circuits, supported measurement/reset/pair-measurement/MPP/MPAD circuits, scoped measurement-record feedback circuits, and scoped heralded-noise record circuits; got {} top-level item(s)",
         circuit.items().len()
     ))
 }

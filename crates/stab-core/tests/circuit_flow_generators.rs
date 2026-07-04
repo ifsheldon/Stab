@@ -173,6 +173,26 @@ fn circuit_flow_generators_promotes_single_instruction_measurement_subset() {
             "X_ -> rec[0]",
         ]
     );
+    assert_eq!(
+        generator_strings(
+            "
+            HERALDED_ERASE(0.04) 1
+            HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 1
+            TICK
+            MPP X0*Y1*Z2 Z0*Z1
+        ",
+        ),
+        vec![
+            "1 -> rec[0]",
+            "1 -> rec[1]",
+            "1 -> XYZ xor rec[2]",
+            "1 -> ZZ_ xor rec[3]",
+            "__Z -> __Z",
+            "_ZX -> _ZX",
+            "XXX -> _ZY xor rec[2]",
+            "Z_X -> _ZX xor rec[3]",
+        ]
+    );
 }
 
 #[test]
@@ -200,6 +220,12 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
         "MPP X0*X1\nCX rec[-1] 0\n",
         "M 0\nCY rec[-1] 1\n",
         "MPAD 0 1 1 0\n",
+        "
+        HERALDED_ERASE(0.04) 1
+        HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 1
+        TICK
+        MPP X0*Y1*Z2 Z0*Z1
+        ",
     ] {
         let circuit = circuit(text);
         let flows = circuit_flow_generators(&circuit).expect(text);
