@@ -473,6 +473,19 @@ fn find_selected_detector_coordinates_in_repeat(
         return Ok(());
     }
 
+    if repeat_body_is_flat(repeat.body()) {
+        find_selected_detector_coordinates_in_flat_repeat_body(
+            repeat,
+            detector_set,
+            coordinates,
+            detector_offset,
+            coordinate_shift,
+            body_detector_shift,
+            &body_coordinate_shift,
+        )?;
+        return Ok(());
+    }
+
     let SelectedRepeatIterations {
         iterations,
         truncated_detectors,
@@ -510,6 +523,168 @@ fn find_selected_detector_coordinates_in_repeat(
         )));
     }
     Ok(())
+}
+
+fn repeat_body_is_flat(model: &DetectorErrorModel) -> bool {
+    model
+        .items()
+        .iter()
+        .all(|item| matches!(item, DemItem::Instruction(_)))
+}
+
+fn find_selected_detector_coordinates_in_flat_repeat_body(
+    repeat: &DemRepeatBlock,
+    detector_set: &BTreeSet<DemDetectorId>,
+    coordinates: &mut BTreeMap<DemDetectorId, Vec<f64>>,
+    detector_offset: u64,
+    coordinate_shift: &[f64],
+    body_detector_shift: u64,
+    body_coordinate_shift: &[f64],
+) -> CircuitResult<()> {
+    let mut local_detector_offset = 0_u64;
+    let mut local_coordinate_shift = Vec::new();
+    let mut scan = FlatRepeatScan {
+        detector_set,
+        existing_coordinates: coordinates,
+        best: BTreeMap::new(),
+        outer_detector_offset: detector_offset,
+        outer_coordinate_shift: coordinate_shift,
+        body_detector_shift,
+        body_coordinate_shift,
+        repeat_count: repeat.repeat_count().get(),
+    };
+    for (body_order, item) in repeat.body().items().iter().enumerate() {
+        let DemItem::Instruction(instruction) = item else {
+            continue;
+        };
+        match instruction.kind() {
+            DemInstructionKind::Detector => {
+                for target in instruction.targets() {
+                    if let DemTarget::RelativeDetector(local_detector) = target {
+                        let local_detector = local_detector_offset
+                            .checked_add(local_detector.get())
+                            .ok_or_else(|| {
+                                CircuitError::invalid_detector_error_model(
+                                    "relative detector id overflowed",
+                                )
+                            })?;
+                        scan.record_candidates(
+                            instruction,
+                            local_detector,
+                            &local_coordinate_shift,
+                            body_order,
+                        )?;
+                    }
+                }
+            }
+            DemInstructionKind::ShiftDetectors => {
+                apply_detector_shift(&mut local_detector_offset, instruction)?;
+                add_coordinate_shift_mul(&mut local_coordinate_shift, instruction.args(), 1.0)?;
+            }
+            DemInstructionKind::Error | DemInstructionKind::LogicalObservable => {}
+        }
+    }
+    for (detector, (_, detector_coordinates)) in scan.best {
+        coordinates.insert(detector, detector_coordinates);
+    }
+    Ok(())
+}
+
+struct FlatRepeatScan<'a> {
+    detector_set: &'a BTreeSet<DemDetectorId>,
+    existing_coordinates: &'a BTreeMap<DemDetectorId, Vec<f64>>,
+    best: BTreeMap<DemDetectorId, (FlatRepeatOrder, Vec<f64>)>,
+    outer_detector_offset: u64,
+    outer_coordinate_shift: &'a [f64],
+    body_detector_shift: u64,
+    body_coordinate_shift: &'a [f64],
+    repeat_count: u64,
+}
+
+impl FlatRepeatScan<'_> {
+    fn record_candidates(
+        &mut self,
+        instruction: &DemInstruction,
+        local_detector: u64,
+        local_coordinate_shift: &[f64],
+        body_order: usize,
+    ) -> CircuitResult<()> {
+        let relative_end = self
+            .body_detector_shift
+            .checked_mul(self.repeat_count.saturating_sub(1))
+            .and_then(|shift| local_detector.checked_add(shift))
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("flat repeat detector range overflowed")
+            })?;
+        let start_detector = DemDetectorId::try_new(
+            self.outer_detector_offset
+                .checked_add(local_detector)
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model("flat repeat detector id overflowed")
+                })?,
+        )?;
+        let end_detector = self
+            .outer_detector_offset
+            .checked_add(relative_end)
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("flat repeat detector id overflowed")
+            })?;
+
+        for detector in self.detector_set.range(start_detector..) {
+            if detector.get() > end_detector {
+                break;
+            }
+            if self.existing_coordinates.contains_key(detector) {
+                continue;
+            }
+            let Some(relative_detector) = detector.get().checked_sub(self.outer_detector_offset)
+            else {
+                continue;
+            };
+            let Some(delta) = relative_detector.checked_sub(local_detector) else {
+                continue;
+            };
+            if !delta.is_multiple_of(self.body_detector_shift) {
+                continue;
+            }
+            let iteration = delta / self.body_detector_shift;
+            if iteration >= self.repeat_count {
+                continue;
+            }
+            let order = FlatRepeatOrder {
+                iteration,
+                body_order,
+            };
+            if self
+                .best
+                .get(detector)
+                .is_none_or(|(best_order, _)| order.precedes(best_order))
+            {
+                let mut candidate_shift = coordinate_shift_with_repeat(
+                    self.outer_coordinate_shift,
+                    self.body_coordinate_shift,
+                    iteration,
+                )?;
+                add_coordinate_shift_mul(&mut candidate_shift, local_coordinate_shift, 1.0)?;
+                let detector_coordinates =
+                    shifted_detector_coordinates(instruction.args(), &candidate_shift)?;
+                self.best.insert(*detector, (order, detector_coordinates));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy)]
+struct FlatRepeatOrder {
+    iteration: u64,
+    body_order: usize,
+}
+
+impl FlatRepeatOrder {
+    fn precedes(&self, other: &Self) -> bool {
+        (self.iteration, self.body_order) < (other.iteration, other.body_order)
+    }
 }
 
 fn detector_in_repeat_body_range(
@@ -563,8 +738,6 @@ fn selected_repeat_iterations(
         if min_iteration > max_iteration {
             continue;
         }
-        // Candidate iterations solve offset + iteration * body_shift + local_detector = detector.
-        // The interval can be wider than one iteration when repeated declaration ranges overlap.
         for iteration in min_iteration..=max_iteration {
             if candidate_count >= MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES {
                 truncated_detectors.insert(*detector);

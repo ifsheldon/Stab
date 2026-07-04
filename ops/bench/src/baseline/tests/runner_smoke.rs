@@ -14,6 +14,8 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             &[
                 "stab_pf4_dem_coordinate_map_all_bounded",
                 "stab_pf4_dem_coordinate_map_selected_huge_repeat",
+                "stab_pf4_dem_coordinate_map_sparse_overlap",
+                "stab_pf4_dem_coordinate_map_flat_overlap_all",
             ][..],
         ),
         (

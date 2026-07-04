@@ -499,6 +499,85 @@ fn pf4_dem_coordinates_preserve_first_overlapping_repeat_declaration() {
 }
 
 #[test]
+fn pf4_dem_coordinates_fold_many_selected_overlapping_repeat_declarations() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 4 {\n\
+             detector(100) D2\n\
+             detector(0) D0\n\
+             shift_detectors(1) 1\n\
+         }\n",
+    )
+    .expect("parse overlapping coordinate DEM");
+
+    assert_eq!(
+        dem.detector_coordinates()
+            .expect("all detector coordinates"),
+        BTreeMap::from([
+            (DemDetectorId::try_new(0).expect("D0"), vec![0.0]),
+            (DemDetectorId::try_new(1).expect("D1"), vec![1.0]),
+            (DemDetectorId::try_new(2).expect("D2"), vec![100.0]),
+            (DemDetectorId::try_new(3).expect("D3"), vec![101.0]),
+            (DemDetectorId::try_new(4).expect("D4"), vec![102.0]),
+            (DemDetectorId::try_new(5).expect("D5"), vec![103.0]),
+        ])
+    );
+}
+
+#[test]
+fn pf4_dem_coordinates_fold_sparse_overlapping_repeat_without_candidate_cap() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 2000001 {\n\
+             detector(10) D2000000\n\
+             shift_detectors(1) 1\n\
+             detector(20) D0\n\
+         }\n",
+    )
+    .expect("parse sparse overlapping coordinate DEM");
+    let detector = DemDetectorId::try_new(1_500_001).expect("D1500001");
+
+    assert_eq!(
+        dem.coordinates_of_detector(detector)
+            .expect("fold sparse overlapping selected detector lookup"),
+        vec![1_500_021.0]
+    );
+}
+
+#[test]
+fn pf4_dem_coordinates_flat_sparse_repeat_hole_returns_empty() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 2000001 {\n\
+             detector(10) D2000000\n\
+             shift_detectors(1) 1\n\
+         }\n",
+    )
+    .expect("parse sparse overlapping coordinate DEM");
+    let detector = DemDetectorId::try_new(1_500_001).expect("D1500001");
+
+    assert_eq!(
+        dem.coordinates_of_detector(detector)
+            .expect("flat sparse selected detector hole is empty"),
+        Vec::<f64>::new()
+    );
+}
+
+#[test]
+fn pf4_dem_coordinates_huge_flat_repeat_does_not_overvalidate_far_endpoint() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 4611686018427387905 {\n\
+             detector(5) D0\n\
+             shift_detectors(1) 1\n\
+         }\n",
+    )
+    .expect("parse huge flat coordinate DEM");
+
+    assert_eq!(
+        dem.coordinates_of_detector(DemDetectorId::try_new(0).expect("D0"))
+            .expect("early selected detector does not validate far repeated endpoint"),
+        vec![5.0]
+    );
+}
+
+#[test]
 fn pf1_dem_iterators_item_ranges_and_flattened_iterator_are_typed() {
     let dem = DetectorErrorModel::from_dem_str(
         "error(0.125) D0\n\
