@@ -17,6 +17,12 @@ fn detector_utility_benchmark_rows_have_stab_compare_runners() {
             &["stab_pf5_detecting_regions_target_filters"][..],
         ),
         (
+            "pf5-detecting-regions-clifford",
+            "doc/python_api_reference_vDev.md",
+            "detecting-regions-clifford",
+            &["stab_pf5_detecting_regions_clifford_gates"][..],
+        ),
+        (
             "pf5-missing-detectors-mpp",
             "src/stim/util_top/missing_detectors.test.cc",
             "missing-detectors-mpp",
