@@ -47,7 +47,7 @@ If a subcase in this plan turns out to require an excluded surface, stop and log
 | PFM1 | Gate semantic execution, full semantic execution of every legal circuit operation, flows | Keep metadata and execution-support contracts synchronized after the current Rust gate metadata surface closed under `pf1-gate-metadata-api`. Finish remaining execution and flow-integration gaps without reopening Python `GateData` shape. |
 | PFM2 | Repeat handling, circuit transforms, measurement-to-detection conversion, full circuit transform API parity, full feedback-inlining transform parity | Finish flow-aware transforms, feedback-loop decisions, repeat traversal behavior, and transform resource boundaries. |
 | PFM3 | Target kinds, gate semantic execution, measurement-to-detection conversion, broader sweep-conditioned simulator and analysis parity | Finish or precisely reject remaining sweep-conditioned execution and analyzer subcases. |
-| PFM4 | DEM parser and canonical printer, DEM detector shifts, DEM introspection, DEM transforms, DEM flattening and large repeat traversal, full DEM public API parity | Finish DEM API gaps and folded or capped traversal behavior for selected consumers. DEM construction and mutation for the current Rust API surface is already closed by `pf1-dem-rust-api`; Python ergonomics remain deferred. |
+| PFM4 | DEM parser and canonical printer evidence lock, DEM detector shifts, DEM introspection, DEM transforms, DEM flattening and large repeat traversal, full DEM public API parity | Finish DEM API gaps and folded or capped traversal behavior for selected consumers. DEM parser and canonical printer status is closed by the PFM0 evidence lock and should be reopened only if parser or printer behavior changes; DEM construction and mutation for the current Rust API surface is already closed by `pf1-dem-rust-api`; Python ergonomics remain deferred. |
 | PFM5 | Detector-analysis utility APIs, flows, circuit transforms, gate validation flags and categories | Finish detecting regions, missing detectors, measurement-rich flow solving, and flow-driven transform integration. |
 | PFM6 | Circuit-to-DEM analysis, `analyze_errors --decompose_errors`, DEM analysis and shortest graphlike error, shortest graphlike and hypergraph search, sparse reverse detector-frame tracking, active matched-error value objects | Finish analyzer/search/sparse-tracker gaps without taking on full ErrorMatcher provenance or `explain_errors` CLI. |
 | PFM7 | `stim m2d`, `stim analyze_errors`, legacy top-level command flags, CLI binary | Finish visible CLI parity for selected commands and accepted legacy aliases, with `--detector_hypergraph` remaining excluded. The selected CLI binary rollup is now closed; reopen only for newly selected command behavior. |
@@ -258,7 +258,7 @@ Objective: finish active DEM Rust API gaps and remove avoidable expansion limits
 
 Rows covered:
 
-- DEM parser and canonical printer.
+- DEM parser and canonical printer evidence lock, with no active parser/printer implementation work unless behavior changes.
 - DEM detector shifts, observables, coordinates, and counts.
 - DEM flattening and large repeat traversal.
 - DEM introspection.

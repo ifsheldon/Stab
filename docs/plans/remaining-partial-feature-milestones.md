@@ -80,7 +80,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | `.stim`, `.dem`, and result-format compatibility | Rollup | RPF2, RPF4, RPF7, RPF8 | Complete only after active transform, DEM, and CLI format gaps are closed or explicitly deferred. |
 | Target kinds | Active | RPF3 | Broader sweep-conditioned execution and analysis behavior must be implemented or explicitly rejected with tests. |
 | Full semantic execution of every legal circuit operation | Active rollup | RPF1, RPF3, RPF6 | Parser acceptance must not imply execution support; execution coverage and unsupported legal shapes must be documented. |
-| DEM parser and canonical printer | Active | RPF4 | Parser/printer rows close only after DEM API transform and folded traversal limits are resolved for non-deferred paths. |
+| DEM parser and canonical printer | Done, evidence lock | RPF4 | Closed by M10 exact and structural parse-print evidence plus PF4 validation coverage; remaining DEM API transform and folded traversal work stays in the separate DEM introspection, transform, traversal, and full API rows. |
 | DEM detector shifts, observables, coordinates, and counts | Active | RPF4 | Finish folded coordinate/count behavior and large-repeat resource policy. |
 | DEM flattening and large repeat traversal | Active | RPF4 and RPF6 | Add public transform APIs and folded traversal for selected consumers, or documented caps with tests. |
 | Gate validation flags and categories | Implemented for current Rust metadata surface | RPF0/PF1 | `pf1-gate-metadata-api` now provides executable closure evidence; Python `GateData` shape stays deferred and execution support remains separately tracked. |
@@ -294,7 +294,7 @@ Objective: finish non-deferred DEM Rust API gaps and remove avoidable large-repe
 
 Owned checklist rows:
 
-- DEM parser and canonical printer.
+- DEM parser and canonical printer evidence lock.
 - DEM detector shifts, observables, coordinates, and counts.
 - DEM flattening and large repeat traversal.
 - DEM introspection.
