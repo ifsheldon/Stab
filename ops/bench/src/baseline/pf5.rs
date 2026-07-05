@@ -15,6 +15,8 @@ const UTILITY_BATCH: usize = 4096;
 const UTILITY_BATCH: usize = 2;
 const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 36;
 const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 120;
+const FLOW_GENERATOR_MEASUREMENT_PYTHON_CASES: usize = 4;
+const FLOW_GENERATOR_MEASUREMENT_PYTHON_FLOWS: usize = 32;
 const FLOW_SOLVE_MEASUREMENT_CASES: usize = 2;
 const FLOW_SOLVE_MEASUREMENT_QUERIES: usize = 15;
 const FLOW_SOLVE_MEASUREMENT_PYTHON_CASES: usize = 8;
@@ -25,6 +27,9 @@ pub(super) fn run_flow_compare_row(
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
         "pf5-flow-generators-measurement-rich" => {
+            run_flow_generators_measurement_rich(row).map(Some)
+        }
+        "pf5-flow-generators-measurement-python" => {
             run_flow_generators_measurement_rich(row).map(Some)
         }
         "pf5-flow-solve-measurement-rich" => run_flow_solve_measurement_rich(row).map(Some),
@@ -47,6 +52,20 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
                 "flows/s",
             ))
         }
+        (
+            "pf5-flow-generators-measurement-python",
+            "stab_pf5_flow_generators_measurement_python_cases",
+        ) => Some((
+            (UTILITY_BATCH * FLOW_GENERATOR_MEASUREMENT_PYTHON_CASES) as f64,
+            "cases/s",
+        )),
+        (
+            "pf5-flow-generators-measurement-python",
+            "stab_pf5_flow_generators_measurement_python_flows",
+        ) => Some((
+            (UTILITY_BATCH * FLOW_GENERATOR_MEASUREMENT_PYTHON_FLOWS) as f64,
+            "flows/s",
+        )),
         ("pf5-flow-solve-measurement-rich", "stab_pf5_flow_solve_measurement_cases") => Some((
             (UTILITY_BATCH * FLOW_SOLVE_MEASUREMENT_CASES) as f64,
             "cases/s",
@@ -76,6 +95,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "pf5-flow-generators-measurement-rich" => Some(
             "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/pair-measurement/MPP/SPP/composed-measurement/unitary-mixed/bounded-repeat/feedback/MPAD/heralded-noise subset without a faithful pinned Stim CLI timing ratio",
         ),
+        "pf5-flow-generators-measurement-python" => Some(
+            "report-only: Stab measures the Rust circuit_flow_generators promoted Python multi-target examples without a faithful pinned Stim CLI timing ratio",
+        ),
         "pf5-flow-solve-measurement-rich" => Some(
             "report-only: Stab measures the Rust solve_for_flow_measurements promoted C++ upstream examples without a faithful pinned Stim CLI timing ratio",
         ),
@@ -89,23 +111,37 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
 fn run_flow_generators_measurement_rich(
     row: &BenchmarkRow,
 ) -> Result<Vec<Measurement>, BenchError> {
+    let (case_measurement, flow_measurement) = flow_generator_measurement_names(&row.id)?;
     Ok(vec![
-        measure_flow_generators_measurement_rich(
-            row,
-            "stab_pf5_flow_generators_measurement_cases",
-        )?,
-        measure_flow_generators_measurement_rich(
-            row,
-            "stab_pf5_flow_generators_measurement_flows",
-        )?,
+        measure_flow_generators_measurement_rich(row, case_measurement)?,
+        measure_flow_generators_measurement_rich(row, flow_measurement)?,
     ])
+}
+
+fn flow_generator_measurement_names(
+    row_id: &str,
+) -> Result<(&'static str, &'static str), BenchError> {
+    match row_id {
+        "pf5-flow-generators-measurement-rich" => Ok((
+            "stab_pf5_flow_generators_measurement_cases",
+            "stab_pf5_flow_generators_measurement_flows",
+        )),
+        "pf5-flow-generators-measurement-python" => Ok((
+            "stab_pf5_flow_generators_measurement_python_cases",
+            "stab_pf5_flow_generators_measurement_python_flows",
+        )),
+        _ => Err(BenchError::StabRunner {
+            row_id: row_id.to_string(),
+            message: "unknown PF5 flow-generator benchmark row".to_string(),
+        }),
+    }
 }
 
 fn measure_flow_generators_measurement_rich(
     row: &BenchmarkRow,
     measurement_name: &'static str,
 ) -> Result<Measurement, BenchError> {
-    let cases = flow_generator_measurement_rich_corpus(&row.id)?;
+    let cases = flow_generator_measurement_corpus(&row.id)?;
     measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
         let mut flow_count = 0usize;
         for _ in 0..UTILITY_BATCH {
@@ -244,6 +280,55 @@ fn flow_generator_measurement_rich_corpus(
     .into_iter()
     .map(|(text, expected)| parse_circuit(row_id, text).map(|circuit| (circuit, expected)))
     .collect()
+}
+
+fn flow_generator_measurement_python_corpus(
+    row_id: &str,
+) -> Result<Vec<(Circuit, usize)>, BenchError> {
+    [
+        ("M 1 2\n", 6),
+        ("MX 1 2\n", 6),
+        ("MYY 1 2 3 4\n", 10),
+        ("MPP Y1*Y2 Y3*Y4\n", 10),
+    ]
+    .into_iter()
+    .map(|(text, expected)| parse_circuit(row_id, text).map(|circuit| (circuit, expected)))
+    .collect()
+}
+
+fn flow_generator_measurement_corpus(row_id: &str) -> Result<Vec<(Circuit, usize)>, BenchError> {
+    match row_id {
+        "pf5-flow-generators-measurement-rich" => flow_generator_measurement_rich_corpus(row_id),
+        "pf5-flow-generators-measurement-python" => {
+            flow_generator_measurement_python_corpus(row_id)
+        }
+        _ => Err(BenchError::StabRunner {
+            row_id: row_id.to_string(),
+            message: "unknown PF5 flow-generator benchmark row".to_string(),
+        }),
+    }
+}
+
+#[cfg(test)]
+pub(super) fn expected_flow_generator_measurement_work_for_test(
+    row_id: &str,
+) -> Result<(f64, f64), BenchError> {
+    let cases = flow_generator_measurement_corpus(row_id)?;
+    let flow_count = cases
+        .iter()
+        .map(|(_, expected_flow_count)| *expected_flow_count)
+        .try_fold(0usize, |count, len| {
+            count
+                .checked_add(len)
+                .ok_or_else(|| BenchError::StabRunner {
+                    row_id: row_id.to_string(),
+                    message: "flow-generator test flow count overflowed".to_string(),
+                })
+        })?;
+    Ok((
+        (UTILITY_BATCH * cases.len()) as f64,
+        (UTILITY_BATCH * flow_count) as f64,
+    ))
 }
 
 type FlowSolveCase = (Circuit, Vec<Flow>, Vec<Option<Vec<i32>>>);

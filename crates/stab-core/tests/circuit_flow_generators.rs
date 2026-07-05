@@ -208,6 +208,53 @@ fn circuit_flow_generators_promotes_single_instruction_measurement_subset() {
 }
 
 #[test]
+fn circuit_flow_generators_promotes_python_multi_target_examples() {
+    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators_test.py.
+    assert_eq!(
+        generator_strings("M 1 2\n"),
+        vec![
+            "1 -> __Z xor rec[1]",
+            "1 -> _Z_ xor rec[0]",
+            "__Z -> rec[1]",
+            "_Z_ -> rec[0]",
+            "X__ -> X__",
+            "Z__ -> Z__",
+        ]
+    );
+    assert_eq!(
+        generator_strings("MX 1 2\n"),
+        vec![
+            "1 -> __X xor rec[1]",
+            "1 -> _X_ xor rec[0]",
+            "__X -> rec[1]",
+            "_X_ -> rec[0]",
+            "X__ -> X__",
+            "Z__ -> Z__",
+        ]
+    );
+    let expected_pair_y_generators = vec![
+        "1 -> ___YY xor rec[1]",
+        "1 -> _YY__ xor rec[0]",
+        "____Y -> ____Y",
+        "___XZ -> ___ZX xor rec[1]",
+        "___ZZ -> ___ZZ",
+        "__Y__ -> __Y__",
+        "_XZ__ -> _ZX__ xor rec[0]",
+        "_ZZ__ -> _ZZ__",
+        "X____ -> X____",
+        "Z____ -> Z____",
+    ];
+    assert_eq!(
+        generator_strings("MYY 1 2 3 4\n"),
+        expected_pair_y_generators
+    );
+    assert_eq!(
+        generator_strings("MPP Y1*Y2 Y3*Y4\n"),
+        expected_pair_y_generators
+    );
+}
+
+#[test]
 fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
     for text in [
         "M 0\n",

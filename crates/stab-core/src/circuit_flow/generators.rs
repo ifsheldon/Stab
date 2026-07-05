@@ -8,7 +8,7 @@ mod helpers;
 use helpers::{
     apply_local_tableau_to_global_pauli, instruction_qubit_count, internal_flow_error,
     measurement_indices_reversed, pair_measurement_target_index, plain_tableau_targets,
-    plain_target_index, record_index_i32, stabilizer_to_circuit_error, unique_plain_target_indices,
+    record_index_i32, stabilizer_to_circuit_error, unique_plain_target_indices,
 };
 
 const MAX_MEASUREMENT_RICH_FLOW_GENERATOR_ROWS: usize = 4096;
@@ -110,37 +110,34 @@ fn simple_measurement_flows(
 ) -> CircuitResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
     validate_measurement_rich_flow_generator_rows(qubit_count, instruction.targets().len())?;
-    let mut flows = Vec::new();
-    let mut last_records_by_qubit = vec![None; qubit_count];
+    let mut measured_targets = Vec::with_capacity(instruction.targets().len());
     for (record_index, target) in instruction.targets().iter().enumerate() {
-        let Some(qubit) = plain_target_index(target) else {
-            return Ok(None);
-        };
-        let Some(slot) = last_records_by_qubit.get_mut(qubit) else {
-            return Ok(None);
-        };
-        if let Some(previous_record) = *slot {
-            flows.push(record_equality_flow(previous_record, record_index)?);
-        }
-        *slot = Some(record_index);
+        measured_targets.push((
+            pair_measurement_target_index(target)?,
+            record_index_i32(record_index)?,
+        ));
     }
 
-    for (qubit, record_index) in last_records_by_qubit.into_iter().enumerate() {
-        if let Some(record_index) = record_index {
-            flows.push(output_measurement_flow(
+    let mut flows = identity_flow_rows(qubit_count);
+    for &((qubit, inverted), record_index) in measured_targets.iter().rev() {
+        remove_single_anticommutations(&mut flows, qubit, basis)?;
+        flows.push(Flow::new(
+            single_pauli_with_sign(
                 qubit_count,
                 qubit,
                 basis,
-                record_index,
-            )?);
-            flows.push(input_measurement_flow(
-                qubit_count,
-                qubit,
-                basis,
-                record_index,
-            )?);
-        }
+                if inverted {
+                    PauliSign::Minus
+                } else {
+                    PauliSign::Plus
+                },
+            ),
+            PauliString::identity(qubit_count),
+            [record_index],
+            [],
+        ));
     }
+    final_canonicalize_measurement_generators(&mut flows, qubit_count, measured_targets.len())?;
     Ok(Some(flows))
 }
 
@@ -1095,32 +1092,6 @@ fn xor_sign(left: PauliSign, right: PauliSign) -> PauliSign {
     } else {
         PauliSign::Plus
     }
-}
-
-fn record_equality_flow(left_record: usize, right_record: usize) -> CircuitResult<Flow> {
-    Ok(Flow::new(
-        PauliString::identity(0),
-        PauliString::identity(0),
-        [
-            record_index_i32(left_record)?,
-            record_index_i32(right_record)?,
-        ],
-        [],
-    ))
-}
-
-fn output_measurement_flow(
-    qubit_count: usize,
-    qubit: usize,
-    basis: PauliBasis,
-    record_index: usize,
-) -> CircuitResult<Flow> {
-    Ok(Flow::new(
-        PauliString::identity(0),
-        single_pauli(qubit_count, qubit, basis),
-        [record_index_i32(record_index)?],
-        [],
-    ))
 }
 
 fn input_measurement_flow(
