@@ -125,6 +125,53 @@ fn detecting_regions_target_shape_supports_inverted_measurement_targets() {
 }
 
 #[test]
+fn detecting_regions_target_shape_supports_pauli_product_measurements() {
+    let circuit = Circuit::from_stim_str(
+        "RX 0\n\
+         RY 1\n\
+         R 2 3\n\
+         TICK\n\
+         MPP !X0*Y1*Z2 Z3\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-1]\n\
+         OBSERVABLE_INCLUDE(0) rec[-2] rec[-1]\n",
+    )
+    .unwrap();
+    let detector_0 = DemTarget::relative_detector(0).unwrap();
+    let detector_1 = DemTarget::relative_detector(1).unwrap();
+    let observable = DemTarget::logical_observable(0).unwrap();
+    let actual = circuit_detecting_regions_for_targets(
+        &circuit,
+        DetectingRegionTargetOptions {
+            targets: vec![detector_0, detector_1, observable],
+            ticks: vec![0],
+            ignore_anticommutation_errors: false,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(actual[&detector_0][&0].to_string(), "+XYZ_");
+    assert_eq!(actual[&detector_1][&0].to_string(), "+___Z");
+    assert_eq!(actual[&observable][&0].to_string(), "+XYZZ");
+}
+
+#[test]
+fn detecting_regions_target_shape_rejects_anti_hermitian_pauli_products() {
+    let circuit = Circuit::from_stim_str("TICK\nMPP X0*Z0\nDETECTOR rec[-1]\n").unwrap();
+    let error = circuit_detecting_regions(
+        &circuit,
+        DetectingRegionOptions {
+            detectors: vec![detector(0)],
+            ticks: vec![0],
+            ignore_anticommutation_errors: false,
+        },
+    )
+    .unwrap_err();
+
+    assert!(error.to_string().contains("anti-Hermitian"), "{error}");
+}
+
+#[test]
 fn detecting_regions_target_shape_keeps_reset_and_unitaries_plain() {
     for text in [
         "R !0\nTICK\nM 0\nDETECTOR rec[-1]\n",

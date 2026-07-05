@@ -272,6 +272,7 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
             validate_single_measurement_qubit_targets(instruction)
         }
         "MXX" | "MYY" | "MZZ" => validate_measurement_qubit_pair_targets(instruction),
+        "MPP" => validate_pauli_product_targets(instruction),
         "TICK" => validate_target_count(instruction, 0),
         "DETECTOR" => validate_detector_targets(instruction),
         "OBSERVABLE_INCLUDE" => validate_observable_include_targets(instruction),
@@ -322,6 +323,31 @@ fn validate_measurement_qubit_pair_targets(instruction: &CircuitInstruction) -> 
         };
         validate_qubit_target(instruction, left, true)?;
         validate_qubit_target(instruction, right, true)?;
+    }
+    Ok(())
+}
+
+fn validate_pauli_product_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
+    for group in instruction.target_groups() {
+        let mut has_pauli_target = false;
+        for target in group {
+            if target.is_combiner() {
+                continue;
+            }
+            if target.pauli_type().is_none() {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "simple detecting-region extraction only supports {} with Pauli-product targets, got {target}",
+                    instruction.gate().canonical_name()
+                )));
+            }
+            has_pauli_target = true;
+        }
+        if !has_pauli_target {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "simple detecting-region extraction only supports {} with non-empty Pauli-product targets",
+                instruction.gate().canonical_name()
+            )));
+        }
     }
     Ok(())
 }
