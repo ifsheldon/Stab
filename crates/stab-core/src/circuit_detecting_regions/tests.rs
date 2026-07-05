@@ -156,19 +156,53 @@ fn detecting_regions_target_shape_supports_pauli_product_measurements() {
 }
 
 #[test]
-fn detecting_regions_target_shape_rejects_anti_hermitian_pauli_products() {
-    let circuit = Circuit::from_stim_str("TICK\nMPP X0*Z0\nDETECTOR rec[-1]\n").unwrap();
-    let error = circuit_detecting_regions(
-        &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: vec![0],
-            ignore_anticommutation_errors: false,
-        },
-    )
-    .unwrap_err();
+fn detecting_regions_target_shape_supports_spp_unitary_products() {
+    for gate_name in ["SPP", "SPP_DAG"] {
+        let circuit = Circuit::from_stim_str(&format!(
+            "RY 0 1\n\
+             R 2\n\
+             TICK\n\
+             {gate_name} X0*Y1*Z2 !X0*X1\n\
+             TICK\n\
+             OBSERVABLE_INCLUDE(0) Z0\n"
+        ))
+        .unwrap();
+        let decomposed = circuit.decomposed().unwrap();
+        let observable = DemTarget::logical_observable(0).unwrap();
+        let options = DetectingRegionTargetOptions {
+            targets: vec![observable],
+            ticks: vec![0, 1],
+            ignore_anticommutation_errors: true,
+        };
+        let actual = circuit_detecting_regions_for_targets(&circuit, options.clone()).unwrap();
+        let expected = circuit_detecting_regions_for_targets(&decomposed, options).unwrap();
 
-    assert!(error.to_string().contains("anti-Hermitian"), "{error}");
+        assert_eq!(actual, expected, "{gate_name}");
+        assert_eq!(actual[&observable][&0].to_string(), "+YX_", "{gate_name}");
+        assert_eq!(actual[&observable][&1].to_string(), "+Z__", "{gate_name}");
+    }
+}
+
+#[test]
+fn detecting_regions_target_shape_rejects_anti_hermitian_pauli_products() {
+    for text in [
+        "TICK\nMPP X0*Z0\nDETECTOR rec[-1]\n",
+        "TICK\nSPP X0*Z0\nTICK\nOBSERVABLE_INCLUDE(0) Z0\n",
+        "TICK\nSPP_DAG X0*Z0\nTICK\nOBSERVABLE_INCLUDE(0) Z0\n",
+    ] {
+        let circuit = Circuit::from_stim_str(text).unwrap();
+        let error = circuit_detecting_regions_for_targets(
+            &circuit,
+            DetectingRegionTargetOptions {
+                targets: all_detecting_region_targets(&circuit).unwrap(),
+                ticks: all_detecting_region_ticks(&circuit).unwrap(),
+                ignore_anticommutation_errors: false,
+            },
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("anti-Hermitian"), "{error}");
+    }
 }
 
 #[test]

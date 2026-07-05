@@ -272,7 +272,7 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
             validate_single_measurement_qubit_targets(instruction)
         }
         "MXX" | "MYY" | "MZZ" => validate_measurement_qubit_pair_targets(instruction),
-        "MPP" => validate_pauli_product_targets(instruction),
+        "MPP" | "SPP" | "SPP_DAG" => validate_pauli_product_targets(instruction),
         "TICK" => validate_target_count(instruction, 0),
         "DETECTOR" => validate_detector_targets(instruction),
         "OBSERVABLE_INCLUDE" => validate_observable_include_targets(instruction),
