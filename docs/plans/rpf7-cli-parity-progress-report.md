@@ -28,7 +28,7 @@ No benchmark row changes are needed because this slice adds contract evidence ar
 This PFM7 slice promotes the broad `pf7-m2d-cli-parity` row from manifest-only to executable structural evidence for the selected Stab `m2d` CLI surface.
 The row is intentionally scoped to accepted flags, sweep input, feedback inlining, skip-reference behavior, append-observables behavior, observable side outputs, supported input formats, supported output formats, path IO, writer failures, stdout behavior, stderr class, exit status, and resource boundaries that are already owned by the PF7 path-IO and command-contract slices plus the existing M9 sweep, feedback, format, and resource tests.
 The closure includes focused `r8` and `hits` input, detector-output, and observable-side-output coverage plus oversized text measurement-record and sweep-record rejection tests, so the parent row no longer relies on nearby result-format support without direct `m2d` CLI evidence.
-It does not close broader detector-converter API parity, exact feedback loop refolding, frame-path sweep-conditioned simulator surfaces, deprecated `--detector_hypergraph`, or any Python binding surface.
+It does not close broader detector-converter API parity, broader feedback-transform parity, frame-path sweep-conditioned simulator surfaces, deprecated `--detector_hypergraph`, or any Python binding surface.
 No benchmark row changes are needed because the existing PF7 `m2d` benchmark rows remain report-only public CLI coverage for the sweep and feedback hot paths.
 
 ## Implemented Slice: `analyze_errors` Path IO Evidence

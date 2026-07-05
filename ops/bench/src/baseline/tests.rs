@@ -874,30 +874,33 @@ fn pf7_cli_benchmark_rows_have_stab_compare_runners() {
 
 #[test]
 fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
-    for (id, expected_measurement) in [
+    for (id, expected_measurements) in [
         (
             "pf2-circuit-flatten-repeat",
-            "stab_circuit_flatten_repeat_shifted_coords",
+            &["stab_circuit_flatten_repeat_shifted_coords"][..],
         ),
         (
             "pf2-circuit-without-noise",
-            "stab_circuit_without_noise_top_level",
+            &["stab_circuit_without_noise_top_level"][..],
         ),
         (
             "pf2-circuit-decompose-mpp-spp",
-            "stab_circuit_decompose_mpp_spp",
+            &["stab_circuit_decompose_mpp_spp"][..],
         ),
         (
             "pf2-feedback-inline-batch",
-            "stab_circuit_with_inlined_feedback_mpp",
+            &[
+                "stab_circuit_with_inlined_feedback_mpp",
+                "stab_circuit_with_inlined_feedback_repeat_loop",
+            ][..],
         ),
         (
             "pf2-time-reverse-flow",
-            "stab_circuit_time_reversed_for_flows_unitary",
+            &["stab_circuit_time_reversed_for_flows_unitary"][..],
         ),
         (
             "pf2-time-reverse-flow-measurement",
-            "stab_circuit_time_reversed_for_flows_measurement",
+            &["stab_circuit_time_reversed_for_flows_measurement"][..],
         ),
     ] {
         let row = BenchmarkRow {
@@ -922,15 +925,17 @@ fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
             .map(|measurement| measurement.name.as_str())
             .collect::<Vec<_>>();
 
-        assert_eq!(names, [expected_measurement]);
+        assert_eq!(names.as_slice(), expected_measurements);
         assert!(
             compare_note(id).is_some(),
             "{id} should explain benchmark comparability"
         );
-        assert!(
-            measurement_work(id, expected_measurement).is_some(),
-            "{id}/{expected_measurement} should report normalized work"
-        );
+        for expected_measurement in expected_measurements {
+            assert!(
+                measurement_work(id, expected_measurement).is_some(),
+                "{id}/{expected_measurement} should report normalized work"
+            );
+        }
     }
 }
 

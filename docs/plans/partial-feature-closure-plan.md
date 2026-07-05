@@ -32,7 +32,7 @@ Rows whose only remaining gap is intentionally deferred are recorded as exclusio
 | Circuit mutation, introspection, coordinates, repeats, transforms, reference samples, and determined measurements | PF1 and PF2 | Rust API closure for non-deferred methods plus transform semantics and resource boundaries. | QASM, Quirk, Crumble, diagrams, and Python operator ergonomics. |
 | DEM construction, mutation, introspection, transforms, and analysis | PF4 and PF6 | Rust DEM methods needed by sampling, analyzer, search, and CLI workflows. | Match-graph diagrams and Python class operators. |
 | Measurement-to-detection conversion | PF3 and PF7 | Remaining `m2d` and converter semantics for sweep-conditioned and feedback-related implemented surfaces. | Full Python converter class parity. |
-| Detector-analysis utility APIs | PF5 | Detecting regions, missing detectors, feedback inlining, exact loop refolding decisions, and typed Rust APIs for owned subcases. | Honeycomb or toric suffix parity unless specifically promoted by PF5 subcase extraction. |
+| Detector-analysis utility APIs | PF5 | Detecting regions, missing detectors, feedback inlining, broader repeat-contained feedback decisions, and typed Rust APIs for owned subcases. | Honeycomb or toric suffix parity unless specifically promoted by PF5 subcase extraction. |
 | Circuit-to-DEM analysis and `analyze_errors` flags | PF6 and PF7 | Analyzer behavior, CLI flags, decomposition behavior, loop folding, and generated-circuit parity where owned by Rust/CLI. | `stim explain_errors` CLI and full ErrorMatcher provenance. |
 | Shortest graphlike and hypergraph logical-error search | PF6 | Broader Rust search parity and generated-circuit evidence for non-deferred search APIs. | New public graph/vector simulator APIs. |
 | Sparse reverse detector-frame tracking | PF6 | Optimized loop folding, deterministic generated supported-unitary coverage, and analyzer/search integration needed by implemented APIs. | Full ErrorMatcher provenance if it only serves deferred `explain_errors`. |
@@ -106,14 +106,14 @@ Acceptance criteria:
 
 ## Milestone PF2: Circuit Transform And Repeat Traversal Closure
 
-Objective: finish active circuit transform parity while preserving explicit deferrals for exports, diagrams, Python ergonomics, and exact loop refolding if it is not implemented in this wave.
+Objective: finish active circuit transform parity while preserving explicit deferrals for exports, diagrams, Python ergonomics, and broader repeat-contained feedback beyond selected loop-refolding cases.
 
 Included features:
 
 - `flattened` and `flattened_operations` style Rust transform APIs for repeat blocks, tags, annotations, and measurement-index-sensitive instructions.
 - `without_noise` for removing noise instructions while preserving deterministic circuit structure, coordinates, ticks, detectors, observables, and measurement record semantics.
 - Broader `decomposed` parity for compound gates, MPP/SPP, pair measurements, and target grouping that can be validated with existing algebra and simulator components.
-- Full Rust `with_inlined_feedback` behavior for selected single-control Pauli feedback and MPP cases, including explicit rejection or implementation of repeat-block loop refolding.
+- Full Rust `with_inlined_feedback` behavior for selected single-control Pauli feedback and MPP cases, including selected bounded repeat-loop refolding and explicit rejection of unsupported repeat-contained feedback.
 - `time_reversed_for_flows` and measurement-rich flow-transform support when required by PF5 flow closure.
 - Repeat traversal helpers that avoid accidental full expansion when a folded traversal can prove the requested transform.
 

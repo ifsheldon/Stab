@@ -4,7 +4,7 @@
 
 The M9 detector utility closure implemented the bounded follow-up scope from `docs/plans/m9-detector-utility-closure-plan.md`.
 Stab now exposes typed Rust APIs for the simple detecting-regions case and the basic single-record missing-detectors subset, and `circuit_with_inlined_feedback` now has source-owned MPP feedback-transform parity evidence for the scoped transform.
-Broader detecting-region target-shape support, gauge handling, multi-record missing-detector row reduction, repeated MPP stabilizer-product missing-detector analysis, observable-interaction missing-detector analysis, honeycomb suffix analysis, toric suffix analysis, feedback repeat-block preservation, unsupported classical feedback gates, exact loop refolding, and full transform API parity remain future work.
+Broader detecting-region target-shape support, gauge handling, multi-record missing-detector row reduction, repeated MPP stabilizer-product missing-detector analysis, observable-interaction missing-detector analysis, honeycomb suffix analysis, toric suffix analysis, broader repeat-contained feedback, unsupported classical feedback gates, and full transform API parity remain future work. The later PF2 feedback slice added selected bounded loop-refolding evidence.
 
 ## Implemented Surfaces
 
@@ -13,7 +13,7 @@ Broader detecting-region target-shape support, gauge handling, multi-record miss
 - Added a sparse reverse tracker region snapshot helper used by detecting-region extraction.
 - Added implicit initial Z-basis anticommutation checking for detecting-region extraction and omitted identity snapshots from the returned tick map.
 - Added exact MPP feedback-transform coverage for `circuit_with_inlined_feedback`.
-- Added fail-closed coverage for unsupported detecting-region target shapes, anti-Hermitian MPP products, multi-record missing-detector row reduction, repeat blocks in feedback inlining, and unsupported classical controlled feedback gates.
+- Added fail-closed coverage for unsupported detecting-region target shapes, anti-Hermitian MPP products, multi-record missing-detector row reduction, repeat blocks in feedback inlining at the time of this slice, and unsupported classical controlled feedback gates.
 - Split the broad M9 utility oracle rows into implemented subcase rows and explicit future manifest-only rows.
 - Added report-only utility benchmark rows for detecting regions, missing detectors, and MPP feedback inlining.
 
@@ -71,7 +71,7 @@ Full-code-review sidecars found three additional issues, all fixed before comple
 
 - The new utility benchmark rows were marked `report-only` but still selected by `--primary`; fixed with the `non-primary-report-only` threshold class and primary-selection tests.
 - `circuit_detecting_regions` accepted feedback-controlled and sweep-controlled `CX` shapes; fixed with explicit target validation and negative tests.
-- `circuit_with_inlined_feedback` failed open for unsupported classical controlled gates and could expand repeat blocks without a transform-specific budget; fixed by rejecting unsupported classical controlled feedback gates and repeat blocks in the scoped transform.
+- At the time of this M9 slice, `circuit_with_inlined_feedback` failed open for unsupported classical controlled gates and could expand repeat blocks without a transform-specific budget; fixed in that slice by rejecting unsupported classical controlled feedback gates and repeat blocks in the scoped transform. The later PF2 feedback slice replaced the broad repeat-block rejection with selected bounded repeat-loop refolding and an explicit repeat-work preflight.
 
 A final GPT-5.5/xhigh full-code-review pass found four more compatibility and resource issues, all fixed before this report was finalized:
 
@@ -123,11 +123,11 @@ just maintenance::pre-commit
 
 The manual pre-commit hook reported no staged changes, which is expected because completion work remained unstaged at report time.
 
-## Remaining Exclusions
+## Remaining Exclusions After Later PF2 Feedback Work
 
-- Exact feedback loop refolding.
 - Full public `Circuit.with_inlined_feedback` parity.
-- Feedback repeat-block preservation and unsupported classical feedback gates.
+- Broader repeat-contained feedback beyond the selected bounded loop-refolding case.
+- Unsupported classical feedback gates.
 - Full MPP stabilizer-product missing-detector analysis.
 - Multi-record missing-detector row reduction and deterministic invariant solving.
 - Observable-interaction missing-detector analysis.

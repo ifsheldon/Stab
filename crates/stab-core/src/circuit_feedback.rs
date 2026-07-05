@@ -2,11 +2,17 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, Gate,
-    GateCategory, MeasureRecordOffset, Pauli, Target, detection::instruction_measurement_count,
-    measurement_record_count, sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    GateCategory, MeasureRecordOffset, Pauli, RepeatBlock, RepeatCount, Target,
+    detection::instruction_measurement_count, measurement_record_count,
+    sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
+const MAX_FEEDBACK_REPEAT_COUNT: u64 = 100_000;
+const MAX_FEEDBACK_REPEAT_WORK_UNITS: u64 = 1_000_000;
+const MAX_FEEDBACK_REPEAT_NESTING: usize = 256;
+
 pub fn circuit_with_inlined_feedback(circuit: &Circuit) -> CircuitResult<Circuit> {
+    validate_feedback_repeat_budget(circuit)?;
     let measurement_count = measurement_record_count(circuit)?;
     let detector_count = detector_count(circuit)?;
     let mut helper = WithoutFeedbackHelper {
@@ -19,16 +25,20 @@ pub fn circuit_with_inlined_feedback(circuit: &Circuit) -> CircuitResult<Circuit
         ),
         observable_changes: BTreeMap::new(),
         detector_changes: BTreeMap::new(),
+        repeat_work_units: 0,
     };
     helper.undo_circuit(circuit)?;
-    helper.build_output()
+    helper
+        .build_output()
+        .and_then(fuse_identical_adjacent_loops)
 }
 
 struct WithoutFeedbackHelper {
-    reversed_output: Vec<CircuitInstruction>,
+    reversed_output: Vec<CircuitItem>,
     tracker: SparseReverseFrameTracker,
     observable_changes: BTreeMap<u64, BTreeSet<MeasureRecordOffset>>,
     detector_changes: BTreeMap<u64, BTreeSet<usize>>,
+    repeat_work_units: u64,
 }
 
 impl WithoutFeedbackHelper {
@@ -36,14 +46,45 @@ impl WithoutFeedbackHelper {
         for item in circuit.items().iter().rev() {
             match item {
                 CircuitItem::Instruction(instruction) => self.undo_instruction(instruction)?,
-                CircuitItem::RepeatBlock(repeat) => {
-                    return Err(CircuitError::invalid_detector_error_model(format!(
-                        "feedback inlining does not support repeat blocks with count {}",
-                        repeat.repeat_count().get()
-                    )));
-                }
+                CircuitItem::RepeatBlock(repeat) => self.undo_repeat_block(repeat)?,
             }
         }
+        Ok(())
+    }
+
+    fn undo_repeat_block(&mut self, repeat: &RepeatBlock) -> CircuitResult<()> {
+        let repeat_count = repeat.repeat_count().get();
+        if repeat_count > MAX_FEEDBACK_REPEAT_COUNT {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "feedback inlining currently supports repeat counts up to {MAX_FEEDBACK_REPEAT_COUNT}, got {repeat_count}"
+            )));
+        }
+        self.repeat_work_units = self
+            .repeat_work_units
+            .checked_add(repeat_count)
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "feedback inlining repeat work units overflowed",
+                )
+            })?;
+        if self.repeat_work_units > MAX_FEEDBACK_REPEAT_WORK_UNITS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "feedback inlining currently supports up to {MAX_FEEDBACK_REPEAT_WORK_UNITS} expanded repeat iterations"
+            )));
+        }
+
+        let mut outer_output = std::mem::take(&mut self.reversed_output);
+        for _ in 0..repeat_count {
+            self.reversed_output.clear();
+            self.undo_circuit(repeat.body())?;
+            let body = Circuit::from_unfused_items(std::mem::take(&mut self.reversed_output));
+            outer_output.push(CircuitItem::RepeatBlock(RepeatBlock::new(
+                RepeatCount::try_new(1)?,
+                body,
+                repeat.tag().map(str::to_owned),
+            )));
+        }
+        self.reversed_output = outer_output;
         Ok(())
     }
 
@@ -62,7 +103,8 @@ impl WithoutFeedbackHelper {
                 instruction.gate().canonical_name()
             )));
         }
-        self.reversed_output.push(instruction.clone());
+        self.reversed_output
+            .push(CircuitItem::Instruction(instruction.clone()));
         self.tracker.undo_instruction(instruction)
     }
 
@@ -85,7 +127,9 @@ impl WithoutFeedbackHelper {
                 (Some(record), None) => self.inline_feedback(instruction, record, second)?,
                 (None, Some(record)) => self.inline_feedback(instruction, record, first)?,
                 (Some(_), Some(_)) => {}
-                (None, None) => self.reversed_output.push(piece.clone()),
+                (None, None) => self
+                    .reversed_output
+                    .push(CircuitItem::Instruction(piece.clone())),
             }
             self.tracker.undo_instruction(&piece)?;
         }
@@ -149,43 +193,240 @@ impl WithoutFeedbackHelper {
                     .collect(),
                 source.tag().map(str::to_owned),
             )?;
-            self.reversed_output.push(instruction);
+            self.reversed_output
+                .push(CircuitItem::Instruction(instruction));
         }
         Ok(())
     }
 
     fn build_output(&self) -> CircuitResult<Circuit> {
-        let mut result = Circuit::new();
         let mut measurements_in_past = 0usize;
         let mut detectors_in_past = 0u64;
-        for instruction in self.reversed_output.iter().rev() {
-            measurements_in_past = measurements_in_past
-                .checked_add(instruction_measurement_count(instruction))
-                .ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
-                        "measurement count overflowed while building feedback-free circuit",
-                    )
-                })?;
-            if instruction.gate().canonical_name() == "DETECTOR" {
-                let detector_id = detectors_in_past;
-                detectors_in_past = detectors_in_past.checked_add(1).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
-                        "detector count overflowed while building feedback-free circuit",
-                    )
-                })?;
-                if let Some(changes) = self.detector_changes.get(&detector_id) {
-                    result.append_instruction(rewritten_detector(
-                        instruction,
-                        changes,
-                        measurements_in_past,
-                    )?);
-                    continue;
+        self.build_output_from_items(
+            &self.reversed_output,
+            &mut measurements_in_past,
+            &mut detectors_in_past,
+        )
+    }
+
+    fn build_output_from_items(
+        &self,
+        items: &[CircuitItem],
+        measurements_in_past: &mut usize,
+        detectors_in_past: &mut u64,
+    ) -> CircuitResult<Circuit> {
+        let mut result = Circuit::new();
+        for item in items.iter().rev() {
+            match item {
+                CircuitItem::Instruction(instruction) => {
+                    *measurements_in_past = measurements_in_past
+                        .checked_add(instruction_measurement_count(instruction))
+                        .ok_or_else(|| {
+                            CircuitError::invalid_detector_error_model(
+                                "measurement count overflowed while building feedback-free circuit",
+                            )
+                        })?;
+                    if instruction.gate().canonical_name() == "DETECTOR" {
+                        let detector_id = *detectors_in_past;
+                        *detectors_in_past = detectors_in_past.checked_add(1).ok_or_else(|| {
+                            CircuitError::invalid_detector_error_model(
+                                "detector count overflowed while building feedback-free circuit",
+                            )
+                        })?;
+                        if let Some(changes) = self.detector_changes.get(&detector_id) {
+                            result.append_instruction(rewritten_detector(
+                                instruction,
+                                changes,
+                                *measurements_in_past,
+                            )?);
+                            continue;
+                        }
+                    }
+                    result.append_instruction(instruction.clone());
+                }
+                CircuitItem::RepeatBlock(repeat) => {
+                    for _ in 0..repeat.repeat_count().get() {
+                        let body = self.build_output_from_items(
+                            repeat.body().items(),
+                            measurements_in_past,
+                            detectors_in_past,
+                        )?;
+                        result.append_repeat_block(RepeatBlock::new(
+                            RepeatCount::try_new(1)?,
+                            body,
+                            repeat.tag().map(str::to_owned),
+                        ));
+                    }
                 }
             }
-            result.append_instruction(instruction.clone());
         }
         Ok(result)
     }
+}
+
+fn append_items(circuit: &mut Circuit, items: Vec<CircuitItem>) {
+    for item in items {
+        match item {
+            CircuitItem::Instruction(instruction) => circuit.append_instruction(instruction),
+            CircuitItem::RepeatBlock(repeat) => circuit.append_repeat_block(repeat),
+        }
+    }
+}
+
+fn fuse_identical_adjacent_loops(circuit: Circuit) -> CircuitResult<Circuit> {
+    let mut result = Circuit::new();
+    let mut growing_loop: Option<(Circuit, u64, Option<String>)> = None;
+
+    for item in circuit.items() {
+        match item {
+            CircuitItem::RepeatBlock(repeat) => {
+                if let Some((body, repetitions, _)) = growing_loop.as_mut()
+                    && body == repeat.body()
+                {
+                    *repetitions = repetitions
+                        .checked_add(repeat.repeat_count().get())
+                        .ok_or_else(|| {
+                            CircuitError::invalid_detector_error_model(
+                                "feedback inlining fused repeat count overflowed",
+                            )
+                        })?;
+                    continue;
+                }
+                flush_growing_loop(&mut result, &mut growing_loop)?;
+                growing_loop = Some((
+                    repeat.body().clone(),
+                    repeat.repeat_count().get(),
+                    repeat.tag().map(str::to_owned),
+                ));
+            }
+            CircuitItem::Instruction(instruction) => {
+                flush_growing_loop(&mut result, &mut growing_loop)?;
+                result.append_instruction(instruction.clone());
+            }
+        }
+    }
+    flush_growing_loop(&mut result, &mut growing_loop)?;
+    Ok(result)
+}
+
+fn flush_growing_loop(
+    result: &mut Circuit,
+    growing_loop: &mut Option<(Circuit, u64, Option<String>)>,
+) -> CircuitResult<()> {
+    let Some((body, repetitions, tag)) = growing_loop.take() else {
+        return Ok(());
+    };
+    let fused_body = fuse_identical_adjacent_loops(body)?;
+    if repetitions == 1 {
+        append_items(result, fused_body.items().to_vec());
+    } else {
+        result.append_repeat_block(RepeatBlock::new(
+            RepeatCount::try_new(repetitions)?,
+            fused_body,
+            tag,
+        ));
+    }
+    Ok(())
+}
+
+#[derive(Default)]
+struct FeedbackRepeatBudget {
+    expanded_work_units: u64,
+    repeat_iterations: u64,
+}
+
+impl FeedbackRepeatBudget {
+    fn add_expanded_work_units(&mut self, count: u64) -> CircuitResult<()> {
+        self.expanded_work_units =
+            self.expanded_work_units.checked_add(count).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "feedback inlining repeat work-unit expansion count overflowed",
+                )
+            })?;
+        if self.expanded_work_units > MAX_FEEDBACK_REPEAT_WORK_UNITS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "feedback inlining currently supports up to {MAX_FEEDBACK_REPEAT_WORK_UNITS} expanded work units"
+            )));
+        }
+        Ok(())
+    }
+
+    fn add_repeat_iterations(&mut self, count: u64) -> CircuitResult<()> {
+        self.repeat_iterations = self.repeat_iterations.checked_add(count).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "feedback inlining repeat iteration count overflowed",
+            )
+        })?;
+        if self.repeat_iterations > MAX_FEEDBACK_REPEAT_WORK_UNITS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "feedback inlining currently supports up to {MAX_FEEDBACK_REPEAT_WORK_UNITS} expanded repeat iterations"
+            )));
+        }
+        Ok(())
+    }
+}
+
+fn validate_feedback_repeat_budget(circuit: &Circuit) -> CircuitResult<()> {
+    let mut budget = FeedbackRepeatBudget::default();
+    validate_feedback_repeat_budget_inner(circuit, 1, 0, &mut budget)
+}
+
+fn validate_feedback_repeat_budget_inner(
+    circuit: &Circuit,
+    multiplier: u64,
+    depth: usize,
+    budget: &mut FeedbackRepeatBudget,
+) -> CircuitResult<()> {
+    if depth > MAX_FEEDBACK_REPEAT_NESTING {
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "feedback inlining repeat nesting exceeds current limit {MAX_FEEDBACK_REPEAT_NESTING}"
+        )));
+    }
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(instruction) => {
+                let work_units = instruction_work_units(instruction)?
+                    .checked_mul(multiplier)
+                    .ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "feedback inlining repeat work-unit expansion count overflowed",
+                        )
+                    })?;
+                budget.add_expanded_work_units(work_units)?;
+            }
+            CircuitItem::RepeatBlock(repeat) => {
+                let repeat_count = repeat.repeat_count().get();
+                if repeat_count > MAX_FEEDBACK_REPEAT_COUNT {
+                    return Err(CircuitError::invalid_detector_error_model(format!(
+                        "feedback inlining currently supports repeat counts up to {MAX_FEEDBACK_REPEAT_COUNT}, got {repeat_count}"
+                    )));
+                }
+                let repeated_multiplier =
+                    multiplier.checked_mul(repeat_count).ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "feedback inlining repeat expansion count overflowed",
+                        )
+                    })?;
+                budget.add_repeat_iterations(repeated_multiplier)?;
+                validate_feedback_repeat_budget_inner(
+                    repeat.body(),
+                    repeated_multiplier,
+                    depth.saturating_add(1),
+                    budget,
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn instruction_work_units(instruction: &CircuitInstruction) -> CircuitResult<u64> {
+    let target_count = u64::try_from(instruction.targets().len()).map_err(|_| {
+        CircuitError::invalid_detector_error_model(
+            "feedback inlining instruction target count does not fit u64",
+        )
+    })?;
+    Ok(target_count.max(1))
 }
 
 fn rewritten_detector(
@@ -441,6 +682,64 @@ mod tests {
     }
 
     #[test]
+    fn circuit_with_inlined_feedback_loop_matches_upstream() {
+        let input = Circuit::from_stim_str(
+            "R 0 1\n\
+             X_ERROR(0.125) 0 1\n\
+             CX 0 1\n\
+             M 1\n\
+             CX rec[-1] 1\n\
+             DETECTOR rec[-1]\n\
+             REPEAT 30 {\n\
+                 X_ERROR(0.125) 0 1\n\
+                 CX 0 1\n\
+                 M 1\n\
+                 CX rec[-1] 1\n\
+                 DETECTOR rec[-1] rec[-2]\n\
+             }\n\
+             M 0\n\
+             DETECTOR rec[-1] rec[-2]\n",
+        )
+        .unwrap();
+        let actual = circuit_with_inlined_feedback(&input).unwrap();
+
+        assert_eq!(
+            actual.to_stim_string(),
+            "\
+R 0 1
+X_ERROR(0.125) 0 1
+CX 0 1
+M 1
+DETECTOR rec[-1]
+X_ERROR(0.125) 0 1
+CX 0 1
+M 1
+DETECTOR rec[-1]
+REPEAT 29 {
+    X_ERROR(0.125) 0 1
+    CX 0 1
+    M 1
+    DETECTOR rec[-3] rec[-1]
+}
+M 0
+DETECTOR rec[-3] rec[-2] rec[-1]
+"
+        );
+
+        let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
+            .unwrap()
+            .flattened()
+            .unwrap()
+            .to_dem_string();
+        let actual_dem = circuit_to_detector_error_model(&actual, ErrorAnalyzerOptions::default())
+            .unwrap()
+            .flattened()
+            .unwrap()
+            .to_dem_string();
+        assert_eq!(actual_dem, expected_dem);
+    }
+
+    #[test]
     fn circuit_with_inlined_feedback_rejects_anti_hermitian_mpp() {
         let circuit = Circuit::from_stim_str(
             "MPP X0*Z0\n\
@@ -469,9 +768,9 @@ mod tests {
     }
 
     #[test]
-    fn circuit_with_inlined_feedback_rejects_repeat_blocks() {
+    fn circuit_with_inlined_feedback_rejects_excessive_repeat_work() {
         let circuit = Circuit::from_stim_str(
-            "REPEAT 2 {\n\
+            "REPEAT 100001 {\n\
                  M 0\n\
                  CX rec[-1] 0\n\
              }\n",
@@ -479,6 +778,22 @@ mod tests {
         .unwrap();
         let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
 
-        assert!(error.to_string().contains("does not support repeat blocks"));
+        assert!(error.to_string().contains("supports repeat counts"));
+
+        let nested = Circuit::from_stim_str(
+            "REPEAT 100000 {\n\
+                 REPEAT 100000 {\n\
+                     M 0\n\
+                     CX rec[-1] 0\n\
+                 }\n\
+             }\n",
+        )
+        .unwrap();
+        let error = circuit_with_inlined_feedback(&nested).unwrap_err();
+
+        assert!(
+            error.to_string().contains("expanded repeat iterations"),
+            "{error}"
+        );
     }
 }

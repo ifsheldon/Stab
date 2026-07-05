@@ -446,24 +446,89 @@ DETECTOR rec[-3] rec[-1]
 }
 
 #[test]
-fn with_inlined_feedback_rejects_unimplemented_repeat_and_control_shapes() {
-    let repeat_error = circuit(
+fn with_inlined_feedback_refolds_repeat_loop_like_upstream() {
+    let input = circuit(
         "
-        REPEAT 2 {
-            M 0
-            CX rec[-1] 0
+        R 0 1
+        X_ERROR(0.125) 0 1
+        CX 0 1
+        M 1
+        CX rec[-1] 1
+        DETECTOR rec[-1]
+        REPEAT 30 {
+            X_ERROR(0.125) 0 1
+            CX 0 1
+            M 1
+            CX rec[-1] 1
+            DETECTOR rec[-1] rec[-2]
         }
+        M 0
+        DETECTOR rec[-1] rec[-2]
     ",
-    )
-    .with_inlined_feedback()
-    .expect_err("reject repeat feedback");
-    assert!(
-        repeat_error
-            .to_string()
-            .contains("does not support repeat blocks"),
-        "{repeat_error}"
+    );
+    let inlined = input.with_inlined_feedback().expect("inline feedback loop");
+
+    assert_eq!(
+        inlined.to_stim_string(),
+        "\
+R 0 1
+X_ERROR(0.125) 0 1
+CX 0 1
+M 1
+DETECTOR rec[-1]
+X_ERROR(0.125) 0 1
+CX 0 1
+M 1
+DETECTOR rec[-1]
+REPEAT 29 {
+    X_ERROR(0.125) 0 1
+    CX 0 1
+    M 1
+    DETECTOR rec[-3] rec[-1]
+}
+M 0
+DETECTOR rec[-3] rec[-2] rec[-1]
+"
     );
 
+    let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
+        .expect("input DEM")
+        .flattened()
+        .expect("flatten input DEM")
+        .to_dem_string();
+    let actual_dem = circuit_to_detector_error_model(&inlined, ErrorAnalyzerOptions::default())
+        .expect("inlined DEM")
+        .flattened()
+        .expect("flatten inlined DEM")
+        .to_dem_string();
+    assert_eq!(actual_dem, expected_dem);
+}
+
+#[test]
+fn with_inlined_feedback_preserves_repeat_body_target_group_order() {
+    let input = circuit(
+        "
+        REPEAT 2 {
+            CX 0 1 2 3 4 5
+        }
+    ",
+    );
+    let inlined = input
+        .with_inlined_feedback()
+        .expect("inline no-feedback repeat");
+
+    assert_eq!(
+        inlined.to_stim_string(),
+        "\
+REPEAT 2 {
+    CX 0 1 2 3 4 5
+}
+"
+    );
+}
+
+#[test]
+fn with_inlined_feedback_rejects_unimplemented_control_shapes_and_excessive_repeat_work() {
     let gate_error = circuit(
         "
         M 0
@@ -477,6 +542,40 @@ fn with_inlined_feedback_rejects_unimplemented_repeat_and_control_shapes() {
     assert!(
         gate_error.to_string().contains("does not support XCZ"),
         "{gate_error}"
+    );
+
+    let repeat_error = circuit(
+        "
+        REPEAT 100001 {
+            M 0
+            CX rec[-1] 0
+        }
+    ",
+    )
+    .with_inlined_feedback()
+    .expect_err("reject excessive repeat feedback work");
+    assert!(
+        repeat_error.to_string().contains("supports repeat counts"),
+        "{repeat_error}"
+    );
+
+    let nested_repeat_error = circuit(
+        "
+        REPEAT 100000 {
+            REPEAT 100000 {
+                M 0
+                CX rec[-1] 0
+            }
+        }
+    ",
+    )
+    .with_inlined_feedback()
+    .expect_err("reject nested excessive repeat feedback work before generic counting");
+    assert!(
+        nested_repeat_error
+            .to_string()
+            .contains("expanded repeat iterations"),
+        "{nested_repeat_error}"
     );
 }
 

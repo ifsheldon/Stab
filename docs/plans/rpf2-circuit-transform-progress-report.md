@@ -13,13 +13,12 @@ Implemented behavior:
 - `Circuit::decomposed` now implements the public Rust counterpart to Stim's `Circuit.decomposed` for the owned RPF2 slice, including fixed-shape H/S/CX/M/R template substitution, ISWAP decomposition, MPP measurement decomposition, SPP/SPP_DAG phase-product decomposition, pair-measurement decomposition, tag preservation, noise and annotation preservation, constant MPP products, and anti-Hermitian product rejection.
 - `Circuit::time_reversed_for_flows` now implements the scoped unitary Rust subset by validating unsigned Pauli-only flows against the original unitary circuit with bounded tableau validation or folded sparse validation for supported large repeats, returning the current QEC inverse subset, and swapping flow input and output endpoints while preserving idle qubits beyond the circuit width.
 - The selected measurement-rich `Circuit::time_reversed_for_flows` subset validates flows through the sparse tracker and reverses flow endpoints while preserving record and observable terms for one noiseless plain `M`, `MX`, `MY`, `MXX`, `MYY`, or `MZZ` instruction group, with pinned Stim `M` and `MZZ` examples plus source-owned basis coverage for `MX`, `MY`, `MXX`, and `MYY`.
-- `Circuit::with_inlined_feedback` now exposes the existing feedback-removal helper as a public method for the supported top-level single-control Pauli and MPP feedback subset, with precise rejections for repeat blocks and unsupported classical controlled gates.
+- `Circuit::with_inlined_feedback` now exposes the existing feedback-removal helper as a public method for the supported top-level single-control Pauli and MPP feedback subset, with selected bounded repeat-loop refolding and precise rejections for excessive repeat work and unsupported classical controlled gates.
 
 Remaining RPF2 work:
 
 - Flow-dependent decomposition checks remain open where they require the RPF5 measurement-rich flow semantics decision.
-- Full public feedback-inlining transform parity remains open beyond the scoped method, especially exact loop refolding and repeat-block feedback behavior.
-- Exact loop refolding remains open.
+- Full public feedback-inlining transform parity remains open beyond the scoped method, especially broader repeat-contained feedback behavior beyond the selected pinned loop-refolding case.
 - Broader measurement-rich `time_reversed_for_flows` rewrites for resets, detectors, feedback, noise, repeats, multi-instruction circuits, and larger QEC inverse behavior remain active follow-up work and stay logged in `docs/plans/milestone-spec-gaps.md`.
 - QASM, Quirk, Crumble, diagrams, and Python-specific ergonomics remain explicitly deferred.
 
@@ -31,7 +30,7 @@ Implemented source-owned tests:
 - `cargo test -p stab-core --test circuit_inverse_qec time_reversed_for_flows --quiet`
 
 The test file ports and adapts pinned Stim v1.16.0 cases from `src/stim/circuit/circuit.test.cc`, `src/stim/circuit/circuit_pybind_test.py`, and tag-specific Python tests.
-Coverage includes empty circuits, dropped `SHIFT_COORDS`, simple repeat unrolling, coordinate shifts through repeats, detector and observable preservation, instruction tags, repeat-tag removal, unfused flattened operations, materialized expansion rejection, folded shift-only repeats, noisy measurement probability stripping, ordinary noise removal, heralded-noise `MPAD` replacement, annotation preservation, coordinate-overflow rejection, public `decomposed` ISWAP and MPP output, decomposition tag preservation across RX, noise, MPP, detector, and SPP, constant MPP products, anti-Hermitian MPP/SPP rejection, scoped unitary `time_reversed_for_flows` empty-flow inverse behavior, upstream-shaped flow-past-end behavior, idle extra-qubit behavior, large-repeat folding, unsatisfied-flow rejection, selected measurement-rich `M`, `MX`, `MY`, `MXX`, `MYY`, and `MZZ` flow reversal, measurement-rich unsatisfied-flow rejection, noisy measurement-rich rejection, multi-instruction measurement-rich rejection, scoped feedback-inlining API exposure, MPP feedback DEM preservation, repeat-block rejection, and unsupported classical-control rejection.
+Coverage includes empty circuits, dropped `SHIFT_COORDS`, simple repeat unrolling, coordinate shifts through repeats, detector and observable preservation, instruction tags, repeat-tag removal, unfused flattened operations, materialized expansion rejection, folded shift-only repeats, noisy measurement probability stripping, ordinary noise removal, heralded-noise `MPAD` replacement, annotation preservation, coordinate-overflow rejection, public `decomposed` ISWAP and MPP output, decomposition tag preservation across RX, noise, MPP, detector, and SPP, constant MPP products, anti-Hermitian MPP/SPP rejection, scoped unitary `time_reversed_for_flows` empty-flow inverse behavior, upstream-shaped flow-past-end behavior, idle extra-qubit behavior, large-repeat folding, unsatisfied-flow rejection, selected measurement-rich `M`, `MX`, `MY`, `MXX`, `MYY`, and `MZZ` flow reversal, measurement-rich unsatisfied-flow rejection, noisy measurement-rich rejection, multi-instruction measurement-rich rejection, scoped feedback-inlining API exposure, MPP feedback DEM preservation, selected bounded repeat-loop refolding, excessive repeat-work rejection, and unsupported classical-control rejection.
 
 ## Oracle Rows
 
@@ -56,7 +55,7 @@ Implemented non-primary report-only runners:
 - `pf2-circuit-flatten-repeat`: measures Rust `Circuit::flattened` on a repeat-heavy coordinate-shift fixture and reports `stab_circuit_flatten_repeat_shifted_coords` with normalized `operations/s`.
 - `pf2-circuit-without-noise`: measures Rust `Circuit::without_noise` on noisy, heralded, measurement, detector, and annotation instruction groups and reports `stab_circuit_without_noise_top_level` with normalized `source-instructions/s`.
 - `pf2-circuit-decompose-mpp-spp`: measures Rust `Circuit::decomposed` on ISWAP, MPP, SPP, SPP_DAG, pair-measurement, noise, and detector operations and reports `stab_circuit_decompose_mpp_spp` with normalized `source-instructions/s`.
-- `pf2-feedback-inline-batch`: measures Rust `Circuit::with_inlined_feedback` on the scoped MPP feedback fixture and reports `stab_circuit_with_inlined_feedback_mpp` with normalized `transforms/s`.
+- `pf2-feedback-inline-batch`: measures Rust `Circuit::with_inlined_feedback` on the scoped MPP feedback fixture and selected bounded repeat-loop fixture and reports `stab_circuit_with_inlined_feedback_mpp` with normalized `transforms/s` plus `stab_circuit_with_inlined_feedback_repeat_loop` with normalized `repeat-iterations/s`.
 - `pf2-time-reverse-flow`: measures scoped unitary Rust `Circuit::time_reversed_for_flows` on an upstream-shaped unitary circuit with idle far-qubit flows and reports `stab_circuit_time_reversed_for_flows_unitary` with normalized `flows/s`.
 - `pf2-time-reverse-flow-measurement`: measures selected measurement-rich Rust `Circuit::time_reversed_for_flows` on the pinned `MZZ` flow-through shape and reports `stab_circuit_time_reversed_for_flows_measurement` with normalized `flows/s`.
 
@@ -70,7 +69,7 @@ Probe evidence:
 - `just bench::compare --only pf2-circuit-flatten-repeat --baseline target/benchmarks/rpf2-flatten-probe/baseline.json --report target/benchmarks/rpf2-flatten-compare-probe` measured `stab_circuit_flatten_repeat_shifted_coords` at `0.000466460s`, about `2.635e7 operations/s`.
 - `just bench::compare --only pf2-circuit-without-noise --baseline target/benchmarks/rpf2-without-noise-probe/baseline.json --report target/benchmarks/rpf2-without-noise-compare-probe` measured `stab_circuit_without_noise_top_level` at `0.000214474s`, about `4.774e7 source-instructions/s`.
 - `just bench::compare --only pf2-circuit-decompose-mpp-spp --baseline target/benchmarks/rpf2-decompose-probe-baseline/baseline.json --report target/benchmarks/rpf2-decompose-compare-probe` measured `stab_circuit_decompose_mpp_spp` at `0.000060760s`, about `1.317e5 source-instructions/s`.
-- `just bench::compare --only pf2-feedback-inline-batch --baseline target/benchmarks/rpf2-feedback-probe-baseline/baseline.json --report target/benchmarks/rpf2-feedback-compare-probe` measured `stab_circuit_with_inlined_feedback_mpp` at `0.000002352s`, about `4.252e5 transforms/s`.
+- `just bench::compare --only pf2-feedback-inline-batch --baseline target/benchmarks/pf2-feedback-repeat-probe-baseline/baseline.json --report target/benchmarks/pf2-feedback-repeat-probe-compare` measured `stab_circuit_with_inlined_feedback_mpp` at `0.000002594s`, about `3.855e5 transforms/s`, and `stab_circuit_with_inlined_feedback_repeat_loop` at `0.000052458s`, about `5.719e5 repeat-iterations/s`.
 - `just bench::compare --only pf2-time-reverse-flow --baseline target/benchmarks/rpf2-time-reverse-flow-probe/baseline.json --report target/benchmarks/rpf2-time-reverse-flow-compare` measured `stab_circuit_time_reversed_for_flows_unitary` at `0.000009764s`, about `4.097e5 flows/s`.
 - `just bench::compare --only pf2-time-reverse-flow-measurement --baseline target/benchmarks/rpf2-time-reverse-flow-measurement-probe/baseline.json --report target/benchmarks/rpf2-time-reverse-flow-measurement-compare` measured `stab_circuit_time_reversed_for_flows_measurement` at `0.000003706s`, about `1.079e6 flows/s`.
 
@@ -90,6 +89,8 @@ Passed for this slice:
 - `cargo test -p stab-oracle fixtures --quiet`
 - `just oracle::run --milestone PF2 --structural`
 - `just bench::smoke`
+- `just bench::baseline --only pf2-feedback-inline-batch --out target/benchmarks/pf2-feedback-repeat-probe-baseline`
+- `just bench::compare --only pf2-feedback-inline-batch --baseline target/benchmarks/pf2-feedback-repeat-probe-baseline/baseline.json --report target/benchmarks/pf2-feedback-repeat-probe-compare`
 - `just bench::baseline --only pf2-time-reverse-flow-measurement --out target/benchmarks/rpf2-time-reverse-flow-measurement-probe`
 - `just bench::compare --only pf2-time-reverse-flow-measurement --baseline target/benchmarks/rpf2-time-reverse-flow-measurement-probe/baseline.json --report target/benchmarks/rpf2-time-reverse-flow-measurement-compare`
 

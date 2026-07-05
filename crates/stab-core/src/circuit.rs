@@ -33,6 +33,10 @@ impl Circuit {
         }
     }
 
+    pub(crate) fn from_unfused_items(items: Vec<CircuitItem>) -> Self {
+        Self { items }
+    }
+
     pub fn from_stim_str(input: &str) -> CircuitResult<Self> {
         Parser::new(input).parse()
     }

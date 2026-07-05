@@ -4,7 +4,7 @@
 
 This is a one-week follow-up plan for the detector-analysis utility work left behind by M9.
 The goal is to promote three bounded surfaces from vague manifest-only or partial status into source-owned Rust evidence: simple detecting-region extraction, basic single-record missing-detector suggestions, and MPP feedback-inlining parity for `circuit_with_inlined_feedback`.
-This plan deliberately avoids full transform API parity, exact loop refolding, multi-record missing-detector row reduction, honeycomb and toric missing-detector analysis, full MPP stabilizer-product missing-detector analysis, sweep-aware `detect`, Python bindings, diagrams, and `explain_errors`.
+This plan deliberately avoided full transform API parity, exact loop refolding in that M9 slice, multi-record missing-detector row reduction, honeycomb and toric missing-detector analysis, full MPP stabilizer-product missing-detector analysis, sweep-aware `detect`, Python bindings, diagrams, and `explain_errors`.
 
 Use `docs/plans/lessons-learned.md` as the guardrail.
 The central rule for this plan is that upstream file names are not acceptance criteria.
@@ -21,9 +21,9 @@ This plan implements only the basic missing-measurement subset with single-recor
 
 `oracle/fixtures/manifest.csv` currently marks `coverage-util-top-transform-without-feedback` as implemented for the M9-owned subset.
 The implemented subset covers basic measurement-feedback removal, demolition feedback, interleaved-operation ordering, sweep-control preservation, and the public `m2d --ran_without_feedback` command case.
-`docs/plans/milestone-spec-gaps.md` still records exact loop refolding and full MPP transform parity as gaps.
+At the time of this plan, `docs/plans/milestone-spec-gaps.md` still recorded exact loop refolding and full MPP transform parity as gaps.
 This plan closes the MPP feedback-transform gap only.
-Exact loop refolding remains future work.
+Broader repeat-contained feedback remains future work after the later PF2 selected bounded loop-refolding slice.
 
 ## Public Rust Surface Changes
 
@@ -193,8 +193,8 @@ Implementation tasks:
 - Preserve non-feedback operation order.
 - Preserve sweep-controlled operations as sweep-controlled operations.
 - Preserve detector and observable meaning by rewriting affected `DETECTOR` and `OBSERVABLE_INCLUDE` declarations, not by merely deleting feedback instructions.
-- Reject repeat blocks and unsupported classical controlled feedback gates with precise errors until exact loop refolding and full feedback-gate parity are planned.
-- Keep exact loop refolding out of scope and keep the existing gap entry until a dedicated transform-refolding plan owns it.
+- Reject repeat blocks and unsupported classical controlled feedback gates with precise errors in this M9 slice until loop refolding and full feedback-gate parity are planned.
+- Keep loop refolding out of scope for this M9 slice and keep the existing gap entry until a dedicated transform-refolding plan owns it.
 
 Required tests:
 
@@ -206,13 +206,13 @@ Required tests:
 Oracle evidence:
 
 - Update `coverage-util-top-transform-without-feedback` metadata so the implemented subset includes MPP feedback transform parity.
-- Keep a separate future note for exact loop refolding.
+- Keep a separate future note for loop refolding.
 
 Acceptance:
 
 - `cargo test -p stab-core circuit_with_inlined_feedback --quiet` passes with the new MPP test included.
 - `just oracle::run --milestone M9` passes for implemented transform rows.
-- `docs/plans/milestone-spec-gaps.md` no longer lists MPP transform parity as unresolved, but still lists exact loop refolding as future work.
+- `docs/plans/milestone-spec-gaps.md` no longer lists MPP transform parity as unresolved, but still lists loop refolding as future work for this historical M9 slice.
 - Unsupported feedback-inlining shapes fail closed instead of passing through to a partial transform.
 
 ## Milestone 4: Add Report-Only Utility Benchmarks
@@ -262,7 +262,7 @@ Documentation tasks:
 
 - Update `docs/stab-feature-checklist.md` so detecting regions, basic missing detectors, and MPP feedback inlining are marked as implemented subsets with exact remaining gaps.
 - Update `docs/plans/rust-stim-drop-in-rewrite.md` so the M9 follow-up text no longer says every detector-analysis utility row is manifest-only.
-- Update `docs/plans/milestone-spec-gaps.md` to close the MPP transform gap and keep exact loop refolding, multi-record missing-detector row reduction, and broader missing-detector analysis as future gaps.
+- Update `docs/plans/milestone-spec-gaps.md` to close the MPP transform gap and keep loop refolding, multi-record missing-detector row reduction, and broader missing-detector analysis as future gaps for this M9 slice.
 - Add a completion report under `docs/plans/` after implementation, including test commands, oracle rows, benchmark rows, probe report paths, audit findings, review findings, and remaining exclusions.
 - Keep `--detector_hypergraph` excluded and do not reopen any CLI detector-hypergraph support.
 
