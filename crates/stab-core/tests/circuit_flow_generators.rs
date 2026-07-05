@@ -389,6 +389,79 @@ fn circuit_flow_generators_promotes_unitary_mixed_measurement_subset() {
 }
 
 #[test]
+fn circuit_flow_generators_measurement_subset_ignores_annotations_and_noise() {
+    let base = circuit(
+        "
+        H 0
+        M 0
+        CX rec[-1] 1
+        MZZ 0 1
+        MPAD 0 1
+        ",
+    );
+    let decorated = circuit(
+        "
+        QUBIT_COORDS(1, 2) 0
+        H 0
+        X_ERROR(0.125) 0
+        Y_ERROR(0.125) 1
+        Z_ERROR(0.125) 0
+        DEPOLARIZE1(0.125) 0
+        DEPOLARIZE2(0.125) 0 1
+        PAULI_CHANNEL_1(0.01, 0.02, 0.03) 0
+        PAULI_CHANNEL_2(0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.010, 0.011, 0.012, 0.013, 0.014, 0.015) 0 1
+        CORRELATED_ERROR(0.125) X0
+        ELSE_CORRELATED_ERROR(0.125) Z1
+        I_ERROR(0.125) 0
+        II_ERROR(0.125) 0 1
+        SHIFT_COORDS(1, 2)
+        M 0
+        DETECTOR(5) rec[-1]
+        OBSERVABLE_INCLUDE(3) rec[-1]
+        CX rec[-1] 1
+        MZZ 0 1
+        DETECTOR rec[-1]
+        OBSERVABLE_INCLUDE(4) X0 Z1
+        MPAD 0 1
+        TICK
+        ",
+    );
+
+    let expected = circuit_flow_generators(&base).expect("base generators");
+    let actual = circuit_flow_generators(&decorated).expect("decorated generators");
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn circuit_flow_generators_measurement_subset_composes_spp_unitaries() {
+    for text in [
+        "SPP Z0\nM 0\n",
+        "SPP_DAG Z0\nMX 0\n",
+        "SPP X0*X1\nMXX 0 1\n",
+        "
+        REPEAT 2 {
+            SPP X0*X1
+            MZZ 0 1
+        }
+        ",
+    ] {
+        let original = circuit(text);
+        let flows = circuit_flow_generators(&original).expect(text);
+        assert_eq!(
+            flows,
+            circuit_flow_generators(&original.decomposed().expect("decompose SPP circuit"))
+                .expect("decomposed generators"),
+            "{text}"
+        );
+        assert_eq!(
+            check_if_circuit_has_unsigned_stabilizer_flows(&original, &flows),
+            vec![true; flows.len()],
+            "{text}"
+        );
+    }
+}
+
+#[test]
 fn circuit_flow_generators_promotes_bounded_repeat_measurement_subset() {
     for (repeat_text, expanded_text) in [
         ("REPEAT 2 {\n    M 0\n}\n", "M 0\nM 0\n"),
@@ -503,6 +576,14 @@ fn circuit_flow_generators_measurement_subset_rejects_anti_hermitian_mpp_product
     assert!(
         error.contains("anti-Hermitian"),
         "unexpected anti-Hermitian SPP error: {error}"
+    );
+
+    let error = circuit_flow_generators(&circuit("SPP X0*Z0\nM 0\n"))
+        .expect_err("composed anti-Hermitian SPP product")
+        .to_string();
+    assert!(
+        error.contains("anti-Hermitian"),
+        "unexpected composed anti-Hermitian SPP error: {error}"
     );
 }
 

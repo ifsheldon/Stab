@@ -13,8 +13,8 @@ use super::{measure_stab_iterations, stab_runner_error};
 const UTILITY_BATCH: usize = 4096;
 #[cfg(test)]
 const UTILITY_BATCH: usize = 2;
-const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 36;
-const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 120;
+const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 40;
+const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 134;
 const FLOW_GENERATOR_MEASUREMENT_PYTHON_CASES: usize = 4;
 const FLOW_GENERATOR_MEASUREMENT_PYTHON_FLOWS: usize = 32;
 const FLOW_SOLVE_MEASUREMENT_CASES: usize = 2;
@@ -93,7 +93,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "pf5-flow-generators-measurement-rich" => Some(
-            "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/pair-measurement/MPP/SPP/composed-measurement/unitary-mixed/bounded-repeat/feedback/MPAD/heralded-noise subset without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/pair-measurement/MPP/SPP/composed-measurement/unitary-mixed/annotation-noise-noop/bounded-repeat/feedback/MPAD/heralded-noise subset without a faithful pinned Stim CLI timing ratio",
         ),
         "pf5-flow-generators-measurement-python" => Some(
             "report-only: Stab measures the Rust circuit_flow_generators promoted Python multi-target examples without a faithful pinned Stim CLI timing ratio",
@@ -263,6 +263,37 @@ fn flow_generator_measurement_rich_corpus(
         ("R 0\nM 0\n", 2),
         ("R 0\nH 0\nM 0\n", 1),
         ("M 0\nR 0\n", 2),
+        (
+            "
+            QUBIT_COORDS(1, 2) 0
+            H 0
+            X_ERROR(0.125) 0
+            Y_ERROR(0.125) 1
+            Z_ERROR(0.125) 0
+            DEPOLARIZE1(0.125) 0
+            DEPOLARIZE2(0.125) 0 1
+            PAULI_CHANNEL_1(0.01, 0.02, 0.03) 0
+            PAULI_CHANNEL_2(0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.010, 0.011, 0.012, 0.013, 0.014, 0.015) 0 1
+            CORRELATED_ERROR(0.125) X0
+            ELSE_CORRELATED_ERROR(0.125) Z1
+            I_ERROR(0.125) 0
+            II_ERROR(0.125) 0 1
+            SHIFT_COORDS(1, 2)
+            M 0
+            DETECTOR(5) rec[-1]
+            OBSERVABLE_INCLUDE(3) rec[-1]
+            CX rec[-1] 1
+            MZZ 0 1
+            DETECTOR rec[-1]
+            OBSERVABLE_INCLUDE(4) X0 Z1
+            MPAD 0 1
+            TICK
+            ",
+            6,
+        ),
+        ("SPP Z0\nM 0\n", 2),
+        ("SPP_DAG Z0\nMX 0\n", 2),
+        ("SPP X0*X1\nMXX 0 1\n", 4),
         ("REPEAT 2 {\n    M 0\n}\n", 3),
         ("M 0\nMX 1\nMY 2\n", 6),
         ("MXX 0 1\nMZZ 0 1\n", 4),

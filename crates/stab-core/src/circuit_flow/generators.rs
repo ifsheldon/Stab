@@ -380,7 +380,9 @@ impl MeasurementFeedbackFlowSolver {
             "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
                 self.undo_heralded_flow_records(instruction)
             }
+            "SPP" | "SPP_DAG" => self.undo_decomposed_instruction(instruction),
             "TICK" => Ok(true),
+            _ if ignored_measurement_flow_generator_instruction(instruction) => Ok(true),
             _ if feedback_measurement_basis(instruction).is_some() => {
                 if self.undo_measurement_feedback(instruction)? {
                     Ok(true)
@@ -668,6 +670,22 @@ impl MeasurementFeedbackFlowSolver {
                     row.measurements(),
                     row.observables(),
                 );
+            }
+        }
+        Ok(true)
+    }
+
+    fn undo_decomposed_instruction(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<bool> {
+        let decomposed = crate::circuit_simplify::decomposed_single_instruction(instruction)?;
+        for item in decomposed.items().iter().rev() {
+            let CircuitItem::Instruction(instruction) = item else {
+                return Ok(false);
+            };
+            if !self.undo_instruction(instruction)? {
+                return Ok(false);
             }
         }
         Ok(true)
@@ -1032,6 +1050,14 @@ fn feedback_measurement_basis(instruction: &CircuitInstruction) -> Option<PauliB
         "CZ" => Some(PauliBasis::Z),
         _ => None,
     }
+}
+
+fn ignored_measurement_flow_generator_instruction(instruction: &CircuitInstruction) -> bool {
+    !instruction.gate().produces_measurements()
+        && matches!(
+            instruction.gate().category(),
+            GateCategory::Annotation | GateCategory::Noise
+        )
 }
 
 fn absolute_record_index(measurements_in_past: usize, record_offset: i32) -> CircuitResult<i32> {
