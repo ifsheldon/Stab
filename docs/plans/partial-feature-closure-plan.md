@@ -243,7 +243,7 @@ Tests:
 
 Benchmarks:
 
-- Add or extend rows `pf6-analyze-errors-generated-surface`, `pf6-error-decomp-loop-folded`, `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, and `pf6-sparse-rev-frame-loop`.
+- Add or extend rows `pf6-analyze-errors-generated-surface`, `pf6-error-decomp-loop-folded`, `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, `pf6-generated-sat-wcnf`, and `pf6-sparse-rev-frame-loop`.
 - For bundled analyzer rows, use schema-version-2 submeasurement thresholds so a passing median cannot hide a slow decomposition or search subcase.
 
 Acceptance criteria:

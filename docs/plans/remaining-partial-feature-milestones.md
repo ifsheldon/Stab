@@ -395,7 +395,7 @@ Owned checklist rows:
 Implementation tasks:
 
 - Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures. The generated-QEC semantic subset for noisy repetition-code and rotated-surface-code circuits is implemented and tracked in [rpf6-analyzer-progress-report.md](rpf6-analyzer-progress-report.md).
-- Extend graphlike, hypergraph, shortest-error, SAT, and WCNF search behavior for selected generated-circuit and DEM cases.
+- Extend graphlike, hypergraph, shortest-error, SAT, and WCNF search behavior for selected generated-circuit and DEM cases. The generated-QEC graphlike and hypergraph search subset is implemented and tracked in [rpf6-search-progress-report.md](rpf6-search-progress-report.md), and the selected generated-QEC SAT/WCNF structural subset is implemented by `pf6-search-generated-sat-wcnf-rust`.
 - Improve sparse reverse detector-frame tracking for optimized loop folding where it affects analyzer or search correctness. The supported-Clifford repeat-folding subset is implemented for the full single-qubit Clifford gate set and fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets, with deterministic generated repeat tests covering nested and grouped target bodies, and the unsigned tracker path supports `SPP` and `SPP_DAG` product propagation for public unsigned-flow checking; analyzer/search-specific consumption and broader variable-target unitary semantics outside this unsigned tracker path remain active.
 - Harden matched-error value objects only when required by active analyzer/search outputs.
 - Keep full stack-frame provenance, heralded matching, repeat-contained noise provenance, and `explain_errors` CLI deferred.
@@ -410,12 +410,12 @@ Tests:
 
 Oracle rows:
 
-- Supplement `pf6-analyzer-generated-looping`, `pf6-search-generated`, and `pf6-sparse-rev-tracker`. The generated-QEC analyzer subset is supplemented by `pf6-analyzer-generated-qec-rust`, and the selected loop-folded decomposition and remnant-edge blocking subset is supplemented by `pf6-error-decomp-loop-folded-rust`; the broader generated-looping row remains manifest-only.
+- Supplement `pf6-analyzer-generated-looping`, `pf6-search-generated`, and `pf6-sparse-rev-tracker`. The generated-QEC analyzer subset is supplemented by `pf6-analyzer-generated-qec-rust`, the selected loop-folded decomposition and remnant-edge blocking subset is supplemented by `pf6-error-decomp-loop-folded-rust`, the generated-QEC graphlike and hypergraph search subset is supplemented by `pf6-search-generated-qec-rust`, and the selected generated-QEC SAT/WCNF structural subset is supplemented by `pf6-search-generated-sat-wcnf-rust`; the broader generated-looping and generated-search rows remain manifest-only.
 - Use exact `.dem` comparators where output order is stable and structural comparators otherwise.
 
 Benchmarks:
 
-- Implement or extend `pf6-analyze-errors-generated-surface`, `pf6-error-decomp-loop-folded`, `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, and `pf6-sparse-rev-frame-loop`. The generated-surface analyzer, loop-folded decomposition, generated graphlike search, generated hypergraph search, and supported-Clifford sparse reverse frame loop rows have report-only Rust runners.
+- Implement or extend `pf6-analyze-errors-generated-surface`, `pf6-error-decomp-loop-folded`, `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, `pf6-generated-sat-wcnf`, and `pf6-sparse-rev-frame-loop`. The generated-surface analyzer, loop-folded decomposition, generated graphlike search, generated hypergraph search, generated SAT/WCNF encoding, and supported-Clifford sparse reverse frame loop rows have report-only Rust runners.
 - Use schema-version-2 submeasurement thresholds for bundled analyzer or search rows.
 - Promote only rows with faithful pinned Stim evidence and repeated stable ratios.
 

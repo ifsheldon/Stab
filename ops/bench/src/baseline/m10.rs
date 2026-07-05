@@ -8,8 +8,9 @@ use stab_core::{
     Circuit, CodeDistance, DetectorErrorModel, ErrorAnalyzerOptions, Flow, Probability, RoundCount,
     SurfaceCodeParams, SurfaceCodeTask, check_if_circuit_has_unsigned_stabilizer_flows,
     circuit_to_detector_error_model, find_undetectable_logical_error,
-    generate_surface_code_circuit, independent_to_disjoint_xyz_errors,
-    shortest_graphlike_undetectable_logical_error, try_disjoint_to_independent_xyz_errors,
+    generate_surface_code_circuit, independent_to_disjoint_xyz_errors, likeliest_error_sat_problem,
+    shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
+    try_disjoint_to_independent_xyz_errors,
 };
 
 use crate::allocations::measure_tracked_memory;
@@ -73,6 +74,7 @@ pub(super) fn run_dem_compare_row(
         "pf6-error-decomp-loop-folded" => run_error_decomp_loop_folded_row(row).map(Some),
         "pf6-graphlike-search-generated" => run_generated_graphlike_search_row(row).map(Some),
         "pf6-hypergraph-search-generated" => run_generated_hypergraph_search_row(row).map(Some),
+        "pf6-generated-sat-wcnf" => run_generated_sat_wcnf_row(row).map(Some),
         "pf6-sparse-rev-frame-loop" => run_sparse_reverse_frame_loop_row(row).map(Some),
         "pf7-cli-analyze-errors-generated" => run_analyze_generated_cli_row(row).map(Some),
         "pf7-cli-analyze-errors-decompose" => run_analyze_decompose_cli_row(row).map(Some),
@@ -109,6 +111,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         }
         ("pf6-graphlike-search-generated", "stab_pf6_graphlike_search_generated_surface")
         | ("pf6-hypergraph-search-generated", "stab_pf6_hypergraph_search_generated_surface") => {
+            Some((error_analyzer_detector_count(), "detectors/s"))
+        }
+        ("pf6-generated-sat-wcnf", "stab_pf6_shortest_sat_generated_surface")
+        | ("pf6-generated-sat-wcnf", "stab_pf6_likeliest_sat_generated_surface") => {
             Some((error_analyzer_detector_count(), "detectors/s"))
         }
         ("pf6-sparse-rev-frame-loop", "stab_pf6_sparse_rev_unitary_repeat_flow") => Some((
@@ -168,6 +174,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf6-hypergraph-search-generated" => Some(
             "report-only: Stab measures generated rotated-surface-code DEM hypergraph search after source-owned Rust analysis and decomposition; pinned Stim exposes this as C++ API behavior, not a faithful public CLI baseline",
+        ),
+        "pf6-generated-sat-wcnf" => Some(
+            "report-only: Stab measures shortest and weighted WCNF generation for a generated rotated-surface-code DEM after source-owned Rust analysis and decomposition; pinned Stim exposes SAT encoding as C++ API behavior, not a faithful public CLI baseline",
         ),
         "pf6-sparse-rev-frame-loop" => Some(
             "report-only: Stab measures public unsigned-flow checking over a measurement-dependent fixed two-qubit Clifford unitary repeat so the sparse reverse frame tracker must use loop folding; broader sparse tracker parity and provenance remain outside this row",
@@ -384,6 +393,32 @@ fn run_generated_hypergraph_search_row(row: &BenchmarkRow) -> Result<Vec<Measure
             Ok(())
         },
     )?])
+}
+
+fn run_generated_sat_wcnf_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let model = generated_search_surface_code_dem(&row.id)?;
+    Ok(vec![
+        measure_stab_iterations(
+            "stab_pf6_shortest_sat_generated_surface",
+            ERROR_ANALYZER_COMPARE_ITERATIONS,
+            || {
+                let wcnf = shortest_error_sat_problem(&model)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(wcnf.len());
+                Ok(())
+            },
+        )?,
+        measure_stab_iterations(
+            "stab_pf6_likeliest_sat_generated_surface",
+            ERROR_ANALYZER_COMPARE_ITERATIONS,
+            || {
+                let wcnf = likeliest_error_sat_problem(&model, 100)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(wcnf.len());
+                Ok(())
+            },
+        )?,
+    ])
 }
 
 fn run_analyze_sweep_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {

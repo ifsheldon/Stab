@@ -149,12 +149,13 @@ impl MaxSatInstance {
     }
 
     fn to_wdimacs(&self, mode: SatProblemMode) -> CircuitResult<String> {
-        let top = self.top_weight(mode)?;
+        let emitted_clause_count = self.emitted_clause_count(mode)?;
+        let top = self.top_weight(mode, emitted_clause_count)?;
         let mut out = String::new();
         out.push_str("p wcnf ");
         out.push_str(&self.num_variables.to_string());
         out.push(' ');
-        out.push_str(&self.clauses.len().to_string());
+        out.push_str(&emitted_clause_count.to_string());
         out.push(' ');
         out.push_str(&top.to_string());
         out.push('\n');
@@ -176,9 +177,32 @@ impl MaxSatInstance {
         Ok(out)
     }
 
-    fn top_weight(&self, mode: SatProblemMode) -> CircuitResult<usize> {
+    fn emitted_clause_count(&self, mode: SatProblemMode) -> CircuitResult<usize> {
+        let mut count = 0usize;
+        for clause in &self.clauses {
+            if self.clause_is_emitted(mode, clause)? {
+                count = count.checked_add(1).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model("SAT clause count overflowed")
+                })?;
+            }
+        }
+        Ok(count)
+    }
+
+    fn clause_is_emitted(&self, mode: SatProblemMode, clause: &Clause) -> CircuitResult<bool> {
+        match clause.weight {
+            ClauseWeight::Hard => Ok(true),
+            ClauseWeight::Soft(_) => Ok(self.quantized_weight(mode, 0, &clause.weight)? != 0),
+        }
+    }
+
+    fn top_weight(
+        &self,
+        mode: SatProblemMode,
+        emitted_clause_count: usize,
+    ) -> CircuitResult<usize> {
         match mode {
-            SatProblemMode::Unweighted => self.clauses.len().checked_add(1).ok_or_else(|| {
+            SatProblemMode::Unweighted => emitted_clause_count.checked_add(1).ok_or_else(|| {
                 CircuitError::invalid_detector_error_model("unweighted SAT top weight overflowed")
             }),
             SatProblemMode::Weighted { quantization } => {
@@ -188,7 +212,7 @@ impl MaxSatInstance {
                     )
                 })?;
                 quantization
-                    .checked_mul(self.clauses.len())
+                    .checked_mul(emitted_clause_count)
                     .and_then(|value| value.checked_add(1))
                     .ok_or_else(|| {
                         CircuitError::invalid_detector_error_model(
@@ -487,7 +511,7 @@ mod tests {
     )]
 
     use super::{likeliest_error_sat_problem, shortest_error_sat_problem};
-    use crate::{CircuitResult, DetectorErrorModel};
+    use crate::{CircuitError, CircuitResult, DetectorErrorModel};
 
     const UNSAT_WDIMACS: &str = "p wcnf 1 2 3\n3 -1 0\n3 1 0\n";
     const TWO_ERROR_UNWEIGHTED_WDIMACS: &str = "\
@@ -615,6 +639,28 @@ p wcnf 3 7 71
 "
         );
         Ok(())
+    }
+
+    #[test]
+    fn sat_problem_likeliest_header_counts_emitted_clauses() -> CircuitResult<()> {
+        let wcnf = likeliest_error_sat_problem(&dem("error(0.1) D0 L0\nerror(0.49) D0\n")?, 1)?;
+        let clause_count = wcnf_clause_count(&wcnf)?;
+        assert_eq!(wcnf.lines().skip(1).count(), clause_count, "{wcnf}");
+        Ok(())
+    }
+
+    fn wcnf_clause_count(wcnf: &str) -> CircuitResult<usize> {
+        let header = wcnf.lines().next().ok_or_else(|| {
+            CircuitError::invalid_detector_error_model("test WCNF output is missing a header")
+        })?;
+        let clause_count = header.split_whitespace().nth(3).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model("test WCNF header is missing a clause count")
+        })?;
+        clause_count.parse::<usize>().map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "test WCNF header clause count is not numeric",
+            )
+        })
     }
 
     #[test]

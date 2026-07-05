@@ -56,6 +56,7 @@ Related PF6 report-only runner coverage tracked in search and sparse-tracker rep
 
 - `pf6-graphlike-search-generated`
 - `pf6-hypergraph-search-generated`
+- `pf6-generated-sat-wcnf`
 - `pf6-sparse-rev-frame-loop`
 
 No analyzer benchmark placeholder remains in this report after promoting `pf6-error-decomp-loop-folded`.

@@ -85,6 +85,15 @@ fn pf6_analyzer_benchmark_rows_have_stab_compare_runners() {
             &["stab_pf6_hypergraph_search_generated_surface"][..],
         ),
         (
+            "pf6-generated-sat-wcnf",
+            "src/stim/search/sat/wcnf.test.cc",
+            "sat-wcnf-generated",
+            &[
+                "stab_pf6_shortest_sat_generated_surface",
+                "stab_pf6_likeliest_sat_generated_surface",
+            ][..],
+        ),
+        (
             "pf6-sparse-rev-frame-loop",
             "src/stim/simulators/sparse_rev_frame_tracker.test.cc",
             "sparse-rev-frame",
