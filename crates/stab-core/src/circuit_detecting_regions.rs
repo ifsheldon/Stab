@@ -1018,6 +1018,51 @@ mod tests {
     }
 
     #[test]
+    fn detecting_regions_gauge_ignores_measurement_collapse_when_requested() {
+        let circuit =
+            Circuit::from_stim_str("RX 0\nTICK\nM 0\nTICK\nMX 0\nDETECTOR rec[-1]\n").unwrap();
+        let ignored = circuit_detecting_regions(
+            &circuit,
+            DetectingRegionOptions {
+                detectors: vec![detector(0)],
+                ticks: vec![0, 1],
+                ignore_anticommutation_errors: true,
+            },
+        )
+        .unwrap();
+        assert_eq!(ignored[&detector(0)][&0].to_string(), "+X");
+        assert_eq!(ignored[&detector(0)][&1].to_string(), "+X");
+
+        let error = circuit_detecting_regions(
+            &circuit,
+            DetectingRegionOptions {
+                detectors: vec![detector(0)],
+                ticks: vec![0, 1],
+                ignore_anticommutation_errors: false,
+            },
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("anti-commuted"));
+    }
+
+    #[test]
+    fn detecting_regions_gauge_allows_product_measurement_cancellation() {
+        let actual = regions(
+            "RX 0 1\n\
+             TICK\n\
+             MZZ 0 1\n\
+             TICK\n\
+             MX 0 1\n\
+             DETECTOR rec[-1] rec[-2]\n",
+            vec![detector(0)],
+            vec![0, 1],
+        );
+
+        assert_eq!(actual[&detector(0)][&0].to_string(), "+XX");
+        assert_eq!(actual[&detector(0)][&1].to_string(), "+XX");
+    }
+
+    #[test]
     fn detecting_regions_omits_identity_snapshots() {
         let actual = regions(
             "H 0\n\

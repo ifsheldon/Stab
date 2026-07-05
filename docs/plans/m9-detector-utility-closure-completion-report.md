@@ -4,7 +4,7 @@
 
 The M9 detector utility closure implemented the bounded follow-up scope from `docs/plans/m9-detector-utility-closure-plan.md`.
 Stab now exposes typed Rust APIs for the simple detecting-regions case and the basic single-record missing-detectors subset, and `circuit_with_inlined_feedback` now has source-owned MPP feedback-transform parity evidence for the scoped transform.
-Broader detecting-region target-shape support, gauge handling, multi-record missing-detector row reduction, repeated MPP stabilizer-product missing-detector analysis, observable-interaction missing-detector analysis, honeycomb suffix analysis, toric suffix analysis, broader repeat-contained feedback, unsupported classical feedback gates, and full transform API parity remain future work. The later PF2 feedback slice added selected bounded loop-refolding evidence.
+Broader detecting-region target-shape support, broader gauge handling, multi-record missing-detector row reduction, repeated MPP stabilizer-product missing-detector analysis, observable-interaction missing-detector analysis, honeycomb suffix analysis, toric suffix analysis, broader repeat-contained feedback, unsupported classical feedback gates, and full transform API parity remain future work. Later PF5 slices added selected detecting-region gauge evidence, and the later PF2 feedback slice added selected bounded loop-refolding evidence.
 
 ## Implemented Surfaces
 
@@ -132,6 +132,6 @@ The manual pre-commit hook reported no staged changes, which is expected because
 - Multi-record missing-detector row reduction and deterministic invariant solving.
 - Observable-interaction missing-detector analysis.
 - Honeycomb-code and toric-code missing-detector suffix analysis.
-- Broader detecting-region target-shape support and gauge handling.
+- Broader detecting-region target-shape support and broader gauge handling.
 - Sweep-aware `detect`, Python bindings, JS/WASM, diagrams, `explain_errors`, `repl`, QASM, Quirk, GPU, and public graph/vector simulator APIs.
 - Deprecated `--detector_hypergraph` support.

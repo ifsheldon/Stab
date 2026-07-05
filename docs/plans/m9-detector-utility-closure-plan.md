@@ -48,7 +48,7 @@ The API returns deterministic `BTreeMap` values ordered by detector id and tick.
 The implemented tick contract must match the pinned Stim simple case: for the circuit `H 0; TICK; CX 0 1; TICK; MXX 0 1; DETECTOR rec[-1]`, detector `D0` at tick `0` is `X_` and detector `D0` at tick `1` is `XX`.
 The API supports `ignore_anticommutation_errors = false`.
 For the original M9 plan, `ignore_anticommutation_errors = true` returned a precise unsupported-domain error because broader gauge-handling was future scope.
-PF5 later promoted ignored anticommutation mode for the current supported detecting-region subset while leaving gauge behavior future work.
+PF5 later promoted ignored anticommutation mode, selected measurement-gauge ignored-mode behavior, and product-measurement gauge-cancellation behavior for the current supported detecting-region subset while leaving broader gauge behavior future work.
 
 Add a basic missing-detectors API in `stab-core`:
 
@@ -77,7 +77,7 @@ Goal: prevent this week from inheriting broad, ambiguous upstream-file acceptanc
 
 Tasks:
 
-- Split `coverage-util-top-circuit-to-detecting-regions` into one implemented target row for the simple H/CX/MXX case and one future row for multi-detector or gauge-handling expansion.
+- Split `coverage-util-top-circuit-to-detecting-regions` into one implemented target row for the simple H/CX/MXX case and one future row for multi-detector or broader gauge-handling expansion.
 - Split `coverage-util-top-missing-detectors` into one implemented target row for basic reset, measure, duplicate-detector, nondeterministic-ignore, duplicate-target parity, and single-record partial multi-measurement cases, plus future rows for multi-record row reduction, repeated MPP stabilizer parity, observable interactions, honeycomb suffix, and toric suffix.
 - Split the current `coverage-util-top-transform-without-feedback` note so it names the currently implemented subset, the new required MPP subcase, and the still-future exact loop-refolding subcase.
 - Add or update red Rust tests before implementation work begins.
@@ -108,7 +108,7 @@ Implementation tasks:
 - Seed the reverse traversal from requested detector ids, propagate detector sensitivity backward through supported Clifford operations, and snapshot the requested tick layers.
 - Support the operations required by the owned case: `H`, `CX`, `MXX`, `TICK`, and `DETECTOR rec[-1]`.
 - Normalize returned `FlexPauliString` values to the circuit qubit width, using identity for qubits not in the region.
-- Return a clear error when a requested detector id does not exist, when a requested tick is outside the circuit tick range, or when the circuit requires unsupported anticommutation or gauge handling.
+- Return a clear error when a requested detector id does not exist, when a requested tick is outside the circuit tick range, or when the circuit requires unsupported anticommutation or broader gauge handling.
 - Return a clear unsupported-domain error for repeat blocks or gates outside the owned simple subset instead of attempting partial propagation.
 - Preserve deterministic output ordering even when the caller provides duplicate or unsorted detector ids and ticks.
 
@@ -118,7 +118,7 @@ Required tests:
 - Duplicate detector and tick inputs are deduplicated in the returned map.
 - Unknown detector id returns a domain error.
 - Out-of-range tick returns a domain error.
-- Unsupported gauge behavior and default false-mode anticommutation conflicts return domain errors.
+- Unsupported broader gauge behavior and default false-mode anticommutation conflicts return domain errors.
 - Unsupported gates and repeat blocks return domain errors that make the scoped subset explicit.
 
 Oracle evidence:
@@ -129,7 +129,7 @@ Acceptance:
 
 - The promoted row passes under `just oracle::run --milestone M9`.
 - The API is public from `stab-core` and uses typed detector ids, typed options, and `FlexPauliString`, not raw strings.
-- The implementation does not claim repeat-block traversal, unsupported-gate propagation, multi-detector gauge handling, or full Python API parity.
+- The implementation does not claim repeat-block traversal, unsupported-gate propagation, broader multi-detector gauge handling, or full Python API parity.
 
 ## Milestone 2: Implement Basic Missing Detectors
 
