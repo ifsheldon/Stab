@@ -82,6 +82,6 @@ just bench::compare --only pf6-error-decomp-loop-folded --baseline target/benchm
 - Generated-loop analyzer behavior beyond the promoted generated-QEC semantic subset.
 - Broader loop-folded error decomposition subcases beyond the promoted repeated composite-error and remnant-edge blocking fixtures.
 - Generated-circuit graphlike, hypergraph, shortest-error, SAT, and WCNF search evidence.
-- Sparse reverse detector-frame tracker behavior beyond supported-Clifford unitary-repeat folding, including broader all-unitary fuzz coverage and analyzer/search-specific consumption.
+- Sparse reverse detector-frame tracker analyzer/search-specific consumption beyond the supported-Clifford generated repeat-folding evidence.
 - Active matched-error value-object hardening required by analyzer or search outputs.
 - Full ErrorMatcher provenance, heralded matching, repeat-contained noise provenance, and `stim explain_errors` remain deferred unless the roadmap deliberately promotes them.

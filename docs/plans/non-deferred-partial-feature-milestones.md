@@ -361,7 +361,7 @@ Tasks:
 - Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures.
 - Extend graphlike, hypergraph, shortest-error, SAT, and WCNF behavior for selected generated-circuit and direct DEM cases.
 - Add ordering-insensitive structural comparators for search outputs where exact target order is not stable.
-- Improve sparse reverse detector-frame tracking for optimized loop folding and all-unitary fuzz coverage where that affects analyzer or search correctness. The supported-Clifford unitary-repeat folding subset is implemented for the full single-qubit Clifford gate set and fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets; broader all-unitary fuzzing and analyzer/search-specific consumption remain active.
+- Improve sparse reverse detector-frame tracking for optimized loop folding and analyzer or search correctness. The supported-Clifford unitary-repeat folding subset is implemented for the full single-qubit Clifford gate set and fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets, with deterministic generated repeat tests covering nested repeats, multi-target single-qubit instructions, multi-pair two-qubit instructions, and no-fold traversal comparisons; analyzer/search-specific consumption and unsupported variable-target unitary semantics remain active.
 - Harden matched-error value objects only where active analyzer/search outputs require them.
 - Keep full stack-frame provenance, heralded matching, repeat-contained noise provenance, and `explain_errors` CLI deferred.
 
@@ -370,7 +370,7 @@ Tests:
 - Port owned cases from `vendor/stim/src/stim/simulators/error_analyzer.test.cc`, `vendor/stim/src/stim/simulators/error_matcher.test.cc`, `vendor/stim/src/stim/simulators/matched_error.test.cc`, `vendor/stim/src/stim/search/graphlike/algo.test.cc`, `vendor/stim/src/stim/search/hyper/algo.test.cc`, `vendor/stim/src/stim/search/sat/wcnf.test.cc`, and `vendor/stim/src/stim/util_top/circuit_to_dem.test.cc`.
 - Add exact `.dem` output tests for deterministic analyzer cases.
 - Add structural tests for generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, ignored failures, graphlike search, hypergraph search, SAT/WCNF encoding, and shortest-error results.
-- Add generated or fuzz tests for all-unitary sparse reverse tracking, repeated loops, detectors with coordinates, observables, and decomposed noise.
+- Add generated or property-style tests for sparse reverse tracking when new supported unitary families, repeated loops, detectors with coordinates, observables, decomposed noise, analyzer consumption, or search consumption are promoted.
 - Add negative tests for unsupported analyzer options, invalid decomposition behavior, excessive repeat expansion, and unsupported provenance requests.
 
 Oracle rows:

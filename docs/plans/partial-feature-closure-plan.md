@@ -35,7 +35,7 @@ Rows whose only remaining gap is intentionally deferred are recorded as exclusio
 | Detector-analysis utility APIs | PF5 | Detecting regions, missing detectors, feedback inlining, exact loop refolding decisions, and typed Rust APIs for owned subcases. | Honeycomb or toric suffix parity unless specifically promoted by PF5 subcase extraction. |
 | Circuit-to-DEM analysis and `analyze_errors` flags | PF6 and PF7 | Analyzer behavior, CLI flags, decomposition behavior, loop folding, and generated-circuit parity where owned by Rust/CLI. | `stim explain_errors` CLI and full ErrorMatcher provenance. |
 | Shortest graphlike and hypergraph logical-error search | PF6 | Broader Rust search parity and generated-circuit evidence for non-deferred search APIs. | New public graph/vector simulator APIs. |
-| Sparse reverse detector-frame tracking | PF6 | Optimized loop folding, unitary fuzzing, and analyzer/search integration needed by implemented APIs. | Full ErrorMatcher provenance if it only serves deferred `explain_errors`. |
+| Sparse reverse detector-frame tracking | PF6 | Optimized loop folding, deterministic generated supported-unitary coverage, and analyzer/search integration needed by implemented APIs. | Full ErrorMatcher provenance if it only serves deferred `explain_errors`. |
 | Flows | PF5 | Measurement-rich flow solving and flow-transform support needed by Rust circuit APIs. | Python flow binding ergonomics. |
 | `stim m2d` | PF7 | Visible CLI parity for supported input/output formats, sweep records, feedback inlining, resource boundaries, and error behavior. | `--detector_hypergraph`, which is intentionally excluded. |
 | `stim analyze_errors` | PF7 | Visible CLI parity for the non-deferred analyzer surface. | `stim explain_errors` and diagram outputs. |
@@ -231,7 +231,7 @@ Included features:
 
 - Broader `circuit_to_detector_error_model` behavior for generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures.
 - Search parity for shortest graphlike errors, hypergraph logical-error search, and generated-circuit search cases selected during PF0.
-- Sparse reverse detector-frame tracking improvements needed by analyzer and search parity, including optimized loop folding and all-unitary fuzz coverage.
+- Sparse reverse detector-frame tracking improvements needed by analyzer and search parity, including optimized loop folding and generated coverage for each promoted unitary family.
 - Existing matched-error value objects may be hardened when analyzer or search needs them, but full provenance is not required in this plan.
 
 Tests:
@@ -239,7 +239,7 @@ Tests:
 - Port owned cases from `vendor/stim/src/stim/simulators/error_analyzer.test.cc`, `vendor/stim/src/stim/simulators/error_matcher.test.cc`, `vendor/stim/src/stim/search/*_test.cc`, `vendor/stim/src/stim/util_top/circuit_to_dem.test.cc`, and generated-circuit analyzer tests.
 - Add exact `.dem` output tests for deterministic analyzer cases.
 - Add structural tests for decomposed errors, gauge detectors, approximate disjoint handling, generated circuits, loop folding, and search results where exact ordering is not stable.
-- Add fuzz or generated tests for all-unitary sparse reverse tracking, repeated loops, detectors with coordinates, and observable frame changes.
+- Add generated or property-style tests for sparse reverse tracking when new supported unitary families, repeated loops, detectors with coordinates, and observable frame changes are promoted.
 
 Benchmarks:
 

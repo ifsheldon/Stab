@@ -211,6 +211,29 @@ mod tests {
     )]
 
     use super::*;
+    use crate::Gate;
+
+    const FIXED_TWO_QUBIT_TABLEAU_GATES: &[&str] = &[
+        "II",
+        "XCX",
+        "XCY",
+        "XCZ",
+        "YCX",
+        "YCY",
+        "YCZ",
+        "SWAP",
+        "ISWAP",
+        "ISWAP_DAG",
+        "CXSWAP",
+        "SWAPCX",
+        "CZSWAP",
+        "SQRT_XX",
+        "SQRT_XX_DAG",
+        "SQRT_YY",
+        "SQRT_YY_DAG",
+        "SQRT_ZZ",
+        "SQRT_ZZ_DAG",
+    ];
 
     fn circuit(text: &str) -> Circuit {
         Circuit::from_stim_str(text).unwrap()
@@ -243,9 +266,95 @@ mod tests {
         tracker
     }
 
+    fn undo_circuit_naively(
+        tracker: &mut SparseReverseFrameTracker,
+        circuit: &Circuit,
+    ) -> CircuitResult<()> {
+        for item in circuit.items().iter().rev() {
+            match item {
+                CircuitItem::Instruction(instruction) => tracker.undo_instruction(instruction)?,
+                CircuitItem::RepeatBlock(repeat) => undo_repeat_naively(tracker, repeat)?,
+            }
+        }
+        Ok(())
+    }
+
+    fn undo_repeat_naively(
+        tracker: &mut SparseReverseFrameTracker,
+        repeat: &RepeatBlock,
+    ) -> CircuitResult<()> {
+        for _ in 0..repeat.repeat_count().get() {
+            undo_circuit_naively(tracker, repeat.body())?;
+        }
+        Ok(())
+    }
+
+    fn assert_repeat_folding_matches_naive(text: &str, input: &str) {
+        let repeat = repeat(text);
+        let mut folded = tracker_from_pauli_text(input);
+        assert!(
+            try_undo_supported_unitary_repeat(&mut folded, &repeat).unwrap(),
+            "{text}"
+        );
+
+        let mut naive = tracker_from_pauli_text(input);
+        undo_repeat_naively(&mut naive, &repeat).unwrap();
+        assert_eq!(folded, naive, "{text}");
+    }
+
+    fn next_generated_value(state: &mut u64) -> usize {
+        *state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        usize::try_from(*state >> 32).unwrap()
+    }
+
+    fn generated_supported_unitary_repeat(
+        seed: u64,
+        repeat_count: u64,
+        instruction_count: usize,
+    ) -> String {
+        let single_gates: Vec<_> = SingleQubitClifford::all()
+            .map(|gate| gate.canonical_name())
+            .collect();
+        let mut state = seed;
+        let mut text = format!("REPEAT {repeat_count} {{\n");
+        for _ in 0..instruction_count {
+            if next_generated_value(&mut state).is_multiple_of(3) {
+                let gate = single_gates[next_generated_value(&mut state) % single_gates.len()];
+                let start = next_generated_value(&mut state) % 6;
+                let target_count = 1 + next_generated_value(&mut state) % 3;
+                text.push_str("    ");
+                text.push_str(gate);
+                for offset in 0..target_count {
+                    text.push(' ');
+                    text.push_str(&((start + offset) % 6).to_string());
+                }
+                text.push('\n');
+            } else {
+                let gate = FIXED_TWO_QUBIT_TABLEAU_GATES
+                    [next_generated_value(&mut state) % FIXED_TWO_QUBIT_TABLEAU_GATES.len()];
+                let pair_start = next_generated_value(&mut state) % 3;
+                let pair_count = 1 + next_generated_value(&mut state) % 2;
+                text.push_str("    ");
+                text.push_str(gate);
+                for offset in 0..pair_count {
+                    let pair = (pair_start + offset) % 3;
+                    text.push(' ');
+                    text.push_str(&(pair * 2).to_string());
+                    text.push(' ');
+                    text.push_str(&(pair * 2 + 1).to_string());
+                }
+                text.push('\n');
+            }
+        }
+        text.push_str("}\n");
+        text
+    }
+
     #[test]
     fn unitary_repeat_folding_matches_naive_mixed_clifford_loop() {
-        let repeat = repeat(
+        assert_repeat_folding_matches_naive(
             "
             REPEAT 37 {
                 H 0
@@ -259,15 +368,8 @@ mod tests {
                 C_ZYX 0
             }
             ",
+            "XYZ",
         );
-        let mut folded = tracker_from_pauli_text("XYZ");
-        assert!(try_undo_supported_unitary_repeat(&mut folded, &repeat).unwrap());
-
-        let mut naive = tracker_from_pauli_text("XYZ");
-        for _ in 0..repeat.repeat_count().get() {
-            naive.undo_circuit(repeat.body()).unwrap();
-        }
-        assert_eq!(folded, naive);
     }
 
     #[test]
@@ -281,45 +383,57 @@ mod tests {
             text.push('\n');
         }
         text.push_str("}\n");
-        let repeat = repeat(&text);
-
-        let mut folded = tracker_from_pauli_text("XYZ");
-        assert!(try_undo_supported_unitary_repeat(&mut folded, &repeat).unwrap());
-
-        let mut naive = tracker_from_pauli_text("XYZ");
-        for _ in 0..repeat.repeat_count().get() {
-            naive.undo_circuit(repeat.body()).unwrap();
-        }
-        assert_eq!(folded, naive);
+        assert_repeat_folding_matches_naive(&text, "XYZ");
     }
 
     #[test]
     fn unitary_repeat_folding_matches_naive_fixed_two_qubit_cliffords() {
-        let repeat = repeat(
+        let mut text = String::from("REPEAT 29 {\n");
+        for (index, gate_name) in FIXED_TWO_QUBIT_TABLEAU_GATES.iter().enumerate() {
+            let gate = Gate::from_name(gate_name).unwrap();
+            assert!(gate.is_two_qubit_gate(), "{gate_name}");
+            assert!(gate.has_tableau(), "{gate_name}");
+            let left = index % 4;
+            let right = (index + 1) % 4;
+            text.push_str("    ");
+            text.push_str(gate_name);
+            text.push(' ');
+            text.push_str(&left.to_string());
+            text.push(' ');
+            text.push_str(&right.to_string());
+            text.push('\n');
+        }
+        text.push_str("    H 0 2\n    S 1 3\n}\n");
+        assert_repeat_folding_matches_naive(&text, "XYZY");
+    }
+
+    #[test]
+    fn unitary_repeat_folding_matches_naive_generated_supported_unitary_loops() {
+        for seed in [1, 2, 3, 5, 8, 13, 21] {
+            let text = generated_supported_unitary_repeat(seed, 7 + seed % 23, 48);
+            assert_repeat_folding_matches_naive(&text, "XYZXYZ");
+        }
+    }
+
+    #[test]
+    fn unitary_repeat_folding_matches_naive_nested_supported_unitary_loops() {
+        assert_repeat_folding_matches_naive(
             "
-            REPEAT 29 {
-                XCX 0 1
-                XCY 1 2
-                SWAP 0 2
-                ISWAP 1 0
-                CXSWAP 2 1
-                SQRT_XX 0 1
-                SQRT_YY_DAG 1 2
-                SQRT_ZZ 0 2
-                SQRT_ZZ_DAG 2 1
-                H 0
-                S 2
+            REPEAT 23 {
+                H 0 2 4
+                REPEAT 5 {
+                    SWAP 0 1 2 3
+                    SQRT_YY 1 5
+                    C_XYZ 4
+                    CXSWAP 2 3
+                }
+                ISWAP_DAG 4 5
+                SQRT_ZZ_DAG 0 2
+                S_DAG 3
             }
             ",
+            "XYZXYZ",
         );
-        let mut folded = tracker_from_pauli_text("XYZ");
-        assert!(try_undo_supported_unitary_repeat(&mut folded, &repeat).unwrap());
-
-        let mut naive = tracker_from_pauli_text("XYZ");
-        for _ in 0..repeat.repeat_count().get() {
-            naive.undo_circuit(repeat.body()).unwrap();
-        }
-        assert_eq!(folded, naive);
     }
 
     #[test]

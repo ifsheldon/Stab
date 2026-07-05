@@ -103,7 +103,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | `analyze_errors --decompose_errors` and related flags | Active | RPF6 and RPF7 | Finish core and CLI analyzer parity for selected decomposition and flag behavior. |
 | Error explanation value objects | Mixed | RPF6 | Harden only value-object behavior required by active analyzer/search paths; full ErrorMatcher provenance and CLI remain deferred. |
 | Shortest graphlike and hypergraph logical-error search | Active | RPF6 | Finish generated-circuit search, ordering-insensitive structural comparators, and resource behavior. |
-| Sparse reverse detector-frame tracking | Active | RPF6 | Finish optimized loop folding, all-unitary fuzz coverage, and analyzer/search integration where needed. |
+| Sparse reverse detector-frame tracking | Active | RPF6 | Finish optimized loop folding and analyzer/search integration where needed; deterministic generated supported-unitary repeat coverage is implemented for the current promoted subset. |
 | Flows | Active | RPF1 and RPF5 | Finish measurement-rich flows, variable-target flow metadata decisions, and transform integration. |
 | `stim m2d` | Implemented for selected PF7 CLI surface | RPF7 | The selected CLI closure is implemented by `pf7-m2d-cli-parity`; only newly selected CLI cases should reopen this row. Broader detector-converter API semantics remain active under measurement-to-detection conversion rows. |
 | `stim analyze_errors` | Implemented for selected PF7 CLI surface | RPF7 | The selected CLI closure is implemented by `pf7-analyze-errors-cli-parity`; only newly selected CLI cases should reopen this row. Broader analyzer semantics remain active under core analyzer rows. |
@@ -396,7 +396,7 @@ Implementation tasks:
 
 - Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures. The generated-QEC semantic subset for noisy repetition-code and rotated-surface-code circuits is implemented and tracked in [rpf6-analyzer-progress-report.md](rpf6-analyzer-progress-report.md).
 - Extend graphlike, hypergraph, shortest-error, SAT, and WCNF search behavior for selected generated-circuit and DEM cases.
-- Improve sparse reverse detector-frame tracking for optimized loop folding and all-unitary fuzz coverage where it affects analyzer or search correctness. The supported-Clifford repeat-folding subset is implemented for the full single-qubit Clifford gate set and fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets; broader all-unitary fuzzing and analyzer/search-specific consumption remain active.
+- Improve sparse reverse detector-frame tracking for optimized loop folding where it affects analyzer or search correctness. The supported-Clifford repeat-folding subset is implemented for the full single-qubit Clifford gate set and fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets, with deterministic generated repeat tests covering nested and grouped target bodies; analyzer/search-specific consumption and unsupported variable-target unitary semantics remain active.
 - Harden matched-error value objects only when required by active analyzer/search outputs.
 - Keep full stack-frame provenance, heralded matching, repeat-contained noise provenance, and `explain_errors` CLI deferred.
 
@@ -405,7 +405,7 @@ Tests:
 - Port owned cases from `vendor/stim/src/stim/simulators/error_analyzer.test.cc`, `vendor/stim/src/stim/simulators/error_matcher.test.cc`, `vendor/stim/src/stim/simulators/matched_error.test.cc`, `vendor/stim/src/stim/search/*_test.cc`, and `vendor/stim/src/stim/util_top/circuit_to_dem.test.cc`.
 - Add exact `.dem` output tests for deterministic analyzer cases.
 - Add structural tests for gauge detectors, approximate disjoint errors, decomposed errors, generated circuits, loop folding, search result sets, and ordering-insensitive outputs.
-- Add fuzz or generated tests for all-unitary sparse reverse tracking, repeated loops, detectors with coordinates, observables, and noise decomposition.
+- Add generated or property-style tests for sparse reverse tracking when new supported unitary families, repeated loops, detectors with coordinates, observables, noise decomposition, analyzer consumption, or search consumption are promoted.
 - Add negative tests for unsupported decomposition failure handling and invalid analyzer options.
 
 Oracle rows:
