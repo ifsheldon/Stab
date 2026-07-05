@@ -123,6 +123,9 @@ pub(super) fn run_detection_compare_row(
         "pf5-detecting-regions-repeat" => detecting_region_rows::run_repeat_row(row).map(Some),
         "pf5-detecting-regions-targets" => detecting_region_rows::run_targets_row(row).map(Some),
         "pf5-detecting-regions-clifford" => detecting_region_rows::run_clifford_row(row).map(Some),
+        "pf5-detecting-regions-generated-repetition" => {
+            detecting_region_rows::run_generated_repetition_row(row).map(Some)
+        }
         "pf5-missing-detectors-mpp" => missing_detector_rows::run_mpp_batch(row).map(Some),
         "pf5-missing-detectors-generated-code" => {
             missing_detector_rows::run_generated_code_batch(row).map(Some)

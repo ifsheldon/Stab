@@ -1,9 +1,10 @@
 use std::hint::black_box;
 
 use stab_core::{
-    DemDetectorId, DetectingRegionOptions, DetectingRegionTargetOptions,
-    all_detecting_region_targets, all_detecting_region_ticks, circuit_detecting_regions,
-    circuit_detecting_regions_for_targets,
+    CodeDistance, DemDetectorId, DetectingRegionOptions, DetectingRegionTargetOptions,
+    RepetitionCodeParams, RepetitionCodeTask, RoundCount, all_detecting_region_targets,
+    all_detecting_region_ticks, circuit_detecting_regions, circuit_detecting_regions_for_targets,
+    generate_repetition_code_circuit,
 };
 
 use crate::error::BenchError;
@@ -249,6 +250,51 @@ pub(super) fn run_clifford_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, B
     )?])
 }
 
+pub(super) fn run_generated_repetition_row(
+    row: &BenchmarkRow,
+) -> Result<Vec<Measurement>, BenchError> {
+    let params = RepetitionCodeParams::new(
+        RoundCount::try_new(3).map_err(|error| stab_runner_error(&row.id, error))?,
+        CodeDistance::try_new(3).map_err(|error| stab_runner_error(&row.id, error))?,
+        RepetitionCodeTask::Memory,
+    )
+    .map_err(|error| stab_runner_error(&row.id, error))?;
+    let generated = generate_repetition_code_circuit(&params)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let circuit = generated.circuit();
+    let targets =
+        all_detecting_region_targets(circuit).map_err(|error| stab_runner_error(&row.id, error))?;
+    let ticks =
+        all_detecting_region_ticks(circuit).map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(vec![super::measure_stab_iterations(
+        "stab_pf5_detecting_regions_generated_repetition",
+        super::super::STAB_COMPARE_ITERATIONS,
+        || {
+            let mut regions = 0usize;
+            for _ in 0..UTILITY_BATCH {
+                let output = circuit_detecting_regions_for_targets(
+                    circuit,
+                    DetectingRegionTargetOptions {
+                        targets: targets.clone(),
+                        ticks: ticks.clone(),
+                        ignore_anticommutation_errors: false,
+                    },
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+                regions = regions
+                    .checked_add(output.values().map(|regions| regions.len()).sum::<usize>())
+                    .ok_or_else(|| BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: "detecting-regions generated benchmark region count overflowed"
+                            .to_string(),
+                    })?;
+            }
+            black_box(regions);
+            Ok(())
+        },
+    )?])
+}
+
 pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     match (row_id, name) {
         ("m9-detecting-regions-basic-batch", "stab_detecting_regions_basic_cases") => {
@@ -268,6 +314,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             (UTILITY_BATCH * DETECTING_REGIONS_CLIFFORD_CASES) as f64,
             "cases/s",
         )),
+        (
+            "pf5-detecting-regions-generated-repetition",
+            "stab_pf5_detecting_regions_generated_repetition",
+        ) => Some((UTILITY_BATCH as f64, "cases/s")),
         _ => None,
     }
 }
@@ -285,6 +335,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf5-detecting-regions-clifford" => Some(
             "report-only: Stab measures representative single-qubit and fixed two-qubit Clifford propagation in the Rust detecting-regions utility without a faithful pinned Stim CLI timing ratio",
+        ),
+        "pf5-detecting-regions-generated-repetition" => Some(
+            "report-only: Stab measures generated repetition-code detecting regions in the Rust utility without a faithful pinned Stim CLI timing ratio",
         ),
         _ => None,
     }

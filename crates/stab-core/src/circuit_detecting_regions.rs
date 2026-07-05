@@ -267,11 +267,14 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
         return validate_plain_qubit_pair_targets(instruction);
     }
     match instruction.gate().canonical_name() {
-        "R" | "RX" | "RY" | "M" | "MX" | "MY" => validate_single_plain_qubit_targets(instruction),
+        "R" | "RX" | "RY" | "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => {
+            validate_single_plain_qubit_targets(instruction)
+        }
         "MXX" | "MYY" | "MZZ" => validate_plain_qubit_pair_targets(instruction),
         "TICK" => validate_target_count(instruction, 0),
         "DETECTOR" => validate_detector_targets(instruction),
         "OBSERVABLE_INCLUDE" => validate_observable_include_targets(instruction),
+        "QUBIT_COORDS" | "SHIFT_COORDS" => Ok(()),
         name => Err(CircuitError::invalid_detector_error_model(format!(
             "simple detecting-region extraction does not support gate {name}"
         ))),
@@ -526,6 +529,10 @@ mod tests {
     )]
 
     use super::*;
+    use crate::{
+        CodeDistance, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
+        generate_repetition_code_circuit,
+    };
 
     fn detector(id: u64) -> DemDetectorId {
         DemDetectorId::try_new(id).unwrap()
@@ -652,6 +659,51 @@ mod tests {
     }
 
     #[test]
+    fn detecting_regions_generated_repetition_code_filters_and_regions() {
+        let params = RepetitionCodeParams::new(
+            RoundCount::try_new(3).unwrap(),
+            CodeDistance::try_new(3).unwrap(),
+            RepetitionCodeTask::Memory,
+        )
+        .unwrap();
+        let generated = generate_repetition_code_circuit(&params).unwrap();
+        let circuit = generated.circuit();
+
+        let all_targets = all_detecting_region_targets(circuit).unwrap();
+        assert_eq!(all_targets.len(), 9);
+        assert_eq!(
+            all_detecting_region_ticks(circuit).unwrap(),
+            (0..9).collect::<Vec<_>>()
+        );
+
+        let actual = circuit_detecting_regions_for_targets(
+            circuit,
+            DetectingRegionTargetOptions {
+                targets: all_targets,
+                ticks: vec![0, 1, 2, 6, 7, 8],
+                ignore_anticommutation_errors: false,
+            },
+        )
+        .unwrap();
+
+        let d0 = DemTarget::relative_detector(0).unwrap();
+        assert_eq!(actual[&d0][&0].to_string(), "+ZZZ__");
+        assert_eq!(actual[&d0][&1].to_string(), "+_ZZ__");
+        assert_eq!(actual[&d0][&2].to_string(), "+_Z___");
+        assert!(!actual[&d0].contains_key(&6));
+
+        let d6 = DemTarget::relative_detector(6).unwrap();
+        assert_eq!(actual[&d6][&6].to_string(), "+_Z___");
+        assert_eq!(actual[&d6][&7].to_string(), "+ZZ___");
+        assert_eq!(actual[&d6][&8].to_string(), "+ZZZ__");
+
+        let logical = DemTarget::logical_observable(0).unwrap();
+        for tick in [0, 1, 2, 6, 7, 8] {
+            assert_eq!(actual[&logical][&tick].to_string(), "+____Z");
+        }
+    }
+
+    #[test]
     fn detecting_regions_target_api_rejects_invalid_targets() {
         let circuit = Circuit::from_stim_str("TICK\nM 0\nDETECTOR rec[-1]\n").unwrap();
         for (target, message) in [
@@ -677,6 +729,22 @@ mod tests {
             .unwrap_err();
             assert!(error.to_string().contains(message), "{target}: {error}");
         }
+    }
+
+    #[test]
+    fn detecting_regions_generated_repetition_rejects_unpromoted_record_annotations() {
+        let circuit = Circuit::from_stim_str("TICK\nMPAD 0\nDETECTOR rec[-1]\n").unwrap();
+        let error = circuit_detecting_regions_for_targets(
+            &circuit,
+            DetectingRegionTargetOptions {
+                targets: vec![DemTarget::relative_detector(0).unwrap()],
+                ticks: vec![0],
+                ignore_anticommutation_errors: false,
+            },
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("does not support gate MPAD"));
     }
 
     #[test]
