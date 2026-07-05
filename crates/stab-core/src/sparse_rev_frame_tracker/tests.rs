@@ -329,19 +329,50 @@ fn sparse_rev_frame_tracker_feedback_from_measurement_subset() {
 
 #[test]
 fn sparse_rev_frame_tracker_feedback_into_measurement_subset() {
-    let target = Gate::from_name("CX").unwrap();
-    let cx = CircuitInstruction::new(target, Vec::new(), vec![rec(-5), q(0)], None).unwrap();
-    let mut actual = tracker_from_pauli_text("ZII");
-    actual.measurement_count = 12;
-    actual.undo_instruction(&cx).unwrap();
+    for (gate, targets, pauli_text) in [
+        ("CX", vec![rec(-5), q(0)], "ZII"),
+        ("CY", vec![rec(-5), q(0)], "XII"),
+        ("CZ", vec![rec(-5), q(0)], "XII"),
+        ("XCZ", vec![q(0), rec(-5)], "ZII"),
+        ("YCZ", vec![q(0), rec(-5)], "XII"),
+    ] {
+        let target = Gate::from_name(gate).unwrap();
+        let instruction = CircuitInstruction::new(target, Vec::new(), targets, None).unwrap();
+        let mut actual = tracker_from_pauli_text(pauli_text);
+        actual.measurement_count = 12;
+        actual.undo_instruction(&instruction).unwrap();
 
-    let mut expected = tracker_from_pauli_text("ZII");
-    expected.measurement_count = 12;
-    expected.rec_bits.insert(
-        7,
-        BTreeSet::from([DemTarget::logical_observable(0).unwrap()]),
-    );
-    assert_eq!(actual, expected);
+        let mut expected = tracker_from_pauli_text(pauli_text);
+        expected.measurement_count = 12;
+        expected.rec_bits.insert(
+            7,
+            BTreeSet::from([DemTarget::logical_observable(0).unwrap()]),
+        );
+        assert_eq!(actual, expected, "{gate}");
+    }
+}
+
+#[test]
+fn sparse_rev_frame_tracker_rejects_invalid_feedback_target_positions() {
+    for text in [
+        "CX 0 rec[-5]\n",
+        "CY 0 rec[-5]\n",
+        "XCZ rec[-5] 0\n",
+        "YCZ rec[-5] 0\n",
+    ] {
+        let mut tracker = tracker_from_pauli_text("ZII");
+        tracker.measurement_count = 12;
+        let error = match tracker.undo_instruction(&instruction(text)) {
+            Ok(_) => panic!("accepted invalid feedback target position in {text:?}"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("measurement-record feedback target in this position"),
+            "{error}"
+        );
+    }
 }
 
 #[test]

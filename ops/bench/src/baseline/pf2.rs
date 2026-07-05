@@ -47,6 +47,14 @@ const FEEDBACK_INLINE_REPEAT_LOOP: &str = "R 0 1\n\
                                           }\n\
                                           M 0\n\
                                           DETECTOR rec[-1] rec[-2]\n";
+const FEEDBACK_INLINE_XCZ_YCZ: &str = "R 0 1 2\n\
+                                      X_ERROR(0.125) 0\n\
+                                      M 0\n\
+                                      XCZ 1 rec[-1]\n\
+                                      YCZ 2 rec[-1]\n\
+                                      M 1 2\n\
+                                      DETECTOR rec[-2]\n\
+                                      DETECTOR rec[-1]\n";
 const DECOMPOSE_MPP_SPP: &str = "ISWAP 0 1 2 1\n\
                                  TICK\n\
                                  MPP X1*Z2*Y3 X4*!X4\n\
@@ -173,6 +181,7 @@ pub(super) fn run_feedback_inline_batch_row(
 ) -> Result<Vec<Measurement>, BenchError> {
     let mpp_circuit = parse_circuit(&row.id, FEEDBACK_INLINE_MPP)?;
     let repeat_loop_circuit = parse_circuit(&row.id, FEEDBACK_INLINE_REPEAT_LOOP)?;
+    let xcz_ycz_circuit = parse_circuit(&row.id, FEEDBACK_INLINE_XCZ_YCZ)?;
     Ok(vec![
         measure_stab_batched(
             "stab_circuit_with_inlined_feedback_mpp",
@@ -190,6 +199,17 @@ pub(super) fn run_feedback_inline_batch_row(
             TRANSFORM_REPETITIONS,
             || {
                 let inlined = repeat_loop_circuit
+                    .with_inlined_feedback()
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(circuit_checksum(&inlined));
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_circuit_with_inlined_feedback_xcz_ycz",
+            TRANSFORM_REPETITIONS,
+            || {
+                let inlined = xcz_ycz_circuit
                     .with_inlined_feedback()
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(circuit_checksum(&inlined));
@@ -274,6 +294,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf2-feedback-inline-batch", "stab_circuit_with_inlined_feedback_repeat_loop") => {
             Some((30.0, "repeat-iterations/s"))
         }
+        ("pf2-feedback-inline-batch", "stab_circuit_with_inlined_feedback_xcz_ycz") => {
+            Some((1.0, "transforms/s"))
+        }
         ("pf2-circuit-decompose-mpp-spp", "stab_circuit_decompose_mpp_spp") => {
             Some((8.0, "source-instructions/s"))
         }
@@ -297,7 +320,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures Rust Circuit::without_noise over top-level noisy, heralded, measurement, detector, and annotation instructions; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",
         ),
         "pf2-feedback-inline-batch" => Some(
-            "contract-only: Stab measures Rust Circuit::with_inlined_feedback on the scoped MPP feedback subset and selected bounded repeat-loop refolding case; pinned Stim has equivalent transform behavior but no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures Rust Circuit::with_inlined_feedback on the scoped MPP feedback subset, selected bounded repeat-loop refolding case, and selected XCZ/YCZ feedback case; pinned Stim has equivalent transform behavior but no faithful Rust direct baseline in this harness",
         ),
         "pf2-circuit-decompose-mpp-spp" => Some(
             "contract-only: Stab measures Rust Circuit::decomposed over ISWAP, MPP, SPP, pair-measurement, noise, and annotation operations; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",

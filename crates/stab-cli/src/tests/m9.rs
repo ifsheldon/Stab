@@ -583,6 +583,79 @@ OBSERVABLE_INCLUDE(0) rec[-1]
 }
 
 #[test]
+fn m2d_ran_without_feedback_accepts_xcz_ycz_feedback() {
+    let temp_dir = tempdir().expect("temp dir");
+    let xcz_path = temp_dir.path().join("xcz.stim");
+    let cxy_path = temp_dir.path().join("cxy.stim");
+    std::fs::write(
+        &xcz_path,
+        "\
+R 0 1 2
+M 0
+XCZ 1 rec[-1]
+YCZ 2 rec[-1]
+M 1 2
+DETECTOR rec[-2]
+DETECTOR rec[-1]
+",
+    )
+    .expect("write XCZ circuit");
+    std::fs::write(
+        &cxy_path,
+        "\
+R 0 1 2
+M 0
+CX rec[-1] 1
+CY rec[-1] 2
+M 1 2
+DETECTOR rec[-2]
+DETECTOR rec[-1]
+",
+    )
+    .expect("write equivalent circuit");
+
+    let input = b"000\n100\n111\n011\n";
+    let mut xcz_stdout = Vec::new();
+    let mut xcz_stderr = Vec::new();
+    let xcz_status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=01",
+            "--out_format=dets",
+            "--ran_without_feedback",
+            "--circuit",
+            xcz_path.to_str().expect("utf-8 path"),
+        ],
+        input.as_slice(),
+        &mut xcz_stdout,
+        &mut xcz_stderr,
+    );
+    let mut cxy_stdout = Vec::new();
+    let mut cxy_stderr = Vec::new();
+    let cxy_status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=01",
+            "--out_format=dets",
+            "--ran_without_feedback",
+            "--circuit",
+            cxy_path.to_str().expect("utf-8 path"),
+        ],
+        input.as_slice(),
+        &mut cxy_stdout,
+        &mut cxy_stderr,
+    );
+
+    assert_eq!(xcz_status, 0);
+    assert_eq!(cxy_status, 0);
+    assert_eq!(String::from_utf8(xcz_stderr).unwrap(), "");
+    assert_eq!(String::from_utf8(cxy_stderr).unwrap(), "");
+    assert_eq!(xcz_stdout, cxy_stdout);
+}
+
+#[test]
 fn m2d_supports_reference_skip_observables_and_b8_input() {
     let temp_dir = tempdir().expect("temp dir");
     let circuit_path = temp_dir.path().join("input.stim");

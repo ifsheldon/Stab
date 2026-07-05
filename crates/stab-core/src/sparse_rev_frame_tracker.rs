@@ -108,6 +108,14 @@ impl SparseReverseFrameTracker {
             "RY" => self.undo_resets(instruction, TrackerBasis::Y),
             "SPP" | "SPP_DAG" => self.undo_spp(instruction),
             "CX" | "CY" | "CZ" => self.undo_controlled_pauli(instruction),
+            "XCZ" | "YCZ"
+                if instruction
+                    .targets()
+                    .iter()
+                    .any(Target::is_classical_bit_target) =>
+            {
+                self.undo_controlled_pauli(instruction)
+            }
             "DETECTOR" => self.undo_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
             "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
@@ -377,8 +385,10 @@ impl SparseReverseFrameTracker {
                 )));
             };
             if control.is_measurement_record_target() {
+                validate_feedback_record_position(instruction.gate().canonical_name(), true)?;
                 self.undo_classical_feedback(instruction, control, target)?;
             } else if target.is_measurement_record_target() {
+                validate_feedback_record_position(instruction.gate().canonical_name(), false)?;
                 self.undo_classical_feedback(instruction, target, control)?;
             } else if control.is_sweep_bit_target() || target.is_sweep_bit_target() {
                 // Sweep-controlled Paulis are preserved by the feedback-inlining
@@ -410,8 +420,8 @@ impl SparseReverseFrameTracker {
             ))
         })?;
         let sensitivity = match instruction.gate().canonical_name() {
-            "CX" => self.zs_for(qubit)?.clone(),
-            "CY" => xor_sets(self.xs_for(qubit)?, self.zs_for(qubit)?),
+            "CX" | "XCZ" => self.zs_for(qubit)?.clone(),
+            "CY" | "YCZ" => xor_sets(self.xs_for(qubit)?, self.zs_for(qubit)?),
             "CZ" => self.xs_for(qubit)?.clone(),
             name => {
                 return Err(CircuitError::invalid_detector_error_model(format!(
@@ -933,6 +943,22 @@ fn qubit_index(qubit: QubitId) -> CircuitResult<usize> {
             qubit.get()
         ))
     })
+}
+
+fn validate_feedback_record_position(gate_name: &str, record_is_first: bool) -> CircuitResult<()> {
+    let valid = match gate_name {
+        "CX" | "CY" => record_is_first,
+        "XCZ" | "YCZ" => !record_is_first,
+        "CZ" => true,
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(CircuitError::invalid_detector_error_model(format!(
+            "{gate_name} does not support a measurement-record feedback target in this position"
+        )))
+    }
 }
 
 fn xor_sets(left: &BTreeSet<DemTarget>, right: &BTreeSet<DemTarget>) -> BTreeSet<DemTarget> {

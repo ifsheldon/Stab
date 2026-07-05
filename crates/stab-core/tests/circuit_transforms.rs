@@ -27,7 +27,10 @@ fn assert_no_measurement_feedback_controls(circuit: &Circuit) {
     for item in circuit.items() {
         match item {
             CircuitItem::Instruction(instruction)
-                if matches!(instruction.gate().canonical_name(), "CX" | "CY" | "CZ") =>
+                if matches!(
+                    instruction.gate().canonical_name(),
+                    "CX" | "CY" | "CZ" | "XCZ" | "YCZ"
+                ) =>
             {
                 assert!(
                     !instruction
@@ -626,6 +629,51 @@ fn with_inlined_feedback_handles_nested_bounded_repeat_feedback() {
 }
 
 #[test]
+fn with_inlined_feedback_supports_xcz_ycz_feedback() {
+    let input = circuit(
+        "
+        R 0 1 2
+        X_ERROR(0.125) 0
+        M 0
+        XCZ 1 rec[-1]
+        YCZ 2 rec[-1]
+        M 1 2
+        DETECTOR rec[-2]
+        DETECTOR rec[-1]
+    ",
+    );
+    let equivalent = circuit(
+        "
+        R 0 1 2
+        X_ERROR(0.125) 0
+        M 0
+        CX rec[-1] 1
+        CY rec[-1] 2
+        M 1 2
+        DETECTOR rec[-2]
+        DETECTOR rec[-1]
+    ",
+    );
+
+    let inlined = input
+        .with_inlined_feedback()
+        .expect("inline XCZ/YCZ feedback");
+    let equivalent_inlined = equivalent
+        .with_inlined_feedback()
+        .expect("inline equivalent CX/CY feedback");
+
+    assert_no_measurement_feedback_controls(&inlined);
+    assert_eq!(inlined, equivalent_inlined);
+    let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
+        .expect("input DEM")
+        .to_dem_string();
+    let actual_dem = circuit_to_detector_error_model(&inlined, ErrorAnalyzerOptions::default())
+        .expect("inlined DEM")
+        .to_dem_string();
+    assert_eq!(actual_dem, expected_dem);
+}
+
+#[test]
 fn with_inlined_feedback_preserves_repeat_body_target_group_order() {
     let input = circuit(
         "
@@ -650,21 +698,6 @@ REPEAT 2 {
 
 #[test]
 fn with_inlined_feedback_rejects_unimplemented_control_shapes_and_excessive_repeat_work() {
-    let gate_error = circuit(
-        "
-        M 0
-        XCZ rec[-1] 1
-        M 1
-        DETECTOR rec[-1]
-    ",
-    )
-    .with_inlined_feedback()
-    .expect_err("reject unsupported feedback gate");
-    assert!(
-        gate_error.to_string().contains("does not support XCZ"),
-        "{gate_error}"
-    );
-
     let repeat_error = circuit(
         "
         REPEAT 100001 {

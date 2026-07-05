@@ -89,7 +89,10 @@ impl WithoutFeedbackHelper {
     }
 
     fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        if matches!(instruction.gate().canonical_name(), "CX" | "CY" | "CZ") {
+        if matches!(
+            instruction.gate().canonical_name(),
+            "CX" | "CY" | "CZ" | "XCZ" | "YCZ"
+        ) {
             return self.undo_feedback_capable_controlled_pauli(instruction);
         }
         if instruction.gate().category() == GateCategory::Controlled
@@ -124,8 +127,14 @@ impl WithoutFeedbackHelper {
                 first.measurement_record_offset(),
                 second.measurement_record_offset(),
             ) {
-                (Some(record), None) => self.inline_feedback(instruction, record, second)?,
-                (None, Some(record)) => self.inline_feedback(instruction, record, first)?,
+                (Some(record), None) => {
+                    validate_feedback_record_position(instruction.gate(), true)?;
+                    self.inline_feedback(instruction, record, second)?;
+                }
+                (None, Some(record)) => {
+                    validate_feedback_record_position(instruction.gate(), false)?;
+                    self.inline_feedback(instruction, record, first)?;
+                }
                 (Some(_), Some(_)) => {}
                 (None, None) => self
                     .reversed_output
@@ -498,12 +507,29 @@ fn instruction_with_targets(
 
 fn feedback_pauli(gate: Gate) -> CircuitResult<Pauli> {
     match gate.canonical_name() {
-        "CX" => Ok(Pauli::X),
-        "CY" => Ok(Pauli::Y),
+        "CX" | "XCZ" => Ok(Pauli::X),
+        "CY" | "YCZ" => Ok(Pauli::Y),
         "CZ" => Ok(Pauli::Z),
         name => Err(CircuitError::invalid_detector_error_model(format!(
             "{name} is not a supported feedback gate"
         ))),
+    }
+}
+
+fn validate_feedback_record_position(gate: Gate, record_is_first: bool) -> CircuitResult<()> {
+    let valid = match gate.canonical_name() {
+        "CX" | "CY" => record_is_first,
+        "XCZ" | "YCZ" => !record_is_first,
+        "CZ" => true,
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(CircuitError::invalid_detector_error_model(format!(
+            "{} does not support a measurement-record feedback target in this position",
+            gate.canonical_name()
+        )))
     }
 }
 
@@ -764,7 +790,11 @@ DETECTOR rec[-3] rec[-2] rec[-1]
         .unwrap();
         let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
 
-        assert!(error.to_string().contains("does not support XCZ"));
+        assert!(
+            error
+                .to_string()
+                .contains("measurement-record feedback target in this position")
+        );
     }
 
     #[test]

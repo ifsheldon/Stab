@@ -892,6 +892,7 @@ fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
             &[
                 "stab_circuit_with_inlined_feedback_mpp",
                 "stab_circuit_with_inlined_feedback_repeat_loop",
+                "stab_circuit_with_inlined_feedback_xcz_ycz",
             ][..],
         ),
         (
