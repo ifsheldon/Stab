@@ -13,8 +13,8 @@ use super::{measure_stab_iterations, stab_runner_error};
 const UTILITY_BATCH: usize = 4096;
 #[cfg(test)]
 const UTILITY_BATCH: usize = 2;
-const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 27;
-const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 100;
+const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 28;
+const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 103;
 const FLOW_SOLVE_MEASUREMENT_CASES: usize = 2;
 const FLOW_SOLVE_MEASUREMENT_QUERIES: usize = 15;
 
@@ -59,7 +59,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "pf5-flow-generators-measurement-rich" => Some(
-            "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/pair-measurement/MPP/composed-measurement/feedback/MPAD/heralded-noise subset without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/pair-measurement/MPP/composed-measurement/bounded-repeat/feedback/MPAD/heralded-noise subset without a faithful pinned Stim CLI timing ratio",
         ),
         "pf5-flow-solve-measurement-rich" => Some(
             "report-only: Stab measures the Rust solve_for_flow_measurements promoted upstream examples without a faithful pinned Stim CLI timing ratio",
@@ -183,6 +183,7 @@ fn flow_generator_measurement_rich_corpus(
         ("M 0\nTICK\nM 0\n", 3),
         ("R 0\nM 0\n", 2),
         ("M 0\nR 0\n", 2),
+        ("REPEAT 2 {\n    M 0\n}\n", 3),
         ("M 0\nMX 1\nMY 2\n", 6),
         ("MXX 0 1\nMZZ 0 1\n", 4),
         ("MPP X0*Y1\nMPAD 0 1\n", 6),

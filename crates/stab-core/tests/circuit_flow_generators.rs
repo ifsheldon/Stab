@@ -275,13 +275,82 @@ fn circuit_flow_generators_promotes_composed_measurement_subset() {
 }
 
 #[test]
+fn circuit_flow_generators_promotes_bounded_repeat_measurement_subset() {
+    for (repeat_text, expanded_text) in [
+        ("REPEAT 2 {\n    M 0\n}\n", "M 0\nM 0\n"),
+        (
+            "
+            M 0
+            REPEAT 2 {
+                TICK
+                MX 1
+            }
+            ",
+            "
+            M 0
+            TICK
+            MX 1
+            TICK
+            MX 1
+            ",
+        ),
+        (
+            "
+            REPEAT 2 {
+                REPEAT 2 {
+                    M 0
+                    TICK
+                }
+            }
+            ",
+            "
+            M 0
+            TICK
+            M 0
+            TICK
+            M 0
+            TICK
+            M 0
+            TICK
+            ",
+        ),
+        (
+            "
+            REPEAT 2 {
+                MPP X0*Y1
+                MPAD 0
+            }
+            ",
+            "
+            MPP X0*Y1
+            MPAD 0
+            MPP X0*Y1
+            MPAD 0
+            ",
+        ),
+    ] {
+        let repeat_circuit = circuit(repeat_text);
+        let repeat_flows = circuit_flow_generators(&repeat_circuit).expect(repeat_text);
+        assert_eq!(
+            repeat_flows,
+            circuit_flow_generators(&circuit(expanded_text)).expect(expanded_text)
+        );
+        assert_eq!(
+            check_if_circuit_has_unsigned_stabilizer_flows(&repeat_circuit, &repeat_flows),
+            vec![true; repeat_flows.len()],
+            "{repeat_text}"
+        );
+    }
+}
+
+#[test]
 fn circuit_flow_generators_rejects_unpromoted_measurement_rich_shapes() {
     for text in [
         "MR 0 0\n",
         "MXX 0 1\nH 0\n",
         "M 0\nH 0\n",
         "M 0\nCX sweep[0] 0\n",
-        "REPEAT 2 {\n    M 0\n}\n",
+        "REPEAT 2 {\n    M 0\n    H 0\n}\n",
     ] {
         let error = circuit_flow_generators(&circuit(text))
             .expect_err("unpromoted measurement-rich flow generator shape")
@@ -291,6 +360,18 @@ fn circuit_flow_generators_rejects_unpromoted_measurement_rich_shapes() {
             "{text}: {error}"
         );
     }
+}
+
+#[test]
+fn circuit_flow_generators_rejects_excessive_repeat_measurement_expansion() {
+    let error = circuit_flow_generators(&circuit("REPEAT 1000000 {\n    M 0\n}\n"))
+        .expect_err("excessive repeat-contained measurement flow generator")
+        .to_string();
+    assert!(
+        error.contains("measurement-rich flow-generator rows")
+            && error.contains("current limit 4096"),
+        "unexpected excessive repeat error: {error}"
+    );
 }
 
 #[test]
