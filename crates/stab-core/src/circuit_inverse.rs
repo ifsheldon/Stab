@@ -47,7 +47,7 @@ pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
 /// the original circuit, returns the selected QEC inverse subset, and swaps each
 /// flow's input and output Pauli terms. The measurement-rich subset is limited
 /// to one noiseless plain unique-target measurement group, selected plain
-/// single-target reset, or selected plain unique-target measure-reset
+/// unique-target reset, or selected plain unique-target measure-reset
 /// instruction; detectors, feedback, noise, repeats, and multi-instruction QEC
 /// rewrites remain deferred.
 pub fn circuit_time_reversed_for_flows(
@@ -94,7 +94,7 @@ enum MeasurementRichTimeReversalKind {
         record_count: usize,
     },
     Reset {
-        qubit: usize,
+        targets: Vec<MeasureResetTarget>,
         basis: PauliBasis,
     },
     MeasureReset {
@@ -139,26 +139,13 @@ fn selected_measurement_rich_time_reversal(
         }));
     }
     if let Some((measurement_gate, basis)) = reset_inverse_gate_and_basis(name) {
-        let [group] = groups.as_slice() else {
-            return Ok(None);
-        };
-        let [target] = *group else {
-            return Ok(None);
-        };
-        if !is_plain_qubit_target(target) {
+        let targets = measure_reset_targets(&groups)?;
+        if targets.is_empty() {
             return Ok(None);
         }
-        let qubit = target.qubit_id().map(|id| id.get() as usize);
-        let Some(qubit) = qubit else {
-            return Ok(None);
-        };
         return Ok(Some(SelectedMeasurementRichTimeReversal {
-            inverse: single_target_circuit(
-                measurement_gate,
-                target,
-                instruction.tag().map(str::to_owned),
-            )?,
-            kind: MeasurementRichTimeReversalKind::Reset { qubit, basis },
+            inverse: reversed_single_instruction_circuit_with_gate(instruction, measurement_gate)?,
+            kind: MeasurementRichTimeReversalKind::Reset { targets, basis },
         }));
     }
     let basis = match name {
@@ -400,9 +387,16 @@ fn single_target_circuit(
 }
 
 fn reversed_single_instruction_circuit(instruction: &CircuitInstruction) -> CircuitResult<Circuit> {
+    reversed_single_instruction_circuit_with_gate(instruction, instruction.gate().canonical_name())
+}
+
+fn reversed_single_instruction_circuit_with_gate(
+    instruction: &CircuitInstruction,
+    gate_name: &str,
+) -> CircuitResult<Circuit> {
     let mut circuit = Circuit::new();
     circuit.append_instruction(CircuitInstruction::new(
-        instruction.gate(),
+        Gate::from_name(gate_name)?,
         instruction.args().to_vec(),
         reversed_target_groups(instruction),
         instruction.tag().map(str::to_owned),
@@ -421,14 +415,14 @@ fn reverse_measurement_rich_flow(
             reversed_measurement_order(flow.measurements(), *record_count)?,
             flow.observables(),
         ),
-        MeasurementRichTimeReversalKind::Reset { qubit, basis } => {
+        MeasurementRichTimeReversalKind::Reset { targets, basis } => {
             let input = flow.output().with_sign(PauliSign::Plus);
             let output = flow.input().with_sign(PauliSign::Plus);
-            if output_depends_on_reset_basis(flow, *qubit, *basis) {
-                Flow::new(input, output, [-1], [])
-            } else {
-                Flow::new(input, output, [], [])
-            }
+            let measurements = targets
+                .iter()
+                .filter(|target| output_depends_on_reset_basis(flow, target.qubit, *basis))
+                .map(|target| target.measurement);
+            Flow::new(input, output, measurements, [])
         }
         MeasurementRichTimeReversalKind::MeasureReset { targets, basis } => {
             let input = flow.output().with_sign(PauliSign::Plus);
@@ -489,7 +483,7 @@ fn has_classical_flow_terms(flows: &[Flow]) -> bool {
 
 fn measurement_rich_time_reversal_error() -> CircuitError {
     CircuitError::invalid_tableau_conversion(
-        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain unique-target measurement instruction group from M, MX, MY, MXX, MYY, or MZZ, one noiseless plain single-target reset instruction from R, RX, or RY, or one noiseless plain unique-target measure-reset instruction from MR, MRX, or MRY; detectors, feedback, noise, repeats, and multi-instruction rewrites remain unsupported",
+        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain unique-target measurement instruction group from M, MX, MY, MXX, MYY, or MZZ, one noiseless plain unique-target reset instruction from R, RX, or RY, or one noiseless plain unique-target measure-reset instruction from MR, MRX, or MRY; detectors, feedback, noise, repeats, and multi-instruction rewrites remain unsupported",
     )
 }
 

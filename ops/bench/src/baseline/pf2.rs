@@ -78,6 +78,9 @@ const TIME_REVERSE_FLOW_MEASUREMENT_MY_TEXTS: [&str; 1] = ["Y0 -> rec[-1]"];
 const TIME_REVERSE_FLOW_MEASUREMENT_R_TEXTS: [&str; 1] = ["1 -> Z0"];
 const TIME_REVERSE_FLOW_MEASUREMENT_RX_TEXTS: [&str; 1] = ["1 -> X0"];
 const TIME_REVERSE_FLOW_MEASUREMENT_RY_TEXTS: [&str; 1] = ["1 -> Y0"];
+const TIME_REVERSE_FLOW_MEASUREMENT_R_MULTI_TEXTS: [&str; 3] = ["1 -> Z0", "1 -> Z1", "1 -> Z0*Z1"];
+const TIME_REVERSE_FLOW_MEASUREMENT_RX_MULTI_TEXTS: [&str; 1] = ["1 -> X0*X1"];
+const TIME_REVERSE_FLOW_MEASUREMENT_RY_MULTI_TEXTS: [&str; 1] = ["1 -> Y0*Y1"];
 const TIME_REVERSE_FLOW_MEASUREMENT_MR_TEXTS: [&str; 2] = ["1 -> Z0", "Z0 -> rec[-1]"];
 const TIME_REVERSE_FLOW_MEASUREMENT_MRX_TEXTS: [&str; 2] = ["1 -> X0", "X0 -> rec[-1]"];
 const TIME_REVERSE_FLOW_MEASUREMENT_MRY_TEXTS: [&str; 2] = ["1 -> Y0", "Y0 -> rec[-1]"];
@@ -90,7 +93,7 @@ const TIME_REVERSE_FLOW_MEASUREMENT_MR_MULTI_TEXTS: [&str; 5] = [
 ];
 const TIME_REVERSE_FLOW_MEASUREMENT_MRX_MULTI_TEXTS: [&str; 1] = ["1 -> X0*X1"];
 const TIME_REVERSE_FLOW_MEASUREMENT_MRY_MULTI_TEXTS: [&str; 1] = ["1 -> Y0*Y1"];
-const TIME_REVERSE_FLOW_MEASUREMENT_CASES: [(&str, &[&str]); 15] = [
+const TIME_REVERSE_FLOW_MEASUREMENT_CASES: [(&str, &[&str]); 18] = [
     ("MZZ 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_MZZ_TEXTS),
     ("M 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_M_MULTI_TEXTS),
     (
@@ -103,6 +106,9 @@ const TIME_REVERSE_FLOW_MEASUREMENT_CASES: [(&str, &[&str]); 15] = [
     ("R 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_R_TEXTS),
     ("RX 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_RX_TEXTS),
     ("RY 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_RY_TEXTS),
+    ("R 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_R_MULTI_TEXTS),
+    ("RX 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_RX_MULTI_TEXTS),
+    ("RY 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_RY_MULTI_TEXTS),
     ("MR 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MR_TEXTS),
     ("MRX 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRX_TEXTS),
     ("MRY 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRY_TEXTS),
@@ -283,7 +289,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures the scoped Rust Circuit::time_reversed_for_flows unitary subset; broader measurement-rich QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         "pf2-time-reverse-flow-measurement" => Some(
-            "contract-only: Stab measures the selected Rust Circuit::time_reversed_for_flows measurement-rich instruction, measurement-ordering, reset-to-measurement, measurement-to-reset, and plain unique-target measure-reset subset; broader QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures the selected Rust Circuit::time_reversed_for_flows measurement-rich instruction, measurement-ordering, plain unique-target reset-to-measurement, measurement-to-reset, and plain unique-target measure-reset subset; broader QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         _ => None,
     }

@@ -394,6 +394,58 @@ fn time_reversed_for_flows_measurement_rich_subset_reverses_resets() {
 }
 
 #[test]
+fn time_reversed_for_flows_measurement_rich_subset_reverses_multi_target_resets() {
+    // Adapted from Stim v1.16.0 circuit_inverse_qec two_to_one reset ordering.
+    let input = circuit("R 0 1\n");
+    let input_flows = [flow("1 -> Z0"), flow("1 -> Z1"), flow("1 -> Z0*Z1")];
+
+    let (actual_circuit, actual_flows) = circuit_time_reversed_for_flows(&input, &input_flows)
+        .expect("time reverse multi-target reset");
+
+    assert_eq!(actual_circuit, circuit("M 1 0\n"));
+    assert_eq!(
+        actual_flows,
+        vec![
+            flow("Z0 -> rec[-1]"),
+            flow("Z1 -> rec[-2]"),
+            flow("Z0*Z1 -> rec[-2] xor rec[-1]"),
+        ]
+    );
+
+    for (circuit_text, expected_circuit, input_flow, expected_flow) in [
+        (
+            "RX 0 1\n",
+            "MX 1 0\n",
+            "1 -> X0*X1",
+            "X0*X1 -> rec[-2] xor rec[-1]",
+        ),
+        (
+            "RY 0 1\n",
+            "MY 1 0\n",
+            "1 -> Y0*Y1",
+            "Y0*Y1 -> rec[-2] xor rec[-1]",
+        ),
+    ] {
+        let (actual_circuit, actual_flows) =
+            circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
+                .expect("time reverse multi-target reset basis");
+
+        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
+        assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
+    }
+
+    let (actual_circuit, actual_flows) =
+        circuit_time_reversed_for_flows(&circuit("R 0 1 2\n"), &[flow("1 -> Z0*Z1*Z2")])
+            .expect("time reverse three-target reset");
+
+    assert_eq!(actual_circuit, circuit("M 2 1 0\n"));
+    assert_eq!(
+        actual_flows,
+        vec![flow("Z0*Z1*Z2 -> rec[-3] xor rec[-2] xor rec[-1]")]
+    );
+}
+
+#[test]
 fn time_reversed_for_flows_unitary_subset_rejects_unsatisfied_general_unitary_flow() {
     let error = circuit_time_reversed_for_flows(&circuit("SWAP 0 1\n"), &[flow("X0 -> X0")])
         .expect_err("swap does not preserve X0")
@@ -506,9 +558,9 @@ fn time_reversed_for_flows_measurement_rich_subset_rejects_noisy_measurements() 
 #[test]
 fn time_reversed_for_flows_measurement_rich_subset_rejects_unpromoted_reset_shapes() {
     for (circuit_text, input_flow) in [
-        ("R 0 1\n", "1 -> Z0"),
-        ("RX 0 1\n", "1 -> X0"),
-        ("RY 0 1\n", "1 -> Y0"),
+        ("R 0 0\n", "1 -> Z0"),
+        ("RX 0 0\n", "1 -> X0"),
+        ("RY 0 0\n", "1 -> Y0"),
     ] {
         let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
             .expect_err("unpromoted reset-only flow rewrites are not in the scoped subset")
