@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate, GateCategory,
-    MeasureRecordOffset, Pauli, PauliBasis, QubitId, Target,
+    MeasureRecordOffset, Pauli, PauliBasis, PauliSign, PauliString, QubitId, Tableau, Target,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -51,6 +51,9 @@ impl MissingDetectorFinder {
     }
 
     fn process_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        if instruction.gate().has_tableau() {
+            return self.process_unitary_tableau(instruction);
+        }
         match instruction.gate().canonical_name() {
             "R" => self.process_reset(instruction, PauliBasis::Z),
             "RX" => self.process_reset(instruction, PauliBasis::X),
@@ -73,6 +76,35 @@ impl MissingDetectorFinder {
                 "basic missing-detector analysis does not support gate {name}"
             ))),
         }
+    }
+
+    fn process_unitary_tableau(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let gate_name = instruction.gate().canonical_name();
+        let tableau = instruction.gate().tableau().map_err(|error| {
+            CircuitError::invalid_detector_error_model(format!(
+                "failed to get tableau data for {gate_name} during missing-detector analysis: {error}"
+            ))
+        })?;
+        for group in instruction.target_groups() {
+            let targets = plain_qubit_group_indices(instruction, group)?;
+            if targets.len() != tableau.len() {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "gate {gate_name} expected {} plain qubit targets during missing-detector analysis but got {}",
+                    tableau.len(),
+                    targets.len()
+                )));
+            }
+            let mut seen = BTreeSet::new();
+            for target in &targets {
+                if !seen.insert(*target) {
+                    return Err(CircuitError::invalid_detector_error_model(format!(
+                        "gate {gate_name} has duplicate tableau target q{target} during missing-detector analysis"
+                    )));
+                }
+            }
+            self.tracker.apply_tableau(gate_name, &tableau, &targets)?;
+        }
+        Ok(())
     }
 
     fn process_reset(
@@ -443,6 +475,28 @@ impl InvariantTracker {
         Ok(None)
     }
 
+    fn apply_tableau(
+        &mut self,
+        gate_name: &str,
+        tableau: &Tableau,
+        targets: &[usize],
+    ) -> CircuitResult<()> {
+        if tableau.len() != targets.len() {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "gate {gate_name} expected {} local tableau targets during missing-detector analysis but got {}",
+                tableau.len(),
+                targets.len()
+            )));
+        }
+        for target in targets {
+            self.require_qubit(*target, "tableau target")?;
+        }
+        for generator in &mut self.generators {
+            generator.apply_tableau(gate_name, tableau, targets)?;
+        }
+        Ok(())
+    }
+
     fn deterministic_dependencies(&self, observable: &TrackedGenerator) -> Option<MeasurementRow> {
         if let Some(generator) = self
             .generators
@@ -620,6 +674,35 @@ impl TrackedGenerator {
         self.dependencies.xor_assign(&rhs.dependencies);
     }
 
+    fn apply_tableau(
+        &mut self,
+        gate_name: &str,
+        tableau: &Tableau,
+        targets: &[usize],
+    ) -> CircuitResult<()> {
+        let input = PauliString::from_bases(
+            PauliSign::Plus,
+            targets.iter().map(|target| self.basis(*target)),
+        );
+        let output = tableau.apply(&input).map_err(|error| {
+            CircuitError::invalid_detector_error_model(format!(
+                "failed to apply tableau for {gate_name} during missing-detector analysis: {error}"
+            ))
+        })?;
+        if output.sign().is_negative() {
+            self.negative = !self.negative;
+        }
+        for (local_index, target) in targets.iter().copied().enumerate() {
+            let basis = output.get(local_index).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "tableau for {gate_name} did not produce output basis {local_index} during missing-detector analysis"
+                ))
+            })?;
+            self.set_basis(target, basis);
+        }
+        Ok(())
+    }
+
     fn symplectic_bits(&self) -> Vec<bool> {
         self.bases
             .iter()
@@ -674,6 +757,29 @@ fn reduce_span_row(row: &mut SpanRow, basis: &[Option<SpanRow>]) {
             return;
         };
         row.xor_assign(pivot);
+    }
+}
+
+fn plain_qubit_group_indices(
+    instruction: &CircuitInstruction,
+    group: &[Target],
+) -> CircuitResult<Vec<usize>> {
+    group
+        .iter()
+        .map(|target| plain_qubit_index(instruction, target))
+        .collect()
+}
+
+fn plain_qubit_index(instruction: &CircuitInstruction, target: &Target) -> CircuitResult<usize> {
+    match target {
+        Target::Qubit {
+            inverted: false,
+            id,
+        } => qubit_index(*id),
+        _ => Err(CircuitError::invalid_detector_error_model(format!(
+            "{} target {target} is not a plain qubit target during missing-detector analysis",
+            instruction.gate().canonical_name()
+        ))),
     }
 }
 
@@ -957,7 +1063,7 @@ mod tests {
     }
 
     #[test]
-    fn missing_detectors_rejects_unpromoted_control_flow_and_cliffords() {
+    fn missing_detectors_rejects_unpromoted_control_flow() {
         let repeat = Circuit::from_stim_str("REPEAT 2 {\n    M 0\n}\n").unwrap();
         let repeat_error = missing_detectors(
             &repeat,
@@ -969,13 +1075,14 @@ mod tests {
         assert!(repeat_error.to_string().contains("repeat blocks"));
 
         let clifford = Circuit::from_stim_str("H 0\nM 0\n").unwrap();
-        let clifford_error = missing_detectors(
+        let clifford_output = missing_detectors(
             &clifford,
             MissingDetectorOptions {
                 ignore_non_deterministic_measurements: false,
             },
         )
-        .unwrap_err();
-        assert!(clifford_error.to_string().contains("gate H"));
+        .unwrap()
+        .to_stim_string();
+        assert_eq!(clifford_output, "");
     }
 }
