@@ -47,6 +47,13 @@ const TIME_REVERSE_FLOW_TEXTS: [&str; 4] = [
     "Z2*X301 -> X2*X301",
     "Y2*Y301 -> Y2*Y301",
 ];
+const TIME_REVERSE_FLOW_MEASUREMENT: &str = "MZZ 0 1\n";
+const TIME_REVERSE_FLOW_MEASUREMENT_TEXTS: [&str; 4] = [
+    "X0*X1 -> Y0*Y1 xor rec[-1]",
+    "X0*X1 -> X0*X1",
+    "Z0 -> Z1 xor rec[-1]",
+    "Z0 -> Z0",
+];
 
 pub(super) fn run_circuit_flatten_repeat_row(
     row: &BenchmarkRow,
@@ -134,6 +141,24 @@ pub(super) fn run_time_reverse_flow_row(
     )?])
 }
 
+pub(super) fn run_time_reverse_flow_measurement_row(
+    row: &BenchmarkRow,
+) -> Result<Vec<Measurement>, BenchError> {
+    let circuit = parse_circuit(&row.id, TIME_REVERSE_FLOW_MEASUREMENT)?;
+    let flows = parse_flows(&row.id, TIME_REVERSE_FLOW_MEASUREMENT_TEXTS)?;
+    Ok(vec![measure_stab_batched(
+        "stab_circuit_time_reversed_for_flows_measurement",
+        TRANSFORM_REPETITIONS,
+        || {
+            let (reversed, reversed_flows) = circuit
+                .time_reversed_for_flows(&flows)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box((circuit_checksum(&reversed), reversed_flows.len()));
+            Ok(())
+        },
+    )?])
+}
+
 pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
     match (row_id, name) {
         ("pf2-circuit-flatten-repeat", "stab_circuit_flatten_repeat_shifted_coords") => {
@@ -154,6 +179,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf2-time-reverse-flow", "stab_circuit_time_reversed_for_flows_unitary") => {
             Some((TIME_REVERSE_FLOW_TEXTS.len() as f64, "flows/s"))
         }
+        (
+            "pf2-time-reverse-flow-measurement",
+            "stab_circuit_time_reversed_for_flows_measurement",
+        ) => Some((TIME_REVERSE_FLOW_MEASUREMENT_TEXTS.len() as f64, "flows/s")),
         _ => None,
     }
 }
@@ -173,7 +202,10 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures Rust Circuit::decomposed over ISWAP, MPP, SPP, pair-measurement, noise, and annotation operations; pinned Stim has equivalent API behavior but no faithful Rust direct baseline in this harness",
         ),
         "pf2-time-reverse-flow" => Some(
-            "contract-only: Stab measures the scoped Rust Circuit::time_reversed_for_flows unitary subset; measurement-rich QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures the scoped Rust Circuit::time_reversed_for_flows unitary subset; broader measurement-rich QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
+        ),
+        "pf2-time-reverse-flow-measurement" => Some(
+            "contract-only: Stab measures the selected Rust Circuit::time_reversed_for_flows single measurement-rich instruction subset; broader QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         _ => None,
     }

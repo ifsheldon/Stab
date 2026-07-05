@@ -26,7 +26,7 @@ Revealed by: implementation of the RPF2 circuit transform slices.
 Current text: RPF2 asks to implement `time_reversed_for_flows` only after RPF5 defines required flow semantics, while also listing flow-time-reversal under the RPF2 transform objective.
 Gap: RPF2 now has a scoped unitary `time_reversed_for_flows` bridge, but it still cannot specify or test the measurement-rich form without the RPF5 measurement-rich `Flow`, `has_flow`, flow-generator, included-observable, and measurement-index semantics. Treating the missing measurement-rich rewrite as an RPF2 implementation defect would force agents to invent flow semantics before the owning milestone defines them.
 Proposed amendment: keep measurement-rich `time_reversed_for_flows` manifest-only under RPF2 until RPF5 closes the measurement-rich flow contract, then add a follow-up transform slice with exact public API shape, flow-semantic tests, and benchmark classification.
-Resolution: Pending RPF5 measurement-rich flow semantics.
+Resolution: Partially narrowed by the selected single-instruction measurement-rich `time_reversed_for_flows` slice, which promotes pinned `M` and `MZZ` examples using the existing sparse flow verifier and logs broader resets, detectors, feedback, noise, repeats, multi-instruction QEC inverse behavior, and exact loop refolding as still active or under-specified.
 
 ## 2026-07-04 - PF1: Path-Based Circuit File Helper Streaming Boundary
 

@@ -179,7 +179,64 @@ fn time_reversed_for_flows_unitary_subset_validates_general_unitaries_with_table
 }
 
 #[test]
-fn time_reversed_for_flows_rejects_unsatisfied_general_unitary_flow() {
+fn time_reversed_for_flows_measurement_rich_subset_reverses_single_measurement() {
+    // Adapted from Stim v1.16.0 circuit_inverse_qec flow_reverse coverage.
+    let input = circuit("M 0\n");
+    let flows = [flow("1 -> Z0 xor rec[-1]")];
+
+    let (actual_circuit, actual_flows) =
+        circuit_time_reversed_for_flows(&input, &flows).expect("time reverse measurement flow");
+
+    assert_eq!(actual_circuit, input);
+    assert_eq!(actual_flows, vec![flow("Z0 -> rec[-1]")]);
+}
+
+#[test]
+fn time_reversed_for_flows_measurement_rich_subset_reverses_pair_measurement() {
+    // Adapted from Stim v1.16.0 circuit_inverse_qec flow_through_mzz coverage.
+    let input = circuit("MZZ 0 1\n");
+    let flows = [
+        flow("X0*X1 -> Y0*Y1 xor rec[-1]"),
+        flow("X0*X1 -> X0*X1"),
+        flow("Z0 -> Z1 xor rec[-1]"),
+        flow("Z0 -> Z0"),
+    ];
+
+    let (actual_circuit, actual_flows) =
+        circuit_time_reversed_for_flows(&input, &flows).expect("time reverse MZZ flows");
+
+    assert_eq!(actual_circuit, input);
+    assert_eq!(
+        actual_flows,
+        vec![
+            flow("Y0*Y1 -> X0*X1 xor rec[-1]"),
+            flow("X0*X1 -> X0*X1"),
+            flow("Z1 -> Z0 xor rec[-1]"),
+            flow("Z0 -> Z0"),
+        ]
+    );
+}
+
+#[test]
+fn time_reversed_for_flows_measurement_rich_subset_covers_selected_bases() {
+    for (circuit_text, input_flow, expected_flow) in [
+        ("MX 0\n", "1 -> X0 xor rec[-1]", "X0 -> rec[-1]"),
+        ("MY 0\n", "1 -> Y0 xor rec[-1]", "Y0 -> rec[-1]"),
+        ("MXX 0 1\n", "1 -> X0*X1 xor rec[-1]", "X0*X1 -> rec[-1]"),
+        ("MYY 0 1\n", "1 -> Y0*Y1 xor rec[-1]", "Y0*Y1 -> rec[-1]"),
+    ] {
+        let input = circuit(circuit_text);
+        let (actual_circuit, actual_flows) =
+            circuit_time_reversed_for_flows(&input, &[flow(input_flow)])
+                .expect("time reverse selected measurement basis");
+
+        assert_eq!(actual_circuit, input, "{circuit_text}");
+        assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
+    }
+}
+
+#[test]
+fn time_reversed_for_flows_unitary_subset_rejects_unsatisfied_general_unitary_flow() {
     let error = circuit_time_reversed_for_flows(&circuit("SWAP 0 1\n"), &[flow("X0 -> X0")])
         .expect_err("swap does not preserve X0")
         .to_string();
@@ -191,7 +248,7 @@ fn time_reversed_for_flows_rejects_unsatisfied_general_unitary_flow() {
 }
 
 #[test]
-fn time_reversed_for_flows_rejects_large_repeated_unitary_outside_folded_subset() {
+fn time_reversed_for_flows_unitary_subset_rejects_large_repeated_unitary_outside_folded_subset() {
     let input = circuit(
         "
         REPEAT 1000001 {
@@ -207,7 +264,7 @@ fn time_reversed_for_flows_rejects_large_repeated_unitary_outside_folded_subset(
 }
 
 #[test]
-fn time_reversed_for_flows_rejects_unsatisfied_flow() {
+fn time_reversed_for_flows_unitary_subset_rejects_unsatisfied_flow() {
     let error = circuit_time_reversed_for_flows(&circuit("H 0\n"), &[flow("Z0 -> Z0")])
         .expect_err("flow is not satisfied")
         .to_string();
@@ -219,13 +276,45 @@ fn time_reversed_for_flows_rejects_unsatisfied_flow() {
 }
 
 #[test]
-fn time_reversed_for_flows_rejects_measurement_rich_terms_for_later_slices() {
-    let error = circuit_time_reversed_for_flows(&circuit("M 0\n"), &[flow("Z0 -> rec[-1]")])
-        .expect_err("measurement-rich flow rewrites are not in the scoped subset")
+fn time_reversed_for_flows_measurement_rich_subset_rejects_unsatisfied_flows() {
+    let error = circuit_time_reversed_for_flows(&circuit("M 0\n"), &[flow("X0 -> rec[-1]")])
+        .expect_err("measurement-rich flow is not satisfied")
         .to_string();
 
     assert!(
-        error.contains("does not support measurement-record or observable terms"),
+        error.contains("requires selected measurement-rich circuit to satisfy flow 0"),
+        "{error}"
+    );
+}
+
+#[test]
+fn time_reversed_for_flows_rejects_unpromoted_measurement_rich_terms() {
+    let error = circuit_time_reversed_for_flows(
+        &circuit(
+            "
+            M 0
+            M 1
+        ",
+        ),
+        &[flow("Z0 -> rec[-2]")],
+    )
+    .expect_err("multi-instruction measurement-rich flow rewrites are not in the scoped subset")
+    .to_string();
+
+    assert!(
+        error.contains("measurement-rich subset supports only one noiseless plain measurement"),
+        "{error}"
+    );
+}
+
+#[test]
+fn time_reversed_for_flows_measurement_rich_subset_rejects_noisy_measurements() {
+    let error = circuit_time_reversed_for_flows(&circuit("M(0.125) 0\n"), &[flow("Z0 -> rec[-1]")])
+        .expect_err("noisy measurement-rich flow rewrites are not in the scoped subset")
+        .to_string();
+
+    assert!(
+        error.contains("measurement-rich subset supports only one noiseless plain measurement"),
         "{error}"
     );
 }

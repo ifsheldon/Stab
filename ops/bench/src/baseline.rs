@@ -272,6 +272,9 @@ pub(crate) fn run_stab_compare_row(
         "pf2-circuit-decompose-mpp-spp" => Ok(Some(pf2::run_circuit_decompose_mpp_spp_row(row)?)),
         "pf2-feedback-inline-batch" => Ok(Some(pf2::run_feedback_inline_batch_row(row)?)),
         "pf2-time-reverse-flow" => Ok(Some(pf2::run_time_reverse_flow_row(row)?)),
+        "pf2-time-reverse-flow-measurement" => {
+            Ok(Some(pf2::run_time_reverse_flow_measurement_row(row)?))
+        }
         "m5-simd-bit-table" => {
             let matrix = m5_bit_matrix(&row.id)?;
             Ok(Some(vec![

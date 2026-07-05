@@ -39,17 +39,23 @@ pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
     circuit_inverse_unitary(circuit)
 }
 
-/// Returns the currently supported unitary time-reversal subset for flows.
+/// Returns the currently supported time-reversal subset for flows.
 ///
 /// This additive API validates that every provided unsigned flow is satisfied by
-/// the original unitary circuit, returns the QEC inverse subset, and swaps each
-/// flow's input and output Pauli terms. Measurement-record and observable flow
-/// terms remain outside this scoped implementation because Stim's richer QEC
-/// measurement, detector, feedback, and noise rewrites are still deferred.
+/// the original circuit, returns the selected QEC inverse subset, and swaps each
+/// flow's input and output Pauli terms. The measurement-rich subset is limited
+/// to one noiseless plain measurement instruction group; resets, detectors, feedback,
+/// noise, repeats, and multi-instruction QEC rewrites remain deferred.
 pub fn circuit_time_reversed_for_flows(
     circuit: &Circuit,
     flows: &[Flow],
 ) -> CircuitResult<(Circuit, Vec<Flow>)> {
+    if let Some(inverse) = selected_measurement_rich_time_reversal_circuit(circuit) {
+        return time_reverse_flows_with_sparse_validation(circuit, inverse, flows);
+    }
+    if has_classical_flow_terms(flows) {
+        return Err(measurement_rich_time_reversal_error());
+    }
     for (index, flow) in flows.iter().enumerate() {
         reject_non_unitary_flow_terms(index, flow)?;
     }
@@ -66,18 +72,92 @@ pub fn circuit_time_reversed_for_flows(
             )));
         }
     }
-    let reversed_flows = flows
-        .iter()
-        .map(|flow| {
-            Flow::new(
-                flow.output().with_sign(PauliSign::Plus),
-                flow.input().with_sign(PauliSign::Plus),
-                [],
-                [],
-            )
-        })
-        .collect();
+    let reversed_flows = flows.iter().map(reversed_pauli_only_flow).collect();
     Ok((inverse, reversed_flows))
+}
+
+fn selected_measurement_rich_time_reversal_circuit(circuit: &Circuit) -> Option<Circuit> {
+    let [CircuitItem::Instruction(instruction)] = circuit.items() else {
+        return None;
+    };
+    if !supports_selected_measurement_rich_time_reversal(instruction) {
+        return None;
+    }
+    Some(circuit.clone())
+}
+
+fn supports_selected_measurement_rich_time_reversal(instruction: &CircuitInstruction) -> bool {
+    if !matches!(
+        instruction.gate().canonical_name(),
+        "M" | "MX" | "MY" | "MXX" | "MYY" | "MZZ"
+    ) {
+        return false;
+    }
+    if !instruction.args().is_empty() {
+        return false;
+    }
+    let groups = instruction.target_groups();
+    matches!(groups.as_slice(), [group] if group.iter().all(is_plain_qubit_target))
+}
+
+fn is_plain_qubit_target(target: &Target) -> bool {
+    matches!(
+        target,
+        Target::Qubit {
+            inverted: false,
+            ..
+        }
+    )
+}
+
+fn time_reverse_flows_with_sparse_validation(
+    circuit: &Circuit,
+    inverse: Circuit,
+    flows: &[Flow],
+) -> CircuitResult<(Circuit, Vec<Flow>)> {
+    for (index, flow) in flows.iter().enumerate() {
+        if !check_unsigned_flow_with_sparse_tracker(circuit, flow)
+            .map_err(|error| CircuitError::invalid_tableau_conversion(error.to_string()))?
+        {
+            return Err(CircuitError::invalid_tableau_conversion(format!(
+                "time_reversed_for_flows measurement-rich subset requires selected measurement-rich circuit to satisfy flow {index}: {flow}"
+            )));
+        }
+    }
+    Ok((
+        inverse,
+        flows.iter().map(reversed_measurement_rich_flow).collect(),
+    ))
+}
+
+fn reversed_pauli_only_flow(flow: &Flow) -> Flow {
+    Flow::new(
+        flow.output().with_sign(PauliSign::Plus),
+        flow.input().with_sign(PauliSign::Plus),
+        [],
+        [],
+    )
+}
+
+fn reversed_measurement_rich_flow(flow: &Flow) -> Flow {
+    Flow::new(
+        flow.output().with_sign(PauliSign::Plus),
+        flow.input().with_sign(PauliSign::Plus),
+        flow.measurements(),
+        flow.observables(),
+    )
+}
+
+fn has_classical_flow_terms(flows: &[Flow]) -> bool {
+    flows
+        .iter()
+        .any(|flow| flow.measurements().next().is_some() || flow.observables().next().is_some())
+}
+
+fn measurement_rich_time_reversal_error() -> CircuitError {
+    CircuitError::invalid_tableau_conversion(
+        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain measurement instruction group from M, MX, MY, MXX, MYY, or MZZ; resets, detectors, feedback, noise, repeats, and multi-instruction rewrites remain unsupported",
+    )
 }
 
 fn inverse_instruction(instruction: &CircuitInstruction) -> CircuitResult<CircuitInstruction> {

@@ -895,6 +895,10 @@ fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
             "pf2-time-reverse-flow",
             "stab_circuit_time_reversed_for_flows_unitary",
         ),
+        (
+            "pf2-time-reverse-flow-measurement",
+            "stab_circuit_time_reversed_for_flows_measurement",
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),
