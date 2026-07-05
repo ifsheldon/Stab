@@ -10,7 +10,7 @@ The implemented boundary is deliberately narrow:
 - The frame-path detector sampler treats sweep controls on `CX` and `CY` qubit targets as false no-ops when `detect` has no sweep input, and follows Stim's `CZ` bit-target semantics by treating sweep/qubit pairs as false no-ops and bit/bit pairs as no-ops.
 - `stab detect` accepts the same non-frame sweep-conditioned circuit shape through the public CLI.
 - `stab detect` also accepts selected frame-path Pauli-observable circuits with sweep-controlled `CX`, `CY`, and `CZ` gates plus `CZ` bit/bit no-op groups under the same omitted all-false semantics.
-- This slice does not add typed sweep input files to `detect`, claim full sweep target-shape parity, or close analyzer sweep behavior beyond the selected no-op matrix and invalid target-position rejections.
+- This slice does not add a Stab-specific sweep-input extension to `detect`, claim full sweep target-shape parity, or close analyzer sweep behavior beyond the selected no-op matrix and invalid target-position rejections. Pinned Stim v1.16.0 has no `stim detect --sweep` flag; typed detector-sampler sweep APIs are deferred to future Python or explicit Rust API work.
 
 ## Evidence
 
@@ -51,11 +51,11 @@ Benchmark row:
 
 - Broader `pf3-analyze-errors-sweep` coverage remains open for analyzer sweep behavior beyond the selected sweep-control no-op matrix and invalid target-position rejections.
 - Broader legal-gate execution remains open for non-tableau legal operations and future execution surfaces; the fixed-tableau gate contract is now covered.
-- Broader frame-path sweep behavior remains open for typed sweep input, unsupported sweep target placements, and any future `detect --sweep` surface.
+- Broader frame-path sweep behavior remains open for unsupported sweep target placements. Any `detect --sweep` surface would be a Stab extension or future API decision, not a pinned Stim v1.16.0 CLI parity gap.
 
 ## Audit And Review Notes
 
-Milestone audit found the slice complete against the selected PFM3 frame-path `detect` contract after keeping typed `detect` sweep input, broader analyzer sweep behavior, and full sweep target-shape parity explicitly open.
+Milestone audit found the slice complete against the selected PFM3 frame-path `detect` contract after keeping broader analyzer sweep behavior and full sweep target-shape parity explicitly open; later scope review confirmed `detect --sweep` is not a pinned Stim v1.16.0 CLI parity target.
 The GPT-5.5/xhigh docs and metadata sidecar found stale roadmap wording that still described frame-path sweep sampling as open; this report and `rust-stim-drop-in-rewrite.md` now identify the selected frame-path subset as implemented.
 The GPT-5.5/xhigh core sidecar found that unsupported frame-path sweep target shapes passed preflight validation and that `CZ` bit/bit groups were incorrectly treated as rejections instead of Stim-compatible no-ops; validation now rejects unsupported `CX` and `CY` bit targets before output files are opened, and `CZ` bit/bit groups are accepted as no-ops.
 The follow-up analyzer audit found the selected sweep-control matrix complete after adding public `stab analyze_errors` CLI evidence. The GPT-5.5/xhigh analyzer sidecar found no correctness issues and suggested extra classical-bit edge cases, which are now covered. The GPT-5.5/xhigh docs and metadata sidecar found stale report boundary text and missing public CLI evidence; the report boundary is reworded and `pf3-analyze-errors-sweep-cli` now proves stdout, stderr, and exit-status behavior.

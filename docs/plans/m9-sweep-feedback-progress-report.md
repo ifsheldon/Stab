@@ -68,7 +68,7 @@ Focused probe reports were generated under:
 
 ## Remaining Exclusions
 
-- `detect` sweep-conditioned sampling still rejects sweep-conditioned circuits because no public detector-sampling sweep input exists yet.
+- `detect` sweep-conditioned sampling now accepts the selected omitted-all-false sweep subset documented by [rpf3-sweep-gate-progress-report.md](rpf3-sweep-gate-progress-report.md). Pinned Stim v1.16.0 has no `stim detect --sweep` flag, so public typed sweep files remain an `m2d --sweep` surface instead of a `detect` CLI gap.
 - Full `Circuit.with_inlined_feedback` parity is not claimed.
 - Broader repeat-contained feedback and unsupported feedback-inlining shapes remain open spec gaps in `docs/plans/milestone-spec-gaps.md`.
 - Deprecated `--detector_hypergraph` remains excluded from Stab CLI parity.
