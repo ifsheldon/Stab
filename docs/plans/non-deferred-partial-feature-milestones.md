@@ -220,7 +220,7 @@ Rows covered:
 Tasks:
 
 - Finish or explicitly reject frame-path sweep-conditioned detector sampling for the current public detection surface. Selected frame-path Pauli-observable `detect` sampling with sweep-controlled `CX` and `CY` qubit targets, sweep-controlled `CZ`, and `CZ` bit/bit no-op groups now uses omitted all-false sweep bits; typed `detect` sweep input and broader sweep target placements remain outside this slice.
-- Expand analyzer sweep behavior beyond the current no-op sweep-control subset only for selected exact subcases.
+- Expand analyzer sweep behavior beyond the original single no-op sweep-control subset only for selected exact subcases. The selected analyzer sweep-control matrix now covers `CX`, `CY`, `CZ`, `XCZ`, and `YCZ` no-op behavior plus invalid controlled-Pauli sweep target-position rejections; broader analyzer sweep-shape parity remains active.
 - Keep `m2d --sweep` and `--sweep_format` behavior synchronized with core converter behavior for every accepted input format.
 - Classify legal gate execution support across sampler, converter, detection, and analyzer paths. The fixed-tableau gate contract is implemented for current sampler, detection-conversion, and analyzer surfaces; non-tableau legal operations remain active or explicitly rejected.
 - Add precise errors for unsupported sweep target shapes, unsupported gate families, unsupported mixed feedback and sweep cases, and unsupported public output formats.

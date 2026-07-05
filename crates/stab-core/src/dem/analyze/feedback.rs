@@ -137,12 +137,13 @@ fn z_controlled_feedback_action(
     target: &Target,
     pauli: AnalyzerPauli,
 ) -> CircuitResult<ControlledPauliAction> {
+    let Some(qubit) = target.qubit_id() else {
+        return Err(non_qubit_target_error(gate_name, "target", target));
+    };
     if control.sweep_bit_id().is_some() {
-        require_qubit(gate_name, "target", target)?;
         return Ok(ControlledPauliAction::NoEffect);
     }
     if let Some(record_offset) = control.measurement_record_offset() {
-        let qubit = require_qubit(gate_name, "target", target)?;
         return Ok(ControlledPauliAction::MeasurementFeedback {
             record_offset: record_offset.get(),
             qubit,
@@ -158,12 +159,11 @@ fn reversed_z_controlled_action(
     control: &Target,
     pauli: AnalyzerPauli,
 ) -> CircuitResult<ControlledPauliAction> {
+    let qubit = require_qubit(gate_name, "target", target)?;
     if control.sweep_bit_id().is_some() {
-        require_qubit(gate_name, "target", target)?;
         return Ok(ControlledPauliAction::NoEffect);
     }
     if let Some(record_offset) = control.measurement_record_offset() {
-        let qubit = require_qubit(gate_name, "target", target)?;
         return Ok(ControlledPauliAction::MeasurementFeedback {
             record_offset: record_offset.get(),
             qubit,
@@ -221,9 +221,13 @@ fn apply_feedback_effect(pending: &mut PendingError, effect: NoiseEffect, observ
 }
 
 fn require_qubit(gate_name: &str, role: &str, target: &Target) -> CircuitResult<QubitId> {
-    target.qubit_id().ok_or_else(|| {
-        CircuitError::invalid_detector_error_model(format!(
-            "{gate_name} {role} {target} is not a qubit"
-        ))
-    })
+    target
+        .qubit_id()
+        .ok_or_else(|| non_qubit_target_error(gate_name, role, target))
+}
+
+fn non_qubit_target_error(gate_name: &str, role: &str, target: &Target) -> CircuitError {
+    CircuitError::invalid_detector_error_model(format!(
+        "{gate_name} {role} {target} is not a qubit"
+    ))
 }

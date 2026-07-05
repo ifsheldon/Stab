@@ -114,6 +114,55 @@ fn analyze_errors_fold_loops_nested_repeat_matches_m10_oracle_golden() {
 }
 
 #[test]
+fn analyze_errors_sweep_controls_match_pf3_oracle() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "analyze_errors"],
+        b"X_ERROR(0.25) 0\n\
+          CX sweep[0] 0\n\
+          CY sweep[1] 0\n\
+          CZ sweep[2] 0\n\
+          CZ 0 sweep[3]\n\
+          CZ sweep[4] sweep[5]\n\
+          XCZ 0 sweep[6]\n\
+          YCZ 0 sweep[7]\n\
+          M 1\n\
+          CZ rec[-1] sweep[8]\n\
+          CZ sweep[9] rec[-1]\n\
+          M 0\n\
+          DETECTOR rec[-1]\n"
+            .as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "error(0.25) D0\n");
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn analyze_errors_sweep_controls_reject_invalid_target_positions() {
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "analyze_errors"],
+        b"X_ERROR(0.25) 0\nCX 0 sweep[0]\nM 0\nDETECTOR rec[-1]\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    let error = String::from_utf8(stderr).unwrap();
+    assert!(
+        error.contains("CX target sweep[0] is not a qubit"),
+        "{error}"
+    );
+}
+
+#[test]
 fn analyze_errors_rejects_oversized_input_file_before_reading() {
     let dir = tempdir().expect("tempdir");
     let input_path = dir.path().join("oversized.stim");

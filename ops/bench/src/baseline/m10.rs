@@ -30,6 +30,15 @@ const ANALYZE_FOLD_REPEAT_FIXTURE: &str =
     include_str!("../../../../oracle/fixtures/inputs/analyze_errors_fold_repeat.stim");
 const ANALYZE_SWEEP_CONTROL_FIXTURE: &str = "X_ERROR(0.25) 0\n\
                                             CX sweep[0] 0\n\
+                                            CY sweep[1] 0\n\
+                                            CZ sweep[2] 0\n\
+                                            CZ 0 sweep[3]\n\
+                                            CZ sweep[4] sweep[5]\n\
+                                            XCZ 0 sweep[6]\n\
+                                            YCZ 0 sweep[7]\n\
+                                            M 1\n\
+                                            CZ rec[-1] sweep[8]\n\
+                                            CZ sweep[9] rec[-1]\n\
                                             M 0\n\
                                             DETECTOR rec[-1]\n";
 const ERROR_ANALYZER_COMPARE_ITERATIONS: usize = 16;
@@ -164,7 +173,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures public unsigned-flow checking over a measurement-dependent fixed two-qubit Clifford unitary repeat so the sparse reverse frame tracker must use loop folding; broader sparse tracker parity and provenance remain outside this row",
         ),
         "pf3-analyze-errors-sweep" => Some(
-            "report-only: Stab measures in-process analyzer handling for sweep-controlled Clifford gates that are semantically ignored by the error analyzer",
+            "report-only: Stab measures in-process analyzer handling for selected sweep-controlled Clifford gates and CZ bit-bit no-op groups that are semantically ignored by the error analyzer",
         ),
         "m10-error-analyzer" => Some(
             "contract-representative: Stab measures in-process generated rotated-memory-z surface-code analysis at d3/r3; the upstream Stim perf row uses d11/r100 and remains the eventual scale target",

@@ -13,18 +13,148 @@ fn analyze(text: &str) -> String {
         .to_dem_string()
 }
 
+fn analyze_error(text: &str) -> String {
+    let circuit = Circuit::from_stim_str(text).expect("circuit");
+    circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .expect_err("reject invalid analyzer circuit")
+        .to_string()
+}
+
 #[test]
 fn dem_analyzer_ignores_sweep_controls_like_upstream() {
-    let dem = analyze(
+    for circuit in [
         "
-        X_ERROR(0.25) 0
-        CNOT sweep[0] 0
-        M 0
-        DETECTOR rec[-1]
+            X_ERROR(0.25) 0
+            CNOT sweep[0] 0
+            M 0
+            DETECTOR rec[-1]
         ",
-    );
+        "
+            X_ERROR(0.25) 0
+            CY sweep[0] 0
+            M 0
+            DETECTOR rec[-1]
+        ",
+        "
+            X_ERROR(0.25) 0
+            CZ sweep[0] 0
+            M 0
+            DETECTOR rec[-1]
+        ",
+        "
+            X_ERROR(0.25) 0
+            CZ 0 sweep[0]
+            M 0
+            DETECTOR rec[-1]
+        ",
+        "
+            X_ERROR(0.25) 0
+            CZ sweep[0] sweep[1]
+            M 0
+            DETECTOR rec[-1]
+        ",
+        "
+            X_ERROR(0.25) 0
+            M 1
+            CZ rec[-1] sweep[0]
+            M 0
+            DETECTOR rec[-1]
+        ",
+        "
+            X_ERROR(0.25) 0
+            M 1
+            CZ sweep[0] rec[-1]
+            M 0
+            DETECTOR rec[-1]
+        ",
+        "
+            X_ERROR(0.25) 0
+            XCZ 0 sweep[0]
+            M 0
+            DETECTOR rec[-1]
+        ",
+        "
+            X_ERROR(0.25) 0
+            YCZ 0 sweep[0]
+            M 0
+            DETECTOR rec[-1]
+        ",
+    ] {
+        assert_eq!(analyze(circuit), "error(0.25) D0\n");
+    }
+}
 
-    assert_eq!(dem, "error(0.25) D0\n");
+#[test]
+fn dem_analyzer_rejects_invalid_sweep_target_positions() {
+    for (circuit, expected) in [
+        (
+            "
+            X_ERROR(0.25) 0
+            CX 0 sweep[0]
+            M 0
+            DETECTOR rec[-1]
+            ",
+            "CX target sweep[0] is not a qubit",
+        ),
+        (
+            "
+            X_ERROR(0.25) 0
+            CX sweep[0] sweep[1]
+            M 0
+            DETECTOR rec[-1]
+            ",
+            "CX target sweep[1] is not a qubit",
+        ),
+        (
+            "
+            X_ERROR(0.25) 0
+            M 0
+            CY rec[-1] sweep[0]
+            M 0
+            DETECTOR rec[-1]
+            ",
+            "CY target sweep[0] is not a qubit",
+        ),
+        (
+            "
+            X_ERROR(0.25) 0
+            CY 0 sweep[0]
+            M 0
+            DETECTOR rec[-1]
+            ",
+            "CY target sweep[0] is not a qubit",
+        ),
+        (
+            "
+            X_ERROR(0.25) 0
+            XCZ sweep[0] sweep[1]
+            M 0
+            DETECTOR rec[-1]
+            ",
+            "XCZ target sweep[0] is not a qubit",
+        ),
+        (
+            "
+            X_ERROR(0.25) 0
+            XCZ sweep[0] 0
+            M 0
+            DETECTOR rec[-1]
+            ",
+            "XCZ target sweep[0] is not a qubit",
+        ),
+        (
+            "
+            X_ERROR(0.25) 0
+            YCZ sweep[0] 0
+            M 0
+            DETECTOR rec[-1]
+            ",
+            "YCZ target sweep[0] is not a qubit",
+        ),
+    ] {
+        let error = analyze_error(circuit);
+        assert!(error.contains(expected), "{error}");
+    }
 }
 
 #[test]
