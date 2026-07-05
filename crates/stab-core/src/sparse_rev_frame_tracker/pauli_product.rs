@@ -4,7 +4,7 @@ use crate::{CircuitError, CircuitInstruction, CircuitResult, QubitId, Target};
 
 use super::TrackerBasis;
 
-pub(super) fn pauli_product_measurement_terms_reversed(
+pub(super) fn pauli_product_terms_reversed(
     instruction: &CircuitInstruction,
 ) -> CircuitResult<Vec<Vec<(QubitId, TrackerBasis)>>> {
     instruction
@@ -13,6 +13,12 @@ pub(super) fn pauli_product_measurement_terms_reversed(
         .rev()
         .map(|group| normalize_pauli_product_terms(instruction.gate().canonical_name(), group))
         .collect()
+}
+
+pub(super) fn pauli_product_measurement_terms_reversed(
+    instruction: &CircuitInstruction,
+) -> CircuitResult<Vec<Vec<(QubitId, TrackerBasis)>>> {
+    pauli_product_terms_reversed(instruction)
 }
 
 fn normalize_pauli_product_terms(

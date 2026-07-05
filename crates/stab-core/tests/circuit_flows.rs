@@ -106,23 +106,43 @@ fn circuit_has_unsigned_stabilizer_flow_helpers_match_supported_batch_semantics(
 }
 
 #[test]
-fn circuit_has_unsigned_stabilizer_flow_helpers_fail_closed_on_unsupported_unitary_gates() {
-    let circuit = circuit("SPP X0*Y1*Z2\n");
+fn pf6_sparse_rev_spp_circuit_has_unsigned_stabilizer_flow_helpers_support_unsigned_semantics() {
+    let spp_circuit = circuit("SPP X0*Y1*Z2\n");
+    let spp_dag_circuit = circuit("SPP_DAG X0*Y1*Z2\n");
+    let true_unsigned_flows = [flow("Z__ -> YYZ"), flow("__Z -> __Z")];
     let false_identity_flow = flow("Z__ -> Z__");
     assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(&spp_circuit, &true_unsigned_flows),
+        vec![true, true]
+    );
+    assert!(circuit_has_all_unsigned_stabilizer_flows(
+        &spp_circuit,
+        &true_unsigned_flows
+    ));
+    assert!(circuit_has_all_unsigned_stabilizer_flows(
+        &spp_dag_circuit,
+        &true_unsigned_flows
+    ));
+    assert_eq!(
         check_if_circuit_has_unsigned_stabilizer_flows(
-            &circuit,
+            &spp_circuit,
             std::slice::from_ref(&false_identity_flow),
         ),
         vec![false]
     );
     assert!(!circuit_has_unsigned_stabilizer_flow(
-        &circuit,
+        &spp_circuit,
         &false_identity_flow
     ));
     assert!(!circuit_has_all_unsigned_stabilizer_flows(
-        &circuit,
+        &spp_circuit,
         &[false_identity_flow]
+    ));
+
+    let anti_hermitian_circuit = circuit("SPP X0*Z0\n");
+    assert!(!circuit_has_unsigned_stabilizer_flow(
+        &anti_hermitian_circuit,
+        &flow("Z -> Z")
     ));
 }
 

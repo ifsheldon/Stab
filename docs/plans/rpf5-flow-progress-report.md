@@ -28,8 +28,8 @@ Completion evidence for this slice includes exact generator tests for repeated s
 ## Unsigned Has-All Scope
 
 The current PFM5 has-all slice promotes only deterministic unsigned Rust helpers over the existing supported flow checker: `circuit_has_unsigned_stabilizer_flow` for one flow and `circuit_has_all_unsigned_stabilizer_flows` for an empty or non-empty batch.
-Owned positive and negative subcases are unitary sign-insensitive flows, false unitary flows, unsupported variable-target unitary fail-closed behavior, measurement-record and observable dependencies, and folded-repeat measurement references.
-The helpers return booleans and deliberately preserve the existing fail-closed checker behavior for unsupported sparse-tracker shapes.
+Owned positive and negative subcases are unitary sign-insensitive flows, false unitary flows, unsigned `SPP`/`SPP_DAG` product propagation, anti-Hermitian `SPP` failure, measurement-record and observable dependencies, and folded-repeat measurement references.
+The helpers return booleans and deliberately preserve the existing fail-closed checker behavior for sparse-tracker shapes that remain unsupported outside the promoted unsigned path.
 They do not expose Stim's signed randomized `has_flow` or `has_all_flows` behavior and do not claim Python binding parity.
 The report-only `pf5-has-all-flows-batch` benchmark now calls the public batch helper while still validating the vector checker's per-flow expected results inside the benchmark closure.
 
@@ -41,7 +41,7 @@ Implemented Rust tests:
 - `check_if_circuit_has_unsigned_stabilizer_flows_supports_pair_measurement_records`
 - `check_if_circuit_has_unsigned_stabilizer_flows_supports_observable_dependencies`
 - `circuit_has_unsigned_stabilizer_flow_helpers_match_supported_batch_semantics`
-- `circuit_has_unsigned_stabilizer_flow_helpers_fail_closed_on_unsupported_unitary_gates`
+- `pf6_sparse_rev_spp_circuit_has_unsigned_stabilizer_flow_helpers_support_unsigned_semantics`
 - `circuit_flow_generators_promotes_single_instruction_measurement_subset`
 - `circuit_flow_generators_promotes_composed_measurement_subset`
 - `circuit_flow_generators_measurement_subset_flows_satisfy_checker`
@@ -58,7 +58,7 @@ Implemented Rust tests:
 - `time_reversed_for_flows_rejects_unsatisfied_flow`
 - `time_reversed_for_flows_rejects_measurement_rich_terms_for_later_slices`
 
-These tests cover measurement-record dependencies, pair-measurement records, observable dependencies from records and Pauli targets, sign-insensitive matching, unsigned single-flow and all-flow helper success and failure cases, empty all-flow batches, folded-repeat measurement references, unsupported `SPP` fail-closed behavior instead of identity acceptance, exact measurement, reset, pair-measurement, nonconstant and constant `MPP`, composed measurement-rich instruction sequences without ordinary unitary mixing, feedback, `MPAD`, and promoted heralded-noise MPP generators, generated-flow satisfaction checks for the supported checker subset, pinned Stim measurement-solver examples, scoped unitary flow time reversal, and negative cases ported from pinned Stim v1.16.0 `has_flow`, `has_all_flows`, `circuit_flow_generators`, and `circuit_inverse_qec` tests.
+These tests cover measurement-record dependencies, pair-measurement records, observable dependencies from records and Pauli targets, sign-insensitive matching, unsigned single-flow and all-flow helper success and failure cases, empty all-flow batches, folded-repeat measurement references, unsigned `SPP`/`SPP_DAG` product propagation with false identity-flow rejection, exact measurement, reset, pair-measurement, nonconstant and constant `MPP`, composed measurement-rich instruction sequences without ordinary unitary mixing, feedback, `MPAD`, and promoted heralded-noise MPP generators, generated-flow satisfaction checks for the supported checker subset, pinned Stim measurement-solver examples, scoped unitary flow time reversal, and negative cases ported from pinned Stim v1.16.0 `has_flow`, `has_all_flows`, `circuit_flow_generators`, and `circuit_inverse_qec` tests.
 
 ## Oracle Rows
 
@@ -119,7 +119,7 @@ just bench::compare --only pf5-flow-generators-measurement-rich --baseline targe
 
 Milestone-audit for the unsigned has-all helper slice found the promoted scope complete against the current PFM5 text: the Rust API is additive, deterministic, unsigned-only, fail-closed for unsupported sparse-tracker gates, covered by direct tests, represented by oracle row `pf5-has-all-flows-rust`, and measured by report-only row `pf5-has-all-flows-batch`.
 Full-code-review used GPT-5.5/xhigh sidecars for Rust/API behavior and docs or benchmark alignment.
-The Rust/API reviewer found a P1 fail-open risk where unsupported `SPP` could be treated as identity by sparse-tracker fallback; this was fixed by making unsupported non-noise and non-annotation sparse-tracker instructions return an error, which the unsigned checker converts to `false`, and by adding `circuit_has_unsigned_stabilizer_flow_helpers_fail_closed_on_unsupported_unitary_gates`.
+The Rust/API reviewer found a P1 fail-open risk where unsupported `SPP` could be treated as identity by sparse-tracker fallback; the initial fix made unsupported non-noise and non-annotation sparse-tracker instructions return an error, and the promoted follow-up added unsigned `SPP`/`SPP_DAG` propagation plus false identity-flow and anti-Hermitian regression coverage.
 The docs and benchmark reviewer found two P2 alignment gaps: this audit block still described the earlier composed-measurement slice, and the historical RPF oracle-row rollup omitted `pf5-has-all-flows-rust`; both were corrected.
 The benchmark row remains report-only and outside primary thresholds because there is no faithful pinned-Stim CLI timing ratio for this Rust utility helper.
 `crates/stab-core/src/circuit_flow.rs` remains on the large-file watch list below the 1200-line finding threshold, so the next flow-generator expansion should split generator ownership into a submodule before adding much more code.

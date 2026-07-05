@@ -182,6 +182,85 @@ fn sparse_rev_frame_tracker_undo_fixed_two_qubit_gates_match_tableau() {
 }
 
 #[test]
+fn pf6_sparse_rev_spp_matches_decomposed_tableau_unsigned() {
+    let target = DemTarget::logical_observable(0).unwrap();
+    let basis_cases = [PauliBasis::I, PauliBasis::X, PauliBasis::Y, PauliBasis::Z];
+    for (gate_name, inverse_name) in [("SPP", "SPP_DAG"), ("SPP_DAG", "SPP")] {
+        let instruction = instruction(&format!("{gate_name} X0*Y1*Z2\n"));
+        let expected_tableau = circuit(&format!("{inverse_name} X0*Y1*Z2\n"))
+            .decomposed()
+            .unwrap()
+            .to_tableau(false, false, false)
+            .unwrap();
+        for left_basis in basis_cases {
+            for middle_basis in basis_cases {
+                for right_basis in basis_cases {
+                    let input_text = text_from_bases([left_basis, middle_basis, right_basis]);
+                    let mut actual = tracker_from_pauli_text(&input_text);
+                    actual.undo_instruction(&instruction).unwrap();
+                    let expected = expected_tableau
+                        .apply(&PauliString::from_bases(
+                            PauliSign::Plus,
+                            [left_basis, middle_basis, right_basis],
+                        ))
+                        .unwrap();
+                    let actual = actual.region_for_target(target).unwrap();
+                    for index in 0..3 {
+                        assert_eq!(
+                            actual.get(index).unwrap(),
+                            expected.get(index).unwrap(),
+                            "{gate_name} {input_text} qubit {index}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn pf6_sparse_rev_spp_handles_multiple_groups_and_inverted_products() {
+    let instruction_text = "SPP X0*X1 !Z1*Z2\n";
+    let instruction = instruction(instruction_text);
+    let expected_tableau = circuit(instruction_text)
+        .decomposed()
+        .unwrap()
+        .inverse_unitary()
+        .unwrap()
+        .to_tableau(false, false, false)
+        .unwrap();
+    let mut actual = tracker_from_pauli_text("ZYX");
+    actual.undo_instruction(&instruction).unwrap();
+
+    let expected = expected_tableau
+        .apply(&PauliString::from_bases(
+            PauliSign::Plus,
+            [PauliBasis::Z, PauliBasis::Y, PauliBasis::X],
+        ))
+        .unwrap();
+    let actual = actual
+        .region_for_target(DemTarget::logical_observable(0).unwrap())
+        .unwrap();
+    for index in 0..3 {
+        assert_eq!(
+            actual.get(index).unwrap(),
+            expected.get(index).unwrap(),
+            "multi-group SPP qubit {index}"
+        );
+    }
+}
+
+#[test]
+fn pf6_sparse_rev_spp_rejects_anti_hermitian_products() {
+    let mut actual = tracker_from_pauli_text("Z");
+    let error = actual
+        .undo_instruction(&instruction("SPP X0*Z0\n"))
+        .unwrap_err();
+
+    assert!(error.to_string().contains("anti-Hermitian"));
+}
+
+#[test]
 fn sparse_rev_frame_tracker_measurements_preserve_matching_basis() {
     for (gate, input) in [("MX", "XXX"), ("MY", "YYY"), ("M", "ZZZ")] {
         let mut actual = tracker_from_pauli_text(input);

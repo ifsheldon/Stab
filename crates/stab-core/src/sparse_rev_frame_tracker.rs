@@ -13,7 +13,7 @@ use crate::{
 mod pauli_product;
 mod unitary_repeat;
 
-use pauli_product::pauli_product_measurement_terms_reversed;
+use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_terms_reversed};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SparseReverseFrameTracker {
@@ -106,6 +106,7 @@ impl SparseReverseFrameTracker {
             "R" => self.undo_resets(instruction, TrackerBasis::Z),
             "RX" => self.undo_resets(instruction, TrackerBasis::X),
             "RY" => self.undo_resets(instruction, TrackerBasis::Y),
+            "SPP" | "SPP_DAG" => self.undo_spp(instruction),
             "CX" | "CY" | "CZ" => self.undo_controlled_pauli(instruction),
             "DETECTOR" => self.undo_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
@@ -230,6 +231,24 @@ impl SparseReverseFrameTracker {
         for term in terms {
             let sensitivity = self.pop_record_sensitivity()?;
             self.toggle_product_sensitivity(&term, &sensitivity)?;
+        }
+        Ok(())
+    }
+
+    fn undo_spp(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        for terms in pauli_product_terms_reversed(instruction)? {
+            let mut sensitivity = BTreeSet::new();
+            for (qubit, basis) in &terms {
+                toggle_targets(
+                    &mut sensitivity,
+                    self.anticommuting_sensitivity(*qubit, *basis)?
+                        .iter()
+                        .copied(),
+                );
+            }
+            // SPP and SPP_DAG differ only by phase signs on anticommuting Paulis; this tracker
+            // stores unsigned detector and observable regions, so both gates share propagation.
+            self.toggle_product_sensitivity(&terms, &sensitivity)?;
         }
         Ok(())
     }
