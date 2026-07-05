@@ -4,7 +4,7 @@
 
 The M9 detector utility closure implemented the bounded follow-up scope from `docs/plans/m9-detector-utility-closure-plan.md`.
 Stab now exposes typed Rust APIs for the simple detecting-regions case and the basic single-record missing-detectors subset, and `circuit_with_inlined_feedback` now has source-owned MPP feedback-transform parity evidence for the scoped transform.
-Broader detecting-region target-shape support, broader gauge handling, multi-record missing-detector row reduction, repeated MPP stabilizer-product missing-detector analysis, observable-interaction missing-detector analysis, honeycomb suffix analysis, toric suffix analysis, broader repeat-contained feedback, unsupported classical feedback gates, and full transform API parity remain future work. Later PF5 slices added selected detecting-region gauge evidence, and the later PF2 feedback slice added selected bounded loop-refolding evidence.
+Broader detecting-region target-shape support, broader gauge handling, multi-record missing-detector row reduction, repeated MPP stabilizer-product missing-detector analysis, observable-interaction missing-detector analysis, honeycomb suffix analysis, toric suffix analysis, broader repeat-contained feedback, unsupported classical feedback gates, and full transform API parity remain future work. Later PF5 slices added selected detecting-region gauge evidence, and later PF2 feedback slices added selected bounded loop-refolding and nested bounded-repeat detector-parity evidence.
 
 ## Implemented Surfaces
 
@@ -71,7 +71,7 @@ Full-code-review sidecars found three additional issues, all fixed before comple
 
 - The new utility benchmark rows were marked `report-only` but still selected by `--primary`; fixed with the `non-primary-report-only` threshold class and primary-selection tests.
 - `circuit_detecting_regions` accepted feedback-controlled and sweep-controlled `CX` shapes; fixed with explicit target validation and negative tests.
-- At the time of this M9 slice, `circuit_with_inlined_feedback` failed open for unsupported classical controlled gates and could expand repeat blocks without a transform-specific budget; fixed in that slice by rejecting unsupported classical controlled feedback gates and repeat blocks in the scoped transform. The later PF2 feedback slice replaced the broad repeat-block rejection with selected bounded repeat-loop refolding and an explicit repeat-work preflight.
+- At the time of this M9 slice, `circuit_with_inlined_feedback` failed open for unsupported classical controlled gates and could expand repeat blocks without a transform-specific budget; fixed in that slice by rejecting unsupported classical controlled feedback gates and repeat blocks in the scoped transform. Later PF2 feedback slices replaced the broad repeat-block rejection with selected bounded repeat-loop refolding, selected nested bounded-repeat detector-parity preservation, and an explicit repeat-work preflight.
 
 A final GPT-5.5/xhigh full-code-review pass found four more compatibility and resource issues, all fixed before this report was finalized:
 
@@ -126,7 +126,7 @@ The manual pre-commit hook reported no staged changes, which is expected because
 ## Remaining Exclusions After Later PF2 Feedback Work
 
 - Full public `Circuit.with_inlined_feedback` parity.
-- Broader repeat-contained feedback beyond the selected bounded loop-refolding case.
+- Broader repeat-contained feedback beyond the selected bounded loop-refolding and nested bounded-repeat detector-parity cases.
 - Unsupported classical feedback gates.
 - Full MPP stabilizer-product missing-detector analysis.
 - Multi-record missing-detector row reduction and deterministic invariant solving.

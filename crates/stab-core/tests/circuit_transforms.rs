@@ -4,12 +4,35 @@
 )]
 
 use stab_core::{
-    Circuit, CircuitError, ErrorAnalyzerOptions, circuit_to_detector_error_model,
+    Circuit, CircuitError, CircuitItem, ErrorAnalyzerOptions, circuit_to_detector_error_model,
     circuit_with_inlined_feedback,
 };
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
+}
+
+fn assert_no_measurement_feedback_controls(circuit: &Circuit) {
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(instruction)
+                if matches!(instruction.gate().canonical_name(), "CX" | "CY" | "CZ") =>
+            {
+                assert!(
+                    !instruction
+                        .targets()
+                        .iter()
+                        .any(|target| target.is_measurement_record_target()),
+                    "measurement feedback control survived in {}",
+                    instruction.gate().canonical_name()
+                );
+            }
+            CircuitItem::Instruction(_) => {}
+            CircuitItem::RepeatBlock(repeat) => {
+                assert_no_measurement_feedback_controls(repeat.body())
+            }
+        }
+    }
 }
 
 #[test]
@@ -491,6 +514,46 @@ DETECTOR rec[-3] rec[-2] rec[-1]
 "
     );
 
+    let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
+        .expect("input DEM")
+        .flattened()
+        .expect("flatten input DEM")
+        .to_dem_string();
+    let actual_dem = circuit_to_detector_error_model(&inlined, ErrorAnalyzerOptions::default())
+        .expect("inlined DEM")
+        .flattened()
+        .expect("flatten inlined DEM")
+        .to_dem_string();
+    assert_eq!(actual_dem, expected_dem);
+}
+
+#[test]
+fn with_inlined_feedback_handles_nested_bounded_repeat_feedback() {
+    let input = circuit(
+        "
+        R 0 1 2
+        REPEAT 2 {
+            X_ERROR(0.125) 0
+            M 0
+            CY rec[-1] 1
+            REPEAT 2 {
+                X_ERROR(0.25) 1
+                M 1
+                DETECTOR rec[-1] rec[-2]
+                CZ rec[-1] 2
+                M 2
+                DETECTOR rec[-1] rec[-2]
+                R 1 2
+            }
+            R 0
+        }
+    ",
+    );
+    let inlined = input
+        .with_inlined_feedback()
+        .expect("inline nested repeat feedback");
+
+    assert_no_measurement_feedback_controls(&inlined);
     let expected_dem = circuit_to_detector_error_model(&input, ErrorAnalyzerOptions::default())
         .expect("input DEM")
         .flattened()

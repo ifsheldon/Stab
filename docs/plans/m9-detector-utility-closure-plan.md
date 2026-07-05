@@ -23,7 +23,7 @@ This plan implements only the basic missing-measurement subset with single-recor
 The implemented subset covers basic measurement-feedback removal, demolition feedback, interleaved-operation ordering, sweep-control preservation, and the public `m2d --ran_without_feedback` command case.
 At the time of this plan, `docs/plans/milestone-spec-gaps.md` still recorded exact loop refolding and full MPP transform parity as gaps.
 This plan closes the MPP feedback-transform gap only.
-Broader repeat-contained feedback remains future work after the later PF2 selected bounded loop-refolding slice.
+Broader repeat-contained feedback remains future work after the later PF2 selected bounded loop-refolding and nested bounded-repeat detector-parity slices.
 
 ## Public Rust Surface Changes
 

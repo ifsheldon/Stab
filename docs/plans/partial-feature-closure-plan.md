@@ -106,14 +106,14 @@ Acceptance criteria:
 
 ## Milestone PF2: Circuit Transform And Repeat Traversal Closure
 
-Objective: finish active circuit transform parity while preserving explicit deferrals for exports, diagrams, Python ergonomics, and broader repeat-contained feedback beyond selected loop-refolding cases.
+Objective: finish active circuit transform parity while preserving explicit deferrals for exports, diagrams, Python ergonomics, and broader repeat-contained feedback beyond selected loop-refolding and nested bounded-repeat detector-parity cases.
 
 Included features:
 
 - `flattened` and `flattened_operations` style Rust transform APIs for repeat blocks, tags, annotations, and measurement-index-sensitive instructions.
 - `without_noise` for removing noise instructions while preserving deterministic circuit structure, coordinates, ticks, detectors, observables, and measurement record semantics.
 - Broader `decomposed` parity for compound gates, MPP/SPP, pair measurements, and target grouping that can be validated with existing algebra and simulator components.
-- Full Rust `with_inlined_feedback` behavior for selected single-control Pauli feedback and MPP cases, including selected bounded repeat-loop refolding and explicit rejection of unsupported repeat-contained feedback.
+- Full Rust `with_inlined_feedback` behavior for selected single-control Pauli feedback and MPP cases, including selected bounded repeat-loop refolding, selected nested bounded-repeat detector-parity preservation, and explicit rejection of unsupported repeat-contained feedback.
 - `time_reversed_for_flows` and measurement-rich flow-transform support when required by PF5 flow closure.
 - Repeat traversal helpers that avoid accidental full expansion when a folded traversal can prove the requested transform.
 

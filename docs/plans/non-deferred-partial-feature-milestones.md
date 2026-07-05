@@ -176,7 +176,7 @@ Tasks:
 
 - Finish flow-semantic checks for `Circuit::decomposed` that depend on PFM5 measurement-rich flows.
 - Promote `time_reversed_for_flows` beyond the current unitary Rust subset for the measurement-rich flow cases selected by PFM5. The selected single-instruction measurement-rich subset for one noiseless plain `M`, `MX`, `MY`, `MXX`, `MYY`, or `MZZ` instruction group is implemented with pinned `M` and `MZZ` examples; broader resets, detectors, feedback, noise, repeats, and multi-instruction QEC inverse behavior remain active.
-- Extend feedback loop handling beyond the selected bounded pinned repeat-loop case only when the exact repeat-contained feedback subcases, resource bounds, comparator, tests, and benchmark evidence are specified.
+- Extend feedback loop handling beyond the selected bounded pinned repeat-loop and nested bounded-repeat detector-parity cases only when the exact repeat-contained feedback subcases, resource bounds, comparator, tests, and benchmark evidence are specified.
 - Preserve measurement record, detector, observable, coordinate, sweep, and repeat semantics across every transform.
 - Keep materialized transforms capped or folded, and reject excessive expansion before building huge intermediate circuits.
 
