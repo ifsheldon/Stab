@@ -395,7 +395,7 @@ Owned checklist rows:
 Implementation tasks:
 
 - Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures. The generated-QEC semantic subset for noisy repetition-code and rotated-surface-code circuits is implemented and tracked in [rpf6-analyzer-progress-report.md](rpf6-analyzer-progress-report.md).
-- Extend graphlike, hypergraph, shortest-error, SAT, and WCNF search behavior for selected generated-circuit and DEM cases. The generated-QEC graphlike and hypergraph search subset is implemented and tracked in [rpf6-search-progress-report.md](rpf6-search-progress-report.md), and the selected generated-QEC SAT/WCNF structural subset is implemented by `pf6-search-generated-sat-wcnf-rust`.
+- Extend graphlike, hypergraph, shortest-error, SAT, and WCNF search behavior for selected generated-circuit and DEM cases. The generated-QEC graphlike and hypergraph search subset is implemented with canonical target-signature invariant checks and tracked in [rpf6-search-progress-report.md](rpf6-search-progress-report.md), and the selected generated-QEC SAT/WCNF structural subset is implemented by `pf6-search-generated-sat-wcnf-rust`.
 - Improve sparse reverse detector-frame tracking for optimized loop folding where it affects analyzer or search correctness. The supported-Clifford repeat-folding subset is implemented for the full single-qubit Clifford gate set and fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets, with deterministic generated repeat tests covering nested and grouped target bodies, and the unsigned tracker path supports `SPP` and `SPP_DAG` product propagation for public unsigned-flow checking; analyzer/search-specific consumption and broader variable-target unitary semantics outside this unsigned tracker path remain active.
 - Harden matched-error value objects only when required by active analyzer/search outputs.
 - Keep full stack-frame provenance, heralded matching, repeat-contained noise provenance, and `explain_errors` CLI deferred.
@@ -404,7 +404,7 @@ Tests:
 
 - Port owned cases from `vendor/stim/src/stim/simulators/error_analyzer.test.cc`, `vendor/stim/src/stim/simulators/error_matcher.test.cc`, `vendor/stim/src/stim/simulators/matched_error.test.cc`, `vendor/stim/src/stim/search/*_test.cc`, and `vendor/stim/src/stim/util_top/circuit_to_dem.test.cc`.
 - Add exact `.dem` output tests for deterministic analyzer cases.
-- Add structural tests for gauge detectors, approximate disjoint errors, decomposed errors, generated circuits, loop folding, search result sets, and ordering-insensitive outputs.
+- Add structural tests for gauge detectors, approximate disjoint errors, decomposed errors, generated circuits, loop folding, search result sets, and ordering-insensitive outputs. The selected generated-QEC graphlike and hypergraph rows now cover target-signature invariant checks, while broader generated families and tie-sensitive output comparators remain active.
 - Add generated or property-style tests for sparse reverse tracking when new supported unitary families, repeated loops, detectors with coordinates, observables, noise decomposition, analyzer consumption, or search consumption are promoted.
 - Add negative tests for unsupported decomposition failure handling and invalid analyzer options.
 

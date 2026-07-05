@@ -4,6 +4,8 @@
     reason = "integration tests use direct assertions for compact diagnostics"
 )]
 
+use std::collections::BTreeSet;
+
 use stab_core::{
     CircuitResult, CodeDistance, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
     ErrorAnalyzerOptions, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
@@ -76,25 +78,25 @@ fn pf4_dem_search_and_sat_repeat_resource_policy_is_source_owned() {
 }
 
 #[test]
-fn pf6_generated_qec_graphlike_search_matches_upstream_instruction_counts() {
+fn pf6_generated_qec_graphlike_search_has_structural_signature() {
     let surface = generated_rotated_surface_code_dem().unwrap();
-    assert_search_result_shape(
+    assert_graphlike_search_signature(
         &shortest_graphlike_undetectable_logical_error(&surface, false).unwrap(),
         5,
     );
-    assert_search_result_shape(
+    assert_graphlike_search_signature(
         &shortest_graphlike_undetectable_logical_error(&surface, true).unwrap(),
         5,
     );
 
     let repetition = generated_repetition_code_dem().unwrap();
-    assert_search_result_shape(
+    assert_graphlike_search_signature(
         &shortest_graphlike_undetectable_logical_error(&repetition, false).unwrap(),
         7,
     );
 
     let ungraphlike_surface = generated_rotated_surface_code_ungraphlike_dem().unwrap();
-    assert_search_result_shape(
+    assert_graphlike_search_signature(
         &shortest_graphlike_undetectable_logical_error(&ungraphlike_surface, true).unwrap(),
         5,
     );
@@ -105,21 +107,21 @@ fn pf6_generated_qec_graphlike_search_matches_upstream_instruction_counts() {
 }
 
 #[test]
-fn pf6_generated_qec_hypergraph_search_matches_upstream_instruction_counts() {
+fn pf6_generated_qec_hypergraph_search_has_structural_signature() {
     let surface = generated_rotated_surface_code_dem().unwrap();
-    assert_search_result_shape(
+    assert_hypergraph_search_signature(
         &find_undetectable_logical_error(&surface, 4, 4, true).unwrap(),
         5,
     );
 
     let repetition = generated_repetition_code_dem().unwrap();
-    assert_search_result_shape(
+    assert_hypergraph_search_signature(
         &find_undetectable_logical_error(&repetition, 4, 4, false).unwrap(),
         7,
     );
 
     let ungraphlike_surface = generated_rotated_surface_code_ungraphlike_dem().unwrap();
-    assert_search_result_shape(
+    assert_hypergraph_search_signature(
         &find_undetectable_logical_error(&ungraphlike_surface, 4, 4, true).unwrap(),
         5,
     );
@@ -224,25 +226,155 @@ fn generated_small_repetition_code_dem() -> CircuitResult<DetectorErrorModel> {
     )
 }
 
-fn assert_search_result_shape(model: &DetectorErrorModel, expected_error_count: usize) {
-    assert_eq!(model.items().len(), expected_error_count);
-    assert!(
-        model.items().iter().all(|item| matches!(
-            item,
-            DemItem::Instruction(instruction)
-                if instruction.kind() == DemInstructionKind::Error
-        )),
-        "search output should contain only error instructions: {}",
+fn assert_graphlike_search_signature(model: &DetectorErrorModel, expected_error_count: usize) {
+    assert_search_result_signature(model, expected_error_count, 2);
+}
+
+fn assert_hypergraph_search_signature(model: &DetectorErrorModel, expected_error_count: usize) {
+    assert_search_result_signature(model, expected_error_count, 4);
+}
+
+fn assert_search_result_signature(
+    model: &DetectorErrorModel,
+    expected_error_count: usize,
+    max_detectors_per_error: usize,
+) {
+    let signature = SearchResultSignature::from_model(model, max_detectors_per_error);
+    assert_eq!(
+        signature.error_count,
+        expected_error_count,
+        "search output should have the pinned Stim v1.16.0 error count: {}",
         model.to_dem_string()
     );
     assert!(
-        model.items().iter().any(|item| matches!(
-            item,
-            DemItem::Instruction(instruction)
-                if instruction.targets().iter().any(|target| matches!(target, DemTarget::LogicalObservable(_)))
-        )),
-        "search output should include a logical observable: {}",
+        signature.detector_parity.is_empty(),
+        "search output should be undetected after target-set parity: {:?}\n{}",
+        signature.detector_parity,
         model.to_dem_string()
+    );
+    assert_eq!(
+        signature.observable_parity,
+        BTreeSet::from([0]),
+        "search output should toggle exactly logical observable L0: {}",
+        model.to_dem_string()
+    );
+    assert_eq!(
+        signature.unique_target_sets,
+        expected_error_count,
+        "search output should not repeat canonical target sets: {}",
+        model.to_dem_string()
+    );
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct SearchResultSignature {
+    error_count: usize,
+    detector_parity: BTreeSet<u64>,
+    observable_parity: BTreeSet<u64>,
+    unique_target_sets: usize,
+}
+
+impl SearchResultSignature {
+    fn from_model(model: &DetectorErrorModel, max_detectors_per_error: usize) -> Self {
+        let mut signature = Self {
+            error_count: 0,
+            detector_parity: BTreeSet::new(),
+            observable_parity: BTreeSet::new(),
+            unique_target_sets: 0,
+        };
+        let mut target_sets = BTreeSet::new();
+
+        for item in model.items() {
+            assert!(
+                matches!(item, DemItem::Instruction(_)),
+                "search output should not contain repeat blocks: {}",
+                model.to_dem_string()
+            );
+            let DemItem::Instruction(instruction) = item else {
+                continue;
+            };
+            assert_eq!(
+                instruction.kind(),
+                DemInstructionKind::Error,
+                "search output should contain only error instructions: {}",
+                model.to_dem_string()
+            );
+            assert_eq!(
+                instruction.args(),
+                &[1.0],
+                "search output should use deterministic error instructions: {}",
+                model.to_dem_string()
+            );
+
+            let targets = CanonicalSearchTargets::from_targets(instruction.targets());
+            assert!(
+                targets.detectors.len() <= max_detectors_per_error,
+                "search output exceeded the per-error detector weight: {}",
+                model.to_dem_string()
+            );
+            assert!(
+                target_sets.insert(targets.clone()),
+                "search output repeated a canonical target set: {}",
+                model.to_dem_string()
+            );
+            for detector in &targets.detectors {
+                toggle_parity(&mut signature.detector_parity, *detector);
+            }
+            for observable in &targets.observables {
+                toggle_parity(&mut signature.observable_parity, *observable);
+            }
+            signature.error_count += 1;
+        }
+
+        signature.unique_target_sets = target_sets.len();
+        signature
+    }
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct CanonicalSearchTargets {
+    detectors: Vec<u64>,
+    observables: Vec<u64>,
+}
+
+impl CanonicalSearchTargets {
+    fn from_targets(targets: &[DemTarget]) -> Self {
+        let mut detectors = Vec::new();
+        let mut observables = Vec::new();
+        for target in targets {
+            assert!(
+                !matches!(target, DemTarget::Separator | DemTarget::Numeric(_)),
+                "search output should use only detector and observable targets"
+            );
+            match target {
+                DemTarget::RelativeDetector(detector) => detectors.push(detector.get()),
+                DemTarget::LogicalObservable(observable) => observables.push(observable.get()),
+                DemTarget::Separator | DemTarget::Numeric(_) => {}
+            }
+        }
+        detectors.sort_unstable();
+        observables.sort_unstable();
+        assert_strictly_increasing(&detectors, "detector");
+        assert_strictly_increasing(&observables, "observable");
+        Self {
+            detectors,
+            observables,
+        }
+    }
+}
+
+fn toggle_parity(set: &mut BTreeSet<u64>, value: u64) {
+    if !set.insert(value) {
+        set.remove(&value);
+    }
+}
+
+fn assert_strictly_increasing(values: &[u64], label: &str) {
+    assert!(
+        values
+            .windows(2)
+            .all(|window| matches!(window, [left, right] if left < right)),
+        "search output should not repeat {label} targets inside one error row: {values:?}"
     );
 }
 
