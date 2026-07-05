@@ -145,4 +145,4 @@ The remaining review risk is that the report-only benchmark rows exercise promot
 
 - Target-shape support beyond plain qubit pairs and the promoted measurement families, multi-detector generated-code regions, and gauge behavior.
 - Missing-detector generated-code suffix analysis beyond the promoted honeycomb and toric cases, plus broader flow-dependent utility behavior.
-- Measurement-rich flows, `has_flow`, `has_all_flows`, `flow_generators`, diagnostics, and transform integration.
+- Measurement-rich flows beyond the promoted unsigned `has_flow` and `has_all_flows` Rust helper subset, including broader `flow_generators`, diagnostics, signed sampled checks, and transform integration.

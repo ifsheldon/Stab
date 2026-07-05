@@ -30,6 +30,25 @@ pub fn check_if_circuit_has_unsigned_stabilizer_flows(
         .collect()
 }
 
+/// Returns true when the circuit has the given unsigned stabilizer flow.
+pub fn circuit_has_unsigned_stabilizer_flow(circuit: &Circuit, flow: &Flow) -> bool {
+    check_if_circuit_has_unsigned_stabilizer_flows(circuit, std::slice::from_ref(flow))
+        .into_iter()
+        .next()
+        .unwrap_or(false)
+}
+
+/// Returns true when the circuit has every requested unsigned stabilizer flow.
+///
+/// This is the Rust unsigned counterpart of Stim's `has_all_flows` batch query for the supported
+/// Stab flow-checker subset. Signs are ignored, matching
+/// [`check_if_circuit_has_unsigned_stabilizer_flows`].
+pub fn circuit_has_all_unsigned_stabilizer_flows(circuit: &Circuit, flows: &[Flow]) -> bool {
+    check_if_circuit_has_unsigned_stabilizer_flows(circuit, flows)
+        .into_iter()
+        .all(|has_flow| has_flow)
+}
+
 pub(crate) fn check_unsigned_flow_with_sparse_tracker(
     circuit: &Circuit,
     flow: &Flow,

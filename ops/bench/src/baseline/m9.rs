@@ -8,9 +8,10 @@ use stab_core::{
     Circuit, CircuitError, CodeDistance, CompiledDetectionConverter, CompiledSampler,
     DetectionConversionOptions, DetectionObservableOutputMode, ErrorAnalyzerOptions, Flow, Gate,
     Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount, SampleFormat,
-    check_if_circuit_has_unsigned_stabilizer_flows, circuit_to_detector_error_model,
-    circuit_with_inlined_feedback, convert_measurements_to_detection_events,
-    generate_repetition_code_circuit, measurement_record_count,
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_has_all_unsigned_stabilizer_flows,
+    circuit_to_detector_error_model, circuit_with_inlined_feedback,
+    convert_measurements_to_detection_events, generate_repetition_code_circuit,
+    measurement_record_count,
     result_formats::write_ptb64_records_checked,
     result_formats::{read_records, write_records},
     sample_detection_events, try_for_each_sampled_detection_event, write_detection_records,
@@ -126,7 +127,7 @@ pub(super) fn run_detection_compare_row(
         "pf5-missing-detectors-generated-code" => {
             missing_detector_rows::run_generated_code_batch(row).map(Some)
         }
-        "pf5-has-all-flows-batch" => run_has_flows_batch(row).map(Some),
+        "pf5-has-all-flows-batch" => run_has_all_flows_batch(row).map(Some),
         "m9-detect-primary-matrix-contract" => run_primary_detect_row(row).map(Some),
         "m9-m2d-primary-matrix-contract" => run_primary_m2d_row(row).map(Some),
         "pf3-m2d-sweep-b8" => run_m2d_cli_row(
@@ -237,7 +238,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures the public CLI m2d --ran_without_feedback path for PF7 visible CLI parity using the source-owned M9 feedback fixture",
         ),
         "pf5-has-all-flows-batch" => Some(
-            "report-only: Stab measures the Rust unsigned has_flow measurement-record and observable-dependency subset without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures the Rust unsigned has_all_flow helper over measurement-record observable-dependency and false-flow batches without a faithful pinned Stim CLI timing ratio",
         ),
         "m9-feedback-inline-mpp-batch" => Some(
             "report-only: Stab measures the Rust MPP feedback-inlining utility subset without a faithful pinned Stim CLI timing ratio",
@@ -268,33 +269,47 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     }
 }
 
-fn run_has_flows_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+fn run_has_all_flows_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     Ok(vec![
-        measure_has_flows(row, "stab_pf5_has_flows_batch_cases")?,
-        measure_has_flows(row, "stab_pf5_has_flows_batch_flows")?,
+        measure_has_all_flows(row, "stab_pf5_has_flows_batch_cases")?,
+        measure_has_all_flows(row, "stab_pf5_has_flows_batch_flows")?,
     ])
 }
 
-fn measure_has_flows(
+fn measure_has_all_flows(
     row: &BenchmarkRow,
     measurement_name: &'static str,
 ) -> Result<Measurement, BenchError> {
     let cases = flow_check_corpus(&row.id)?;
+    let mut expected_all_by_case = Vec::with_capacity(cases.len());
+    for (circuit, flows, expected) in &cases {
+        let actual = check_if_circuit_has_unsigned_stabilizer_flows(circuit, flows);
+        if actual != *expected {
+            return Err(BenchError::StabRunner {
+                row_id: row.id.clone(),
+                message: format!("has-flow benchmark expected {expected:?} but got {actual:?}"),
+            });
+        }
+        expected_all_by_case.push(expected.iter().all(|value| *value));
+    }
+
     measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
         let mut true_count = 0usize;
         for _ in 0..UTILITY_BATCH {
-            for (circuit, flows, expected) in &cases {
-                let actual = check_if_circuit_has_unsigned_stabilizer_flows(circuit, flows);
-                if actual != *expected {
+            for ((circuit, flows, _expected), expected_all) in
+                cases.iter().zip(expected_all_by_case.iter().copied())
+            {
+                let actual_all = circuit_has_all_unsigned_stabilizer_flows(circuit, flows);
+                if actual_all != expected_all {
                     return Err(BenchError::StabRunner {
                         row_id: row.id.clone(),
                         message: format!(
-                            "has-flow benchmark expected {expected:?} but got {actual:?}"
+                            "has-all-flow benchmark expected {expected_all} but got {actual_all}"
                         ),
                     });
                 }
                 true_count = true_count
-                    .checked_add(actual.iter().filter(|value| **value).count())
+                    .checked_add(usize::from(actual_all))
                     .ok_or_else(|| BenchError::StabRunner {
                         row_id: row.id.clone(),
                         message: "has-flow benchmark true count overflowed".to_string(),

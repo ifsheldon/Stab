@@ -12,6 +12,7 @@ It implements supported-Clifford unitary-repeat folding inside the sparse revers
 - For those repeat bodies, the tracker builds a linear slot transform for X and Z sensitivity slots, exponentiates it by the repeat count, and applies the powered transform to the current detector and observable sensitivity sets.
 - Deterministic generated tests cover supported fixed-shape unitary repeat bodies across every fixed two-qubit tableau-backed gate, nested repeats, multi-target single-qubit instructions, and multi-pair two-qubit instructions by comparing the folded path to a test-only traversal that deliberately bypasses repeat folding.
 - Non-unitary repeat bodies, unsupported unitary gates, and non-plain classical or sweep-controlled target shapes continue to use the existing traversal path or fail through the existing gate-specific errors, so this slice does not broaden unsupported semantics.
+- Unsupported sparse-tracker instruction families such as `SPP` now fail closed instead of being silently treated as identity when the tracker is reached from unsigned flow checking; executing those variable-target unitary semantics remains future work.
 - `check_if_circuit_has_unsigned_stabilizer_flows` now skips the tableau shortcut when any requested flow depends on measurements or observables, which routes measurement-dependent flow checks directly through the sparse tracker and avoids unrolling huge measured circuits before the tracker can fold their unitary repeats.
 
 ## Tests
@@ -28,9 +29,10 @@ Implemented Rust tests:
 - `sparse_rev_frame_tracker_undo_tableau_cy_subset`
 - `sparse_rev_frame_tracker_undo_fixed_two_qubit_gates_match_tableau`
 - `check_if_circuit_has_unsigned_stabilizer_flows_folds_unitary_repeats`
+- `circuit_has_unsigned_stabilizer_flow_helpers_fail_closed_on_unsupported_unitary_gates`
 
 The sparse tracker tests live in `crates/stab-core/src/sparse_rev_frame_tracker/tests.rs` and `crates/stab-core/src/sparse_rev_frame_tracker/unitary_repeat.rs`.
-The public consumption test lives in `crates/stab-core/tests/circuit_flows.rs` and proves measurement-dependent unsigned-flow checking reaches the folded sparse-tracker path.
+The public consumption tests live in `crates/stab-core/tests/circuit_flows.rs` and prove measurement-dependent unsigned-flow checking reaches the folded sparse-tracker path and unsupported `SPP` flow checking fails closed instead of accepting identity flows.
 
 ## Oracle Rows
 

@@ -6,7 +6,9 @@
 use std::str::FromStr;
 
 use stab_core::{
-    Circuit, Flow, check_if_circuit_has_unsigned_stabilizer_flows, solve_for_flow_measurements,
+    Circuit, Flow, check_if_circuit_has_unsigned_stabilizer_flows,
+    circuit_has_all_unsigned_stabilizer_flows, circuit_has_unsigned_stabilizer_flow,
+    solve_for_flow_measurements,
 };
 
 #[test]
@@ -38,6 +40,90 @@ fn check_if_circuit_has_unsigned_stabilizer_flows_ignores_signs() {
         check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
         vec![true, true, true]
     );
+}
+
+#[test]
+fn circuit_has_unsigned_stabilizer_flow_helpers_match_supported_batch_semantics() {
+    let h_circuit = circuit("H 0\n");
+    let h_flows = [
+        flow("X -> Z"),
+        flow("Y -> Y"),
+        flow("Z -> X"),
+        flow("X -> X"),
+    ];
+    assert!(circuit_has_unsigned_stabilizer_flow(
+        &h_circuit,
+        &h_flows[1]
+    ));
+    assert!(!circuit_has_unsigned_stabilizer_flow(
+        &h_circuit,
+        &h_flows[3]
+    ));
+    assert!(circuit_has_all_unsigned_stabilizer_flows(
+        &h_circuit,
+        &h_flows[..3]
+    ));
+    assert!(!circuit_has_all_unsigned_stabilizer_flows(
+        &h_circuit, &h_flows
+    ));
+    assert!(circuit_has_all_unsigned_stabilizer_flows(&h_circuit, &[]));
+
+    let mzz_observable_circuit = circuit(
+        "
+        MZZ 0 1
+        OBSERVABLE_INCLUDE(2) rec[-1]
+    ",
+    );
+    let observable_flows = [flow("Z0*Z1 -> obs[2]"), flow("X0*X1 -> Y0*Y1 xor obs[2]")];
+    assert!(circuit_has_all_unsigned_stabilizer_flows(
+        &mzz_observable_circuit,
+        &observable_flows
+    ));
+    assert!(!circuit_has_all_unsigned_stabilizer_flows(
+        &mzz_observable_circuit,
+        &[
+            observable_flows[0].clone(),
+            flow("X0*X1 -> Y0*Y1 xor obs[1]")
+        ]
+    ));
+
+    let folded_measurement_circuit = circuit(
+        "
+        REPEAT 1000001 {
+            H 0
+        }
+        M 0
+        ",
+    );
+    assert!(circuit_has_all_unsigned_stabilizer_flows(
+        &folded_measurement_circuit,
+        &[flow("X -> rec[-1]")]
+    ));
+    assert!(!circuit_has_all_unsigned_stabilizer_flows(
+        &folded_measurement_circuit,
+        &[flow("Z -> rec[-1]")]
+    ));
+}
+
+#[test]
+fn circuit_has_unsigned_stabilizer_flow_helpers_fail_closed_on_unsupported_unitary_gates() {
+    let circuit = circuit("SPP X0*Y1*Z2\n");
+    let false_identity_flow = flow("Z__ -> Z__");
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(
+            &circuit,
+            std::slice::from_ref(&false_identity_flow),
+        ),
+        vec![false]
+    );
+    assert!(!circuit_has_unsigned_stabilizer_flow(
+        &circuit,
+        &false_identity_flow
+    ));
+    assert!(!circuit_has_all_unsigned_stabilizer_flows(
+        &circuit,
+        &[false_identity_flow]
+    ));
 }
 
 #[test]

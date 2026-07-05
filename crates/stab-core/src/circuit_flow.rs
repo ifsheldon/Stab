@@ -6,8 +6,11 @@ use crate::{
 mod checker;
 mod solver;
 
-pub use checker::check_if_circuit_has_unsigned_stabilizer_flows;
 pub(crate) use checker::check_unsigned_flow_with_sparse_tracker;
+pub use checker::{
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_has_all_unsigned_stabilizer_flows,
+    circuit_has_unsigned_stabilizer_flow,
+};
 pub use solver::solve_for_flow_measurements;
 
 /// Returns unsigned stabilizer-flow generators for the supported tableau and measurement subset.

@@ -2,12 +2,13 @@
 
 ## Summary
 
-This RPF5 report now covers the promoted unsigned `has_flow` subset for measurement-record and observable dependencies, the scoped measurement-rich `circuit_flow_generators` subset including nonconstant and constant single-instruction `MPP`, composed measurement-rich instruction sequences without ordinary unitary mixing, and the pinned heralded-noise MPP fixture, the pinned Stim `solve_for_flow_measurements` empty, `MX`, idle-extra-qubit, and repetition-code examples, and the scoped unitary `time_reversed_for_flows` transform bridge.
-It does not complete the flow milestone because broader all-operation composed measurement-rich flow-generator synthesis, broader heralded-noise generator synthesis, full generator-table measurement solving, failure explanations, measurement-rich `time_reversed_for_flows`, broader transform integration, and Python flow binding ergonomics remain open.
+This RPF5 report now covers the promoted unsigned `has_flow` and `has_all_flows` Rust helper subset for measurement-record and observable dependencies, the scoped measurement-rich `circuit_flow_generators` subset including nonconstant and constant single-instruction `MPP`, composed measurement-rich instruction sequences without ordinary unitary mixing, and the pinned heralded-noise MPP fixture, the pinned Stim `solve_for_flow_measurements` empty, `MX`, idle-extra-qubit, and repetition-code examples, and the scoped unitary `time_reversed_for_flows` transform bridge.
+It does not complete the flow milestone because broader all-operation composed measurement-rich flow-generator synthesis, broader heralded-noise generator synthesis, full generator-table measurement solving, signed sampled flow checking, failure explanations, measurement-rich `time_reversed_for_flows`, broader transform integration, and Python flow binding ergonomics remain open.
 
 ## Implemented Surfaces
 
 - `check_if_circuit_has_unsigned_stabilizer_flows` still uses tableau comparison for deterministic unitary flows when available.
+- `circuit_has_unsigned_stabilizer_flow` and `circuit_has_all_unsigned_stabilizer_flows` are additive Rust helpers over the same deterministic unsigned checker semantics and intentionally do not implement Stim's randomized signed Python `has_flow` or `has_all_flows` mode.
 - For circuits with measurement or observable dependencies, it now uses the sparse reverse tracker to map final Pauli, `rec[...]`, and `obs[...]` terms back to initial Pauli regions.
 - Both absolute `rec[0]` and relative `rec[-1]` flow references are supported for the promoted checker subset.
 - Sign differences are intentionally ignored, matching the unsigned checker contract.
@@ -24,6 +25,14 @@ The current PFM5 composed-measurement slice promotes composed measurement-rich f
 It explicitly keeps ordinary mixed unitary instructions, sweep feedback, repeat-contained measurements, unsupported classical-control shapes, and broad all-operation generated circuits fail-closed until their exact flow semantics and resource rules are specified.
 Completion evidence for this slice includes exact generator tests for repeated same-qubit measurements across instructions and reset/measurement ordering, generated-flow checker satisfaction for independent composed measurements and mixed composed measurement families, oracle metadata updates, refreshed `pf5-flow-generators-measurement-rich` benchmark corpus work units, milestone-audit, full-code-review, and targeted verification.
 
+## Unsigned Has-All Scope
+
+The current PFM5 has-all slice promotes only deterministic unsigned Rust helpers over the existing supported flow checker: `circuit_has_unsigned_stabilizer_flow` for one flow and `circuit_has_all_unsigned_stabilizer_flows` for an empty or non-empty batch.
+Owned positive and negative subcases are unitary sign-insensitive flows, false unitary flows, unsupported variable-target unitary fail-closed behavior, measurement-record and observable dependencies, and folded-repeat measurement references.
+The helpers return booleans and deliberately preserve the existing fail-closed checker behavior for unsupported sparse-tracker shapes.
+They do not expose Stim's signed randomized `has_flow` or `has_all_flows` behavior and do not claim Python binding parity.
+The report-only `pf5-has-all-flows-batch` benchmark now calls the public batch helper while still validating the vector checker's per-flow expected results inside the benchmark closure.
+
 ## Tests
 
 Implemented Rust tests:
@@ -31,6 +40,8 @@ Implemented Rust tests:
 - `check_if_circuit_has_unsigned_stabilizer_flows_supports_measurement_records`
 - `check_if_circuit_has_unsigned_stabilizer_flows_supports_pair_measurement_records`
 - `check_if_circuit_has_unsigned_stabilizer_flows_supports_observable_dependencies`
+- `circuit_has_unsigned_stabilizer_flow_helpers_match_supported_batch_semantics`
+- `circuit_has_unsigned_stabilizer_flow_helpers_fail_closed_on_unsupported_unitary_gates`
 - `circuit_flow_generators_promotes_single_instruction_measurement_subset`
 - `circuit_flow_generators_promotes_composed_measurement_subset`
 - `circuit_flow_generators_measurement_subset_flows_satisfy_checker`
@@ -47,13 +58,14 @@ Implemented Rust tests:
 - `time_reversed_for_flows_rejects_unsatisfied_flow`
 - `time_reversed_for_flows_rejects_measurement_rich_terms_for_later_slices`
 
-These tests cover measurement-record dependencies, pair-measurement records, observable dependencies from records and Pauli targets, sign-insensitive matching, exact measurement, reset, pair-measurement, nonconstant and constant `MPP`, composed measurement-rich instruction sequences without ordinary unitary mixing, feedback, `MPAD`, and promoted heralded-noise MPP generators, generated-flow satisfaction checks for the supported checker subset, pinned Stim measurement-solver examples, scoped unitary flow time reversal, and negative cases ported from pinned Stim v1.16.0 `has_flow`, `circuit_flow_generators`, and `circuit_inverse_qec` tests.
+These tests cover measurement-record dependencies, pair-measurement records, observable dependencies from records and Pauli targets, sign-insensitive matching, unsigned single-flow and all-flow helper success and failure cases, empty all-flow batches, folded-repeat measurement references, unsupported `SPP` fail-closed behavior instead of identity acceptance, exact measurement, reset, pair-measurement, nonconstant and constant `MPP`, composed measurement-rich instruction sequences without ordinary unitary mixing, feedback, `MPAD`, and promoted heralded-noise MPP generators, generated-flow satisfaction checks for the supported checker subset, pinned Stim measurement-solver examples, scoped unitary flow time reversal, and negative cases ported from pinned Stim v1.16.0 `has_flow`, `has_all_flows`, `circuit_flow_generators`, and `circuit_inverse_qec` tests.
 
 ## Oracle Rows
 
 Implemented row:
 
 - `pf5-has-flow-record-observable-rust`
+- `pf5-has-all-flows-rust`
 - `pf5-flow-generators-measurement-rust`
 - `pf5-flow-solve-measurement-rust`
 - `pf2-time-reverse-flow-unitary-rust`
@@ -71,7 +83,7 @@ Report-only runner coverage:
 - `pf5-flow-solve-measurement-rich`
 - `pf2-time-reverse-flow`
 
-The row measures the promoted unsigned has-flow corpus through the Rust public flow checker.
+The row measures the promoted unsigned has-all-flow corpus through the Rust public batch helper while validating per-flow expected results through the vector checker.
 It reports `stab_pf5_has_flows_batch_cases`, normalized as cases per second, and `stab_pf5_has_flows_batch_flows`, normalized as flows per second.
 The generator row measures the promoted measurement, reset, pair-measurement, nonconstant and constant `MPP`, composed measurement-rich, feedback, `MPAD`, and heralded-noise MPP generator corpus through the Rust public `circuit_flow_generators` helper.
 It reports `stab_pf5_flow_generators_measurement_cases`, normalized as cases per second, and `stab_pf5_flow_generators_measurement_flows`, normalized as flows per second.
@@ -105,17 +117,18 @@ just bench::compare --only pf5-flow-generators-measurement-rich --baseline targe
 
 ## Audit And Review
 
-Milestone-audit for the composed-measurement generator slice found no implementation or specification blockers.
-The promoted scope is the top-level composed measurement-rich instruction subset handled by the reverse measurement-flow solver, with exact output tests for repeated same-qubit measurements and reset/measurement ordering, generated-flow checker satisfaction for independent and mixed composed measurement families, refreshed oracle metadata, and refreshed report-only benchmark work units.
-Full-code-review used GPT-5.5/xhigh sidecars for Rust compatibility and docs or benchmark alignment.
-The Rust compatibility reviewer found no confirmed issues in the focused core flow-generator files and confirmed unsupported ordinary unitary mixing, sweep feedback, and repeat-contained measurement cases remain covered by rejection tests.
-The docs and benchmark reviewer found the stale audit block from the previous heralded-noise slice and confirmed the PF5 generator row remains report-only and outside primary thresholds; this section was refreshed to describe the composed-measurement slice.
-`crates/stab-core/src/circuit_flow.rs` remains on the large-file watch list at 1160 lines, below the 1200-line finding threshold but close enough that the next flow-generator expansion should split generator ownership into a submodule before adding much more code.
+Milestone-audit for the unsigned has-all helper slice found the promoted scope complete against the current PFM5 text: the Rust API is additive, deterministic, unsigned-only, fail-closed for unsupported sparse-tracker gates, covered by direct tests, represented by oracle row `pf5-has-all-flows-rust`, and measured by report-only row `pf5-has-all-flows-batch`.
+Full-code-review used GPT-5.5/xhigh sidecars for Rust/API behavior and docs or benchmark alignment.
+The Rust/API reviewer found a P1 fail-open risk where unsupported `SPP` could be treated as identity by sparse-tracker fallback; this was fixed by making unsupported non-noise and non-annotation sparse-tracker instructions return an error, which the unsigned checker converts to `false`, and by adding `circuit_has_unsigned_stabilizer_flow_helpers_fail_closed_on_unsupported_unitary_gates`.
+The docs and benchmark reviewer found two P2 alignment gaps: this audit block still described the earlier composed-measurement slice, and the historical RPF oracle-row rollup omitted `pf5-has-all-flows-rust`; both were corrected.
+The benchmark row remains report-only and outside primary thresholds because there is no faithful pinned-Stim CLI timing ratio for this Rust utility helper.
+`crates/stab-core/src/circuit_flow.rs` remains on the large-file watch list below the 1200-line finding threshold, so the next flow-generator expansion should split generator ownership into a submodule before adding much more code.
 
 ## Remaining RPF5 Flow Work
 
 - `circuit_flow_generators` for broader all-operation composed measurement-rich circuits, unsupported feedback shapes, broader heralded-noise synthesis, and all-operation generator checks.
 - Full generator-table `solve_for_flow_measurements` parity for larger composed measurement-rich circuits and richer measurement-set diagnostics.
 - Measurement-rich `time_reversed_for_flows` and broader transform-integration checks.
+- Signed sampled `has_flow` and `has_all_flows` semantics remain absent until a Rust API plan chooses whether to expose randomized evidence.
 - Flow failure explanations beyond boolean unsigned checking.
 - Python binding ergonomics remain deferred.

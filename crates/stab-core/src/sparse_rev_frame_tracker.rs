@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget,
-    FlexPauliString, Pauli, PauliBasis, PauliPhase, PauliSign, PauliString, QubitId,
+    FlexPauliString, GateCategory, Pauli, PauliBasis, PauliPhase, PauliSign, PauliString, QubitId,
     SingleQubitClifford, Tableau, Target,
 };
 
@@ -117,7 +117,13 @@ impl SparseReverseFrameTracker {
             }
             _ => match SingleQubitClifford::from_gate(instruction.gate()) {
                 Ok(clifford) => self.undo_single_qubit_clifford(instruction, clifford),
-                Err(_) => Ok(()),
+                Err(_) => match instruction.gate().category() {
+                    GateCategory::Annotation | GateCategory::Noise => Ok(()),
+                    _ => Err(CircuitError::invalid_detector_error_model(format!(
+                        "sparse reverse frame tracker does not support gate {}",
+                        instruction.gate().canonical_name()
+                    ))),
+                },
             },
         }
     }

@@ -73,5 +73,5 @@ just bench::compare --milestone PF5
 
 - Broader generated-code missing-detector suffix analysis beyond the promoted honeycomb and toric cases.
 - Broader gate support in the invariant tracker if generated-code cases require it.
-- Public measurement-rich flow semantics beyond the promoted unsigned `has_flow` and single-instruction generator subsets, including `has_all_flows`, composed `flow_generators`, diagnostics, and transform integration.
+- Public measurement-rich flow semantics beyond the promoted unsigned `has_flow`, unsigned `has_all_flows` Rust helper, and current generator subsets, including signed sampled checks, broader composed `flow_generators`, diagnostics, and transform integration.
 - Continue keeping benchmark harness smoke tests split out of `ops/bench/src/baseline/tests.rs`, because the file is close to the project’s 1200-line threshold.

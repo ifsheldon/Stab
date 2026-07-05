@@ -44,6 +44,7 @@ pub use circuit_detecting_regions::{
 pub use circuit_feedback::circuit_with_inlined_feedback;
 pub use circuit_flow::{
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
+    circuit_has_all_unsigned_stabilizer_flows, circuit_has_unsigned_stabilizer_flow,
     solve_for_flow_measurements,
 };
 pub use circuit_generation::{
