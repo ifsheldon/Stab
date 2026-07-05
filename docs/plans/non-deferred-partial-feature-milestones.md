@@ -34,7 +34,7 @@ Excluded:
 - C++ header compatibility.
 - New public graph simulator, vector simulator, `TableauSimulator`, or `FlipSimulator` products.
 - Deprecated `--detector_hypergraph` support.
-- Generated Python or JS/WASM API documentation, Python stubs, and generated machine-readable feature-matrix tooling.
+- Generated Python or JS/WASM API documentation, Python stubs, and generated feature/status matrix tooling.
   The Rust API documentation workflow is implemented by `just docs::api` and `just docs::api-check`; expanding beyond that workflow needs a separate documentation source-of-truth plan.
 
 If a subcase in this plan turns out to require an excluded surface, stop and log the under-specification in `docs/plans/milestone-spec-gaps.md` instead of silently widening scope.

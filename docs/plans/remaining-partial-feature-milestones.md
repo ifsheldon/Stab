@@ -111,7 +111,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | Highest-priority remaining feature gaps | Rollup | RPF8 | Complete only after the named child milestones reach their acceptance criteria. |
 
 The Rust generated API documentation workflow is implemented by `just docs::api` and `just docs::api-check`.
-Generated Python or JS/WASM docs, Python stubs, and generated machine-readable feature-matrix tooling remain useful follow-up work but are not part of this historical partial-feature milestone plan.
+Generated Python or JS/WASM docs, Python stubs, and generated feature/status matrix tooling remain useful follow-up work but are not part of this historical partial-feature milestone plan.
 
 ## Milestone RPF0: Inventory And Comparator Lock
 

@@ -12,6 +12,7 @@ This slice closes the non-deferred Rust API documentation workflow gap without e
 - Fixed a rustdoc warning in the benchmark CLI comments so the strict check is meaningful.
 - Documented the workflow in `README.md`.
 - Updated `docs/stab-feature-checklist.md` to mark the Rust API reference workflow as implemented while keeping Python stubs and generated feature matrices out of scope.
+- Reconciled the later high-priority gaps row so generated feature/status matrix tooling is marked deferred instead of leaving a duplicate active `Partial` row after the Rust API documentation workflow closed.
 
 ## Verification
 
@@ -28,4 +29,4 @@ just maintenance::pre-commit
 ## Remaining Future Documentation Surface
 
 - Generated Python stubs remain deferred until Python bindings exist.
-- A generated machine-readable compatibility matrix remains future work and should get its own source-of-truth plan before implementation.
+- Generated feature/status matrix tooling remains future work and should get its own source-of-truth plan before implementation.
