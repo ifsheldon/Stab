@@ -198,6 +198,7 @@ Deferred or out of scope:
 | Graph simulator and vector simulator public APIs | M12 uses scoped cross-checks only. New public APIs are out of scope. | Keep deferred. |
 | Circuit exports | QASM, Quirk, Crumble, and diagrams are future surfaces. | Keep deferred. |
 | DEM diagrams | Rendering surfaces are future work. | Keep deferred. |
+| Sampler class-shaped API parity | Current Rust and CLI streaming DEM sampling plus detector sampling surfaces are closed by `docs/plans/pfm0-sampling-streaming-evidence-lock.md`, while Python `CompiledDetectorSampler`, Python `CompiledDemSampler`, Python `sample_write` ergonomics, and any future explicit Rust compiled detector-sampler product remain outside active PF work. | Keep `Streaming DEM sampling` and `Detector sampling` tied to current Rust and CLI evidence, and keep class-shaped API parity deferred through the checklist's sampler and converter classes row. |
 | Generated feature/status matrix tooling | The Rust API documentation workflow is implemented by `just docs::api` and `just docs::api-check`; generated Python or JS/WASM docs, Python stubs, and generated feature/status matrix tooling remain future documentation surfaces. | Keep the Rust docs workflow synchronized with `docs/plans/generated-api-docs-progress-report.md`; plan generated feature/status matrix tooling separately if it becomes a product requirement. |
 
 ## RPF0 Manifest Rows
