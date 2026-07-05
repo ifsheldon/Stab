@@ -8,8 +8,15 @@ fn missing_with_options(
     ignore_non_deterministic_measurements: bool,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let circuit = Circuit::from_stim_str(text)?;
+    missing_circuit_with_options(&circuit, ignore_non_deterministic_measurements)
+}
+
+fn missing_circuit_with_options(
+    circuit: &Circuit,
+    ignore_non_deterministic_measurements: bool,
+) -> Result<String, Box<dyn std::error::Error>> {
     let output = missing_detectors(
-        &circuit,
+        circuit,
         MissingDetectorOptions {
             ignore_non_deterministic_measurements,
         },
@@ -210,6 +217,94 @@ fn pf5_missing_detectors_clifford_rejects_non_plain_unitary_targets()
 }
 
 #[test]
+fn pf5_missing_detectors_spp_has_pinned_outputs() -> Result<(), Box<dyn std::error::Error>> {
+    require_missing_eq(
+        "RX 0\nSPP Z0\nMY 0\n",
+        true,
+        "DETECTOR rec[-1]\n",
+        "SPP Z rotates known X input into deterministic Y measurement",
+    )?;
+    require_missing_eq(
+        "RX 0\nSPP_DAG Z0\nMY 0\n",
+        true,
+        "DETECTOR rec[-1]\n",
+        "SPP_DAG Z rotates known X input into deterministic Y measurement",
+    )?;
+    require_missing_eq(
+        "RX 0\nSPP !Z0\nMY 0\n",
+        true,
+        "DETECTOR rec[-1]\n",
+        "inverted SPP Z rotates known X input into deterministic Y measurement",
+    )?;
+    require_missing_eq(
+        "RX 0 1\nSPP Z0 Z1\nMY 0 1\n",
+        true,
+        "DETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+        "multi-group SPP Z rotations preserve per-target deterministic measurements",
+    )?;
+    require_missing_eq(
+        "SPP Z0\nMY 0\n",
+        true,
+        "",
+        "unknown input after SPP stays nondeterministic when nondeterministic rows are ignored",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn pf5_missing_detectors_spp_supports_unitary_products() -> Result<(), Box<dyn std::error::Error>> {
+    let mut saw_non_empty_detector_suggestion = false;
+    for (name, text) in [
+        ("spp z", "RX 0\nSPP Z0\nMY 0\n"),
+        ("spp_dag z", "RX 0\nSPP_DAG Z0\nMY 0\n"),
+        ("spp product", "RX 0\nRY 1\nSPP X0*Y1*Z2\nMPP Z0*Z1*Z2\n"),
+        (
+            "spp_dag inverted product",
+            "R 0\nRX 1\nSPP_DAG !Z0*X1\nMPP Y0*Y1\n",
+        ),
+    ] {
+        let circuit = Circuit::from_stim_str(text)?;
+        let expected = missing_circuit_with_options(&circuit.decomposed()?, true)?;
+        let actual = missing_circuit_with_options(&circuit, true)?;
+        if actual != expected {
+            return Err(std::io::Error::other(format!(
+                "{name}: expected decomposed missing detectors {expected:?}, got {actual:?}"
+            ))
+            .into());
+        }
+        saw_non_empty_detector_suggestion |= !actual.is_empty();
+    }
+    if !saw_non_empty_detector_suggestion {
+        return Err(
+            std::io::Error::other("expected at least one SPP case to suggest a detector").into(),
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn pf5_missing_detectors_spp_rejects_anti_hermitian_unitary_products()
+-> Result<(), Box<dyn std::error::Error>> {
+    for gate in ["SPP", "SPP_DAG"] {
+        let circuit = Circuit::from_stim_str(&format!("{gate} X0*Z0\nM 0\n"))?;
+        let Err(error) = missing_detectors(
+            &circuit,
+            MissingDetectorOptions {
+                ignore_non_deterministic_measurements: true,
+            },
+        ) else {
+            return Err(
+                std::io::Error::other(format!("expected anti-Hermitian {gate} rejection")).into(),
+            );
+        };
+        if !error.to_string().contains("anti-Hermitian") {
+            return Err(std::io::Error::other(format!("unexpected {gate} error: {error}")).into());
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn pf5_missing_detectors_repeat_tracks_deterministic_measurements()
 -> Result<(), Box<dyn std::error::Error>> {
     require_missing_eq(
@@ -269,6 +364,19 @@ fn pf5_missing_detectors_repeat_rejects_excessive_expansion()
         },
     ) else {
         return Err(std::io::Error::other("expected excessive repeat work-unit rejection").into());
+    };
+    if !error.to_string().contains("expanded work units") {
+        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
+    }
+
+    let circuit = Circuit::from_stim_str("REPEAT 500001 {\n    SPP X0\n}\n")?;
+    let Err(error) = missing_detectors(
+        &circuit,
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements: true,
+        },
+    ) else {
+        return Err(std::io::Error::other("expected decomposed SPP repeat work rejection").into());
     };
     if !error.to_string().contains("expanded work units") {
         return Err(std::io::Error::other(format!("unexpected error: {error}")).into());

@@ -77,6 +77,7 @@ impl MissingDetectorFinder {
             "MXX" => self.process_pair_measurement(instruction, PauliBasis::X),
             "MYY" => self.process_pair_measurement(instruction, PauliBasis::Y),
             "MZZ" => self.process_pair_measurement(instruction, PauliBasis::Z),
+            "SPP" | "SPP_DAG" => self.process_decomposed_instruction(instruction),
             "DETECTOR" => self.process_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.process_observable_include(instruction),
             "TICK" => Ok(()),
@@ -85,6 +86,20 @@ impl MissingDetectorFinder {
                 "basic missing-detector analysis does not support gate {name}"
             ))),
         }
+    }
+
+    fn process_decomposed_instruction(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<()> {
+        let decomposed = crate::circuit_simplify::decomposed_single_instruction(instruction)
+            .map_err(|error| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{} cannot be analyzed via decomposition for missing detectors: {error}",
+                    instruction.gate().canonical_name()
+                ))
+            })?;
+        self.process_circuit(&decomposed)
     }
 
     fn process_unitary_tableau(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
@@ -433,12 +448,52 @@ fn validate_repeat_budget_inner(
 }
 
 fn instruction_work_units(instruction: &CircuitInstruction) -> CircuitResult<u64> {
+    match instruction.gate().canonical_name() {
+        "SPP" | "SPP_DAG" => decomposed_instruction_work_units(instruction),
+        _ => direct_instruction_work_units(instruction),
+    }
+}
+
+fn direct_instruction_work_units(instruction: &CircuitInstruction) -> CircuitResult<u64> {
     let target_count = u64::try_from(instruction.targets().len()).map_err(|_| {
         CircuitError::invalid_detector_error_model(
             "missing-detector instruction target count does not fit u64",
         )
     })?;
     Ok(target_count.max(1))
+}
+
+fn decomposed_instruction_work_units(instruction: &CircuitInstruction) -> CircuitResult<u64> {
+    let decomposed =
+        crate::circuit_simplify::decomposed_single_instruction(instruction).map_err(|error| {
+            CircuitError::invalid_detector_error_model(format!(
+                "{} cannot be analyzed via decomposition for missing detectors: {error}",
+                instruction.gate().canonical_name()
+            ))
+        })?;
+    expanded_circuit_work_units(&decomposed).map(|count| count.max(1))
+}
+
+fn expanded_circuit_work_units(circuit: &Circuit) -> CircuitResult<u64> {
+    let mut total = 0_u64;
+    for item in circuit.items() {
+        let work_units = match item {
+            CircuitItem::Instruction(instruction) => direct_instruction_work_units(instruction)?,
+            CircuitItem::RepeatBlock(repeat) => expanded_circuit_work_units(repeat.body())?
+                .checked_mul(repeat.repeat_count().get())
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "missing-detector repeat work-unit expansion count overflowed",
+                    )
+                })?,
+        };
+        total = total.checked_add(work_units).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "missing-detector repeat work-unit expansion count overflowed",
+            )
+        })?;
+    }
+    Ok(total)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
