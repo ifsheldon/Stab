@@ -158,7 +158,7 @@ Deferred or out of scope:
 | Checklist row | Status class | Completion rule |
 | --- | --- | --- |
 | Rust core library equivalent for core Stim semantics | Rollup | Complete only after RPF1 through RPF6 close the active Rust API, transform, DEM, utility, flow, analyzer, and search rows. |
-| CLI binary | Rollup | RPF7 selected CLI rows are implemented; final rollup wording is owned by PFM8 so broad CLI status does not imply deferred command support or drop-in `stim` packaging. |
+| CLI binary | Implemented for selected Stab CLI surface | Section 11 checklist command rows and PF7 evidence close the selected `stab` CLI surface, while deferred commands and drop-in `stim` packaging remain excluded unless a later release plan promotes them. |
 | `.stim`, `.dem`, and result-format compatibility | Rollup | Complete only after RPF2, RPF3, RPF4, and RPF7 close active transform, sweep, DEM, and command-specific format gaps. |
 | Full semantic execution of every legal circuit operation | Rollup | Complete only after RPF3 records which legal gates execute in sampler, converter, detection, and analyzer paths, with explicit rejection tests for unsupported shapes. |
 | Highest-priority remaining feature gaps | Rollup | Complete only after the child rows for circuit transforms, DEM API, sweep-conditioned behavior, and feedback-inlining parity are implemented or explicitly deferred. |

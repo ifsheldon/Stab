@@ -7,6 +7,13 @@ It also has executable CLI evidence for selected legacy-mode conflicts and expli
 
 This slice reuses source-owned M9 and M10 fixtures or generated workloads and routes through `stab_cli::run_from`, so it measures public CLI behavior instead of lower-level conversion helpers.
 
+## Implemented Slice: Selected CLI Binary Rollup Closure
+
+The top-level `CLI binary` checklist row is now closed for the selected Stab CLI surface.
+Section 11 of `docs/stab-feature-checklist.md` records every selected command as implemented or explicitly deferred: `gen`, `convert`, `sample`, `detect`, `m2d`, `analyze_errors`, `sample_dem`, Stab-native `help`, and selected legacy aliases are covered by their command-specific rows, while `diagram`, `explain_errors`, and `repl` remain deferred.
+This rollup closure does not add `stim`-named packaging, promote deferred commands, or reopen the deprecated `--detector_hypergraph` surface.
+No code or benchmark changes are needed for this rollup-only slice because the command behavior was already covered by PF7, M7, M8, M9, M10, M11, M12, and convert/help evidence.
+
 ## Implemented Slice: `m2d` Path IO Evidence
 
 This PFM7 slice promotes source-owned CLI evidence for `stab m2d --circuit`, `--in`, `--out`, `--sweep`, and `--obs_out` path behavior without changing detection-conversion semantics.

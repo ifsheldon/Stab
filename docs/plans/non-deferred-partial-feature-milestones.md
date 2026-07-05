@@ -50,8 +50,8 @@ If a subcase in this plan turns out to require an excluded surface, stop and log
 | PFM4 | DEM parser and canonical printer, DEM detector shifts, DEM introspection, DEM transforms, DEM flattening and large repeat traversal, full DEM public API parity | Finish DEM API gaps and folded or capped traversal behavior for selected consumers. DEM construction and mutation for the current Rust API surface is already closed by `pf1-dem-rust-api`; Python ergonomics remain deferred. |
 | PFM5 | Detector-analysis utility APIs, flows, circuit transforms, gate validation flags and categories | Finish detecting regions, missing detectors, measurement-rich flow solving, and flow-driven transform integration. |
 | PFM6 | Circuit-to-DEM analysis, `analyze_errors --decompose_errors`, DEM analysis and shortest graphlike error, shortest graphlike and hypergraph search, sparse reverse detector-frame tracking, active matched-error value objects | Finish analyzer/search/sparse-tracker gaps without taking on full ErrorMatcher provenance or `explain_errors` CLI. |
-| PFM7 | `stim m2d`, `stim analyze_errors`, legacy top-level command flags, CLI binary | Finish visible CLI parity for selected commands and accepted legacy aliases, with `--detector_hypergraph` remaining excluded. |
-| PFM8 | Rust core library equivalent, CLI binary, `.stim`/`.dem`/result-format compatibility, full semantic execution, highest-priority remaining feature gaps | Audit, review, benchmark, documentation, and rollup-status closure after child milestones have evidence. |
+| PFM7 | `stim m2d`, `stim analyze_errors`, legacy top-level command flags, CLI binary | Finish visible CLI parity for selected commands and accepted legacy aliases, with `--detector_hypergraph` remaining excluded. The selected CLI binary rollup is now closed; reopen only for newly selected command behavior. |
+| PFM8 | Rust core library equivalent, `.stim`/`.dem`/result-format compatibility, full semantic execution, highest-priority remaining feature gaps, and CLI binary regression checks | Audit, review, benchmark, documentation, and rollup-status closure after child milestones have evidence. |
 
 ## Execution Order
 
@@ -408,7 +408,7 @@ Rows covered:
 - `stim m2d`.
 - `stim analyze_errors`.
 - Legacy top-level command flags.
-- CLI binary rollup, for selected command behavior.
+- CLI binary rollup, closed for selected command behavior.
 - Measurement-to-detection conversion, for public command behavior.
 
 Tasks:
@@ -452,7 +452,7 @@ Objective: turn child milestone evidence into durable acceptance evidence and up
 Rows covered:
 
 - Rust core library equivalent for core Stim semantics.
-- CLI binary.
+- CLI binary status synchronization after selected command closure.
 - `.stim`, `.dem`, and result-format compatibility.
 - Full semantic execution of every legal circuit operation.
 - Highest-priority remaining feature gaps.

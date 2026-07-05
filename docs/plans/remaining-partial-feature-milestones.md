@@ -76,7 +76,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | Checklist row or row group | Disposition | Owner milestone | Completion rule |
 | --- | --- | --- | --- |
 | Rust core library equivalent for core Stim semantics | Rollup | RPF8 | Complete only after RPF1 through RPF6 close active Rust rows and docs no longer imply Python or simulator product parity. |
-| CLI binary | Rollup | RPF7 and RPF8 | Complete only after active `m2d`, `analyze_errors`, and accepted legacy alias behavior is proven. |
+| CLI binary | Implemented for selected Stab CLI surface | RPF7 and RPF8 | Section 11 checklist command rows and PF7 evidence prove the selected `stab` CLI surface; deferred commands and drop-in `stim` packaging remain excluded unless a later release plan promotes them. |
 | `.stim`, `.dem`, and result-format compatibility | Rollup | RPF2, RPF4, RPF7, RPF8 | Complete only after active transform, DEM, and CLI format gaps are closed or explicitly deferred. |
 | Target kinds | Active | RPF3 | Broader sweep-conditioned execution and analysis behavior must be implemented or explicitly rejected with tests. |
 | Full semantic execution of every legal circuit operation | Active rollup | RPF1, RPF3, RPF6 | Parser acceptance must not imply execution support; execution coverage and unsupported legal shapes must be documented. |
@@ -435,7 +435,7 @@ Owned checklist rows:
 - `stim m2d`.
 - `stim analyze_errors`.
 - Legacy top-level command flags.
-- CLI binary, as a rollup.
+- CLI binary, closed for selected command behavior.
 - Measurement-to-detection conversion, for public command behavior.
 
 Implementation tasks:
@@ -480,7 +480,7 @@ Objective: turn milestone evidence into durable acceptance evidence and update r
 Owned checklist rows:
 
 - Rust core library equivalent for core Stim semantics.
-- CLI binary.
+- CLI binary status synchronization after selected command closure.
 - `.stim`, `.dem`, and result-format compatibility.
 - Full semantic execution of every legal circuit operation.
 - Highest-priority remaining feature gaps.
