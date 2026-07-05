@@ -47,7 +47,7 @@ pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
 /// the original circuit, returns the selected QEC inverse subset, and swaps each
 /// flow's input and output Pauli terms. The measurement-rich subset is limited
 /// to one noiseless plain unique-target measurement group, selected plain
-/// unique-target reset, or selected plain unique-target measure-reset
+/// unique-target reset, or selected unique-target measure-reset
 /// instruction; detectors, feedback, noise, repeats, and multi-instruction QEC
 /// rewrites remain deferred.
 pub fn circuit_time_reversed_for_flows(
@@ -139,7 +139,7 @@ fn selected_measurement_rich_time_reversal(
         }));
     }
     if let Some((measurement_gate, basis)) = reset_inverse_gate_and_basis(name) {
-        let targets = measure_reset_targets(&groups)?;
+        let targets = plain_measure_reset_targets(&groups)?;
         if targets.is_empty() {
             return Ok(None);
         }
@@ -204,7 +204,18 @@ fn measurement_groups_are_plain_unique(groups: &[&[Target]]) -> bool {
     true
 }
 
+fn plain_measure_reset_targets(groups: &[&[Target]]) -> CircuitResult<Vec<MeasureResetTarget>> {
+    selected_measure_reset_targets(groups, false)
+}
+
 fn measure_reset_targets(groups: &[&[Target]]) -> CircuitResult<Vec<MeasureResetTarget>> {
+    selected_measure_reset_targets(groups, true)
+}
+
+fn selected_measure_reset_targets(
+    groups: &[&[Target]],
+    allow_inverted: bool,
+) -> CircuitResult<Vec<MeasureResetTarget>> {
     if groups.is_empty() {
         return Ok(Vec::new());
     }
@@ -214,7 +225,7 @@ fn measure_reset_targets(groups: &[&[Target]]) -> CircuitResult<Vec<MeasureReset
         let [target] = *group else {
             return Ok(Vec::new());
         };
-        if !is_plain_qubit_target(target) {
+        if !(target.is_qubit_target() && (allow_inverted || !target.is_inverted_result_target())) {
             return Ok(Vec::new());
         }
         let Some(qubit) = target.qubit_id().map(|id| id.get() as usize) else {
@@ -483,7 +494,7 @@ fn has_classical_flow_terms(flows: &[Flow]) -> bool {
 
 fn measurement_rich_time_reversal_error() -> CircuitError {
     CircuitError::invalid_tableau_conversion(
-        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain unique-target measurement instruction group from M, MX, MY, MXX, MYY, or MZZ, one noiseless plain unique-target reset instruction from R, RX, or RY, or one noiseless plain unique-target measure-reset instruction from MR, MRX, or MRY; detectors, feedback, noise, repeats, and multi-instruction rewrites remain unsupported",
+        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain unique-target measurement instruction group from M, MX, MY, MXX, MYY, or MZZ, one noiseless plain unique-target reset instruction from R, RX, or RY, or one noiseless unique-target measure-reset instruction from MR, MRX, or MRY; detectors, feedback, noise, repeats, and multi-instruction rewrites remain unsupported",
     )
 }
 

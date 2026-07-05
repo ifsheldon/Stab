@@ -93,7 +93,12 @@ const TIME_REVERSE_FLOW_MEASUREMENT_MR_MULTI_TEXTS: [&str; 5] = [
 ];
 const TIME_REVERSE_FLOW_MEASUREMENT_MRX_MULTI_TEXTS: [&str; 1] = ["1 -> X0*X1"];
 const TIME_REVERSE_FLOW_MEASUREMENT_MRY_MULTI_TEXTS: [&str; 1] = ["1 -> Y0*Y1"];
-const TIME_REVERSE_FLOW_MEASUREMENT_CASES: [(&str, &[&str]); 18] = [
+const TIME_REVERSE_FLOW_MEASUREMENT_MR_INVERTED_TEXTS: [&str; 3] =
+    ["Z0*Z1 -> rec[-2] xor rec[-1]", "1 -> Z0", "1 -> Z1"];
+const TIME_REVERSE_FLOW_MEASUREMENT_MRX_INVERTED_TEXTS: [&str; 2] = ["1 -> X0", "X0 -> rec[-1]"];
+const TIME_REVERSE_FLOW_MEASUREMENT_MRY_INVERTED_TEXTS: [&str; 2] =
+    ["Y0*Y1 -> rec[-2] xor rec[-1]", "1 -> Y0*Y1"];
+const TIME_REVERSE_FLOW_MEASUREMENT_CASES: [(&str, &[&str]); 21] = [
     ("MZZ 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_MZZ_TEXTS),
     ("M 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_M_MULTI_TEXTS),
     (
@@ -115,6 +120,18 @@ const TIME_REVERSE_FLOW_MEASUREMENT_CASES: [(&str, &[&str]); 18] = [
     ("MR 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_MR_MULTI_TEXTS),
     ("MRX 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRX_MULTI_TEXTS),
     ("MRY 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRY_MULTI_TEXTS),
+    (
+        "MR !0 1\n",
+        &TIME_REVERSE_FLOW_MEASUREMENT_MR_INVERTED_TEXTS,
+    ),
+    (
+        "MRX !0\n",
+        &TIME_REVERSE_FLOW_MEASUREMENT_MRX_INVERTED_TEXTS,
+    ),
+    (
+        "MRY 0 !1\n",
+        &TIME_REVERSE_FLOW_MEASUREMENT_MRY_INVERTED_TEXTS,
+    ),
 ];
 
 pub(super) fn run_circuit_flatten_repeat_row(
@@ -289,7 +306,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures the scoped Rust Circuit::time_reversed_for_flows unitary subset; broader measurement-rich QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         "pf2-time-reverse-flow-measurement" => Some(
-            "contract-only: Stab measures the selected Rust Circuit::time_reversed_for_flows measurement-rich instruction, measurement-ordering, plain unique-target reset-to-measurement, measurement-to-reset, and plain unique-target measure-reset subset; broader QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures the selected Rust Circuit::time_reversed_for_flows measurement-rich instruction, measurement-ordering, plain unique-target reset-to-measurement, measurement-to-reset, and unique-target measure-reset subset including inverted result targets; broader QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         _ => None,
     }

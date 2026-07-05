@@ -377,6 +377,56 @@ fn time_reversed_for_flows_measurement_rich_subset_reverses_multi_target_measure
 }
 
 #[test]
+fn time_reversed_for_flows_measurement_rich_subset_reverses_inverted_measure_resets() {
+    // Adapted from Stim v1.16.0 inverted measure-reset time_reversed_for_flows behavior.
+    for (circuit_text, input_flows, expected_circuit, expected_flows) in [
+        (
+            "MR !0\n",
+            vec!["1 -> Z0", "Z0 -> rec[-1]"],
+            "MR !0\n",
+            vec!["Z0 -> rec[-1]", "1 -> Z0"],
+        ),
+        (
+            "MR !0 1\n",
+            vec!["Z0*Z1 -> rec[-2] xor rec[-1]", "1 -> Z0", "1 -> Z1"],
+            "MR 1 !0\n",
+            vec!["1 -> Z0*Z1", "Z0 -> rec[-1]", "Z1 -> rec[-2]"],
+        ),
+        (
+            "MR 0 !1\n",
+            vec!["Z0*Z1 -> rec[-2] xor rec[-1]", "1 -> Z0", "1 -> Z1"],
+            "MR !1 0\n",
+            vec!["1 -> Z0*Z1", "Z0 -> rec[-1]", "Z1 -> rec[-2]"],
+        ),
+        (
+            "MRX !0\n",
+            vec!["1 -> X0", "X0 -> rec[-1]"],
+            "MRX !0\n",
+            vec!["X0 -> rec[-1]", "1 -> X0"],
+        ),
+        (
+            "MRY 0 !1\n",
+            vec!["Y0*Y1 -> rec[-2] xor rec[-1]", "1 -> Y0*Y1"],
+            "MRY !1 0\n",
+            vec!["1 -> Y0*Y1", "Y0*Y1 -> rec[-2] xor rec[-1]"],
+        ),
+    ] {
+        let actual_input_flows = input_flows.into_iter().map(flow).collect::<Vec<_>>();
+
+        let (actual_circuit, actual_flows) =
+            circuit_time_reversed_for_flows(&circuit(circuit_text), &actual_input_flows)
+                .expect("time reverse inverted measure-reset targets");
+
+        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
+        assert_eq!(
+            actual_flows,
+            expected_flows.into_iter().map(flow).collect::<Vec<_>>(),
+            "{circuit_text}"
+        );
+    }
+}
+
+#[test]
 fn time_reversed_for_flows_measurement_rich_subset_reverses_resets() {
     // Adapted from Stim v1.16.0 circuit_inverse_qec reset-to-measurement reversal behavior.
     for (circuit_text, input_flow, expected_circuit, expected_flow) in [
@@ -576,15 +626,15 @@ fn time_reversed_for_flows_measurement_rich_subset_rejects_duplicate_reset_targe
 }
 
 #[test]
-fn time_reversed_for_flows_measurement_rich_subset_rejects_unpromoted_measure_reset_shapes() {
+fn time_reversed_for_flows_measurement_rich_subset_rejects_duplicate_measure_reset_targets() {
     for (circuit_text, input_flow) in [
         ("MR 0 0\n", "1 -> Z0"),
-        ("MR !0\n", "Z0 -> rec[-1]"),
         ("MRX 0 0\n", "1 -> X0"),
-        ("MRY !0\n", "Y0 -> rec[-1]"),
+        ("MRY 0 0\n", "1 -> Y0"),
+        ("MR 0 1 0\n", "1 -> Z0*Z1"),
     ] {
         let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
-            .expect_err("unpromoted measure-reset flow rewrites are not in the scoped subset")
+            .expect_err("duplicate measure-reset flow rewrites are not in the scoped subset")
             .to_string();
 
         assert!(
