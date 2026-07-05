@@ -8,10 +8,10 @@ const MAX_EXHAUSTIVE_FLOW_SOLVE_MEASUREMENTS: usize = 16;
 
 /// Finds measurement indices that explain each queried unsigned stabilizer flow.
 ///
-/// The promoted Rust scope matches the pinned Stim v1.16.0 examples for unitary, single
-/// measurement, extra-idle-qubit, and small composed measurement-rich circuits. Broader composed
-/// measurement-rich circuits use a bounded checker fallback until the full generator-table solver is
-/// promoted.
+/// The promoted Rust scope matches pinned Stim v1.16.0 examples for unitary, measured-idle,
+/// multi-target measurement, fewer-measurements heuristic, and small composed measurement-rich
+/// circuits. Broader composed measurement-rich circuits use a bounded checker fallback until the
+/// full generator-table solver is promoted.
 pub fn solve_for_flow_measurements(
     circuit: &Circuit,
     flows: &[Flow],

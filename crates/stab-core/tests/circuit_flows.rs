@@ -273,7 +273,7 @@ fn check_if_circuit_has_unsigned_stabilizer_flows_folds_unitary_repeats() {
 }
 
 #[test]
-fn solve_for_flow_measurements_matches_stim_empty_and_simple_examples() {
+fn solve_for_flow_measurements_cpp_empty_and_simple_examples() {
     // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators.test.cc.
     assert_eq!(
         solve_for_flow_measurements(&circuit(""), &[]).expect("empty solve"),
@@ -314,7 +314,114 @@ fn solve_for_flow_measurements_matches_stim_empty_and_simple_examples() {
 }
 
 #[test]
-fn solve_for_flow_measurements_matches_stim_repetition_code_example() {
+fn solve_for_flow_measurements_python_measured_idle_examples() {
+    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators_test.py.
+    let measured_idle_circuit = circuit("M 2\n");
+    assert_eq!(
+        solve_for_flow_measurements(&measured_idle_circuit, &[flow("X2 -> X2")])
+            .expect("solve measured X identity"),
+        vec![None]
+    );
+    assert_eq!(
+        solve_for_flow_measurements(
+            &measured_idle_circuit,
+            &[
+                flow("X2 -> X2"),
+                flow("Y2 -> Y2"),
+                flow("Z2 -> Z2"),
+                flow("Z2 -> 1"),
+            ],
+        )
+        .expect("solve measured idle batch"),
+        vec![None, None, Some(vec![]), Some(vec![0])]
+    );
+}
+
+#[test]
+fn solve_for_flow_measurements_python_multi_target_examples() {
+    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators_test.py.
+    assert_eq!(
+        solve_for_flow_measurements(
+            &circuit("MXX 0 1\n"),
+            &[flow("YY -> ZZ"), flow("YY -> YY"), flow("YZ -> ZY"),]
+        )
+        .expect("solve MXX multi-target batch"),
+        vec![Some(vec![0]), Some(vec![]), Some(vec![0])]
+    );
+    assert_eq!(
+        solve_for_flow_measurements(&circuit("M 1 2\n"), &[flow("_Z -> 1")])
+            .expect("solve multi-target M"),
+        vec![Some(vec![0])]
+    );
+    assert_eq!(
+        solve_for_flow_measurements(&circuit("MX 1 2\n"), &[flow("_X -> 1")])
+            .expect("solve multi-target MX"),
+        vec![Some(vec![0])]
+    );
+    assert_eq!(
+        solve_for_flow_measurements(&circuit("MYY 1 2 3 4\n"), &[flow("_YY__ -> 1")])
+            .expect("solve multi-target MYY"),
+        vec![Some(vec![0])]
+    );
+    assert_eq!(
+        solve_for_flow_measurements(&circuit("MPP Y1*Y2 Y3*Y4\n"), &[flow("_YY__ -> 1")])
+            .expect("solve multi-target MPP"),
+        vec![Some(vec![0])]
+    );
+}
+
+#[test]
+fn solve_for_flow_measurements_python_fewer_measurements_heuristic_examples() {
+    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators_test.py.
+    let mpp_then_single_measurements = circuit(
+        "
+        MPP Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8
+        M 0 1 2 3 4 5 6 7 8
+        ",
+    );
+    assert_eq!(
+        solve_for_flow_measurements(
+            &mpp_then_single_measurements,
+            &[flow("1 -> Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8")]
+        )
+        .expect("solve MPP before single measurements output"),
+        vec![Some(vec![0])]
+    );
+    assert_eq!(
+        solve_for_flow_measurements(
+            &mpp_then_single_measurements,
+            &[flow("Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8 -> 1")]
+        )
+        .expect("solve MPP before single measurements input"),
+        vec![Some(vec![0])]
+    );
+
+    let single_measurements_then_mpp = circuit(
+        "
+        M 0 1 2 3 4 5 6 7 8
+        MPP Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8
+        ",
+    );
+    assert_eq!(
+        solve_for_flow_measurements(
+            &single_measurements_then_mpp,
+            &[flow("1 -> Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8")]
+        )
+        .expect("solve MPP after single measurements output"),
+        vec![Some(vec![9])]
+    );
+    assert_eq!(
+        solve_for_flow_measurements(
+            &single_measurements_then_mpp,
+            &[flow("Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8 -> 1")]
+        )
+        .expect("solve MPP after single measurements input"),
+        vec![Some(vec![9])]
+    );
+}
+
+#[test]
+fn solve_for_flow_measurements_cpp_repetition_code_example() {
     // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators.test.cc.
     let circuit = circuit(
         "

@@ -1,4 +1,7 @@
-use super::super::{compare_note, measurement_work, run_stab_compare_row};
+use super::super::{
+    compare_note, measurement_work, pf5::expected_flow_solve_measurement_work_for_test,
+    run_stab_compare_row,
+};
 use crate::manifest::{BenchmarkRow, Milestone, Runner};
 
 #[test]
@@ -73,6 +76,15 @@ fn detector_utility_benchmark_rows_have_stab_compare_runners() {
                 "stab_pf5_flow_solve_measurement_queries",
             ][..],
         ),
+        (
+            "pf5-flow-solve-measurement-python",
+            "src/stim/util_top/circuit_flow_generators_test.py",
+            "flow-solve-python",
+            &[
+                "stab_pf5_flow_solve_measurement_python_cases",
+                "stab_pf5_flow_solve_measurement_python_queries",
+            ][..],
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),
@@ -101,5 +113,32 @@ fn detector_utility_benchmark_rows_have_stab_compare_runners() {
         for name in names {
             assert!(measurement_work(id, name).is_some());
         }
+    }
+}
+
+#[test]
+fn flow_solve_measurement_work_tracks_promoted_corpus() {
+    for (row_id, case_name, query_name) in [
+        (
+            "pf5-flow-solve-measurement-rich",
+            "stab_pf5_flow_solve_measurement_cases",
+            "stab_pf5_flow_solve_measurement_queries",
+        ),
+        (
+            "pf5-flow-solve-measurement-python",
+            "stab_pf5_flow_solve_measurement_python_cases",
+            "stab_pf5_flow_solve_measurement_python_queries",
+        ),
+    ] {
+        let (expected_cases, expected_queries) =
+            expected_flow_solve_measurement_work_for_test(row_id).expect("flow-solve work");
+        assert_eq!(
+            measurement_work(row_id, case_name),
+            Some((expected_cases, "cases/s"))
+        );
+        assert_eq!(
+            measurement_work(row_id, query_name),
+            Some((expected_queries, "queries/s"))
+        );
     }
 }

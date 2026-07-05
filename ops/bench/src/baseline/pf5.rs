@@ -17,6 +17,8 @@ const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 36;
 const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 120;
 const FLOW_SOLVE_MEASUREMENT_CASES: usize = 2;
 const FLOW_SOLVE_MEASUREMENT_QUERIES: usize = 15;
+const FLOW_SOLVE_MEASUREMENT_PYTHON_CASES: usize = 8;
+const FLOW_SOLVE_MEASUREMENT_PYTHON_QUERIES: usize = 15;
 
 pub(super) fn run_flow_compare_row(
     row: &BenchmarkRow,
@@ -26,6 +28,7 @@ pub(super) fn run_flow_compare_row(
             run_flow_generators_measurement_rich(row).map(Some)
         }
         "pf5-flow-solve-measurement-rich" => run_flow_solve_measurement_rich(row).map(Some),
+        "pf5-flow-solve-measurement-python" => run_flow_solve_measurement_rich(row).map(Some),
         _ => Ok(None),
     }
 }
@@ -52,6 +55,18 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             (UTILITY_BATCH * FLOW_SOLVE_MEASUREMENT_QUERIES) as f64,
             "queries/s",
         )),
+        ("pf5-flow-solve-measurement-python", "stab_pf5_flow_solve_measurement_python_cases") => {
+            Some((
+                (UTILITY_BATCH * FLOW_SOLVE_MEASUREMENT_PYTHON_CASES) as f64,
+                "cases/s",
+            ))
+        }
+        ("pf5-flow-solve-measurement-python", "stab_pf5_flow_solve_measurement_python_queries") => {
+            Some((
+                (UTILITY_BATCH * FLOW_SOLVE_MEASUREMENT_PYTHON_QUERIES) as f64,
+                "queries/s",
+            ))
+        }
         _ => None,
     }
 }
@@ -62,7 +77,10 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/pair-measurement/MPP/SPP/composed-measurement/unitary-mixed/bounded-repeat/feedback/MPAD/heralded-noise subset without a faithful pinned Stim CLI timing ratio",
         ),
         "pf5-flow-solve-measurement-rich" => Some(
-            "report-only: Stab measures the Rust solve_for_flow_measurements promoted upstream examples without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures the Rust solve_for_flow_measurements promoted C++ upstream examples without a faithful pinned Stim CLI timing ratio",
+        ),
+        "pf5-flow-solve-measurement-python" => Some(
+            "report-only: Stab measures the Rust solve_for_flow_measurements promoted Python upstream examples without a faithful pinned Stim CLI timing ratio",
         ),
         _ => None,
     }
@@ -118,17 +136,35 @@ fn measure_flow_generators_measurement_rich(
 }
 
 fn run_flow_solve_measurement_rich(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let (case_measurement, query_measurement) = flow_solve_measurement_names(&row.id)?;
     Ok(vec![
-        measure_flow_solve_measurement_rich(row, "stab_pf5_flow_solve_measurement_cases")?,
-        measure_flow_solve_measurement_rich(row, "stab_pf5_flow_solve_measurement_queries")?,
+        measure_flow_solve_measurement_rich(row, case_measurement)?,
+        measure_flow_solve_measurement_rich(row, query_measurement)?,
     ])
+}
+
+fn flow_solve_measurement_names(row_id: &str) -> Result<(&'static str, &'static str), BenchError> {
+    match row_id {
+        "pf5-flow-solve-measurement-rich" => Ok((
+            "stab_pf5_flow_solve_measurement_cases",
+            "stab_pf5_flow_solve_measurement_queries",
+        )),
+        "pf5-flow-solve-measurement-python" => Ok((
+            "stab_pf5_flow_solve_measurement_python_cases",
+            "stab_pf5_flow_solve_measurement_python_queries",
+        )),
+        _ => Err(BenchError::StabRunner {
+            row_id: row_id.to_string(),
+            message: "unknown PF5 flow-solve benchmark row".to_string(),
+        }),
+    }
 }
 
 fn measure_flow_solve_measurement_rich(
     row: &BenchmarkRow,
     measurement_name: &'static str,
 ) -> Result<Measurement, BenchError> {
-    let cases = flow_solve_measurement_rich_corpus(&row.id)?;
+    let cases = flow_solve_measurement_corpus(&row.id)?;
     measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
         let mut solved_count = 0usize;
         for _ in 0..UTILITY_BATCH {
@@ -261,6 +297,109 @@ fn flow_solve_measurement_rich_corpus(row_id: &str) -> Result<Vec<FlowSolveCase>
             ],
         ),
     ])
+}
+
+fn flow_solve_measurement_python_corpus(row_id: &str) -> Result<Vec<FlowSolveCase>, BenchError> {
+    Ok(vec![
+        (
+            parse_circuit(row_id, "M 2\n")?,
+            parse_flows(row_id, &["X2 -> X2", "Y2 -> Y2", "Z2 -> Z2", "Z2 -> 1"])?,
+            vec![None, None, Some(vec![]), Some(vec![0])],
+        ),
+        (
+            parse_circuit(row_id, "MXX 0 1\n")?,
+            parse_flows(row_id, &["YY -> ZZ", "YY -> YY", "YZ -> ZY"])?,
+            vec![Some(vec![0]), Some(vec![]), Some(vec![0])],
+        ),
+        (
+            parse_circuit(row_id, "M 1 2\n")?,
+            parse_flows(row_id, &["_Z -> 1"])?,
+            vec![Some(vec![0])],
+        ),
+        (
+            parse_circuit(row_id, "MX 1 2\n")?,
+            parse_flows(row_id, &["_X -> 1"])?,
+            vec![Some(vec![0])],
+        ),
+        (
+            parse_circuit(row_id, "MYY 1 2 3 4\n")?,
+            parse_flows(row_id, &["_YY__ -> 1"])?,
+            vec![Some(vec![0])],
+        ),
+        (
+            parse_circuit(row_id, "MPP Y1*Y2 Y3*Y4\n")?,
+            parse_flows(row_id, &["_YY__ -> 1"])?,
+            vec![Some(vec![0])],
+        ),
+        (
+            parse_circuit(
+                row_id,
+                "
+                MPP Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8
+                M 0 1 2 3 4 5 6 7 8
+                ",
+            )?,
+            parse_flows(
+                row_id,
+                &[
+                    "1 -> Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8",
+                    "Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8 -> 1",
+                ],
+            )?,
+            vec![Some(vec![0]), Some(vec![0])],
+        ),
+        (
+            parse_circuit(
+                row_id,
+                "
+                M 0 1 2 3 4 5 6 7 8
+                MPP Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8
+                ",
+            )?,
+            parse_flows(
+                row_id,
+                &[
+                    "1 -> Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8",
+                    "Z0*Z1*Z2*Z3*Z4*Z5*Z6*Z7*Z8 -> 1",
+                ],
+            )?,
+            vec![Some(vec![9]), Some(vec![9])],
+        ),
+    ])
+}
+
+fn flow_solve_measurement_corpus(row_id: &str) -> Result<Vec<FlowSolveCase>, BenchError> {
+    match row_id {
+        "pf5-flow-solve-measurement-rich" => flow_solve_measurement_rich_corpus(row_id),
+        "pf5-flow-solve-measurement-python" => flow_solve_measurement_python_corpus(row_id),
+        _ => Err(BenchError::StabRunner {
+            row_id: row_id.to_string(),
+            message: "unknown PF5 flow-solve benchmark row".to_string(),
+        }),
+    }
+}
+
+#[cfg(test)]
+pub(super) fn expected_flow_solve_measurement_work_for_test(
+    row_id: &str,
+) -> Result<(f64, f64), BenchError> {
+    let cases = flow_solve_measurement_corpus(row_id)?;
+    let query_count =
+        cases
+            .iter()
+            .map(|(_, flows, _)| flows.len())
+            .try_fold(0usize, |count, len| {
+                count
+                    .checked_add(len)
+                    .ok_or_else(|| BenchError::StabRunner {
+                        row_id: row_id.to_string(),
+                        message: "flow-solve test query count overflowed".to_string(),
+                    })
+            })?;
+    Ok((
+        (UTILITY_BATCH * cases.len()) as f64,
+        (UTILITY_BATCH * query_count) as f64,
+    ))
 }
 
 fn parse_circuit(row_id: &str, text: &str) -> Result<Circuit, BenchError> {

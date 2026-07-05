@@ -2,7 +2,7 @@
 
 ## Summary
 
-This RPF5 report now covers the promoted unsigned `has_flow` and `has_all_flows` Rust helper subset for measurement-record and observable dependencies, the scoped `circuit_flow_generators` subset including pinned variable-target `SPP` and `SPP_DAG` unitary examples, nonconstant and constant single-instruction `MPP`, selected unitary-mixed composed measurement-rich instruction sequences, bounded repeat-contained measurement-rich instruction sequences, and the pinned heralded-noise MPP fixture, the pinned Stim `solve_for_flow_measurements` empty, `MX`, idle-extra-qubit, and repetition-code examples, the scoped unitary `time_reversed_for_flows` transform bridge, and the selected single-instruction measurement-rich `time_reversed_for_flows` bridge for pinned `M` and `MZZ` examples.
+This RPF5 report now covers the promoted unsigned `has_flow` and `has_all_flows` Rust helper subset for measurement-record and observable dependencies, the scoped `circuit_flow_generators` subset including pinned variable-target `SPP` and `SPP_DAG` unitary examples, nonconstant and constant single-instruction `MPP`, selected unitary-mixed composed measurement-rich instruction sequences, bounded repeat-contained measurement-rich instruction sequences, and the pinned heralded-noise MPP fixture, the pinned Stim `solve_for_flow_measurements` empty, `MX`, measured-idle, multi-target measurement and `MPP`, fewer-measurements heuristic, and repetition-code examples, the scoped unitary `time_reversed_for_flows` transform bridge, and the selected single-instruction measurement-rich `time_reversed_for_flows` bridge for pinned `M` and `MZZ` examples.
 It does not complete the flow milestone because broader all-operation composed measurement-rich flow-generator synthesis, broader heralded-noise generator synthesis, full generator-table measurement solving, signed sampled flow checking, failure explanations, broader measurement-rich `time_reversed_for_flows`, broader transform integration, and Python flow binding ergonomics remain open.
 
 ## Implemented Surfaces
@@ -16,7 +16,7 @@ It does not complete the flow milestone because broader all-operation composed m
 - `circuit_flow_generators` supports exact single-instruction generators for `M`, `MX`, `MY`, `R`, `RX`, `RY`, `MR`, `MRX`, `MRY`, `MXX`, `MYY`, `MZZ`, nonconstant and constant `MPP`, pinned variable-target `SPP` and `SPP_DAG` unitary examples through existing decomposition, and `MPAD`, plus selected unitary-mixed composed measurement-rich instruction sequences with tableau-backed plain-qubit Clifford gates, bounded repeat-contained measurement-rich instruction sequences through the 4096-row flow-generator cap and `Circuit::flattened_operations` materialization limit, the scoped measurement-record feedback examples `M; CX rec`, `MPP; CX rec`, `M; XCZ rec`, `M; CY rec`, and the pinned `HERALDED_ERASE`; `HERALDED_PAULI_CHANNEL_1`; `TICK`; `MPP` generator fixture.
 - Unpromoted measurement-rich generator shapes such as duplicate measure-reset targets, unsupported sweep feedback, unsupported classical-control shapes, excessive flow-generator rows or repeat expansion beyond current caps, and broader heralded-noise composition fail closed with an explicit unsupported generator or resource-limit error.
 - `solve_for_flow_measurements` is exposed as a Rust helper for the promoted unsigned scope, uses generator rows when the current `circuit_flow_generators` subset applies, and falls back to a bounded checker search for small composed measurement-rich circuits.
-- The promoted solver scope covers empty input, simple `MX`, idle extra-qubit identity flows, repetition-code measurement solving, empty-Pauli query rejection, and fallback resource-limit hardening.
+- The promoted solver scope covers empty input, simple `MX`, measured-idle identity and collapse flows, multi-target measurement and `MPP` products, fewer-measurements heuristic cases, repetition-code measurement solving, empty-Pauli query rejection, and fallback resource-limit hardening.
 - `Circuit::time_reversed_for_flows` is exposed for the scoped unitary flow-transform subset, validates unsigned Pauli-only flows against the original unitary circuit with bounded tableau validation or folded sparse validation for supported large repeats including the owned `H`, `SQRT_X`, and `CY` regression cases, and supports idle flow qubits beyond the circuit width.
 - The selected measurement-rich flow-transform subset validates flows through the sparse tracker and reverses flow endpoints while preserving record and observable terms for one noiseless plain `M`, `MX`, `MY`, `MXX`, `MYY`, or `MZZ` instruction group, with pinned Stim `M` and `MZZ` evidence plus source-owned basis coverage for `MX`, `MY`, `MXX`, and `MYY`; larger QEC inverse shapes still fail closed.
 
@@ -52,8 +52,11 @@ Implemented Rust tests:
 - `circuit_flow_generators_rejects_unpromoted_measurement_rich_shapes`
 - `circuit_flow_generators_rejects_excessive_repeat_measurement_expansion`
 - `circuit_flow_generators_measurement_subset_rejects_anti_hermitian_mpp_products`
-- `solve_for_flow_measurements_matches_stim_empty_and_simple_examples`
-- `solve_for_flow_measurements_matches_stim_repetition_code_example`
+- `solve_for_flow_measurements_cpp_empty_and_simple_examples`
+- `solve_for_flow_measurements_python_measured_idle_examples`
+- `solve_for_flow_measurements_python_multi_target_examples`
+- `solve_for_flow_measurements_python_fewer_measurements_heuristic_examples`
+- `solve_for_flow_measurements_cpp_repetition_code_example`
 - `solve_for_flow_measurements_has_documented_fallback_resource_limit`
 - `time_reversed_for_flows_unitary_subset_matches_qec_inverse`
 - `time_reversed_for_flows_unitary_subset_supports_flow_past_end`
@@ -67,7 +70,7 @@ Implemented Rust tests:
 - `time_reversed_for_flows_measurement_rich_subset_rejects_unsatisfied_flows`
 - `time_reversed_for_flows_rejects_unpromoted_measurement_rich_terms`
 
-These tests cover measurement-record dependencies, pair-measurement records, observable dependencies from records and Pauli targets, sign-insensitive matching, unsigned single-flow and all-flow helper success and failure cases, empty all-flow batches, folded-repeat measurement references, unsigned `SPP`/`SPP_DAG` product propagation with false identity-flow rejection, exact measurement, reset, pair-measurement, nonconstant and constant `MPP`, pinned variable-target `SPP` and `SPP_DAG` unitary flow-generator examples with anti-Hermitian rejection, selected unitary-mixed composed measurement-rich instruction sequences, bounded repeat-contained measurement-rich instruction sequences, feedback, `MPAD`, and promoted heralded-noise MPP generators, generated-flow satisfaction checks for the supported checker subset, pinned Stim measurement-solver examples, scoped unitary flow time reversal, selected single-instruction measurement-rich flow time reversal for all promoted measurement bases, and negative cases ported from pinned Stim v1.16.0 `has_flow`, `has_all_flows`, `circuit_flow_generators`, and `circuit_inverse_qec` tests.
+These tests cover measurement-record dependencies, pair-measurement records, observable dependencies from records and Pauli targets, sign-insensitive matching, unsigned single-flow and all-flow helper success and failure cases, empty all-flow batches, folded-repeat measurement references, unsigned `SPP`/`SPP_DAG` product propagation with false identity-flow rejection, exact measurement, reset, pair-measurement, nonconstant and constant `MPP`, pinned variable-target `SPP` and `SPP_DAG` unitary flow-generator examples with anti-Hermitian rejection, selected unitary-mixed composed measurement-rich instruction sequences, bounded repeat-contained measurement-rich instruction sequences, feedback, `MPAD`, and promoted heralded-noise MPP generators, generated-flow satisfaction checks for the supported checker subset, pinned Stim measurement-solver examples for empty input, simple `MX`, measured-idle collapse, multi-target measurement and `MPP`, fewer-measurements heuristic, and repetition-code solving, scoped unitary flow time reversal, selected single-instruction measurement-rich flow time reversal for all promoted measurement bases, and negative cases ported from pinned Stim v1.16.0 `has_flow`, `has_all_flows`, `circuit_flow_generators`, and `circuit_inverse_qec` tests.
 
 ## Oracle Rows
 
@@ -77,6 +80,8 @@ Implemented row:
 - `pf5-has-all-flows-rust`
 - `pf5-flow-generators-measurement-rust`
 - `pf5-flow-solve-measurement-rust`
+- `pf5-flow-solve-measurement-python-rust`
+- `pf5-flow-solve-measurement-resource-rust`
 - `pf2-time-reverse-flow-unitary-rust`
 - `pf2-time-reverse-flow-measurement-rust`
 
@@ -91,6 +96,7 @@ Report-only runner coverage:
 - `pf5-has-all-flows-batch`
 - `pf5-flow-generators-measurement-rich`
 - `pf5-flow-solve-measurement-rich`
+- `pf5-flow-solve-measurement-python`
 - `pf2-time-reverse-flow`
 - `pf2-time-reverse-flow-measurement`
 
@@ -101,8 +107,16 @@ It reports `stab_pf5_flow_generators_measurement_cases`, normalized as cases per
 The refreshed corpus covers 36 cases and 120 generated flows per utility batch.
 The current focused report-only probe used `target/benchmarks/rpf5-spp-flow-generator-probe/baseline.json` and `target/benchmarks/rpf5-spp-flow-generator-compare/compare.json`.
 It measured `stab_pf5_flow_generators_measurement_cases` at `3.829e5 cases/s` and `stab_pf5_flow_generators_measurement_flows` at `1.279e6 flows/s`.
-The solver row measures the promoted `solve_for_flow_measurements` corpus through the Rust public helper.
+The C++ solver row measures the promoted C++ `solve_for_flow_measurements` examples through the Rust public helper.
 It reports `stab_pf5_flow_solve_measurement_cases`, normalized as cases per second, and `stab_pf5_flow_solve_measurement_queries`, normalized as queries per second.
+The refreshed C++ solver corpus covers 2 cases and 15 queried flows per utility batch.
+The current focused report-only C++ solver probe used `target/benchmarks/rpf5-flow-solve-cpp-probe/baseline.json` and `target/benchmarks/rpf5-flow-solve-cpp-compare/compare.json`.
+It measured `stab_pf5_flow_solve_measurement_cases` at `8.502e4 cases/s` and `stab_pf5_flow_solve_measurement_queries` at `6.340e5 queries/s`.
+The Python solver row measures the promoted Python `solve_flow_measurements` examples through the same Rust helper.
+It reports `stab_pf5_flow_solve_measurement_python_cases`, normalized as cases per second, and `stab_pf5_flow_solve_measurement_python_queries`, normalized as queries per second.
+The refreshed Python solver corpus covers 8 cases and 15 queried flows per utility batch.
+The current focused report-only Python solver probe used `target/benchmarks/rpf5-flow-solve-python-probe/baseline.json` and `target/benchmarks/rpf5-flow-solve-python-compare/compare.json`.
+It measured `stab_pf5_flow_solve_measurement_python_cases` at `1.175e5 cases/s` and `stab_pf5_flow_solve_measurement_python_queries` at `2.204e5 queries/s`.
 These rows remain `non-primary-report-only` because pinned Stim does not provide a faithful CLI timing ratio for this Rust utility surface, and they are not part of the 1.25x primary threshold file.
 The `pf2-time-reverse-flow` row measures the scoped unitary flow-transform bridge from the RPF2 side and remains report-only for the same reason.
 The `pf2-time-reverse-flow-measurement` row measures the selected single-instruction measurement-rich flow-transform bridge from the RPF2 side and remains report-only for the same reason.
@@ -117,16 +131,23 @@ Target checks for this slice:
 
 ```sh
 cargo test -p stab-core --test circuit_flows --quiet
+cargo test -p stab-core --test circuit_flows solve_for_flow_measurements --quiet
 cargo test -p stab-core --test circuit_flow_generators --quiet
 cargo test -p stab-core --test circuit_inverse_qec time_reversed_for_flows --quiet
 cargo test -p stab-core sparse_rev_frame_tracker --quiet
+cargo test -p stab-bench pf5:: --quiet
 cargo test -p stab-bench pf5::detector_utility_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-oracle fixtures --quiet
 cargo clippy -p stab-core -p stab-bench -p stab-oracle --all-targets -- -D warnings
 just oracle::run --milestone PF5
+just oracle::run --implemented-only
 just bench::smoke
 just bench::baseline --only pf5-flow-generators-measurement-rich --out target/benchmarks/rpf5-spp-flow-generator-probe
 just bench::compare --only pf5-flow-generators-measurement-rich --baseline target/benchmarks/rpf5-spp-flow-generator-probe/baseline.json --report target/benchmarks/rpf5-spp-flow-generator-compare
+just bench::baseline --only pf5-flow-solve-measurement-rich --out target/benchmarks/rpf5-flow-solve-cpp-probe
+just bench::compare --only pf5-flow-solve-measurement-rich --baseline target/benchmarks/rpf5-flow-solve-cpp-probe/baseline.json --report target/benchmarks/rpf5-flow-solve-cpp-compare
+just bench::baseline --only pf5-flow-solve-measurement-python --out target/benchmarks/rpf5-flow-solve-python-probe
+just bench::compare --only pf5-flow-solve-measurement-python --baseline target/benchmarks/rpf5-flow-solve-python-probe/baseline.json --report target/benchmarks/rpf5-flow-solve-python-compare
 just bench::baseline --only pf2-time-reverse-flow-measurement --out target/benchmarks/rpf2-time-reverse-flow-measurement-probe
 just bench::compare --only pf2-time-reverse-flow-measurement --baseline target/benchmarks/rpf2-time-reverse-flow-measurement-probe/baseline.json --report target/benchmarks/rpf2-time-reverse-flow-measurement-compare
 ```
@@ -157,6 +178,11 @@ The Rust/API reviewer reported no confirmed findings and noted residual non-bloc
 The docs and benchmark reviewer found a P2 oracle-filter gap where `pf5-flow-generators-measurement-rust` claimed SPP evidence but ran only tests matching `measurement`, plus a P3 stale roadmap summary at `docs/plans/rust-stim-drop-in-rewrite.md`.
 The positive SPP test was renamed into the oracle filter, `cargo test -p stab-core --test circuit_flow_generators measurement -- --list` now includes it, and the stale roadmap summary was corrected.
 The large-file pass records `crates/stab-core/src/circuit_flow/generators.rs` at 1193 lines after this slice, still under the 1200-line threshold but on the watch list for the next flow-generator change.
+The current solver-scope slice promotes pinned Python `solve_flow_measurements` examples for measured-idle collapse, multi-target measurement and `MPP`, and fewer-measurements heuristic cases into source-specific Rust `solve_for_flow_measurements` tests and report-only benchmark corpus.
+Milestone-audit for the current solver-scope slice found the promoted scope complete against the current PFM5 text: exact pinned examples are tested, oracle rows run source-specific filters, benchmark rows separate C++ and Python provenance, docs keep full generator-table solving open, and no new under-specification was found.
+Full-code-review used GPT-5.5/xhigh sidecars for Rust/API behavior and docs or benchmark alignment.
+The Rust/API reviewer found a P3 benchmark-work guard gap where the new test asserted hardcoded work units instead of deriving expected work from the actual corpus; `expected_flow_solve_measurement_work_for_test` now derives those counts from the selected row corpus and compares them to `measurement_work`.
+The docs and benchmark reviewer found P2 provenance and reproducibility gaps: Python-derived solver coverage was machine-recorded as C++-only, and the verification block initially omitted the focused Python solver benchmark commands. The oracle and benchmark rows are now split by upstream source, the PFM5 source list includes `circuit_flow_generators_test.py`, and the verification block names the focused Python solver benchmark commands.
 
 ## Remaining RPF5 Flow Work
 
