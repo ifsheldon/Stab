@@ -1,15 +1,17 @@
 # RPF3 Sweep And Gate Progress Report
 
-## Implemented Slice: `detect` Default-False Sweep Sampling
+## Implemented Slice: `detect` Default-False Sweep Sampling And Selected Feedback
 
 Stab now permits `detect` sampling to execute selected sweep-conditioned circuits by using omitted all-false sweep bits for the current non-frame sampler, detector-conversion subset, and frame-path Pauli-observable subset.
+The same frame-path subset now also accepts measurement-record `XCZ` or `YCZ` target feedback, treating it as X or Y feedback equivalent to `CX` or `CY` feedback.
 
 The implemented boundary is deliberately narrow:
 
 - `sample_detection_events` and `try_for_each_sampled_detection_event` compile non-frame circuits with sweep support and feed the detection converter an all-false sweep record.
 - The frame-path detector sampler treats sweep controls on `CX` and `CY` qubit targets as false no-ops when `detect` has no sweep input, follows Stim's `CZ` bit-target semantics by treating sweep/qubit pairs as false no-ops and bit/bit pairs as no-ops, and treats qubit/sweep `XCZ` or `YCZ` groups as false no-ops.
+- The frame-path detector sampler accepts `XCZ q rec[-k]` and `YCZ q rec[-k]` as measurement-record-controlled X and Y feedback, matching the equivalent `CX rec[-k] q` and `CY rec[-k] q` forms for the selected Pauli-observable detection surface.
 - `stab detect` accepts the same non-frame sweep-conditioned circuit shape through the public CLI.
-- `stab detect` also accepts selected frame-path Pauli-observable circuits with sweep-controlled `CX`, `CY`, `CZ`, qubit/sweep `XCZ`, and qubit/sweep `YCZ` groups plus `CZ` bit/bit no-op groups under the same omitted all-false semantics.
+- `stab detect` also accepts selected frame-path Pauli-observable circuits with sweep-controlled `CX`, `CY`, `CZ`, qubit/sweep `XCZ`, and qubit/sweep `YCZ` groups plus `CZ` bit/bit no-op groups under the same omitted all-false semantics, and accepts measurement-record `XCZ` or `YCZ` feedback in the selected frame path.
 - This slice does not add a Stab-specific sweep-input extension to `detect`, claim full sweep target-shape parity, or close analyzer sweep behavior beyond the selected no-op matrix and invalid target-position rejections. Pinned Stim v1.16.0 has no `stim detect --sweep` flag; typed detector-sampler sweep APIs are deferred to future Python or explicit Rust API work.
 
 ## Evidence
@@ -18,6 +20,8 @@ Oracle rows:
 
 - `pf3-detect-default-false-sweep-core` runs `cargo test -p stab-core detection_sampling_uses_all_false_default_sweep_bits`.
 - `pf3-detect-default-false-sweep-cli` runs `cargo test -p stab-cli detect_accepts_default_false`, covering both non-frame and selected frame-path CLI cases.
+- `pf3-detect-xcz-ycz-feedback-core` runs `cargo test -p stab-core detection_sampling_supports_xcz_ycz_measurement_feedback_frame_path`, covering selected frame-path measurement-record `XCZ` or `YCZ` feedback against equivalent `CX` or `CY` feedback.
+- `pf3-detect-xcz-ycz-feedback-cli` runs `cargo test -p stab-cli detect_accepts_frame_path_xcz_ycz_measurement_feedback`, covering public `stab detect` stdout, stderr, exit status, and seeded output equivalence for selected frame-path measurement-record `XCZ` or `YCZ` feedback.
 - `pf3-m2d-sweep-format-matrix-cli` runs `cargo test -p stab-cli m2d_accepts_sweep_records`, covering public `stab m2d --sweep_format` input records for `01`, `b8`, `r8`, `hits`, `dets`, and input-only `ptb64`.
 - `pf3-m2d-text-format-negative-cli` runs `cargo test -p stab-cli m2d_rejects_unterminated_text_records`, covering public `stab m2d` rejection of unterminated `01` measurement records and unterminated `01` or `hits` sweep records.
 - `pf3-analyze-errors-sweep-core` runs `cargo test -p stab-core --test dem_analyzer_classical sweep`, covering selected analyzer sweep no-op and invalid target-position cases.
@@ -32,9 +36,11 @@ Direct tests:
 
 - `detection_sampling_uses_all_false_default_sweep_bits` compares materialized and streaming non-frame detection sampling against an equivalent explicit all-false circuit.
 - `detection_sampling_uses_all_false_default_sweep_bits_frame_path` compares materialized and streaming frame-path Pauli-observable detection sampling against an equivalent explicit all-false circuit, including repeated sweep controls, `CZ` bit/bit no-op groups, and qubit/sweep `XCZ` or `YCZ` no-op groups.
+- `detection_sampling_supports_xcz_ycz_measurement_feedback_frame_path` compares materialized and streaming frame-path `XCZ` or `YCZ` measurement-record feedback against the equivalent `CX` or `CY` feedback circuit for two seeded measurement-producing setups.
 - `detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfaces` continues to validate unsupported sweep target shapes in converter and frame contexts, including preflight validation of frame-path controlled-Pauli target shapes.
 - `detect_accepts_default_false_sweep_conditioned_sampling` proves the public CLI accepts omitted all-false sweep sampling for a non-frame circuit.
 - `detect_accepts_default_false_frame_path_sweep_conditioned_sampling` proves the public CLI accepts omitted all-false sweep sampling for a frame-path Pauli-observable circuit.
+- `detect_accepts_frame_path_xcz_ycz_measurement_feedback` proves the public CLI accepts selected frame-path `XCZ` or `YCZ` measurement-record feedback and emits the same seeded output as the equivalent `CX` or `CY` feedback circuit.
 - `detect_rejects_invalid_frame_path_sweep_targets_before_opening_output` proves invalid frame-path sweep targets fail before `stab detect --out` opens or truncates the output path.
 - `m2d_accepts_sweep_records_in_all_text_and_byte_formats` proves public `stab m2d --sweep_format` accepts `01`, `b8`, `r8`, `hits`, and `dets` sweep records, skips Stim-valid blank `dets` lines, and preserves stdout, empty stderr, and successful exit behavior.
 - `m2d_accepts_sweep_records_in_ptb64_format` proves public `stab m2d --sweep_format=ptb64` accepts a complete 64-shot sweep group while `ptb64` remains an input-only format for `m2d`.
@@ -66,7 +72,7 @@ Benchmark row:
 
 - Broader `pf3-analyze-errors-sweep` coverage remains open for analyzer sweep behavior beyond the selected sweep-control no-op matrix and invalid target-position rejections. The public `m2d --sweep_format` input matrix for `01`, `b8`, `r8`, `hits`, `dets`, and input-only `ptb64` is now covered by `pf3-m2d-sweep-format-matrix-cli`.
 - Broader legal-gate execution remains open for remaining non-tableau legal operations and future execution surfaces; the fixed-tableau gate contract and sampler, detection-conversion, detector-frame, and analyzer SPP subset are now covered.
-- Broader frame-path sweep behavior remains open for unsupported sweep target placements and measurement-record `XCZ` or `YCZ` feedback. Any `detect --sweep` surface would be a Stab extension or future API decision, not a pinned Stim v1.16.0 CLI parity gap.
+- Broader frame-path sweep behavior remains open for unsupported sweep target placements. Any `detect --sweep` surface would be a Stab extension or future API decision, not a pinned Stim v1.16.0 CLI parity gap.
 
 ## Audit And Review Notes
 
@@ -74,3 +80,4 @@ Milestone audit found the slice complete against the selected PFM3 frame-path `d
 The GPT-5.5/xhigh docs and metadata sidecar found stale roadmap wording that still described frame-path sweep sampling as open; this report and `rust-stim-drop-in-rewrite.md` now identify the selected frame-path subset as implemented.
 The GPT-5.5/xhigh core sidecar found that unsupported frame-path sweep target shapes passed preflight validation and that `CZ` bit/bit groups were incorrectly treated as rejections instead of Stim-compatible no-ops; validation now rejects unsupported `CX` and `CY` bit targets before output files are opened, and `CZ` bit/bit groups are accepted as no-ops.
 The follow-up analyzer audit found the selected sweep-control matrix complete after adding public `stab analyze_errors` CLI evidence. The GPT-5.5/xhigh analyzer sidecar found no correctness issues and suggested extra classical-bit edge cases, which are now covered. The GPT-5.5/xhigh docs and metadata sidecar found stale report boundary text and missing public CLI evidence; the report boundary is reworded and `pf3-analyze-errors-sweep-cli` now proves stdout, stderr, and exit-status behavior.
+The follow-up frame-path feedback review found the initial oracle metadata overstated `XCZ` or `YCZ` feedback evidence under the existing default-false rows; dedicated `pf3-detect-xcz-ycz-feedback-core` and `pf3-detect-xcz-ycz-feedback-cli` rows now run the new feedback tests directly.

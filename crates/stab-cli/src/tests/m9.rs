@@ -80,6 +80,65 @@ fn detect_accepts_default_false_frame_path_sweep_conditioned_sampling() {
 }
 
 #[test]
+fn detect_accepts_frame_path_xcz_ycz_measurement_feedback() {
+    for measured_state in ["M 0", "X_ERROR(1) 0\nM 0"] {
+        let xcz_input = format!(
+            "R 0 1 2\n\
+             {measured_state}\n\
+             XCZ 1 rec[-1]\n\
+             YCZ 2 rec[-1]\n\
+             OBSERVABLE_INCLUDE(0) Z1\n\
+             OBSERVABLE_INCLUDE(1) Z2\n"
+        );
+        let cxy_input = format!(
+            "R 0 1 2\n\
+             {measured_state}\n\
+             CX rec[-1] 1\n\
+             CY rec[-1] 2\n\
+             OBSERVABLE_INCLUDE(0) Z1\n\
+             OBSERVABLE_INCLUDE(1) Z2\n"
+        );
+        let mut xcz_stdout = Vec::new();
+        let mut xcz_stderr = Vec::new();
+        let xcz_status = run_from(
+            [
+                "stab",
+                "detect",
+                "--shots",
+                "3",
+                "--append_observables",
+                "--seed=7",
+            ],
+            xcz_input.as_bytes(),
+            &mut xcz_stdout,
+            &mut xcz_stderr,
+        );
+        let mut cxy_stdout = Vec::new();
+        let mut cxy_stderr = Vec::new();
+        let cxy_status = run_from(
+            [
+                "stab",
+                "detect",
+                "--shots",
+                "3",
+                "--append_observables",
+                "--seed=7",
+            ],
+            cxy_input.as_bytes(),
+            &mut cxy_stdout,
+            &mut cxy_stderr,
+        );
+
+        assert_eq!(xcz_status, 0);
+        assert_eq!(cxy_status, 0);
+        assert_eq!(String::from_utf8(xcz_stderr).unwrap(), "");
+        assert_eq!(String::from_utf8(cxy_stderr).unwrap(), "");
+        assert_eq!(xcz_stdout, cxy_stdout);
+        assert!(!xcz_stdout.is_empty());
+    }
+}
+
+#[test]
 fn detect_rejects_invalid_frame_path_sweep_targets_before_opening_output() {
     let temp_dir = tempdir().expect("temp dir");
     let output_path = temp_dir.path().join("detectors.01");

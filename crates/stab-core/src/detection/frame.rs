@@ -138,6 +138,9 @@ fn validate_frame_x_or_y_controlled_z_targets(
         if left.qubit_id().is_some() && right.qubit_id().is_some() {
             continue;
         }
+        if left.qubit_id().is_some() && right.measurement_record_offset().is_some() {
+            continue;
+        }
         if left.qubit_id().is_some() && right.is_sweep_bit_target() {
             continue;
         }
@@ -651,12 +654,23 @@ impl ScalarDetectionFrame {
     }
 
     fn apply_x_or_y_controlled_z(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let feedback_basis = match instruction.gate().canonical_name() {
+            "XCZ" => PauliBasis::X,
+            "YCZ" => PauliBasis::Y,
+            _ => return Err(unsupported_frame_instruction(instruction)),
+        };
         for target_group in instruction.target_groups() {
             let [left, right] = target_group else {
                 return Err(unsupported_frame_instruction(instruction));
             };
             if left.qubit_id().is_some() && right.is_sweep_bit_target() {
                 // `detect` has no sweep input. Omitted sweep bits use all-false Stim semantics.
+                continue;
+            }
+            if let (Some(_), Some(offset)) = (left.qubit_id(), right.measurement_record_offset()) {
+                if measurement_record_bit(&self.measurements, offset)? {
+                    self.apply_pauli(qubit_index(instruction, left)?, feedback_basis)?;
+                }
                 continue;
             }
             if left.qubit_id().is_some() && right.qubit_id().is_some() {

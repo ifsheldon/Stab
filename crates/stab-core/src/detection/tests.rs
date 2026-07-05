@@ -472,11 +472,11 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
             "CX",
         ),
         (
-            "RX 0\nMX 0\nXCZ 0 rec[-1]\nOBSERVABLE_INCLUDE(0) X0\n",
+            "RX 0\nMX 0\nXCZ rec[-1] 0\nOBSERVABLE_INCLUDE(0) X0\n",
             "XCZ",
         ),
         (
-            "RX 0\nMX 0\nYCZ 0 rec[-1]\nOBSERVABLE_INCLUDE(0) X0\n",
+            "RX 0\nMX 0\nYCZ rec[-1] 0\nOBSERVABLE_INCLUDE(0) X0\n",
             "YCZ",
         ),
     ] {
@@ -548,6 +548,53 @@ fn detection_sampling_uses_all_false_default_sweep_bits_frame_path() {
     })
     .expect("stream frame sweep sampling");
     assert_eq!(streamed, sweep_output.records);
+}
+
+#[test]
+fn detection_sampling_supports_xcz_ycz_measurement_feedback_frame_path() {
+    for measured_state in ["M 0", "X_ERROR(1) 0\nM 0"] {
+        let feedback_circuit = Circuit::from_stim_str(&format!(
+            "R 0 1 2\n\
+             {measured_state}\n\
+             XCZ 1 rec[-1]\n\
+             YCZ 2 rec[-1]\n\
+             OBSERVABLE_INCLUDE(0) Z1\n\
+             OBSERVABLE_INCLUDE(1) Z2\n"
+        ))
+        .expect("parse feedback circuit");
+        let explicit_circuit = Circuit::from_stim_str(&format!(
+            "R 0 1 2\n\
+             {measured_state}\n\
+             CX rec[-1] 1\n\
+             CY rec[-1] 2\n\
+             OBSERVABLE_INCLUDE(0) Z1\n\
+             OBSERVABLE_INCLUDE(1) Z2\n"
+        ))
+        .expect("parse equivalent feedback circuit");
+
+        validate_detection_sampling_circuit(&feedback_circuit).expect("validate feedback circuit");
+        assert_eq!(
+            measurement_record_count(&feedback_circuit).expect("feedback measurement count"),
+            measurement_record_count(&explicit_circuit).expect("equivalent measurement count")
+        );
+        assert_eq!(
+            detection_record_width(&feedback_circuit).expect("feedback detection width"),
+            detection_record_width(&explicit_circuit).expect("equivalent detection width")
+        );
+        let feedback_output = sample_detection_events(&feedback_circuit, 16, Some(7))
+            .expect("sample feedback circuit");
+        let explicit_output = sample_detection_events(&explicit_circuit, 16, Some(7))
+            .expect("sample equivalent feedback");
+        assert_eq!(feedback_output.records, explicit_output.records);
+
+        let mut streamed = Vec::new();
+        try_for_each_sampled_detection_event(&feedback_circuit, 16, Some(7), |record| {
+            streamed.push(record.clone());
+            Ok::<(), CircuitError>(())
+        })
+        .expect("stream feedback circuit");
+        assert_eq!(streamed, feedback_output.records);
+    }
 }
 
 #[test]
