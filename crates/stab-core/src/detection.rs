@@ -1,8 +1,9 @@
 mod frame;
 
 use frame::{
-    circuit_has_pauli_observable_targets, sample_detection_events_with_frame,
-    try_for_each_detection_event_with_frame, validate_frame_detection_circuit,
+    circuit_has_pauli_observable_targets, frame_execution_circuit,
+    sample_detection_events_with_frame, try_for_each_detection_event_with_frame,
+    validate_frame_detection_circuit,
 };
 
 use crate::{
@@ -405,11 +406,11 @@ where
 }
 
 pub fn measurement_record_count(circuit: &Circuit) -> CircuitResult<usize> {
-    Ok(ConversionPlan::from_circuit(circuit)?.measurement_count)
+    Ok(detection_conversion_plan(circuit)?.measurement_count)
 }
 
 pub fn detection_record_width(circuit: &Circuit) -> CircuitResult<usize> {
-    ConversionPlan::from_circuit(circuit)?.output_bit_count()
+    detection_conversion_plan(circuit)?.output_bit_count()
 }
 
 pub fn validate_detection_sampling_circuit(circuit: &Circuit) -> CircuitResult<()> {
@@ -420,6 +421,15 @@ pub fn validate_detection_sampling_circuit(circuit: &Circuit) -> CircuitResult<(
         CompiledSampler::compile_allowing_sweep(circuit)?;
         Ok(())
     }
+}
+
+fn detection_conversion_plan(circuit: &Circuit) -> CircuitResult<ConversionPlan> {
+    if circuit_has_pauli_observable_targets(circuit) {
+        let executable = frame_execution_circuit(circuit)?;
+        validate_frame_detection_circuit(&executable)?;
+        return ConversionPlan::from_circuit(&executable);
+    }
+    ConversionPlan::from_circuit(circuit)
 }
 
 pub fn write_detection_records(

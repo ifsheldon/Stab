@@ -77,6 +77,7 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
         "SPP" | "SPP_DAG" => validate_decomposed_frame_instruction(instruction),
         "CX" | "CY" => validate_frame_controlled_pauli_targets(instruction),
         "CZ" => validate_frame_cz_targets(instruction),
+        "XCZ" | "YCZ" => validate_frame_x_or_y_controlled_z_targets(instruction),
         name if crate::circuit_tableau::gate_tableau(name).is_ok() => Ok(()),
         _ if zero_probability_noise(instruction)? => Ok(()),
         name => Err(CircuitError::invalid_sampler_compilation(format!(
@@ -127,6 +128,24 @@ fn validate_frame_cz_targets(instruction: &CircuitInstruction) -> CircuitResult<
     Ok(())
 }
 
+fn validate_frame_x_or_y_controlled_z_targets(
+    instruction: &CircuitInstruction,
+) -> CircuitResult<()> {
+    for target_group in instruction.target_groups() {
+        let [left, right] = target_group else {
+            return Err(unsupported_frame_instruction(instruction));
+        };
+        if left.qubit_id().is_some() && right.qubit_id().is_some() {
+            continue;
+        }
+        if left.qubit_id().is_some() && right.is_sweep_bit_target() {
+            continue;
+        }
+        return Err(unsupported_frame_instruction(instruction));
+    }
+    Ok(())
+}
+
 pub(super) fn sample_detection_events_with_frame(
     circuit: &Circuit,
     shots: usize,
@@ -170,7 +189,7 @@ where
     })
 }
 
-fn frame_execution_circuit(circuit: &Circuit) -> CircuitResult<Circuit> {
+pub(super) fn frame_execution_circuit(circuit: &Circuit) -> CircuitResult<Circuit> {
     let mut result = Circuit::new();
     append_frame_execution_circuit(circuit, &mut result)?;
     Ok(result)
@@ -184,7 +203,11 @@ fn append_frame_execution_circuit(circuit: &Circuit, result: &mut Circuit) -> Ci
             {
                 result.append_circuit(&decomposed_frame_instruction(instruction)?);
             }
-            CircuitItem::Instruction(instruction) => result.append_instruction(instruction.clone()),
+            CircuitItem::Instruction(instruction) => {
+                if let Some(instruction) = frame_execution_instruction(instruction)? {
+                    result.append_instruction(instruction);
+                }
+            }
             CircuitItem::RepeatBlock(repeat) => {
                 let body = frame_execution_circuit(repeat.body())?;
                 result.append_repeat_block(RepeatBlock::new(
@@ -196,6 +219,34 @@ fn append_frame_execution_circuit(circuit: &Circuit, result: &mut Circuit) -> Ci
         }
     }
     Ok(())
+}
+
+fn frame_execution_instruction(
+    instruction: &CircuitInstruction,
+) -> CircuitResult<Option<CircuitInstruction>> {
+    if !matches!(instruction.gate().canonical_name(), "XCZ" | "YCZ") {
+        return Ok(Some(instruction.clone()));
+    }
+
+    let mut targets = Vec::new();
+    for target_group in instruction.target_groups() {
+        let [left, right] = target_group else {
+            return Ok(Some(instruction.clone()));
+        };
+        if left.qubit_id().is_some() && right.is_sweep_bit_target() {
+            continue;
+        }
+        targets.extend(target_group.iter().cloned());
+    }
+    if targets.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(CircuitInstruction::new(
+        instruction.gate(),
+        instruction.args().to_vec(),
+        targets,
+        instruction.tag().map(ToOwned::to_owned),
+    )?))
 }
 
 fn sample_detection_events_with_frame_plan<E, F>(
@@ -312,6 +363,7 @@ impl ScalarDetectionFrame {
             "CX" => self.apply_controlled_or_feedback(instruction, PauliBasis::X),
             "CY" => self.apply_controlled_or_feedback(instruction, PauliBasis::Y),
             "CZ" => self.apply_cz_or_feedback(instruction),
+            "XCZ" | "YCZ" => self.apply_x_or_y_controlled_z(instruction),
             "X_ERROR" => self.apply_single_pauli_noise(
                 instruction,
                 [single_probability_argument(instruction)?.get(), 0.0, 0.0],
@@ -594,6 +646,24 @@ impl ScalarDetectionFrame {
                     self.apply_tableau_targets(instruction.gate().canonical_name(), target_group)?
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn apply_x_or_y_controlled_z(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        for target_group in instruction.target_groups() {
+            let [left, right] = target_group else {
+                return Err(unsupported_frame_instruction(instruction));
+            };
+            if left.qubit_id().is_some() && right.is_sweep_bit_target() {
+                // `detect` has no sweep input. Omitted sweep bits use all-false Stim semantics.
+                continue;
+            }
+            if left.qubit_id().is_some() && right.qubit_id().is_some() {
+                self.apply_tableau_targets(instruction.gate().canonical_name(), target_group)?;
+                continue;
+            }
+            return Err(unsupported_frame_instruction(instruction));
         }
         Ok(())
     }

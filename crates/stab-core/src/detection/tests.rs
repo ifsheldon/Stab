@@ -471,6 +471,14 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
             "RX 0\nMX 0\nCX rec[-1] sweep[0]\nOBSERVABLE_INCLUDE(0) X0\n",
             "CX",
         ),
+        (
+            "RX 0\nMX 0\nXCZ 0 rec[-1]\nOBSERVABLE_INCLUDE(0) X0\n",
+            "XCZ",
+        ),
+        (
+            "RX 0\nMX 0\nYCZ 0 rec[-1]\nOBSERVABLE_INCLUDE(0) X0\n",
+            "YCZ",
+        ),
     ] {
         let unsupported_frame_shape =
             Circuit::from_stim_str(source).expect("parse unsupported frame sweep shape");
@@ -497,23 +505,36 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
 fn detection_sampling_uses_all_false_default_sweep_bits_frame_path() {
     let sweep_circuit = Circuit::from_stim_str(
         "RX 0\n\
+         RX 1\n\
          CX sweep[0] 0\n\
          CY sweep[1] 0\n\
          CZ 0 sweep[2]\n\
          CZ sweep[3] 0\n\
          CZ sweep[4] sweep[5]\n\
+         XCZ 0 1 0 sweep[6]\n\
+         YCZ 0 1 0 sweep[7]\n\
          MX 0\n\
-         CZ rec[-1] sweep[6]\n\
+         CZ rec[-1] sweep[8]\n\
          REPEAT 2 {\n\
-             CX sweep[7] 0\n\
+             CX sweep[9] 0\n\
+             XCZ 0 sweep[10]\n\
          }\n\
          OBSERVABLE_INCLUDE(0) X0\n",
     )
     .expect("parse frame-path sweep-conditioned circuit");
-    let explicit_false_circuit = Circuit::from_stim_str("RX 0\nMX 0\nOBSERVABLE_INCLUDE(0) X0\n")
-        .expect("parse explicit circuit");
+    let explicit_false_circuit =
+        Circuit::from_stim_str("RX 0\nRX 1\nXCZ 0 1\nYCZ 0 1\nMX 0\nOBSERVABLE_INCLUDE(0) X0\n")
+            .expect("parse explicit circuit");
 
     validate_detection_sampling_circuit(&sweep_circuit).expect("validate frame sweep sampling");
+    assert_eq!(
+        measurement_record_count(&sweep_circuit).expect("sweep measurement count"),
+        measurement_record_count(&explicit_false_circuit).expect("explicit measurement count")
+    );
+    assert_eq!(
+        detection_record_width(&sweep_circuit).expect("sweep detection width"),
+        detection_record_width(&explicit_false_circuit).expect("explicit detection width")
+    );
     let sweep_output =
         sample_detection_events(&sweep_circuit, 32, Some(5)).expect("sample frame sweep circuit");
     let explicit_false_output = sample_detection_events(&explicit_false_circuit, 32, Some(5))

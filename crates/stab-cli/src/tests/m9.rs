@@ -69,7 +69,7 @@ fn detect_accepts_default_false_frame_path_sweep_conditioned_sampling() {
     let mut stderr = Vec::new();
     let status = run_from(
         ["stab", "detect", "--shots", "3", "--append_observables"],
-        b"RX 0\nCX sweep[0] 0\nCY sweep[1] 0\nCZ 0 sweep[2]\nOBSERVABLE_INCLUDE(0) X0\n".as_slice(),
+        b"RX 0\nCX sweep[0] 0\nCY sweep[1] 0\nCZ 0 sweep[2]\nXCZ 0 sweep[3]\nYCZ 0 sweep[4]\nOBSERVABLE_INCLUDE(0) X0\n".as_slice(),
         &mut stdout,
         &mut stderr,
     );

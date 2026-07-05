@@ -7,9 +7,9 @@ Stab now permits `detect` sampling to execute selected sweep-conditioned circuit
 The implemented boundary is deliberately narrow:
 
 - `sample_detection_events` and `try_for_each_sampled_detection_event` compile non-frame circuits with sweep support and feed the detection converter an all-false sweep record.
-- The frame-path detector sampler treats sweep controls on `CX` and `CY` qubit targets as false no-ops when `detect` has no sweep input, and follows Stim's `CZ` bit-target semantics by treating sweep/qubit pairs as false no-ops and bit/bit pairs as no-ops.
+- The frame-path detector sampler treats sweep controls on `CX` and `CY` qubit targets as false no-ops when `detect` has no sweep input, follows Stim's `CZ` bit-target semantics by treating sweep/qubit pairs as false no-ops and bit/bit pairs as no-ops, and treats qubit/sweep `XCZ` or `YCZ` groups as false no-ops.
 - `stab detect` accepts the same non-frame sweep-conditioned circuit shape through the public CLI.
-- `stab detect` also accepts selected frame-path Pauli-observable circuits with sweep-controlled `CX`, `CY`, and `CZ` gates plus `CZ` bit/bit no-op groups under the same omitted all-false semantics.
+- `stab detect` also accepts selected frame-path Pauli-observable circuits with sweep-controlled `CX`, `CY`, `CZ`, qubit/sweep `XCZ`, and qubit/sweep `YCZ` groups plus `CZ` bit/bit no-op groups under the same omitted all-false semantics.
 - This slice does not add a Stab-specific sweep-input extension to `detect`, claim full sweep target-shape parity, or close analyzer sweep behavior beyond the selected no-op matrix and invalid target-position rejections. Pinned Stim v1.16.0 has no `stim detect --sweep` flag; typed detector-sampler sweep APIs are deferred to future Python or explicit Rust API work.
 
 ## Evidence
@@ -31,7 +31,7 @@ Oracle rows:
 Direct tests:
 
 - `detection_sampling_uses_all_false_default_sweep_bits` compares materialized and streaming non-frame detection sampling against an equivalent explicit all-false circuit.
-- `detection_sampling_uses_all_false_default_sweep_bits_frame_path` compares materialized and streaming frame-path Pauli-observable detection sampling against an equivalent explicit all-false circuit, including repeated sweep controls and `CZ` bit/bit no-op groups.
+- `detection_sampling_uses_all_false_default_sweep_bits_frame_path` compares materialized and streaming frame-path Pauli-observable detection sampling against an equivalent explicit all-false circuit, including repeated sweep controls, `CZ` bit/bit no-op groups, and qubit/sweep `XCZ` or `YCZ` no-op groups.
 - `detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfaces` continues to validate unsupported sweep target shapes in converter and frame contexts, including preflight validation of frame-path controlled-Pauli target shapes.
 - `detect_accepts_default_false_sweep_conditioned_sampling` proves the public CLI accepts omitted all-false sweep sampling for a non-frame circuit.
 - `detect_accepts_default_false_frame_path_sweep_conditioned_sampling` proves the public CLI accepts omitted all-false sweep sampling for a frame-path Pauli-observable circuit.
@@ -66,7 +66,7 @@ Benchmark row:
 
 - Broader `pf3-analyze-errors-sweep` coverage remains open for analyzer sweep behavior beyond the selected sweep-control no-op matrix and invalid target-position rejections. The public `m2d --sweep_format` input matrix for `01`, `b8`, `r8`, `hits`, `dets`, and input-only `ptb64` is now covered by `pf3-m2d-sweep-format-matrix-cli`.
 - Broader legal-gate execution remains open for remaining non-tableau legal operations and future execution surfaces; the fixed-tableau gate contract and sampler, detection-conversion, detector-frame, and analyzer SPP subset are now covered.
-- Broader frame-path sweep behavior remains open for unsupported sweep target placements. Any `detect --sweep` surface would be a Stab extension or future API decision, not a pinned Stim v1.16.0 CLI parity gap.
+- Broader frame-path sweep behavior remains open for unsupported sweep target placements and measurement-record `XCZ` or `YCZ` feedback. Any `detect --sweep` surface would be a Stab extension or future API decision, not a pinned Stim v1.16.0 CLI parity gap.
 
 ## Audit And Review Notes
 
