@@ -210,6 +210,73 @@ fn pf5_missing_detectors_clifford_rejects_non_plain_unitary_targets()
 }
 
 #[test]
+fn pf5_missing_detectors_repeat_tracks_deterministic_measurements()
+-> Result<(), Box<dyn std::error::Error>> {
+    require_missing_eq(
+        "R 0\nREPEAT 3 {\n    M 0\n}\n",
+        true,
+        "DETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+        "three repeated deterministic measurements",
+    )?;
+    require_missing_eq(
+        "R 0\nREPEAT 2 {\n    M 0\n    DETECTOR rec[-1]\n}\n",
+        true,
+        "",
+        "repeat body covers each deterministic measurement",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn pf5_missing_detectors_repeat_handles_nested_rows_and_known_rows()
+-> Result<(), Box<dyn std::error::Error>> {
+    require_missing_eq(
+        "R 0\nREPEAT 2 {\n    REPEAT 2 {\n        M 0\n    }\n}\nDETECTOR rec[-1]\n",
+        true,
+        "DETECTOR rec[-4]\nDETECTOR rec[-3]\nDETECTOR rec[-2]\n",
+        "nested repeats with final known row",
+    )?;
+    require_missing_eq(
+        "R 0\nREPEAT 2 {\n    M 0\n}\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+        true,
+        "DETECTOR rec[-2]\n",
+        "repeat rows reduced against observable row",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn pf5_missing_detectors_repeat_rejects_excessive_expansion()
+-> Result<(), Box<dyn std::error::Error>> {
+    let circuit = Circuit::from_stim_str("REPEAT 1000001 {\n    M 0\n}\n")?;
+    let Err(error) = missing_detectors(
+        &circuit,
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements: true,
+        },
+    ) else {
+        return Err(std::io::Error::other("expected excessive repeat expansion rejection").into());
+    };
+    if !error.to_string().contains("expanded repeat iterations") {
+        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
+    }
+
+    let circuit = Circuit::from_stim_str("REPEAT 1000000 {\n    M 0 1\n}\n")?;
+    let Err(error) = missing_detectors(
+        &circuit,
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements: true,
+        },
+    ) else {
+        return Err(std::io::Error::other("expected excessive repeat work-unit rejection").into());
+    };
+    if !error.to_string().contains("expanded work units") {
+        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
+    }
+    Ok(())
+}
+
+#[test]
 fn missing_detectors_supports_honeycomb_generated_code_suffix()
 -> Result<(), Box<dyn std::error::Error>> {
     // Adapted from Stim v1.16.0 src/stim/util_top/missing_detectors.test.cc.
