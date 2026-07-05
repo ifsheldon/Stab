@@ -556,14 +556,14 @@ fn time_reversed_for_flows_measurement_rich_subset_rejects_noisy_measurements() 
 }
 
 #[test]
-fn time_reversed_for_flows_measurement_rich_subset_rejects_unpromoted_reset_shapes() {
+fn time_reversed_for_flows_measurement_rich_subset_rejects_duplicate_reset_targets() {
     for (circuit_text, input_flow) in [
         ("R 0 0\n", "1 -> Z0"),
         ("RX 0 0\n", "1 -> X0"),
         ("RY 0 0\n", "1 -> Y0"),
     ] {
         let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
-            .expect_err("unpromoted reset-only flow rewrites are not in the scoped subset")
+            .expect_err("duplicate reset-only flow rewrites are not in the scoped subset")
             .to_string();
 
         assert!(
