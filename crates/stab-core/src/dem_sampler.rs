@@ -7,26 +7,22 @@ use crate::{
     dem::MAX_DEM_REPEAT_NESTING,
 };
 
-const MAX_DEM_SAMPLER_REPEAT_UNROLL: u64 = 100_000;
-const MAX_DEM_SAMPLER_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
-const MAX_DEM_SAMPLER_REPEAT_ITERATIONS: u64 = 1_000_000;
 const MAX_DEM_SAMPLER_BUFFER_UNITS: usize = 64_000_000;
 const MAX_DEM_SAMPLER_BUFFER_BYTES: usize = 64 * 1024 * 1024;
+const MAX_DEM_SAMPLER_SAMPLE_ERROR_APPLICATIONS: usize = 64_000_000;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledDemSampler {
     detector_count: usize,
     observable_count: usize,
-    operations: Vec<DemSampleOperation>,
+    operations: DemSampleBlock,
 }
 
 impl CompiledDemSampler {
     pub fn compile(model: &DetectorErrorModel) -> CircuitResult<Self> {
-        validate_compile_budget(model.items())?;
+        let operations = compile_items(model.items(), 0)?;
         let detector_count = usize_from_u64(model.count_detectors()?, "detector count")?;
         let observable_count = usize_from_u64(model.count_observables()?, "observable count")?;
-        let mut operations = Vec::new();
-        compile_items(model.items(), 0, &mut operations)?;
         Ok(Self {
             detector_count,
             observable_count,
@@ -60,7 +56,7 @@ impl CompiledDemSampler {
     }
 
     pub fn error_count(&self) -> usize {
-        self.operations.len()
+        self.operations.error_count
     }
 
     pub fn validate_sample_buffer_units(
@@ -77,7 +73,7 @@ impl CompiledDemSampler {
                 )
             })?;
         if include_error_records {
-            units_per_shot = units_per_shot.checked_add(self.operations.len()).ok_or_else(|| {
+            units_per_shot = units_per_shot.checked_add(self.error_count()).ok_or_else(|| {
                 CircuitError::invalid_sampler_compilation(
                     "DEM sampler output and error width overflowed while validating buffer size",
                 )
@@ -123,7 +119,7 @@ impl CompiledDemSampler {
         if include_error_records {
             bytes = bytes
                 .checked_add(std::mem::size_of::<Vec<bool>>())
-                .and_then(|value| value.checked_add(self.operations.len()))
+                .and_then(|value| value.checked_add(self.error_count()))
                 .ok_or_else(|| {
                     CircuitError::invalid_sampler_compilation(
                         "DEM sampler per-shot error byte size overflowed",
@@ -131,6 +127,21 @@ impl CompiledDemSampler {
                 })?;
         }
         Ok(bytes.max(1))
+    }
+
+    fn validate_sample_work_units(&self, shots: usize) -> CircuitResult<()> {
+        if self.error_count() == 0 || shots == 0 {
+            return Ok(());
+        }
+        let work_units = shots.checked_mul(self.error_count()).ok_or_else(|| {
+            CircuitError::invalid_sampler_compilation("DEM sampler sample work overflowed")
+        })?;
+        if work_units > MAX_DEM_SAMPLER_SAMPLE_ERROR_APPLICATIONS {
+            return Err(CircuitError::invalid_sampler_compilation(format!(
+                "DEM sampler would apply {work_units} sampled errors; current limit is {MAX_DEM_SAMPLER_SAMPLE_ERROR_APPLICATIONS}"
+            )));
+        }
+        Ok(())
     }
 
     pub fn sample_detection_events_and_errors_with_seed(
@@ -190,9 +201,14 @@ impl CompiledDemSampler {
         E: From<CircuitError>,
         F: FnMut(&DetectionEventRecord) -> Result<(), E>,
     {
-        self.try_for_each_detection_event_and_error_with_seed(shots, seed, |record, _error| {
-            visit(record)
-        })
+        self.validate_sample_work_units(shots)?;
+        let mut rng = dem_sampler_rng(seed);
+        let mut record = self.reusable_detection_record();
+        for _ in 0..shots {
+            self.sample_detection_record_into(&mut rng, &mut record)?;
+            visit(&record)?;
+        }
+        Ok(())
     }
 
     pub fn try_for_each_detection_event_and_error_with_seed<E, F>(
@@ -205,12 +221,17 @@ impl CompiledDemSampler {
         E: From<CircuitError>,
         F: FnMut(&DetectionEventRecord, &[bool]) -> Result<(), E>,
     {
+        self.validate_sample_buffer_units(1, true)?;
+        self.validate_sample_work_units(shots)?;
         let mut rng = dem_sampler_rng(seed);
-        let mut error_record = Vec::with_capacity(self.operations.len());
+        let mut error_record = Vec::with_capacity(self.error_count());
         let mut record = self.reusable_detection_record();
         for _ in 0..shots {
-            self.sample_error_record_into(&mut rng, &mut error_record);
-            self.detection_record_from_error_record_into(&error_record, &mut record)?;
+            self.sample_detection_record_and_error_record_into(
+                &mut rng,
+                &mut record,
+                &mut error_record,
+            )?;
             visit(&record, &error_record)?;
         }
         Ok(())
@@ -242,16 +263,42 @@ impl CompiledDemSampler {
         }
     }
 
-    fn sample_error_record_into<R>(&self, rng: &mut R, error_record: &mut Vec<bool>)
+    fn sample_detection_record_into<R>(
+        &self,
+        rng: &mut R,
+        record: &mut DetectionEventRecord,
+    ) -> CircuitResult<()>
     where
         R: Rng,
     {
+        reset_detection_record(record, self.detector_count, self.observable_count);
+        sample_block_into(
+            &self.operations,
+            0,
+            rng,
+            record,
+            SampledErrorOutput::Discard,
+        )
+    }
+
+    fn sample_detection_record_and_error_record_into<R>(
+        &self,
+        rng: &mut R,
+        record: &mut DetectionEventRecord,
+        error_record: &mut Vec<bool>,
+    ) -> CircuitResult<()>
+    where
+        R: Rng,
+    {
+        reset_detection_record(record, self.detector_count, self.observable_count);
         error_record.clear();
-        error_record.extend(
-            self.operations
-                .iter()
-                .map(|operation| operation.sample_occurs(rng)),
-        );
+        sample_block_into(
+            &self.operations,
+            0,
+            rng,
+            record,
+            SampledErrorOutput::Record(error_record),
+        )
     }
 
     fn validate_error_record_width(
@@ -259,19 +306,19 @@ impl CompiledDemSampler {
         error_record: &[bool],
         shot_index: Option<usize>,
     ) -> CircuitResult<()> {
-        if error_record.len() == self.operations.len() {
+        if error_record.len() == self.error_count() {
             return Ok(());
         }
         if let Some(shot_index) = shot_index {
             return Err(CircuitError::invalid_result_format(format!(
                 "DEM error record {shot_index} expected {} bits, got {}",
-                self.operations.len(),
+                self.error_count(),
                 error_record.len()
             )));
         }
         Err(CircuitError::invalid_result_format(format!(
             "DEM error record expected {} bits, got {}",
-            self.operations.len(),
+            self.error_count(),
             error_record.len()
         )))
     }
@@ -282,74 +329,46 @@ impl CompiledDemSampler {
         record: &mut DetectionEventRecord,
     ) -> CircuitResult<()> {
         self.validate_error_record_width(error_record, None)?;
-        record.detectors.clear();
-        record.detectors.resize(self.detector_count, false);
-        record.observables.clear();
-        record.observables.resize(self.observable_count, false);
-        for (operation, occurred) in self.operations.iter().zip(error_record) {
-            if !occurred {
-                continue;
-            }
-            for detector in &operation.detectors {
-                toggle_bit(&mut record.detectors, *detector, "detector")?;
-            }
-            for observable in &operation.observables {
-                toggle_bit(&mut record.observables, *observable, "observable")?;
-            }
+        reset_detection_record(record, self.detector_count, self.observable_count);
+        let mut cursor = 0;
+        apply_error_record_block(&self.operations, 0, error_record, &mut cursor, record)?;
+        if cursor != error_record.len() {
+            return Err(CircuitError::invalid_result_format(
+                "DEM error record had unused trailing bits",
+            ));
         }
         Ok(())
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct DemSamplerCompileBudget {
-    expanded_instructions: u64,
-    repeat_iterations: u64,
-}
-
-impl DemSamplerCompileBudget {
-    fn add_expanded_instructions(&mut self, count: u64) -> CircuitResult<()> {
-        self.expanded_instructions =
-            self.expanded_instructions
-                .checked_add(count)
-                .ok_or_else(|| {
-                    CircuitError::invalid_sampler_compilation(
-                        "DEM sampler expanded instruction count overflowed",
-                    )
-                })?;
-        if self.expanded_instructions > MAX_DEM_SAMPLER_EXPANDED_INSTRUCTIONS {
-            return Err(CircuitError::invalid_sampler_compilation(format!(
-                "DEM sampler currently supports at most {MAX_DEM_SAMPLER_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
-                self.expanded_instructions
-            )));
-        }
-        Ok(())
-    }
-
-    fn add_repeat_iterations(&mut self, count: u64) -> CircuitResult<()> {
-        self.repeat_iterations = self.repeat_iterations.checked_add(count).ok_or_else(|| {
-            CircuitError::invalid_sampler_compilation(
-                "DEM sampler repeat iteration count overflowed",
-            )
-        })?;
-        if self.repeat_iterations > MAX_DEM_SAMPLER_REPEAT_ITERATIONS {
-            return Err(CircuitError::invalid_sampler_compilation(format!(
-                "DEM sampler currently supports at most {MAX_DEM_SAMPLER_REPEAT_ITERATIONS} expanded repeat iterations, got at least {}",
-                self.repeat_iterations
-            )));
-        }
-        Ok(())
-    }
+#[derive(Clone, Debug, Default, PartialEq)]
+struct DemSampleBlock {
+    operations: Vec<DemSampleOperation>,
+    detector_shift: u64,
+    error_count: usize,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct DemSampleOperation {
+enum DemSampleOperation {
+    Error(DemSampleError),
+    Repeat(DemSampleRepeat),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct DemSampleError {
     probability: f64,
-    detectors: Vec<usize>,
+    detectors: Vec<u64>,
     observables: Vec<usize>,
 }
 
-impl DemSampleOperation {
+#[derive(Clone, Debug, PartialEq)]
+struct DemSampleRepeat {
+    start_detector_shift: u64,
+    repeat_count: u64,
+    body: DemSampleBlock,
+}
+
+impl DemSampleError {
     fn sample_occurs<R>(&self, rng: &mut R) -> bool
     where
         R: Rng,
@@ -364,61 +383,18 @@ impl DemSampleOperation {
     }
 }
 
-fn validate_compile_budget(items: &[DemItem]) -> CircuitResult<()> {
-    let mut budget = DemSamplerCompileBudget::default();
-    validate_compile_budget_items(items, 1, 0, &mut budget)
-}
-
-fn validate_compile_budget_items(
-    items: &[DemItem],
-    multiplier: u64,
-    depth: usize,
-    budget: &mut DemSamplerCompileBudget,
-) -> CircuitResult<()> {
+fn compile_items(items: &[DemItem], depth: usize) -> CircuitResult<DemSampleBlock> {
     if depth > MAX_DEM_REPEAT_NESTING {
         return Err(CircuitError::invalid_sampler_compilation(format!(
             "DEM repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
         )));
     }
-    for item in items {
-        match item {
-            DemItem::Instruction(_) => budget.add_expanded_instructions(multiplier)?,
-            DemItem::RepeatBlock(repeat) => {
-                let repeat_count = repeat.repeat_count().get();
-                if repeat_count > MAX_DEM_SAMPLER_REPEAT_UNROLL {
-                    return Err(CircuitError::invalid_sampler_compilation(format!(
-                        "DEM sampler currently supports repeat counts up to {MAX_DEM_SAMPLER_REPEAT_UNROLL}, got {repeat_count}"
-                    )));
-                }
-                let repeated_multiplier =
-                    multiplier.checked_mul(repeat_count).ok_or_else(|| {
-                        CircuitError::invalid_sampler_compilation(
-                            "DEM sampler repeat expansion count overflowed",
-                        )
-                    })?;
-                budget.add_repeat_iterations(repeated_multiplier)?;
-                validate_compile_budget_items(
-                    repeat.body().items(),
-                    repeated_multiplier,
-                    depth + 1,
-                    budget,
-                )?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn compile_items(
-    items: &[DemItem],
-    detector_shift: u64,
-    operations: &mut Vec<DemSampleOperation>,
-) -> CircuitResult<u64> {
-    let mut current_shift = detector_shift;
+    let mut block = DemSampleBlock::default();
+    let mut current_shift = 0;
     for item in items {
         match item {
             DemItem::Instruction(instruction) => {
-                compile_instruction(instruction, current_shift, operations)?;
+                compile_instruction(instruction, current_shift, &mut block)?;
                 if instruction.kind() == DemInstructionKind::ShiftDetectors {
                     current_shift = current_shift
                         .checked_add(instruction.detector_shift()?)
@@ -431,25 +407,44 @@ fn compile_items(
             }
             DemItem::RepeatBlock(repeat) => {
                 let repeat_count = repeat.repeat_count().get();
-                if repeat_count > MAX_DEM_SAMPLER_REPEAT_UNROLL {
-                    return Err(CircuitError::invalid_sampler_compilation(format!(
-                        "DEM sampler currently supports repeat counts up to {MAX_DEM_SAMPLER_REPEAT_UNROLL}, got {repeat_count}"
-                    )));
-                }
-                for _ in 0..repeat_count {
-                    current_shift =
-                        compile_items(repeat.body().items(), current_shift, operations)?;
-                }
+                let body = compile_items(repeat.body().items(), depth + 1)?;
+                let repeat_start_shift = current_shift;
+                let repeated_shift =
+                    body.detector_shift
+                        .checked_mul(repeat_count)
+                        .ok_or_else(|| {
+                            CircuitError::invalid_sampler_compilation(
+                                "DEM sampler repeat detector shift overflowed",
+                            )
+                        })?;
+                current_shift = current_shift.checked_add(repeated_shift).ok_or_else(|| {
+                    CircuitError::invalid_sampler_compilation(
+                        "DEM sampler detector shift overflowed",
+                    )
+                })?;
+                block.error_count = checked_repeated_error_count(
+                    block.error_count,
+                    body.error_count,
+                    repeat_count,
+                )?;
+                block
+                    .operations
+                    .push(DemSampleOperation::Repeat(DemSampleRepeat {
+                        start_detector_shift: repeat_start_shift,
+                        repeat_count,
+                        body,
+                    }));
             }
         }
     }
-    Ok(current_shift)
+    block.detector_shift = current_shift;
+    Ok(block)
 }
 
 fn compile_instruction(
     instruction: &DemInstruction,
     detector_shift: u64,
-    operations: &mut Vec<DemSampleOperation>,
+    block: &mut DemSampleBlock,
 ) -> CircuitResult<()> {
     if instruction.kind() != DemInstructionKind::Error {
         return Ok(());
@@ -458,7 +453,7 @@ fn compile_instruction(
         instruction.args().first().copied().ok_or_else(|| {
             CircuitError::invalid_sampler_compilation("error is missing probability")
         })?;
-    let mut operation = DemSampleOperation {
+    let mut operation = DemSampleError {
         probability,
         detectors: Vec::new(),
         observables: Vec::new(),
@@ -469,9 +464,7 @@ fn compile_instruction(
                 let shifted = detector_shift
                     .checked_add(detector.get())
                     .ok_or_else(|| detector_index_overflow_error("detector"))?;
-                operation
-                    .detectors
-                    .push(usize_from_u64(shifted, "detector index")?);
+                operation.detectors.push(shifted);
             }
             DemTarget::LogicalObservable(observable) => {
                 operation
@@ -486,8 +479,152 @@ fn compile_instruction(
             }
         }
     }
-    operations.push(operation);
+    block.error_count = block.error_count.checked_add(1).ok_or_else(|| {
+        CircuitError::invalid_sampler_compilation("DEM sampler error count overflowed")
+    })?;
+    block.operations.push(DemSampleOperation::Error(operation));
     Ok(())
+}
+
+enum SampledErrorOutput<'a> {
+    Discard,
+    Record(&'a mut Vec<bool>),
+}
+
+fn sample_block_into<R>(
+    block: &DemSampleBlock,
+    detector_shift: u64,
+    rng: &mut R,
+    record: &mut DetectionEventRecord,
+    mut error_output: SampledErrorOutput<'_>,
+) -> CircuitResult<()>
+where
+    R: Rng,
+{
+    for operation in &block.operations {
+        match operation {
+            DemSampleOperation::Error(error) => {
+                let occurred = error.sample_occurs(rng);
+                if let SampledErrorOutput::Record(error_record) = &mut error_output {
+                    error_record.push(occurred);
+                }
+                if occurred {
+                    apply_error_to_record(error, detector_shift, record)?;
+                }
+            }
+            DemSampleOperation::Repeat(repeat) => {
+                let mut iteration_shift = detector_shift
+                    .checked_add(repeat.start_detector_shift)
+                    .ok_or_else(detector_shift_overflow_error)?;
+                for _ in 0..repeat.repeat_count {
+                    sample_block_into(
+                        &repeat.body,
+                        iteration_shift,
+                        rng,
+                        record,
+                        match &mut error_output {
+                            SampledErrorOutput::Discard => SampledErrorOutput::Discard,
+                            SampledErrorOutput::Record(error_record) => {
+                                SampledErrorOutput::Record(error_record)
+                            }
+                        },
+                    )?;
+                    iteration_shift = iteration_shift
+                        .checked_add(repeat.body.detector_shift)
+                        .ok_or_else(detector_shift_overflow_error)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn apply_error_record_block(
+    block: &DemSampleBlock,
+    detector_shift: u64,
+    error_record: &[bool],
+    cursor: &mut usize,
+    record: &mut DetectionEventRecord,
+) -> CircuitResult<()> {
+    for operation in &block.operations {
+        match operation {
+            DemSampleOperation::Error(error) => {
+                let occurred = *error_record.get(*cursor).ok_or_else(|| {
+                    CircuitError::invalid_result_format("DEM error record ended early")
+                })?;
+                *cursor = cursor.checked_add(1).ok_or_else(|| {
+                    CircuitError::invalid_result_format("DEM error record cursor overflowed")
+                })?;
+                if occurred {
+                    apply_error_to_record(error, detector_shift, record)?;
+                }
+            }
+            DemSampleOperation::Repeat(repeat) => {
+                let mut iteration_shift = detector_shift
+                    .checked_add(repeat.start_detector_shift)
+                    .ok_or_else(detector_shift_overflow_error)?;
+                for _ in 0..repeat.repeat_count {
+                    apply_error_record_block(
+                        &repeat.body,
+                        iteration_shift,
+                        error_record,
+                        cursor,
+                        record,
+                    )?;
+                    iteration_shift = iteration_shift
+                        .checked_add(repeat.body.detector_shift)
+                        .ok_or_else(detector_shift_overflow_error)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn apply_error_to_record(
+    error: &DemSampleError,
+    detector_shift: u64,
+    record: &mut DetectionEventRecord,
+) -> CircuitResult<()> {
+    for detector in &error.detectors {
+        let shifted = detector_shift
+            .checked_add(*detector)
+            .ok_or_else(|| detector_index_overflow_error("detector"))?;
+        toggle_bit(
+            &mut record.detectors,
+            usize_from_u64(shifted, "detector index")?,
+            "detector",
+        )?;
+    }
+    for observable in &error.observables {
+        toggle_bit(&mut record.observables, *observable, "observable")?;
+    }
+    Ok(())
+}
+
+fn checked_repeated_error_count(
+    current: usize,
+    body_error_count: usize,
+    repeat_count: u64,
+) -> CircuitResult<usize> {
+    let repeat_count = usize_from_u64(repeat_count, "DEM sampler repeat count")?;
+    let repeated = body_error_count.checked_mul(repeat_count).ok_or_else(|| {
+        CircuitError::invalid_sampler_compilation("DEM sampler repeated error count overflowed")
+    })?;
+    current.checked_add(repeated).ok_or_else(|| {
+        CircuitError::invalid_sampler_compilation("DEM sampler error count overflowed")
+    })
+}
+
+fn reset_detection_record(
+    record: &mut DetectionEventRecord,
+    detector_count: usize,
+    observable_count: usize,
+) {
+    record.detectors.clear();
+    record.detectors.resize(detector_count, false);
+    record.observables.clear();
+    record.observables.resize(observable_count, false);
 }
 
 fn toggle_bit(bits: &mut [bool], index: usize, kind: &'static str) -> CircuitResult<()> {
@@ -506,6 +643,10 @@ fn usize_from_u64(value: u64, kind: &'static str) -> CircuitResult<usize> {
 
 fn detector_index_overflow_error(kind: &'static str) -> CircuitError {
     CircuitError::invalid_sampler_compilation(format!("{kind} index overflowed"))
+}
+
+fn detector_shift_overflow_error() -> CircuitError {
+    CircuitError::invalid_sampler_compilation("DEM sampler detector shift overflowed")
 }
 
 fn dem_sampler_rng(seed: Option<u64>) -> SmallRng {

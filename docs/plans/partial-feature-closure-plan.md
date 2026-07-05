@@ -173,7 +173,7 @@ Included features:
 
 - DEM introspection for error counts, instruction counts, final detector shifts, final coordinate shifts, detector coordinate maps, and flattened iterators.
 - DEM transforms `flattened`, `rounded`, and `without_tags` for owned cases.
-- Folded traversal for graphlike search, hypergraph search, SAT encoding, analyzer-adjacent operations, matcher-adjacent operations, and sampler-adjacent operations where the current expansion limits are product limitations.
+- Folded traversal for graphlike search, hypergraph search, SAT encoding, analyzer-adjacent operations, matcher-adjacent operations, and remaining sampled-error sampler work where the current expansion or sampled-work limits are product limitations.
 - Clear public behavior for decomposition separators, tags, coordinate shifts, repeat blocks, and numerical rounding.
 
 Tests:

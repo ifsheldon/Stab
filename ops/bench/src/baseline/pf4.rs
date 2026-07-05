@@ -108,10 +108,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf4-dem-coordinate-map", "stab_pf4_dem_coordinate_map_flat_overlap_all") => {
             Some((flat_overlap_coordinate_detectors() as f64, "detectors/s"))
         }
-        ("pf4-dem-sampler-folded-repeat", "stab_pf4_dem_sampler_compile_capped_repeat") => {
-            Some((SAMPLER_REPEAT_COUNT as f64, "expanded-errors/s"))
+        ("pf4-dem-sampler-folded-repeat", "stab_pf4_dem_sampler_compile_folded_repeat") => {
+            Some((SAMPLER_REPEAT_COUNT as f64, "logical-error-occurrences/s"))
         }
-        ("pf4-dem-sampler-folded-repeat", "stab_pf4_dem_sampler_sample_capped_repeat") => Some((
+        ("pf4-dem-sampler-folded-repeat", "stab_pf4_dem_sampler_sample_folded_repeat") => Some((
             (SAMPLER_REPEAT_COUNT as f64) * (SAMPLER_SHOTS as f64),
             "error-applications/s",
         )),
@@ -151,7 +151,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures bounded all-detector DEM coordinate maps, selected detector coordinate lookup through a huge-repeat model, sparse flat and nested overlapping selected-coordinate lookups, and many-selected flat-overlap coordinate lookup; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
         ),
         "pf4-dem-sampler-folded-repeat" => Some(
-            "contract-only: Stab measures current capped-repeat CompiledDemSampler compile and sample behavior; true folded sampler traversal remains an explicit RPF4 follow-up",
+            "contract-only: Stab measures folded CompiledDemSampler compile and direct sample behavior; sampled-error materialization and excessive repeated-error work remain capped and broader PF4 traversal consumers remain explicit follow-up work",
         ),
         "pf4-dem-folded-traversal" => Some(
             "contract-only: Stab measures current capped-repeat hypergraph search, SAT problem generation, analyzer, and ErrorMatcher traversal behavior; true folded traversal remains an explicit RPF4 follow-up",
@@ -286,7 +286,7 @@ fn run_dem_sampler_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
 
     Ok(vec![
         measure_stab_batched(
-            "stab_pf4_dem_sampler_compile_capped_repeat",
+            "stab_pf4_dem_sampler_compile_folded_repeat",
             TRANSFORM_REPETITIONS,
             || {
                 let compiled = CompiledDemSampler::compile(&model)
@@ -296,7 +296,7 @@ fn run_dem_sampler_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
             },
         )?,
         measure_stab_batched(
-            "stab_pf4_dem_sampler_sample_capped_repeat",
+            "stab_pf4_dem_sampler_sample_folded_repeat",
             TRANSFORM_REPETITIONS,
             || {
                 let output = sampler

@@ -445,9 +445,10 @@ Tasks:
 
 M11 accepts a bounded materialized sampler for the initial Rust core and CLI surface.
 Completion requires explicit rejection tests for oversized DEM input, bounded DEM line and repeat nesting during parse, bounded repeat expansion, excessive detector or observable output width, excessive sampled-error materialization, replay buffers that would exceed the current materialized limit, truncated `ptb64` replay, and invalid replay shot counts.
-The accepted M11 limits are a 64 MiB `sample_dem` DEM input cap, a 1,000,000 line DEM parser cap, a 256 level DEM repeat nesting cap, a 64,000,000 buffered-unit materialization cap, a 64 MiB estimated materialized-buffer byte cap, the existing DEM sampler repeat and expanded-instruction caps, and a 1,048,576 byte cap per requested text replay record.
-True streaming output, folded repeat sampling without bounded unrolling, exact output-byte budgeting, and performance thresholds are deferred to M12 performance hardening.
-M12 makes `sample_dem` stream detector, observable, sampled-error, and replayed-error outputs by default in the CLI; the materialized Rust APIs retain the M11 buffer-unit and byte caps for callers that request in-memory `DetectionConversionOutput` or sampled-error vectors.
+The accepted M11 limits are a 64 MiB `sample_dem` DEM input cap, a 1,000,000 line DEM parser cap, a 256 level DEM repeat nesting cap, a 64,000,000 buffered-unit materialization cap, a 64 MiB estimated materialized-buffer byte cap, and a 1,048,576 byte cap per requested text replay record.
+PF4 later replaced the DEM sampler's flat repeat-operation compilation with a folded operation tree for compile and direct detector sampling, while sampled-error output and replay still preserve flat repeated error-bit order and keep materialized width caps.
+M12 makes `sample_dem` stream detector, observable, sampled-error, and replayed-error outputs by default in the CLI, while the materialized Rust APIs retain the M11 buffer-unit and byte caps for callers that request in-memory `DetectionConversionOutput` or sampled-error vectors.
+The remaining post-PF4 sampler work is optimized repeated stochastic-body traversal that can tighten or remove the current sampled-error application work cap without changing flat sampled-error semantics.
 
 The required M11 `sample_dem` CLI surface is the pinned Stim v1.16.0 flag set `--shots`, `--in`, `--out`, `--out_format`, `--seed`, `--obs_out`, `--obs_out_format`, `--err_out`, `--err_out_format`, `--replay_err_in`, and `--replay_err_in_format`.
 Detector output, observable side output, sampled-error output, and replay input must support `01`, `b8`, `r8`, `ptb64`, `hits`, and `dets` where Stim accepts those formats.

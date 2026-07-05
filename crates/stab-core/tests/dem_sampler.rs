@@ -4,8 +4,9 @@
 )]
 
 use stab_core::{
-    CompiledDemSampler, DemRepeatBlock, DetectionEventRecord, DetectionObservableOutputMode,
-    DetectorErrorModel, RepeatCount, SampleFormat, write_detection_records,
+    CircuitError, CompiledDemSampler, DemRepeatBlock, DetectionEventRecord,
+    DetectionObservableOutputMode, DetectorErrorModel, RepeatCount, SampleFormat,
+    write_detection_records,
 };
 
 fn compile_dem(text: &str) -> CompiledDemSampler {
@@ -298,96 +299,154 @@ fn dem_sampler_seeded_noisy_error_is_reproducible_and_statistical() {
 }
 
 #[test]
-fn dem_sampler_rejects_repeat_expansion_before_counting_detectors() {
-    let too_large_repeat = DetectorErrorModel::from_dem_str(
+fn pf4_dem_sampler_compiles_repeats_without_flat_operation_cap() {
+    let formerly_too_large_repeat = DetectorErrorModel::from_dem_str(
         "
         repeat 100001 {
             error(1) D0
         }
         ",
     )
-    .expect("parse oversized repeat");
-    let error = CompiledDemSampler::compile(&too_large_repeat).expect_err("reject repeat count");
-    assert!(
-        error
-            .to_string()
-            .contains("supports repeat counts up to 100000"),
-        "{error}"
-    );
+    .expect("parse folded repeat");
+    let sampler =
+        CompiledDemSampler::compile(&formerly_too_large_repeat).expect("compile folded repeat");
+    assert_eq!(sampler.error_count(), 100_001);
+    let sampled = sampler
+        .sample_detection_events_with_seed(1, Some(5))
+        .expect("sample folded repeat");
+    let sampled_record = sampled.records.first().expect("one sampled record");
+    assert_eq!(sampled_record.detectors, [true]);
 
-    let nested_explosion = DetectorErrorModel::from_dem_str(
+    let formerly_nested_explosion = DetectorErrorModel::from_dem_str(
         "
-        repeat 100000 {
-            repeat 100000 {
+        repeat 1001 {
+            repeat 1000 {
                 error(1) D0
             }
         }
         ",
     )
-    .expect("parse nested repeat");
-    let error =
-        CompiledDemSampler::compile(&nested_explosion).expect_err("reject nested expansion");
-    assert!(
-        error.to_string().contains("expanded repeat iterations"),
-        "{error}"
+    .expect("parse nested folded repeat");
+    let nested_sampler =
+        CompiledDemSampler::compile(&formerly_nested_explosion).expect("compile nested repeat");
+    assert_eq!(nested_sampler.error_count(), 1_001_000);
+}
+
+#[test]
+fn pf4_dem_sampler_preserves_flat_error_order_through_nested_repeats() {
+    let sampler = compile_dem(
+        "
+        error(1) D0 L0
+        shift_detectors 1
+        repeat 2 {
+            error(1) D0
+            error(0) D1 L1
+            shift_detectors 2
+            repeat 2 {
+                error(1) D0 L2
+                shift_detectors 1
+            }
+        }
+        error(1) D0 L3
+        ",
+    );
+    assert_eq!(sampler.error_count(), 10);
+
+    let (sampled_output, error_records) = sampler
+        .sample_detection_events_and_errors_with_seed(1, Some(5))
+        .expect("sample nested repeated errors");
+    assert_eq!(
+        error_records,
+        vec![vec![
+            true, true, false, true, true, true, false, true, true, true,
+        ]]
+    );
+    assert_eq!(
+        sampled_output.records,
+        vec![DetectionEventRecord {
+            detectors: vec![true, true, false, true, true, true, false, true, true, true,],
+            observables: vec![true, false, false, true],
+        }]
+    );
+
+    let replayed = sampler
+        .sample_detection_events_from_error_records(&[vec![
+            false, false, false, false, false, false, true, false, false, false,
+        ]])
+        .expect("replay nested flat error");
+    assert_eq!(
+        replayed.records,
+        vec![DetectionEventRecord {
+            detectors: vec![
+                false, false, false, false, false, false, true, false, false, false,
+            ],
+            observables: vec![false, true, false, false],
+        }]
     );
 }
 
 #[test]
-fn pf4_dem_sampler_repeat_caps_and_allowed_shifted_repeat_sampling() {
+fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
     let sampler = compile_dem(
         "
-        repeat 3 {
+        repeat 100001 {
             error(1) D0 L0
             shift_detectors 1
         }
         ",
     );
-    assert_eq!(sampler.error_count(), 3);
+    assert_eq!(sampler.error_count(), 100_001);
 
     let output = sampler
         .sample_detection_events_with_seed(1, Some(5))
-        .expect("sample allowed repeat");
-    assert_eq!(output.detector_count, 3);
+        .expect("sample shifted folded repeat");
+    assert_eq!(output.detector_count, 100_001);
     assert_eq!(output.observable_count, 1);
-    assert_eq!(
-        output.records,
-        vec![DetectionEventRecord {
-            detectors: vec![true, true, true],
-            observables: vec![true],
-        }]
-    );
+    assert_eq!(output.records.len(), 1);
+    let record = output.records.first().expect("one shifted folded record");
+    assert!(record.detectors.iter().all(|bit| *bit));
+    assert_eq!(record.observables, [true]);
 
-    let too_large_repeat = DetectorErrorModel::from_dem_str(
+    let huge_error_record = DetectorErrorModel::from_dem_str(
         "
-        repeat 100001 {
-            error(1) D0
+        repeat 64000001 {
+            error(0) D0
         }
         ",
     )
-    .expect("parse oversized repeat");
-    let error = CompiledDemSampler::compile(&too_large_repeat).expect_err("reject repeat count");
+    .expect("parse huge flat error-record DEM");
+    let huge_sampler =
+        CompiledDemSampler::compile(&huge_error_record).expect("compile folded error-record DEM");
+    assert_eq!(huge_sampler.error_count(), 64_000_001);
+    let error = huge_sampler
+        .sample_detection_events_with_seed(1, Some(5))
+        .expect_err("reject excessive detector-only sampled work");
     assert!(
         error
             .to_string()
-            .contains("supports repeat counts up to 100000"),
+            .contains("would apply 64000001 sampled errors"),
         "{error}"
     );
 
-    let nested_explosion = DetectorErrorModel::from_dem_str(
-        "
-        repeat 100000 {
-            repeat 100000 {
-                error(1) D0
-            }
-        }
-        ",
-    )
-    .expect("parse nested repeat");
-    let error =
-        CompiledDemSampler::compile(&nested_explosion).expect_err("reject nested expansion");
+    let error = huge_sampler
+        .try_for_each_detection_event_and_error_with_seed(1, Some(5), |_record, _error_record| {
+            Ok::<(), CircuitError>(())
+        })
+        .expect_err("reject excessive streamed sampled-error record");
     assert!(
-        error.to_string().contains("expanded repeat iterations"),
+        error
+            .to_string()
+            .contains("would require 64000002 buffered units"),
+        "{error}"
+    );
+
+    let error = huge_sampler
+        .sample_detection_events_and_errors_with_seed(1, Some(5))
+        .expect_err("reject materialized sampled-error record");
+    assert!(
+        error
+            .to_string()
+            .contains("would require 64000002 buffered units"),
         "{error}"
     );
 }
@@ -467,7 +526,7 @@ fn dem_sampler_rejects_materialized_heap_pressure_before_sampling() {
 }
 
 #[test]
-fn dem_sampler_rejects_programmatic_deep_repeat_nesting() {
+fn pf4_dem_sampler_rejects_programmatic_deep_repeat_nesting() {
     let mut model = DetectorErrorModel::new();
     for _ in 0..257 {
         let mut outer = DetectorErrorModel::new();

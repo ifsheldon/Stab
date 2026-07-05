@@ -94,7 +94,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | DEM construction and mutation | Implemented for current Rust API surface | RPF0/PF1 | `pf1-dem-rust-api` now provides executable closure evidence; Python-style list operations, operators, and exact Python API shape stay deferred. |
 | DEM introspection | Active | RPF4 | Finish folded large-repeat traversal and resource behavior across every public DEM query selected for Rust scope. |
 | DEM transforms | Active | RPF4 | Finish public `flattened`, `rounded`, and transform resource boundaries. |
-| DEM analysis and shortest graphlike error | Active | RPF4 and RPF6 | Finish folded traversal and generated-circuit evidence for graphlike, hypergraph, SAT, sampler-adjacent, and analyzer-adjacent consumers. |
+| DEM analysis and shortest graphlike error | Active | RPF4 and RPF6 | Finish folded traversal and generated-circuit evidence for graphlike, hypergraph, SAT, remaining sampled-error sampler work, and analyzer-adjacent consumers. |
 | Measurement-to-detection conversion | Active | RPF2, RPF3, RPF7 | Finish feedback transform semantics, broader sweep-conditioned conversion, and visible CLI parity. |
 | Detector-analysis utility APIs | Active | RPF5 | Finish promoted detecting-region, missing-detector, feedback, and flow utility subcases. |
 | Single-shot interactive tableau simulator | Deferred-only | None | Public simulator product remains out of scope. |
@@ -307,7 +307,7 @@ Implementation tasks:
 - Implement public `rounded` for probability rounding with explicit numerical behavior. The current Rust `DetectorErrorModel::rounded` subset is implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-transform-progress-report.md`.
 - Treat the current Rust construction and mutation helper subset as closed by `pf1-dem-rust-api`; add copy, concat, repetition, or mutation helpers only if a later plan extracts a concrete non-Python Rust API gap.
 - Finish folded traversal for coordinate maps where current APIs still require caps or do not prove non-flat ambiguous overlapping selected-coordinate lookup through very large repeats. The current all-detector coordinate-map cap, folded non-overlapping selected-query lookup, flat sparse-overlap selected-query fast path, bounded nested sparse-overlap selected-query fast path, valid flat sparse-hole behavior, and many-selected flat-overlap scan are implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-coordinate-progress-report.md`; final shifts, final detector shifts, counts, recursive `without_tags`, and selected coordinates through shifted repeats have PF4 query evidence in `docs/plans/rpf4-dem-transform-progress-report.md`.
-- Add folded or capped traversal behavior for graphlike, hypergraph, SAT, matcher-adjacent, sampler-adjacent, and analyzer-adjacent DEM consumers where owned by RPF4. The current capped graphlike, hypergraph, SAT, analyzer, ErrorMatcher, and DEM sampler repeat subsets are implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-search-sat-progress-report.md` and `docs/plans/rpf4-dem-sampler-progress-report.md`.
+- Add folded or capped traversal behavior for graphlike, hypergraph, SAT, matcher-adjacent, remaining sampled-error sampler work, and analyzer-adjacent DEM consumers where owned by RPF4. The current capped graphlike, hypergraph, SAT, analyzer, ErrorMatcher, and folded DEM sampler repeat subsets are implemented with tests, oracle metadata, benchmark metadata, and progress evidence in `docs/plans/rpf4-dem-search-sat-progress-report.md` and `docs/plans/rpf4-dem-sampler-progress-report.md`.
 - Preserve decomposition separators and tags according to the transform contract.
 
 Tests:
@@ -326,7 +326,7 @@ Oracle rows:
 
 Benchmarks:
 
-- Implement `pf4-dem-flatten-repeat`, `pf4-dem-rounded`, `pf4-dem-coordinate-map`, `pf4-dem-folded-traversal`, `pf4-dem-folded-graphlike-traversal`, and `pf4-dem-sampler-folded-repeat`. These rows now have report-only runner coverage for current materialized transforms, coordinate resource behavior, and capped-repeat traversal behavior. Full folded traversal remains active beyond these report-only rows.
+- Implement `pf4-dem-flatten-repeat`, `pf4-dem-rounded`, `pf4-dem-coordinate-map`, `pf4-dem-folded-traversal`, `pf4-dem-folded-graphlike-traversal`, and `pf4-dem-sampler-folded-repeat`. These rows now have report-only runner coverage for current materialized transforms, coordinate resource behavior, capped search/analyzer traversal behavior, and folded sampler compile or direct-sampling behavior with sampled-error caps. Full folded traversal remains active beyond these report-only rows.
 - Use `direct-match` only when Stim v1.16.0 exposes a faithful timing surface.
 - Keep rows report-only when they prove Stab resource behavior without a faithful Stim ratio.
 
