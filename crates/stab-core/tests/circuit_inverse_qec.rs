@@ -236,6 +236,38 @@ fn time_reversed_for_flows_measurement_rich_subset_covers_selected_bases() {
 }
 
 #[test]
+fn time_reversed_for_flows_measurement_rich_subset_preserves_measurement_ordering() {
+    // Adapted from Stim v1.16.0 circuit_inverse_qec measurement_ordering coverage.
+    for (circuit_text, input_flows, expected_circuit, expected_flows) in [
+        (
+            "M 0 1\n",
+            vec!["1 -> Z0 xor rec[-2]", "1 -> Z1 xor rec[-1]"],
+            "M 1 0\n",
+            vec!["Z0 -> rec[-1]", "Z1 -> rec[-2]"],
+        ),
+        (
+            "MZZ 0 1 2 3\n",
+            vec!["1 -> Z0*Z1 xor rec[-2]", "1 -> Z2*Z3 xor rec[-1]"],
+            "MZZ 2 3 0 1\n",
+            vec!["Z0*Z1 -> rec[-1]", "Z2*Z3 -> rec[-2]"],
+        ),
+    ] {
+        let input = circuit(circuit_text);
+        let input_flows: Vec<Flow> = input_flows.into_iter().map(flow).collect();
+
+        let (actual_circuit, actual_flows) = circuit_time_reversed_for_flows(&input, &input_flows)
+            .expect("time reverse measurement ordering");
+
+        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
+        assert_eq!(
+            actual_flows,
+            expected_flows.into_iter().map(flow).collect::<Vec<_>>(),
+            "{circuit_text}"
+        );
+    }
+}
+
+#[test]
 fn time_reversed_for_flows_measurement_rich_subset_turns_measurements_into_resets() {
     // Adapted from Stim v1.16.0 circuit_inverse_qec measurement-to-reset reversal behavior.
     for (circuit_text, input_flow, expected_circuit, expected_flow) in [
@@ -291,6 +323,56 @@ fn time_reversed_for_flows_measurement_rich_subset_reverses_measure_resets() {
             vec![flow(expected_reset), flow(expected_record)],
             "{circuit_text}"
         );
+    }
+}
+
+#[test]
+fn time_reversed_for_flows_measurement_rich_subset_reverses_multi_target_measure_resets() {
+    // Adapted from Stim v1.16.0 circuit_inverse_qec measurement_ordering_3 coverage.
+    let input = circuit("MR 0 1\n");
+    let input_flows = [
+        flow("Z0 -> rec[-2]"),
+        flow("Z1 -> rec[-1]"),
+        flow("1 -> Z0"),
+        flow("1 -> Z1"),
+        flow("1 -> Z0*Z1"),
+    ];
+
+    let (actual_circuit, actual_flows) = circuit_time_reversed_for_flows(&input, &input_flows)
+        .expect("time reverse multi-target measure-reset");
+
+    assert_eq!(actual_circuit, circuit("MR 1 0\n"));
+    assert_eq!(
+        actual_flows,
+        vec![
+            flow("1 -> Z0"),
+            flow("1 -> Z1"),
+            flow("Z0 -> rec[-1]"),
+            flow("Z1 -> rec[-2]"),
+            flow("Z0*Z1 -> rec[-2] xor rec[-1]"),
+        ]
+    );
+
+    for (circuit_text, expected_circuit, input_flow, expected_flow) in [
+        (
+            "MRX 0 1\n",
+            "MRX 1 0\n",
+            "1 -> X0*X1",
+            "X0*X1 -> rec[-2] xor rec[-1]",
+        ),
+        (
+            "MRY 0 1\n",
+            "MRY 1 0\n",
+            "1 -> Y0*Y1",
+            "Y0*Y1 -> rec[-2] xor rec[-1]",
+        ),
+    ] {
+        let (actual_circuit, actual_flows) =
+            circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
+                .expect("time reverse multi-target measure-reset basis");
+
+        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
+        assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
     }
 }
 
@@ -369,6 +451,7 @@ fn time_reversed_for_flows_measurement_rich_subset_rejects_unpromoted_terms() {
         &circuit(
             "
             M 0
+            TICK
             M 1
         ",
         ),
@@ -378,9 +461,32 @@ fn time_reversed_for_flows_measurement_rich_subset_rejects_unpromoted_terms() {
     .to_string();
 
     assert!(
-        error.contains("measurement-rich subset supports only one noiseless plain measurement"),
+        error.contains(
+            "measurement-rich subset supports only one noiseless plain unique-target measurement"
+        ),
         "{error}"
     );
+}
+
+#[test]
+fn time_reversed_for_flows_measurement_rich_subset_rejects_duplicate_measurement_targets() {
+    for (circuit_text, input_flow) in [
+        ("M 0 0\n", "1 -> Z0 xor rec[-1]"),
+        ("MX 0 0\n", "1 -> X0 xor rec[-1]"),
+        ("MY 0 0\n", "1 -> Y0 xor rec[-1]"),
+        ("MZZ 0 1 1 2\n", "1 -> Z0*Z1 xor rec[-2]"),
+    ] {
+        let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
+            .expect_err("duplicate measurement targets are not in the scoped subset")
+            .to_string();
+
+        assert!(
+            error.contains(
+                "measurement-rich subset supports only one noiseless plain unique-target measurement"
+            ),
+            "{circuit_text}: {error}"
+        );
+    }
 }
 
 #[test]
@@ -390,7 +496,9 @@ fn time_reversed_for_flows_measurement_rich_subset_rejects_noisy_measurements() 
         .to_string();
 
     assert!(
-        error.contains("measurement-rich subset supports only one noiseless plain measurement"),
+        error.contains(
+            "measurement-rich subset supports only one noiseless plain unique-target measurement"
+        ),
         "{error}"
     );
 }
@@ -407,7 +515,30 @@ fn time_reversed_for_flows_measurement_rich_subset_rejects_unpromoted_reset_shap
             .to_string();
 
         assert!(
-            error.contains("measurement-rich subset supports only one noiseless plain measurement"),
+            error.contains(
+                "measurement-rich subset supports only one noiseless plain unique-target measurement"
+            ),
+            "{circuit_text}: {error}"
+        );
+    }
+}
+
+#[test]
+fn time_reversed_for_flows_measurement_rich_subset_rejects_unpromoted_measure_reset_shapes() {
+    for (circuit_text, input_flow) in [
+        ("MR 0 0\n", "1 -> Z0"),
+        ("MR !0\n", "Z0 -> rec[-1]"),
+        ("MRX 0 0\n", "1 -> X0"),
+        ("MRY !0\n", "Y0 -> rec[-1]"),
+    ] {
+        let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
+            .expect_err("unpromoted measure-reset flow rewrites are not in the scoped subset")
+            .to_string();
+
+        assert!(
+            error.contains(
+                "measurement-rich subset supports only one noiseless plain unique-target measurement"
+            ),
             "{circuit_text}: {error}"
         );
     }
