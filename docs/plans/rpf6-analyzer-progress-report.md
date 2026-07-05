@@ -3,7 +3,7 @@
 ## Summary
 
 This RPF6 report makes the generated-QEC analyzer subset, the selected loop-folded error-decomposition subset, the bounded mixed-top-level `fold_loops=true` fallback, and the selected matched-error canonicalization hardening explicit in the source-owned evidence.
-It does not complete RPF6 because broad true folded generated-loop output, graphlike and hypergraph generated search beyond the promoted QEC subset, sparse reverse tracker work beyond supported-Clifford unitary repeats, and broader matched-error hardening remain open.
+It does not complete RPF6 because broad true folded generated-loop output, graphlike and hypergraph generated search beyond the promoted QEC subset, and sparse reverse tracker work beyond supported-Clifford unitary repeats remain open; additional matched-error value-object hardening belongs to future analyzer or search slices only when those outputs require it.
 
 ## Implemented Evidence Slice
 
@@ -104,7 +104,7 @@ just bench::compare --only pf6-error-decomp-loop-folded --baseline target/benchm
 
 - True folded generated-loop analyzer behavior beyond the promoted generated-QEC semantic subset and bounded mixed-top-level fallback.
 - Broader loop-folded error decomposition subcases beyond the promoted repeated composite-error and remnant-edge blocking fixtures.
-- Generated-circuit graphlike, hypergraph, shortest-error, SAT, and WCNF search evidence.
+- Broader generated-circuit graphlike, hypergraph, shortest-error, SAT, and WCNF search evidence beyond the promoted generated-QEC search rows.
 - Sparse reverse detector-frame tracker analyzer/search-specific consumption beyond the supported-Clifford generated repeat-folding evidence.
-- Broader matched-error value-object hardening required by analyzer or search outputs beyond the selected canonicalization slice.
+- Future matched-error value-object hardening required by newly promoted analyzer or search outputs beyond the selected canonicalization slice.
 - Full ErrorMatcher provenance, heralded matching, repeat-contained noise provenance, and `stim explain_errors` remain deferred unless the roadmap deliberately promotes them.

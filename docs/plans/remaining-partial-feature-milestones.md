@@ -101,7 +101,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | Batched flip-frame simulator | Deferred-only | None | Public simulator product remains out of scope. |
 | Circuit-to-DEM analysis | Active | RPF6 and RPF7 | Finish analyzer subcases, generated-circuit evidence, loop folding, gauge behavior, and CLI proof. |
 | `analyze_errors --decompose_errors` and related flags | Active | RPF6 and RPF7 | Finish core and CLI analyzer parity for selected decomposition and flag behavior. |
-| Error explanation value objects | Mixed | RPF6 | Harden only value-object behavior required by active analyzer/search paths; full ErrorMatcher provenance and CLI remain deferred. |
+| Error explanation value objects | Implemented for current active Rust subset | RPF6 | The selected canonicalization slice is implemented; future analyzer/search slices may add value-object hardening only if their outputs require it, while full ErrorMatcher provenance and CLI remain deferred. |
 | Shortest graphlike and hypergraph logical-error search | Active | RPF6 | Finish generated-circuit search, ordering-insensitive structural comparators, and resource behavior. |
 | Sparse reverse detector-frame tracking | Active | RPF6 | Finish optimized loop folding and analyzer/search integration where needed; deterministic generated supported-unitary repeat coverage is implemented for the current promoted subset. |
 | Flows | Active | RPF1 and RPF5 | Finish measurement-rich flows, variable-target flow metadata decisions, and transform integration. |

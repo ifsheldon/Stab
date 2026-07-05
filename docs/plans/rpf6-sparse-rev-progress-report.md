@@ -47,7 +47,7 @@ Implemented row:
 - `pf6-sparse-rev-spp-rust`
 - `pf6-matched-error-canonicalize-rust`
 
-The broad row `pf6-sparse-rev-tracker` remains manifest-only because full sparse reverse tracker parity still includes analyzer/search consumption where needed, broader variable-target unitary semantics outside the promoted unsigned tracker path, broader matched-error hardening beyond the selected canonicalization slice, and provenance-adjacent behavior not promoted here.
+The broad row `pf6-sparse-rev-tracker` remains manifest-only because full sparse reverse tracker parity still includes analyzer/search consumption where needed, broader variable-target unitary semantics outside the promoted unsigned tracker path, future matched-error hardening only when newly promoted analyzer or search outputs require it, and provenance-adjacent behavior not promoted here.
 
 ## Benchmark Rows
 
@@ -87,5 +87,5 @@ just oracle::run --milestone PF6 --structural
 
 - Analyzer and search consumption cases that specifically require sparse tracker behavior beyond unsigned-flow checking.
 - Broader variable-target unitary semantics outside unsigned sparse-tracker propagation and the already promoted sampler, detection-conversion, detector-frame, and analyzer SPP subsets, including repeat-folding execution of `SPP` and `SPP_DAG` if later milestones promote that surface.
-- Broader matched-error value-object hardening beyond the selected canonicalization slice if future analyzer or search outputs require it.
+- Future matched-error value-object hardening beyond the selected canonicalization slice if newly promoted analyzer or search outputs require it.
 - Full ErrorMatcher provenance, heralded matching, repeat-contained noise stack frames, and `stim explain_errors` CLI remain deferred.
