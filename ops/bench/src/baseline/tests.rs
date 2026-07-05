@@ -769,7 +769,7 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
         ),
         (
             "pf3-gate-semantic-wide",
-            &["stab_pf3_gate_semantic_tableau_contract"][..],
+            &["stab_pf3_gate_semantic_contract"][..],
             "gate-semantic-wide",
         ),
     ] {

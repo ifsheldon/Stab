@@ -22,6 +22,14 @@ pub fn decomposed_circuit(circuit: &Circuit) -> CircuitResult<Circuit> {
     Ok(result)
 }
 
+pub(crate) fn decomposed_single_instruction(
+    instruction: &CircuitInstruction,
+) -> CircuitResult<Circuit> {
+    let mut result = Circuit::new();
+    append_decomposed_instruction(instruction, &mut result)?;
+    Ok(result)
+}
+
 fn append_simplified_circuit(circuit: &Circuit, result: &mut Circuit) -> CircuitResult<()> {
     for item in circuit.items() {
         match item {

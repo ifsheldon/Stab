@@ -88,8 +88,8 @@ It prevents parser acceptance from being mistaken for sampler, detection-convers
 | `SQRT_ZZ` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `SQRT_ZZ_DAG` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `MPP` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
-| `SPP` | Yes | No | No | Yes | Yes | Reject | Reject | Reject |
-| `SPP_DAG` | Yes | No | No | Yes | Yes | Reject | Reject | Reject |
+| `SPP` | Yes | No | No | Yes | Yes | Decomposed | Decomposed | Reject |
+| `SPP_DAG` | Yes | No | No | Yes | Yes | Decomposed | Decomposed | Reject |
 | `SWAP` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `ISWAP` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `CXSWAP` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
@@ -102,5 +102,5 @@ It prevents parser acceptance from being mistaken for sampler, detection-convers
 
 ## Open Follow-Ups
 
-- RPF3 owns deciding whether `SPP` and `SPP_DAG` execution should be implemented in the sampler and detection conversion paths or remain explicit rejections for the current Rust/CLI scope.
-- RPF6 owns analyzer parity for `SPP`, `SPP_DAG`, generated-circuit coverage, and loop-folding evidence.
+- RPF3 has promoted supported Hermitian `SPP` and `SPP_DAG` execution in sampler and detection-conversion paths through the existing decomposition lowering, with anti-Hermitian products rejected.
+- RPF6 or a later analyzer-focused PF3 slice owns analyzer parity for `SPP`, `SPP_DAG`, generated-circuit coverage, and loop-folding evidence.

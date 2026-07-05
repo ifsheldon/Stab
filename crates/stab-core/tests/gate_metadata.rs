@@ -600,45 +600,30 @@ fn gate_decomposition_metadata_matches_tableau_where_defined() {
 }
 
 #[test]
-fn gate_execution_contract_rejects_variable_target_spp_sampler_execution() {
-    // Parser validation accepts SPP/SPP_DAG targets, but sampler and detector conversion execution are explicit later gate-semantics milestones.
+fn gate_execution_contract_accepts_supported_spp_sampler_and_detector_paths() {
     for gate_name in ["SPP", "SPP_DAG"] {
-        let circuit =
-            Circuit::from_stim_str(&format!("{gate_name} X0 X1*Y2*Z3\n")).expect("parse SPP");
-        let error = CompiledSampler::compile(&circuit)
-            .expect_err("sampler should reject SPP execution")
-            .to_string();
-        assert!(
-            error.contains("sampler subset does not support"),
-            "{gate_name}: {error}"
-        );
+        let circuit = Circuit::from_stim_str(&format!("{gate_name} Z0\nM 0\nDETECTOR rec[-1]\n"))
+            .expect("parse SPP");
+        let sampler =
+            CompiledSampler::compile(&circuit).expect("sampler should accept supported SPP");
+        assert_eq!(sampler.sample_zero_one(1), vec![vec![false]]);
         for skip_reference_sample in [false, true] {
-            let error = CompiledDetectionConverter::compile(
+            CompiledDetectionConverter::compile(
                 &circuit,
                 DetectionConversionOptions {
                     skip_reference_sample,
                 },
             )
-            .expect_err("detection conversion should reject SPP execution")
-            .to_string();
-            assert!(
-                error.contains("detection conversion does not yet support"),
-                "{gate_name}: {error}"
-            );
+            .expect("detection conversion should accept supported SPP");
         }
-        let error = convert_measurements_to_detection_events(
+        convert_measurements_to_detection_events(
             &circuit,
-            &[Vec::new()],
+            &[vec![false]],
             DetectionConversionOptions {
                 skip_reference_sample: true,
             },
         )
-        .expect_err("public conversion helper should reject SPP execution")
-        .to_string();
-        assert!(
-            error.contains("detection conversion does not yet support"),
-            "{gate_name}: {error}"
-        );
+        .expect("public conversion helper should accept supported SPP");
     }
 }
 
@@ -681,6 +666,25 @@ fn gate_metadata_api_contract_table_matches_rust_accessors() {
             "{gate_name} decomposition"
         );
     }
+
+    for gate_name in ["SPP", "SPP_DAG"] {
+        let row = support_table.get(gate_name).expect("SPP contract row");
+        assert_eq!(
+            row.sampler,
+            SupportContractStatus::Decomposed,
+            "{gate_name} sampler support"
+        );
+        assert_eq!(
+            row.detection_conversion,
+            SupportContractStatus::Decomposed,
+            "{gate_name} detection-conversion support"
+        );
+        assert_eq!(
+            row.analyzer,
+            SupportContractStatus::Reject,
+            "{gate_name} analyzer support"
+        );
+    }
 }
 
 fn flow_texts(flows: Vec<stab_core::Flow>) -> Vec<String> {
@@ -694,6 +698,22 @@ struct GateSupportContractRow {
     unitary: bool,
     flow: bool,
     decomposition: bool,
+    sampler: SupportContractStatus,
+    detection_conversion: SupportContractStatus,
+    analyzer: SupportContractStatus,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SupportContractStatus {
+    Yes,
+    No,
+    NoOp,
+    Metadata,
+    Repeat,
+    CappedFolded,
+    SamplerBacked,
+    Reject,
+    Decomposed,
 }
 
 fn parse_gate_support_contract_table() -> Vec<(&'static str, GateSupportContractRow)> {
@@ -715,9 +735,9 @@ fn parse_gate_support_contract_table() -> Vec<(&'static str, GateSupportContract
                 unitary,
                 flow,
                 decomposition,
-                _sampler,
-                _detection_conversion,
-                _analyzer,
+                sampler,
+                detection_conversion,
+                analyzer,
             ] = cells.as_slice()
             else {
                 panic!("support contract row shape: {line}");
@@ -731,6 +751,13 @@ fn parse_gate_support_contract_table() -> Vec<(&'static str, GateSupportContract
                     unitary: support_contract_bool(gate, "Unitary", unitary),
                     flow: support_contract_bool(gate, "Flow", flow),
                     decomposition: support_contract_bool(gate, "Decomposition", decomposition),
+                    sampler: support_contract_status(gate, "Sampler", sampler),
+                    detection_conversion: support_contract_status(
+                        gate,
+                        "Detection conversion",
+                        detection_conversion,
+                    ),
+                    analyzer: support_contract_status(gate, "Analyzer", analyzer),
                 },
             ))
         })
@@ -742,6 +769,21 @@ fn support_contract_bool(gate: &str, column: &str, value: &str) -> bool {
         "Yes" => true,
         "No" => false,
         _ => panic!("{gate} {column} support cell must be Yes or No, got {value:?}"),
+    }
+}
+
+fn support_contract_status(gate: &str, column: &str, value: &str) -> SupportContractStatus {
+    match value {
+        "Yes" => SupportContractStatus::Yes,
+        "No" => SupportContractStatus::No,
+        "No-op" => SupportContractStatus::NoOp,
+        "Metadata" => SupportContractStatus::Metadata,
+        "Repeat" => SupportContractStatus::Repeat,
+        "Capped/folded" => SupportContractStatus::CappedFolded,
+        "Sampler-backed" => SupportContractStatus::SamplerBacked,
+        "Reject" => SupportContractStatus::Reject,
+        "Decomposed" => SupportContractStatus::Decomposed,
+        _ => panic!("{gate} {column} support cell has unknown status {value:?}"),
     }
 }
 

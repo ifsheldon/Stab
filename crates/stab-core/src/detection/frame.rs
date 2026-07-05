@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory, Pauli,
-    PauliBasis, PauliSign, PauliString, Target,
+    PauliBasis, PauliSign, PauliString, RepeatBlock, Target,
 };
 
 pub(super) fn circuit_has_pauli_observable_targets(circuit: &Circuit) -> bool {
@@ -74,6 +74,7 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
         | "ELSE_CORRELATED_ERROR"
         | "HERALDED_ERASE"
         | "HERALDED_PAULI_CHANNEL_1" => Ok(()),
+        "SPP" | "SPP_DAG" => validate_decomposed_frame_instruction(instruction),
         "CX" | "CY" => validate_frame_controlled_pauli_targets(instruction),
         "CZ" => validate_frame_cz_targets(instruction),
         name if crate::circuit_tableau::gate_tableau(name).is_ok() => Ok(()),
@@ -82,6 +83,20 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
             "M9 detector frame subset does not support {name}"
         ))),
     }
+}
+
+fn validate_decomposed_frame_instruction(instruction: &CircuitInstruction) -> CircuitResult<()> {
+    let decomposed = decomposed_frame_instruction(instruction)?;
+    validate_frame_detection_circuit(&decomposed)
+}
+
+fn decomposed_frame_instruction(instruction: &CircuitInstruction) -> CircuitResult<Circuit> {
+    crate::circuit_simplify::decomposed_single_instruction(instruction).map_err(|error| {
+        CircuitError::invalid_sampler_compilation(format!(
+            "{} cannot be executed by frame detection via decomposition: {error}",
+            instruction.gate().canonical_name()
+        ))
+    })
 }
 
 fn validate_frame_controlled_pauli_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
@@ -117,14 +132,15 @@ pub(super) fn sample_detection_events_with_frame(
     shots: usize,
     seed: Option<u64>,
 ) -> CircuitResult<DetectionConversionOutput> {
-    validate_frame_detection_circuit(circuit)?;
-    let plan = ConversionPlan::from_circuit(circuit)?;
+    let executable = frame_execution_circuit(circuit)?;
+    validate_frame_detection_circuit(&executable)?;
+    let plan = ConversionPlan::from_circuit(&executable)?;
     plan.validate_shot_count(shots)?;
     let detector_count = plan.detector_terms.len();
     let observable_count = plan.observable_terms.len();
     let mut rng = SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random));
     let mut records = Vec::with_capacity(shots);
-    sample_detection_events_with_frame_plan(circuit, shots, &plan, &mut rng, |record| {
+    sample_detection_events_with_frame_plan(&executable, shots, &plan, &mut rng, |record| {
         records.push(record.clone());
         Ok::<(), CircuitError>(())
     })?;
@@ -145,10 +161,41 @@ where
     E: From<CircuitError>,
     F: FnMut(&DetectionEventRecord) -> Result<(), E>,
 {
-    validate_frame_detection_circuit(circuit)?;
-    let plan = ConversionPlan::from_circuit(circuit)?;
+    let executable = frame_execution_circuit(circuit)?;
+    validate_frame_detection_circuit(&executable)?;
+    let plan = ConversionPlan::from_circuit(&executable)?;
     let mut rng = SmallRng::seed_from_u64(seed.unwrap_or_else(rand::random));
-    sample_detection_events_with_frame_plan(circuit, shots, &plan, &mut rng, |record| visit(record))
+    sample_detection_events_with_frame_plan(&executable, shots, &plan, &mut rng, |record| {
+        visit(record)
+    })
+}
+
+fn frame_execution_circuit(circuit: &Circuit) -> CircuitResult<Circuit> {
+    let mut result = Circuit::new();
+    append_frame_execution_circuit(circuit, &mut result)?;
+    Ok(result)
+}
+
+fn append_frame_execution_circuit(circuit: &Circuit, result: &mut Circuit) -> CircuitResult<()> {
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(instruction)
+                if matches!(instruction.gate().canonical_name(), "SPP" | "SPP_DAG") =>
+            {
+                result.append_circuit(&decomposed_frame_instruction(instruction)?);
+            }
+            CircuitItem::Instruction(instruction) => result.append_instruction(instruction.clone()),
+            CircuitItem::RepeatBlock(repeat) => {
+                let body = frame_execution_circuit(repeat.body())?;
+                result.append_repeat_block(RepeatBlock::new(
+                    repeat.repeat_count(),
+                    body,
+                    repeat.tag().map(ToOwned::to_owned),
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn sample_detection_events_with_frame_plan<E, F>(
@@ -301,6 +348,7 @@ impl ScalarDetectionFrame {
             "ELSE_CORRELATED_ERROR" => self.apply_correlated_error(instruction, true, rng),
             "HERALDED_ERASE" => self.apply_heralded_erase(instruction, rng),
             "HERALDED_PAULI_CHANNEL_1" => self.apply_heralded_pauli_channel(instruction, rng),
+            "SPP" | "SPP_DAG" => self.execute_decomposed_instruction(instruction, rng),
             name if crate::circuit_tableau::gate_tableau(name).is_ok() => {
                 self.apply_tableau_instruction(instruction)
             }
@@ -309,6 +357,15 @@ impl ScalarDetectionFrame {
                 "M9 detector frame subset does not support {name}"
             ))),
         }
+    }
+
+    fn execute_decomposed_instruction(
+        &mut self,
+        instruction: &CircuitInstruction,
+        rng: &mut impl Rng,
+    ) -> CircuitResult<()> {
+        let decomposed = decomposed_frame_instruction(instruction)?;
+        self.execute_circuit(&decomposed, rng)
     }
 
     fn record_detector(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {

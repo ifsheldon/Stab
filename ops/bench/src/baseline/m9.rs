@@ -55,6 +55,8 @@ const FLOW_CHECK_CASES: usize = 4;
 const FLOW_CHECK_FLOWS: usize = 27;
 const GATE_SEMANTIC_FIXED_TABLEAU_GATES: usize = 46;
 const GATE_SEMANTIC_SURFACES_PER_GATE: usize = 3;
+const GATE_SEMANTIC_SPP_CASES: usize = 4;
+const GATE_SEMANTIC_SPP_SURFACES_PER_CASE: usize = 2;
 const FEEDBACK_INLINE_MPP: &str = "RX 0\n\
                                   RY 1\n\
                                   RZ 2\n\
@@ -194,8 +196,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf5-has-all-flows-batch", "stab_pf5_has_flows_batch_flows") => {
             Some(((UTILITY_BATCH * FLOW_CHECK_FLOWS) as f64, "flows/s"))
         }
-        ("pf3-gate-semantic-wide", "stab_pf3_gate_semantic_tableau_contract") => Some((
-            (GATE_SEMANTIC_FIXED_TABLEAU_GATES * GATE_SEMANTIC_SURFACES_PER_GATE) as f64,
+        ("pf3-gate-semantic-wide", "stab_pf3_gate_semantic_contract") => Some((
+            (GATE_SEMANTIC_FIXED_TABLEAU_GATES * GATE_SEMANTIC_SURFACES_PER_GATE
+                + GATE_SEMANTIC_SPP_CASES * GATE_SEMANTIC_SPP_SURFACES_PER_CASE) as f64,
             "surface-checks/s",
         )),
         ("m9-feedback-inline-mpp-batch", "stab_feedback_inline_mpp_transforms") => {
@@ -273,7 +276,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures the Rust sweep-conditioned detection sampler using omitted all-false sweep bits for non-frame and frame-path workloads; no faithful pinned Stim CLI ratio is claimed for this partial PF3 surface",
         ),
         "pf3-gate-semantic-wide" => Some(
-            "report-only: Stab measures fixed-tableau gate execution contract coverage across sampler compilation, detection-conversion compilation, and analyzer propagation without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures fixed-tableau gate execution contract coverage plus promoted SPP sampler and detection-conversion checks without a faithful pinned Stim CLI timing ratio",
         ),
         _ => detecting_region_rows::compare_note(row_id)
             .or_else(|| missing_detector_rows::compare_note(row_id)),
@@ -475,8 +478,9 @@ fn measure_detect_sweep_sampling(
 
 fn run_gate_semantic_wide_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let circuits = fixed_tableau_gate_execution_circuits(&row.id)?;
+    let spp_circuits = spp_gate_execution_circuits(&row.id)?;
     Ok(vec![measure_stab_iterations(
-        "stab_pf3_gate_semantic_tableau_contract",
+        "stab_pf3_gate_semantic_contract",
         super::STAB_COMPARE_ITERATIONS,
         || {
             let mut checked = 0usize;
@@ -506,6 +510,26 @@ fn run_gate_semantic_wide_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
                 checked = checked
                     .checked_add(1)
                     .ok_or_else(|| gate_semantic_count_overflow_error(row, "analyzer checks"))?;
+            }
+            for circuit in &spp_circuits {
+                let sampler = CompiledSampler::compile(circuit)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(sampler.sample_zero_one_with_seed(4, Some(23)));
+                checked = checked
+                    .checked_add(1)
+                    .ok_or_else(|| gate_semantic_count_overflow_error(row, "SPP sampler checks"))?;
+
+                let converter = CompiledDetectionConverter::compile(
+                    circuit,
+                    DetectionConversionOptions {
+                        skip_reference_sample: false,
+                    },
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(converter.detector_count());
+                checked = checked.checked_add(1).ok_or_else(|| {
+                    gate_semantic_count_overflow_error(row, "SPP detection-conversion checks")
+                })?;
             }
             black_box(checked);
             Ok(())
@@ -898,6 +922,18 @@ fn fixed_tableau_gate_execution_circuits(row_id: &str) -> Result<Vec<Circuit>, B
         .filter(|gate| gate.has_tableau())
         .map(|gate| fixed_tableau_gate_execution_circuit(row_id, gate))
         .collect()
+}
+
+fn spp_gate_execution_circuits(row_id: &str) -> Result<Vec<Circuit>, BenchError> {
+    [
+        "SPP X0\nM 0\nDETECTOR rec[-1]\n",
+        "SPP !X0\nM 0\nDETECTOR rec[-1]\n",
+        "SPP X0*X1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
+        "SPP_DAG Y0*Y1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
+    ]
+    .into_iter()
+    .map(|text| parse_circuit(row_id, text))
+    .collect()
 }
 
 fn fixed_tableau_gate_execution_circuit(row_id: &str, gate: Gate) -> Result<Circuit, BenchError> {

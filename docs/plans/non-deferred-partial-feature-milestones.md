@@ -134,14 +134,14 @@ Tasks:
 
 - Treat current Rust gate metadata accessors, unsupported-accessor errors, and metadata-column support-contract synchronization as closed by `pf1-gate-metadata-api`.
 - Keep the resolved decision that measurement-rich and variable-target `GateData.flows` metadata belongs in `Gate::flows`, while sampler, detector-conversion, analyzer, and full circuit flow execution support remain separate milestone surfaces.
-- Keep `SPP` and `SPP_DAG` parser, decomposition metadata, sampler execution, detection-conversion execution, and analyzer execution behavior synchronized.
+- Keep `SPP` and `SPP_DAG` parser, decomposition metadata, sampler execution, detection-conversion execution, and analyzer execution behavior synchronized. The sampler, detection-conversion planner, and detector-frame paths now execute supported Hermitian products via decomposition lowering, while analyzer execution remains an explicit rejection until variable-target unitary state propagation is implemented.
 - Update `docs/plans/rpf1-gate-execution-support-contract.md`, the checklist, and milestone reports whenever execution support changes so parser acceptance remains separate from execution support.
 
 Tests:
 
 - Keep the table-driven metadata-column support-contract test current when metadata columns change, and add execution-column checks when an implementation slice changes execution support.
 - Port owned metadata cases from `vendor/stim/src/stim/gates/gates.test.cc`, `vendor/stim/src/stim/gates/gates_test.py`, and gate data tests as semantic sources.
-- Add execution-boundary tests proving parser-accepted but unsupported execution gates fail with precise domain errors in sampler, detector conversion, and analyzer paths.
+- Add execution-boundary tests proving parser-accepted but unsupported execution gates fail with precise domain errors in the surfaces where they remain unsupported, and positive decomposition-equivalence tests whenever sampler or detector-conversion support is promoted.
 
 Oracle rows:
 

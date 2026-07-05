@@ -534,12 +534,23 @@ impl ConversionPlan {
         match instruction.gate().canonical_name() {
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
-            "SPP" | "SPP_DAG" => Err(CircuitError::invalid_sampler_compilation(format!(
-                "detection conversion does not yet support {}",
-                instruction.gate().canonical_name()
-            ))),
+            "SPP" | "SPP_DAG" => self.visit_decomposed_instruction(instruction),
             _ => self.add_measurements(instruction),
         }
+    }
+
+    fn visit_decomposed_instruction(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<()> {
+        let decomposed = crate::circuit_simplify::decomposed_single_instruction(instruction)
+            .map_err(|error| {
+                CircuitError::invalid_sampler_compilation(format!(
+                    "{} cannot be converted via decomposition: {error}",
+                    instruction.gate().canonical_name()
+                ))
+            })?;
+        self.visit_circuit(&decomposed)
     }
 
     fn record_detector(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {

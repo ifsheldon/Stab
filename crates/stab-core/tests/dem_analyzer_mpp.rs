@@ -84,7 +84,7 @@ fn dem_analyzer_mpp_ordering_rejects_non_deterministic_upstream_subset() {
 }
 
 #[test]
-fn dem_analyzer_rejects_spp_until_variable_target_gate_execution_lands() {
+fn dem_analyzer_keeps_spp_explicitly_rejected_until_state_support_lands() {
     for gate_name in ["SPP", "SPP_DAG"] {
         let parsed =
             Circuit::from_stim_str(&format!("{gate_name} X0 X1*Y2*Z3\n")).expect("parse SPP");

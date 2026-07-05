@@ -516,6 +516,7 @@ fn compile_instruction(
         "MXX" | "MYY" | "MZZ" => compile_pair_measurement(instruction, operations, state),
         "MPP" => compile_pauli_product_measurement(instruction, operations, state),
         "MPAD" => compile_measurement_pads(instruction, operations, state),
+        "SPP" | "SPP_DAG" => compile_decomposed_instruction(instruction, operations, state),
         "CX" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::X),
         "CY" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Y),
         "CZ" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Z),
@@ -621,6 +622,21 @@ fn compile_instruction(
         _ if zero_probability_noise(instruction)? => Ok(()),
         _ => Err(unsupported_sampler_instruction(instruction)),
     }
+}
+
+fn compile_decomposed_instruction(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    state: &mut CompileState,
+) -> CircuitResult<()> {
+    let decomposed =
+        crate::circuit_simplify::decomposed_single_instruction(instruction).map_err(|error| {
+            CircuitError::invalid_sampler_compilation(format!(
+                "{} cannot be executed via decomposition: {error}",
+                instruction.gate().canonical_name()
+            ))
+        })?;
+    compile_circuit_with_state(&decomposed, operations, state)
 }
 
 fn compile_reset(
