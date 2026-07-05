@@ -295,6 +295,23 @@ fn time_reversed_for_flows_measurement_rich_subset_reverses_measure_resets() {
 }
 
 #[test]
+fn time_reversed_for_flows_measurement_rich_subset_reverses_resets() {
+    // Adapted from Stim v1.16.0 circuit_inverse_qec reset-to-measurement reversal behavior.
+    for (circuit_text, input_flow, expected_circuit, expected_flow) in [
+        ("R 0\n", "1 -> Z0", "M 0\n", "Z0 -> rec[-1]"),
+        ("RX 0\n", "1 -> X0", "MX 0\n", "X0 -> rec[-1]"),
+        ("RY 0\n", "1 -> Y0", "MY 0\n", "Y0 -> rec[-1]"),
+    ] {
+        let (actual_circuit, actual_flows) =
+            circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
+                .expect("time reverse selected reset basis");
+
+        assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
+        assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
+    }
+}
+
+#[test]
 fn time_reversed_for_flows_unitary_subset_rejects_unsatisfied_general_unitary_flow() {
     let error = circuit_time_reversed_for_flows(&circuit("SWAP 0 1\n"), &[flow("X0 -> X0")])
         .expect_err("swap does not preserve X0")
@@ -376,6 +393,46 @@ fn time_reversed_for_flows_measurement_rich_subset_rejects_noisy_measurements() 
         error.contains("measurement-rich subset supports only one noiseless plain measurement"),
         "{error}"
     );
+}
+
+#[test]
+fn time_reversed_for_flows_measurement_rich_subset_rejects_unpromoted_reset_shapes() {
+    for (circuit_text, input_flow) in [
+        ("R 0 1\n", "1 -> Z0"),
+        ("RX 0 1\n", "1 -> X0"),
+        ("RY 0 1\n", "1 -> Y0"),
+    ] {
+        let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
+            .expect_err("unpromoted reset-only flow rewrites are not in the scoped subset")
+            .to_string();
+
+        assert!(
+            error.contains("measurement-rich subset supports only one noiseless plain measurement"),
+            "{circuit_text}: {error}"
+        );
+    }
+}
+
+#[test]
+fn time_reversed_for_flows_measurement_rich_subset_rejects_unscoped_reset_terms() {
+    for (circuit_text, input_flow, expected_error) in [
+        ("R 0\n", "1 -> Z0 xor obs[0]", "observable terms"),
+        ("RX 0\n", "1 -> X0 xor obs[0]", "observable terms"),
+        ("RY 0\n", "1 -> Y0 xor obs[0]", "observable terms"),
+        ("MR 0\n", "1 -> Z0 xor obs[0]", "observable terms"),
+        ("MRX 0\n", "1 -> X0 xor obs[0]", "observable terms"),
+        ("MRY 0\n", "1 -> Y0 xor obs[0]", "observable terms"),
+        ("R 0\n", "1 -> Z0 xor rec[0]", "measurement-record terms"),
+    ] {
+        let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(input_flow)])
+            .expect_err("unscoped reset flow terms must fail closed")
+            .to_string();
+
+        assert!(
+            error.contains(expected_error),
+            "{circuit_text} {input_flow}: {error}"
+        );
+    }
 }
 
 fn circuit(text: &str) -> Circuit {
