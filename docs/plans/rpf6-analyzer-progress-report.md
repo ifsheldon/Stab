@@ -2,14 +2,15 @@
 
 ## Summary
 
-This RPF6 report makes the generated-QEC analyzer subset and the selected loop-folded error-decomposition subset explicit in the source-owned evidence.
-It does not complete RPF6 because broad generated-loop handling, including generated prefix, repeat, and tail circuits under `fold_loops=true`, graphlike and hypergraph generated search beyond the promoted QEC subset, sparse reverse tracker work beyond supported-Clifford unitary repeats, and active matched-error hardening remain open.
+This RPF6 report makes the generated-QEC analyzer subset, the selected loop-folded error-decomposition subset, and the bounded mixed-top-level `fold_loops=true` fallback explicit in the source-owned evidence.
+It does not complete RPF6 because broad true folded generated-loop output, graphlike and hypergraph generated search beyond the promoted QEC subset, sparse reverse tracker work beyond supported-Clifford unitary repeats, and active matched-error hardening remain open.
 
 ## Implemented Evidence Slice
 
 - `circuit_to_detector_error_model` is covered for noisy generated repetition-code and rotated-surface-code circuits through semantic DEM comparison against pinned Stim v1.16.0 expected output.
 - The semantic comparator normalizes detector shifts, graphlike decomposition separators, repeat traversal, and floating probability drift within tolerance.
 - `circuit_to_detector_error_model` is covered for the selected `fold_loops + decompose_errors + block_decomposition_from_introducing_remnant_edges` cases where repeated composite errors decompose into graphlike components inside a folded DEM repeat and remnant-edge blocking is enforced inside a folded repeat.
+- `circuit_to_detector_error_model` now handles unsupported mixed top-level `fold_loops=true` shapes through the existing capped non-folded analyzer. This selected bounded fallback covers the pinned generated surface-code prefix, repeat, and tail coordinate case without claiming true folded output for broader generated-loop families.
 - The promoted evidence is Rust-core analyzer evidence, not public `stab analyze_errors` CLI parity.
 
 ## Tests
@@ -21,8 +22,14 @@ Implemented Rust tests:
 - `semantic_dem_treats_graphlike_decomposition_as_equivalent`
 - `pf6_dem_analyzer_fold_loops_decomposes_repeat_errors`
 - `pf6_dem_analyzer_fold_loops_respects_remnant_edge_blocking`
+- `pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_mixed_top_level`
+- `pf6_dem_analyzer_fallback_does_not_mask_prefixed_repeat_errors`
+- `pf6_dem_analyzer_fallback_preserves_repeat_count_cap`
+- `pf6_dem_analyzer_fallback_preserves_repeat_iteration_cap`
+- `pf6_dem_analyzer_fallback_preserves_expanded_instruction_cap`
+- `pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit`
 
-These tests run under `cargo test -p stab-core generated_qec_dem` and `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_loops_`.
+These tests run under `cargo test -p stab-core generated_qec_dem`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_loops_`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fallback_`, and `cargo test -p stab-core --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit`.
 
 ## Oracle Rows
 
@@ -31,9 +38,10 @@ Implemented rows:
 - `pf6-analyzer-generated-qec-rust`
 - `pf6-error-decomp-loop-folded-rust`
 
-Implemented explicit-gap guard row:
+Implemented bounded fallback row:
 
-- `pf6-analyzer-generated-fold-loop-gap-rust`
+- `pf6-analyzer-mixed-top-level-fallback-rust`
+- `pf6-analyzer-generated-fold-loop-fallback-rust`
 
 Still broad and manifest-only:
 
@@ -72,7 +80,8 @@ Target checks for this slice:
 ```sh
 cargo test -p stab-core generated_qec_dem --quiet
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_loops_ --quiet
-cargo test -p stab-core --test dem_api pf4_dem_generated_surface_code_fold_loop_coordinate_gap_is_explicit --quiet
+cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fallback_ --quiet
+cargo test -p stab-core --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit --quiet
 cargo test -p stab-bench pf6_analyzer_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-bench --quiet
 cargo test -p stab-oracle fixtures --quiet
@@ -85,7 +94,7 @@ just bench::compare --only pf6-error-decomp-loop-folded --baseline target/benchm
 
 ## Remaining RPF6 Work
 
-- Generated-loop analyzer behavior beyond the promoted generated-QEC semantic subset, including the pinned Stim generated surface-code prefix, repeat, and tail coordinate case with `fold_loops=true`.
+- True folded generated-loop analyzer behavior beyond the promoted generated-QEC semantic subset and bounded mixed-top-level fallback.
 - Broader loop-folded error decomposition subcases beyond the promoted repeated composite-error and remnant-edge blocking fixtures.
 - Generated-circuit graphlike, hypergraph, shortest-error, SAT, and WCNF search evidence.
 - Sparse reverse detector-frame tracker analyzer/search-specific consumption beyond the supported-Clifford generated repeat-folding evidence.

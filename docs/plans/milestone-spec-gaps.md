@@ -19,15 +19,6 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
-## 2026-07-05 - PFM4/PFM6: Generated Surface-Code Folded Coordinate Boundary
-
-Status: Open
-Revealed by: implementation of the PFM4 DEM coordinate-resource slice.
-Current text: PFM4 asks to finish selected folded coordinate behavior for large, nested, and ambiguous repeats, while PFM6 tracks broader generated-loop analyzer behavior and loop-folded decomposition families.
-Gap: the pinned Stim v1.16.0 `surface_code_coords_dont_infinite_loop` case compares `DetectorErrorModel::get_detector_coordinates` against `Circuit::get_detector_coordinates` after running `ErrorAnalyzer::circuit_to_detector_error_model` with `decompose_errors=true`, `fold_loops=true`, and remnant-edge blocking on a generated rotated surface-code circuit with prefix, repeat, and tail structure. Stab currently rejects this generated circuit before producing a DEM because `fold_loops=true` only supports top-level repeat-only and selected prefixed-repeat shapes. Treating the coordinate API as incomplete would hide the real analyzer loop-folding dependency, while treating the current coordinate tests as completion would overstate generated-loop parity.
-Proposed amendment: split the pinned generated surface-code coordinate case into a PFM6 analyzer-loop-folding requirement for generated prefix, repeat, and tail circuits, followed by a PFM4 coordinate equivalence check that compares DEM and circuit coordinate maps once the folded analyzer can produce the DEM. Keep the current explicit rejection test as a non-completion guard until that analyzer shape is implemented or deliberately scoped out.
-Resolution: Pending PFM6 generated-loop analyzer work.
-
 ## 2026-07-04 - RPF2: Flow-Time-Reversal Dependency Boundary
 
 Status: Open
@@ -56,6 +47,15 @@ Proposed amendment: keep the Rust API hardening documented for PF1, and require 
 Resolution: Pending future binding-parity decision.
 
 ## Resolved Entries
+
+## 2026-07-05 - PFM4/PFM6: Generated Surface-Code Folded Coordinate Boundary
+
+Status: Resolved
+Revealed by: implementation of the PFM4 DEM coordinate-resource slice.
+Current text: PFM4 asks to finish selected folded coordinate behavior for large, nested, and ambiguous repeats, while PFM6 tracks broader generated-loop analyzer behavior and loop-folded decomposition families.
+Gap: the pinned Stim v1.16.0 `surface_code_coords_dont_infinite_loop` case compares `DetectorErrorModel::get_detector_coordinates` against `Circuit::get_detector_coordinates` after running `ErrorAnalyzer::circuit_to_detector_error_model` with `decompose_errors=true`, `fold_loops=true`, and remnant-edge blocking on a generated rotated surface-code circuit with prefix, repeat, and tail structure. Stab previously rejected this generated circuit before producing a DEM because `fold_loops=true` only supported top-level repeat-only and selected prefixed-repeat shapes. Treating the coordinate API as incomplete would have hidden the real analyzer loop-folding dependency, while treating the older coordinate tests as completion would have overstated generated-loop parity.
+Proposed amendment: split the pinned generated surface-code coordinate case into a PFM6 analyzer-loop-handling requirement for generated prefix, repeat, and tail circuits, followed by a PFM4 coordinate equivalence check that compares DEM and circuit coordinate maps once the analyzer can produce the DEM.
+Resolution: Resolved by the bounded mixed-top-level fallback in `circuit_to_detector_error_model` for unsupported `fold_loops=true` shapes. The fallback uses the existing capped non-folded analyzer, `pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_mixed_top_level` proves semantic equality with non-folded analysis, the `pf6_dem_analyzer_fallback_preserves_` tests prove repeat-count, aggregate repeat-iteration, and expanded-instruction caps remain active, `pf6_dem_analyzer_fallback_does_not_mask_prefixed_repeat_errors` proves selected folded prefixed-repeat errors are not silently replaced by fallback output, and `pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit` proves the pinned generated surface-code coordinate comparison. Broader true folded generated-loop output remains active PFM6 work.
 
 ## 2026-07-05 - RPF3: SPP Analyzer State Propagation Boundary
 

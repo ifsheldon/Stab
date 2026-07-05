@@ -127,3 +127,171 @@ fn pf6_dem_analyzer_fold_loops_respects_remnant_edge_blocking() {
         "repeat 5 {\n    error(0.125) D2 D3\n    error(0.25) D2 D3 ^ D0 D1\n    shift_detectors 4\n}\n"
     );
 }
+
+#[test]
+fn pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_mixed_top_level() {
+    let circuit = Circuit::from_stim_str(
+        "
+        R 0
+        M 0
+        DETECTOR rec[-1]
+        REPEAT 2 {
+            X_ERROR(0.125) 0
+            M 0
+            DETECTOR rec[-1] rec[-2]
+        }
+        M 0
+        DETECTOR rec[-1] rec[-2]
+        ",
+    )
+    .expect("circuit");
+
+    let expected = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .expect("non-folded analysis")
+        .to_dem_string();
+    let actual = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect("fold-loop bounded fallback")
+    .to_dem_string();
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn pf6_dem_analyzer_fallback_does_not_mask_prefixed_repeat_errors() {
+    let circuit = Circuit::from_stim_str(
+        "
+        X_ERROR(0.125) 0
+        REPEAT 2 {
+            M 0
+            DETECTOR rec[-1]
+        }
+        ",
+    )
+    .expect("circuit");
+
+    let non_folded = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .expect("non-folded analysis still succeeds")
+        .to_dem_string();
+    assert_eq!(non_folded, "error(0.125) D0 D1\n");
+
+    let error = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("preserve unsupported prefixed-repeat folded error");
+
+    assert!(
+        error
+            .to_string()
+            .contains("supports prefixed repeats only when the first iteration ends"),
+        "{error}"
+    );
+}
+
+#[test]
+fn pf6_dem_analyzer_fallback_preserves_repeat_count_cap() {
+    let circuit = Circuit::from_stim_str(
+        "
+        M 0
+        REPEAT 100001 {
+            M 0
+            DETECTOR rec[-1] rec[-2]
+        }
+        M 0
+        ",
+    )
+    .expect("circuit");
+
+    let error = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("reject unsupported mixed top-level expansion beyond cap");
+
+    assert!(
+        error
+            .to_string()
+            .contains("analyze_errors currently supports repeat counts up to 100000"),
+        "{error}"
+    );
+}
+
+#[test]
+fn pf6_dem_analyzer_fallback_preserves_repeat_iteration_cap() {
+    let circuit = Circuit::from_stim_str(
+        "
+        M 0
+        REPEAT 10000 {
+            REPEAT 101 {
+                M 0
+            }
+        }
+        M 0
+        ",
+    )
+    .expect("circuit");
+
+    let error = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("reject aggregate repeat iterations beyond cap");
+
+    assert!(
+        error.to_string().contains("expanded repeat iterations"),
+        "{error}"
+    );
+}
+
+#[test]
+fn pf6_dem_analyzer_fallback_preserves_expanded_instruction_cap() {
+    let circuit = Circuit::from_stim_str(
+        "
+        M 0
+        REPEAT 100000 {
+            M 0
+            R 0
+            M 0
+            R 0
+            M 0
+            R 0
+            M 0
+            R 0
+            M 0
+            R 0
+            M 0
+        }
+        M 0
+        ",
+    )
+    .expect("circuit");
+
+    let error = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("reject aggregate expanded instructions beyond cap");
+
+    assert!(
+        error.to_string().contains("expanded instructions"),
+        "{error}"
+    );
+}

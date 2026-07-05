@@ -24,9 +24,7 @@ impl FoldedAnalyzer {
         for item in circuit.items() {
             match item {
                 CircuitItem::Instruction(_) => {
-                    return Err(CircuitError::invalid_detector_error_model(
-                        "analyze_errors --fold_loops currently supports top-level repeat blocks only",
-                    ));
+                    return self.analyze_bounded_unfolded(circuit);
                 }
                 CircuitItem::RepeatBlock(repeat) => {
                     dem.push_repeat_block(self.analyze_repeat(repeat)?);
@@ -34,6 +32,13 @@ impl FoldedAnalyzer {
             }
         }
         Ok(dem)
+    }
+
+    fn analyze_bounded_unfolded(&self, circuit: &Circuit) -> CircuitResult<DetectorErrorModel> {
+        // Unsupported folded shapes still use the normal analyzer budget before unrolling.
+        let mut options = self.options;
+        options.fold_loops = false;
+        Analyzer::new(options).analyze(circuit)
     }
 
     fn analyze_prefixed_repeat(

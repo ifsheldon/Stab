@@ -615,7 +615,7 @@ fn pf4_dem_coordinates_nested_loop_matches_pinned_stim_example() {
 }
 
 #[test]
-fn pf4_dem_generated_surface_code_fold_loop_coordinate_gap_is_explicit() {
+fn pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit() {
     let params = SurfaceCodeParams::new(
         RoundCount::try_new(7).expect("round count"),
         CodeDistance::try_new(5).expect("code distance"),
@@ -625,15 +625,10 @@ fn pf4_dem_generated_surface_code_fold_loop_coordinate_gap_is_explicit() {
     .with_after_clifford_depolarization(Probability::try_new(0.01).expect("probability"));
     let generated = generate_surface_code_circuit(&params).expect("generate surface-code circuit");
     let circuit = generated.circuit();
-    assert_eq!(
-        circuit
-            .detector_coordinates()
-            .expect("all circuit detector coordinates")
-            .len(),
-        168
-    );
-
-    let error = circuit_to_detector_error_model(
+    let circuit_coordinates = circuit
+        .detector_coordinates()
+        .expect("all circuit detector coordinates");
+    let dem = circuit_to_detector_error_model(
         circuit,
         ErrorAnalyzerOptions {
             fold_loops: true,
@@ -642,13 +637,24 @@ fn pf4_dem_generated_surface_code_fold_loop_coordinate_gap_is_explicit() {
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect_err("generated surface-code folded analysis remains an active gap");
-    assert!(
-        error
-            .to_string()
-            .contains("supports top-level repeat blocks only"),
-        "{error}"
-    );
+    .expect("analyze generated surface-code circuit");
+    let dem_coordinates = dem
+        .detector_coordinates()
+        .expect("all DEM detector coordinates");
+
+    assert_eq!(dem.count_detectors().expect("DEM detector count"), 168);
+    assert_eq!(circuit_coordinates.len(), 168);
+    assert_eq!(dem_coordinates.len(), 168);
+    for (detector, dem_coordinate) in &dem_coordinates {
+        assert_eq!(
+            circuit_coordinates
+                .get(&stab_core::CircuitDetectorId::new(detector.get()))
+                .expect("matching circuit detector coordinate"),
+            dem_coordinate,
+            "coordinate mismatch for D{}",
+            detector.get()
+        );
+    }
 }
 
 #[test]

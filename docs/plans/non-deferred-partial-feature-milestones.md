@@ -269,7 +269,7 @@ Rows covered:
 Tasks:
 
 - Treat current Rust DEM construction and mutation helpers as closed by `pf1-dem-rust-api`; do not add more non-Python mutation ergonomics unless a concrete active Rust consumer needs them and the plan is updated first.
-- Finish selected folded coordinate behavior for large, nested, and ambiguous overlapping repeats, or keep documented caps with exact rejection tests. The pinned Stim generated surface-code coordinate comparison requires PFM6 generated-loop analyzer support for prefix, repeat, and tail circuits under `fold_loops=true` before it can be counted as PFM4 coordinate equivalence evidence.
+- Finish selected folded coordinate behavior for large, nested, and ambiguous overlapping repeats, or keep documented caps with exact rejection tests. The pinned Stim generated surface-code coordinate comparison is now counted only through the PFM6 bounded mixed-top-level analyzer fallback for prefix, repeat, and tail circuits under `fold_loops=true`; true folded generated-loop output remains active PFM6 work.
 - Finish folded or capped traversal behavior for DEM sampler, graphlike search, hypergraph search, SAT/WCNF generation, matcher-adjacent operations, and analyzer-adjacent operations where PFM4 owns the resource boundary.
 - Preserve tags, separators, detector shifts, coordinate shifts, logical observables, repeat structure, and probability rounding contracts across public transforms.
 - Keep all-detector materialization APIs capped when they must materialize large maps, and point callers to selected lookup APIs.
@@ -359,7 +359,7 @@ Rows covered:
 
 Tasks:
 
-- Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures. This includes deciding and implementing the generated surface-code prefix, repeat, and tail circuit shape under `fold_loops=true` that blocks the pinned Stim coordinate comparison, or logging an explicit non-completion scope decision before any coordinate row claims that case.
+- Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures. The selected generated surface-code prefix, repeat, and tail circuit shape under `fold_loops=true` is implemented through a bounded mixed-top-level fallback that reuses the capped non-folded analyzer, which is enough to prove the pinned Stim coordinate comparison but does not claim true folded output for broader generated-loop families.
 - Extend graphlike, hypergraph, shortest-error, SAT, and WCNF behavior for selected generated-circuit and direct DEM cases.
   The selected generated-QEC graphlike and hypergraph search subset is implemented by `pf6-search-generated-qec-rust`, and the selected generated-QEC SAT/WCNF structural subset is implemented by `pf6-search-generated-sat-wcnf-rust`.
 - Add or extend ordering-insensitive structural comparators for search outputs where exact target order is not stable. The selected generated-QEC graphlike and hypergraph search rows now include canonical target-set uniqueness, deterministic error rows, zero detector parity, and exact `L0` observable parity; broader generated families and tie-sensitive target-set comparators remain active.
@@ -380,6 +380,7 @@ Oracle rows:
 - Supplement `pf6-analyzer-generated-looping`, `pf6-search-generated`, and `pf6-sparse-rev-tracker`.
 - Keep `pf6-analyzer-generated-qec-rust` as evidence only for the generated-QEC subset it names.
 - Keep `pf6-error-decomp-loop-folded-rust` as evidence only for the selected loop-folded decomposition and remnant-edge blocking subset it names.
+- Keep `pf6-analyzer-mixed-top-level-fallback-rust` and `pf6-analyzer-generated-fold-loop-fallback-rust` as evidence only for the bounded non-folded fallback, analyzer-budget cap preservation, selected folded-error non-masking guard, and selected generated surface-code coordinate comparison they name.
 - Use exact `.dem` comparators where output order is stable and structural comparators otherwise.
 
 Benchmarks:
