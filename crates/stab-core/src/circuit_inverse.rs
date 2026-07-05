@@ -1,7 +1,7 @@
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, GateCategory,
-    PauliBasis, PauliSign, PauliString, RepeatBlock, SingleQubitClifford, Tableau, Target,
-    circuit_flow::check_unsigned_flow_with_sparse_tracker,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, Gate,
+    GateCategory, PauliBasis, PauliSign, PauliString, RepeatBlock, SingleQubitClifford, Tableau,
+    Target, circuit_flow::check_unsigned_flow_with_sparse_tracker,
 };
 
 const MAX_TIME_REVERSE_TABLEAU_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
@@ -44,14 +44,15 @@ pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
 /// This additive API validates that every provided unsigned flow is satisfied by
 /// the original circuit, returns the selected QEC inverse subset, and swaps each
 /// flow's input and output Pauli terms. The measurement-rich subset is limited
-/// to one noiseless plain measurement instruction group; resets, detectors, feedback,
-/// noise, repeats, and multi-instruction QEC rewrites remain deferred.
+/// to one noiseless plain measurement or selected plain single-target measure-reset
+/// instruction group; detectors, feedback, noise, repeats, and multi-instruction
+/// QEC rewrites remain deferred.
 pub fn circuit_time_reversed_for_flows(
     circuit: &Circuit,
     flows: &[Flow],
 ) -> CircuitResult<(Circuit, Vec<Flow>)> {
-    if let Some(inverse) = selected_measurement_rich_time_reversal_circuit(circuit) {
-        return time_reverse_flows_with_sparse_validation(circuit, inverse, flows);
+    if let Some(selected) = selected_measurement_rich_time_reversal(circuit) {
+        return time_reverse_flows_with_sparse_validation(circuit, selected, flows);
     }
     if has_classical_flow_terms(flows) {
         return Err(measurement_rich_time_reversal_error());
@@ -76,28 +77,95 @@ pub fn circuit_time_reversed_for_flows(
     Ok((inverse, reversed_flows))
 }
 
-fn selected_measurement_rich_time_reversal_circuit(circuit: &Circuit) -> Option<Circuit> {
+struct SelectedMeasurementRichTimeReversal {
+    inverse: Circuit,
+    kind: MeasurementRichTimeReversalKind,
+}
+
+enum MeasurementRichTimeReversalKind {
+    Measurement {
+        reset_candidate: Option<MeasurementToResetCandidate>,
+    },
+    MeasureReset {
+        qubit: usize,
+        basis: PauliBasis,
+    },
+}
+
+struct MeasurementToResetCandidate {
+    qubit: usize,
+    reset_gate: &'static str,
+    target: Target,
+    tag: Option<String>,
+}
+
+fn selected_measurement_rich_time_reversal(
+    circuit: &Circuit,
+) -> Option<SelectedMeasurementRichTimeReversal> {
     let [CircuitItem::Instruction(instruction)] = circuit.items() else {
         return None;
     };
-    if !supports_selected_measurement_rich_time_reversal(instruction) {
+    if !instruction.args().is_empty() {
         return None;
     }
-    Some(circuit.clone())
+    let groups = instruction.target_groups();
+    let name = instruction.gate().canonical_name();
+    if matches!(name, "M" | "MX" | "MY" | "MXX" | "MYY" | "MZZ")
+        && matches!(groups.as_slice(), [group] if group.iter().all(is_plain_qubit_target))
+    {
+        let reset_candidate = selected_measurement_to_reset_candidate(instruction);
+        return Some(SelectedMeasurementRichTimeReversal {
+            inverse: circuit.clone(),
+            kind: MeasurementRichTimeReversalKind::Measurement { reset_candidate },
+        });
+    }
+    let basis = match name {
+        "MR" => PauliBasis::Z,
+        "MRX" => PauliBasis::X,
+        "MRY" => PauliBasis::Y,
+        _ => return None,
+    };
+    let [group] = groups.as_slice() else {
+        return None;
+    };
+    let [target] = *group else {
+        return None;
+    };
+    if !is_plain_qubit_target(target) {
+        return None;
+    }
+    Some(SelectedMeasurementRichTimeReversal {
+        inverse: circuit.clone(),
+        kind: MeasurementRichTimeReversalKind::MeasureReset {
+            qubit: target.qubit_id()?.get() as usize,
+            basis,
+        },
+    })
 }
 
-fn supports_selected_measurement_rich_time_reversal(instruction: &CircuitInstruction) -> bool {
-    if !matches!(
-        instruction.gate().canonical_name(),
-        "M" | "MX" | "MY" | "MXX" | "MYY" | "MZZ"
-    ) {
-        return false;
-    }
-    if !instruction.args().is_empty() {
-        return false;
-    }
+fn selected_measurement_to_reset_candidate(
+    instruction: &CircuitInstruction,
+) -> Option<MeasurementToResetCandidate> {
+    let reset_gate = match instruction.gate().canonical_name() {
+        "M" => "R",
+        "MX" => "RX",
+        "MY" => "RY",
+        _ => return None,
+    };
     let groups = instruction.target_groups();
-    matches!(groups.as_slice(), [group] if group.iter().all(is_plain_qubit_target))
+    let [group] = groups.as_slice() else {
+        return None;
+    };
+    let [target] = *group else {
+        return None;
+    };
+    let qubit = target.qubit_id()?.get() as usize;
+    Some(MeasurementToResetCandidate {
+        qubit,
+        reset_gate,
+        target: target.clone(),
+        tag: instruction.tag().map(str::to_owned),
+    })
 }
 
 fn is_plain_qubit_target(target: &Target) -> bool {
@@ -112,7 +180,7 @@ fn is_plain_qubit_target(target: &Target) -> bool {
 
 fn time_reverse_flows_with_sparse_validation(
     circuit: &Circuit,
-    inverse: Circuit,
+    selected: SelectedMeasurementRichTimeReversal,
     flows: &[Flow],
 ) -> CircuitResult<(Circuit, Vec<Flow>)> {
     for (index, flow) in flows.iter().enumerate() {
@@ -124,10 +192,7 @@ fn time_reverse_flows_with_sparse_validation(
             )));
         }
     }
-    Ok((
-        inverse,
-        flows.iter().map(reversed_measurement_rich_flow).collect(),
-    ))
+    reverse_measurement_rich_flows(selected, flows)
 }
 
 fn reversed_pauli_only_flow(flow: &Flow) -> Flow {
@@ -139,13 +204,80 @@ fn reversed_pauli_only_flow(flow: &Flow) -> Flow {
     )
 }
 
-fn reversed_measurement_rich_flow(flow: &Flow) -> Flow {
-    Flow::new(
-        flow.output().with_sign(PauliSign::Plus),
-        flow.input().with_sign(PauliSign::Plus),
-        flow.measurements(),
-        flow.observables(),
-    )
+fn reverse_measurement_rich_flows(
+    selected: SelectedMeasurementRichTimeReversal,
+    flows: &[Flow],
+) -> CircuitResult<(Circuit, Vec<Flow>)> {
+    match &selected.kind {
+        MeasurementRichTimeReversalKind::Measurement {
+            reset_candidate: Some(reset_candidate),
+        } if should_turn_measurement_into_reset(reset_candidate, flows) => Ok((
+            measurement_to_reset_circuit(reset_candidate)?,
+            flows.iter().map(reversed_pauli_only_flow).collect(),
+        )),
+        _ => Ok((
+            selected.inverse,
+            flows
+                .iter()
+                .map(|flow| reverse_measurement_rich_flow(flow, &selected.kind))
+                .collect(),
+        )),
+    }
+}
+
+fn should_turn_measurement_into_reset(
+    candidate: &MeasurementToResetCandidate,
+    flows: &[Flow],
+) -> bool {
+    let has_record_dependence = flows.iter().any(flow_depends_on_selected_measurement);
+    let no_future_dependence_on_measured_qubit = flows
+        .iter()
+        .all(|flow| !flow_has_future_dependence_on_qubit(flow, candidate.qubit));
+    has_record_dependence && no_future_dependence_on_measured_qubit
+}
+
+fn flow_depends_on_selected_measurement(flow: &Flow) -> bool {
+    flow.measurements()
+        .any(|measurement| matches!(measurement, -1 | 0))
+}
+
+fn flow_has_future_dependence_on_qubit(flow: &Flow, qubit: usize) -> bool {
+    !matches!(flow.output().get(qubit), None | Some(PauliBasis::I))
+}
+
+fn measurement_to_reset_circuit(candidate: &MeasurementToResetCandidate) -> CircuitResult<Circuit> {
+    let mut circuit = Circuit::new();
+    circuit.append_instruction(CircuitInstruction::new(
+        Gate::from_name(candidate.reset_gate)?,
+        Vec::new(),
+        vec![candidate.target.clone()],
+        candidate.tag.clone(),
+    )?);
+    Ok(circuit)
+}
+
+fn reverse_measurement_rich_flow(flow: &Flow, kind: &MeasurementRichTimeReversalKind) -> Flow {
+    match kind {
+        MeasurementRichTimeReversalKind::Measurement { .. } => Flow::new(
+            flow.output().with_sign(PauliSign::Plus),
+            flow.input().with_sign(PauliSign::Plus),
+            flow.measurements(),
+            flow.observables(),
+        ),
+        MeasurementRichTimeReversalKind::MeasureReset { qubit, basis } => {
+            let input = flow.output().with_sign(PauliSign::Plus);
+            let output = flow.input().with_sign(PauliSign::Plus);
+            if flow
+                .output()
+                .get(*qubit)
+                .is_some_and(|actual| actual == *basis)
+            {
+                Flow::new(input, output, [-1], [])
+            } else {
+                Flow::new(input, output, [], [])
+            }
+        }
+    }
 }
 
 fn has_classical_flow_terms(flows: &[Flow]) -> bool {
@@ -156,7 +288,7 @@ fn has_classical_flow_terms(flows: &[Flow]) -> bool {
 
 fn measurement_rich_time_reversal_error() -> CircuitError {
     CircuitError::invalid_tableau_conversion(
-        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain measurement instruction group from M, MX, MY, MXX, MYY, or MZZ; resets, detectors, feedback, noise, repeats, and multi-instruction rewrites remain unsupported",
+        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain measurement instruction group from M, MX, MY, MXX, MYY, or MZZ, or one noiseless plain single-target measure-reset instruction from MR, MRX, or MRY; detectors, feedback, noise, repeats, and multi-instruction rewrites remain unsupported",
     )
 }
 

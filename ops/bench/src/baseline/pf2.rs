@@ -62,12 +62,26 @@ const TIME_REVERSE_FLOW_TEXTS: [&str; 4] = [
     "Z2*X301 -> X2*X301",
     "Y2*Y301 -> Y2*Y301",
 ];
-const TIME_REVERSE_FLOW_MEASUREMENT: &str = "MZZ 0 1\n";
-const TIME_REVERSE_FLOW_MEASUREMENT_TEXTS: [&str; 4] = [
+const TIME_REVERSE_FLOW_MEASUREMENT_MZZ_TEXTS: [&str; 4] = [
     "X0*X1 -> Y0*Y1 xor rec[-1]",
     "X0*X1 -> X0*X1",
     "Z0 -> Z1 xor rec[-1]",
     "Z0 -> Z0",
+];
+const TIME_REVERSE_FLOW_MEASUREMENT_M_TEXTS: [&str; 1] = ["Z0 -> rec[-1]"];
+const TIME_REVERSE_FLOW_MEASUREMENT_MX_TEXTS: [&str; 1] = ["X0 -> rec[-1]"];
+const TIME_REVERSE_FLOW_MEASUREMENT_MY_TEXTS: [&str; 1] = ["Y0 -> rec[-1]"];
+const TIME_REVERSE_FLOW_MEASUREMENT_MR_TEXTS: [&str; 2] = ["1 -> Z0", "Z0 -> rec[-1]"];
+const TIME_REVERSE_FLOW_MEASUREMENT_MRX_TEXTS: [&str; 2] = ["1 -> X0", "X0 -> rec[-1]"];
+const TIME_REVERSE_FLOW_MEASUREMENT_MRY_TEXTS: [&str; 2] = ["1 -> Y0", "Y0 -> rec[-1]"];
+const TIME_REVERSE_FLOW_MEASUREMENT_CASES: [(&str, &[&str]); 7] = [
+    ("MZZ 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_MZZ_TEXTS),
+    ("M 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_M_TEXTS),
+    ("MX 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MX_TEXTS),
+    ("MY 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MY_TEXTS),
+    ("MR 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MR_TEXTS),
+    ("MRX 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRX_TEXTS),
+    ("MRY 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRY_TEXTS),
 ];
 
 pub(super) fn run_circuit_flatten_repeat_row(
@@ -173,16 +187,21 @@ pub(super) fn run_time_reverse_flow_row(
 pub(super) fn run_time_reverse_flow_measurement_row(
     row: &BenchmarkRow,
 ) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = parse_circuit(&row.id, TIME_REVERSE_FLOW_MEASUREMENT)?;
-    let flows = parse_flows(&row.id, TIME_REVERSE_FLOW_MEASUREMENT_TEXTS)?;
+    let cases = parse_time_reverse_measurement_cases(&row.id)?;
     Ok(vec![measure_stab_batched(
         "stab_circuit_time_reversed_for_flows_measurement",
         TRANSFORM_REPETITIONS,
         || {
-            let (reversed, reversed_flows) = circuit
-                .time_reversed_for_flows(&flows)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box((circuit_checksum(&reversed), reversed_flows.len()));
+            let mut checksum = 0_u64;
+            let mut reversed_flow_count = 0_usize;
+            for (circuit, flows) in &cases {
+                let (reversed, reversed_flows) = circuit
+                    .time_reversed_for_flows(flows)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                checksum ^= circuit_checksum(&reversed);
+                reversed_flow_count += reversed_flows.len();
+            }
+            black_box((checksum, reversed_flow_count));
             Ok(())
         },
     )?])
@@ -214,7 +233,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         (
             "pf2-time-reverse-flow-measurement",
             "stab_circuit_time_reversed_for_flows_measurement",
-        ) => Some((TIME_REVERSE_FLOW_MEASUREMENT_TEXTS.len() as f64, "flows/s")),
+        ) => Some((time_reverse_measurement_flow_count() as f64, "flows/s")),
         _ => None,
     }
 }
@@ -237,7 +256,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures the scoped Rust Circuit::time_reversed_for_flows unitary subset; broader measurement-rich QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         "pf2-time-reverse-flow-measurement" => Some(
-            "contract-only: Stab measures the selected Rust Circuit::time_reversed_for_flows single measurement-rich instruction subset; broader QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures the selected Rust Circuit::time_reversed_for_flows single measurement-rich instruction, measurement-to-reset, and plain single-target measure-reset subset; broader QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         _ => None,
     }
@@ -284,6 +303,34 @@ fn parse_flows<const N: usize>(row_id: &str, texts: [&str; N]) -> Result<Vec<Flo
         .into_iter()
         .map(|text| Flow::from_str(text).map_err(|error| stab_runner_error(row_id, error)))
         .collect()
+}
+
+fn parse_flow_slice(row_id: &str, texts: &[&str]) -> Result<Vec<Flow>, BenchError> {
+    texts
+        .iter()
+        .map(|text| Flow::from_str(text).map_err(|error| stab_runner_error(row_id, error)))
+        .collect()
+}
+
+fn parse_time_reverse_measurement_cases(
+    row_id: &str,
+) -> Result<Vec<(Circuit, Vec<Flow>)>, BenchError> {
+    TIME_REVERSE_FLOW_MEASUREMENT_CASES
+        .iter()
+        .map(|(circuit_text, flow_texts)| {
+            Ok((
+                parse_circuit(row_id, circuit_text)?,
+                parse_flow_slice(row_id, flow_texts)?,
+            ))
+        })
+        .collect()
+}
+
+fn time_reverse_measurement_flow_count() -> usize {
+    TIME_REVERSE_FLOW_MEASUREMENT_CASES
+        .iter()
+        .map(|(_, flows)| flows.len())
+        .sum()
 }
 
 fn circuit_checksum(circuit: &Circuit) -> u64 {
