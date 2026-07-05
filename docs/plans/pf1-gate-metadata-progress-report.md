@@ -39,7 +39,7 @@ Implemented supporting rows:
 - `pf1-gate-metadata-identity-error-probabilities`
 - `pf1-gate-metadata-controlled-bit-targets`
 
-The selected closure row runs `cargo test -p stab-core --test gate_metadata` and is intentionally scoped to Rust metadata accessors, metadata-column support-contract synchronization, validation regressions, and parser-versus-execution boundary checks for the owned `SPP` and `SPP_DAG` cases. It does not claim Python `GateData` object shape or broad execution-column support-contract synchronization; current `SPP` and `SPP_DAG` sampler and detection-conversion support is owned by the later PF3 gate-semantics slice, while analyzer execution remains open.
+The selected closure row runs `cargo test -p stab-core --test gate_metadata` and is intentionally scoped to Rust metadata accessors, metadata-column support-contract synchronization, validation regressions, and parser-versus-execution boundary checks for the owned `SPP` and `SPP_DAG` cases. It does not claim Python `GateData` object shape or broad execution-column support-contract synchronization; `SPP` and `SPP_DAG` sampler, detection-conversion, detector-frame, and analyzer execution support are owned by the later PF3 gate-semantics slices.
 
 ## Benchmark Rows
 
@@ -105,7 +105,7 @@ Milestone-audit and full-code-review sidecars found the following issues, all fi
 - The same broad oracle sweep exposed a stale feedback-inlining rejection fixture using invalid `XCX rec[-1] 1`; it now uses valid-but-unsupported `XCZ rec[-1] 1` so parser validation and transformer capability stay separated.
 - The fixed-shape unitary matrix accessor initially relied on tableau conversion for most supported gates, which missed global-phase-sensitive exact matrix drift; it now compares all 46 supported gates against the upstream-derived matrix corpus.
 - The unitary matrix accessor initially returned nested vectors despite documenting a fixed one- or two-qubit shape; it now returns the `GateUnitaryMatrix` enum and materializes nested rows only for generic matrix consumers.
-- The later RPF3 gate-semantics slice promoted supported Hermitian `SPP` and `SPP_DAG` products in sampler and detection-conversion paths through decomposition lowering, including `skip_reference_sample=true` validation and anti-Hermitian rejection. Analyzer execution remains explicitly rejected until analyzer state propagation for variable-target unitary gates is implemented.
+- The later RPF3 gate-semantics slices promoted supported Hermitian `SPP` and `SPP_DAG` products in sampler and detection-conversion paths through decomposition lowering, including `skip_reference_sample=true` validation and anti-Hermitian rejection, and in analyzer state and gauge-tracker paths through unsigned Pauli-product propagation.
 - The RPF1 review found that the first decomposition benchmark mixed metadata lookup with parsing and printing; it is now split into pure decomposition-text reads measured in bytes per second and parseability checks measured in instructions per second.
 - The RPF1 review found that exact raw decomposition text coverage was representative instead of exhaustive; the gate metadata test now compares all 61 strings against the pinned `vendor/stim/src/stim/gates/gate_data_*.cc` files.
 - The PFM1 gate-flow metadata slice resolved the remaining measurement-rich and variable-target `GateData.flows` metadata decision by adding exact metadata tests for `M`, `MXX`, `MPP`, and `SPP`, representative circuit satisfaction checks for measurement-rich gates, and execution-boundary tests for `SPP` and `SPP_DAG` that were later updated when sampler and detection-conversion support landed.
@@ -114,7 +114,6 @@ Milestone-audit and full-code-review sidecars found the following issues, all fi
 ## Remaining PF1 Gate Metadata Work
 
 - No active PF1 Rust metadata accessor subcase remains for the current Rust metadata surface.
-- Implementation of `SPP` and `SPP_DAG` analyzer semantics if a later RPF3 or RPF6 milestone promotes those gates from explicit analyzer rejection to supported analyzer execution.
 - Any Python `GateData` class shape or binding behavior, which remains deferred.
 
 ## PFM0 Refresh

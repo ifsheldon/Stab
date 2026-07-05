@@ -11,9 +11,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use num_complex::Complex32;
 use stab_core::{
     Circuit, CircuitItem, CompiledDetectionConverter, CompiledSampler, DetectionConversionOptions,
-    Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
-    check_if_circuit_has_unsigned_stabilizer_flows, convert_measurements_to_detection_events,
-    unitary_to_tableau,
+    ErrorAnalyzerOptions, Gate, GateArgumentRule, GateTargetGroupKind, GateTargetRule, Probability,
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_to_detector_error_model,
+    convert_measurements_to_detection_events, unitary_to_tableau,
 };
 
 #[test]
@@ -600,7 +600,7 @@ fn gate_decomposition_metadata_matches_tableau_where_defined() {
 }
 
 #[test]
-fn gate_execution_contract_accepts_supported_spp_sampler_and_detector_paths() {
+fn gate_execution_contract_accepts_supported_spp_execution_paths() {
     for gate_name in ["SPP", "SPP_DAG"] {
         let circuit = Circuit::from_stim_str(&format!("{gate_name} Z0\nM 0\nDETECTOR rec[-1]\n"))
             .expect("parse SPP");
@@ -624,6 +624,8 @@ fn gate_execution_contract_accepts_supported_spp_sampler_and_detector_paths() {
             },
         )
         .expect("public conversion helper should accept supported SPP");
+        circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+            .expect("analyzer should accept supported SPP");
     }
 }
 
@@ -681,7 +683,7 @@ fn gate_metadata_api_contract_table_matches_rust_accessors() {
         );
         assert_eq!(
             row.analyzer,
-            SupportContractStatus::Reject,
+            SupportContractStatus::Yes,
             "{gate_name} analyzer support"
         );
     }

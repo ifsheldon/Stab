@@ -19,15 +19,6 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
-## 2026-07-05 - RPF3: SPP Analyzer State Propagation Boundary
-
-Status: Open
-Revealed by: implementation of sampler and detection-conversion SPP execution support plus focused analyzer probes.
-Current text: the non-deferred partial milestone says to keep `SPP` and `SPP_DAG` parser, decomposition metadata, sampler execution, detection-conversion execution, and analyzer execution behavior synchronized, but it does not say what extra analyzer state-propagation evidence is required before analyzer execution can be promoted.
-Gap: simply reusing the public `Circuit::decomposed()` SPP lowering is sufficient for sampler and detection-conversion compilation, but it is not a valid analyzer acceptance criterion by itself. During implementation, direct analyzer probes showed that promoting SPP through a naive decomposition hook could accept circuits whose fully decomposed H/S/H form still fails analyzer determinism checks. The milestone therefore needs a stricter analyzer-specific requirement instead of treating sampler, detection conversion, and analyzer promotion as one interchangeable task.
-Proposed amendment: require any future analyzer `SPP` or `SPP_DAG` promotion to prove analyzer-state equivalence against explicit small-circuit expansions, including deterministic and nondeterministic detector cases, single-product and multi-product targets, sign handling, anti-Hermitian rejection, and comparison against pinned Stim v1.16.0 `analyze_errors` behavior where applicable. Until that evidence lands, `SPP` and `SPP_DAG` analyzer execution must remain an explicit rejection even if sampler and detection-conversion support is implemented.
-Resolution: pending a future analyzer-focused PF3 or RPF6 slice.
-
 ## 2026-07-04 - RPF2: Flow-Time-Reversal Dependency Boundary
 
 Status: Open
@@ -56,6 +47,15 @@ Proposed amendment: keep the Rust API hardening documented for PF1, and require 
 Resolution: Pending future binding-parity decision.
 
 ## Resolved Entries
+
+## 2026-07-05 - RPF3: SPP Analyzer State Propagation Boundary
+
+Status: Resolved
+Revealed by: implementation of sampler and detection-conversion SPP execution support plus focused analyzer probes.
+Current text: the non-deferred partial milestone says to keep `SPP` and `SPP_DAG` parser, decomposition metadata, sampler execution, detection-conversion execution, and analyzer execution behavior synchronized, but it did not say what extra analyzer state-propagation evidence was required before analyzer execution could be promoted.
+Gap: simply reusing the public `Circuit::decomposed()` SPP lowering is sufficient for sampler and detection-conversion compilation, but it is not a valid analyzer acceptance criterion by itself. During implementation, direct analyzer probes showed that promoting SPP through a naive decomposition hook could accept circuits whose fully decomposed H/S/H form still fails analyzer determinism checks. The milestone therefore needed a stricter analyzer-specific requirement instead of treating sampler, detection conversion, and analyzer promotion as one interchangeable task.
+Proposed amendment: require analyzer `SPP` or `SPP_DAG` promotion to prove analyzer-state equivalence against explicit small-circuit expansions, including deterministic and nondeterministic detector cases, single-product and multi-product targets, sign handling, anti-Hermitian rejection, and comparison against pinned Stim v1.16.0 `analyze_errors` behavior where applicable.
+Resolution: Resolved by the analyzer SPP slice. `PendingError`, observable sensitivity, and the analyzer gauge tracker now propagate supported Hermitian `SPP` and `SPP_DAG` products as unsigned Pauli-product Clifford updates, anti-Hermitian products are rejected, `dem_analyzer_spp_matches_explicit_phase_product_expansions`, `dem_analyzer_spp_nondeterministic_detector_matches_explicit_expansion`, and `dem_analyzer_spp_nondeterministic_observable_matches_explicit_expansion` prove explicit-expansion parity, and `gate_metadata_api_contract_table_matches_rust_accessors` keeps the support contract synchronized.
 
 ## 2026-07-04 - M9: Exact Feedback Loop Refolding Boundary
 

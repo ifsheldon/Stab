@@ -81,6 +81,6 @@ just oracle::run --milestone PF6 --structural
 ## Remaining PF6 Sparse Tracker Work
 
 - Analyzer and search consumption cases that specifically require sparse tracker behavior beyond unsigned-flow checking.
-- Broader variable-target unitary semantics outside unsigned sparse-tracker propagation, including sampler, detection-conversion, analyzer, or repeat-folding execution of `SPP` and `SPP_DAG` if later milestones promote those surfaces.
+- Broader variable-target unitary semantics outside unsigned sparse-tracker propagation and the already promoted sampler, detection-conversion, detector-frame, and analyzer SPP subsets, including repeat-folding execution of `SPP` and `SPP_DAG` if later milestones promote that surface.
 - Active matched-error value-object hardening if future analyzer or search outputs require it.
 - Full ErrorMatcher provenance, heralded matching, repeat-contained noise stack frames, and `stim explain_errors` CLI remain deferred.

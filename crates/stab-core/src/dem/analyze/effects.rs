@@ -240,6 +240,18 @@ impl PendingError {
         flips
     }
 
+    pub(super) fn apply_spp_product(&mut self, terms: &[(QubitId, AnalyzerBasis)]) {
+        if !self.flips_product_measurement(terms) {
+            return;
+        }
+        for (qubit, basis) in terms {
+            self.toggle_effect(NoiseEffect {
+                qubit: *qubit,
+                pauli: (*basis).into(),
+            });
+        }
+    }
+
     pub(super) fn flips_measurement_record(&self, measurement: usize) -> bool {
         let mut flips = false;
         for recorded in &self.measurements {
@@ -278,6 +290,18 @@ impl ObservableSensitivity {
             AnalyzerBasis::Z => toggle_all(self.zs.entry(qubit).or_default(), &values),
         }
         self.remove_empty(qubit);
+    }
+
+    pub(super) fn apply_spp_product(&mut self, terms: &[(QubitId, AnalyzerBasis)]) {
+        let mut sensitive_observables = BTreeSet::new();
+        for (qubit, basis) in terms {
+            self.toggle_anticommuting_observables(*qubit, *basis, &mut sensitive_observables);
+        }
+        for (qubit, basis) in terms {
+            for observable in &sensitive_observables {
+                self.toggle(*qubit, *basis, *observable);
+            }
+        }
     }
 
     pub(super) fn flipped_observables(&self, effects: &[NoiseEffect]) -> Vec<u64> {
@@ -515,6 +539,34 @@ impl ObservableSensitivity {
             self.zs.remove(&qubit);
         }
     }
+
+    fn toggle_anticommuting_observables(
+        &self,
+        qubit: QubitId,
+        basis: AnalyzerBasis,
+        observables: &mut BTreeSet<u64>,
+    ) {
+        match basis {
+            AnalyzerBasis::X => {
+                if let Some(zs) = self.zs.get(&qubit) {
+                    toggle_all(observables, zs);
+                }
+            }
+            AnalyzerBasis::Y => {
+                if let Some(xs) = self.xs.get(&qubit) {
+                    toggle_all(observables, xs);
+                }
+                if let Some(zs) = self.zs.get(&qubit) {
+                    toggle_all(observables, zs);
+                }
+            }
+            AnalyzerBasis::Z => {
+                if let Some(xs) = self.xs.get(&qubit) {
+                    toggle_all(observables, xs);
+                }
+            }
+        }
+    }
 }
 
 fn swap_entries<T>(map: &mut BTreeMap<QubitId, T>, left: QubitId, right: QubitId) {
@@ -618,6 +670,16 @@ impl From<AnalyzerPauli> for Pauli {
             AnalyzerPauli::X => Self::X,
             AnalyzerPauli::Y => Self::Y,
             AnalyzerPauli::Z => Self::Z,
+        }
+    }
+}
+
+impl From<AnalyzerBasis> for AnalyzerPauli {
+    fn from(value: AnalyzerBasis) -> Self {
+        match value {
+            AnalyzerBasis::X => Self::X,
+            AnalyzerBasis::Y => Self::Y,
+            AnalyzerBasis::Z => Self::Z,
         }
     }
 }

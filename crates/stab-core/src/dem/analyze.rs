@@ -195,6 +195,7 @@ impl Analyzer {
             | "SQRT_YY" | "SQRT_YY_DAG" | "SQRT_ZZ" | "SQRT_ZZ_DAG" => {
                 self.apply_two_qubit_clifford(instruction)
             }
+            "SPP" | "SPP_DAG" => self.apply_spp(instruction),
             "MPAD" => self.record_measurement_pads(instruction),
             "DETECTOR" => self.record_detector(instruction),
             "OBSERVABLE_INCLUDE" => self.record_observable(instruction),
@@ -203,7 +204,7 @@ impl Analyzer {
             name => {
                 if let Ok(clifford) = SingleQubitClifford::from_gate(instruction.gate()) {
                     self.apply_single_qubit_clifford(instruction, clifford)
-                } else if matches!(name, "SPP" | "SPP_DAG") || is_noise_instruction(name) {
+                } else if is_noise_instruction(name) {
                     Err(CircuitError::invalid_detector_error_model(format!(
                         "analyze_errors does not yet support {name}"
                     )))

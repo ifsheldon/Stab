@@ -7,7 +7,7 @@ use crate::{
 
 use super::effects::analyzer_paulis_anticommute;
 use super::feedback::{ControlledPauliAction, controlled_pauli_action};
-use super::mpp::pauli_product_terms;
+use super::mpp::{pauli_product_terms, reduced_pauli_product_terms};
 use super::{AnalyzerBasis, AnalyzerPauli, DemTarget};
 
 pub(super) fn find_gauge_errors(
@@ -117,6 +117,7 @@ impl GaugeTracker {
             | "SQRT_YY" | "SQRT_YY_DAG" | "SQRT_ZZ" | "SQRT_ZZ_DAG" => {
                 self.undo_two_qubit_clifford(instruction)
             }
+            "SPP" | "SPP_DAG" => self.undo_spp(instruction),
             "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
             _ => {
                 if let Ok(clifford) = SingleQubitClifford::from_gate(instruction.gate()) {
@@ -606,6 +607,30 @@ impl GaugeTracker {
             return Err(CircuitError::invalid_detector_error_model(
                 "two-qubit tableau sensitivity mapped to identity during gauge analysis",
             ));
+        }
+        Ok(())
+    }
+
+    fn undo_spp(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        let gate_name = instruction.gate().canonical_name();
+        for group in instruction.target_groups().into_iter().rev() {
+            let terms = reduced_pauli_product_terms(gate_name, group)?;
+            let mut sensitivity = BTreeSet::new();
+            for (qubit, basis) in &terms {
+                match basis {
+                    AnalyzerBasis::X => {
+                        toggle_targets(&mut sensitivity, self.zs_for(*qubit)?.iter().copied())
+                    }
+                    AnalyzerBasis::Y => {
+                        toggle_targets(&mut sensitivity, self.xs_for(*qubit)?.iter().copied());
+                        toggle_targets(&mut sensitivity, self.zs_for(*qubit)?.iter().copied());
+                    }
+                    AnalyzerBasis::Z => {
+                        toggle_targets(&mut sensitivity, self.xs_for(*qubit)?.iter().copied())
+                    }
+                }
+            }
+            self.toggle_product_sensitivity(&terms, &sensitivity)?;
         }
         Ok(())
     }

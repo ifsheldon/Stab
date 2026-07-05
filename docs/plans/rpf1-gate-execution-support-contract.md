@@ -88,8 +88,8 @@ It prevents parser acceptance from being mistaken for sampler, detection-convers
 | `SQRT_ZZ` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `SQRT_ZZ_DAG` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `MPP` | Yes | No | No | Yes | Yes | Yes | Sampler-backed | Yes |
-| `SPP` | Yes | No | No | Yes | Yes | Decomposed | Decomposed | Reject |
-| `SPP_DAG` | Yes | No | No | Yes | Yes | Decomposed | Decomposed | Reject |
+| `SPP` | Yes | No | No | Yes | Yes | Decomposed | Decomposed | Yes |
+| `SPP_DAG` | Yes | No | No | Yes | Yes | Decomposed | Decomposed | Yes |
 | `SWAP` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `ISWAP` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
 | `CXSWAP` | Yes | Yes | Yes | Yes | Yes | Yes | Sampler-backed | Yes |
@@ -102,5 +102,5 @@ It prevents parser acceptance from being mistaken for sampler, detection-convers
 
 ## Open Follow-Ups
 
-- RPF3 has promoted supported Hermitian `SPP` and `SPP_DAG` execution in sampler and detection-conversion paths through the existing decomposition lowering, with anti-Hermitian products rejected.
-- RPF6 or a later analyzer-focused PF3 slice owns analyzer parity for `SPP`, `SPP_DAG`, generated-circuit coverage, and loop-folding evidence.
+- RPF3 has promoted supported Hermitian `SPP` and `SPP_DAG` execution in sampler and detection-conversion paths through the existing decomposition lowering, and in analyzer state and gauge-tracker paths through unsigned Pauli-product propagation, with anti-Hermitian products rejected.
+- RPF6 or a later analyzer/search slice still owns broader generated-circuit coverage, loop-folding evidence, and any remaining non-tableau legal-operation execution not named by this contract.
