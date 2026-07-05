@@ -275,6 +275,57 @@ fn circuit_flow_generators_promotes_composed_measurement_subset() {
 }
 
 #[test]
+fn circuit_flow_generators_promotes_unitary_mixed_measurement_subset() {
+    assert_eq!(
+        generator_strings("H 0\nM 0\n"),
+        vec!["1 -> Z xor rec[0]", "X -> rec[0]"]
+    );
+    assert_eq!(
+        generator_strings("S 0\nMX 0\n"),
+        vec!["1 -> X xor rec[0]", "Y -> -rec[0]"]
+    );
+    assert_eq!(
+        generator_strings("S_DAG 0\nMX 0\n"),
+        vec!["1 -> X xor rec[0]", "Y -> rec[0]"]
+    );
+
+    for text in [
+        "M 0\nH 0\n",
+        "H 0\nM 0\nS 0\n",
+        "MXX 0 1\nH 0\nCX 0 1\n",
+        "R 0\nH 0\nM 0\n",
+        "
+        REPEAT 2 {
+            M 0
+            H 0
+        }
+        ",
+    ] {
+        let circuit = circuit(text);
+        let flows = circuit_flow_generators(&circuit).expect(text);
+        assert_eq!(
+            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+            vec![true; flows.len()],
+            "{text}"
+        );
+    }
+
+    assert_eq!(
+        circuit_flow_generators(&circuit(
+            "
+            REPEAT 2 {
+                M 0
+                H 0
+            }
+            "
+        ))
+        .expect("repeat unitary-mixed generators"),
+        circuit_flow_generators(&circuit("M 0\nH 0\nM 0\nH 0\n"))
+            .expect("expanded unitary-mixed generators")
+    );
+}
+
+#[test]
 fn circuit_flow_generators_promotes_bounded_repeat_measurement_subset() {
     for (repeat_text, expanded_text) in [
         ("REPEAT 2 {\n    M 0\n}\n", "M 0\nM 0\n"),
@@ -347,10 +398,9 @@ fn circuit_flow_generators_promotes_bounded_repeat_measurement_subset() {
 fn circuit_flow_generators_rejects_unpromoted_measurement_rich_shapes() {
     for text in [
         "MR 0 0\n",
-        "MXX 0 1\nH 0\n",
-        "M 0\nH 0\n",
         "M 0\nCX sweep[0] 0\n",
-        "REPEAT 2 {\n    M 0\n    H 0\n}\n",
+        "M 0\nCX rec[-1] 0 1 2\n",
+        "M 0\nCX 1 2 rec[-1] 0\n",
     ] {
         let error = circuit_flow_generators(&circuit(text))
             .expect_err("unpromoted measurement-rich flow generator shape")

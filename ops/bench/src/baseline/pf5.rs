@@ -13,8 +13,8 @@ use super::{measure_stab_iterations, stab_runner_error};
 const UTILITY_BATCH: usize = 4096;
 #[cfg(test)]
 const UTILITY_BATCH: usize = 2;
-const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 28;
-const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 103;
+const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 32;
+const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 110;
 const FLOW_SOLVE_MEASUREMENT_CASES: usize = 2;
 const FLOW_SOLVE_MEASUREMENT_QUERIES: usize = 15;
 
@@ -59,7 +59,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "pf5-flow-generators-measurement-rich" => Some(
-            "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/pair-measurement/MPP/composed-measurement/bounded-repeat/feedback/MPAD/heralded-noise subset without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/pair-measurement/MPP/composed-measurement/unitary-mixed/bounded-repeat/feedback/MPAD/heralded-noise subset without a faithful pinned Stim CLI timing ratio",
         ),
         "pf5-flow-solve-measurement-rich" => Some(
             "report-only: Stab measures the Rust solve_for_flow_measurements promoted upstream examples without a faithful pinned Stim CLI timing ratio",
@@ -91,14 +91,14 @@ fn measure_flow_generators_measurement_rich(
     measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
         let mut flow_count = 0usize;
         for _ in 0..UTILITY_BATCH {
-            for (circuit, expected_flow_count) in &cases {
+            for (case_index, (circuit, expected_flow_count)) in cases.iter().enumerate() {
                 let flows = circuit_flow_generators(circuit)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 if flows.len() != *expected_flow_count {
                     return Err(BenchError::StabRunner {
                         row_id: row.id.clone(),
                         message: format!(
-                            "flow-generator benchmark expected {expected_flow_count} flows but got {}",
+                            "flow-generator benchmark case {case_index} expected {expected_flow_count} flows but got {}",
                             flows.len()
                         ),
                     });
@@ -181,7 +181,11 @@ fn flow_generator_measurement_rich_corpus(
         ("M 0\nCY rec[-1] 1\n", 4),
         ("MPAD 0 1 1 0\n", 4),
         ("M 0\nTICK\nM 0\n", 3),
+        ("H 0\nM 0\n", 2),
+        ("M 0\nH 0\n", 2),
+        ("H 0\nM 0\nS 0\n", 2),
         ("R 0\nM 0\n", 2),
+        ("R 0\nH 0\nM 0\n", 1),
         ("M 0\nR 0\n", 2),
         ("REPEAT 2 {\n    M 0\n}\n", 3),
         ("M 0\nMX 1\nMY 2\n", 6),

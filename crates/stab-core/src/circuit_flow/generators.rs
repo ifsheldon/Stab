@@ -3,6 +3,14 @@ use crate::{
     Pauli, PauliBasis, PauliSign, PauliString, Target,
 };
 
+mod helpers;
+
+use helpers::{
+    apply_local_tableau_to_global_pauli, instruction_qubit_count, internal_flow_error,
+    measurement_indices_reversed, pair_measurement_target_index, plain_tableau_targets,
+    plain_target_index, record_index_i32, stabilizer_to_circuit_error, unique_plain_target_indices,
+};
+
 const MAX_MEASUREMENT_RICH_FLOW_GENERATOR_ROWS: usize = 4096;
 
 /// Returns unsigned stabilizer-flow generators for the supported tableau and PFM5 measurement subset.
@@ -361,7 +369,14 @@ impl MeasurementFeedbackFlowSolver {
             }
             "TICK" => Ok(true),
             _ if feedback_measurement_basis(instruction).is_some() => {
-                self.undo_measurement_feedback(instruction)
+                if self.undo_measurement_feedback(instruction)? {
+                    Ok(true)
+                } else {
+                    self.undo_tableau_instruction(instruction)
+                }
+            }
+            _ if crate::circuit_tableau::gate_has_tableau(instruction.gate().canonical_name()) => {
+                self.undo_tableau_instruction(instruction)
             }
             _ => Ok(false),
         }
@@ -612,6 +627,39 @@ impl MeasurementFeedbackFlowSolver {
         Ok(true)
     }
 
+    fn undo_tableau_instruction(
+        &mut self,
+        instruction: &CircuitInstruction,
+    ) -> CircuitResult<bool> {
+        for group in instruction.target_groups().into_iter().rev() {
+            let Some(targets) = plain_tableau_targets(group) else {
+                return Ok(false);
+            };
+            let local_inverse =
+                crate::circuit_tableau::gate_tableau(instruction.gate().canonical_name())?
+                    .inverse()
+                    .map_err(stabilizer_to_circuit_error)?;
+            if local_inverse.len() != targets.len() {
+                return Ok(false);
+            }
+            for row in &mut self.flows {
+                let input = apply_local_tableau_to_global_pauli(
+                    row.input(),
+                    &targets,
+                    &local_inverse,
+                    self.qubit_count,
+                )?;
+                *row = Flow::new(
+                    input,
+                    row.output().clone(),
+                    row.measurements(),
+                    row.observables(),
+                );
+            }
+        }
+        Ok(true)
+    }
+
     fn finalize(mut self) -> CircuitResult<Vec<Flow>> {
         final_canonicalize_measurement_generators(
             &mut self.flows,
@@ -620,60 +668,6 @@ impl MeasurementFeedbackFlowSolver {
         )?;
         Ok(self.flows)
     }
-}
-
-fn instruction_qubit_count(instruction: &CircuitInstruction) -> usize {
-    instruction
-        .targets()
-        .iter()
-        .filter_map(Target::qubit_id)
-        .map(|qubit| qubit.get() as usize + 1)
-        .max()
-        .unwrap_or(0)
-}
-
-fn plain_target_index(target: &Target) -> Option<usize> {
-    if target.is_inverted_result_target() {
-        return None;
-    }
-    target.qubit_id().map(|qubit| qubit.get() as usize)
-}
-
-fn unique_plain_target_indices(instruction: &CircuitInstruction) -> Option<Vec<usize>> {
-    let mut qubits = Vec::with_capacity(instruction.targets().len());
-    for target in instruction.targets() {
-        let qubit = plain_target_index(target)?;
-        if qubits.contains(&qubit) {
-            return None;
-        }
-        qubits.push(qubit);
-    }
-    Some(qubits)
-}
-
-fn measurement_indices_reversed(
-    measurements_in_past: &mut usize,
-    count: usize,
-) -> CircuitResult<Vec<i32>> {
-    let mut indices = Vec::with_capacity(count);
-    for _ in 0..count {
-        *measurements_in_past = measurements_in_past.checked_sub(1).ok_or_else(|| {
-            CircuitError::invalid_tableau_conversion(
-                "measurement count underflowed during flow generation",
-            )
-        })?;
-        indices.push(record_index_i32(*measurements_in_past)?);
-    }
-    Ok(indices)
-}
-
-fn pair_measurement_target_index(target: &Target) -> CircuitResult<(usize, bool)> {
-    let qubit = target.qubit_id().ok_or_else(|| {
-        CircuitError::invalid_tableau_conversion(format!(
-            "pair-measurement flow generator target {target} does not identify a qubit"
-        ))
-    })?;
-    Ok((qubit.get() as usize, target.is_inverted_result_target()))
 }
 
 fn measured_pauli_product(
@@ -1162,14 +1156,6 @@ fn pauli_basis(pauli: Pauli) -> PauliBasis {
     }
 }
 
-fn record_index_i32(record_index: usize) -> CircuitResult<i32> {
-    i32::try_from(record_index).map_err(|_| {
-        CircuitError::invalid_tableau_conversion(format!(
-            "flow measurement record index {record_index} does not fit i32"
-        ))
-    })
-}
-
 fn unsupported_flow_generator_error(circuit: &Circuit) -> CircuitError {
     CircuitError::invalid_tableau_conversion(format!(
         "circuit_flow_generators only supports unitary tableau circuits, supported measurement/reset/pair-measurement/MPP/MPAD circuits, scoped composed measurement-rich circuits, scoped measurement-record feedback circuits, and scoped heralded-noise record circuits; got {} top-level item(s)",
@@ -1188,12 +1174,4 @@ pub(super) fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> Pauli
             }
         }),
     )
-}
-
-fn stabilizer_to_circuit_error(error: crate::StabilizerError) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(error.to_string())
-}
-
-fn internal_flow_error(message: &'static str) -> CircuitError {
-    CircuitError::invalid_tableau_conversion(message)
 }

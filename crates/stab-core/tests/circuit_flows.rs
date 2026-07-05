@@ -358,7 +358,7 @@ fn solve_for_flow_measurements_has_documented_fallback_resource_limit() {
     let circuit = circuit(
         "
         M 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
-        H 0
+        CX sweep[0] 0
     ",
     );
     let error = solve_for_flow_measurements(&circuit, &[flow("Z0 -> Z0")])
