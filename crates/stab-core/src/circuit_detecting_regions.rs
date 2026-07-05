@@ -263,11 +263,12 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
     if SingleQubitClifford::from_gate(instruction.gate()).is_ok() {
         return validate_single_plain_qubit_targets(instruction);
     }
+    if instruction.gate().is_two_qubit_gate() && instruction.gate().has_tableau() {
+        return validate_plain_qubit_pair_targets(instruction);
+    }
     match instruction.gate().canonical_name() {
         "R" | "RX" | "RY" | "M" | "MX" | "MY" => validate_single_plain_qubit_targets(instruction),
-        "CX" | "CY" | "CZ" | "MXX" | "MYY" | "MZZ" => {
-            validate_plain_qubit_pair_targets(instruction)
-        }
+        "MXX" | "MYY" | "MZZ" => validate_plain_qubit_pair_targets(instruction),
         "TICK" => validate_target_count(instruction, 0),
         "DETECTOR" => validate_detector_targets(instruction),
         "OBSERVABLE_INCLUDE" => validate_observable_include_targets(instruction),
@@ -986,10 +987,10 @@ mod tests {
     }
 
     #[test]
-    fn detecting_regions_rejects_unsupported_gate() {
+    fn detecting_regions_clifford_supports_swap_gate() {
         let circuit =
-            Circuit::from_stim_str("SWAP 0 1\nTICK\nMXX 0 1\nDETECTOR rec[-1]\n").unwrap();
-        let error = circuit_detecting_regions(
+            Circuit::from_stim_str("R 0 1\nTICK\nSWAP 0 1\nM 0\nDETECTOR rec[-1]\n").unwrap();
+        let actual = circuit_detecting_regions(
             &circuit,
             DetectingRegionOptions {
                 detectors: vec![detector(0)],
@@ -997,16 +998,16 @@ mod tests {
                 ignore_anticommutation_errors: false,
             },
         )
-        .unwrap_err();
+        .unwrap();
 
-        assert!(error.to_string().contains("does not support gate SWAP"));
+        assert_eq!(actual[&detector(0)][&0].to_string(), "+_Z");
     }
 
     #[test]
-    fn detecting_regions_clifford_rejects_unpromoted_controlled_pauli_gate() {
+    fn detecting_regions_clifford_supports_promoted_controlled_pauli_gate() {
         let circuit =
-            Circuit::from_stim_str("R 0 1\nTICK\nXCX 0 1\nM 0\nDETECTOR rec[-1]\n").unwrap();
-        let error = circuit_detecting_regions(
+            Circuit::from_stim_str("R 0\nRX 1\nTICK\nXCX 0 1\nM 0\nDETECTOR rec[-1]\n").unwrap();
+        let actual = circuit_detecting_regions(
             &circuit,
             DetectingRegionOptions {
                 detectors: vec![detector(0)],
@@ -1014,13 +1015,13 @@ mod tests {
                 ignore_anticommutation_errors: false,
             },
         )
-        .unwrap_err();
+        .unwrap();
 
-        assert!(error.to_string().contains("does not support gate XCX"));
+        assert_eq!(actual[&detector(0)][&0].to_string(), "+ZX");
     }
 
     #[test]
-    fn detecting_regions_rejects_feedback_controlled_cx() {
+    fn detecting_regions_clifford_rejects_feedback_controlled_cx() {
         let circuit =
             Circuit::from_stim_str("MXX 0 1\nCX rec[-1] 2\nTICK\nMXX 2 3\nDETECTOR rec[-1]\n")
                 .unwrap();
@@ -1038,7 +1039,7 @@ mod tests {
     }
 
     #[test]
-    fn detecting_regions_rejects_sweep_controlled_cx() {
+    fn detecting_regions_clifford_rejects_sweep_controlled_cx() {
         let circuit =
             Circuit::from_stim_str("CX sweep[0] 2\nTICK\nMXX 2 3\nDETECTOR rec[-1]\n").unwrap();
         let error = circuit_detecting_regions(

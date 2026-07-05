@@ -46,7 +46,7 @@ It remains `non-primary-report-only` and `contract-only` because this internal R
 
 ## Remaining PF6 Sparse Tracker Work
 
-- Broader all-unitary fuzzing beyond the promoted single-qubit Clifford and `CX`/`CY`/`CZ` loop-folding subset.
+- Broader all-unitary fuzzing beyond the promoted fixed two-qubit direct propagation and the single-qubit Clifford plus `CX`/`CY`/`CZ` loop-folding subset.
 - Analyzer and search consumption cases that specifically require sparse tracker behavior beyond unsigned-flow checking.
 - Active matched-error value-object hardening if future analyzer or search outputs require it.
 - Full ErrorMatcher provenance, heralded matching, repeat-contained noise stack frames, and `stim explain_errors` CLI remain deferred.

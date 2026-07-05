@@ -6,7 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget,
-    FlexPauliString, Pauli, PauliBasis, PauliPhase, QubitId, SingleQubitClifford, Target,
+    FlexPauliString, Pauli, PauliBasis, PauliPhase, PauliSign, PauliString, QubitId,
+    SingleQubitClifford, Tableau, Target,
 };
 
 mod pauli_product;
@@ -110,6 +111,9 @@ impl SparseReverseFrameTracker {
             "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
             "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
                 self.undo_heralded_measurements(instruction)
+            }
+            name if instruction.gate().is_two_qubit_gate() && instruction.gate().has_tableau() => {
+                self.undo_two_qubit_tableau(instruction, name)
             }
             _ => match SingleQubitClifford::from_gate(instruction.gate()) {
                 Ok(clifford) => self.undo_single_qubit_clifford(instruction, clifford),
@@ -440,6 +444,103 @@ impl SparseReverseFrameTracker {
                 "{name} sparse reverse tracking is not implemented for qubit-qubit controls"
             ))),
         }
+    }
+
+    fn undo_two_qubit_tableau(
+        &mut self,
+        instruction: &CircuitInstruction,
+        gate_name: &'static str,
+    ) -> CircuitResult<()> {
+        let inverse = instruction.gate().inverse().ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(format!(
+                "{gate_name} does not have a unitary inverse for sparse reverse tracking"
+            ))
+        })?;
+        let inverse_tableau = inverse.tableau().map_err(|error| {
+            CircuitError::invalid_detector_error_model(format!(
+                "failed to load inverse tableau for {gate_name} during sparse reverse tracking: {error}"
+            ))
+        })?;
+        if inverse_tableau.len() != 2 {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "{gate_name} expected a two-qubit tableau during sparse reverse tracking"
+            )));
+        }
+        for group in instruction.target_groups().into_iter().rev() {
+            let [left, right] = group else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} expected paired targets during sparse reverse tracking"
+                )));
+            };
+            let left = left.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} target {left} is not a qubit"
+                ))
+            })?;
+            let right = right.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{gate_name} target {right} is not a qubit"
+                ))
+            })?;
+            self.undo_two_qubit_tableau_group(gate_name, &inverse_tableau, left, right)?;
+        }
+        Ok(())
+    }
+
+    fn undo_two_qubit_tableau_group(
+        &mut self,
+        gate_name: &'static str,
+        inverse_tableau: &Tableau,
+        left: QubitId,
+        right: QubitId,
+    ) -> CircuitResult<()> {
+        let left_index = self.checked_qubit_index(left)?;
+        let right_index = self.checked_qubit_index(right)?;
+        let old_left_xs = clone_qubit_set(&self.xs, left_index, left, "X")?;
+        let old_left_zs = clone_qubit_set(&self.zs, left_index, left, "Z")?;
+        let old_right_xs = clone_qubit_set(&self.xs, right_index, right, "X")?;
+        let old_right_zs = clone_qubit_set(&self.zs, right_index, right, "Z")?;
+        let mut tracked_targets = BTreeSet::new();
+        tracked_targets.extend(old_left_xs.iter().copied());
+        tracked_targets.extend(old_left_zs.iter().copied());
+        tracked_targets.extend(old_right_xs.iter().copied());
+        tracked_targets.extend(old_right_zs.iter().copied());
+
+        let mut new_left_xs = BTreeSet::new();
+        let mut new_left_zs = BTreeSet::new();
+        let mut new_right_xs = BTreeSet::new();
+        let mut new_right_zs = BTreeSet::new();
+        for target in tracked_targets {
+            let input = PauliString::from_bases(
+                PauliSign::Plus,
+                [
+                    basis_from_sets(&old_left_xs, &old_left_zs, target),
+                    basis_from_sets(&old_right_xs, &old_right_zs, target),
+                ],
+            );
+            let output = inverse_tableau.apply(&input).map_err(|error| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "failed to apply inverse tableau for {gate_name} during sparse reverse tracking: {error}"
+                ))
+            })?;
+            let left_basis = output.get(0).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "inverse tableau for {gate_name} did not return left output basis"
+                ))
+            })?;
+            let right_basis = output.get(1).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "inverse tableau for {gate_name} did not return right output basis"
+                ))
+            })?;
+            insert_basis_target(&mut new_left_xs, &mut new_left_zs, target, left_basis);
+            insert_basis_target(&mut new_right_xs, &mut new_right_zs, target, right_basis);
+        }
+        replace_qubit_set(&mut self.xs, left_index, left, "X", new_left_xs)?;
+        replace_qubit_set(&mut self.zs, left_index, left, "Z", new_left_zs)?;
+        replace_qubit_set(&mut self.xs, right_index, right, "X", new_right_xs)?;
+        replace_qubit_set(&mut self.zs, right_index, right, "Z", new_right_zs)?;
+        Ok(())
     }
 
     fn undo_detector(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
@@ -815,6 +916,59 @@ fn xor_sets(left: &BTreeSet<DemTarget>, right: &BTreeSet<DemTarget>) -> BTreeSet
     result
 }
 
+fn basis_from_sets(
+    xs: &BTreeSet<DemTarget>,
+    zs: &BTreeSet<DemTarget>,
+    target: DemTarget,
+) -> PauliBasis {
+    PauliBasis::from_xz(xs.contains(&target), zs.contains(&target))
+}
+
+fn insert_basis_target(
+    xs: &mut BTreeSet<DemTarget>,
+    zs: &mut BTreeSet<DemTarget>,
+    target: DemTarget,
+    basis: PauliBasis,
+) {
+    if basis.x_bit() {
+        xs.insert(target);
+    }
+    if basis.z_bit() {
+        zs.insert(target);
+    }
+}
+
+fn clone_qubit_set(
+    sets: &[BTreeSet<DemTarget>],
+    index: usize,
+    qubit: QubitId,
+    basis: &'static str,
+) -> CircuitResult<BTreeSet<DemTarget>> {
+    sets.get(index).cloned().ok_or_else(|| {
+        CircuitError::invalid_detector_error_model(format!(
+            "missing {basis}-basis sensitivity set for qubit {} during sparse reverse tracking",
+            qubit.get()
+        ))
+    })
+}
+
+fn replace_qubit_set(
+    sets: &mut [BTreeSet<DemTarget>],
+    index: usize,
+    qubit: QubitId,
+    basis: &'static str,
+    value: BTreeSet<DemTarget>,
+) -> CircuitResult<()> {
+    let Some(slot) = sets.get_mut(index) else {
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "missing {basis}-basis sensitivity set for qubit {} during sparse reverse tracking",
+            qubit.get()
+        )));
+    };
+    *slot = value;
+    Ok(())
+}
+
 fn toggle_targets(target: &mut BTreeSet<DemTarget>, values: impl Iterator<Item = DemTarget>) {
     for value in values {
         toggle_target(target, value);
@@ -828,372 +982,4 @@ fn toggle_target(target: &mut BTreeSet<DemTarget>, value: DemTarget) {
 }
 
 #[cfg(test)]
-mod tests {
-    #![allow(
-        clippy::indexing_slicing,
-        clippy::panic,
-        clippy::unwrap_used,
-        reason = "unit tests use direct fixed-width tracker assertions for compact diagnostics"
-    )]
-
-    use super::*;
-    use crate::{Gate, MeasureRecordOffset, PauliSign, PauliString, measurement_record_count};
-
-    fn tracker_from_pauli_text(text: &str) -> SparseReverseFrameTracker {
-        let mut tracker = SparseReverseFrameTracker::new(text.len(), 0, 0, true);
-        let sensitivity = BTreeSet::from([DemTarget::logical_observable(0).unwrap()]);
-        for (index, character) in text.chars().enumerate() {
-            let qubit = QubitId::new(u32::try_from(index).unwrap()).unwrap();
-            match character {
-                'I' => {}
-                'X' => tracker.toggle_xs(qubit, &sensitivity).unwrap(),
-                'Y' => {
-                    tracker.toggle_xs(qubit, &sensitivity).unwrap();
-                    tracker.toggle_zs(qubit, &sensitivity).unwrap();
-                }
-                'Z' => tracker.toggle_zs(qubit, &sensitivity).unwrap(),
-                _ => panic!("unexpected Pauli text character {character}"),
-            }
-        }
-        tracker
-    }
-    fn circuit(text: &str) -> Circuit {
-        Circuit::from_stim_str(text).unwrap()
-    }
-    fn instruction(text: &str) -> CircuitInstruction {
-        let parsed = circuit(text);
-        let Some(CircuitItem::Instruction(instruction)) = parsed.items().first() else {
-            panic!("expected one instruction in {text}");
-        };
-        instruction.clone()
-    }
-    fn assert_undo_tableau(instruction_text: &str, cases: &[&str]) {
-        let instruction = instruction(instruction_text);
-        for &case in cases {
-            let (input, expected) = case.split_once(' ').unwrap();
-            let mut actual = tracker_from_pauli_text(input);
-            actual.undo_instruction(&instruction).unwrap();
-            assert_eq!(actual, tracker_from_pauli_text(expected), "{input}");
-        }
-    }
-    fn q(id: u32) -> Target {
-        Target::qubit(QubitId::new(id).unwrap(), false)
-    }
-    fn rec(offset: i32) -> Target {
-        Target::measurement_record(MeasureRecordOffset::try_new(offset).unwrap())
-    }
-    fn single_pauli_set(id: u64) -> BTreeSet<DemTarget> {
-        BTreeSet::from([DemTarget::logical_observable(id).unwrap()])
-    }
-    #[test]
-    fn sparse_rev_frame_tracker_undo_tableau_cx_subset() {
-        assert_undo_tableau(
-            "CX 0 1\n",
-            &["II II", "IZ ZZ", "ZI ZI", "XI XX", "IX IX", "YY XZ"],
-        );
-    }
-    #[test]
-    fn sparse_rev_frame_tracker_undo_tableau_cy_subset() {
-        assert_undo_tableau(
-            "CY 0 1\n",
-            &[
-                "II II", "IX ZX", "IY IY", "IZ ZZ", "XI XY", "XX YZ", "XY XI", "XZ YX", "YI YY",
-                "YX XZ", "YY YI", "YZ XX", "ZI ZI", "ZX IX", "ZY ZY", "ZZ IZ",
-            ],
-        );
-    }
-    #[test]
-    fn sparse_rev_frame_tracker_undo_single_qubit_cliffords_match_tableau() {
-        let target = DemTarget::logical_observable(0).unwrap();
-        let basis_cases = [
-            ("I", PauliBasis::I),
-            ("X", PauliBasis::X),
-            ("Y", PauliBasis::Y),
-            ("Z", PauliBasis::Z),
-        ];
-        for gate in SingleQubitClifford::all() {
-            let parsed_gate = Gate::from_name(gate.canonical_name()).unwrap();
-            let inverse_gate = parsed_gate.best_candidate_inverse().unwrap();
-            let expected_tableau = circuit(&format!("{} 0\n", inverse_gate.canonical_name()))
-                .to_tableau(false, false, false)
-                .unwrap();
-            let instruction = instruction(&format!("{} 0\n", gate.canonical_name()));
-            for (input_text, input_basis) in basis_cases {
-                let mut actual = tracker_from_pauli_text(input_text);
-                actual.undo_instruction(&instruction).unwrap();
-                let expected = expected_tableau
-                    .apply(&PauliString::from_bases(PauliSign::Plus, [input_basis]))
-                    .unwrap()
-                    .get(0)
-                    .unwrap();
-                let actual = actual.region_for_target(target).unwrap().get(0).unwrap();
-                assert_eq!(actual, expected, "{} {input_text}", gate.canonical_name());
-            }
-        }
-    }
-    #[test]
-    fn sparse_rev_frame_tracker_measurements_preserve_matching_basis() {
-        for (gate, input) in [("MX", "XXX"), ("MY", "YYY"), ("M", "ZZZ")] {
-            let mut actual = tracker_from_pauli_text(input);
-            actual.measurement_count = 2;
-            actual
-                .undo_instruction(&instruction(&format!("{gate} 0 2\n")))
-                .unwrap();
-            let mut expected = tracker_from_pauli_text(input);
-            expected.measurement_count = 0;
-            assert_eq!(actual, expected);
-        }
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_measurements_reject_anticommuting_basis_without_mutation() {
-        for (gate, input) in [("MX", "XIZ"), ("MY", "YIZ"), ("M", "YIZ")] {
-            let mut actual = tracker_from_pauli_text(input);
-            actual.measurement_count = 2;
-            let before = actual.clone();
-            let err = actual
-                .undo_instruction(&instruction(&format!("{gate} 0 2\n")))
-                .unwrap_err();
-            assert!(err.to_string().contains("anti-commuted"));
-            assert_eq!(actual, before);
-        }
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_measure_resets_clear_then_move_feedback() {
-        let mut actual = tracker_from_pauli_text("XXX");
-        actual.measurement_count = 2;
-        actual.undo_instruction(&instruction("MRX 0 2\n")).unwrap();
-        let mut expected = tracker_from_pauli_text("IXI");
-        expected.measurement_count = 0;
-        assert_eq!(actual, expected);
-
-        let mut actual = tracker_from_pauli_text("III");
-        actual.measurement_count = 2;
-        actual.rec_bits.insert(
-            0,
-            BTreeSet::from([DemTarget::logical_observable(0).unwrap()]),
-        );
-        actual.undo_instruction(&instruction("MRX 0 2\n")).unwrap();
-        let mut expected = tracker_from_pauli_text("XII");
-        expected.measurement_count = 0;
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_feedback_from_measurement_subset() {
-        for (gate, expected_text) in [("MX", "XII"), ("MY", "YII"), ("M", "ZII")] {
-            let mut actual = tracker_from_pauli_text("III");
-            actual.measurement_count = 2;
-            actual.rec_bits.insert(
-                0,
-                BTreeSet::from([DemTarget::logical_observable(0).unwrap()]),
-            );
-            actual
-                .undo_instruction(&instruction(&format!("{gate} 0 2\n")))
-                .unwrap();
-            let mut expected = tracker_from_pauli_text(expected_text);
-            expected.measurement_count = 0;
-            assert_eq!(actual, expected);
-        }
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_feedback_into_measurement_subset() {
-        let target = Gate::from_name("CX").unwrap();
-        let cx = CircuitInstruction::new(target, Vec::new(), vec![rec(-5), q(0)], None).unwrap();
-        let mut actual = tracker_from_pauli_text("ZII");
-        actual.measurement_count = 12;
-        actual.undo_instruction(&cx).unwrap();
-
-        let mut expected = tracker_from_pauli_text("ZII");
-        expected.measurement_count = 12;
-        expected.rec_bits.insert(
-            7,
-            BTreeSet::from([DemTarget::logical_observable(0).unwrap()]),
-        );
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_pair_measurements_subset() {
-        for (gate, expected_text) in [("MXX", "XXI"), ("MYY", "YYI"), ("MZZ", "ZZI")] {
-            let mut actual = tracker_from_pauli_text("III");
-            actual.measurement_count = 2;
-            actual.rec_bits.insert(
-                1,
-                BTreeSet::from([DemTarget::logical_observable(0).unwrap()]),
-            );
-            actual
-                .undo_instruction(&instruction(&format!("{gate} 0 1\n")))
-                .unwrap();
-
-            let mut expected = tracker_from_pauli_text(expected_text);
-            expected.measurement_count = 1;
-            assert_eq!(actual, expected);
-        }
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_mpp_measurements_subset() {
-        let mut actual = SparseReverseFrameTracker::new(6, 2, 0, true);
-        actual.rec_bits.insert(0, single_pauli_set(0));
-        actual.rec_bits.insert(1, single_pauli_set(1));
-        actual
-            .undo_instruction(&instruction("MPP X0*Y1*Z2 Z5\n"))
-            .unwrap();
-
-        let mut expected = tracker_from_pauli_text("XYZIIZ");
-        expected.xs[0] = single_pauli_set(0);
-        expected.xs[1] = single_pauli_set(0);
-        expected.zs[1] = single_pauli_set(0);
-        expected.zs[2] = single_pauli_set(0);
-        expected.zs[5] = single_pauli_set(1);
-        expected.measurement_count = 0;
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_rejects_anti_hermitian_mpp_products() {
-        let mut actual = SparseReverseFrameTracker::new(1, 1, 0, true);
-        let error = actual
-            .undo_instruction(&instruction("MPP X0*Z0\n"))
-            .unwrap_err();
-
-        assert!(error.to_string().contains("anti-Hermitian"));
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_undo_circuit_feedback_subset() {
-        let circuit = circuit(
-            "
-            MR 0
-            CX rec[-1] 0
-            M 0
-            DETECTOR rec[-1]
-            ",
-        );
-        let mut actual = SparseReverseFrameTracker::new(
-            circuit.count_qubits(),
-            measurement_record_count(&circuit).unwrap(),
-            1,
-            true,
-        );
-        actual.undo_circuit(&circuit).unwrap();
-
-        let mut expected = SparseReverseFrameTracker::new(1, 0, 0, true);
-        expected.zs[0].insert(DemTarget::relative_detector(0).unwrap());
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_tracks_anticommutation_when_requested() {
-        let circuit = circuit(
-            "
-            RX 0
-            M 0
-            DETECTOR rec[-1]
-            ",
-        );
-        let mut tracker = SparseReverseFrameTracker::new(
-            circuit.count_qubits(),
-            measurement_record_count(&circuit).unwrap(),
-            1,
-            false,
-        );
-        tracker.undo_circuit(&circuit).unwrap();
-
-        assert_eq!(
-            tracker.anticommutations,
-            BTreeSet::from([Anticommutation {
-                target: DemTarget::relative_detector(0).unwrap(),
-                location: TrackerLocation {
-                    qubit: QubitId::new(0).unwrap(),
-                    basis: TrackerBasis::X,
-                },
-            }])
-        );
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_fails_anticommutation_by_default() {
-        let circuit = circuit(
-            "
-            RX 0
-            M 0
-            DETECTOR rec[-1]
-            ",
-        );
-        let mut tracker = SparseReverseFrameTracker::new(
-            circuit.count_qubits(),
-            measurement_record_count(&circuit).unwrap(),
-            1,
-            true,
-        );
-        assert!(tracker.undo_circuit(&circuit).is_err());
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_observable_include_paulis_subset() {
-        let mut tracker = SparseReverseFrameTracker::new(4, 4, 4, true);
-        tracker
-            .undo_circuit(&circuit("OBSERVABLE_INCLUDE(5) X1 Y2 Z3 rec[-1]\n"))
-            .unwrap();
-
-        assert!(tracker.xs[0].is_empty());
-        assert!(tracker.zs[0].is_empty());
-        assert_eq!(tracker.xs[1], single_pauli_set(5));
-        assert!(tracker.zs[1].is_empty());
-        assert_eq!(tracker.xs[2], single_pauli_set(5));
-        assert_eq!(tracker.zs[2], single_pauli_set(5));
-        assert!(tracker.xs[3].is_empty());
-        assert_eq!(tracker.zs[3], single_pauli_set(5));
-        assert_eq!(tracker.rec_bits.get(&3), Some(&single_pauli_set(5)));
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_unrolls_repeat_blocks_for_now() {
-        let circuit = circuit(
-            "
-            REPEAT 2 {
-                M 0
-                DETECTOR rec[-1]
-            }
-            ",
-        );
-        let mut tracker = SparseReverseFrameTracker::new(
-            circuit.count_qubits(),
-            measurement_record_count(&circuit).unwrap(),
-            2,
-            true,
-        );
-        tracker.undo_circuit(&circuit).unwrap();
-
-        let mut expected = SparseReverseFrameTracker::new(1, 0, 0, true);
-        expected.zs[0].insert(DemTarget::relative_detector(0).unwrap());
-        expected.zs[0].insert(DemTarget::relative_detector(1).unwrap());
-        assert_eq!(tracker, expected);
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_accepts_mpad_and_discards_record_sensitivity() {
-        let mut actual = tracker_from_pauli_text("IIZ");
-        actual.measurement_count = 2;
-        actual.rec_bits.insert(
-            1,
-            BTreeSet::from([DemTarget::relative_detector(5).unwrap()]),
-        );
-        actual.undo_instruction(&instruction("MPAD 0\n")).unwrap();
-
-        let mut expected = tracker_from_pauli_text("IIZ");
-        expected.measurement_count = 1;
-        assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn sparse_rev_frame_tracker_target_pauli_mapping_is_explicit() {
-        assert_eq!(TrackerBasis::from_pauli(Pauli::X), TrackerBasis::X);
-        assert_eq!(TrackerBasis::from_pauli(Pauli::Y), TrackerBasis::Y);
-        assert_eq!(TrackerBasis::from_pauli(Pauli::Z), TrackerBasis::Z);
-    }
-}
+mod tests;

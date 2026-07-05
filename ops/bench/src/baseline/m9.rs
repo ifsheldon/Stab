@@ -6,12 +6,9 @@ use std::str::FromStr;
 
 use stab_core::{
     Circuit, CircuitError, CodeDistance, CompiledDetectionConverter, CompiledSampler,
-    DemDetectorId, DetectingRegionOptions, DetectingRegionTargetOptions,
     DetectionConversionOptions, DetectionObservableOutputMode, ErrorAnalyzerOptions, Flow, Gate,
     Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount, SampleFormat,
-    all_detecting_region_targets, all_detecting_region_ticks,
-    check_if_circuit_has_unsigned_stabilizer_flows, circuit_detecting_regions,
-    circuit_detecting_regions_for_targets, circuit_to_detector_error_model,
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_to_detector_error_model,
     circuit_with_inlined_feedback, convert_measurements_to_detection_events,
     generate_repetition_code_circuit, measurement_record_count,
     result_formats::write_ptb64_records_checked,
@@ -25,6 +22,7 @@ use crate::report::Measurement;
 
 use super::{measure_stab_iterations, stab_runner_error};
 
+mod detecting_region_rows;
 mod missing_detector_rows;
 
 const DETECT_BASIC_FIXTURE: &str =
@@ -56,67 +54,6 @@ const FLOW_CHECK_CASES: usize = 4;
 const FLOW_CHECK_FLOWS: usize = 27;
 const GATE_SEMANTIC_FIXED_TABLEAU_GATES: usize = 46;
 const GATE_SEMANTIC_SURFACES_PER_GATE: usize = 3;
-const DETECTING_REGIONS_PER_CASE: usize = 2;
-const DETECTING_REGIONS_CLIFFORD_CASES: usize = 2;
-const DETECTING_REGIONS_SIMPLE: &str = "H 0\n\
-                                        TICK\n\
-                                        CX 0 1\n\
-                                        TICK\n\
-                                        MXX 0 1\n\
-                                        DETECTOR rec[-1]\n";
-const DETECTING_REGIONS_REPEAT: &str = "H 0\n\
-                                        REPEAT 2 {\n\
-                                            TICK\n\
-                                        }\n\
-                                        CX 0 1\n\
-                                        TICK\n\
-                                        MXX 0 1\n\
-                                        DETECTOR rec[-1]\n";
-const DETECTING_REGIONS_TARGETS: &str = "R 0\n\
-                                         TICK\n\
-                                         M 0\n\
-                                         DETECTOR rec[-1]\n\
-                                         OBSERVABLE_INCLUDE(0) rec[-1]\n\
-                                         TICK\n\
-                                         OBSERVABLE_INCLUDE(1) Z1\n";
-const DETECTING_REGIONS_CLIFFORD: &str = "RX 0\n\
-                                          TICK\n\
-                                          SQRT_X 0\n\
-                                          TICK\n\
-                                          MX 0\n\
-                                          DETECTOR rec[-1]\n\
-                                          RX 1\n\
-                                          TICK\n\
-                                          H_YZ 1\n\
-                                          TICK\n\
-                                          MX 1\n\
-                                          DETECTOR rec[-1]\n\
-                                          RY 2\n\
-                                          TICK\n\
-                                          C_ZYX 2\n\
-                                          TICK\n\
-                                          MX 2\n\
-                                          DETECTOR rec[-1]\n\
-                                          R 3\n\
-                                          TICK\n\
-                                          C_NXYZ 3\n\
-                                          TICK\n\
-                                          MX 3\n\
-                                          DETECTOR rec[-1]\n\
-                                          R 4 5\n\
-                                          TICK\n\
-                                          H 4\n\
-                                          CZ 4 5\n\
-                                          TICK\n\
-                                          MX 4\n\
-                                          DETECTOR rec[-1]\n";
-const DETECTING_REGIONS_CY: &str = "RX 0\n\
-                                    RY 1\n\
-                                    TICK\n\
-                                    CY 0 1\n\
-                                    TICK\n\
-                                    MX 0\n\
-                                    DETECTOR rec[-1]\n";
 const FEEDBACK_INLINE_MPP: &str = "RX 0\n\
                                   RY 1\n\
                                   RZ 2\n\
@@ -179,12 +116,12 @@ pub(super) fn run_detection_compare_row(
             None,
         )
         .map(Some),
-        "m9-detecting-regions-basic-batch" => run_detecting_regions_basic_batch(row).map(Some),
+        "m9-detecting-regions-basic-batch" => detecting_region_rows::run_basic_batch(row).map(Some),
         "m9-missing-detectors-basic-batch" => missing_detector_rows::run_basic_batch(row).map(Some),
         "m9-feedback-inline-mpp-batch" => run_feedback_inline_mpp_batch(row).map(Some),
-        "pf5-detecting-regions-repeat" => run_detecting_regions_repeat_row(row).map(Some),
-        "pf5-detecting-regions-targets" => run_detecting_regions_targets_row(row).map(Some),
-        "pf5-detecting-regions-clifford" => run_detecting_regions_clifford_row(row).map(Some),
+        "pf5-detecting-regions-repeat" => detecting_region_rows::run_repeat_row(row).map(Some),
+        "pf5-detecting-regions-targets" => detecting_region_rows::run_targets_row(row).map(Some),
+        "pf5-detecting-regions-clifford" => detecting_region_rows::run_clifford_row(row).map(Some),
         "pf5-missing-detectors-mpp" => missing_detector_rows::run_mpp_batch(row).map(Some),
         "pf5-missing-detectors-generated-code" => {
             missing_detector_rows::run_generated_code_batch(row).map(Some)
@@ -242,23 +179,6 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf7-cli-m2d-feedback-inline", "stab_pf7_cli_m2d_feedback_inline") => {
             Some((6.0, "shots/s"))
         }
-        ("m9-detecting-regions-basic-batch", "stab_detecting_regions_basic_cases") => {
-            Some((UTILITY_BATCH as f64, "cases/s"))
-        }
-        ("m9-detecting-regions-basic-batch", "stab_detecting_regions_basic_regions") => Some((
-            (UTILITY_BATCH * DETECTING_REGIONS_PER_CASE) as f64,
-            "regions/s",
-        )),
-        ("pf5-detecting-regions-repeat", "stab_pf5_detecting_regions_repeat_ticks") => {
-            Some((UTILITY_BATCH as f64, "cases/s"))
-        }
-        ("pf5-detecting-regions-targets", "stab_pf5_detecting_regions_target_filters") => {
-            Some((UTILITY_BATCH as f64, "cases/s"))
-        }
-        ("pf5-detecting-regions-clifford", "stab_pf5_detecting_regions_clifford_gates") => Some((
-            (UTILITY_BATCH * DETECTING_REGIONS_CLIFFORD_CASES) as f64,
-            "cases/s",
-        )),
         ("pf5-has-all-flows-batch", "stab_pf5_has_flows_batch_cases") => {
             Some(((UTILITY_BATCH * FLOW_CHECK_CASES) as f64, "cases/s"))
         }
@@ -285,7 +205,8 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         | ("m9-m2d-primary-matrix-contract", "stab_m2d_primary_repetition_d3_r3_b8") => {
             Some((PRIMARY_SHOTS as f64, "shots/s"))
         }
-        _ => missing_detector_rows::measurement_work(row_id, name),
+        _ => detecting_region_rows::measurement_work(row_id, name)
+            .or_else(|| missing_detector_rows::measurement_work(row_id, name)),
     }
 }
 
@@ -315,18 +236,6 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "pf7-cli-m2d-feedback-inline" => Some(
             "report-only: Stab measures the public CLI m2d --ran_without_feedback path for PF7 visible CLI parity using the source-owned M9 feedback fixture",
         ),
-        "m9-detecting-regions-basic-batch" => Some(
-            "report-only: Stab measures the Rust detecting-regions utility subset without a faithful pinned Stim CLI timing ratio",
-        ),
-        "pf5-detecting-regions-repeat" => Some(
-            "report-only: Stab measures bounded repeat traversal in the Rust detecting-regions utility without a faithful pinned Stim CLI timing ratio",
-        ),
-        "pf5-detecting-regions-targets" => Some(
-            "report-only: Stab measures detector and logical-observable target filters in the Rust detecting-regions utility without a faithful pinned Stim CLI timing ratio",
-        ),
-        "pf5-detecting-regions-clifford" => Some(
-            "report-only: Stab measures representative single-qubit Clifford plus CY/CZ propagation in the Rust detecting-regions utility without a faithful pinned Stim CLI timing ratio",
-        ),
         "pf5-has-all-flows-batch" => Some(
             "report-only: Stab measures the Rust unsigned has_flow measurement-record and observable-dependency subset without a faithful pinned Stim CLI timing ratio",
         ),
@@ -354,175 +263,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "pf3-gate-semantic-wide" => Some(
             "report-only: Stab measures fixed-tableau gate execution contract coverage across sampler compilation, detection-conversion compilation, and analyzer propagation without a faithful pinned Stim CLI timing ratio",
         ),
-        _ => missing_detector_rows::compare_note(row_id),
+        _ => detecting_region_rows::compare_note(row_id)
+            .or_else(|| missing_detector_rows::compare_note(row_id)),
     }
-}
-
-fn run_detecting_regions_basic_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    Ok(vec![
-        measure_detecting_regions_basic(row, "stab_detecting_regions_basic_cases")?,
-        measure_detecting_regions_basic(row, "stab_detecting_regions_basic_regions")?,
-    ])
-}
-
-fn run_detecting_regions_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = parse_circuit(&row.id, DETECTING_REGIONS_REPEAT)?;
-    let detector = DemDetectorId::try_new(0).map_err(|error| stab_runner_error(&row.id, error))?;
-    Ok(vec![measure_stab_iterations(
-        "stab_pf5_detecting_regions_repeat_ticks",
-        super::STAB_COMPARE_ITERATIONS,
-        || {
-            let mut regions = 0usize;
-            for _ in 0..UTILITY_BATCH {
-                let output = circuit_detecting_regions(
-                    &circuit,
-                    DetectingRegionOptions {
-                        detectors: vec![detector],
-                        ticks: vec![0, 1, 2],
-                        ignore_anticommutation_errors: false,
-                    },
-                )
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-                regions = regions
-                    .checked_add(output.get(&detector).map_or(0, |regions| regions.len()))
-                    .ok_or_else(|| BenchError::StabRunner {
-                        row_id: row.id.clone(),
-                        message: "detecting-regions repeat benchmark region count overflowed"
-                            .to_string(),
-                    })?;
-            }
-            black_box(regions);
-            Ok(())
-        },
-    )?])
-}
-
-fn run_detecting_regions_targets_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = parse_circuit(&row.id, DETECTING_REGIONS_TARGETS)?;
-    let targets = all_detecting_region_targets(&circuit)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-    let ticks =
-        all_detecting_region_ticks(&circuit).map_err(|error| stab_runner_error(&row.id, error))?;
-    Ok(vec![measure_stab_iterations(
-        "stab_pf5_detecting_regions_target_filters",
-        super::STAB_COMPARE_ITERATIONS,
-        || {
-            let mut regions = 0usize;
-            for _ in 0..UTILITY_BATCH {
-                let output = circuit_detecting_regions_for_targets(
-                    &circuit,
-                    DetectingRegionTargetOptions {
-                        targets: targets.clone(),
-                        ticks: ticks.clone(),
-                        ignore_anticommutation_errors: false,
-                    },
-                )
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-                regions = regions
-                    .checked_add(output.values().map(|regions| regions.len()).sum::<usize>())
-                    .ok_or_else(|| BenchError::StabRunner {
-                        row_id: row.id.clone(),
-                        message: "detecting-regions target benchmark region count overflowed"
-                            .to_string(),
-                    })?;
-            }
-            black_box(regions);
-            Ok(())
-        },
-    )?])
-}
-
-fn run_detecting_regions_clifford_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = parse_circuit(&row.id, DETECTING_REGIONS_CLIFFORD)?;
-    let cy_circuit = parse_circuit(&row.id, DETECTING_REGIONS_CY)?;
-    let targets = all_detecting_region_targets(&circuit)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-    let ticks =
-        all_detecting_region_ticks(&circuit).map_err(|error| stab_runner_error(&row.id, error))?;
-    let cy_targets = all_detecting_region_targets(&cy_circuit)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-    let cy_ticks = all_detecting_region_ticks(&cy_circuit)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-    Ok(vec![measure_stab_iterations(
-        "stab_pf5_detecting_regions_clifford_gates",
-        super::STAB_COMPARE_ITERATIONS,
-        || {
-            let mut regions = 0usize;
-            for _ in 0..UTILITY_BATCH {
-                let output = circuit_detecting_regions_for_targets(
-                    &circuit,
-                    DetectingRegionTargetOptions {
-                        targets: targets.clone(),
-                        ticks: ticks.clone(),
-                        ignore_anticommutation_errors: false,
-                    },
-                )
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-                let cy_output = circuit_detecting_regions_for_targets(
-                    &cy_circuit,
-                    DetectingRegionTargetOptions {
-                        targets: cy_targets.clone(),
-                        ticks: cy_ticks.clone(),
-                        ignore_anticommutation_errors: false,
-                    },
-                )
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-                regions = regions
-                    .checked_add(output.values().map(|regions| regions.len()).sum::<usize>())
-                    .and_then(|count| {
-                        count.checked_add(
-                            cy_output
-                                .values()
-                                .map(|regions| regions.len())
-                                .sum::<usize>(),
-                        )
-                    })
-                    .ok_or_else(|| BenchError::StabRunner {
-                        row_id: row.id.clone(),
-                        message: "detecting-regions Clifford benchmark region count overflowed"
-                            .to_string(),
-                    })?;
-            }
-            black_box(regions);
-            Ok(())
-        },
-    )?])
-}
-
-fn measure_detecting_regions_basic(
-    row: &BenchmarkRow,
-    measurement_name: &'static str,
-) -> Result<Measurement, BenchError> {
-    let circuit = parse_circuit(&row.id, DETECTING_REGIONS_SIMPLE)?;
-    let detector = DemDetectorId::try_new(0).map_err(|error| stab_runner_error(&row.id, error))?;
-    measure_stab_iterations(measurement_name, super::STAB_COMPARE_ITERATIONS, || {
-        let mut regions = 0usize;
-        for _ in 0..UTILITY_BATCH {
-            let output = circuit_detecting_regions(
-                &circuit,
-                DetectingRegionOptions {
-                    detectors: vec![detector],
-                    ticks: vec![0, 1],
-                    ignore_anticommutation_errors: false,
-                },
-            )
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            let detector_regions = output
-                .get(&detector)
-                .ok_or_else(|| BenchError::StabRunner {
-                    row_id: row.id.clone(),
-                    message: "detecting-regions benchmark output omitted detector D0".to_string(),
-                })?;
-            regions = regions.checked_add(detector_regions.len()).ok_or_else(|| {
-                BenchError::StabRunner {
-                    row_id: row.id.clone(),
-                    message: "detecting-regions benchmark region count overflowed".to_string(),
-                }
-            })?;
-        }
-        black_box(regions);
-        Ok(())
-    })
 }
 
 fn run_has_flows_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
