@@ -361,7 +361,7 @@ Tasks:
 - Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures.
 - Extend graphlike, hypergraph, shortest-error, SAT, and WCNF behavior for selected generated-circuit and direct DEM cases.
 - Add ordering-insensitive structural comparators for search outputs where exact target order is not stable.
-- Improve sparse reverse detector-frame tracking for optimized loop folding and all-unitary fuzz coverage where that affects analyzer or search correctness. The supported-Clifford unitary-repeat folding subset is implemented; broader all-unitary fuzzing and analyzer/search-specific consumption remain active.
+- Improve sparse reverse detector-frame tracking for optimized loop folding and all-unitary fuzz coverage where that affects analyzer or search correctness. The supported-Clifford unitary-repeat folding subset is implemented for the full single-qubit Clifford gate set and fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets; broader all-unitary fuzzing and analyzer/search-specific consumption remain active.
 - Harden matched-error value objects only where active analyzer/search outputs require them.
 - Keep full stack-frame provenance, heralded matching, repeat-contained noise provenance, and `explain_errors` CLI deferred.
 

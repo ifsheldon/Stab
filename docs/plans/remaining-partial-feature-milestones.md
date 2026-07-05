@@ -396,7 +396,7 @@ Implementation tasks:
 
 - Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures. The generated-QEC semantic subset for noisy repetition-code and rotated-surface-code circuits is implemented and tracked in [rpf6-analyzer-progress-report.md](rpf6-analyzer-progress-report.md).
 - Extend graphlike, hypergraph, shortest-error, SAT, and WCNF search behavior for selected generated-circuit and DEM cases.
-- Improve sparse reverse detector-frame tracking for optimized loop folding and all-unitary fuzz coverage where it affects analyzer or search correctness.
+- Improve sparse reverse detector-frame tracking for optimized loop folding and all-unitary fuzz coverage where it affects analyzer or search correctness. The supported-Clifford repeat-folding subset is implemented for the full single-qubit Clifford gate set and fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets; broader all-unitary fuzzing and analyzer/search-specific consumption remain active.
 - Harden matched-error value objects only when required by active analyzer/search outputs.
 - Keep full stack-frame provenance, heralded matching, repeat-contained noise provenance, and `explain_errors` CLI deferred.
 

@@ -161,7 +161,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures generated rotated-surface-code DEM hypergraph search after source-owned Rust analysis and decomposition; pinned Stim exposes this as C++ API behavior, not a faithful public CLI baseline",
         ),
         "pf6-sparse-rev-frame-loop" => Some(
-            "report-only: Stab measures public unsigned-flow checking over a measurement-dependent supported-Clifford unitary repeat so the sparse reverse frame tracker must use loop folding; broader sparse tracker parity and provenance remain outside this row",
+            "report-only: Stab measures public unsigned-flow checking over a measurement-dependent fixed two-qubit Clifford unitary repeat so the sparse reverse frame tracker must use loop folding; broader sparse tracker parity and provenance remain outside this row",
         ),
         "pf3-analyze-errors-sweep" => Some(
             "report-only: Stab measures in-process analyzer handling for sweep-controlled Clifford gates that are semantically ignored by the error analyzer",
@@ -396,7 +396,7 @@ fn run_sparse_reverse_frame_loop_row(row: &BenchmarkRow) -> Result<Vec<Measureme
     let circuit = Circuit::from_stim_str(&sparse_reverse_frame_loop_fixture())
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let flows = [
-        Flow::from_str("X -> rec[-1]").map_err(|error| BenchError::StabRunner {
+        Flow::from_str("Z_ -> rec[-1]").map_err(|error| BenchError::StabRunner {
             row_id: row.id.clone(),
             message: format!("failed to parse sparse reverse flow benchmark fixture: {error}"),
         })?,
@@ -645,7 +645,7 @@ fn graphlike_search_model(row_id: &str) -> Result<DetectorErrorModel, BenchError
 }
 
 fn sparse_reverse_frame_loop_fixture() -> String {
-    format!("REPEAT {SPARSE_REVERSE_UNITARY_REPEAT_COUNT} {{\n    H 0\n}}\nM 0\n")
+    format!("REPEAT {SPARSE_REVERSE_UNITARY_REPEAT_COUNT} {{\n    SWAP 0 1\n}}\nM 1\n")
 }
 
 fn error_decomp_loop_folded_fixture() -> String {

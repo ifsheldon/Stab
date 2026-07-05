@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, QubitId,
-    RepeatBlock, SingleQubitClifford,
+    RepeatBlock, SingleQubitClifford, Target,
 };
 
 use super::{SparseReverseFrameTracker, toggle_targets};
@@ -115,8 +115,29 @@ fn is_supported_unitary_circuit(circuit: &Circuit) -> bool {
 }
 
 fn is_supported_unitary_instruction(instruction: &CircuitInstruction) -> bool {
-    SingleQubitClifford::from_gate(instruction.gate()).is_ok()
-        || matches!(instruction.gate().canonical_name(), "CX" | "CY" | "CZ")
+    if SingleQubitClifford::from_gate(instruction.gate()).is_ok() {
+        return has_plain_qubit_groups(instruction, 1);
+    }
+    instruction.gate().is_two_qubit_gate()
+        && instruction.gate().has_tableau()
+        && has_plain_qubit_groups(instruction, 2)
+}
+
+fn has_plain_qubit_groups(instruction: &CircuitInstruction, group_size: usize) -> bool {
+    instruction
+        .target_groups()
+        .into_iter()
+        .all(|group| group.len() == group_size && group.iter().all(is_plain_qubit_target))
+}
+
+fn is_plain_qubit_target(target: &Target) -> bool {
+    matches!(
+        target,
+        Target::Qubit {
+            inverted: false,
+            ..
+        }
+    )
 }
 
 fn seed_slot(
@@ -273,6 +294,35 @@ mod tests {
     }
 
     #[test]
+    fn unitary_repeat_folding_matches_naive_fixed_two_qubit_cliffords() {
+        let repeat = repeat(
+            "
+            REPEAT 29 {
+                XCX 0 1
+                XCY 1 2
+                SWAP 0 2
+                ISWAP 1 0
+                CXSWAP 2 1
+                SQRT_XX 0 1
+                SQRT_YY_DAG 1 2
+                SQRT_ZZ 0 2
+                SQRT_ZZ_DAG 2 1
+                H 0
+                S 2
+            }
+            ",
+        );
+        let mut folded = tracker_from_pauli_text("XYZ");
+        assert!(try_undo_supported_unitary_repeat(&mut folded, &repeat).unwrap());
+
+        let mut naive = tracker_from_pauli_text("XYZ");
+        for _ in 0..repeat.repeat_count().get() {
+            naive.undo_circuit(repeat.body()).unwrap();
+        }
+        assert_eq!(folded, naive);
+    }
+
+    #[test]
     fn unitary_repeat_folding_handles_huge_periodic_loop() {
         let repeat = repeat(
             "
@@ -308,7 +358,33 @@ mod tests {
                 &repeat(
                     "
                     REPEAT 2 {
-                        SWAP 0 1
+                        CX rec[-1] 1
+                    }
+                    "
+                ),
+            )
+            .unwrap()
+        );
+        assert!(
+            !try_undo_supported_unitary_repeat(
+                &mut tracker,
+                &repeat(
+                    "
+                    REPEAT 2 {
+                        CX sweep[0] 1
+                    }
+                    "
+                ),
+            )
+            .unwrap()
+        );
+        assert!(
+            !try_undo_supported_unitary_repeat(
+                &mut tracker,
+                &repeat(
+                    "
+                    REPEAT 2 {
+                        SPP X0*X1
                     }
                     "
                 ),

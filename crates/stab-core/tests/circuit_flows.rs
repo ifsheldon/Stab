@@ -134,7 +134,7 @@ fn check_if_circuit_has_unsigned_stabilizer_flows_supports_observable_dependenci
 
 #[test]
 fn check_if_circuit_has_unsigned_stabilizer_flows_folds_unitary_repeats() {
-    let circuit = circuit(
+    let h_repeat_circuit = circuit(
         "
         REPEAT 1000001 {
             H 0
@@ -144,7 +144,24 @@ fn check_if_circuit_has_unsigned_stabilizer_flows_folds_unitary_repeats() {
     );
     let flows = [flow("X -> rec[-1]"), flow("Z -> rec[-1]")];
     assert_eq!(
-        check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+        check_if_circuit_has_unsigned_stabilizer_flows(&h_repeat_circuit, &flows),
+        vec![true, false]
+    );
+
+    let fixed_two_qubit_circuit = circuit(
+        "
+        REPEAT 1000001 {
+            SWAP 0 1
+        }
+        M 1
+        ",
+    );
+    let fixed_two_qubit_flows = [flow("Z_ -> rec[-1]"), flow("_Z -> rec[-1]")];
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(
+            &fixed_two_qubit_circuit,
+            &fixed_two_qubit_flows,
+        ),
         vec![true, false]
     );
 }
