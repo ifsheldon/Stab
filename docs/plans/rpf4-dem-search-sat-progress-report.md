@@ -24,6 +24,6 @@ This is not a full folded-traversal implementation. These APIs still expand repe
 
 ## Still Open
 
-- True folded graphlike, hypergraph, SAT, analyzer, and ErrorMatcher traversal remains open if Stab chooses to avoid expansion even within the current cap; the sampler now has folded compilation and direct detector sampling, but repeated stochastic body execution can still be optimized when dense outputs do not require per-occurrence work.
+- True folded graphlike, hypergraph, SAT, analyzer, and ErrorMatcher traversal remains open if Stab chooses to avoid expansion even within the current cap; the sampler now has folded compilation, direct detector sampling, and zero-probability repeat skipping, but repeated nonzero-probability body execution can still be optimized when dense outputs do not require per-occurrence work.
 - Broader RPF6 analyzer and search parity remains active beyond the repeat-resource guardrails recorded here.
 - The broad RPF4 milestone must not be closed until these remaining traversal consumers are either folded, capped with tests and benchmarks, or explicitly deferred.

@@ -326,7 +326,7 @@ Oracle rows:
 
 Benchmarks:
 
-- Implement `pf4-dem-flatten-repeat`, `pf4-dem-rounded`, `pf4-dem-coordinate-map`, `pf4-dem-folded-traversal`, `pf4-dem-folded-graphlike-traversal`, and `pf4-dem-sampler-folded-repeat`. These rows now have report-only runner coverage for current materialized transforms, coordinate resource behavior, capped search/analyzer traversal behavior, and folded sampler compile or direct-sampling behavior with sampled-error caps. Full folded traversal remains active beyond these report-only rows.
+- Implement `pf4-dem-flatten-repeat`, `pf4-dem-rounded`, `pf4-dem-coordinate-map`, `pf4-dem-folded-traversal`, `pf4-dem-folded-graphlike-traversal`, and `pf4-dem-sampler-folded-repeat`. These rows now have report-only runner coverage for current materialized transforms, coordinate resource behavior, capped search/analyzer traversal behavior, and folded sampler compile, stochastic direct-sampling, zero-probability repeat-skip behavior, and sampled-error caps. Full folded traversal remains active beyond these report-only rows.
 - Use `direct-match` only when Stim v1.16.0 exposes a faithful timing surface.
 - Keep rows report-only when they prove Stab resource behavior without a faithful Stim ratio.
 

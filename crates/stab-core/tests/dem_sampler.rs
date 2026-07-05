@@ -407,7 +407,7 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
     assert!(record.detectors.iter().all(|bit| *bit));
     assert_eq!(record.observables, [true]);
 
-    let huge_error_record = DetectorErrorModel::from_dem_str(
+    let huge_no_op_error_record = DetectorErrorModel::from_dem_str(
         "
         repeat 64000001 {
             error(0) D0
@@ -415,10 +415,56 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
         ",
     )
     .expect("parse huge flat error-record DEM");
-    let huge_sampler =
-        CompiledDemSampler::compile(&huge_error_record).expect("compile folded error-record DEM");
+    let huge_sampler = CompiledDemSampler::compile(&huge_no_op_error_record)
+        .expect("compile folded error-record DEM");
     assert_eq!(huge_sampler.error_count(), 64_000_001);
+    let output = huge_sampler
+        .sample_detection_events_with_seed(3, Some(5))
+        .expect("skip huge detector-only no-op repeat");
+    assert_eq!(output.detector_count, 1);
+    assert_eq!(output.observable_count, 0);
+    assert_eq!(output.records.len(), 3);
+    assert!(
+        output
+            .records
+            .iter()
+            .all(|record| record.detectors == [false] && record.observables.is_empty())
+    );
+
+    let huge_stochastic_record = DetectorErrorModel::from_dem_str(
+        "
+        repeat 64000001 {
+            error(0.5) D0
+        }
+        ",
+    )
+    .expect("parse huge stochastic DEM");
+    let huge_stochastic_sampler =
+        CompiledDemSampler::compile(&huge_stochastic_record).expect("compile stochastic DEM");
+    assert_eq!(huge_stochastic_sampler.error_count(), 64_000_001);
+    let mixed_zero_and_stochastic_record = DetectorErrorModel::from_dem_str(
+        "
+        repeat 32000001 {
+            error(0.5) D0
+            error(0) D0
+        }
+        ",
+    )
+    .expect("parse mixed stochastic and zero-probability DEM");
+    let mixed_zero_and_stochastic_sampler =
+        CompiledDemSampler::compile(&mixed_zero_and_stochastic_record).expect("compile mixed DEM");
+    assert_eq!(mixed_zero_and_stochastic_sampler.error_count(), 64_000_002);
     let error = huge_sampler
+        .sample_detection_events_and_errors_with_seed(1, Some(5))
+        .expect_err("reject materialized sampled-error record");
+    assert!(
+        error
+            .to_string()
+            .contains("would require 64000002 buffered units"),
+        "{error}"
+    );
+
+    let error = huge_stochastic_sampler
         .sample_detection_events_with_seed(1, Some(5))
         .expect_err("reject excessive detector-only sampled work");
     assert!(
@@ -428,21 +474,21 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
         "{error}"
     );
 
+    let error = mixed_zero_and_stochastic_sampler
+        .sample_detection_events_with_seed(1, Some(5))
+        .expect_err("reject mixed zero-probability traversal work");
+    assert!(
+        error
+            .to_string()
+            .contains("would apply 64000002 sampled errors"),
+        "{error}"
+    );
+
     let error = huge_sampler
         .try_for_each_detection_event_and_error_with_seed(1, Some(5), |_record, _error_record| {
             Ok::<(), CircuitError>(())
         })
         .expect_err("reject excessive streamed sampled-error record");
-    assert!(
-        error
-            .to_string()
-            .contains("would require 64000002 buffered units"),
-        "{error}"
-    );
-
-    let error = huge_sampler
-        .sample_detection_events_and_errors_with_seed(1, Some(5))
-        .expect_err("reject materialized sampled-error record");
     assert!(
         error
             .to_string()

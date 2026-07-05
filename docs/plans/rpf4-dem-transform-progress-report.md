@@ -48,7 +48,7 @@ Report-only runner coverage:
 - `pf4-dem-flatten-repeat`
 - `pf4-dem-rounded`
 - `pf4-dem-coordinate-map`, tracked in `docs/plans/rpf4-dem-coordinate-progress-report.md`
-- `pf4-dem-sampler-folded-repeat`, tracking folded sampler compilation and direct sampling plus sampled-error caps in `docs/plans/rpf4-dem-sampler-progress-report.md`
+- `pf4-dem-sampler-folded-repeat`, tracking folded sampler compilation, stochastic direct sampling, zero-probability repeat skipping, and sampled-error caps in `docs/plans/rpf4-dem-sampler-progress-report.md`
 
 Still placeholder rows:
 

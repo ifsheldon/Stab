@@ -9,8 +9,9 @@ It is not an RPF4 completion report because sampled-error records still use Stim
 
 - `CompiledDemSampler::compile` now stores a folded operation tree instead of unrolling every repeated DEM error into the compiled operation list.
 - Detector-only sampling walks the folded operation tree directly and no longer allocates a flat sampled-error record internally.
+- Detector-only sampling skips folded repeat bodies whose errors all have zero probability, so huge no-op repeats no longer consume sampled-error application work.
 - Flat sampled-error output and replay preserve the existing public error-bit order, including repeated errors, through the folded operation tree.
-- Detector-only and sampled-error sampling reject per-shot repeated error work above the current sampled-error application limit before walking the folded tree.
+- Detector-only stochastic sampling and sampled-error sampling reject per-shot repeated error work above the current sampled-error application limit before walking the folded tree.
 - Materialized sampled-error APIs and sampled-error streaming still reject per-shot flat error records that exceed the existing buffer limits before allocating the record.
 - Programmatic repeat nesting above the shared DEM nesting limit is still rejected with a domain error.
 
@@ -23,7 +24,7 @@ Implemented Rust test:
 - `pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps`
 - `pf4_dem_sampler_rejects_programmatic_deep_repeat_nesting`
 
-These tests cover folded compilation past the previous repeat-count and expanded-iteration caps, shifted repeated detector sampling, observable parity through repeated errors, flat error-bit order and replay through nested repeats, detector-only sampled-work cap enforcement, sampled-error streaming and materialized buffer cap enforcement, and deep repeat-nesting rejection.
+These tests cover folded compilation past the previous repeat-count and expanded-iteration caps, shifted repeated detector sampling, observable parity through repeated errors, flat error-bit order and replay through nested repeats, detector-only zero-probability repeat skipping, detector-only stochastic sampled-work cap enforcement, sampled-error streaming and materialized buffer cap enforcement, and deep repeat-nesting rejection.
 
 ## Oracle Rows
 
@@ -41,7 +42,7 @@ Report-only runner coverage:
 
 - `pf4-dem-sampler-folded-repeat`
 
-The row measures folded `CompiledDemSampler` compile and direct sample behavior while sampled-error materialization and excessive repeated-error work remain capped.
+The row measures folded `CompiledDemSampler` compile, stochastic direct sample behavior, and zero-probability repeat skipping while sampled-error materialization and excessive stochastic repeated-error work remain capped.
 It remains `non-primary-report-only` because it is a Rust public API contract workload and because broad PF4 traversal consumers still need folded or explicitly capped treatment.
 It is not part of the 1.25x primary threshold file.
 
@@ -62,6 +63,6 @@ just bench::smoke
 
 ## Remaining RPF4 Work
 
-- Optimize folded DEM sampler execution for repeated stochastic bodies whose dense detector outputs do not require per-occurrence work, then tighten or remove the current sampled-error application work cap without changing flat sampled-error semantics.
+- Optimize folded DEM sampler execution for repeated nonzero-probability bodies whose dense detector outputs do not require per-occurrence work, then tighten or remove the current sampled-error application work cap without changing flat sampled-error semantics.
 - Finish folded traversal or explicit caps for graphlike search, hypergraph search, SAT or WCNF encoding, matcher-adjacent operations, and analyzer-adjacent operations.
 - Add benchmark runners for the remaining `pf4-dem-folded-traversal` and `pf4-dem-folded-graphlike-traversal` rows only when their implementation or explicit cap behavior is source-owned enough to measure honestly.
