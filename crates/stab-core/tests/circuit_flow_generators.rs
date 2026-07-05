@@ -34,6 +34,18 @@ fn circuit_flow_generators_composed_unitary_matches_stim() {
 }
 
 #[test]
+fn circuit_flow_generators_promotes_spp_measurement_row_unitary_examples() {
+    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators.test.cc.
+    assert_eq!(generator_strings("SPP Z0\n"), vec!["X -> Y", "Z -> Z"]);
+    assert_eq!(generator_strings("SPP X0 Z0\n"), vec!["X -> Y", "Z -> X"]);
+    assert_eq!(
+        generator_strings("SPP X0*X1\n"),
+        vec!["_X -> _X", "_Z -> -XY", "X_ -> X_", "Z_ -> -YX"]
+    );
+    assert_eq!(generator_strings("SPP_DAG Z0\n"), vec!["X -> -Y", "Z -> Z"]);
+}
+
+#[test]
 fn circuit_flow_generators_two_qubit_unitary_order_matches_stim() {
     assert_eq!(
         generator_strings("ISWAP 3 1 2 3\n"),
@@ -216,6 +228,10 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
         "MPP X0*X0\n",
         "MPP !X0*X0\n",
         "MPP X0 X1*X1\n",
+        "SPP Z0\n",
+        "SPP X0 Z0\n",
+        "SPP X0*X1\n",
+        "SPP_DAG Z0\n",
         "M 0\nCX rec[-1] 0\n",
         "MPP X0*X1\nCX rec[-1] 0\n",
         "M 0\nCY rec[-1] 1\n",
@@ -432,6 +448,14 @@ fn circuit_flow_generators_measurement_subset_rejects_anti_hermitian_mpp_product
     assert!(
         error.contains("not Hermitian"),
         "unexpected anti-Hermitian MPP error: {error}"
+    );
+
+    let error = circuit_flow_generators(&circuit("SPP X0*Z0\n"))
+        .expect_err("anti-Hermitian SPP product")
+        .to_string();
+    assert!(
+        error.contains("anti-Hermitian"),
+        "unexpected anti-Hermitian SPP error: {error}"
     );
 }
 

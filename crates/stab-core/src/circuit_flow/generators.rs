@@ -25,7 +25,7 @@ pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
 }
 
 fn unitary_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
-    let tableau = circuit.to_tableau(false, false, false)?;
+    let tableau = unitary_flow_tableau(circuit)?;
     let mut flows = Vec::with_capacity(tableau.len() * 2);
     for index in (0..tableau.len()).rev() {
         flows.push(Flow::new(
@@ -48,6 +48,22 @@ fn unitary_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
         ));
     }
     Ok(flows)
+}
+
+fn unitary_flow_tableau(circuit: &Circuit) -> CircuitResult<crate::Tableau> {
+    if circuit_contains_spp(circuit) {
+        return circuit.decomposed()?.to_tableau(false, false, false);
+    }
+    circuit.to_tableau(false, false, false)
+}
+
+fn circuit_contains_spp(circuit: &Circuit) -> bool {
+    circuit.items().iter().any(|item| match item {
+        CircuitItem::Instruction(instruction) => {
+            matches!(instruction.gate().canonical_name(), "SPP" | "SPP_DAG")
+        }
+        CircuitItem::RepeatBlock(repeat) => circuit_contains_spp(repeat.body()),
+    })
 }
 
 fn circuit_needs_measurement_rich_generators(circuit: &Circuit) -> bool {
