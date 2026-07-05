@@ -19,6 +19,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
+## 2026-07-05 - PFM4/PFM6: Generated Surface-Code Folded Coordinate Boundary
+
+Status: Open
+Revealed by: implementation of the PFM4 DEM coordinate-resource slice.
+Current text: PFM4 asks to finish selected folded coordinate behavior for large, nested, and ambiguous repeats, while PFM6 tracks broader generated-loop analyzer behavior and loop-folded decomposition families.
+Gap: the pinned Stim v1.16.0 `surface_code_coords_dont_infinite_loop` case compares `DetectorErrorModel::get_detector_coordinates` against `Circuit::get_detector_coordinates` after running `ErrorAnalyzer::circuit_to_detector_error_model` with `decompose_errors=true`, `fold_loops=true`, and remnant-edge blocking on a generated rotated surface-code circuit with prefix, repeat, and tail structure. Stab currently rejects this generated circuit before producing a DEM because `fold_loops=true` only supports top-level repeat-only and selected prefixed-repeat shapes. Treating the coordinate API as incomplete would hide the real analyzer loop-folding dependency, while treating the current coordinate tests as completion would overstate generated-loop parity.
+Proposed amendment: split the pinned generated surface-code coordinate case into a PFM6 analyzer-loop-folding requirement for generated prefix, repeat, and tail circuits, followed by a PFM4 coordinate equivalence check that compares DEM and circuit coordinate maps once the folded analyzer can produce the DEM. Keep the current explicit rejection test as a non-completion guard until that analyzer shape is implemented or deliberately scoped out.
+Resolution: Pending PFM6 generated-loop analyzer work.
+
 ## 2026-07-04 - RPF2: Flow-Time-Reversal Dependency Boundary
 
 Status: Open

@@ -3,7 +3,7 @@
 ## Summary
 
 This RPF6 report makes the generated-QEC analyzer subset and the selected loop-folded error-decomposition subset explicit in the source-owned evidence.
-It does not complete RPF6 because broad generated-loop handling, graphlike and hypergraph generated search beyond the promoted QEC subset, sparse reverse tracker work beyond supported-Clifford unitary repeats, and active matched-error hardening remain open.
+It does not complete RPF6 because broad generated-loop handling, including generated prefix, repeat, and tail circuits under `fold_loops=true`, graphlike and hypergraph generated search beyond the promoted QEC subset, sparse reverse tracker work beyond supported-Clifford unitary repeats, and active matched-error hardening remain open.
 
 ## Implemented Evidence Slice
 
@@ -30,6 +30,10 @@ Implemented rows:
 
 - `pf6-analyzer-generated-qec-rust`
 - `pf6-error-decomp-loop-folded-rust`
+
+Implemented explicit-gap guard row:
+
+- `pf6-analyzer-generated-fold-loop-gap-rust`
 
 Still broad and manifest-only:
 
@@ -68,6 +72,7 @@ Target checks for this slice:
 ```sh
 cargo test -p stab-core generated_qec_dem --quiet
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_loops_ --quiet
+cargo test -p stab-core --test dem_api pf4_dem_generated_surface_code_fold_loop_coordinate_gap_is_explicit --quiet
 cargo test -p stab-bench pf6_analyzer_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-bench --quiet
 cargo test -p stab-oracle fixtures --quiet
@@ -80,7 +85,7 @@ just bench::compare --only pf6-error-decomp-loop-folded --baseline target/benchm
 
 ## Remaining RPF6 Work
 
-- Generated-loop analyzer behavior beyond the promoted generated-QEC semantic subset.
+- Generated-loop analyzer behavior beyond the promoted generated-QEC semantic subset, including the pinned Stim generated surface-code prefix, repeat, and tail coordinate case with `fold_loops=true`.
 - Broader loop-folded error decomposition subcases beyond the promoted repeated composite-error and remnant-edge blocking fixtures.
 - Generated-circuit graphlike, hypergraph, shortest-error, SAT, and WCNF search evidence.
 - Sparse reverse detector-frame tracker analyzer/search-specific consumption beyond the supported-Clifford generated repeat-folding evidence.

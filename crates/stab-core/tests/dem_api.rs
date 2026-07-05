@@ -7,8 +7,10 @@ use std::collections::BTreeMap;
 use std::ops::Bound;
 
 use stab_core::{
-    CircuitResult, DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock,
-    DemTarget, DetectorErrorModel, Probability, RepeatCount,
+    CircuitResult, CodeDistance, DemDetectorId, DemInstruction, DemInstructionKind, DemItem,
+    DemRepeatBlock, DemTarget, DetectorErrorModel, ErrorAnalyzerOptions, Probability, RepeatCount,
+    RoundCount, SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
+    generate_surface_code_circuit,
 };
 
 #[test]
@@ -421,6 +423,78 @@ fn pf1_dem_counts_errors_and_coordinates_through_repeats() {
 }
 
 #[test]
+fn pf4_dem_coordinates_trivial_selected_matches_pinned_stim_examples() {
+    let dem =
+        DetectorErrorModel::from_dem_str("detector(1, 2) D1\n").expect("parse coordinate DEM");
+    assert_eq!(
+        dem.detector_coordinates_for([
+            DemDetectorId::try_new(0).expect("D0"),
+            DemDetectorId::try_new(1).expect("D1"),
+        ])
+        .expect("selected coordinates"),
+        BTreeMap::from([
+            (DemDetectorId::try_new(0).expect("D0"), vec![]),
+            (DemDetectorId::try_new(1).expect("D1"), vec![1.0, 2.0]),
+        ])
+    );
+    assert!(
+        dem.detector_coordinates_for([DemDetectorId::try_new(2).expect("D2")])
+            .expect_err("reject out-of-range detector")
+            .to_string()
+            .contains("too big")
+    );
+
+    let dem =
+        DetectorErrorModel::from_dem_str("error(0.25) D0 D1\n").expect("parse coordinate DEM");
+    assert_eq!(
+        dem.detector_coordinates_for([
+            DemDetectorId::try_new(0).expect("D0"),
+            DemDetectorId::try_new(1).expect("D1"),
+        ])
+        .expect("selected coordinates"),
+        BTreeMap::from([
+            (DemDetectorId::try_new(0).expect("D0"), vec![]),
+            (DemDetectorId::try_new(1).expect("D1"), vec![]),
+        ])
+    );
+    assert!(
+        dem.detector_coordinates_for([DemDetectorId::try_new(2).expect("D2")])
+            .expect_err("reject out-of-range detector")
+            .to_string()
+            .contains("too big")
+    );
+
+    let dem = DetectorErrorModel::from_dem_str(
+        "error(0.25) D0 D1\n\
+         detector(1, 2, 3) D1\n\
+         shift_detectors(5) 1\n\
+         detector(1, 2) D2\n",
+    )
+    .expect("parse shifted coordinate DEM");
+    assert_eq!(
+        dem.detector_coordinates_for([
+            DemDetectorId::try_new(0).expect("D0"),
+            DemDetectorId::try_new(1).expect("D1"),
+            DemDetectorId::try_new(2).expect("D2"),
+            DemDetectorId::try_new(3).expect("D3"),
+        ])
+        .expect("selected coordinates"),
+        BTreeMap::from([
+            (DemDetectorId::try_new(0).expect("D0"), vec![]),
+            (DemDetectorId::try_new(1).expect("D1"), vec![1.0, 2.0, 3.0]),
+            (DemDetectorId::try_new(2).expect("D2"), vec![]),
+            (DemDetectorId::try_new(3).expect("D3"), vec![6.0, 2.0]),
+        ])
+    );
+    assert!(
+        dem.detector_coordinates_for([DemDetectorId::try_new(4).expect("D4")])
+            .expect_err("reject out-of-range detector")
+            .to_string()
+            .contains("too big")
+    );
+}
+
+#[test]
 fn pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries() {
     let dem = DetectorErrorModel::from_dem_str(
         "repeat 1000001 {\n\
@@ -537,6 +611,43 @@ fn pf4_dem_coordinates_nested_loop_matches_pinned_stim_example() {
                 vec![102.0, 1.0, 0.0, 4.0]
             ),
         ])
+    );
+}
+
+#[test]
+fn pf4_dem_generated_surface_code_fold_loop_coordinate_gap_is_explicit() {
+    let params = SurfaceCodeParams::new(
+        RoundCount::try_new(7).expect("round count"),
+        CodeDistance::try_new(5).expect("code distance"),
+        SurfaceCodeTask::RotatedMemoryX,
+    )
+    .expect("surface-code params")
+    .with_after_clifford_depolarization(Probability::try_new(0.01).expect("probability"));
+    let generated = generate_surface_code_circuit(&params).expect("generate surface-code circuit");
+    let circuit = generated.circuit();
+    assert_eq!(
+        circuit
+            .detector_coordinates()
+            .expect("all circuit detector coordinates")
+            .len(),
+        168
+    );
+
+    let error = circuit_to_detector_error_model(
+        circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            decompose_errors: true,
+            block_decomposition_from_introducing_remnant_edges: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("generated surface-code folded analysis remains an active gap");
+    assert!(
+        error
+            .to_string()
+            .contains("supports top-level repeat blocks only"),
+        "{error}"
     );
 }
 

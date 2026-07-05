@@ -17,13 +17,16 @@ It is not an RPF4 completion report because folded traversal across every DEM co
 - The flat repeat path scans detector declarations once against the selected detector set, returns empty coordinates for valid sparse holes with no coordinate declaration, and has many-selected all-map benchmark coverage so the sparse fast path does not regress bounded coordinate maps into per-detector body scans.
 - Non-flat repeat bodies whose nested structure expands to at most 1,000,000 detector declarations now use the same algebraic selected-lookup scan after a bounded local declaration flattening pass, so nested sparse overlap cases can find coordinates beyond the previous one-million outer-candidate fallback cap.
 - The bounded nested scan streams local detector declarations into the arithmetic matcher and delays coordinate-vector materialization until a selected detector candidate wins, avoiding eager allocation for nonmatching declarations.
+- The pinned Stim v1.16.0 trivial selected-coordinate examples are now ported exactly for a single declared detector, error-only detector allocation with empty coordinates, shifted detector declarations, and out-of-range selected detector rejection.
 - PF4 transform evidence now separately covers final detector shifts, final coordinate shifts, detector counts, observable counts, error counts, and selected coordinate lookups through shifted repeats.
+- The pinned Stim generated surface-code folded-coordinate case revealed a cross-cutting analyzer loop-folding gap: Stab currently rejects `fold_loops=true` for the generated prefix, repeat, and tail circuit shape before a DEM exists. The current slice adds an explicit regression for that rejection and logs the acceptance gap in `docs/plans/milestone-spec-gaps.md`; it does not count that generated-loop case as implemented coordinate parity.
 
 ## Tests
 
 Implemented Rust tests:
 
 - `pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries`
+- `pf4_dem_coordinates_trivial_selected_matches_pinned_stim_examples`
 - `pf4_dem_coordinates_fold_late_selected_detector_lookup`
 - `pf4_dem_coordinates_nested_loop_matches_pinned_stim_example`
 - `pf4_dem_coordinates_fold_nested_sparse_repeat_without_candidate_cap`
@@ -33,13 +36,23 @@ Implemented Rust tests:
 - `pf4_dem_coordinates_flat_sparse_repeat_hole_returns_empty`
 - `pf4_dem_coordinates_huge_flat_repeat_does_not_overvalidate_far_endpoint`
 
-These tests cover huge all-map rejection, selected coordinate lookup through a huge repeat, single-detector lookup through the same huge-repeat model, folded late selected lookup through a billion-record non-overlapping repeat, the pinned Stim nested-loop coordinate example, nested sparse overlapping repeat lookup whose first matching declaration is beyond the previous one-million outer-candidate cap, first-declaration behavior for bounded overlapping repeats, many-selected flat overlapping repeat declarations, sparse flat overlapping repeat lookup whose first matching declaration is beyond the previous one-million candidate cap, valid sparse flat detector holes that must return empty coordinates instead of a resource-cap error, and huge flat repeats whose far endpoint exceeds the typed detector-id ceiling while the selected detector is still valid.
+These tests cover pinned Stim trivial selected-coordinate examples, huge all-map rejection, selected coordinate lookup through a huge repeat, single-detector lookup through the same huge-repeat model, folded late selected lookup through a billion-record non-overlapping repeat, the pinned Stim nested-loop coordinate example, nested sparse overlapping repeat lookup whose first matching declaration is beyond the previous one-million outer-candidate cap, first-declaration behavior for bounded overlapping repeats, many-selected flat overlapping repeat declarations, sparse flat overlapping repeat lookup whose first matching declaration is beyond the previous one-million candidate cap, valid sparse flat detector holes that must return empty coordinates instead of a resource-cap error, and huge flat repeats whose far endpoint exceeds the typed detector-id ceiling while the selected detector is still valid.
+
+Explicit non-completion guard:
+
+- `pf4_dem_generated_surface_code_fold_loop_coordinate_gap_is_explicit`
+
+This test documents that the pinned Stim generated surface-code coordinate comparison remains blocked by the active `fold_loops=true` generated prefix, repeat, and tail analyzer gap. It is a spec-gap guard, not a coordinate-parity completion row.
 
 ## Oracle Rows
 
 Implemented row:
 
 - `pf4-dem-coordinate-resource-rust`
+
+Related explicit non-completion guard row:
+
+- `pf6-analyzer-generated-fold-loop-gap-rust`
 
 Still broad and manifest-only:
 
@@ -63,6 +76,7 @@ Target checks for this slice:
 
 ```sh
 cargo test -p stab-core --test dem_api pf4_dem_coordinates_ --quiet
+cargo test -p stab-core --test dem_api pf4_dem_generated_surface_code_fold_loop_coordinate_gap_is_explicit --quiet
 cargo test -p stab-bench pf4_dem_transform_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-bench --quiet
 cargo test -p stab-oracle fixtures --quiet
@@ -77,16 +91,20 @@ The focused nested-sparse coordinate probe recorded `stab_pf4_dem_coordinate_map
 
 ## Audit And Review
 
-Milestone-audit status for this selected coordinate-resource slice: complete against the current PFM4 coordinate-resource text, with broader non-flat ambiguous coordinate ranges above the bounded flattened-declaration scan left as documented remaining RPF4 work.
-The audit checked that the slice names the supported nested sparse-overlap subcase, keeps all-detector materialization capped, preserves selected lookup behavior through typed `DemDetectorId`, updates oracle and benchmark metadata, and keeps the benchmark row report-only.
+Milestone-audit status for the original coordinate-resource slice: complete against the current PFM4 coordinate-resource text, with broader non-flat ambiguous coordinate ranges above the bounded flattened-declaration scan left as documented remaining RPF4 work.
+That audit checked that the slice named the supported nested sparse-overlap subcase, kept all-detector materialization capped, preserved selected lookup behavior through typed `DemDetectorId`, updated oracle and benchmark metadata, and kept the benchmark row report-only.
 
-Full-code-review status for this slice: findings resolved.
-The compatibility sidecar found a transient compile blocker while the helper extraction was half-finished; the final worktree compiles, the duplicate local helper definitions are gone, and `crates/stab-core/src/dem/api.rs` is below the 1200-line source threshold after extracting `crates/stab-core/src/dem/coordinate_scan.rs`.
-The Rust/resource sidecar found eager coordinate-vector materialization before selected-detector filtering; the bounded nested scan now streams local declarations into `FlatRepeatScan` and delays coordinate materialization until a candidate wins.
+Milestone-audit status for the follow-up trivial-coordinate and generated-loop-gap slice: complete with a PFM6 spec follow-up.
+The follow-up audit checked that pinned Stim trivial selected-coordinate behavior is direct PFM4 coordinate evidence, while the generated surface-code folded-coordinate case is logged as an analyzer loop-folding dependency instead of being counted as implemented coordinate parity.
+
+Full-code-review status for the follow-up slice: findings resolved.
+Two GPT-5.5/xhigh sidecars found that the generated-loop gap guard was easy to miss because it was not covered by the documented PF4 coordinate filter; the guard now has a dedicated PF6 oracle row, `pf6-analyzer-generated-fold-loop-gap-rust`, and the verification commands name it explicitly.
+The earlier Rust/resource review finding about eager coordinate-vector materialization remains resolved by streaming local declarations into `FlatRepeatScan` and delaying coordinate materialization until a candidate wins.
 
 ## Remaining RPF4 Work
 
 - Finish folded traversal or explicit caps for graphlike search, hypergraph search, SAT or WCNF encoding, matcher-adjacent operations, sampler-adjacent operations, and analyzer-adjacent operations.
+- Implement or explicitly scope the generated surface-code `fold_loops=true` analyzer path with prefix, repeat, and tail structure before claiming the pinned Stim `surface_code_coords_dont_infinite_loop` coordinate case.
 - Finish or explicitly cap any later-promoted nested or non-flat ambiguous overlapping selected-coordinate ranges that need more than the current bounded flattened-declaration scan or fallback search.
 - Decide whether any Rust-specific copy, concat, repetition, or mutation helpers beyond existing `Clone`, `push_instruction`, `push_repeat_block`, and `append_from_dem_text` are still worth adding.
 - Add remaining malformed-input or resource-boundary cases only if later RPF4 work promotes behavior beyond the current validation, introspection, and coordinate-resource subsets.
