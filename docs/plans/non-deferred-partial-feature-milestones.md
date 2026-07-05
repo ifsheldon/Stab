@@ -270,7 +270,7 @@ Tasks:
 
 - Treat current Rust DEM construction and mutation helpers as closed by `pf1-dem-rust-api`; do not add more non-Python mutation ergonomics unless a concrete active Rust consumer needs them and the plan is updated first.
 - Finish selected folded coordinate behavior for large, nested, and ambiguous overlapping repeats, or keep documented caps with exact rejection tests. The pinned Stim generated surface-code coordinate comparison is now counted only through the PFM6 bounded mixed-top-level analyzer fallback for prefix, repeat, and tail circuits under `fold_loops=true`; true folded generated-loop output remains active PFM6 work.
-- Finish folded or capped traversal behavior for DEM sampler, graphlike search, hypergraph search, SAT/WCNF generation, matcher-adjacent operations, and analyzer-adjacent operations where PFM4 owns the resource boundary.
+- Finish folded or capped traversal behavior for DEM sampler, graphlike search, hypergraph search, SAT/WCNF generation, matcher-adjacent operations, and analyzer-adjacent operations where PFM4 owns the resource boundary. Graphlike and hypergraph search skip zero-probability repeated bodies but keep a dense search-graph node cap for shifted active errors, while SAT/WCNF generation remains capped for repeated zero-probability errors because the unweighted encoding still treats them as structural.
 - Preserve tags, separators, detector shifts, coordinate shifts, logical observables, repeat structure, and probability rounding contracts across public transforms.
 - Keep all-detector materialization APIs capped when they must materialize large maps, and point callers to selected lookup APIs.
 
@@ -292,7 +292,7 @@ Benchmarks:
 
 - Keep or refresh report-only rows `pf4-dem-flatten-repeat`, `pf4-dem-rounded`, `pf4-dem-coordinate-map`, `pf4-dem-folded-traversal`, `pf4-dem-folded-graphlike-traversal`, and `pf4-dem-sampler-folded-repeat`.
 - Promote only faithful direct-match rows with repeated stable evidence.
-- Record measurement work units for detector count, detector coordinate lookup, flattened instruction count, and sampled or searched model size.
+- Record measurement work units for detector count, detector coordinate lookup, flattened instruction count, skipped zero-probability error occurrences, and sampled or searched model size.
 
 Acceptance criteria:
 

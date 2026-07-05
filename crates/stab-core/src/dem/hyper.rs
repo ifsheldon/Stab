@@ -12,6 +12,8 @@ use super::{
 };
 use crate::{CircuitError, CircuitResult, Probability};
 
+const MAX_FULL_DEM_SEARCH_GRAPH_NODES: u64 = 1_000_000;
+
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 struct ObservableMask {
     observables: BTreeSet<DemObservableId>,
@@ -140,6 +142,21 @@ impl Graph {
         }
     }
 
+    fn try_new(node_count: usize, num_observables: usize) -> CircuitResult<Self> {
+        let mut nodes = Vec::new();
+        nodes.try_reserve_exact(node_count).map_err(|_| {
+            CircuitError::invalid_detector_error_model(format!(
+                "hypergraph search cannot allocate {node_count} detector nodes"
+            ))
+        })?;
+        nodes.resize(node_count, Node::default());
+        Ok(Self {
+            nodes,
+            num_observables,
+            distance_1_error_mask: ObservableMask::new(),
+        })
+    }
+
     fn from_parts(
         nodes: Vec<Node>,
         num_observables: usize,
@@ -188,14 +205,29 @@ impl Graph {
     }
 
     fn from_dem(model: &DetectorErrorModel, max_weight: usize) -> CircuitResult<Self> {
-        model.validate_flattening_budget("hypergraph search")?;
-        let node_count = usize::try_from(model.count_detectors()?).map_err(|_| {
+        model.validate_effective_error_traversal_budget("hypergraph search")?;
+        let full_detector_count = model.count_detectors()?;
+        let full_observable_count = model.count_observables()?;
+        let (effective_detector_count, effective_observable_count) =
+            model.nonzero_error_target_counts("hypergraph search")?;
+        let (detector_count, observable_count) =
+            if full_detector_count <= MAX_FULL_DEM_SEARCH_GRAPH_NODES {
+                (full_detector_count, full_observable_count)
+            } else {
+                (effective_detector_count, effective_observable_count)
+            };
+        if detector_count > MAX_FULL_DEM_SEARCH_GRAPH_NODES {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "hypergraph search currently supports at most {MAX_FULL_DEM_SEARCH_GRAPH_NODES} effective detector nodes, got {detector_count}"
+            )));
+        }
+        let node_count = usize::try_from(detector_count).map_err(|_| {
             CircuitError::invalid_detector_error_model("detector count does not fit usize")
         })?;
-        let num_observables = usize::try_from(model.count_observables()?).map_err(|_| {
+        let num_observables = usize::try_from(observable_count).map_err(|_| {
             CircuitError::invalid_detector_error_model("observable count does not fit usize")
         })?;
-        let mut graph = Self::new(node_count, num_observables);
+        let mut graph = Self::try_new(node_count, num_observables)?;
         graph.add_flattened_dem(model, 0, max_weight)?;
         Ok(graph)
     }
@@ -227,6 +259,21 @@ impl Graph {
                     DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
                 },
                 DemItem::RepeatBlock(repeat) => {
+                    if !repeat
+                        .body()
+                        .has_nonzero_probability_error("hypergraph search")?
+                    {
+                        let body_shift = repeat.body().total_detector_shift()?;
+                        detector_offset = body_shift
+                            .checked_mul(repeat.repeat_count().get())
+                            .and_then(|shift| detector_offset.checked_add(shift))
+                            .ok_or_else(|| {
+                                CircuitError::invalid_detector_error_model(
+                                    "hypergraph repeat detector offset overflowed",
+                                )
+                            })?;
+                        continue;
+                    }
                     for _ in 0..repeat.repeat_count().get() {
                         detector_offset =
                             self.add_flattened_dem(repeat.body(), detector_offset, max_weight)?;

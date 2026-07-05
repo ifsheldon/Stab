@@ -78,6 +78,65 @@ fn pf4_dem_search_and_sat_repeat_resource_policy_is_source_owned() {
 }
 
 #[test]
+fn pf4_dem_search_skips_zero_probability_repeat_bodies() {
+    let zero_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0) D1000000 L1000\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n",
+    )
+    .unwrap();
+    let expected = "error(1) D0\nerror(1) D0 L0\n";
+
+    assert_eq!(
+        shortest_graphlike_undetectable_logical_error(&zero_repeat, false)
+            .unwrap()
+            .to_dem_string(),
+        expected
+    );
+    assert_eq!(
+        find_undetectable_logical_error(&zero_repeat, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string(),
+        expected
+    );
+
+    let sat_error = shortest_error_sat_problem(&zero_repeat)
+        .expect_err("unweighted SAT still treats zero-probability errors as structural")
+        .to_string();
+    assert!(
+        sat_error
+            .contains("DEM SAT problem generation currently supports repeat counts up to 100000"),
+        "{sat_error}"
+    );
+}
+
+#[test]
+fn pf4_dem_search_rejects_shifted_zero_probability_repeat_node_explosion() {
+    let hostile = DetectorErrorModel::from_dem_str(
+        "repeat 1000001 {\n    error(0) D0\n    shift_detectors 1\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n",
+    )
+    .unwrap();
+
+    let graphlike_error = shortest_graphlike_undetectable_logical_error(&hostile, false)
+        .expect_err("graphlike search should reject excessive effective detector nodes")
+        .to_string();
+    assert!(
+        graphlike_error.contains(
+            "graphlike search currently supports at most 1000000 effective detector nodes"
+        ),
+        "{graphlike_error}"
+    );
+
+    let hyper_error = find_undetectable_logical_error(&hostile, usize::MAX, usize::MAX, false)
+        .expect_err("hypergraph search should reject excessive effective detector nodes")
+        .to_string();
+    assert!(
+        hyper_error.contains(
+            "hypergraph search currently supports at most 1000000 effective detector nodes"
+        ),
+        "{hyper_error}"
+    );
+}
+
+#[test]
 fn pf6_generated_qec_graphlike_search_has_structural_signature() {
     let surface = generated_rotated_surface_code_dem().unwrap();
     assert_graphlike_search_signature(

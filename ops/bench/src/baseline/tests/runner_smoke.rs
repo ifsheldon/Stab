@@ -23,6 +23,7 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             "pf4-dem-folded-traversal",
             &[
                 "stab_pf4_dem_hyper_capped_repeat",
+                "stab_pf4_dem_hyper_zero_probability_repeat_skip",
                 "stab_pf4_dem_sat_capped_repeat",
                 "stab_pf4_dem_analyzer_capped_repeat",
                 "stab_pf4_error_matcher_capped_repeat",
@@ -30,7 +31,10 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
         ),
         (
             "pf4-dem-folded-graphlike-traversal",
-            &["stab_pf4_dem_graphlike_capped_repeat"][..],
+            &[
+                "stab_pf4_dem_graphlike_capped_repeat",
+                "stab_pf4_dem_graphlike_zero_probability_repeat_skip",
+            ][..],
         ),
         (
             "pf4-dem-sampler-folded-repeat",

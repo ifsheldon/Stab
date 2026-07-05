@@ -46,6 +46,10 @@ const SEARCH_REPEAT_COUNT: u64 = 2048;
 #[cfg(test)]
 const SEARCH_REPEAT_COUNT: u64 = 2;
 #[cfg(not(test))]
+const SEARCH_ZERO_REPEAT_COUNT: u64 = 1_000_000;
+#[cfg(test)]
+const SEARCH_ZERO_REPEAT_COUNT: u64 = 64;
+#[cfg(not(test))]
 const SAT_REPEAT_COUNT: u64 = 512;
 #[cfg(test)]
 const SAT_REPEAT_COUNT: u64 = 2;
@@ -130,6 +134,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             search_expanded_errors(SEARCH_REPEAT_COUNT) as f64,
             "expanded-errors/s",
         )),
+        ("pf4-dem-folded-traversal", "stab_pf4_dem_hyper_zero_probability_repeat_skip") => Some((
+            SEARCH_ZERO_REPEAT_COUNT as f64,
+            "skipped-zero-probability-errors/s",
+        )),
         ("pf4-dem-folded-traversal", "stab_pf4_dem_sat_capped_repeat") => Some((
             search_expanded_errors(SAT_REPEAT_COUNT) as f64,
             "expanded-errors/s",
@@ -145,6 +153,13 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf4-dem-folded-graphlike-traversal", "stab_pf4_dem_graphlike_capped_repeat") => Some((
             search_expanded_errors(SEARCH_REPEAT_COUNT) as f64,
             "expanded-errors/s",
+        )),
+        (
+            "pf4-dem-folded-graphlike-traversal",
+            "stab_pf4_dem_graphlike_zero_probability_repeat_skip",
+        ) => Some((
+            SEARCH_ZERO_REPEAT_COUNT as f64,
+            "skipped-zero-probability-errors/s",
         )),
         _ => None,
     }
@@ -165,10 +180,10 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures folded CompiledDemSampler compile, stochastic direct sample behavior, and zero-probability repeat skipping; sampled-error materialization and excessive stochastic repeated-error work remain capped and broader PF4 traversal consumers remain explicit follow-up work",
         ),
         "pf4-dem-folded-traversal" => Some(
-            "contract-only: Stab measures current capped-repeat hypergraph search, SAT problem generation, analyzer, and ErrorMatcher traversal behavior; true folded traversal remains an explicit RPF4 follow-up",
+            "contract-only: Stab measures current capped-repeat hypergraph search, zero-probability repeat skipping for hypergraph search, SAT problem generation, analyzer, and ErrorMatcher traversal behavior; true folded traversal remains an explicit RPF4 follow-up",
         ),
         "pf4-dem-folded-graphlike-traversal" => Some(
-            "contract-only: Stab measures current capped-repeat graphlike search behavior; true folded graphlike traversal remains an explicit RPF4 follow-up",
+            "contract-only: Stab measures current capped-repeat graphlike search behavior plus zero-probability repeat skipping; true folded graphlike traversal remains an explicit RPF4 follow-up",
         ),
         _ => None,
     }
@@ -340,6 +355,9 @@ fn run_dem_search_sat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
     let hyper_fixture = search_repeat_fixture(SEARCH_REPEAT_COUNT);
     let hyper_model = DetectorErrorModel::from_dem_str(&hyper_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let hyper_zero_fixture = search_zero_probability_repeat_fixture(SEARCH_ZERO_REPEAT_COUNT);
+    let hyper_zero_model = DetectorErrorModel::from_dem_str(&hyper_zero_fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
     let sat_fixture = search_repeat_fixture(SAT_REPEAT_COUNT);
     let sat_model = DetectorErrorModel::from_dem_str(&sat_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
@@ -358,6 +376,21 @@ fn run_dem_search_sat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
                 let logical_error =
                     find_undetectable_logical_error(&hyper_model, usize::MAX, usize::MAX, false)
                         .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(dem_model_checksum(&logical_error));
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_hyper_zero_probability_repeat_skip",
+            TRANSFORM_REPETITIONS,
+            || {
+                let logical_error = find_undetectable_logical_error(
+                    &hyper_zero_model,
+                    usize::MAX,
+                    usize::MAX,
+                    false,
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(dem_model_checksum(&logical_error));
                 Ok(())
             },
@@ -402,17 +435,33 @@ fn run_dem_graphlike_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, 
     let fixture = search_repeat_fixture(SEARCH_REPEAT_COUNT);
     let model = DetectorErrorModel::from_dem_str(&fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let zero_fixture = search_zero_probability_repeat_fixture(SEARCH_ZERO_REPEAT_COUNT);
+    let zero_model = DetectorErrorModel::from_dem_str(&zero_fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
 
-    Ok(vec![measure_stab_batched(
-        "stab_pf4_dem_graphlike_capped_repeat",
-        TRANSFORM_REPETITIONS,
-        || {
-            let logical_error = shortest_graphlike_undetectable_logical_error(&model, false)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(dem_model_checksum(&logical_error));
-            Ok(())
-        },
-    )?])
+    Ok(vec![
+        measure_stab_batched(
+            "stab_pf4_dem_graphlike_capped_repeat",
+            TRANSFORM_REPETITIONS,
+            || {
+                let logical_error = shortest_graphlike_undetectable_logical_error(&model, false)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(dem_model_checksum(&logical_error));
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_graphlike_zero_probability_repeat_skip",
+            TRANSFORM_REPETITIONS,
+            || {
+                let logical_error =
+                    shortest_graphlike_undetectable_logical_error(&zero_model, false)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(dem_model_checksum(&logical_error));
+                Ok(())
+            },
+        )?,
+    ])
 }
 
 fn flatten_repeat_fixture() -> String {
@@ -438,6 +487,18 @@ repeat {repeat_count} {{
     error(0.1) D0 D1
     shift_detectors 1
 }}
+error(0.1) D0 L0
+"
+    )
+}
+
+fn search_zero_probability_repeat_fixture(repeat_count: u64) -> String {
+    format!(
+        "\
+repeat {repeat_count} {{
+    error(0) D1000000 L1000
+}}
+error(0.1) D0
 error(0.1) D0 L0
 "
     )
