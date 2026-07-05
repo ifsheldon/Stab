@@ -74,7 +74,7 @@ pub fn circuit_detecting_regions_for_targets(
         .collect::<DetectingRegionTargetMap>();
 
     let mut tracker = SparseReverseFrameTracker::new(
-        circuit.count_qubits(),
+        detecting_region_qubit_count(circuit),
         measurement_record_count(circuit)?,
         detector_count,
         fail_on_anticommute,
@@ -132,6 +132,37 @@ fn dense_target_helper_capacity(
             "detecting-region all-target helper target count {target_count} does not fit in memory on this platform"
         ))
     })
+}
+
+fn detecting_region_qubit_count(circuit: &Circuit) -> usize {
+    circuit
+        .items()
+        .iter()
+        .map(detecting_region_item_qubit_count)
+        .max()
+        .unwrap_or(0)
+}
+
+fn detecting_region_item_qubit_count(item: &CircuitItem) -> usize {
+    match item {
+        CircuitItem::Instruction(instruction) => {
+            detecting_region_instruction_qubit_count(instruction)
+        }
+        CircuitItem::RepeatBlock(repeat) => detecting_region_qubit_count(repeat.body()),
+    }
+}
+
+fn detecting_region_instruction_qubit_count(instruction: &CircuitInstruction) -> usize {
+    if instruction.gate().canonical_name() == "MPAD" {
+        return 0;
+    }
+    instruction
+        .targets()
+        .iter()
+        .filter_map(Target::qubit_id)
+        .map(|qubit| qubit.get() as usize + 1)
+        .max()
+        .unwrap_or(0)
 }
 
 pub fn all_detecting_region_ticks(circuit: &Circuit) -> CircuitResult<Vec<u64>> {
@@ -273,6 +304,7 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
         }
         "MXX" | "MYY" | "MZZ" => validate_measurement_qubit_pair_targets(instruction),
         "MPP" | "SPP" | "SPP_DAG" => validate_pauli_product_targets(instruction),
+        "MPAD" => validate_measurement_pad_targets(instruction),
         "TICK" => validate_target_count(instruction, 0),
         "DETECTOR" => validate_detector_targets(instruction),
         "OBSERVABLE_INCLUDE" => validate_observable_include_targets(instruction),
@@ -348,6 +380,27 @@ fn validate_pauli_product_targets(instruction: &CircuitInstruction) -> CircuitRe
                 instruction.gate().canonical_name()
             )));
         }
+    }
+    Ok(())
+}
+
+fn validate_measurement_pad_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
+    for target in instruction.targets() {
+        let Target::Qubit {
+            id,
+            inverted: false,
+        } = target
+        else {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "simple detecting-region extraction only supports MPAD constant targets 0 or 1, got {target}"
+            )));
+        };
+        if id.get() <= 1 {
+            continue;
+        }
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "simple detecting-region extraction only supports MPAD constant targets 0 or 1, got {target}"
+        )));
     }
     Ok(())
 }

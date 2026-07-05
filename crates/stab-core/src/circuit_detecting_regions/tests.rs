@@ -351,8 +351,53 @@ fn detecting_regions_target_api_rejects_invalid_targets() {
 }
 
 #[test]
-fn detecting_regions_generated_repetition_rejects_unpromoted_record_annotations() {
-    let circuit = Circuit::from_stim_str("TICK\nMPAD 0\nDETECTOR rec[-1]\n").unwrap();
+fn detecting_regions_target_shape_supports_measurement_pads() {
+    let circuit = Circuit::from_stim_str(
+        "R 0\n\
+             TICK\n\
+             M 0\n\
+             MPAD 1\n\
+             DETECTOR rec[-2] rec[-1]\n\
+             OBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .unwrap();
+    assert_eq!(circuit.count_qubits(), 2);
+    let detector_target = DemTarget::relative_detector(0).unwrap();
+    let observable = DemTarget::logical_observable(0).unwrap();
+    let actual = circuit_detecting_regions_for_targets(
+        &circuit,
+        DetectingRegionTargetOptions {
+            targets: vec![detector_target, observable],
+            ticks: vec![0],
+            ignore_anticommutation_errors: false,
+        },
+    )
+    .unwrap();
+
+    assert_eq!(actual[&detector_target][&0].to_string(), "+Z");
+    assert!(actual[&observable].is_empty());
+
+    let all_pad_circuit =
+        Circuit::from_stim_str("TICK\nMPAD(0.125) 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n")
+            .unwrap();
+    let all_pad_regions = circuit_detecting_regions(
+        &all_pad_circuit,
+        DetectingRegionOptions {
+            detectors: vec![detector(0), detector(1)],
+            ticks: vec![0],
+            ignore_anticommutation_errors: false,
+        },
+    )
+    .unwrap();
+
+    assert!(all_pad_regions[&detector(0)].is_empty());
+    assert!(all_pad_regions[&detector(1)].is_empty());
+}
+
+#[test]
+fn detecting_regions_target_shape_rejects_unpromoted_heralded_record_annotations() {
+    let circuit =
+        Circuit::from_stim_str("TICK\nHERALDED_ERASE(0.125) 0\nDETECTOR rec[-1]\n").unwrap();
     let error = circuit_detecting_regions_for_targets(
         &circuit,
         DetectingRegionTargetOptions {
@@ -363,7 +408,11 @@ fn detecting_regions_generated_repetition_rejects_unpromoted_record_annotations(
     )
     .unwrap_err();
 
-    assert!(error.to_string().contains("does not support gate MPAD"));
+    assert!(
+        error
+            .to_string()
+            .contains("does not support gate HERALDED_ERASE")
+    );
 }
 
 #[test]
