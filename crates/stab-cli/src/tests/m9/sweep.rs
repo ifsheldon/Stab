@@ -1,4 +1,4 @@
-use super::run_from;
+use super::{ptb64_words, run_from};
 use tempfile::tempdir;
 
 #[test]
@@ -177,6 +177,179 @@ fn m2d_writes_sweep_conditioned_observables_to_side_output() {
     assert_eq!(String::from_utf8(stdout).unwrap(), "0\n1\n1\n0\n");
     assert_eq!(std::fs::read(obs_path).expect("read obs"), [0, 1, 1, 0]);
     assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn m2d_accepts_sweep_records_in_all_text_and_byte_formats() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    std::fs::write(&circuit_path, "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").expect("write circuit");
+    let cases: [(&str, Vec<u8>); 5] = [
+        ("01", b"0\n1\n0\n1\n".to_vec()),
+        ("b8", vec![0, 1, 0, 1]),
+        ("r8", vec![1, 0, 0, 1, 0, 0]),
+        ("hits", b"\n0\n\n0\n".to_vec()),
+        (
+            "dets",
+            b"\nshot\n\r\n   shot M0\n\nshot\n   \nshot M0\n".to_vec(),
+        ),
+    ];
+
+    for (format, sweep_bytes) in cases {
+        let sweep_path = temp_dir.path().join(format!("sweep.{format}"));
+        std::fs::write(&sweep_path, sweep_bytes).expect("write sweep");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            [
+                "stab",
+                "m2d",
+                "--in_format=01",
+                "--out_format=01",
+                "--sweep",
+                sweep_path.to_str().expect("utf-8 path"),
+                "--sweep_format",
+                format,
+                "--circuit",
+                circuit_path.to_str().expect("utf-8 path"),
+            ],
+            b"0\n0\n1\n1\n".as_slice(),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(
+            status,
+            0,
+            "{format} stderr: {}",
+            String::from_utf8_lossy(&stderr)
+        );
+        assert_eq!(
+            String::from_utf8(stdout).expect("stdout is UTF-8"),
+            "0\n1\n1\n0\n",
+            "{format}"
+        );
+        assert_eq!(String::from_utf8(stderr).unwrap(), "", "{format}");
+    }
+}
+
+#[test]
+fn m2d_accepts_sweep_records_in_ptb64_format() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    let sweep_path = temp_dir.path().join("sweep.ptb64");
+    std::fs::write(&circuit_path, "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").expect("write circuit");
+    std::fs::write(&sweep_path, ptb64_words(&[0xAAAA_AAAA_AAAA_AAAA])).expect("write sweep");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            "stab",
+            "m2d",
+            "--in_format=01",
+            "--out_format=01",
+            "--sweep",
+            sweep_path.to_str().expect("utf-8 path"),
+            "--sweep_format=ptb64",
+            "--circuit",
+            circuit_path.to_str().expect("utf-8 path"),
+        ],
+        "0\n".repeat(64).as_bytes(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(
+        status,
+        0,
+        "ptb64 stderr: {}",
+        String::from_utf8_lossy(&stderr)
+    );
+    let expected: String = (0..64)
+        .map(|shot| if shot % 2 == 0 { "0\n" } else { "1\n" })
+        .collect();
+    assert_eq!(String::from_utf8(stdout).unwrap(), expected);
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn m2d_rejects_unterminated_text_records() {
+    let temp_dir = tempdir().expect("temp dir");
+    let circuit_path = temp_dir.path().join("input.stim");
+    std::fs::write(&circuit_path, "CX sweep[0] 0\nM 0\nDETECTOR rec[-1]\n").expect("write circuit");
+
+    let measurement_run = {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            [
+                "stab",
+                "m2d",
+                "--in_format=01",
+                "--out_format=01",
+                "--circuit",
+                circuit_path.to_str().expect("utf-8 path"),
+            ],
+            b"0".as_slice(),
+            &mut stdout,
+            &mut stderr,
+        );
+        (
+            status,
+            stdout,
+            String::from_utf8(stderr).expect("stderr is UTF-8"),
+        )
+    };
+    assert_eq!(measurement_run.0, 1);
+    assert_eq!(measurement_run.1, b"");
+    assert!(
+        measurement_run
+            .2
+            .contains("m2d measurement input 01 record must end with a newline"),
+        "{}",
+        measurement_run.2
+    );
+
+    for (format, sweep_bytes, expected_error) in [
+        (
+            "01",
+            b"0".as_slice(),
+            "m2d sweep input 01 record must end with a newline",
+        ),
+        (
+            "hits",
+            b"0".as_slice(),
+            "m2d sweep input hits record must end with a newline",
+        ),
+    ] {
+        let sweep_path = temp_dir.path().join(format!("unterminated.{format}"));
+        std::fs::write(&sweep_path, sweep_bytes).expect("write unterminated sweep");
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            [
+                "stab",
+                "m2d",
+                "--in_format=01",
+                "--out_format=01",
+                "--sweep",
+                sweep_path.to_str().expect("utf-8 path"),
+                "--sweep_format",
+                format,
+                "--circuit",
+                circuit_path.to_str().expect("utf-8 path"),
+            ],
+            b"0\n".as_slice(),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, 1, "{format}");
+        assert_eq!(stdout, b"", "{format}");
+        let stderr = String::from_utf8(stderr).expect("stderr is UTF-8");
+        assert!(stderr.contains(expected_error), "{stderr}");
+    }
 }
 
 #[test]

@@ -18,6 +18,8 @@ Oracle rows:
 
 - `pf3-detect-default-false-sweep-core` runs `cargo test -p stab-core detection_sampling_uses_all_false_default_sweep_bits`.
 - `pf3-detect-default-false-sweep-cli` runs `cargo test -p stab-cli detect_accepts_default_false`, covering both non-frame and selected frame-path CLI cases.
+- `pf3-m2d-sweep-format-matrix-cli` runs `cargo test -p stab-cli m2d_accepts_sweep_records`, covering public `stab m2d --sweep_format` input records for `01`, `b8`, `r8`, `hits`, `dets`, and input-only `ptb64`.
+- `pf3-m2d-text-format-negative-cli` runs `cargo test -p stab-cli m2d_rejects_unterminated_text_records`, covering public `stab m2d` rejection of unterminated `01` measurement records and unterminated `01` or `hits` sweep records.
 - `pf3-analyze-errors-sweep-core` runs `cargo test -p stab-core --test dem_analyzer_classical sweep`, covering selected analyzer sweep no-op and invalid target-position cases.
 - `pf3-analyze-errors-sweep-cli` runs `cargo test -p stab-cli analyze_errors_sweep_controls`, covering public `stab analyze_errors` stdout, stderr, and exit-status behavior for the selected analyzer sweep matrix.
 - `pf3-gate-semantic-wide-rust` runs `cargo test -p stab-core --test gate_semantic_execution`, covering the fixed-tableau gate contract plus sampler, detection-conversion, and detector-frame SPP execution.
@@ -34,6 +36,9 @@ Direct tests:
 - `detect_accepts_default_false_sweep_conditioned_sampling` proves the public CLI accepts omitted all-false sweep sampling for a non-frame circuit.
 - `detect_accepts_default_false_frame_path_sweep_conditioned_sampling` proves the public CLI accepts omitted all-false sweep sampling for a frame-path Pauli-observable circuit.
 - `detect_rejects_invalid_frame_path_sweep_targets_before_opening_output` proves invalid frame-path sweep targets fail before `stab detect --out` opens or truncates the output path.
+- `m2d_accepts_sweep_records_in_all_text_and_byte_formats` proves public `stab m2d --sweep_format` accepts `01`, `b8`, `r8`, `hits`, and `dets` sweep records, skips Stim-valid blank `dets` lines, and preserves stdout, empty stderr, and successful exit behavior.
+- `m2d_accepts_sweep_records_in_ptb64_format` proves public `stab m2d --sweep_format=ptb64` accepts a complete 64-shot sweep group while `ptb64` remains an input-only format for `m2d`.
+- `m2d_rejects_unterminated_text_records` proves the streaming public CLI reader rejects unterminated `01` measurement records and unterminated `01` or `hits` sweep records like pinned Stim's strict text readers.
 - `dem_analyzer_ignores_sweep_controls_like_upstream` ports the pinned Stim v1.16.0 `ErrorAnalyzer, ignores_sweep_controls` case and extends it to selected `CY`, `CZ`, `XCZ`, and `YCZ` sweep-control no-op cases, including `CZ` sweep/sweep and record/sweep bit-bit no-op groups.
 - `dem_analyzer_rejects_invalid_sweep_target_positions` proves invalid controlled-Pauli sweep target positions fail with explicit analyzer errors instead of being silently ignored.
 - `analyze_errors_sweep_controls_match_pf3_oracle` and `analyze_errors_sweep_controls_reject_invalid_target_positions` prove the public CLI returns the selected no-op DEM for the same matrix, empty stderr on success, empty stdout on failure, nonzero failure status, and actionable stderr.
@@ -59,7 +64,7 @@ Benchmark row:
 
 ## Still Open In RPF3
 
-- Broader `pf3-analyze-errors-sweep` coverage remains open for analyzer sweep behavior beyond the selected sweep-control no-op matrix and invalid target-position rejections.
+- Broader `pf3-analyze-errors-sweep` coverage remains open for analyzer sweep behavior beyond the selected sweep-control no-op matrix and invalid target-position rejections. The public `m2d --sweep_format` input matrix for `01`, `b8`, `r8`, `hits`, `dets`, and input-only `ptb64` is now covered by `pf3-m2d-sweep-format-matrix-cli`.
 - Broader legal-gate execution remains open for remaining non-tableau legal operations and future execution surfaces; the fixed-tableau gate contract and sampler, detection-conversion, detector-frame, and analyzer SPP subset are now covered.
 - Broader frame-path sweep behavior remains open for unsupported sweep target placements. Any `detect --sweep` surface would be a Stab extension or future API decision, not a pinned Stim v1.16.0 CLI parity gap.
 

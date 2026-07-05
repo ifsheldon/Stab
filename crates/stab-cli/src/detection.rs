@@ -426,14 +426,7 @@ impl<'a> M2dRecordStream<'a> {
     fn next_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
         match self.format {
             RecordFormatArg::ZeroOne | RecordFormatArg::Hits | RecordFormatArg::Dets => {
-                let Some(line) =
-                    read_m2d_line(&mut self.reader, self.input_path.as_ref(), self.kind)?
-                else {
-                    return Ok(None);
-                };
-                let sample_format = self.format.sample_format()?;
-                decode_single_m2d_record(&line, sample_format, self.bits_per_record, self.kind)
-                    .map(Some)
+                self.next_text_record()
             }
             RecordFormatArg::B8 => self.next_b8_record(),
             RecordFormatArg::R8 => read_m2d_r8_record(
@@ -444,6 +437,22 @@ impl<'a> M2dRecordStream<'a> {
             ),
             RecordFormatArg::Ptb64 => self.next_ptb64_record(),
             RecordFormatArg::Stim => Err(CliError::UnsupportedConversion),
+        }
+    }
+
+    fn next_text_record(&mut self) -> Result<Option<Vec<bool>>, CliError> {
+        loop {
+            let Some(line) = read_m2d_line(&mut self.reader, self.input_path.as_ref(), self.kind)?
+            else {
+                return Ok(None);
+            };
+            if self.format == RecordFormatArg::Dets && is_m2d_blank_dets_line(&line) {
+                continue;
+            }
+            validate_m2d_text_record_terminator(&line, self.format, self.kind)?;
+            let sample_format = self.format.sample_format()?;
+            return decode_single_m2d_record(&line, sample_format, self.bits_per_record, self.kind)
+                .map(Some);
         }
     }
 
@@ -548,6 +557,27 @@ where
         });
     }
     Ok(Some(line))
+}
+
+fn is_m2d_blank_dets_line(line: &[u8]) -> bool {
+    line.iter().all(u8::is_ascii_whitespace)
+}
+
+fn validate_m2d_text_record_terminator(
+    line: &[u8],
+    format: RecordFormatArg,
+    kind: &str,
+) -> Result<(), CliError> {
+    match format {
+        RecordFormatArg::ZeroOne | RecordFormatArg::Hits if !line.ends_with(b"\n") => {
+            Err(invalid_result_format(format!(
+                "{} {} record must end with a newline",
+                kind,
+                format.name()
+            )))
+        }
+        _ => Ok(()),
+    }
 }
 
 fn decode_single_m2d_record(

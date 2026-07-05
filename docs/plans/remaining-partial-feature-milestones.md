@@ -266,7 +266,7 @@ Implementation tasks:
 Tests:
 
 - Port owned cases from `vendor/stim/src/stim/simulators/measurements_to_detection_events.test.cc`, `vendor/stim/src/stim/simulators/frame_simulator.test.cc`, `vendor/stim/src/stim/simulators/error_analyzer.test.cc`, `vendor/stim/src/stim/cmd/command_detect.test.cc`, and `vendor/stim/src/stim/cmd/command_m2d.test.cc`.
-- Add sweep record tests for `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` wherever accepted.
+- Add sweep record tests for `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` wherever accepted. The selected public `m2d --sweep_format` matrix is implemented by `pf3-m2d-sweep-format-matrix-cli`, while broader sweep execution and analyzer-shape work remains open.
 - Add semantic tests comparing sweep-conditioned circuits to explicit small-circuit expansions.
 - Add tests for omitted sweep defaults, width mismatch, invalid sweep record counts, unsupported formats, unsupported sweep target shapes, and writer errors.
 - Add gate execution tests that separate parser validation, sampler execution, detector conversion, and analyzer propagation.
