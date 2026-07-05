@@ -11,3 +11,6 @@ mod oracle 'justfiles/oracle.just'
 
 # Benchmark workflow helpers.
 mod bench 'justfiles/bench.just'
+
+# Documentation generation helpers.
+mod docs 'justfiles/docs.just'

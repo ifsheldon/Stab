@@ -20,6 +20,21 @@ just maintenance::pre-commit
 The hook reads staged Git index entries, treats `vendor/stim` as a submodule pointer, runs Rust formatting and Clippy only for staged Rust-affecting changes, scans staged source blobs for oversized files, and checks instruction-document structure when `README.md`, `AGENTS.md`, `CLAUDE.md`, or `.gitmodules` changes.
 Every scanned `README.md` needs a colocated `AGENTS.md`, and every effective `AGENTS.md` source needs at least one `CLAUDE.md` symlink pointing to it.
 
+Generate Rust API documentation with:
+
+```sh
+just docs::api
+```
+
+The generated Rust API reference is written under `target/doc/`, including `target/doc/stab_core/index.html`.
+Run the stricter documentation check before changing public Rust APIs:
+
+```sh
+just docs::api-check
+```
+
+This check runs rustdoc for the workspace with warnings denied.
+
 Validate the pinned Stim oracle with:
 
 ```sh

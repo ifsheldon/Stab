@@ -110,8 +110,8 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | Legacy top-level command flags | Implemented for selected PF7 CLI surface | RPF7 | The selected legacy-dispatch closure is implemented by `pf7-legacy-dispatch-parity`; only newly selected legacy spellings or failure modes should reopen this row. |
 | Highest-priority remaining feature gaps | Rollup | RPF8 | Complete only after the named child milestones reach their acceptance criteria. |
 
-`Generated API docs` and `Generated API reference or machine-readable feature matrix` are `Missing`, not `Partial`.
-They are useful follow-up work but are not part of this partial-feature milestone plan.
+The Rust generated API documentation workflow is implemented by `just docs::api` and `just docs::api-check`.
+Generated Python or JS/WASM docs, Python stubs, and generated machine-readable feature-matrix tooling remain useful follow-up work but are not part of this historical partial-feature milestone plan.
 
 ## Milestone RPF0: Inventory And Comparator Lock
 

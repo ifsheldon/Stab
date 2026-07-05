@@ -126,7 +126,7 @@ enum Command {
         #[arg(long)]
         require_profiler_notes: bool,
 
-        /// Directory containing profiler notes, defaulting to <report>/profiler-notes.
+        /// Directory containing profiler notes, defaulting to `report/profiler-notes`.
         #[arg(long)]
         profiler_notes_dir: Option<PathBuf>,
 

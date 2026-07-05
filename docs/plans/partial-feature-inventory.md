@@ -198,7 +198,7 @@ Deferred or out of scope:
 | Graph simulator and vector simulator public APIs | M12 uses scoped cross-checks only. New public APIs are out of scope. | Keep deferred. |
 | Circuit exports | QASM, Quirk, Crumble, and diagrams are future surfaces. | Keep deferred. |
 | DEM diagrams | Rendering surfaces are future work. | Keep deferred. |
-| Generated API docs or machine-readable feature matrix | This row is `Missing`, not `Partial`; it is useful tooling work but not part of the current partial-feature closure set. | Plan separately if documentation generation becomes a product requirement. |
+| Generated API docs or machine-readable feature matrix | The Rust API documentation workflow is implemented by `just docs::api` and `just docs::api-check`; generated Python or JS/WASM docs, Python stubs, and generated machine-readable feature-matrix tooling remain future documentation surfaces. | Keep the Rust docs workflow synchronized with `docs/plans/generated-api-docs-progress-report.md`; plan generated feature-matrix tooling separately if it becomes a product requirement. |
 
 ## RPF0 Manifest Rows
 
