@@ -70,10 +70,9 @@ pub fn explain_errors_from_circuit(
 
 fn add_location(
     explained: &mut ExplainedError,
-    mut location: CircuitErrorLocation,
+    location: CircuitErrorLocation,
     reduce_to_one_representative_error: bool,
 ) {
-    location.canonicalize();
     if explained.circuit_error_locations.is_empty() || !reduce_to_one_representative_error {
         explained.circuit_error_locations.push(location);
     } else if let Some(existing) = explained.circuit_error_locations.first_mut()

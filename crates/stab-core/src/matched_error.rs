@@ -2,7 +2,14 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 
-use crate::{CircuitError, CircuitInstruction, CircuitResult, DemTarget, Gate, Target};
+use crate::{CircuitError, CircuitInstruction, CircuitResult, DemTarget, Gate, Pauli, Target};
+
+const STIM_TARGET_INVERTED_BIT: u32 = 1 << 31;
+const STIM_TARGET_PAULI_X_BIT: u32 = 1 << 30;
+const STIM_TARGET_PAULI_Z_BIT: u32 = 1 << 29;
+const STIM_TARGET_RECORD_BIT: u32 = 1 << 28;
+const STIM_TARGET_COMBINER: u32 = 1 << 27;
+const STIM_TARGET_SWEEP_BIT: u32 = 1 << 26;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CircuitErrorLocationStackFrame {
@@ -167,8 +174,11 @@ pub struct CircuitErrorLocation {
 
 impl CircuitErrorLocation {
     pub fn canonicalize(&mut self) {
-        // Stim preserves Pauli-product order in explanations. Keep this hook for callers that
-        // canonicalize entire explained errors without reordering the products themselves.
+        self.flipped_pauli_product
+            .sort_by(compare_gate_targets_with_coords);
+        self.flipped_measurement
+            .measured_observable
+            .sort_by(compare_gate_targets_with_coords);
     }
 
     pub fn is_simpler_than(&self, other: &Self) -> bool {
@@ -509,7 +519,32 @@ fn compare_optional_gate(left: Option<Gate>, right: Option<Gate>) -> Ordering {
 }
 
 fn compare_target(left: &Target, right: &Target) -> Ordering {
-    left.to_string().cmp(&right.to_string())
+    stim_target_sort_key(left).cmp(&stim_target_sort_key(right))
+}
+
+fn stim_target_sort_key(target: &Target) -> u32 {
+    match target {
+        Target::Qubit { id, inverted } => {
+            id.get() | (u32::from(*inverted) * STIM_TARGET_INVERTED_BIT)
+        }
+        Target::MeasurementRecord { offset } => {
+            offset.get().unsigned_abs() | STIM_TARGET_RECORD_BIT
+        }
+        Target::SweepBit { id } => *id | STIM_TARGET_SWEEP_BIT,
+        Target::Pauli {
+            pauli,
+            id,
+            inverted,
+        } => {
+            let pauli_bits = match pauli {
+                Pauli::X => STIM_TARGET_PAULI_X_BIT,
+                Pauli::Y => STIM_TARGET_PAULI_X_BIT | STIM_TARGET_PAULI_Z_BIT,
+                Pauli::Z => STIM_TARGET_PAULI_Z_BIT,
+            };
+            id.get() | pauli_bits | (u32::from(*inverted) * STIM_TARGET_INVERTED_BIT)
+        }
+        Target::Combiner => STIM_TARGET_COMBINER,
+    }
 }
 
 fn format_float(value: f64) -> String {
@@ -881,6 +916,74 @@ ExplainedError {
 ExplainedError {
     dem_error_terms: D5[coords 11,13] D6
     [no single circuit error had these exact symptoms]
+}"
+        );
+    }
+
+    #[test]
+    fn matched_error_canonicalize_sorts_terms_like_upstream() {
+        let mut err = ExplainedError {
+            dem_error_terms: vec![
+                dem_target(DemTarget::logical_observable(5).unwrap(), &[]),
+                dem_target(DemTarget::relative_detector(5).unwrap(), &[1.0, 2.0]),
+            ],
+            circuit_error_locations: vec![
+                CircuitErrorLocation {
+                    noise_tag: None,
+                    tick_offset: 7,
+                    flipped_pauli_product: vec![
+                        gate_target(x(10), &[16.0]),
+                        gate_target(z(5), &[]),
+                        gate_target(x(2), &[11.0, 12.0]),
+                    ],
+                    flipped_measurement: FlippedMeasurement {
+                        measurement_record_index: Some(5),
+                        measured_observable: vec![
+                            gate_target(y(4), &[14.0, 15.0]),
+                            gate_target(x(10), &[16.0]),
+                            gate_target(x(3), &[]),
+                        ],
+                    },
+                    instruction_targets: instruction_targets(),
+                    stack_frames: vec![CircuitErrorLocationStackFrame {
+                        instruction_offset: 13,
+                        iteration_index: 15,
+                        instruction_repetitions_arg: 0,
+                    }],
+                },
+                location(6),
+            ],
+        };
+
+        err.canonicalize();
+
+        assert_eq!(
+            err.to_string(),
+            "\
+ExplainedError {
+    dem_error_terms: D5[coords 1,2] L5
+    CircuitErrorLocation {
+        flipped_pauli_product: Z5*X3[coords 11,12]
+        flipped_measurement.measurement_record_index: 5
+        flipped_measurement.measured_observable: X3*Y4[coords 14,15]
+        Circuit location stack trace:
+            (after 6 TICKs)
+            at instruction #10 (a REPEAT 100 block) in the circuit
+            after 15 completed iterations
+            at instruction #14 (X_ERROR) in the REPEAT block
+            at targets #12 to #17 of the instruction
+            resolving to X_ERROR(0.125) 5[coords 1,2,3] X6*Y9[coords 3,4] rec[-5]
+    }
+    CircuitErrorLocation {
+        flipped_pauli_product: Z5*X2[coords 11,12]*X10[coords 16]
+        flipped_measurement.measurement_record_index: 5
+        flipped_measurement.measured_observable: X3*X10[coords 16]*Y4[coords 14,15]
+        Circuit location stack trace:
+            (after 7 TICKs)
+            at instruction #14 (X_ERROR) in the circuit
+            at targets #12 to #17 of the instruction
+            resolving to X_ERROR(0.125) 5[coords 1,2,3] X6*Y9[coords 3,4] rec[-5]
+    }
 }"
         );
     }

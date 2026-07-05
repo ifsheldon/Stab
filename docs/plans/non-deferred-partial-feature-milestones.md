@@ -364,7 +364,7 @@ Tasks:
   The selected generated-QEC graphlike and hypergraph search subset is implemented by `pf6-search-generated-qec-rust`, and the selected generated-QEC SAT/WCNF structural subset is implemented by `pf6-search-generated-sat-wcnf-rust`.
 - Add or extend ordering-insensitive structural comparators for search outputs where exact target order is not stable. The selected generated-QEC graphlike and hypergraph search rows now include canonical target-set uniqueness, deterministic error rows, zero detector parity, and exact `L0` observable parity; broader generated families and tie-sensitive target-set comparators remain active.
 - Improve sparse reverse detector-frame tracking for optimized loop folding and analyzer or search correctness. The supported-Clifford unitary-repeat folding subset is implemented for the full single-qubit Clifford gate set and fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets, with deterministic generated repeat tests covering nested repeats, multi-target single-qubit instructions, multi-pair two-qubit instructions, and no-fold traversal comparisons. The unsigned sparse-tracker path also supports `SPP` and `SPP_DAG` product propagation for public unsigned-flow checking. Analyzer/search-specific consumption and broader variable-target unitary semantics outside this unsigned tracker path remain active.
-- Harden matched-error value objects only where active analyzer/search outputs require them.
+- Harden matched-error value objects only where active analyzer/search outputs require them. The selected `ExplainedError` and `CircuitErrorLocation` canonicalization slice is implemented by `pf6-matched-error-canonicalize-rust`; broader hardening remains active only when new analyzer or search outputs require it.
 - Keep full stack-frame provenance, heralded matching, repeat-contained noise provenance, and `explain_errors` CLI deferred.
 
 Tests:
@@ -381,6 +381,7 @@ Oracle rows:
 - Keep `pf6-analyzer-generated-qec-rust` as evidence only for the generated-QEC subset it names.
 - Keep `pf6-error-decomp-loop-folded-rust` as evidence only for the selected loop-folded decomposition and remnant-edge blocking subset it names.
 - Keep `pf6-analyzer-mixed-top-level-fallback-rust` and `pf6-analyzer-generated-fold-loop-fallback-rust` as evidence only for the bounded non-folded fallback, analyzer-budget cap preservation, selected folded-error non-masking guard, and selected generated surface-code coordinate comparison they name.
+- Keep `pf6-matched-error-canonicalize-rust` as evidence only for the selected matched-error value-object canonicalization behavior it names.
 - Use exact `.dem` comparators where output order is stable and structural comparators otherwise.
 
 Benchmarks:
@@ -388,6 +389,7 @@ Benchmarks:
 - Keep or refresh `pf6-analyze-errors-generated-surface`.
 - Keep or refresh `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, and `pf6-generated-sat-wcnf`, which have report-only runner coverage for the promoted generated rotated-surface-code search and SAT/WCNF subsets.
 - Keep `pf6-error-decomp-loop-folded` synchronized with the promoted repeated composite-error loop-folded decomposition subset, and extend or split it if broader decomposition families become active; keep the implemented `pf6-sparse-rev-frame-loop` row report-only unless a faithful pinned-Stim comparator is added.
+- Do not add a benchmark for matched-error canonicalization unless a future analyzer or search surface puts it on a measured throughput path.
 - Use schema-version-2 submeasurement thresholds for bundled analyzer or search rows.
 - Promote only faithful pinned-Stim rows with repeated stable evidence.
 

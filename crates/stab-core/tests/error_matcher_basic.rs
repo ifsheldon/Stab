@@ -53,6 +53,28 @@ fn error_matcher_correlated_error_matches_upstream_subset() {
 }
 
 #[test]
+fn error_matcher_preserves_uncanonical_correlated_error_product_order() {
+    let actual = explain(
+        "
+        QUBIT_COORDS(1, 2) 5
+        QUBIT_COORDS(3, 4) 3
+        RX 5
+        R 3
+        CORRELATED_ERROR(0.25) X3 Z5
+        MX 5
+        M 3
+        DETECTOR rec[-2]
+        DETECTOR rec[-1]
+        ",
+    );
+
+    assert_eq!(
+        only_error(&actual).to_string(),
+        "ExplainedError {\n    dem_error_terms: D0 D1\n    CircuitErrorLocation {\n        flipped_pauli_product: X3[coords 3,4]*Z5[coords 1,2]\n        Circuit location stack trace:\n            (after 0 TICKs)\n            at instruction #5 (E) in the circuit\n            at targets #1 to #2 of the instruction\n            resolving to E(0.25) X3[coords 3,4] Z5[coords 1,2]\n    }\n}"
+    );
+}
+
+#[test]
 fn error_matcher_mx_error_matches_upstream_subset() {
     let actual = explain(
         "
