@@ -329,7 +329,7 @@ Priority:
 
 - P0/P1 M6-M10: circuit-to-DEM, detecting regions, flow generators, inverse behavior, circuit-vs-tableau, count determined measurements, missing detectors, reference samples, simplification, stabilizers-to-tableau, and transform without feedback.
 - P3: Crumble, QASM, and Quirk exports unless they become explicit drop-in goals.
-- P2: amplitude and vector checks should become small semantic cross-checks, not necessarily full amplitude-simulator parity.
+- P2 Future: amplitude and state-vector checks are deferred unless a later matrix/state-vector parity plan selects exact subcases. Current M12 graph/vector coverage is limited to the scoped `simulator_cross_checks` semantic evidence and does not imply public simulator or amplitude API parity.
 
 ## Python Test Hierarchy
 
