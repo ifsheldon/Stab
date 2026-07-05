@@ -3,6 +3,11 @@ use std::ops::{Bound, Range, RangeBounds};
 
 use crate::{CircuitError, CircuitResult};
 
+use super::coordinate_scan::{
+    MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS, RepeatScanGeometry,
+    find_selected_detector_coordinates_in_bounded_flattened_repeat_body,
+    flattened_detector_declaration_count_up_to,
+};
 use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemTarget,
     DetectorErrorModel,
@@ -338,7 +343,7 @@ impl DemRepeatBlock {
     }
 }
 
-fn coordinate_shift_of(model: &DetectorErrorModel) -> CircuitResult<Vec<f64>> {
+pub(super) fn coordinate_shift_of(model: &DetectorErrorModel) -> CircuitResult<Vec<f64>> {
     let mut shift = Vec::new();
     apply_coordinate_shift_of(model, &mut shift)?;
     Ok(shift)
@@ -486,6 +491,26 @@ fn find_selected_detector_coordinates_in_repeat(
         return Ok(());
     }
 
+    if flattened_detector_declaration_count_up_to(
+        repeat.body(),
+        MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS,
+    )?
+    .is_some()
+    {
+        find_selected_detector_coordinates_in_bounded_flattened_repeat_body(
+            repeat,
+            detector_set,
+            coordinates,
+            detector_offset,
+            coordinate_shift,
+            RepeatScanGeometry {
+                body_detector_shift,
+                body_coordinate_shift: &body_coordinate_shift,
+            },
+        )?;
+        return Ok(());
+    }
+
     let SelectedRepeatIterations {
         iterations,
         truncated_detectors,
@@ -590,15 +615,15 @@ fn find_selected_detector_coordinates_in_flat_repeat_body(
     Ok(())
 }
 
-struct FlatRepeatScan<'a> {
-    detector_set: &'a BTreeSet<DemDetectorId>,
-    existing_coordinates: &'a BTreeMap<DemDetectorId, Vec<f64>>,
-    best: BTreeMap<DemDetectorId, (FlatRepeatOrder, Vec<f64>)>,
-    outer_detector_offset: u64,
-    outer_coordinate_shift: &'a [f64],
-    body_detector_shift: u64,
-    body_coordinate_shift: &'a [f64],
-    repeat_count: u64,
+pub(super) struct FlatRepeatScan<'a> {
+    pub(super) detector_set: &'a BTreeSet<DemDetectorId>,
+    pub(super) existing_coordinates: &'a BTreeMap<DemDetectorId, Vec<f64>>,
+    pub(super) best: BTreeMap<DemDetectorId, (FlatRepeatOrder, Vec<f64>)>,
+    pub(super) outer_detector_offset: u64,
+    pub(super) outer_coordinate_shift: &'a [f64],
+    pub(super) body_detector_shift: u64,
+    pub(super) body_coordinate_shift: &'a [f64],
+    pub(super) repeat_count: u64,
 }
 
 impl FlatRepeatScan<'_> {
@@ -606,6 +631,21 @@ impl FlatRepeatScan<'_> {
         &mut self,
         instruction: &DemInstruction,
         local_detector: u64,
+        local_coordinate_shift: &[f64],
+        body_order: usize,
+    ) -> CircuitResult<()> {
+        self.record_declaration_with_shift(
+            local_detector,
+            instruction.args(),
+            local_coordinate_shift,
+            body_order,
+        )
+    }
+
+    pub(super) fn record_declaration_with_shift(
+        &mut self,
+        local_detector: u64,
+        detector_coordinates: &[f64],
         local_coordinate_shift: &[f64],
         body_order: usize,
     ) -> CircuitResult<()> {
@@ -666,9 +706,9 @@ impl FlatRepeatScan<'_> {
                     iteration,
                 )?;
                 add_coordinate_shift_mul(&mut candidate_shift, local_coordinate_shift, 1.0)?;
-                let detector_coordinates =
-                    shifted_detector_coordinates(instruction.args(), &candidate_shift)?;
-                self.best.insert(*detector, (order, detector_coordinates));
+                let shifted_coordinates =
+                    shifted_detector_coordinates(detector_coordinates, &candidate_shift)?;
+                self.best.insert(*detector, (order, shifted_coordinates));
             }
         }
         Ok(())
@@ -676,7 +716,7 @@ impl FlatRepeatScan<'_> {
 }
 
 #[derive(Clone, Copy)]
-struct FlatRepeatOrder {
+pub(super) struct FlatRepeatOrder {
     iteration: u64,
     body_order: usize,
 }
@@ -832,7 +872,7 @@ fn count_declared_detectors_from(
     Ok(count)
 }
 
-fn detector_offset_with_repeat(
+pub(super) fn detector_offset_with_repeat(
     detector_offset: u64,
     body_detector_shift: u64,
     iteration: u64,
@@ -845,7 +885,7 @@ fn detector_offset_with_repeat(
         })
 }
 
-fn coordinate_shift_with_repeat(
+pub(super) fn coordinate_shift_with_repeat(
     coordinate_shift: &[f64],
     body_coordinate_shift: &[f64],
     iteration: u64,
@@ -855,7 +895,7 @@ fn coordinate_shift_with_repeat(
     Ok(shifted)
 }
 
-fn add_detector_shift_mul(
+pub(super) fn add_detector_shift_mul(
     detector_offset: &mut u64,
     detector_shift: u64,
     multiplier: u64,
@@ -907,7 +947,7 @@ fn count_errors_in(model: &DetectorErrorModel) -> CircuitResult<u64> {
     Ok(total)
 }
 
-fn apply_detector_shift(
+pub(super) fn apply_detector_shift(
     detector_offset: &mut u64,
     instruction: &DemInstruction,
 ) -> CircuitResult<()> {
@@ -954,7 +994,10 @@ fn shifted_target(target: DemTarget, detector_offset: u64) -> CircuitResult<DemT
     }
 }
 
-fn shifted_detector_coordinates(coordinates: &[f64], shift: &[f64]) -> CircuitResult<Vec<f64>> {
+pub(super) fn shifted_detector_coordinates(
+    coordinates: &[f64],
+    shift: &[f64],
+) -> CircuitResult<Vec<f64>> {
     let mut shifted = coordinates.to_vec();
     for (index, coordinate) in shifted.iter_mut().enumerate() {
         if let Some(delta) = shift.get(index) {
@@ -969,7 +1012,7 @@ fn shifted_detector_coordinates(coordinates: &[f64], shift: &[f64]) -> CircuitRe
     Ok(shifted)
 }
 
-fn add_coordinate_shift_mul(
+pub(super) fn add_coordinate_shift_mul(
     shift: &mut Vec<f64>,
     delta: &[f64],
     multiplier: f64,

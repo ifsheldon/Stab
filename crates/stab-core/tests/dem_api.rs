@@ -480,6 +480,88 @@ fn pf4_dem_coordinates_fold_late_selected_detector_lookup() {
 }
 
 #[test]
+fn pf4_dem_coordinates_nested_loop_matches_pinned_stim_example() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 200 {\n\
+             repeat 100 {\n\
+                 detector(0, 0, 0, 4) D1\n\
+                 shift_detectors(1, 0, 0) 10\n\
+             }\n\
+             detector(0, 0, 0, 3) D2\n\
+             shift_detectors(0, 1, 0) 0\n\
+         }\n\
+         detector(0, 0, 0, 2) D3\n",
+    )
+    .expect("parse nested coordinate DEM");
+
+    assert_eq!(
+        dem.detector_coordinates_for([
+            DemDetectorId::try_new(0).expect("D0"),
+            DemDetectorId::try_new(1).expect("D1"),
+            DemDetectorId::try_new(11).expect("D11"),
+            DemDetectorId::try_new(991).expect("D991"),
+            DemDetectorId::try_new(1001).expect("D1001"),
+            DemDetectorId::try_new(1002).expect("D1002"),
+            DemDetectorId::try_new(1011).expect("D1011"),
+            DemDetectorId::try_new(1021).expect("D1021"),
+        ])
+        .expect("nested loop coordinates"),
+        BTreeMap::from([
+            (DemDetectorId::try_new(0).expect("D0"), vec![]),
+            (
+                DemDetectorId::try_new(1).expect("D1"),
+                vec![0.0, 0.0, 0.0, 4.0]
+            ),
+            (
+                DemDetectorId::try_new(11).expect("D11"),
+                vec![1.0, 0.0, 0.0, 4.0]
+            ),
+            (
+                DemDetectorId::try_new(991).expect("D991"),
+                vec![99.0, 0.0, 0.0, 4.0]
+            ),
+            (
+                DemDetectorId::try_new(1001).expect("D1001"),
+                vec![100.0, 1.0, 0.0, 4.0]
+            ),
+            (
+                DemDetectorId::try_new(1002).expect("D1002"),
+                vec![100.0, 0.0, 0.0, 3.0]
+            ),
+            (
+                DemDetectorId::try_new(1011).expect("D1011"),
+                vec![101.0, 1.0, 0.0, 4.0]
+            ),
+            (
+                DemDetectorId::try_new(1021).expect("D1021"),
+                vec![102.0, 1.0, 0.0, 4.0]
+            ),
+        ])
+    );
+}
+
+#[test]
+fn pf4_dem_coordinates_fold_nested_sparse_repeat_without_candidate_cap() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 4000000 {\n\
+             repeat 1 {\n\
+                 detector(7) D0\n\
+             }\n\
+             detector(99) D2000000\n\
+             shift_detectors(1) 1\n\
+         }\n",
+    )
+    .expect("parse nested sparse overlapping coordinate DEM");
+    let detector = DemDetectorId::try_new(1_500_000).expect("D1500000");
+
+    assert_eq!(
+        dem.coordinates_of_detector(detector)
+            .expect("fold nested sparse selected detector lookup"),
+        vec![1_500_007.0]
+    );
+}
+
+#[test]
 fn pf4_dem_coordinates_preserve_first_overlapping_repeat_declaration() {
     let dem = DetectorErrorModel::from_dem_str(
         "repeat 10 {\n\

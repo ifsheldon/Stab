@@ -4,6 +4,7 @@ use std::str::Lines;
 
 mod analyze;
 mod api;
+mod coordinate_scan;
 #[cfg(test)]
 mod generated_qec_tests;
 mod graphlike;

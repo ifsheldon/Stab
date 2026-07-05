@@ -63,6 +63,7 @@ const FLATTEN_SOURCE_INSTRUCTIONS_PER_REPETITION: u64 = 4;
 const ROUNDED_REPEAT_ERROR_COUNT: usize = 2;
 const SELECTED_COORDINATE_DETECTORS: usize = 2;
 const SPARSE_OVERLAP_COORDINATE_DETECTORS: usize = 1;
+const NESTED_SPARSE_COORDINATE_DETECTORS: usize = 1;
 const SEARCH_FIXED_ERRORS: u64 = 2;
 const ANALYZER_INSTRUCTIONS_PER_REPETITION: u64 = 3;
 const MATCHER_INSTRUCTIONS_PER_REPETITION: u64 = 1;
@@ -98,6 +99,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         }
         ("pf4-dem-coordinate-map", "stab_pf4_dem_coordinate_map_sparse_overlap") => Some((
             SPARSE_OVERLAP_COORDINATE_DETECTORS as f64,
+            "selected-detectors/s",
+        )),
+        ("pf4-dem-coordinate-map", "stab_pf4_dem_coordinate_map_nested_sparse_overlap") => Some((
+            NESTED_SPARSE_COORDINATE_DETECTORS as f64,
             "selected-detectors/s",
         )),
         ("pf4-dem-coordinate-map", "stab_pf4_dem_coordinate_map_flat_overlap_all") => {
@@ -143,7 +148,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures the Rust DetectorErrorModel::rounded public API over top-level and nested error probabilities while preserving non-error coordinate args; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
         ),
         "pf4-dem-coordinate-map" => Some(
-            "contract-only: Stab measures bounded all-detector DEM coordinate maps, selected detector coordinate lookup through a huge-repeat model, sparse overlapping selected-coordinate lookup, and many-selected flat-overlap coordinate lookup; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
+            "contract-only: Stab measures bounded all-detector DEM coordinate maps, selected detector coordinate lookup through a huge-repeat model, sparse flat and nested overlapping selected-coordinate lookups, and many-selected flat-overlap coordinate lookup; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
         ),
         "pf4-dem-sampler-folded-repeat" => Some(
             "contract-only: Stab measures current capped-repeat CompiledDemSampler compile and sample behavior; true folded sampler traversal remains an explicit RPF4 follow-up",
@@ -205,6 +210,11 @@ fn run_dem_coordinate_map_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let sparse_overlap_detectors =
         [DemDetectorId::try_new(1_500_001).map_err(|error| stab_runner_error(&row.id, error))?];
+    let nested_sparse_overlap_dem =
+        DetectorErrorModel::from_dem_str(COORDINATE_NESTED_SPARSE_OVERLAP_FIXTURE)
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+    let nested_sparse_overlap_detectors =
+        [DemDetectorId::try_new(1_500_000).map_err(|error| stab_runner_error(&row.id, error))?];
     let flat_overlap_dem = DetectorErrorModel::from_dem_str(&coordinate_flat_overlap_fixture())
         .map_err(|error| stab_runner_error(&row.id, error))?;
 
@@ -237,6 +247,17 @@ fn run_dem_coordinate_map_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
             || {
                 let coordinates = sparse_overlap_dem
                     .detector_coordinates_for(sparse_overlap_detectors)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(coordinate_map_checksum(&coordinates));
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_coordinate_map_nested_sparse_overlap",
+            TRANSFORM_REPETITIONS,
+            || {
+                let coordinates = nested_sparse_overlap_dem
+                    .detector_coordinates_for(nested_sparse_overlap_detectors)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(coordinate_map_checksum(&coordinates));
                 Ok(())
@@ -444,6 +465,16 @@ repeat 2000001 {
     detector(10) D2000000
     shift_detectors(1) 1
     detector(20) D0
+}
+";
+
+const COORDINATE_NESTED_SPARSE_OVERLAP_FIXTURE: &str = "\
+repeat 4000000 {
+    repeat 1 {
+        detector(7) D0
+    }
+    detector(99) D2000000
+    shift_detectors(1) 1
 }
 ";
 

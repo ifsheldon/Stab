@@ -3,7 +3,7 @@
 ## Summary
 
 This RPF4 slice adds the current Rust public materialized `DetectorErrorModel::flattened` and `DetectorErrorModel::rounded` transform subset, plus source-owned evidence for recursive tag stripping and final count or shift introspection.
-It is not an RPF4 completion report because folded traversal across every DEM consumer, nested or non-flat selected-coordinate traversal optimization, diagram APIs, and Python binding shape remain outside this slice or still active.
+It is not an RPF4 completion report because folded traversal across every DEM consumer, non-flat selected-coordinate traversal above the bounded flattened-declaration scan, diagram APIs, and Python binding shape remain outside this slice or still active.
 
 ## Implemented Surfaces
 
@@ -76,7 +76,7 @@ just bench::smoke
 
 ## Remaining RPF4 Work
 
-- Finish folded coordinate-map resource policy where current APIs still require caps or do not prove nested or non-flat selected-coordinate lookup through very large repeats; the all-coordinate map cap, folded selected-query behavior, flat sparse-overlap fast path, valid flat sparse-hole behavior, and many-selected flat-overlap scan are tracked separately in `docs/plans/rpf4-dem-coordinate-progress-report.md`.
+- Finish folded coordinate-map resource policy where current APIs still require caps or do not prove non-flat selected-coordinate lookup through very large repeats; the all-coordinate map cap, folded selected-query behavior, flat sparse-overlap fast path, bounded nested sparse-overlap fast path, valid flat sparse-hole behavior, and many-selected flat-overlap scan are tracked separately in `docs/plans/rpf4-dem-coordinate-progress-report.md`.
 - Finish folded or capped traversal evidence for graphlike search, hypergraph search, SAT or WCNF encoding, matcher-adjacent operations, sampler-adjacent operations, and analyzer-adjacent operations.
 - Decide whether any Rust-specific copy, concat, repetition, or mutation helpers beyond existing `Clone`, `push_instruction`, `push_repeat_block`, and `append_from_dem_text` are still worth adding.
 - Add remaining resource-boundary cases only if later RPF4 work promotes high-detector or high-observable behavior beyond the current public validation and coordinate-resource subsets.
