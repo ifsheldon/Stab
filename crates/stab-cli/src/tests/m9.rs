@@ -64,22 +64,52 @@ fn detect_accepts_default_false_sweep_conditioned_sampling() {
 }
 
 #[test]
-fn detect_still_rejects_frame_path_sweep_conditioned_sampling() {
+fn detect_accepts_default_false_frame_path_sweep_conditioned_sampling() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let status = run_from(
-        ["stab", "detect"],
-        b"RX 0\nCX sweep[0] 0\nOBSERVABLE_INCLUDE(0) X0\n".as_slice(),
+        ["stab", "detect", "--shots", "3", "--append_observables"],
+        b"RX 0\nCX sweep[0] 0\nCY sweep[1] 0\nCZ 0 sweep[2]\nOBSERVABLE_INCLUDE(0) X0\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 0);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "0\n0\n0\n");
+    assert_eq!(String::from_utf8(stderr).unwrap(), "");
+}
+
+#[test]
+fn detect_rejects_invalid_frame_path_sweep_targets_before_opening_output() {
+    let temp_dir = tempdir().expect("temp dir");
+    let output_path = temp_dir.path().join("detectors.01");
+    std::fs::write(&output_path, "keep\n").expect("write pre-existing output");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        [
+            OsString::from("stab"),
+            OsString::from("detect"),
+            OsString::from("--shots=3"),
+            OsString::from("--out"),
+            output_path.clone().into_os_string(),
+        ],
+        b"RX 0\nCX 0 sweep[0]\nOBSERVABLE_INCLUDE(0) X0\n".as_slice(),
         &mut stdout,
         &mut stderr,
     );
 
     assert_eq!(status, 1);
     assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    let error = String::from_utf8(stderr).unwrap();
     assert!(
-        String::from_utf8(stderr)
-            .unwrap()
-            .contains("sweep-conditioned detection conversion requires sweep input support")
+        error.contains("M9 detector frame subset does not support CX"),
+        "{error}"
+    );
+    assert_eq!(
+        std::fs::read_to_string(output_path).expect("read output"),
+        "keep\n"
     );
 }
 

@@ -465,24 +465,68 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
         "{unsupported_shape_error}"
     );
 
-    let frame_circuit = Circuit::from_stim_str("RX 0\nCX sweep[0] 0\nOBSERVABLE_INCLUDE(0) X0\n")
-        .expect("parse frame-path sweep-conditioned circuit");
-    let validation_error =
-        validate_detection_sampling_circuit(&frame_circuit).expect_err("reject frame validation");
-    assert!(
-        validation_error
-            .to_string()
-            .contains(UNSUPPORTED_SWEEP_DETECTION_MESSAGE),
-        "{validation_error}"
-    );
-    let frame_error =
-        sample_detection_events(&frame_circuit, 1, Some(5)).expect_err("reject frame sweep");
-    assert!(
-        frame_error
-            .to_string()
-            .contains(UNSUPPORTED_SWEEP_DETECTION_MESSAGE),
-        "{frame_error}"
-    );
+    for (source, gate) in [
+        ("RX 0\nCX 0 sweep[0]\nOBSERVABLE_INCLUDE(0) X0\n", "CX"),
+        (
+            "RX 0\nMX 0\nCX rec[-1] sweep[0]\nOBSERVABLE_INCLUDE(0) X0\n",
+            "CX",
+        ),
+    ] {
+        let unsupported_frame_shape =
+            Circuit::from_stim_str(source).expect("parse unsupported frame sweep shape");
+        let validation_error = validate_detection_sampling_circuit(&unsupported_frame_shape)
+            .expect_err("reject frame sweep target during validation");
+        assert!(
+            validation_error
+                .to_string()
+                .contains(&format!("M9 detector frame subset does not support {gate}")),
+            "{validation_error}"
+        );
+        let frame_error = sample_detection_events(&unsupported_frame_shape, 1, Some(5))
+            .expect_err("reject frame sweep target");
+        assert!(
+            frame_error
+                .to_string()
+                .contains(&format!("M9 detector frame subset does not support {gate}")),
+            "{frame_error}"
+        );
+    }
+}
+
+#[test]
+fn detection_sampling_uses_all_false_default_sweep_bits_frame_path() {
+    let sweep_circuit = Circuit::from_stim_str(
+        "RX 0\n\
+         CX sweep[0] 0\n\
+         CY sweep[1] 0\n\
+         CZ 0 sweep[2]\n\
+         CZ sweep[3] 0\n\
+         CZ sweep[4] sweep[5]\n\
+         MX 0\n\
+         CZ rec[-1] sweep[6]\n\
+         REPEAT 2 {\n\
+             CX sweep[7] 0\n\
+         }\n\
+         OBSERVABLE_INCLUDE(0) X0\n",
+    )
+    .expect("parse frame-path sweep-conditioned circuit");
+    let explicit_false_circuit = Circuit::from_stim_str("RX 0\nMX 0\nOBSERVABLE_INCLUDE(0) X0\n")
+        .expect("parse explicit circuit");
+
+    validate_detection_sampling_circuit(&sweep_circuit).expect("validate frame sweep sampling");
+    let sweep_output =
+        sample_detection_events(&sweep_circuit, 32, Some(5)).expect("sample frame sweep circuit");
+    let explicit_false_output = sample_detection_events(&explicit_false_circuit, 32, Some(5))
+        .expect("sample explicit false frame circuit");
+    assert_eq!(sweep_output.records, explicit_false_output.records);
+
+    let mut streamed = Vec::new();
+    try_for_each_sampled_detection_event(&sweep_circuit, 32, Some(5), |record| {
+        streamed.push(record.clone());
+        Ok::<(), CircuitError>(())
+    })
+    .expect("stream frame sweep sampling");
+    assert_eq!(streamed, sweep_output.records);
 }
 
 #[test]

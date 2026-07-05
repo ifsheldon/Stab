@@ -344,7 +344,6 @@ pub fn sample_detection_events(
     seed: Option<u64>,
 ) -> CircuitResult<DetectionConversionOutput> {
     if circuit_has_pauli_observable_targets(circuit) {
-        validate_no_sweep_targets(circuit)?;
         return sample_detection_events_with_frame(circuit, shots, seed);
     }
     validate_detection_sampling_circuit(circuit)?;
@@ -380,7 +379,6 @@ where
     F: FnMut(&DetectionEventRecord) -> Result<(), E>,
 {
     if circuit_has_pauli_observable_targets(circuit) {
-        validate_no_sweep_targets(circuit)?;
         return try_for_each_detection_event_with_frame(circuit, shots, seed, visit);
     }
     validate_detection_sampling_circuit(circuit)?;
@@ -416,7 +414,6 @@ pub fn detection_record_width(circuit: &Circuit) -> CircuitResult<usize> {
 
 pub fn validate_detection_sampling_circuit(circuit: &Circuit) -> CircuitResult<()> {
     if circuit_has_pauli_observable_targets(circuit) {
-        validate_no_sweep_targets(circuit)?;
         validate_frame_detection_circuit(circuit)
     } else {
         ConversionPlan::from_circuit(circuit)?;
@@ -734,30 +731,6 @@ impl ConversionPlan {
         }
         Ok(())
     }
-}
-
-fn validate_no_sweep_targets(circuit: &Circuit) -> CircuitResult<()> {
-    for item in circuit.items() {
-        match item {
-            CircuitItem::Instruction(instruction) => reject_sweep_targets(instruction)?,
-            CircuitItem::RepeatBlock(repeat) => validate_no_sweep_targets(repeat.body())?,
-        }
-    }
-    Ok(())
-}
-
-fn reject_sweep_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
-    if let Some(target) = instruction
-        .targets()
-        .iter()
-        .find(|target| target.is_sweep_bit_target())
-    {
-        return Err(CircuitError::invalid_result_format(format!(
-            "{UNSUPPORTED_SWEEP_DETECTION_MESSAGE}; found {target} in {}",
-            instruction.gate().canonical_name()
-        )));
-    }
-    Ok(())
 }
 
 fn reference_sample(circuit: &Circuit, measurement_count: usize) -> CircuitResult<Vec<bool>> {

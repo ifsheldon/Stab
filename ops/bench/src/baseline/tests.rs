@@ -743,26 +743,33 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
 
 #[test]
 fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
-    for (id, expected_measurement, measurement) in [
-        ("pf3-m2d-sweep-b8", "stab_pf3_m2d_sweep_b8", "m2d-sweep"),
+    for (id, expected_measurements, measurement) in [
+        (
+            "pf3-m2d-sweep-b8",
+            &["stab_pf3_m2d_sweep_b8"][..],
+            "m2d-sweep",
+        ),
         (
             "pf3-m2d-sweep-ptb64-input",
-            "stab_pf3_m2d_sweep_ptb64",
+            &["stab_pf3_m2d_sweep_ptb64"][..],
             "m2d-sweep-ptb64",
         ),
         (
             "pf3-detect-sweep-sampling",
-            "stab_detect_sweep_default_false",
+            &[
+                "stab_detect_sweep_default_false",
+                "stab_detect_frame_sweep_default_false",
+            ][..],
             "detect-sweep",
         ),
         (
             "pf3-analyze-errors-sweep",
-            "stab_analyze_errors_sweep_control",
+            &["stab_analyze_errors_sweep_control"][..],
             "analyze-errors-sweep",
         ),
         (
             "pf3-gate-semantic-wide",
-            "stab_pf3_gate_semantic_tableau_contract",
+            &["stab_pf3_gate_semantic_tableau_contract"][..],
             "gate-semantic-wide",
         ),
     ] {
@@ -788,15 +795,17 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
             .map(|measurement| measurement.name.as_str())
             .collect::<Vec<_>>();
 
-        assert_eq!(names.as_slice(), &[expected_measurement]);
+        assert_eq!(names.as_slice(), expected_measurements);
         assert!(
             compare_note(id).is_some(),
             "{id} should explain benchmark comparability"
         );
-        assert!(
-            measurement_work(id, expected_measurement).is_some(),
-            "{id}/{expected_measurement} should report normalized work"
-        );
+        for expected_measurement in expected_measurements {
+            assert!(
+                measurement_work(id, expected_measurement).is_some(),
+                "{id}/{expected_measurement} should report normalized work"
+            );
+        }
     }
 }
 

@@ -74,13 +74,42 @@ fn validate_frame_detection_instruction(instruction: &CircuitInstruction) -> Cir
         | "ELSE_CORRELATED_ERROR"
         | "HERALDED_ERASE"
         | "HERALDED_PAULI_CHANNEL_1" => Ok(()),
-        "CX" | "CY" | "CZ" => Ok(()),
+        "CX" | "CY" => validate_frame_controlled_pauli_targets(instruction),
+        "CZ" => validate_frame_cz_targets(instruction),
         name if crate::circuit_tableau::gate_tableau(name).is_ok() => Ok(()),
         _ if zero_probability_noise(instruction)? => Ok(()),
         name => Err(CircuitError::invalid_sampler_compilation(format!(
             "M9 detector frame subset does not support {name}"
         ))),
     }
+}
+
+fn validate_frame_controlled_pauli_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
+    for target_group in instruction.target_groups() {
+        let [control, target] = target_group else {
+            return Err(unsupported_frame_instruction(instruction));
+        };
+        if (control.qubit_id().is_some() || is_frame_bit_target(control))
+            && target.qubit_id().is_some()
+        {
+            continue;
+        }
+        return Err(unsupported_frame_instruction(instruction));
+    }
+    Ok(())
+}
+
+fn validate_frame_cz_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
+    for target_group in instruction.target_groups() {
+        let [left, right] = target_group else {
+            return Err(unsupported_frame_instruction(instruction));
+        };
+        if is_frame_qubit_or_bit_target(left) && is_frame_qubit_or_bit_target(right) {
+            continue;
+        }
+        return Err(unsupported_frame_instruction(instruction));
+    }
+    Ok(())
 }
 
 pub(super) fn sample_detection_events_with_frame(
@@ -452,12 +481,20 @@ impl ScalarDetectionFrame {
             let [control, target] = target_group else {
                 return Err(unsupported_frame_instruction(instruction));
             };
+            if control.is_sweep_bit_target() {
+                if target.qubit_id().is_some() {
+                    // `detect` has no sweep input. Omitted sweep bits use all-false Stim semantics.
+                    continue;
+                }
+                return Err(unsupported_frame_instruction(instruction));
+            }
+            if target.measurement_record_offset().is_some() || target.is_sweep_bit_target() {
+                return Err(unsupported_frame_instruction(instruction));
+            }
             if let Some(offset) = control.measurement_record_offset() {
                 if measurement_record_bit(&self.measurements, offset)? {
                     self.apply_pauli(qubit_index(instruction, target)?, basis)?;
                 }
-            } else if target.measurement_record_offset().is_some() || target.is_sweep_bit_target() {
-                return Err(unsupported_frame_instruction(instruction));
             } else {
                 self.apply_tableau_targets(instruction.gate().canonical_name(), target_group)?;
             }
@@ -470,6 +507,17 @@ impl ScalarDetectionFrame {
             let [left, right] = target_group else {
                 return Err(unsupported_frame_instruction(instruction));
             };
+            if is_frame_bit_target(left) && is_frame_bit_target(right) {
+                continue;
+            }
+            if left.is_sweep_bit_target() && right.qubit_id().is_some() {
+                // `detect` has no sweep input. Omitted sweep bits use all-false Stim semantics.
+                continue;
+            }
+            if right.is_sweep_bit_target() && left.qubit_id().is_some() {
+                // `detect` has no sweep input. Omitted sweep bits use all-false Stim semantics.
+                continue;
+            }
             match (
                 left.measurement_record_offset(),
                 right.measurement_record_offset(),
@@ -839,6 +887,14 @@ fn measurement_record_bit(
             offset.get()
         ))
     })
+}
+
+fn is_frame_bit_target(target: &Target) -> bool {
+    target.measurement_record_offset().is_some() || target.is_sweep_bit_target()
+}
+
+fn is_frame_qubit_or_bit_target(target: &Target) -> bool {
+    target.qubit_id().is_some() || is_frame_bit_target(target)
 }
 
 fn sample_flip(probability: f64, rng: &mut impl Rng) -> bool {

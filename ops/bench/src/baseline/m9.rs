@@ -66,6 +66,11 @@ const DETECT_SWEEP_DEFAULT_FALSE: &str = "H 0\n\
                                          CX sweep[0] 0\n\
                                          M 0\n\
                                          DETECTOR rec[-1]\n";
+const DETECT_FRAME_SWEEP_DEFAULT_FALSE: &str = "RX 0\n\
+                                               CX sweep[0] 0\n\
+                                               CY sweep[1] 0\n\
+                                               CZ 0 sweep[2]\n\
+                                               OBSERVABLE_INCLUDE(0) X0\n";
 const SWEEP_PTB64_SHOTS: usize = 64;
 const SWEEP_PTB64_WIDTH: usize = 8;
 
@@ -203,6 +208,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf3-detect-sweep-sampling", "stab_detect_sweep_default_false") => {
             Some((DETECT_SHOTS as f64, "shots/s"))
         }
+        ("pf3-detect-sweep-sampling", "stab_detect_frame_sweep_default_false") => {
+            Some((DETECT_SHOTS as f64, "shots/s"))
+        }
         ("m9-detect-primary-matrix-contract", "stab_detect_primary_repetition_d3_r3_dets")
         | ("m9-detect-primary-matrix-contract", "stab_detect_primary_repetition_d3_r3_b8")
         | ("m9-m2d-primary-matrix-contract", "stab_m2d_primary_repetition_d3_r3_dets")
@@ -262,7 +270,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures the public CLI m2d --sweep packed b8 path for PF7 visible CLI parity using the source-owned M9 sweep fixture",
         ),
         "pf3-detect-sweep-sampling" => Some(
-            "report-only: Stab measures the Rust sweep-conditioned detection sampler using omitted all-false sweep bits; no faithful pinned Stim CLI ratio is claimed for this partial PF3 surface",
+            "report-only: Stab measures the Rust sweep-conditioned detection sampler using omitted all-false sweep bits for non-frame and frame-path workloads; no faithful pinned Stim CLI ratio is claimed for this partial PF3 surface",
         ),
         "pf3-gate-semantic-wide" => Some(
             "report-only: Stab measures fixed-tableau gate execution contract coverage across sampler compilation, detection-conversion compilation, and analyzer propagation without a faithful pinned Stim CLI timing ratio",
@@ -435,26 +443,34 @@ fn run_feedback_inline_mpp_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>,
 }
 
 fn run_detect_sweep_sampling_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = parse_circuit(&row.id, DETECT_SWEEP_DEFAULT_FALSE)?;
-    Ok(vec![measure_stab_iterations(
-        "stab_detect_sweep_default_false",
-        super::STAB_COMPARE_ITERATIONS,
-        || {
-            let mut bits = 0usize;
-            try_for_each_sampled_detection_event::<CircuitError, _>(
-                &circuit,
-                DETECT_SHOTS,
-                Some(17),
-                |record| {
-                    bits += record.detectors.len() + record.observables.len();
-                    Ok(())
-                },
-            )
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(bits);
-            Ok(())
-        },
-    )?])
+    let non_frame = parse_circuit(&row.id, DETECT_SWEEP_DEFAULT_FALSE)?;
+    let frame = parse_circuit(&row.id, DETECT_FRAME_SWEEP_DEFAULT_FALSE)?;
+    Ok(vec![
+        measure_detect_sweep_sampling(row, &non_frame, "stab_detect_sweep_default_false")?,
+        measure_detect_sweep_sampling(row, &frame, "stab_detect_frame_sweep_default_false")?,
+    ])
+}
+
+fn measure_detect_sweep_sampling(
+    row: &BenchmarkRow,
+    circuit: &Circuit,
+    name: &str,
+) -> Result<Measurement, BenchError> {
+    measure_stab_iterations(name, super::STAB_COMPARE_ITERATIONS, || {
+        let mut bits = 0usize;
+        try_for_each_sampled_detection_event::<CircuitError, _>(
+            circuit,
+            DETECT_SHOTS,
+            Some(17),
+            |record| {
+                bits += record.detectors.len() + record.observables.len();
+                Ok(())
+            },
+        )
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+        black_box(bits);
+        Ok(())
+    })
 }
 
 fn run_gate_semantic_wide_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
