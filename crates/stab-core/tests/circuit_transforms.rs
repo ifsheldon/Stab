@@ -4,12 +4,23 @@
 )]
 
 use stab_core::{
-    Circuit, CircuitError, CircuitItem, ErrorAnalyzerOptions, circuit_to_detector_error_model,
-    circuit_with_inlined_feedback,
+    Circuit, CircuitError, CircuitItem, ErrorAnalyzerOptions,
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
+    circuit_to_detector_error_model, circuit_with_inlined_feedback,
 };
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
+}
+
+fn sorted_flow_strings(circuit: &Circuit) -> Vec<String> {
+    let mut flows = circuit_flow_generators(circuit)
+        .expect("generate flows")
+        .into_iter()
+        .map(|flow| flow.to_string())
+        .collect::<Vec<_>>();
+    flows.sort();
+    flows
 }
 
 fn assert_no_measurement_feedback_controls(circuit: &Circuit) {
@@ -31,6 +42,21 @@ fn assert_no_measurement_feedback_controls(circuit: &Circuit) {
             CircuitItem::RepeatBlock(repeat) => {
                 assert_no_measurement_feedback_controls(repeat.body())
             }
+        }
+    }
+}
+
+fn assert_no_product_measurement_gates(circuit: &Circuit) {
+    for item in circuit.items() {
+        match item {
+            CircuitItem::Instruction(instruction) => {
+                let gate_name = instruction.gate().canonical_name();
+                assert!(
+                    !matches!(gate_name, "MPP" | "MXX" | "MYY" | "MZZ"),
+                    "{gate_name} survived decomposition"
+                );
+            }
+            CircuitItem::RepeatBlock(repeat) => assert_no_product_measurement_gates(repeat.body()),
         }
     }
 }
@@ -395,6 +421,38 @@ fn decomposed_handles_constant_mpp_products_and_rejects_anti_hermitian_products(
         spp_error.to_string().contains("anti-Hermitian"),
         "{spp_error}"
     );
+}
+
+#[test]
+fn decomposed_preserves_selected_measurement_rich_flows() {
+    for text in [
+        "MPP X0*Y1 Z2*Z3\n",
+        "MXX 0 1\nMZZ 0 1\n",
+        "
+        H 0
+        S 1
+        MPP X0*Z1 Y2*Y3
+        H 0
+        ",
+    ] {
+        let input = circuit(text);
+        let decomposed = input.decomposed().expect("decompose");
+        let input_flows = circuit_flow_generators(&input).expect("input flows");
+
+        assert_no_product_measurement_gates(&decomposed);
+        assert_eq!(
+            sorted_flow_strings(&decomposed),
+            sorted_flow_strings(&input),
+            "{text}\n{}",
+            decomposed.to_stim_string()
+        );
+        assert_eq!(
+            check_if_circuit_has_unsigned_stabilizer_flows(&decomposed, &input_flows),
+            vec![true; input_flows.len()],
+            "{text}\n{}",
+            decomposed.to_stim_string()
+        );
+    }
 }
 
 #[test]

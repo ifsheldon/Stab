@@ -68,8 +68,9 @@ impl Circuit {
     ///
     /// This is Stab's Rust counterpart to Stim's `Circuit.decomposed()` surface for the current
     /// RPF2-owned gate families. It decomposes supported single-qubit, two-qubit, pair-measurement,
-    /// MPP, SPP, and SPP_DAG operations while preserving noise, annotations, `MPAD`, and repeat
-    /// structure.
+    /// MPP, SPP, and SPP_DAG operations while preserving noise, annotations, `MPAD`, repeat
+    /// structure, and selected measurement-rich flow-generator semantics for decomposed MPP and
+    /// pair-measurement cases.
     pub fn decomposed(&self) -> CircuitResult<Self> {
         crate::decomposed_circuit(self)
     }
