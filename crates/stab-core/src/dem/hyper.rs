@@ -176,9 +176,9 @@ impl Graph {
     ) -> CircuitResult<()> {
         let (detectors, observables) = toggled_dem_targets(targets)?;
         if detectors.is_empty() {
-            self.distance_1_error_mask = self
-                .distance_1_error_mask
-                .symmetric_difference(&observables);
+            if !observables.is_empty() {
+                self.distance_1_error_mask = observables;
+            }
             return Ok(());
         }
         if detectors.len() > max_weight {

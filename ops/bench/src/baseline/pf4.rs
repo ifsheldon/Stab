@@ -110,6 +110,9 @@ pub(super) fn run_dem_transform_compare_row(
         "pf4-dem-coordinate-map" => Ok(Some(run_dem_coordinate_map_row(row)?)),
         "pf4-dem-folded-traversal" => Ok(Some(run_dem_search_sat_repeat_row(row)?)),
         "pf4-dem-folded-graphlike-traversal" => Ok(Some(run_dem_graphlike_repeat_row(row)?)),
+        "pf4-dem-hypergraph-logical-repeat" => {
+            Ok(Some(run_dem_hypergraph_logical_repeat_row(row)?))
+        }
         "pf4-dem-sat-flat-repeat-fold" => Ok(Some(run_dem_sat_flat_repeat_row(row)?)),
         "pf4-error-matcher-filter-flat-repeat" => {
             Ok(Some(run_error_matcher_filter_flat_repeat_row(row)?))
@@ -242,6 +245,20 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf4-dem-folded-graphlike-traversal", "stab_pf4_dem_graphlike_flat_repeat_fold") => {
             Some(((SEARCH_FLAT_REPEAT_COUNT as f64) * 2.0, "folded-errors/s"))
         }
+        (
+            "pf4-dem-folded-graphlike-traversal",
+            "stab_pf4_dem_graphlike_logical_only_flat_repeat_fold",
+        ) => Some((
+            SEARCH_FLAT_REPEAT_COUNT as f64,
+            "folded-detectorless-logical-errors/s",
+        )),
+        (
+            "pf4-dem-hypergraph-logical-repeat",
+            "stab_pf4_dem_hyper_logical_only_flat_repeat_fold",
+        ) => Some((
+            SEARCH_FLAT_REPEAT_COUNT as f64,
+            "folded-detectorless-logical-errors/s",
+        )),
         _ => None,
     }
 }
@@ -264,7 +281,10 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures current capped-repeat hypergraph search, zero-probability repeat skipping for hypergraph search, selected flat detector-touching zero-shift hypergraph search repeat folding, weighted SAT zero-probability variable elision and repeated-body skipping, capped unselected SAT problem generation, analyzer traversal, and ErrorMatcher circuit traversal; true folded traversal remains an explicit RPF4 follow-up",
         ),
         "pf4-dem-folded-graphlike-traversal" => Some(
-            "contract-only: Stab measures current capped-repeat graphlike search behavior, zero-probability repeat skipping, and selected flat detector-touching zero-shift graphlike repeat folding; true folded graphlike traversal remains an explicit RPF4 follow-up",
+            "contract-only: Stab measures current capped-repeat graphlike search behavior, zero-probability repeat skipping, and selected flat detector-touching and detectorless logical-only zero-shift graphlike repeat folding; true folded graphlike traversal remains an explicit RPF4 follow-up",
+        ),
+        "pf4-dem-hypergraph-logical-repeat" => Some(
+            "contract-only: Stab measures selected flat detectorless logical-only zero-shift hypergraph search repeat folding; broader shifted, nested, non-flat, numeric-target, and detectorless no-target hypergraph repeat traversal remains capped or excluded",
         ),
         "pf4-dem-sat-flat-repeat-fold" => Some(
             "contract-only: Stab measures selected SAT/WCNF flat zero-shift repeat folding for unweighted shortest-error SAT including zero-probability structural mechanisms and weighted concrete-MAP SAT; broader shifted, nested, non-flat, and high-index dense-target structural SAT repeat traversal remains capped",
@@ -598,6 +618,26 @@ fn run_dem_search_sat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
     ])
 }
 
+fn run_dem_hypergraph_logical_repeat_row(
+    row: &BenchmarkRow,
+) -> Result<Vec<Measurement>, BenchError> {
+    let fixture = search_logical_only_flat_repeat_fixture(SEARCH_FLAT_REPEAT_COUNT);
+    let model = DetectorErrorModel::from_dem_str(&fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+
+    Ok(vec![measure_stab_batched(
+        "stab_pf4_dem_hyper_logical_only_flat_repeat_fold",
+        TRANSFORM_REPETITIONS,
+        || {
+            let logical_error =
+                find_undetectable_logical_error(&model, usize::MAX, usize::MAX, false)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(dem_model_checksum(&logical_error));
+            Ok(())
+        },
+    )?])
+}
+
 fn run_error_matcher_filter_flat_repeat_row(
     row: &BenchmarkRow,
 ) -> Result<Vec<Measurement>, BenchError> {
@@ -674,6 +714,10 @@ fn run_dem_graphlike_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, 
     let flat_fixture = search_flat_repeat_fixture(SEARCH_FLAT_REPEAT_COUNT);
     let flat_model = DetectorErrorModel::from_dem_str(&flat_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let logical_only_flat_fixture =
+        search_logical_only_flat_repeat_fixture(SEARCH_FLAT_REPEAT_COUNT);
+    let logical_only_flat_model = DetectorErrorModel::from_dem_str(&logical_only_flat_fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
 
     Ok(vec![
         measure_stab_batched(
@@ -703,6 +747,17 @@ fn run_dem_graphlike_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, 
             || {
                 let logical_error =
                     shortest_graphlike_undetectable_logical_error(&flat_model, false)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(dem_model_checksum(&logical_error));
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_graphlike_logical_only_flat_repeat_fold",
+            TRANSFORM_REPETITIONS,
+            || {
+                let logical_error =
+                    shortest_graphlike_undetectable_logical_error(&logical_only_flat_model, false)
                         .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(dem_model_checksum(&logical_error));
                 Ok(())
@@ -757,6 +812,16 @@ fn search_flat_repeat_fixture(repeat_count: u64) -> String {
 repeat {repeat_count} {{
     error(0.1) D0 L0
     error(0.2) D0
+}}
+"
+    )
+}
+
+fn search_logical_only_flat_repeat_fixture(repeat_count: u64) -> String {
+    format!(
+        "\
+repeat {repeat_count} {{
+    error(0.1) L0
 }}
 "
     )

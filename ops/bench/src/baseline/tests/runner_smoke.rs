@@ -37,7 +37,12 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
                 "stab_pf4_dem_graphlike_capped_repeat",
                 "stab_pf4_dem_graphlike_zero_probability_repeat_skip",
                 "stab_pf4_dem_graphlike_flat_repeat_fold",
+                "stab_pf4_dem_graphlike_logical_only_flat_repeat_fold",
             ][..],
+        ),
+        (
+            "pf4-dem-hypergraph-logical-repeat",
+            &["stab_pf4_dem_hyper_logical_only_flat_repeat_fold"][..],
         ),
         (
             "pf4-dem-sat-flat-repeat-fold",

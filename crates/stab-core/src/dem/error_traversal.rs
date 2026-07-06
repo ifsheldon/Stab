@@ -40,15 +40,17 @@ impl DetectorErrorModel {
             if probability == 0.0 {
                 return Ok(None);
             }
-            let mut has_detector_target = false;
+            let mut has_search_target = false;
             for target in instruction.targets() {
                 match target {
-                    DemTarget::RelativeDetector(_) => has_detector_target = true,
+                    DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_) => {
+                        has_search_target = true;
+                    }
                     DemTarget::Numeric(_) => return Ok(None),
-                    DemTarget::LogicalObservable(_) | DemTarget::Separator => {}
+                    DemTarget::Separator => {}
                 }
             }
-            if !has_detector_target {
+            if !has_search_target {
                 return Ok(None);
             }
             count = count.checked_add(1).ok_or_else(|| {

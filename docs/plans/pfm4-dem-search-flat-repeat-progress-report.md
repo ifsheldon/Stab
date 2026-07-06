@@ -10,7 +10,8 @@ The selected behavior is compact search-graph construction for repeated identica
 - `find_undetectable_logical_error` uses the same selected folded traversal for the hypergraph search graph.
 - Small selected repeats may also share the folded graph-construction path because graph nodes already deduplicate identical edges and the search objective is unweighted shortest error count.
 
-This slice does not change SAT or WCNF generation, analyzer traversal, ErrorMatcher traversal, sampled-error output, replayed-error output, detectorless logical-only repeated errors, zero-probability structural repeats, shifted active repeats, repeat bodies containing non-error instructions, nested repeat bodies beyond capped outer traversal, dense detector or observable caps, Python APIs, diagrams, or deferred simulator-product surfaces.
+This slice did not change SAT or WCNF generation, analyzer traversal, ErrorMatcher traversal, sampled-error output, replayed-error output, detectorless logical-only repeated errors, zero-probability structural repeats, shifted active repeats, repeat bodies containing non-error instructions, nested repeat bodies beyond capped outer traversal, dense detector or observable caps, Python APIs, diagrams, or deferred simulator-product surfaces.
+The later detectorless logical-only follow-up in `docs/plans/pfm4-dem-search-detectorless-logical-repeat-progress-report.md` promotes the selected flat detectorless logical-only graphlike and hypergraph search case.
 
 ## Comparator And Evidence
 
@@ -26,7 +27,8 @@ Existing rejection tests remain the comparator for shifted active repeats and no
 That traversal recognizes selected flat detector-touching zero-shift repeat bodies before applying the generic repeat-count cap.
 The graph builders then add the selected body once at the current detector offset, relying on the existing graph edge deduplication and unweighted shortest-search objective.
 
-Detectorless logical-only repeated errors are intentionally excluded because hypergraph search currently folds detectorless logical rows through a separate distance-1 mask behavior that needs its own compatibility decision.
+Detectorless logical-only repeated errors were intentionally excluded at the time of this slice because hypergraph search folded detectorless logical rows through a separate distance-1 mask behavior that needed its own compatibility decision.
+The later detectorless logical-only follow-up resolves the selected flat graphlike and hypergraph search case.
 Shifted, nested, non-flat, mixed-instruction, zero-probability, analyzer, matcher, sampled-error, and replay paths keep the previous caps or explicit rejections.
 
 ## Tests
@@ -35,7 +37,7 @@ Targeted tests prove:
 
 - A selected large flat zero-shift repeated graphlike body produces the same graphlike shortest-error output as the compact single-body model.
 - A selected large flat zero-shift repeated hypergraph body produces the same hypergraph shortest-error output as the compact single-body model.
-- Detectorless logical-only repeated errors remain outside this fold until hypergraph detectorless-distance behavior is specified separately.
+- Detectorless logical-only repeated errors were outside this fold at the time of this slice; the later detectorless logical-only follow-up promotes the selected flat graphlike and hypergraph search case.
 - Existing zero-probability repeat skipping and shifted zero-probability dense-node rejection remain unchanged.
 
 New test:
@@ -89,6 +91,7 @@ just bench::compare --only pf4-dem-folded-traversal --baseline target/benchmarks
 ```
 
 Milestone-audit status: complete for this selected slice.
-No blocking findings were found; the audit verified the scoped graphlike and hypergraph search fold, direct tests, PF4 oracle metadata, report-only benchmark runner coverage, measurement work units, compare notes, focused benchmark reports, and explicit exclusions for detectorless logical-only, shifted, nested, non-flat, analyzer, matcher, sampled-error, and replay paths.
+No blocking findings were found; the audit verified the scoped graphlike and hypergraph search fold, direct tests, PF4 oracle metadata, report-only benchmark runner coverage, measurement work units, compare notes, focused benchmark reports, and explicit exclusions for detectorless logical-only, shifted, nested, non-flat, analyzer, matcher, sampled-error, and replay paths at the time of that slice.
+The later detectorless logical-only follow-up promotes the previously excluded flat detectorless logical-only search case without changing the remaining shifted, nested, non-flat, analyzer, matcher, sampled-error, or replay exclusions.
 Full-code-review status: complete for this selected slice.
 The core GPT-5.5/xhigh sidecar and the docs/oracle/benchmark GPT-5.5/xhigh sidecar found no evidence-backed blocking issues; the local review also found no blocker, with only the existing PF4/PF6 large-file watch list remaining below the 1200-line source threshold.
