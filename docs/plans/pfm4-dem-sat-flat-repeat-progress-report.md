@@ -84,6 +84,7 @@ git diff --check
 
 Milestone-audit status: complete for this selected slice.
 The implemented evidence satisfies the scoped contract for flat zero-shift SAT/WCNF repeat bodies while keeping shifted, nested, non-flat, analyzer, ErrorMatcher, graphlike, hypergraph, and high-index dense-target structural repeat work outside this slice.
+The later selected nested zero-shift SAT/WCNF follow-up is tracked separately in `pfm4-dem-sat-nested-repeat-progress-report.md`.
 
 Previous full-code-review status for the original all-nonzero unweighted and weighted flat-repeat slice: findings resolved.
 The later zero-probability structural SAT extension has its own review status in `pfm4-dem-sat-zero-probability-repeat-progress-report.md`.

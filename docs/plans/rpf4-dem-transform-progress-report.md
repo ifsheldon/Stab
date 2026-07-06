@@ -51,7 +51,7 @@ Report-only runner coverage:
 - `pf4-dem-sampler-folded-repeat`, tracking folded sampler compilation, stochastic direct sampling, zero-probability repeat skipping, and sampled-error caps in `docs/plans/rpf4-dem-sampler-progress-report.md`
 - `pf4-dem-folded-traversal`, tracking current capped search/analyzer traversal, graphlike and hypergraph zero-probability repeat skipping, and weighted SAT/WCNF zero-probability handling in `docs/plans/rpf4-dem-search-sat-progress-report.md`
 - `pf4-dem-folded-graphlike-traversal`, tracking current capped graphlike traversal and graphlike zero-probability repeat skipping in `docs/plans/rpf4-dem-search-sat-progress-report.md`
-- `pf4-dem-sat-flat-repeat-fold`, tracking selected flat zero-shift SAT/WCNF repeat folding in `docs/plans/rpf4-dem-search-sat-progress-report.md`
+- `pf4-dem-sat-flat-repeat-fold`, tracking selected flat and nested zero-shift SAT/WCNF repeat folding in `docs/plans/rpf4-dem-search-sat-progress-report.md`
 
 The implemented rows remain `non-primary-report-only` because they measure Rust public APIs and pinned Stim does not provide a faithful Rust direct timing baseline in this harness.
 They are not part of the 1.25x primary threshold file.

@@ -28,7 +28,7 @@ This confirms selected structural folding reaches target validation and fails be
 ## Documentation And Metadata
 
 Updated the existing SAT flat-repeat reports and checklist wording to name the dedicated high-observable cap evidence.
-Reused the existing SAT-sourced oracle row `pf4-dem-sat-flat-repeat-fold-rust`; no new oracle row is needed because the existing row runs the `sat_problem_` test family and already owns selected SAT flat-repeat folding evidence.
+Reused the existing SAT-sourced oracle row `pf4-dem-sat-flat-repeat-fold-rust`; no new oracle row is needed because the existing row runs the `flat_zero_shift` test filter and already owns selected SAT flat-repeat folding evidence.
 No benchmark row was added because this is a rejection-path resource guard, not a throughput path.
 
 ## Verification

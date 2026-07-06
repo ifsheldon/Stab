@@ -222,6 +222,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
                 "folded-zero-probability-errors/s",
             ))
         }
+        ("pf4-dem-sat-flat-repeat-fold", "stab_pf4_dem_sat_nested_repeat_fold") => {
+            Some((sat_nested_folded_errors(), "folded-nested-errors/s"))
+        }
         ("pf4-dem-folded-traversal", "stab_pf4_dem_weighted_sat_zero_probability_repeat_skip") => {
             Some((
                 SEARCH_ZERO_REPEAT_COUNT as f64,
@@ -230,6 +233,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         }
         ("pf4-dem-sat-flat-repeat-fold", "stab_pf4_dem_weighted_sat_flat_repeat_fold") => {
             Some(((SAT_FLAT_REPEAT_COUNT as f64) * 2.0, "folded-errors/s"))
+        }
+        ("pf4-dem-sat-flat-repeat-fold", "stab_pf4_dem_weighted_sat_nested_repeat_fold") => {
+            Some((sat_nested_folded_errors(), "folded-nested-errors/s"))
         }
         ("pf4-dem-folded-traversal", "stab_pf4_dem_analyzer_capped_repeat") => Some((
             analyzer_expanded_instructions() as f64,
@@ -662,6 +668,9 @@ fn run_dem_sat_flat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, B
     let sat_zero_probability_flat_model =
         DetectorErrorModel::from_dem_str(&sat_zero_probability_flat_fixture)
             .map_err(|error| stab_runner_error(&row.id, error))?;
+    let sat_nested_fixture = sat_nested_repeat_fixture(SAT_FLAT_REPEAT_COUNT);
+    let sat_nested_model = DetectorErrorModel::from_dem_str(&sat_nested_fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
     Ok(vec![
         measure_stab_batched(
             "stab_pf4_dem_sat_flat_repeat_fold",
@@ -684,10 +693,30 @@ fn run_dem_sat_flat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, B
             },
         )?,
         measure_stab_batched(
+            "stab_pf4_dem_sat_nested_repeat_fold",
+            TRANSFORM_REPETITIONS,
+            || {
+                let problem = shortest_error_sat_problem(&sat_nested_model)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(problem.len());
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
             "stab_pf4_dem_weighted_sat_flat_repeat_fold",
             TRANSFORM_REPETITIONS,
             || {
                 let problem = likeliest_error_sat_problem(&sat_flat_model, 100)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(problem.len());
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_weighted_sat_nested_repeat_fold",
+            TRANSFORM_REPETITIONS,
+            || {
+                let problem = likeliest_error_sat_problem(&sat_nested_model, 100)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(problem.len());
                 Ok(())
@@ -868,6 +897,29 @@ repeat {repeat_count} {{
 }}
 "
     )
+}
+
+fn sat_nested_repeat_fixture(repeat_count: u64) -> String {
+    format!(
+        "\
+repeat {repeat_count} {{
+    detector(1, 2) D0
+    repeat {repeat_count} {{
+        error(0.000001) D0 L0
+        shift_detectors 0
+        error(0.25) D1 L1
+    }}
+}}
+error(0.1) D0
+error(0.1) D0 L0
+error(0.1) D1 L1
+"
+    )
+}
+
+fn sat_nested_folded_errors() -> f64 {
+    let repeat_count = SAT_FLAT_REPEAT_COUNT as f64;
+    repeat_count * repeat_count * 2.0
 }
 
 fn analyzer_repeat_fixture(repeat_count: u64) -> String {

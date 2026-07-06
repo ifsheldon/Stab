@@ -83,7 +83,8 @@ git diff --check
 Milestone-audit status: complete for this selected slice.
 The audit found no blocking implementation or evidence findings.
 The completion matrix is satisfied by the SAT unit test at `crates/stab-core/src/dem/sat.rs`, the PF4 integration test at `crates/stab-core/tests/dem_search.rs`, the SAT-sourced oracle row `pf4-dem-sat-flat-repeat-fold-rust`, and the `pf4-dem-sat-flat-repeat-fold` benchmark submeasurement.
-Residual shifted, nested, non-flat, and high-index dense-target structural SAT repeat work remains explicit follow-up scope, not a defect in this slice.
+Residual shifted, nested, non-flat, and high-index dense-target structural SAT repeat work remained explicit follow-up scope for this slice, not a defect in this slice.
+The later selected nested zero-shift SAT/WCNF follow-up in `pfm4-dem-sat-nested-repeat-progress-report.md` promotes part of that former nested follow-up scope while shifted, non-flat, and high-index dense-target structural SAT repeats remain active outside the selected shape.
 Full-code-review status: findings resolved.
 The core GPT-5.5/xhigh sidecar found no blocking issues and confirmed the unweighted branch keeps zero-probability mechanisms structurally while the weighted branch still elides them.
 It also confirmed dense target caps still run before vector allocation for the high-detector structural case and that the selected fold is scoped to nonempty zero-shift all-error bodies.

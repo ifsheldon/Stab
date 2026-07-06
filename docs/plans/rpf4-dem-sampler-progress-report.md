@@ -3,7 +3,7 @@
 ## Summary
 
 This RPF4 slice records source-owned evidence for folded DEM sampler compilation and direct detector sampling across repeat blocks.
-It is not an RPF4 completion report because sampled-error records still use Stim-compatible flat error occurrence order and therefore retain materialized width caps, and because graphlike, hypergraph, SAT, matcher-adjacent, and analyzer-adjacent traversal consumers still have active folded-traversal work beyond the implemented graphlike and hypergraph zero-probability repeat skip, weighted SAT/WCNF zero-probability variable elision and repeated-body skip, and selected SAT/WCNF flat zero-shift repeat folding.
+It is not an RPF4 completion report because sampled-error records still use Stim-compatible flat error occurrence order and therefore retain materialized width caps, and because graphlike, hypergraph, SAT, matcher-adjacent, and analyzer-adjacent traversal consumers still have active folded-traversal work beyond the implemented graphlike and hypergraph zero-probability repeat skip, weighted SAT/WCNF zero-probability variable elision and repeated-body skip, and selected SAT/WCNF flat and nested zero-shift repeat folding.
 
 ## Implemented Surfaces
 
@@ -70,5 +70,5 @@ just bench::smoke
 ## Remaining RPF4 Work
 
 - Optimize folded DEM sampler execution for nested or shifted repeated stochastic nonzero-probability bodies whose dense detector outputs do not require per-occurrence work, then tighten or remove the current sampled-error application work cap without changing flat sampled-error semantics.
-- Finish folded traversal or explicit caps for graphlike search, hypergraph search, SAT or WCNF encoding, matcher-adjacent operations, and analyzer-adjacent operations beyond the current graphlike and hypergraph zero-probability repeat skip, weighted SAT/WCNF zero-probability variable elision and repeated-body skip, and selected SAT/WCNF flat zero-shift repeat folding.
+- Finish folded traversal or explicit caps for graphlike search, hypergraph search, SAT or WCNF encoding, matcher-adjacent operations, and analyzer-adjacent operations beyond the current graphlike and hypergraph zero-probability repeat skip, weighted SAT/WCNF zero-probability variable elision and repeated-body skip, and selected SAT/WCNF flat and nested zero-shift repeat folding.
 - Keep benchmark runners for `pf4-dem-folded-traversal` and `pf4-dem-folded-graphlike-traversal` synchronized when additional implementation or explicit cap behavior becomes source-owned enough to measure honestly.
