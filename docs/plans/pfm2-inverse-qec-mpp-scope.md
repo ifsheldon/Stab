@@ -19,7 +19,7 @@ It is a narrow exact-output packet, not a general measurement-rich reverse detec
 
 - Reject sparse detector subsets, duplicate detector records, detector references outside the selected `MPP` measurement group, non-identity detector parities, empty detectors, empty `MPP` products, noisy `MPP` instructions, and anti-Hermitian `MPP` products.
 - Keep multiple detectors, interleaved operations, resets, pair measurements, ordinary measurements, observables, feedback, noise, repeats, `dont_turn_measurements_into_resets`, Python API shape, and flow-returning overloads out of scope for this packet.
-- Keep broader `m_det`, `mzz`, `noisy_mr`, `obs_include_pauli`, and multi-instruction QEC inverse behavior active for later PFM2 or PFM5 slices.
+- Keep broader `m_det`, `mzz`, noisy measure-reset detector-flow, `obs_include_pauli`, and multi-instruction QEC inverse behavior active for later PFM2 or PFM5 slices.
 
 ## Comparator And Evidence
 

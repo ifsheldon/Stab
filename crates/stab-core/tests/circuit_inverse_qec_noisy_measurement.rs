@@ -78,9 +78,6 @@ fn circuit_inverse_qec_drops_empty_selected_measurement_instructions() {
 #[test]
 fn circuit_inverse_qec_rejects_unpromoted_noisy_measurement_shapes() {
     for circuit_text in [
-        "MR(0.125) 0\n",
-        "MRX(0.125) 0\n",
-        "MRY(0.125) 0\n",
         "MXX(0.125) 0 1\n",
         "MYY(0.125) 0 1\n",
         "MZZ(0.125) 0 1\n",
@@ -94,10 +91,7 @@ fn circuit_inverse_qec_rejects_unpromoted_noisy_measurement_shapes() {
             .to_string();
 
         assert!(
-            error.contains("operation MR is not unitary")
-                || error.contains("operation MRX is not unitary")
-                || error.contains("operation MRY is not unitary")
-                || error.contains("operation MXX is not unitary")
+            error.contains("operation MXX is not unitary")
                 || error.contains("operation MYY is not unitary")
                 || error.contains("operation MZZ is not unitary")
                 || error.contains("operation MPP is not unitary")

@@ -19,7 +19,7 @@ It is a narrow measurement-only packet, not a general noisy reverse detector-flo
 ## Explicit Rejections And Deferrals
 
 - Keep `MR`, `MRX`, `MRY`, pair measurements, `MPP`, detectors, observables, feedback, ordinary noise instructions, repeat blocks, `TICK`, coordinates, `SHIFT_COORDS`, and interleaved Clifford or detector-flow rewrites out of scope for this packet.
-- Keep Stim's noisy measure-reset rewrite, such as `MR(0.125) 0` becoming `MR 0` followed by `X_ERROR(0.125) 0`, active for a later PFM2 slice.
+- Keep noisy measure-reset plus detector rewrites, such as pinned `noisy_mr_det`, active for a later PFM2 slice; selected top-level noisy `MR`/`MRX`/`MRY` measure-reset-only reversal is owned by `docs/plans/pfm2-inverse-qec-noisy-measure-reset-scope.md`.
 - Keep `dont_turn_measurements_into_resets`, Python API shape, and flow-returning overloads out of scope.
 
 ## Comparator And Evidence

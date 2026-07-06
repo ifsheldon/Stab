@@ -17,6 +17,9 @@ pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Ci
     if let Some(inverse) = selected_noisy_measurement_inverse(circuit)? {
         return Ok(Some(inverse));
     }
+    if let Some(inverse) = selected_noisy_measure_reset_inverse(circuit)? {
+        return Ok(Some(inverse));
+    }
     if let Some(inverse) = selected_measure_reset_pass_through_inverse(circuit)? {
         return Ok(Some(inverse));
     }
@@ -261,6 +264,130 @@ fn reversed_measurement_targets(instruction: &CircuitInstruction) -> CircuitResu
         targets.push(target.clone());
     }
     Ok(targets)
+}
+
+fn selected_noisy_measure_reset_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+    if circuit.items().is_empty() {
+        return Ok(None);
+    }
+    let mut instructions = Vec::with_capacity(circuit.items().len());
+    for item in circuit.items() {
+        let CircuitItem::Instruction(instruction) = item else {
+            return Ok(None);
+        };
+        match instruction.gate().canonical_name() {
+            "MR" | "MRX" | "MRY" => instructions.push(instruction),
+            _ => return Ok(None),
+        }
+    }
+
+    let mut result = Circuit::new();
+    for instruction in instructions.into_iter().rev() {
+        append_measure_reset_inverse(&mut result, instruction)?;
+    }
+    Ok(Some(result))
+}
+
+fn append_measure_reset_inverse(
+    result: &mut Circuit,
+    instruction: &CircuitInstruction,
+) -> CircuitResult<()> {
+    let noisy = !instruction.args().is_empty();
+    if instruction.args().len() > 1 {
+        return Err(inverse_qec_noisy_measure_reset_error(
+            "measure-reset instructions must have at most one probability argument",
+        ));
+    }
+    let targets = reversed_measure_reset_targets(instruction, !noisy)?;
+    if !noisy {
+        return append_target_instruction(
+            result,
+            instruction.gate(),
+            instruction.args(),
+            targets,
+            instruction.tag(),
+        );
+    }
+
+    let error_gate = Gate::from_name(noisy_measure_reset_error_gate(
+        instruction.gate().canonical_name(),
+    )?)?;
+    for chunk in split_noisy_measure_reset_targets(targets)? {
+        append_target_instruction(
+            result,
+            instruction.gate(),
+            &[],
+            chunk.clone(),
+            instruction.tag(),
+        )?;
+        append_target_instruction(
+            result,
+            error_gate,
+            instruction.args(),
+            chunk,
+            instruction.tag(),
+        )?;
+    }
+    Ok(())
+}
+
+fn reversed_measure_reset_targets(
+    instruction: &CircuitInstruction,
+    allow_inverted: bool,
+) -> CircuitResult<Vec<Target>> {
+    let mut targets = Vec::with_capacity(instruction.targets().len());
+    for group in instruction.target_groups().into_iter().rev() {
+        let [target] = group else {
+            return Err(inverse_qec_noisy_measure_reset_error(
+                "measure-reset target groups must contain one qubit target",
+            ));
+        };
+        if !target.is_qubit_target() {
+            return Err(inverse_qec_noisy_measure_reset_error(
+                "measure-reset targets must be qubit targets",
+            ));
+        }
+        if !allow_inverted && target.is_inverted_result_target() {
+            return Err(inverse_qec_noisy_measure_reset_error(
+                "noisy measure-reset targets must not be inverted",
+            ));
+        }
+        targets.push(target.clone());
+    }
+    Ok(targets)
+}
+
+fn split_noisy_measure_reset_targets(targets: Vec<Target>) -> CircuitResult<Vec<Vec<Target>>> {
+    let mut chunks = Vec::new();
+    let mut chunk = Vec::new();
+    let mut seen = HashSet::new();
+    for target in targets {
+        let qubit = target
+            .qubit_id()
+            .ok_or_else(|| inverse_qec_noisy_measure_reset_error("target must have a qubit"))?
+            .get();
+        if !seen.insert(qubit) {
+            chunks.push(chunk);
+            chunk = Vec::new();
+            seen.clear();
+            seen.insert(qubit);
+        }
+        chunk.push(target);
+    }
+    if !chunk.is_empty() {
+        chunks.push(chunk);
+    }
+    Ok(chunks)
+}
+
+fn noisy_measure_reset_error_gate(gate_name: &str) -> CircuitResult<&'static str> {
+    match gate_name {
+        "MR" => Ok("X_ERROR"),
+        "MRX" | "MRY" => Ok("Z_ERROR"),
+        _ => Err(inverse_qec_noisy_measure_reset_error(
+            "unsupported measure-reset gate",
+        )),
+    }
 }
 
 fn selected_measure_reset_pass_through_inverse(
@@ -830,6 +957,12 @@ fn inverse_qec_mpp_detector_error(reason: &str) -> CircuitError {
 fn inverse_qec_noisy_measurement_error(reason: &str) -> CircuitError {
     CircuitError::invalid_tableau_conversion(format!(
         "inverse_qec selected noisy measurement subset requires only top-level M, MX, and MY instructions with qubit targets; {reason}"
+    ))
+}
+
+fn inverse_qec_noisy_measure_reset_error(reason: &str) -> CircuitError {
+    CircuitError::invalid_tableau_conversion(format!(
+        "inverse_qec selected noisy measure-reset subset requires only top-level MR, MRX, and MRY instructions with qubit targets; {reason}"
     ))
 }
 
