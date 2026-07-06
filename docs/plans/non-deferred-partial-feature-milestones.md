@@ -121,6 +121,10 @@ Acceptance criteria:
 - Every deferred-only row has a named deferral reason.
 - Every rollup row names the child milestones that must close before the rollup status changes.
 
+Current evidence:
+
+- `docs/plans/pfm0-current-evidence-lock-report.md` records the current PFM0 classification pass, metadata checks, and next active implementation candidates.
+
 ## PFM1: Gate Metadata And Execution-Support Contract
 
 Objective: keep parser acceptance, metadata availability, and execution support impossible to confuse while active execution and flow-integration gaps close.

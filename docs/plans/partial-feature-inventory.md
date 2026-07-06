@@ -221,3 +221,7 @@ RPF0 is complete when:
 - `benchmarks/manifest.csv` has non-primary PF benchmark placeholders for each milestone that will need performance evidence.
 - Oracle and benchmark tooling can parse PF milestones without adding them to the current M12 primary gate.
 - `just oracle::list`, `just oracle::matrix --check`, `cargo test -p stab-oracle fixtures --quiet`, and `just bench::list` pass.
+
+Current evidence-lock report:
+
+- `docs/plans/pfm0-current-evidence-lock-report.md` records the latest PFM0 pass over the active partial rows, manifest-only extraction contracts, deferred-only exclusions, and metadata health checks.
