@@ -867,6 +867,31 @@ repeat 100001 {
     }
 
     #[test]
+    fn sat_problem_shortest_rejects_large_flat_zero_shift_zero_probability_high_observable_repeat()
+    -> CircuitResult<()> {
+        let model = dem("\
+repeat 100001 {
+    error(0) L1000001
+}
+")?;
+        let error = match shortest_error_sat_problem(&model) {
+            Ok(output) => {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "unweighted SAT unexpectedly accepted high-observable zero-probability repeat: {output}"
+                )));
+            }
+            Err(error) => error.to_string(),
+        };
+        assert!(
+            error.contains(
+                "SAT problem generation currently supports at most 1000000 effective observable nodes"
+            ),
+            "{error}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn sat_problem_likeliest_folds_large_flat_zero_shift_repeats_by_map_cost() -> CircuitResult<()>
     {
         let model = dem("\

@@ -87,5 +87,6 @@ Residual shifted, nested, non-flat, and high-index dense-target structural SAT r
 Full-code-review status: findings resolved.
 The core GPT-5.5/xhigh sidecar found no blocking issues and confirmed the unweighted branch keeps zero-probability mechanisms structurally while the weighted branch still elides them.
 It also confirmed dense target caps still run before vector allocation for the high-detector structural case and that the selected fold is scoped to nonempty zero-shift all-error bodies.
-Residual risks are documented: the large-repeat WCNF comparator is compact semantic equivalence rather than byte-for-byte Stim unrolling, high-observable zero-probability flat-repeat caps share the same cap path but do not have a dedicated test, and `crates/stab-core/src/dem/sat.rs` remains close to the 1200-line watch threshold.
+Residual risks are documented: the large-repeat WCNF comparator is compact semantic equivalence rather than byte-for-byte Stim unrolling, and `crates/stab-core/src/dem/sat.rs` remains close to the 1200-line watch threshold.
+The high-observable zero-probability flat-repeat cap now has dedicated follow-up evidence in `pfm4-dem-sat-high-observable-cap-progress-report.md`.
 The docs and benchmark GPT-5.5/xhigh sidecar found two P3 documentation issues in the older flat-repeat report, both fixed by aligning the benchmark artifact commands and scoping its previous review-status note to the prior slice.
