@@ -3,8 +3,8 @@ use std::hint::black_box;
 use stab_core::{
     Circuit, CompiledDemSampler, DemDetectorId, DemInstructionKind, DemItem, DemTarget,
     DetectorErrorModel, ErrorAnalyzerOptions, circuit_to_detector_error_model,
-    explain_errors_from_circuit, find_undetectable_logical_error, shortest_error_sat_problem,
-    shortest_graphlike_undetectable_logical_error,
+    explain_errors_from_circuit, find_undetectable_logical_error, likeliest_error_sat_problem,
+    shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
 };
 
 use crate::error::BenchError;
@@ -142,6 +142,12 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             search_expanded_errors(SAT_REPEAT_COUNT) as f64,
             "expanded-errors/s",
         )),
+        ("pf4-dem-folded-traversal", "stab_pf4_dem_weighted_sat_zero_probability_repeat_skip") => {
+            Some((
+                SEARCH_ZERO_REPEAT_COUNT as f64,
+                "skipped-zero-probability-errors/s",
+            ))
+        }
         ("pf4-dem-folded-traversal", "stab_pf4_dem_analyzer_capped_repeat") => Some((
             analyzer_expanded_instructions() as f64,
             "expanded-instructions/s",
@@ -180,7 +186,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures folded CompiledDemSampler compile, stochastic direct sample behavior, and zero-probability repeat skipping; sampled-error materialization and excessive stochastic repeated-error work remain capped and broader PF4 traversal consumers remain explicit follow-up work",
         ),
         "pf4-dem-folded-traversal" => Some(
-            "contract-only: Stab measures current capped-repeat hypergraph search, zero-probability repeat skipping for hypergraph search, SAT problem generation, analyzer, and ErrorMatcher traversal behavior; true folded traversal remains an explicit RPF4 follow-up",
+            "contract-only: Stab measures current capped-repeat hypergraph search, zero-probability repeat skipping for hypergraph search, weighted SAT zero-probability variable elision and repeated-body skipping, capped unweighted SAT problem generation, analyzer, and ErrorMatcher traversal behavior; true folded traversal remains an explicit RPF4 follow-up",
         ),
         "pf4-dem-folded-graphlike-traversal" => Some(
             "contract-only: Stab measures current capped-repeat graphlike search behavior plus zero-probability repeat skipping; true folded graphlike traversal remains an explicit RPF4 follow-up",
@@ -361,6 +367,10 @@ fn run_dem_search_sat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
     let sat_fixture = search_repeat_fixture(SAT_REPEAT_COUNT);
     let sat_model = DetectorErrorModel::from_dem_str(&sat_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let weighted_sat_zero_fixture =
+        search_zero_probability_repeat_fixture(SEARCH_ZERO_REPEAT_COUNT);
+    let weighted_sat_zero_model = DetectorErrorModel::from_dem_str(&weighted_sat_zero_fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
     let analyzer_fixture = analyzer_repeat_fixture(ANALYZER_REPEAT_COUNT);
     let analyzer_circuit = Circuit::from_stim_str(&analyzer_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
@@ -400,6 +410,16 @@ fn run_dem_search_sat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
             TRANSFORM_REPETITIONS,
             || {
                 let problem = shortest_error_sat_problem(&sat_model)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(problem.len());
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_weighted_sat_zero_probability_repeat_skip",
+            TRANSFORM_REPETITIONS,
+            || {
+                let problem = likeliest_error_sat_problem(&weighted_sat_zero_model, 10)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(problem.len());
                 Ok(())
