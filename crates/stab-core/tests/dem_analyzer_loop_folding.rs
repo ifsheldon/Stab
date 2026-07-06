@@ -3,7 +3,7 @@
     reason = "compatibility tests use direct fixture assertions for compact diagnostics"
 )]
 
-use stab_core::{Circuit, ErrorAnalyzerOptions, circuit_to_detector_error_model};
+use stab_core::{Circuit, ErrorAnalyzerOptions, Probability, circuit_to_detector_error_model};
 
 fn analyze_folding_loops(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
@@ -29,6 +29,23 @@ fn analyze_folding_and_decomposing_errors(
             fold_loops: true,
             decompose_errors: true,
             block_decomposition_from_introducing_remnant_edges: block_remnant_edges,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .map(|dem| dem.to_dem_string())
+    .map_err(|error| error.to_string())
+}
+
+fn analyze_folding_with_decomposition_and_approximation(text: &str) -> Result<String, String> {
+    let circuit = Circuit::from_stim_str(text).expect("circuit");
+    circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            decompose_errors: true,
+            approximate_disjoint_errors_threshold: Some(
+                Probability::try_new(1.0).expect("probability"),
+            ),
             ..ErrorAnalyzerOptions::default()
         },
     )
@@ -195,6 +212,27 @@ fn pf6_dem_analyzer_fallback_does_not_mask_prefixed_repeat_errors() {
             .contains("supports prefixed repeats only when the first iteration ends"),
         "{error}"
     );
+}
+
+#[test]
+fn pf6_dem_analyzer_rejects_folded_observables_crossing_iterations() {
+    let error = analyze_folding_with_decomposition_and_approximation(
+        "
+        RX 0 2
+        REPEAT 100 {
+            R 1
+            CX 0 1 2 1
+            MRZ 1
+            MRX 2
+        }
+        MX 0
+        OBSERVABLE_INCLUDE(0) rec[-1] rec[-2] rec[-4]
+        ",
+    )
+    .expect_err("reject incomplete observable dependency across folded iterations");
+
+    assert!(error.contains("non-deterministic observables"), "{error}");
+    assert!(error.contains("L0"), "{error}");
 }
 
 #[test]

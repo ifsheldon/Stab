@@ -2,7 +2,7 @@
 
 ## Summary
 
-This RPF6 report makes the generated-QEC analyzer subset, the selected loop-folded error-decomposition subset, the bounded mixed-top-level `fold_loops=true` fallback, and the selected matched-error canonicalization hardening explicit in the source-owned evidence.
+This RPF6 report makes the generated-QEC analyzer subset, the selected loop-folded error-decomposition subset, the selected folded observable-dependency rejection guard, the bounded mixed-top-level `fold_loops=true` fallback, and the selected matched-error canonicalization hardening explicit in the source-owned evidence.
 It does not complete RPF6 because broad true folded generated-loop output, graphlike and hypergraph generated search beyond the promoted QEC subset, and sparse reverse tracker work beyond supported-Clifford unitary repeats remain open; additional matched-error value-object hardening belongs to future analyzer or search slices only when those outputs require it.
 
 ## Implemented Evidence Slice
@@ -10,6 +10,7 @@ It does not complete RPF6 because broad true folded generated-loop output, graph
 - `circuit_to_detector_error_model` is covered for noisy generated repetition-code and rotated-surface-code circuits through semantic DEM comparison against pinned Stim v1.16.0 expected output.
 - The semantic comparator normalizes detector shifts, graphlike decomposition separators, repeat traversal, and floating probability drift within tolerance.
 - `circuit_to_detector_error_model` is covered for the selected `fold_loops + decompose_errors + block_decomposition_from_introducing_remnant_edges` cases where repeated composite errors decompose into graphlike components inside a folded DEM repeat and remnant-edge blocking is enforced inside a folded repeat.
+- `circuit_to_detector_error_model` is covered for the selected upstream `fold_loops + decompose_errors + approximate_disjoint_errors` rejection case where `OBSERVABLE_INCLUDE` omits loop-carried measurement dependencies across folded iterations and must fail with nondeterministic-observable evidence instead of producing a folded DEM.
 - `circuit_to_detector_error_model` now handles unsupported mixed top-level `fold_loops=true` shapes through the existing capped non-folded analyzer. This selected bounded fallback covers the pinned generated surface-code prefix, repeat, and tail coordinate case without claiming true folded output for broader generated-loop families.
 - `ExplainedError::canonicalize` and `CircuitErrorLocation::canonicalize` now sort DEM terms, circuit error locations, flipped Pauli products, and flipped measured observables like pinned Stim, while `ErrorMatcher` preserves upstream-like returned location order by avoiding implicit location canonicalization.
 - The promoted evidence is Rust-core analyzer evidence, not public `stab analyze_errors` CLI parity.
@@ -23,6 +24,7 @@ Implemented Rust tests:
 - `semantic_dem_treats_graphlike_decomposition_as_equivalent`
 - `pf6_dem_analyzer_fold_loops_decomposes_repeat_errors`
 - `pf6_dem_analyzer_fold_loops_respects_remnant_edge_blocking`
+- `pf6_dem_analyzer_rejects_folded_observables_crossing_iterations`
 - `pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_mixed_top_level`
 - `pf6_dem_analyzer_fallback_does_not_mask_prefixed_repeat_errors`
 - `pf6_dem_analyzer_fallback_preserves_repeat_count_cap`
@@ -31,7 +33,7 @@ Implemented Rust tests:
 - `pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit`
 - `matched_error_canonicalize_sorts_terms_like_upstream`
 
-These tests run under `cargo test -p stab-core generated_qec_dem`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_loops_`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fallback_`, `cargo test -p stab-core --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit`, and `cargo test -p stab-core matched_error_canonicalize_sorts_terms_like_upstream`.
+These tests run under `cargo test -p stab-core generated_qec_dem`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_loops_`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_rejects_folded_observables_crossing_iterations`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fallback_`, `cargo test -p stab-core --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit`, and `cargo test -p stab-core matched_error_canonicalize_sorts_terms_like_upstream`.
 
 ## Oracle Rows
 
@@ -44,6 +46,10 @@ Implemented bounded fallback row:
 
 - `pf6-analyzer-mixed-top-level-fallback-rust`
 - `pf6-analyzer-generated-fold-loop-fallback-rust`
+
+Implemented folded-observable rejection row:
+
+- `pf6-analyzer-folded-observable-guard-rust`
 
 Implemented matched-error value-object row:
 
@@ -79,6 +85,7 @@ Related PF6 report-only runner coverage tracked in search and sparse-tracker rep
 
 No analyzer benchmark placeholder remains in this report after promoting `pf6-error-decomp-loop-folded`.
 No separate benchmark row is added for matched-error canonicalization because this is a value-object ordering contract and `ErrorMatcher` deliberately avoids implicit canonicalization on its returned hot path.
+No separate benchmark row is added for the folded-observable rejection guard because it is negative correctness evidence for an unsupported folded-output shape, not a throughput path.
 
 ## Verification Evidence
 
@@ -87,6 +94,7 @@ Target checks for this slice:
 ```sh
 cargo test -p stab-core generated_qec_dem --quiet
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_loops_ --quiet
+cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_rejects_folded_observables_crossing_iterations --quiet
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fallback_ --quiet
 cargo test -p stab-core --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit --quiet
 cargo test -p stab-core matched_error_canonicalize_sorts_terms_like_upstream --quiet
