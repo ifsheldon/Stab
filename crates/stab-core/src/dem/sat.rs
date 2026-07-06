@@ -576,9 +576,6 @@ fn folded_flat_sat_repeat_errors(
         has_nonzero_probability_error |= probability != 0.0;
         match mode {
             SatProblemMode::Unweighted => {
-                if probability == 0.0 {
-                    return Ok(None);
-                }
                 folded_errors.push(flatten_error(instruction, detector_offset)?);
             }
             SatProblemMode::Weighted { .. } => {
@@ -594,10 +591,10 @@ fn folded_flat_sat_repeat_errors(
             }
         }
     }
-    if has_nonzero_probability_error {
-        Ok(Some(folded_errors))
-    } else {
-        Ok(None)
+    match mode {
+        SatProblemMode::Unweighted => Ok(Some(folded_errors)),
+        SatProblemMode::Weighted { .. } if has_nonzero_probability_error => Ok(Some(folded_errors)),
+        SatProblemMode::Weighted { .. } => Ok(None),
     }
 }
 
@@ -851,6 +848,20 @@ repeat 100001 {
 }
 ")?;
         let expected = shortest_error_sat_problem(&dem("error(0.1) D0 L0\nerror(0.2) D0\n")?)?;
+        assert_eq!(shortest_error_sat_problem(&model)?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn sat_problem_shortest_folds_large_flat_zero_shift_zero_probability_repeats()
+    -> CircuitResult<()> {
+        let model = dem("\
+repeat 100001 {
+    error(0) D0 L0
+    error(0) D0
+}
+")?;
+        let expected = shortest_error_sat_problem(&dem("error(0) D0 L0\nerror(0) D0\n")?)?;
         assert_eq!(shortest_error_sat_problem(&model)?, expected);
         Ok(())
     }

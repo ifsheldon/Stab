@@ -198,6 +198,12 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf4-dem-sat-flat-repeat-fold", "stab_pf4_dem_sat_flat_repeat_fold") => {
             Some(((SAT_FLAT_REPEAT_COUNT as f64) * 2.0, "folded-errors/s"))
         }
+        ("pf4-dem-sat-flat-repeat-fold", "stab_pf4_dem_sat_zero_probability_flat_repeat_fold") => {
+            Some((
+                (SAT_FLAT_REPEAT_COUNT as f64) * 2.0,
+                "folded-zero-probability-errors/s",
+            ))
+        }
         ("pf4-dem-folded-traversal", "stab_pf4_dem_weighted_sat_zero_probability_repeat_skip") => {
             Some((
                 SEARCH_ZERO_REPEAT_COUNT as f64,
@@ -261,7 +267,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures current capped-repeat graphlike search behavior, zero-probability repeat skipping, and selected flat detector-touching zero-shift graphlike repeat folding; true folded graphlike traversal remains an explicit RPF4 follow-up",
         ),
         "pf4-dem-sat-flat-repeat-fold" => Some(
-            "contract-only: Stab measures selected SAT/WCNF flat all-nonzero zero-shift repeat folding for unweighted shortest-error SAT and weighted concrete-MAP SAT; broader shifted, nested, non-flat, and zero-probability unweighted SAT repeat traversal remains capped",
+            "contract-only: Stab measures selected SAT/WCNF flat zero-shift repeat folding for unweighted shortest-error SAT including zero-probability structural mechanisms and weighted concrete-MAP SAT; broader shifted, nested, non-flat, and high-index dense-target structural SAT repeat traversal remains capped",
         ),
         "pf4-error-matcher-filter-flat-repeat" => Some(
             "contract-only: Stab measures selected ErrorMatcher filter DEM flat detector-touching zero-shift repeat folding by compact filter-key semantics; broader shifted, nested, mixed-instruction, detectorless logical-only, circuit-repeat provenance, and explain_errors CLI behavior remains scoped out",
@@ -619,12 +625,27 @@ fn run_dem_sat_flat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, B
     let sat_flat_fixture = sat_flat_repeat_fixture(SAT_FLAT_REPEAT_COUNT);
     let sat_flat_model = DetectorErrorModel::from_dem_str(&sat_flat_fixture)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let sat_zero_probability_flat_fixture =
+        sat_zero_probability_flat_repeat_fixture(SAT_FLAT_REPEAT_COUNT);
+    let sat_zero_probability_flat_model =
+        DetectorErrorModel::from_dem_str(&sat_zero_probability_flat_fixture)
+            .map_err(|error| stab_runner_error(&row.id, error))?;
     Ok(vec![
         measure_stab_batched(
             "stab_pf4_dem_sat_flat_repeat_fold",
             TRANSFORM_REPETITIONS,
             || {
                 let problem = shortest_error_sat_problem(&sat_flat_model)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(problem.len());
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_sat_zero_probability_flat_repeat_fold",
+            TRANSFORM_REPETITIONS,
+            || {
+                let problem = shortest_error_sat_problem(&sat_zero_probability_flat_model)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(problem.len());
                 Ok(())
@@ -751,6 +772,17 @@ repeat {repeat_count} {{
 error(0.1) D0
 error(0.1) D0 L0
 error(0.1) D1 L1
+"
+    )
+}
+
+fn sat_zero_probability_flat_repeat_fixture(repeat_count: u64) -> String {
+    format!(
+        "\
+repeat {repeat_count} {{
+    error(0) D0 L0
+    error(0) D0
+}}
 "
     )
 }

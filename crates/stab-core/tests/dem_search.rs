@@ -99,11 +99,12 @@ fn pf4_dem_search_skips_zero_probability_repeat_bodies() {
     );
 
     let sat_error = shortest_error_sat_problem(&zero_repeat)
-        .expect_err("unweighted SAT still treats zero-probability errors as structural")
+        .expect_err("unweighted SAT should keep high-index structural zero-probability caps")
         .to_string();
     assert!(
-        sat_error
-            .contains("DEM SAT problem generation currently supports repeat counts up to 100000"),
+        sat_error.contains(
+            "SAT problem generation currently supports at most 1000000 effective detector nodes"
+        ),
         "{sat_error}"
     );
 }
@@ -178,6 +179,20 @@ fn pf4_dem_search_sat_folds_flat_nonzero_zero_shift_repeat_bodies() {
         shifted_error
             .contains("DEM SAT problem generation currently supports repeat counts up to 100000"),
         "{shifted_error}"
+    );
+}
+
+#[test]
+fn pf4_dem_search_sat_folds_flat_zero_probability_zero_shift_repeat_bodies() {
+    let flat_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0) D0 L0\n    error(0) D0\n}\n",
+    )
+    .unwrap();
+    let compact = DetectorErrorModel::from_dem_str("error(0) D0 L0\nerror(0) D0\n").unwrap();
+    let expected_shortest = shortest_error_sat_problem(&compact).unwrap();
+    assert_eq!(
+        shortest_error_sat_problem(&flat_repeat).unwrap(),
+        expected_shortest
     );
 }
 
