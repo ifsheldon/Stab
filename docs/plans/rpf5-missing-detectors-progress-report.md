@@ -77,6 +77,21 @@ They are not part of the 1.25x primary threshold file.
 The `SPP` and `SPP_DAG` slice is structural parity work that reuses the existing decomposition path and is not separately benchmarked; the generated-code row remains the performance-oriented missing-detectors workload.
 The bounded and selected folded final-repeat traversal slices are structural resource-boundary work and are not separately benchmarked.
 
+## Evidence Repair
+
+The 2026-07-06 toric evidence-repair slice found that this report and `oracle/fixtures/manifest.csv` already named `missing_detectors_supports_toric_global_stabilizer_product`, but the manifest used a package-wide Cargo filter that also matched an internal unit test with the same name.
+The slice adds the integration-test mirror beside the other PF5 missing-detectors rows and narrows `pf5-missing-detectors-generated-toric-rust` to `--test missing_detectors`, without changing `missing_detectors` behavior.
+The focused integration test proves the existing implementation already matches the pinned Stim v1.16.0 toric global-stabilizer suffix expectation.
+The scope note is `docs/plans/pfm5-missing-detectors-toric-evidence-repair-scope.md`.
+
+Focused checks for the repair:
+
+```sh
+cargo test -p stab-core --test missing_detectors missing_detectors_supports_toric_global_stabilizer_product --quiet
+cargo test -p stab-oracle fixtures --quiet
+just oracle::run --milestone PF5 --structural
+```
+
 ## Verification Evidence
 
 Current folded-final-repeat slice checks:
@@ -118,6 +133,15 @@ just bench::compare --milestone PF5
 - Continue keeping benchmark harness smoke tests split out of `ops/bench/src/baseline/tests.rs`, because the file is close to the project’s 1200-line threshold.
 
 ## Audit And Review
+
+Local milestone-audit for the selected toric evidence-repair slice found the updated scope, integration test, and narrowed oracle command complete against `docs/plans/pfm5-missing-detectors-toric-evidence-repair-scope.md`.
+The audit found no new under-specification requiring an entry in `docs/plans/milestone-spec-gaps.md`.
+
+Full-code-review used GPT-5.5/xhigh sidecars for Rust or oracle evidence and docs or milestone alignment.
+The Rust or oracle sidecar found a P2 evidence-ownership ambiguity: `pf5-missing-detectors-generated-toric-rust` used a package-wide Cargo filter, which matched both the existing internal unit test and the new integration test with the same name.
+The oracle manifest now narrows the row to `cargo-test|-p|stab-core|--test|missing_detectors|missing_detectors_supports_toric_global_stabilizer_product`, and the scope note plus this report now describe the slice as an ambiguity repair instead of a zero-test repair.
+The docs or milestone-alignment sidecar found no P0, P1, or P2 issues.
+No remaining P0, P1, or P2 findings are known for this toric evidence-repair slice.
 
 Local milestone-audit for the selected folded-final-repeat slice found the scope complete after fixing two proof-boundary issues: observable rows are now explicit fold non-goals because they merge by observable id across iterations, and proof-run analyzer errors now fall back to the original repeat-budget path instead of changing the public error class.
 

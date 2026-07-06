@@ -492,3 +492,34 @@ fn missing_detectors_supports_honeycomb_generated_code_suffix()
     }
     Ok(())
 }
+
+#[test]
+fn missing_detectors_supports_toric_global_stabilizer_product()
+-> Result<(), Box<dyn std::error::Error>> {
+    // Adapted from Stim v1.16.0 src/stim/util_top/missing_detectors.test.cc.
+    let actual = missing(
+        "R 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15\n\
+         TICK\n\
+         MPP X0*X4*X5*X1 X2*X6*X7*X3 X10*X14*X15*X11 X8*X12*X13*X9\n\
+         TICK\n\
+         MPP X5*X9*X10*X6 X1*X13*X14*X2 X0*X12*X15*X3 X4*X8*X11*X7\n\
+         TICK\n\
+         MPP Z4*Z8*Z9*Z5 Z6*Z10*Z11*Z7 Z2*Z14*Z15*Z3 Z0*Z12*Z13*Z1\n\
+         TICK\n\
+         MPP Z1*Z5*Z6*Z2 Z9*Z13*Z14*Z10 Z8*Z12*Z15*Z11 Z0*Z4*Z7*Z3\n\
+         DETECTOR rec[-1]\n\
+         DETECTOR rec[-2]\n\
+         DETECTOR rec[-3]\n\
+         DETECTOR rec[-4]\n\
+         DETECTOR rec[-5]\n\
+         DETECTOR rec[-6]\n\
+         DETECTOR rec[-7]\n\
+         DETECTOR rec[-8]\n",
+    )?;
+    let expected =
+        "DETECTOR rec[-16] rec[-15] rec[-14] rec[-13] rec[-12] rec[-11] rec[-10] rec[-9]\n";
+    if actual != expected {
+        return Err(std::io::Error::other(format!("expected {expected:?}, got {actual:?}")).into());
+    }
+    Ok(())
+}
