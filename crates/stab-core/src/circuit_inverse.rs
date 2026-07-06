@@ -36,13 +36,192 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
 /// Returns the currently implemented QEC inverse subset.
 ///
 /// This includes the unitary inverse plus selected Stim-compatible
-/// reset-measure-detector triplets. Broader QEC-specific inverse rewrites for
-/// measurements, resets, detectors, noise, and feedback remain deferred.
+/// reset-measure-detector and measure-reset pass-through packets. Broader
+/// QEC-specific inverse rewrites for measurements, resets, detectors, noise,
+/// and feedback remain deferred.
 pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
+    if let Some(inverse) = selected_measure_reset_pass_through_inverse(circuit)? {
+        return Ok(inverse);
+    }
     if let Some(inverse) = selected_reset_measure_detector_inverse(circuit)? {
         return Ok(inverse);
     }
     circuit_inverse_unitary(circuit)
+}
+
+fn selected_measure_reset_pass_through_inverse(
+    circuit: &Circuit,
+) -> CircuitResult<Option<Circuit>> {
+    let [
+        CircuitItem::Instruction(reset),
+        CircuitItem::Instruction(measurement),
+        CircuitItem::Instruction(measure_reset),
+        CircuitItem::Instruction(detector),
+    ] = circuit.items()
+    else {
+        return Ok(None);
+    };
+
+    let Some((measurement_gate, basis)) =
+        reset_inverse_gate_and_basis(reset.gate().canonical_name())
+    else {
+        return Ok(None);
+    };
+    if measurement.gate().canonical_name() != measurement_gate
+        || measure_reset.gate().canonical_name() != measure_reset_gate_for_basis(basis)
+        || detector.gate().canonical_name() != "DETECTOR"
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(build_selected_measure_reset_pass_through_inverse(
+        reset,
+        measurement,
+        measure_reset,
+        detector,
+    )?))
+}
+
+fn build_selected_measure_reset_pass_through_inverse(
+    reset: &CircuitInstruction,
+    measurement: &CircuitInstruction,
+    measure_reset: &CircuitInstruction,
+    detector: &CircuitInstruction,
+) -> CircuitResult<Circuit> {
+    if !reset.args().is_empty()
+        || !measurement.args().is_empty()
+        || !measure_reset.args().is_empty()
+    {
+        return Err(inverse_qec_measure_reset_pass_through_error(
+            "reset, measurement, and measure-reset instructions must be noiseless",
+        ));
+    }
+
+    let reset_targets = plain_unique_single_qubit_targets(reset).ok_or_else(|| {
+        inverse_qec_measure_reset_pass_through_error("reset targets must be plain unique qubits")
+    })?;
+    let measurement_targets = plain_unique_single_qubit_targets(measurement).ok_or_else(|| {
+        inverse_qec_measure_reset_pass_through_error(
+            "measurement targets must be plain unique qubits",
+        )
+    })?;
+    let measure_reset_targets =
+        plain_unique_single_qubit_targets(measure_reset).ok_or_else(|| {
+            inverse_qec_measure_reset_pass_through_error(
+                "measure-reset targets must be plain unique qubits",
+            )
+        })?;
+    if reset_targets.is_empty() {
+        return Err(inverse_qec_measure_reset_pass_through_error(
+            "target lists must be non-empty",
+        ));
+    }
+    if reset_targets != measurement_targets || reset_targets != measure_reset_targets {
+        return Err(inverse_qec_measure_reset_pass_through_error(
+            "reset, measurement, and measure-reset targets must match exactly",
+        ));
+    }
+
+    let measure_reset_count = i64::try_from(measure_reset_targets.len()).map_err(|_| {
+        inverse_qec_measure_reset_pass_through_error(
+            "measure-reset target count exceeds supported range",
+        )
+    })?;
+    let mut detector_record_deps = vec![false; measure_reset_targets.len()];
+    for target in detector.targets() {
+        let Some(offset) = target.measurement_record_offset() else {
+            return Err(inverse_qec_measure_reset_pass_through_error(
+                "detector targets must be measurement records",
+            ));
+        };
+        let index = measure_reset_count + i64::from(offset.get());
+        if !(0..measure_reset_count).contains(&index) {
+            return Err(inverse_qec_measure_reset_pass_through_error(
+                "detector record target is outside the selected measure-reset group",
+            ));
+        }
+        let detector_record_index = usize::try_from(index).map_err(|_| {
+            inverse_qec_measure_reset_pass_through_error(
+                "detector record target index exceeds supported range",
+            )
+        })?;
+        let Some(record_dep) = detector_record_deps.get_mut(detector_record_index) else {
+            return Err(inverse_qec_measure_reset_pass_through_error(
+                "detector record target index is outside the selected measure-reset group",
+            ));
+        };
+        *record_dep = !*record_dep;
+    }
+
+    let mut result = Circuit::new();
+    append_target_instruction(
+        &mut result,
+        measure_reset.gate(),
+        measure_reset.args(),
+        measure_reset_targets.iter().rev().cloned().collect(),
+        measure_reset.tag(),
+    )?;
+    append_target_instruction(
+        &mut result,
+        measurement.gate(),
+        measurement.args(),
+        measurement_targets.iter().rev().cloned().collect(),
+        measurement.tag(),
+    )?;
+    append_target_instruction(
+        &mut result,
+        measurement.gate(),
+        reset.args(),
+        reset_targets.iter().rev().cloned().collect(),
+        reset.tag(),
+    )?;
+
+    let total_measurements = measure_reset_targets.len().checked_mul(3).ok_or_else(|| {
+        inverse_qec_measure_reset_pass_through_error(
+            "new measurement count exceeds supported range",
+        )
+    })?;
+    let mut detector_measurements = Vec::new();
+    for (original_index, &record_dep) in detector_record_deps.iter().enumerate() {
+        if record_dep {
+            let measurement_index = total_measurements
+                .checked_sub(original_index + 1)
+                .ok_or_else(|| {
+                    inverse_qec_measure_reset_pass_through_error(
+                        "new detector measurement index exceeds supported range",
+                    )
+                })?;
+            detector_measurements.push(measurement_index);
+        }
+    }
+    detector_measurements.sort_unstable();
+    if !detector_measurements.is_empty() {
+        let total_measurements = i32::try_from(total_measurements).map_err(|_| {
+            inverse_qec_measure_reset_pass_through_error(
+                "new measurement count exceeds supported range",
+            )
+        })?;
+        let mut detector_targets = Vec::with_capacity(detector_measurements.len());
+        for measurement_index in detector_measurements {
+            let measurement_index = i32::try_from(measurement_index).map_err(|_| {
+                inverse_qec_measure_reset_pass_through_error(
+                    "new detector measurement index exceeds supported range",
+                )
+            })?;
+            detector_targets.push(Target::measurement_record(MeasureRecordOffset::try_new(
+                measurement_index - total_measurements,
+            )?));
+        }
+        append_target_instruction(
+            &mut result,
+            detector.gate(),
+            detector.args(),
+            detector_targets,
+            detector.tag(),
+        )?;
+    }
+
+    Ok(result)
 }
 
 fn selected_reset_measure_detector_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
@@ -274,6 +453,12 @@ fn inverse_qec_reset_measure_detector_error(reason: &str) -> CircuitError {
     ))
 }
 
+fn inverse_qec_measure_reset_pass_through_error(reason: &str) -> CircuitError {
+    CircuitError::invalid_tableau_conversion(format!(
+        "inverse_qec selected measure-reset pass-through subset requires one noiseless plain reset instruction, one matching noiseless plain measurement instruction, one matching noiseless plain measure-reset instruction, and one detector referencing only those measure-reset records; {reason}"
+    ))
+}
+
 /// Returns the currently supported time-reversal subset for flows.
 ///
 /// This additive API validates that every provided unsigned flow is satisfied by
@@ -403,6 +588,15 @@ fn reset_inverse_gate_and_basis(name: &str) -> Option<(&'static str, PauliBasis)
         "RX" => Some(("MX", PauliBasis::X)),
         "RY" => Some(("MY", PauliBasis::Y)),
         _ => None,
+    }
+}
+
+fn measure_reset_gate_for_basis(basis: PauliBasis) -> &'static str {
+    match basis {
+        PauliBasis::X => "MRX",
+        PauliBasis::Y => "MRY",
+        PauliBasis::Z => "MR",
+        PauliBasis::I => unreachable!("reset_inverse_gate_and_basis never returns identity basis"),
     }
 }
 

@@ -206,6 +206,153 @@ fn circuit_inverse_qec_simplifies_detector_record_parity() {
 }
 
 #[test]
+fn circuit_inverse_qec_supports_measure_reset_pass_through_detector_flow() {
+    // Adapted from Stim v1.16.0 circuit_inverse_qec pass_through behavior.
+    for (input_text, expected_text) in [
+        (
+            "
+            R 0
+            M 0
+            MR 0
+            DETECTOR rec[-1]
+            ",
+            "
+            MR 0
+            M 0 0
+            DETECTOR rec[-1]
+            ",
+        ),
+        (
+            "
+            RX 0
+            MX 0
+            MRX 0
+            DETECTOR rec[-1]
+            ",
+            "
+            MRX 0
+            MX 0 0
+            DETECTOR rec[-1]
+            ",
+        ),
+        (
+            "
+            RY 0
+            MY 0
+            MRY 0
+            DETECTOR rec[-1]
+            ",
+            "
+            MRY 0
+            MY 0 0
+            DETECTOR rec[-1]
+            ",
+        ),
+        (
+            "
+            R[r] 0
+            M[m] 0
+            MR[mr] 0
+            DETECTOR[d](5) rec[-1]
+            ",
+            "
+            MR[mr] 0
+            M[m] 0
+            M[r] 0
+            DETECTOR[d](5) rec[-1]
+            ",
+        ),
+        (
+            "
+            R 0 1
+            M 0 1
+            MR 0 1
+            DETECTOR rec[-2] rec[-1]
+            ",
+            "
+            MR 1 0
+            M 1 0 1 0
+            DETECTOR rec[-2] rec[-1]
+            ",
+        ),
+        (
+            "
+            R 0 1
+            M 0 1
+            MR 0 1
+            DETECTOR rec[-2]
+            ",
+            "
+            MR 1 0
+            M 1 0 1 0
+            DETECTOR rec[-1]
+            ",
+        ),
+        (
+            "
+            R 0 1
+            M 0 1
+            MR 0 1
+            DETECTOR rec[-1]
+            ",
+            "
+            MR 1 0
+            M 1 0 1 0
+            DETECTOR rec[-2]
+            ",
+        ),
+    ] {
+        let input = circuit(input_text);
+        let expected = circuit(expected_text);
+
+        assert_eq!(
+            circuit_inverse_qec(&input).expect("inverse measure-reset pass-through"),
+            expected,
+            "{input_text}"
+        );
+    }
+}
+
+#[test]
+fn circuit_inverse_qec_simplifies_measure_reset_pass_through_detector_parity() {
+    for (input_text, expected_text) in [
+        (
+            "
+            R 0
+            M 0
+            MR 0
+            DETECTOR rec[-1] rec[-1]
+            ",
+            "
+            MR 0
+            M 0 0
+            ",
+        ),
+        (
+            "
+            R 0
+            M 0
+            MR 0
+            DETECTOR
+            ",
+            "
+            MR 0
+            M 0 0
+            ",
+        ),
+    ] {
+        let input = circuit(input_text);
+        let expected = circuit(expected_text);
+
+        assert_eq!(
+            circuit_inverse_qec(&input).expect("inverse measure-reset detector parity"),
+            expected,
+            "{input_text}"
+        );
+    }
+}
+
+#[test]
 fn circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed() {
     for circuit_text in [
         "
@@ -244,6 +391,48 @@ fn circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed() {
         M 0 0
         DETECTOR rec[-1]
         ",
+        "
+        R 0
+        M 0
+        MR 0
+        DETECTOR rec[-2]
+        ",
+        "
+        R 0
+        M 1
+        MR 1
+        DETECTOR rec[-1]
+        ",
+        "
+        R 0
+        M 0
+        MR 1
+        DETECTOR rec[-1]
+        ",
+        "
+        R 0
+        M 0
+        MR(0.125) 0
+        DETECTOR rec[-1]
+        ",
+        "
+        R 0
+        MX 0
+        MR 0
+        DETECTOR rec[-1]
+        ",
+        "
+        R 0
+        M 0
+        MR !0
+        DETECTOR rec[-1]
+        ",
+        "
+        R 0 0
+        M 0 0
+        MR 0 0
+        DETECTOR rec[-1]
+        ",
     ] {
         let error = circuit_inverse_qec(&circuit(circuit_text))
             .expect_err("unpromoted inverse-QEC measurement rewrite is rejected")
@@ -251,6 +440,7 @@ fn circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed() {
 
         assert!(
             error.contains("inverse_qec selected reset-measure-detector subset")
+                || error.contains("inverse_qec selected measure-reset pass-through subset")
                 || error.contains("operation R is not unitary")
                 || error.contains("operation TICK is not unitary")
                 || error.contains("operation DETECTOR is not unitary"),
