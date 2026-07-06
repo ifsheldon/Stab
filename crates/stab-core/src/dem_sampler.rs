@@ -597,6 +597,18 @@ where
                         )?;
                         continue;
                     }
+                    if let Some(error) = single_stochastic_zero_shift_error(&repeat.body) {
+                        let probability =
+                            odd_parity_probability(error.probability, repeat.repeat_count);
+                        let occurred = sample_probability(probability, rng);
+                        if occurred {
+                            let iteration_shift = detector_shift
+                                .checked_add(repeat.start_detector_shift)
+                                .ok_or_else(detector_shift_overflow_error)?;
+                            apply_error_to_record(error, iteration_shift, record)?;
+                        }
+                        continue;
+                    }
                 }
                 let mut iteration_shift = detector_shift
                     .checked_add(repeat.start_detector_shift)
@@ -715,12 +727,67 @@ fn folded_direct_sample_repeat_work_count(
         }
         return Ok(body.direct_sample_work_count);
     }
+    if single_stochastic_zero_shift_error(body).is_some() {
+        return Ok(1);
+    }
     checked_repeated_count(
         0,
         body.direct_sample_work_count,
         repeat_count,
         "DEM sampler direct sample work count",
     )
+}
+
+fn single_stochastic_zero_shift_error(block: &DemSampleBlock) -> Option<&DemSampleError> {
+    if block.detector_shift != 0 || block.operations.len() != 1 {
+        return None;
+    }
+    let Some(DemSampleOperation::Error(error)) = block.operations.first() else {
+        return None;
+    };
+    (error.probability > 0.0 && error.probability < 1.0).then_some(error)
+}
+
+fn odd_parity_probability(probability: f64, repeat_count: u64) -> f64 {
+    if repeat_count == 0 || probability <= 0.0 {
+        return 0.0;
+    }
+    if probability >= 1.0 {
+        return if repeat_count.is_multiple_of(2) {
+            0.0
+        } else {
+            1.0
+        };
+    }
+    if probability == 0.5 {
+        return 0.5;
+    }
+
+    if probability < 0.5 {
+        let log_bias = (repeat_count as f64) * (-2.0 * probability).ln_1p();
+        return (-0.5 * log_bias.exp_m1()).clamp(0.0, 0.5);
+    }
+
+    let complement = 1.0 - probability;
+    let log_magnitude = (repeat_count as f64) * (-2.0 * complement).ln_1p();
+    if repeat_count.is_multiple_of(2) {
+        (-0.5 * log_magnitude.exp_m1()).clamp(0.0, 0.5)
+    } else {
+        (1.0 + 0.5 * log_magnitude.exp_m1()).clamp(0.5, 1.0)
+    }
+}
+
+fn sample_probability<R>(probability: f64, rng: &mut R) -> bool
+where
+    R: Rng,
+{
+    if probability <= 0.0 {
+        return false;
+    }
+    if probability >= 1.0 {
+        return true;
+    }
+    rng.random::<f64>() < probability
 }
 
 fn reset_detection_record(
@@ -786,6 +853,25 @@ mod tests {
             },
         )?;
         Ok((records, errors))
+    }
+
+    #[test]
+    fn odd_parity_probability_matches_repeated_independent_error_parity() {
+        assert_eq!(odd_parity_probability(0.0, 1_000_000), 0.0);
+        assert_eq!(odd_parity_probability(1.0, 4), 0.0);
+        assert_eq!(odd_parity_probability(1.0, 5), 1.0);
+        assert!((odd_parity_probability(0.25, 2) - 0.375).abs() < 1e-12);
+        assert!((odd_parity_probability(0.5, 64_000_001) - 0.5).abs() < 1e-12);
+
+        let tiny_probability = odd_parity_probability(1e-18, 1_000_000_000_000_000_000);
+        let expected_tiny_probability = -0.5 * (-2.0_f64).exp_m1();
+        assert!((tiny_probability - expected_tiny_probability).abs() < 1e-12);
+
+        let near_one = 1.0 - 1e-12;
+        let near_one_probability = odd_parity_probability(near_one, 1_000_000_000_001);
+        let expected_near_one_probability =
+            1.0 - odd_parity_probability(1.0 - near_one, 1_000_000_000_001);
+        assert!((near_one_probability - expected_near_one_probability).abs() < 1e-12);
     }
 
     #[test]

@@ -13,9 +13,9 @@ The selected behavior is parity folding for direct detector and observable outpu
 
 ## Explicit Non-Scope
 
-This slice does not change sampled-error output, sampled-error replay, stochastic repeated bodies, shifted repeated bodies, graphlike search, hypergraph search, SAT/WCNF generation, analyzer traversal, ErrorMatcher traversal, Python APIs, diagrams, or any deferred simulator-product surface.
+This deterministic-repeat slice did not change sampled-error output, sampled-error replay, stochastic repeated bodies, shifted repeated bodies, graphlike search, hypergraph search, SAT/WCNF generation, analyzer traversal, ErrorMatcher traversal, Python APIs, diagrams, or any deferred simulator-product surface.
 
-Stochastic repeated bodies still use the existing sampled-error application work cap.
+The later `docs/plans/pfm4-dem-sampler-single-stochastic-repeat-progress-report.md` promotes one selected detector-only single-stochastic zero-shift repeat shape; broader stochastic repeated bodies still use the existing sampled-error application work cap.
 Sampled-error output and replay still use the existing flat sampled-error width caps because Stim-compatible sampled-error records expose one bit per repeated error occurrence.
 
 ## Comparator And Evidence Plan
@@ -29,7 +29,7 @@ When detector-only direct sampling reaches a repeat body with zero net detector 
 
 - It skips even repeat counts.
 - It samples the body once for odd repeat counts.
-- It keeps the normal folded traversal for stochastic bodies, shifted bodies, sampled-error output, and sampled-error replay.
+- At the time of this deterministic slice, it kept the normal folded traversal for stochastic bodies, shifted bodies, sampled-error output, and sampled-error replay; the later single-stochastic report promotes one selected detector-only stochastic shape.
 
 The direct-sampling work validator uses the same folded parity work count, so huge deterministic zero-shift repeats no longer fail the stochastic sampled-error application work cap.
 
@@ -101,7 +101,7 @@ The focused compare report measured `stab_pf4_dem_sampler_sample_deterministic_p
 
 Milestone-audit status: complete for this PFM4 slice.
 The audit found the selected deterministic zero-shift sampler subcase implemented with direct tests, oracle metadata, report-only benchmark metadata, benchmark runner coverage, and synchronized docs.
-It did not mark the broader PFM4 folded-traversal milestone complete because stochastic repeated bodies, sampled-error output and replay flat-width limits, graphlike and hypergraph search, SAT/WCNF generation, analyzer traversal, and ErrorMatcher traversal remain scoped separately.
+It did not mark the broader PFM4 folded-traversal milestone complete because stochastic repeated bodies, sampled-error output and replay flat-width limits, graphlike and hypergraph search, SAT/WCNF generation, analyzer traversal, and ErrorMatcher traversal remained scoped separately at the time of that slice.
 
 Full-code-review status: complete after GPT-5.5/xhigh sidecar review.
 The core review reported no blocking findings and noted residual evidence risks for RNG preservation and sampled-error ordering; those were addressed by `pf4_dem_sampler_deterministic_repeat_folding_preserves_rng_and_error_order`.

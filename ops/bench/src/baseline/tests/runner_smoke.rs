@@ -44,6 +44,7 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
                 "stab_pf4_dem_sampler_sample_folded_repeat",
                 "stab_pf4_dem_sampler_sample_zero_probability_folded_repeat",
                 "stab_pf4_dem_sampler_sample_deterministic_parity_repeat",
+                "stab_pf4_dem_sampler_sample_single_stochastic_parity_repeat",
             ][..],
         ),
     ] {

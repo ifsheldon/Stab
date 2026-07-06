@@ -28,6 +28,19 @@ fn observable_hits(output: &[DetectionEventRecord], observable: usize) -> usize 
         .count()
 }
 
+fn assert_detector_hit_probability(
+    output: &[DetectionEventRecord],
+    detector: usize,
+    expected_probability: f64,
+    tolerance: f64,
+) {
+    let observed_probability = detector_hits(output, detector) as f64 / output.len() as f64;
+    assert!(
+        (observed_probability - expected_probability).abs() < tolerance,
+        "observed {observed_probability}, expected {expected_probability}"
+    );
+}
+
 #[test]
 fn dem_sampler_basic_sizing_matches_upstream_semantics() {
     let empty = compile_dem("");
@@ -427,6 +440,88 @@ fn pf4_dem_sampler_deterministic_repeat_folding_preserves_rng_and_error_order() 
 }
 
 #[test]
+fn pf4_dem_sampler_single_stochastic_repeat_folds_by_parity_distribution() {
+    let repeat_count = 64_000_001_u64;
+    let probability = 0.25_f64;
+    let sampler = compile_dem(&format!(
+        "
+        repeat {repeat_count} {{
+            error({probability}) D0 L0
+        }}
+        "
+    ));
+    assert_eq!(sampler.error_count(), 64_000_001);
+
+    let shots = 2048;
+    let output = sampler
+        .sample_detection_events_with_seed(shots, Some(17))
+        .expect("fold huge single-stochastic repeat by parity probability");
+    let expected_probability = 0.5;
+    let hits = output
+        .records
+        .iter()
+        .filter(|record| record.detectors == [true] && record.observables == [true])
+        .count();
+    let observed_probability = hits as f64 / shots as f64;
+    assert!(
+        (observed_probability - expected_probability).abs() < 0.06,
+        "observed {observed_probability}, expected {expected_probability}"
+    );
+    assert!(
+        output
+            .records
+            .iter()
+            .all(|record| record.detectors == record.observables),
+        "detector and observable targets should toggle together"
+    );
+
+    let tiny_probability = 1e-18_f64;
+    let tiny_repeat_count = 1_000_000_000_000_000_000_u64;
+    let tiny_sampler = compile_dem(&format!(
+        "
+        repeat {tiny_repeat_count} {{
+            error({tiny_probability}) D0
+        }}
+        "
+    ));
+    let tiny_output = tiny_sampler
+        .sample_detection_events_with_seed(4096, Some(19))
+        .expect("fold tiny-probability stochastic repeat by parity probability");
+    let expected_tiny_probability = -0.5 * (-2.0_f64).exp_m1();
+    assert_detector_hit_probability(&tiny_output.records, 0, expected_tiny_probability, 0.05);
+
+    let near_one_probability = 1.0 - 1e-12_f64;
+    let near_one_repeat_count = 1_000_000_000_001_u64;
+    let near_one_sampler = compile_dem(&format!(
+        "
+        repeat {near_one_repeat_count} {{
+            error({near_one_probability}) D0
+        }}
+        "
+    ));
+    let near_one_output = near_one_sampler
+        .sample_detection_events_with_seed(4096, Some(23))
+        .expect("fold near-one stochastic repeat by parity probability");
+    let expected_near_one_probability = 1.0 - (-0.5 * (-2.0_f64).exp_m1());
+    assert_detector_hit_probability(
+        &near_one_output.records,
+        0,
+        expected_near_one_probability,
+        0.05,
+    );
+
+    let error = sampler
+        .sample_detection_events_and_errors_with_seed(1, Some(17))
+        .expect_err("preserve flat sampled-error materialization cap for stochastic repeats");
+    assert!(
+        error
+            .to_string()
+            .contains("would require 64000003 buffered units"),
+        "{error}"
+    );
+}
+
+#[test]
 fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
     let sampler = compile_dem(
         "
@@ -554,15 +649,12 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
         "{error}"
     );
 
-    let error = huge_stochastic_sampler
+    let output = huge_stochastic_sampler
         .sample_detection_events_with_seed(1, Some(5))
-        .expect_err("reject excessive detector-only sampled work");
-    assert!(
-        error
-            .to_string()
-            .contains("would apply 64000001 sampled errors"),
-        "{error}"
-    );
+        .expect("fold single stochastic repeat by parity probability");
+    assert_eq!(output.records.len(), 1);
+    assert_eq!(output.detector_count, 1);
+    assert_eq!(output.observable_count, 0);
 
     let error = huge_deterministic_odd_sampler
         .sample_detection_events_and_errors_with_seed(1, Some(5))
