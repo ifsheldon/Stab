@@ -13,8 +13,8 @@ use super::{measure_stab_iterations, stab_runner_error};
 const UTILITY_BATCH: usize = 4096;
 #[cfg(test)]
 const UTILITY_BATCH: usize = 2;
-const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 40;
-const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 134;
+const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 46;
+const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 148;
 const FLOW_GENERATOR_MEASUREMENT_PYTHON_CASES: usize = 4;
 const FLOW_GENERATOR_MEASUREMENT_PYTHON_FLOWS: usize = 32;
 const FLOW_SOLVE_MEASUREMENT_CASES: usize = 2;
@@ -93,7 +93,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "pf5-flow-generators-measurement-rich" => Some(
-            "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/pair-measurement/MPP/SPP/composed-measurement/unitary-mixed/annotation-noise-noop/bounded-repeat/feedback/MPAD/heralded-noise subset without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/pair-measurement/MPP/SPP/composed-measurement/unitary-mixed/annotation-noise-noop/bounded-repeat/feedback/sweep-controlled-Pauli/MPAD/heralded-noise subset without a faithful pinned Stim CLI timing ratio",
         ),
         "pf5-flow-generators-measurement-python" => Some(
             "report-only: Stab measures the Rust circuit_flow_generators promoted Python multi-target examples without a faithful pinned Stim CLI timing ratio",
@@ -255,6 +255,12 @@ fn flow_generator_measurement_rich_corpus(
         ("MPP X0*X1\nCX rec[-1] 0\n", 4),
         ("M 0\nXCZ 0 rec[-1]\n", 2),
         ("M 0\nCY rec[-1] 1\n", 4),
+        ("CY sweep[0] 0\n", 2),
+        ("M 0\nCY sweep[0] 1\n", 4),
+        ("M 0\nCX sweep[0] 0\n", 2),
+        ("M 0\nCZ 0 sweep[0]\n", 2),
+        ("M 0\nXCZ 0 sweep[0]\n", 2),
+        ("M 0\nYCZ 0 sweep[0]\n", 2),
         ("MPAD 0 1 1 0\n", 4),
         ("M 0\nTICK\nM 0\n", 3),
         ("H 0\nM 0\n", 2),

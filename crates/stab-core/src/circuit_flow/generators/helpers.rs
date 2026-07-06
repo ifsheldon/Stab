@@ -54,6 +54,26 @@ pub(super) fn instruction_qubit_count(instruction: &CircuitInstruction) -> usize
         .unwrap_or(0)
 }
 
+pub(super) fn sweep_controlled_pauli_is_sign_only_noop(instruction: &CircuitInstruction) -> bool {
+    if !matches!(
+        instruction.gate().canonical_name(),
+        "CX" | "CY" | "CZ" | "XCZ" | "YCZ"
+    ) {
+        return false;
+    }
+    let groups = instruction.target_groups();
+    !groups.is_empty()
+        && groups.iter().all(|group| {
+            let [left, right] = *group else {
+                return false;
+            };
+            let left_is_sweep = left.is_sweep_bit_target();
+            let right_is_sweep = right.is_sweep_bit_target();
+            (left_is_sweep ^ right_is_sweep)
+                && left.qubit_id().is_some() != right.qubit_id().is_some()
+        })
+}
+
 pub(super) fn plain_target_index(target: &Target) -> Option<usize> {
     if target.is_inverted_result_target() {
         return None;

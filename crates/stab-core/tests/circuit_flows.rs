@@ -370,6 +370,31 @@ fn solve_for_flow_measurements_cpp_empty_and_simple_examples() {
 }
 
 #[test]
+fn solve_for_flow_measurements_treats_sweep_controlled_paulis_as_noops() {
+    let queries = [flow("1 -> Z0"), flow("Z0 -> 1"), flow("Z0 -> Z0")];
+    let expected = vec![Some(vec![0]), Some(vec![0]), Some(vec![])];
+    for suffix in [
+        "CX sweep[0] 0",
+        "CX 0 sweep[0]",
+        "CY sweep[0] 0",
+        "CY 0 sweep[0]",
+        "CZ sweep[0] 0",
+        "CZ 0 sweep[0]",
+        "XCZ sweep[0] 0",
+        "XCZ 0 sweep[0]",
+        "YCZ sweep[0] 0",
+        "YCZ 0 sweep[0]",
+    ] {
+        let text = format!("M 0\n{suffix}\n");
+        assert_eq!(
+            solve_for_flow_measurements(&circuit(&text), &queries).expect(&text),
+            expected.clone(),
+            "{suffix}"
+        );
+    }
+}
+
+#[test]
 fn solve_for_flow_measurements_python_measured_idle_examples() {
     // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators_test.py.
     let measured_idle_circuit = circuit("M 2\n");
@@ -521,7 +546,7 @@ fn solve_for_flow_measurements_has_documented_fallback_resource_limit() {
     let circuit = circuit(
         "
         M 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
-        CX sweep[0] 0
+        CX rec[-1] sweep[0]
     ",
     );
     let error = solve_for_flow_measurements(&circuit, &[flow("Z0 -> Z0")])

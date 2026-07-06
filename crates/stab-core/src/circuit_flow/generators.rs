@@ -8,7 +8,8 @@ mod helpers;
 use helpers::{
     apply_local_tableau_to_global_pauli, instruction_qubit_count, internal_flow_error,
     measurement_indices_reversed, pair_measurement_target_index, plain_tableau_targets,
-    record_index_i32, stabilizer_to_circuit_error, unique_plain_target_indices,
+    record_index_i32, stabilizer_to_circuit_error, sweep_controlled_pauli_is_sign_only_noop,
+    unique_plain_target_indices,
 };
 
 const MAX_MEASUREMENT_RICH_FLOW_GENERATOR_ROWS: usize = 4096;
@@ -74,6 +75,7 @@ fn circuit_needs_measurement_rich_generators(circuit: &Circuit) -> bool {
                     instruction.gate().category(),
                     GateCategory::Collapsing | GateCategory::PairMeasurement
                 )
+                || sweep_controlled_pauli_is_sign_only_noop(instruction)
         }
         CircuitItem::RepeatBlock(repeat) => {
             circuit_needs_measurement_rich_generators(repeat.body())
@@ -98,6 +100,9 @@ fn simple_measurement_rich_flow_generators(circuit: &Circuit) -> CircuitResult<O
             "MZZ" => simple_pair_measurement_flows(instruction, PauliBasis::Z)?,
             "MPP" => simple_pauli_product_measurement_flows(instruction)?,
             "MPAD" => Some(measurement_pad_flows(instruction)?),
+            _ if sweep_controlled_pauli_is_sign_only_noop(instruction) => {
+                Some(identity_flow_rows(instruction_qubit_count(instruction)))
+            }
             _ => None,
         });
     }
@@ -291,6 +296,7 @@ fn scoped_composed_measurement_flow_generators(
                 instruction.gate().category(),
                 GateCategory::Collapsing | GateCategory::PairMeasurement
             )
+            || sweep_controlled_pauli_is_sign_only_noop(instruction)
     }) {
         return Ok(None);
     }
@@ -382,6 +388,7 @@ impl MeasurementFeedbackFlowSolver {
             }
             "SPP" | "SPP_DAG" => self.undo_decomposed_instruction(instruction),
             "TICK" => Ok(true),
+            _ if sweep_controlled_pauli_is_sign_only_noop(instruction) => Ok(true),
             _ if ignored_measurement_flow_generator_instruction(instruction) => Ok(true),
             _ if feedback_measurement_basis(instruction).is_some() => {
                 if self.undo_measurement_feedback(instruction)? {

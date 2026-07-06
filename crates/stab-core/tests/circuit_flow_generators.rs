@@ -108,6 +108,53 @@ fn circuit_flow_generators_promotes_single_instruction_measurement_subset() {
             "Z_ -> rec[0]",
         ]
     );
+    for text in [
+        "CX sweep[0] 0\n",
+        "CX 0 sweep[0]\n",
+        "CY sweep[0] 0\n",
+        "CY 0 sweep[0]\n",
+        "CZ sweep[0] 0\n",
+        "CZ 0 sweep[0]\n",
+        "XCZ sweep[0] 0\n",
+        "XCZ 0 sweep[0]\n",
+        "YCZ sweep[0] 0\n",
+        "YCZ 0 sweep[0]\n",
+    ] {
+        assert_eq!(generator_strings(text), vec!["X -> X", "Z -> Z"], "{text}");
+    }
+    assert_eq!(
+        generator_strings("M 0\nCY sweep[0] 1\n"),
+        vec!["1 -> Z_ xor rec[0]", "_X -> _X", "_Z -> _Z", "Z_ -> rec[0]",]
+    );
+    assert_eq!(
+        generator_strings("M 0\nCX sweep[0] 0\n"),
+        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
+    );
+    assert_eq!(
+        generator_strings("M 0\nCX 0 sweep[0]\n"),
+        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
+    );
+    assert_eq!(
+        generator_strings("M 0 1\nCX sweep[0] 0 sweep[1] 1\n"),
+        vec![
+            "1 -> _Z xor rec[1]",
+            "1 -> Z_ xor rec[0]",
+            "_Z -> rec[1]",
+            "Z_ -> rec[0]",
+        ]
+    );
+    assert_eq!(
+        generator_strings("M 0\nCZ 0 sweep[0]\n"),
+        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
+    );
+    assert_eq!(
+        generator_strings("M 0\nXCZ 0 sweep[0]\n"),
+        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
+    );
+    assert_eq!(
+        generator_strings("M 0\nYCZ 0 sweep[0]\n"),
+        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
+    );
     assert_eq!(
         generator_strings("MPP X0*X1\nCX rec[-1] 0\n"),
         vec![
@@ -282,6 +329,8 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
         "M 0\nCX rec[-1] 0\n",
         "MPP X0*X1\nCX rec[-1] 0\n",
         "M 0\nCY rec[-1] 1\n",
+        "M 0\nCY sweep[0] 1\n",
+        "M 0\nYCZ 0 sweep[0]\n",
         "MPAD 0 1 1 0\n",
         "
         HERALDED_ERASE(0.04) 1
@@ -534,7 +583,8 @@ fn circuit_flow_generators_promotes_bounded_repeat_measurement_subset() {
 fn circuit_flow_generators_rejects_unpromoted_measurement_rich_shapes() {
     for text in [
         "MR 0 0\n",
-        "M 0\nCX sweep[0] 0\n",
+        "M 0\nCX rec[-1] sweep[0]\n",
+        "M 0\nCX sweep[0] 0 1 2\n",
         "M 0\nCX rec[-1] 0 1 2\n",
         "M 0\nCX 1 2 rec[-1] 0\n",
     ] {
