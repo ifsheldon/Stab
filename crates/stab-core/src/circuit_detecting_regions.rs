@@ -378,6 +378,9 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Circui
         let left_is_sweep = left.is_sweep_bit_target();
         let right_is_sweep = right.is_sweep_bit_target();
         if left_is_sweep || right_is_sweep {
+            if left_is_sweep && right_is_sweep && instruction.gate().canonical_name() == "CZ" {
+                continue;
+            }
             if left_is_sweep ^ right_is_sweep {
                 validate_sweep_position(instruction.gate().canonical_name(), left_is_sweep)?;
                 let qubit_target = if left_is_sweep { right } else { left };

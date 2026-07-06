@@ -4,6 +4,7 @@
 
 This slice promotes selected gate-order-valid sweep-controlled Pauli target shapes in the Rust `circuit_detecting_regions` utility.
 It is a narrow PFM5 detector-utility promotion, not broad sweep-conditioned simulator parity or Python binding work.
+The later `pfm5-detecting-regions-cz-sweep-sweep-scope.md` slice adds the selected `CZ sweep[i] sweep[j]` bit-bit no-op case without broadening the one-sweep one-qubit scope described here.
 
 ## Owned Subcases
 
@@ -15,7 +16,7 @@ It is a narrow PFM5 detector-utility promotion, not broad sweep-conditioned simu
 
 ## Explicit Rejections
 
-- Keep sweep/sweep groups rejected where the sparse tracker cannot associate a plain qubit target with the operation.
+- Keep non-`CZ` sweep/sweep groups rejected where the sparse tracker cannot associate a plain qubit target with the operation.
 - Keep measurement-record/sweep groups rejected.
 - Keep one-sweep one-qubit groups rejected when pinned Stim v1.16.0 rejects their target order.
 - Keep controlled-Pauli groups with more than two targets rejected.
