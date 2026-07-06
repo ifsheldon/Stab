@@ -7,12 +7,12 @@
 use std::collections::BTreeSet;
 
 use stab_core::{
-    CircuitResult, CodeDistance, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
-    ErrorAnalyzerOptions, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    SurfaceCodeParams, SurfaceCodeTask, circuit_to_detector_error_model,
-    find_undetectable_logical_error, generate_repetition_code_circuit,
-    generate_surface_code_circuit, likeliest_error_sat_problem, shortest_error_sat_problem,
-    shortest_graphlike_undetectable_logical_error,
+    Circuit, CircuitResult, CodeDistance, DemInstructionKind, DemItem, DemTarget,
+    DetectorErrorModel, ErrorAnalyzerOptions, Probability, RepetitionCodeParams,
+    RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
+    circuit_to_detector_error_model, find_undetectable_logical_error,
+    generate_repetition_code_circuit, generate_surface_code_circuit, likeliest_error_sat_problem,
+    shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
 };
 
 #[test]
@@ -376,6 +376,28 @@ fn pf6_generated_qec_hypergraph_search_has_structural_signature() {
 }
 
 #[test]
+fn pf6_graphlike_search_many_observables_preserves_high_observable_id() {
+    let model = many_observables_dem().unwrap();
+    assert_search_result_signature_for_observable(
+        &shortest_graphlike_undetectable_logical_error(&model, false).unwrap(),
+        5,
+        2,
+        1200,
+    );
+}
+
+#[test]
+fn pf6_hypergraph_search_many_observables_preserves_high_observable_id() {
+    let model = many_observables_dem().unwrap();
+    assert_search_result_signature_for_observable(
+        &find_undetectable_logical_error(&model, 4, 4, false).unwrap(),
+        5,
+        4,
+        1200,
+    );
+}
+
+#[test]
 fn pf6_generated_sat_wcnf_qec_encoding_is_structural() {
     let surface = generated_small_rotated_surface_code_dem(true).unwrap();
     assert_unweighted_wcnf_shape(&shortest_error_sat_problem(&surface).unwrap());
@@ -474,18 +496,40 @@ fn generated_small_repetition_code_dem() -> CircuitResult<DetectorErrorModel> {
     )
 }
 
+fn many_observables_dem() -> CircuitResult<DetectorErrorModel> {
+    let circuit = Circuit::from_stim_str(concat!(
+        "MPP Z0*Z1 Z1*Z2 Z2*Z3 Z3*Z4\n",
+        "X_ERROR(0.1) 0 1 2 3 4\n",
+        "MPP Z0*Z1 Z1*Z2 Z2*Z3 Z3*Z4\n",
+        "DETECTOR rec[-1] rec[-5]\n",
+        "DETECTOR rec[-2] rec[-6]\n",
+        "DETECTOR rec[-3] rec[-7]\n",
+        "DETECTOR rec[-4] rec[-8]\n",
+        "M 4\n",
+        "OBSERVABLE_INCLUDE(1200) rec[-1]\n",
+    ))?;
+    circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            decompose_errors: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+}
+
 fn assert_graphlike_search_signature(model: &DetectorErrorModel, expected_error_count: usize) {
-    assert_search_result_signature(model, expected_error_count, 2);
+    assert_search_result_signature_for_observable(model, expected_error_count, 2, 0);
 }
 
 fn assert_hypergraph_search_signature(model: &DetectorErrorModel, expected_error_count: usize) {
-    assert_search_result_signature(model, expected_error_count, 4);
+    assert_search_result_signature_for_observable(model, expected_error_count, 4, 0);
 }
 
-fn assert_search_result_signature(
+fn assert_search_result_signature_for_observable(
     model: &DetectorErrorModel,
     expected_error_count: usize,
     max_detectors_per_error: usize,
+    expected_observable: u64,
 ) {
     let signature = SearchResultSignature::from_model(model, max_detectors_per_error);
     assert_eq!(
@@ -502,8 +546,8 @@ fn assert_search_result_signature(
     );
     assert_eq!(
         signature.observable_parity,
-        BTreeSet::from([0]),
-        "search output should toggle exactly logical observable L0: {}",
+        BTreeSet::from([expected_observable]),
+        "search output should toggle exactly logical observable L{expected_observable}: {}",
         model.to_dem_string()
     );
     assert_eq!(
