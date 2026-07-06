@@ -146,8 +146,8 @@ fn pf6_dem_analyzer_fold_loops_respects_remnant_edge_blocking() {
 }
 
 #[test]
-fn pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_mixed_top_level() {
-    let circuit = Circuit::from_stim_str(
+fn pf6_dem_analyzer_prefix_repeat_tail_folds_detector_chain() {
+    let dem = analyze_folding_loops(
         "
         R 0
         M 0
@@ -159,6 +159,76 @@ fn pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_mixed_top_level() {
         }
         M 0
         DETECTOR rec[-1] rec[-2]
+        ",
+    );
+
+    assert_eq!(
+        dem,
+        "detector D0\nrepeat 2 {\n    error(0.125) D1\n    shift_detectors 1\n}\ndetector D1\n"
+    );
+}
+
+#[test]
+fn pf6_dem_analyzer_prefix_repeat_tail_folds_tail_error() {
+    let dem = analyze_folding_loops(
+        "
+        R 0
+        M 0
+        DETECTOR rec[-1]
+        REPEAT 2 {
+            X_ERROR(0.125) 0
+            M 0
+            DETECTOR rec[-1] rec[-2]
+        }
+        X_ERROR(0.25) 0
+        M 0
+        DETECTOR rec[-1] rec[-2]
+        ",
+    );
+
+    assert_eq!(
+        dem,
+        "detector D0\nrepeat 2 {\n    error(0.125) D1\n    shift_detectors 1\n}\nerror(0.25) D1\n"
+    );
+}
+
+#[test]
+fn pf6_dem_analyzer_prefix_repeat_tail_folds_large_detector_chain() {
+    let dem = analyze_folding_loops(
+        "
+        R 0
+        M 0
+        DETECTOR rec[-1]
+        REPEAT 100001 {
+            X_ERROR(0.125) 0
+            M 0
+            DETECTOR rec[-1] rec[-2]
+        }
+        M 0
+        DETECTOR rec[-1] rec[-2]
+        ",
+    );
+
+    assert_eq!(
+        dem,
+        "detector D0\nrepeat 100001 {\n    error(0.125) D1\n    shift_detectors 1\n}\ndetector D1\n"
+    );
+}
+
+#[test]
+fn pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_unsafe_tail_dependency() {
+    let circuit = Circuit::from_stim_str(
+        "
+        R 0
+        M 0
+        DETECTOR rec[-1]
+        REPEAT 2 {
+            X_ERROR(0.125) 0
+            M 0
+            DETECTOR rec[-1] rec[-2]
+        }
+        M 0
+        DETECTOR rec[-1]
         ",
     )
     .expect("circuit");
@@ -177,6 +247,49 @@ fn pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_mixed_top_level() {
     .to_dem_string();
 
     assert_eq!(actual, expected);
+    assert!(!actual.contains("repeat"), "{actual}");
+}
+
+#[test]
+fn pf6_dem_analyzer_fallback_preserves_delayed_rec_dependency() {
+    let circuit = Circuit::from_stim_str(
+        "
+        M 0
+        DETECTOR rec[-1]
+        M 0
+        DETECTOR rec[-1]
+        M 0
+        DETECTOR rec[-1]
+        M 0
+        DETECTOR rec[-1]
+        REPEAT 5 {
+            X_ERROR(0.125) 0
+            M 0
+            R 0
+            DETECTOR rec[-1] rec[-5]
+        }
+        M 1
+        DETECTOR rec[-1]
+        ",
+    )
+    .expect("circuit");
+
+    let expected = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .expect("non-folded analysis")
+        .to_dem_string();
+    let actual = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect("fold-loop bounded fallback")
+    .to_dem_string();
+
+    assert_eq!(actual, expected);
+    assert!(actual.contains("error(0.125) D4 D8"), "{actual}");
+    assert!(!actual.contains("repeat"), "{actual}");
 }
 
 #[test]
@@ -239,12 +352,16 @@ fn pf6_dem_analyzer_rejects_folded_observables_crossing_iterations() {
 fn pf6_dem_analyzer_fallback_preserves_repeat_count_cap() {
     let circuit = Circuit::from_stim_str(
         "
+        R 0
         M 0
+        DETECTOR rec[-1]
         REPEAT 100001 {
+            X_ERROR(0.125) 0
             M 0
             DETECTOR rec[-1] rec[-2]
         }
         M 0
+        DETECTOR rec[-1]
         ",
     )
     .expect("circuit");
@@ -257,6 +374,47 @@ fn pf6_dem_analyzer_fallback_preserves_repeat_count_cap() {
         },
     )
     .expect_err("reject unsupported mixed top-level expansion beyond cap");
+
+    assert!(
+        error
+            .to_string()
+            .contains("analyze_errors currently supports repeat counts up to 100000"),
+        "{error}"
+    );
+}
+
+#[test]
+fn pf6_dem_analyzer_fallback_preserves_repeat_count_cap_for_delayed_rec_dependency() {
+    let circuit = Circuit::from_stim_str(
+        "
+        M 0
+        DETECTOR rec[-1]
+        M 0
+        DETECTOR rec[-1]
+        M 0
+        DETECTOR rec[-1]
+        M 0
+        DETECTOR rec[-1]
+        REPEAT 100001 {
+            X_ERROR(0.125) 0
+            M 0
+            R 0
+            DETECTOR rec[-1] rec[-5]
+        }
+        M 1
+        DETECTOR rec[-1]
+        ",
+    )
+    .expect("circuit");
+
+    let error = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("reject unsupported delayed dependency beyond repeat cap");
 
     assert!(
         error

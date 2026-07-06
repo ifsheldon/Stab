@@ -363,7 +363,7 @@ Rows covered:
 
 Tasks:
 
-- Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures. The selected generated surface-code prefix, repeat, and tail circuit shape under `fold_loops=true` is implemented through a bounded mixed-top-level fallback that reuses the capped non-folded analyzer, which is enough to prove the pinned Stim coordinate comparison but does not claim true folded output for broader generated-loop families. The selected upstream guard for folded observable dependencies that cross iterations without including every loop-carried measurement is implemented as a nondeterministic-observable rejection, not folded-output support.
+- Extend `circuit_to_detector_error_model` for selected generated circuits, loop folding, gauge detectors, approximate disjoint errors, decomposition options, remnant-edge blocking, and ignored decomposition failures. The selected prefix, repeat, and tail detector-chain shape under `fold_loops=true` now has true compact folded output after candidate validation against a measurement-record-lookback-sized non-folded expansion, including the selected large repeat-count resource case. Delayed measurement-record dependencies that the selected compact fold cannot prove fall back to the bounded non-folded analyzer. The selected generated surface-code prefix, repeat, and tail coordinate shape still uses a bounded mixed-top-level fallback that reuses the capped non-folded analyzer, which is enough to prove the pinned Stim coordinate comparison but does not claim true folded output for broader generated-loop families. The selected upstream guard for folded observable dependencies that cross iterations without including every loop-carried measurement is implemented as a nondeterministic-observable rejection, not folded-output support.
 - Extend graphlike, hypergraph, shortest-error, SAT, and WCNF behavior for selected generated-circuit and direct DEM cases.
   The selected direct DEM graphlike and hypergraph exact-output subset is implemented by `pf6-search-direct-dem-graphlike-rust` and `pf6-search-direct-dem-hypergraph-rust`, the selected high-observable analyzer-to-search subset is implemented by `pf6-search-many-observables-graphlike-rust` and `pf6-search-many-observables-hypergraph-rust`, the selected generated-QEC graphlike and hypergraph search subset is implemented by `pf6-search-generated-qec-rust`, and the selected generated-QEC SAT/WCNF structural subset is implemented by `pf6-search-generated-sat-wcnf-rust`.
 - Add or extend ordering-insensitive structural comparators for search outputs where exact target order is not stable. The selected generated-QEC graphlike and hypergraph search rows now include canonical target-set uniqueness, deterministic error rows, zero detector parity, and exact `L0` observable parity; broader generated families and tie-sensitive target-set comparators remain active.
@@ -383,8 +383,9 @@ Oracle rows:
 
 - Supplement `pf6-analyzer-generated-looping`, `pf6-search-generated`, and `pf6-sparse-rev-tracker`.
 - Keep `pf6-analyzer-generated-qec-rust` as evidence only for the generated-QEC subset it names.
+- Keep `pf6-analyzer-prefix-repeat-tail-folding-rust` as evidence only for the selected true folded prefix/repeat/tail detector-chain output, tail-error output, and large repeat-count resource case it names.
 - Keep `pf6-error-decomp-loop-folded-rust` as evidence only for the selected loop-folded decomposition and remnant-edge blocking subset it names.
-- Keep `pf6-analyzer-mixed-top-level-fallback-rust` and `pf6-analyzer-generated-fold-loop-fallback-rust` as evidence only for the bounded non-folded fallback, analyzer-budget cap preservation, selected folded-error non-masking guard, and selected generated surface-code coordinate comparison they name.
+- Keep `pf6-analyzer-mixed-top-level-fallback-rust` and `pf6-analyzer-generated-fold-loop-fallback-rust` as evidence only for unsafe or still-unsupported bounded non-folded fallback, analyzer-budget cap preservation, selected folded-error non-masking guard, and selected generated surface-code coordinate comparison they name.
 - Keep `pf6-analyzer-folded-observable-guard-rust` as evidence only for the selected nondeterministic-observable rejection where loop-carried observable dependencies cross folded iterations.
 - Keep `pf6-search-direct-dem-graphlike-rust` and `pf6-search-direct-dem-hypergraph-rust` as evidence only for the selected direct DEM graphlike and hypergraph rejection, distance, canonical-ordering, and bounded hyper-error cases they name.
 - Keep `pf6-search-many-observables-graphlike-rust` and `pf6-search-many-observables-hypergraph-rust` as evidence only for the selected high-observable analyzer-to-search `many_observables` cases that prove `L1200` parity survives graphlike and hypergraph search output.
@@ -404,7 +405,7 @@ Benchmarks:
 Acceptance criteria:
 
 - Analyzer and search outputs match pinned Stim for exact owned cases and satisfy structural comparators for ordering-insensitive cases.
-- Loop folding is proven by tests and benchmark evidence, not only by small-output equality.
+- Loop folding is proven by tests, candidate validation, resource-boundary evidence, and benchmark evidence where the promoted slice is a throughput path, not only by small-output equality.
 - Deferred provenance and CLI explanation surfaces stay outside completion claims.
 
 ## PFM7: Visible CLI Parity For `m2d`, `analyze_errors`, And Legacy Dispatch
