@@ -1033,6 +1033,26 @@ fn detecting_regions_target_shape_supports_measurement_record_feedback() {
 }
 
 #[test]
+fn detecting_regions_target_shape_supports_sweep_controlled_pauli_noops() {
+    let cases = [
+        ("CX sweep-first", "R 0", "CX sweep[0] 0", "M 0", "+Z"),
+        ("CY sweep-first", "R 0", "CY sweep[0] 0", "M 0", "+Z"),
+        ("CZ sweep-first", "RX 0", "CZ sweep[0] 0", "MX 0", "+X"),
+        ("CZ sweep-second", "RX 0", "CZ 0 sweep[0]", "MX 0", "+X"),
+        ("XCZ sweep-second", "R 0", "XCZ 0 sweep[0]", "M 0", "+Z"),
+        ("YCZ sweep-second", "RY 0", "YCZ 0 sweep[0]", "MY 0", "+Y"),
+    ];
+
+    for (name, preparation, operation, measurement, expected) in cases {
+        let circuit =
+            format!("{preparation}\nTICK\n{operation}\n{measurement}\nDETECTOR rec[-1]\n");
+        let actual = regions(&circuit, vec![detector(0)], vec![0]);
+
+        assert_eq!(actual[&detector(0)][&0].to_string(), expected, "{name}");
+    }
+}
+
+#[test]
 fn detecting_regions_target_shape_rejects_unsupported_feedback_shapes() {
     let cases = [
         (
@@ -1086,20 +1106,53 @@ fn detecting_regions_target_shape_rejects_unsupported_feedback_shapes() {
 }
 
 #[test]
-fn detecting_regions_clifford_rejects_sweep_controlled_cx() {
-    let circuit =
-        Circuit::from_stim_str("CX sweep[0] 2\nTICK\nMXX 2 3\nDETECTOR rec[-1]\n").unwrap();
-    let error = circuit_detecting_regions(
-        &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: vec![0],
-            ignore_anticommutation_errors: false,
-        },
-    )
-    .unwrap_err();
+fn detecting_regions_target_shape_rejects_unpromoted_sweep_shapes() {
+    let cases = [
+        (
+            "sweep-sweep",
+            "CX sweep[0] sweep[1]\nTICK\nM 0\nDETECTOR rec[-1]\n",
+        ),
+        (
+            "record-sweep",
+            "M 0\nTICK\nCX rec[-1] sweep[0]\nM 1\nDETECTOR rec[-1]\n",
+        ),
+        (
+            "CX sweep-second",
+            "R 0\nTICK\nCX 0 sweep[0]\nM 0\nDETECTOR rec[-1]\n",
+        ),
+        (
+            "CY sweep-second",
+            "R 0\nTICK\nCY 0 sweep[0]\nM 0\nDETECTOR rec[-1]\n",
+        ),
+        (
+            "XCZ sweep-first",
+            "R 0\nTICK\nXCZ sweep[0] 0\nM 0\nDETECTOR rec[-1]\n",
+        ),
+        (
+            "YCZ sweep-first",
+            "RY 0\nTICK\nYCZ sweep[0] 0\nMY 0\nDETECTOR rec[-1]\n",
+        ),
+    ];
 
-    assert!(error.to_string().contains("sweep-controlled"));
+    for (name, circuit) in cases {
+        let circuit = Circuit::from_stim_str(circuit).unwrap();
+        let error = circuit_detecting_regions(
+            &circuit,
+            DetectingRegionOptions {
+                detectors: vec![detector(0)],
+                ticks: vec![0],
+                ignore_anticommutation_errors: false,
+            },
+        )
+        .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("simple detecting-region extraction"),
+            "{name}: {error}"
+        );
+    }
 }
 
 #[test]

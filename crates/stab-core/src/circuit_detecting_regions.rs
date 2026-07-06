@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemDetectorId,
     DemTarget, FlexPauliString, PauliBasis, SingleQubitClifford, Target,
-    detection::measurement_record_count, sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
 const MAX_DETECTING_REGION_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
@@ -75,7 +75,7 @@ pub fn circuit_detecting_regions_for_targets(
 
     let mut tracker = SparseReverseFrameTracker::new(
         detecting_region_qubit_count(circuit),
-        measurement_record_count(circuit)?,
+        detecting_region_measurement_count(circuit)?,
         detector_count,
         fail_on_anticommute,
     );
@@ -375,9 +375,17 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Circui
                 instruction.gate().canonical_name()
             )));
         };
-        if left.is_sweep_bit_target() || right.is_sweep_bit_target() {
+        let left_is_sweep = left.is_sweep_bit_target();
+        let right_is_sweep = right.is_sweep_bit_target();
+        if left_is_sweep || right_is_sweep {
+            if left_is_sweep ^ right_is_sweep {
+                validate_sweep_position(instruction.gate().canonical_name(), left_is_sweep)?;
+                let qubit_target = if left_is_sweep { right } else { left };
+                validate_qubit_target(instruction, qubit_target, false)?;
+                continue;
+            }
             return Err(CircuitError::invalid_detector_error_model(format!(
-                "simple detecting-region extraction does not support sweep-controlled {} targets",
+                "simple detecting-region extraction only supports {} sweep-controlled groups with exactly one sweep bit and one plain qubit target",
                 instruction.gate().canonical_name()
             )));
         }
@@ -416,6 +424,22 @@ fn validate_feedback_position(gate_name: &str, record_is_first: bool) -> Circuit
     } else {
         Err(CircuitError::invalid_detector_error_model(format!(
             "simple detecting-region extraction does not support {gate_name} measurement-record feedback in this target position"
+        )))
+    }
+}
+
+fn validate_sweep_position(gate_name: &str, sweep_is_first: bool) -> CircuitResult<()> {
+    let valid = match gate_name {
+        "CX" | "CY" => sweep_is_first,
+        "XCZ" | "YCZ" => !sweep_is_first,
+        "CZ" => true,
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(CircuitError::invalid_detector_error_model(format!(
+            "simple detecting-region extraction does not support {gate_name} sweep-controlled targets in this target position"
         )))
     }
 }
@@ -567,6 +591,14 @@ fn detector_count(circuit: &Circuit) -> CircuitResult<u64> {
         }
     }
     Ok(count)
+}
+
+fn detecting_region_measurement_count(circuit: &Circuit) -> CircuitResult<usize> {
+    usize::try_from(circuit.count_measurements()?).map_err(|_| {
+        CircuitError::invalid_detector_error_model(
+            "detecting-region measurement count does not fit in memory on this platform",
+        )
+    })
 }
 
 fn observable_count(circuit: &Circuit) -> CircuitResult<u64> {
