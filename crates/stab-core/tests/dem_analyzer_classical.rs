@@ -69,6 +69,13 @@ fn dem_analyzer_ignores_sweep_controls_like_upstream() {
         ",
         "
             X_ERROR(0.25) 0
+            M 1 2
+            CZ rec[-1] rec[-2]
+            M 0
+            DETECTOR rec[-1]
+        ",
+        "
+            X_ERROR(0.25) 0
             XCZ 0 sweep[0]
             M 0
             DETECTOR rec[-1]
@@ -104,6 +111,46 @@ fn dem_analyzer_rejects_invalid_sweep_target_positions() {
             DETECTOR rec[-1]
             ",
             "CX target sweep[1] is not a qubit",
+        ),
+        (
+            "
+            X_ERROR(0.25) 0
+            M 0 1
+            CX rec[-1] rec[-2]
+            M 0
+            DETECTOR rec[-1]
+            ",
+            "CX target rec[-2] is not a qubit",
+        ),
+        (
+            "
+            X_ERROR(0.25) 0
+            M 0 1
+            CY rec[-1] rec[-2]
+            M 0
+            DETECTOR rec[-1]
+            ",
+            "CY target rec[-2] is not a qubit",
+        ),
+        (
+            "
+            X_ERROR(0.25) 0
+            M 0 1
+            XCZ rec[-1] rec[-2]
+            M 0
+            DETECTOR rec[-1]
+            ",
+            "XCZ target rec[-1] is not a qubit",
+        ),
+        (
+            "
+            X_ERROR(0.25) 0
+            M 0 1
+            YCZ rec[-1] rec[-2]
+            M 0
+            DETECTOR rec[-1]
+            ",
+            "YCZ target rec[-1] is not a qubit",
         ),
         (
             "

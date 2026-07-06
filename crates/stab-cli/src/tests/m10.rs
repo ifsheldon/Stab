@@ -130,6 +130,8 @@ fn analyze_errors_sweep_controls_match_pf3_oracle() {
           M 1\n\
           CZ rec[-1] sweep[8]\n\
           CZ sweep[9] rec[-1]\n\
+          M 2\n\
+          CZ rec[-1] rec[-2]\n\
           M 0\n\
           DETECTOR rec[-1]\n"
             .as_slice(),
@@ -160,6 +162,44 @@ fn analyze_errors_sweep_controls_reject_invalid_target_positions() {
         error.contains("CX target sweep[0] is not a qubit"),
         "{error}"
     );
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let status = run_from(
+        ["stab", "analyze_errors"],
+        b"X_ERROR(0.25) 0\nM 0 1\nCY rec[-1] rec[-2]\nM 0\nDETECTOR rec[-1]\n".as_slice(),
+        &mut stdout,
+        &mut stderr,
+    );
+
+    assert_eq!(status, 1);
+    assert_eq!(String::from_utf8(stdout).unwrap(), "");
+    let error = String::from_utf8(stderr).unwrap();
+    assert!(
+        error.contains("CY target rec[-2] is not a qubit"),
+        "{error}"
+    );
+
+    for (gate, expected) in [
+        ("XCZ", "XCZ target rec[-1] is not a qubit"),
+        ("YCZ", "YCZ target rec[-1] is not a qubit"),
+    ] {
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let input =
+            format!("X_ERROR(0.25) 0\nM 0 1\n{gate} rec[-1] rec[-2]\nM 0\nDETECTOR rec[-1]\n");
+        let status = run_from(
+            ["stab", "analyze_errors"],
+            input.as_bytes(),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, 1);
+        assert_eq!(String::from_utf8(stdout).unwrap(), "");
+        let error = String::from_utf8(stderr).unwrap();
+        assert!(error.contains(expected), "{error}");
+    }
 }
 
 #[test]
