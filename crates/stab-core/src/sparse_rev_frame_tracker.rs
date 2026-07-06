@@ -377,17 +377,17 @@ impl SparseReverseFrameTracker {
 
     fn undo_controlled_pauli(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
         for group in instruction.target_groups().into_iter().rev() {
+            let gate_name = instruction.gate().canonical_name();
             let [control, target] = group else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
-                    "{} expected paired targets during sparse reverse tracking",
-                    instruction.gate().canonical_name()
+                    "{gate_name} expected paired targets during sparse reverse tracking",
                 )));
             };
             if control.is_measurement_record_target() {
-                validate_feedback_record_position(instruction.gate().canonical_name(), true)?;
+                validate_feedback_record_position(gate_name, true)?;
                 self.undo_classical_feedback(instruction, control, target)?;
             } else if target.is_measurement_record_target() {
-                validate_feedback_record_position(instruction.gate().canonical_name(), false)?;
+                validate_feedback_record_position(gate_name, false)?;
                 self.undo_classical_feedback(instruction, target, control)?;
             } else if control.is_sweep_bit_target() || target.is_sweep_bit_target() {
                 // Sweep-controlled Paulis are preserved by the feedback-inlining

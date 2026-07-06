@@ -4,7 +4,7 @@
 
 This slice promotes selected gate-order-valid sweep-controlled Pauli target shapes in the Rust `circuit_detecting_regions` utility.
 It is a narrow PFM5 detector-utility promotion, not broad sweep-conditioned simulator parity or Python binding work.
-The later `pfm5-detecting-regions-cz-sweep-sweep-scope.md` slice adds the selected `CZ sweep[i] sweep[j]` bit-bit no-op case without broadening the one-sweep one-qubit scope described here.
+Later `CZ`-specific slices add selected `CZ sweep[i] sweep[j]`, `CZ rec[-k] sweep[j]`, `CZ sweep[j] rec[-k]`, and `CZ rec[-a] rec[-b]` bit-bit no-op cases without broadening the one-sweep one-qubit scope described here.
 
 ## Owned Subcases
 
@@ -17,10 +17,10 @@ The later `pfm5-detecting-regions-cz-sweep-sweep-scope.md` slice adds the select
 ## Explicit Rejections
 
 - Keep non-`CZ` sweep/sweep groups rejected where the sparse tracker cannot associate a plain qubit target with the operation.
-- Keep measurement-record/sweep groups rejected.
+- Keep non-`CZ` measurement-record/sweep groups rejected; selected `CZ` record/sweep groups are promoted later by `pfm5-detecting-regions-cz-classical-noop-scope.md`.
 - Keep one-sweep one-qubit groups rejected when pinned Stim v1.16.0 rejects their target order.
 - Keep controlled-Pauli groups with more than two targets rejected.
-- Keep unsupported feedback positions and record/record feedback groups rejected.
+- Keep unsupported feedback positions and non-`CZ` record/record feedback groups rejected; selected `CZ` record/record groups are promoted later by `pfm5-detecting-regions-cz-classical-noop-scope.md`.
 - Keep non-selected sweep target shapes in other gates out of scope.
 
 ## Comparator And Evidence

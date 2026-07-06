@@ -230,7 +230,43 @@ fn undo_instruction_with_snapshots(
             snapshot_regions(*current_tick, tracker, targets, regions)?;
         }
     }
-    tracker.undo_instruction(instruction)
+    undo_detecting_region_instruction(instruction, tracker)
+}
+
+fn undo_detecting_region_instruction(
+    instruction: &CircuitInstruction,
+    tracker: &mut SparseReverseFrameTracker,
+) -> CircuitResult<()> {
+    if instruction.gate().canonical_name() != "CZ" {
+        return tracker.undo_instruction(instruction);
+    }
+
+    let mut kept_targets = Vec::new();
+    let mut skipped_classical_noop = false;
+    for group in instruction.target_groups() {
+        let [left, right] = group else {
+            return tracker.undo_instruction(instruction);
+        };
+        if is_cz_classical_bit_noop("CZ", left, right) {
+            skipped_classical_noop = true;
+        } else {
+            kept_targets.extend(group.iter().cloned());
+        }
+    }
+    if !skipped_classical_noop {
+        return tracker.undo_instruction(instruction);
+    }
+    if kept_targets.is_empty() {
+        return Ok(());
+    }
+
+    let kept_instruction = CircuitInstruction::new(
+        instruction.gate(),
+        instruction.args().to_vec(),
+        kept_targets,
+        instruction.tag().map(str::to_owned),
+    )?;
+    tracker.undo_instruction(&kept_instruction)
 }
 
 fn snapshot_regions(
@@ -375,21 +411,25 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Circui
                 instruction.gate().canonical_name()
             )));
         };
+        let gate_name = instruction.gate().canonical_name();
+        if is_cz_classical_bit_noop(gate_name, left, right) {
+            continue;
+        }
         let left_is_sweep = left.is_sweep_bit_target();
         let right_is_sweep = right.is_sweep_bit_target();
         if left_is_sweep || right_is_sweep {
-            if left_is_sweep && right_is_sweep && instruction.gate().canonical_name() == "CZ" {
+            if left_is_sweep && right_is_sweep && gate_name == "CZ" {
                 continue;
             }
             if left_is_sweep ^ right_is_sweep {
-                validate_sweep_position(instruction.gate().canonical_name(), left_is_sweep)?;
+                validate_sweep_position(gate_name, left_is_sweep)?;
                 let qubit_target = if left_is_sweep { right } else { left };
                 validate_qubit_target(instruction, qubit_target, false)?;
                 continue;
             }
             return Err(CircuitError::invalid_detector_error_model(format!(
                 "simple detecting-region extraction only supports {} sweep-controlled groups with exactly one sweep bit and one plain qubit target",
-                instruction.gate().canonical_name()
+                gate_name
             )));
         }
         let left_is_record = left.is_measurement_record_target();
@@ -400,19 +440,23 @@ fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> Circui
                 validate_qubit_target(instruction, right, false)?;
             }
             (true, false) | (false, true) => {
-                validate_feedback_position(instruction.gate().canonical_name(), left_is_record)?;
+                validate_feedback_position(gate_name, left_is_record)?;
                 let feedback_target = if left_is_record { right } else { left };
                 validate_qubit_target(instruction, feedback_target, false)?;
             }
             (true, true) => {
                 return Err(CircuitError::invalid_detector_error_model(format!(
                     "simple detecting-region extraction only supports {} measurement-record feedback with exactly one plain qubit target",
-                    instruction.gate().canonical_name()
+                    gate_name
                 )));
             }
         }
     }
     Ok(())
+}
+
+fn is_cz_classical_bit_noop(gate_name: &str, left: &Target, right: &Target) -> bool {
+    gate_name == "CZ" && left.is_classical_bit_target() && right.is_classical_bit_target()
 }
 
 fn validate_feedback_position(gate_name: &str, record_is_first: bool) -> CircuitResult<()> {

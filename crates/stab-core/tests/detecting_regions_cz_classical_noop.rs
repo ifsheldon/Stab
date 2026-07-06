@@ -51,35 +51,35 @@ fn require_contains(haystack: &str, needle: &str, context: &str) -> Result<(), S
 }
 
 #[test]
-fn detecting_regions_target_shape_supports_cz_sweep_sweep_noop() -> Result<(), String> {
-    let cases = [
+fn detecting_regions_target_shape_supports_cz_record_sweep_noop() -> Result<(), String> {
+    for (name, circuit_text) in [
         (
-            "single bit-bit group",
+            "record first",
             "
-            RX 0
+            M 0
+            RX 1
             TICK
-            CZ sweep[0] sweep[1]
-            MX 0
+            CZ rec[-1] sweep[0]
+            MX 1
             DETECTOR rec[-1]
             ",
         ),
         (
-            "multiple bit-bit groups",
+            "record second",
             "
-            RX 0
+            M 0
+            RX 1
             TICK
-            CZ sweep[0] sweep[1] sweep[2] sweep[3]
-            MX 0
+            CZ sweep[0] rec[-1]
+            MX 1
             DETECTOR rec[-1]
             ",
         ),
-    ];
-
-    for (name, circuit_text) in cases {
+    ] {
         let actual = detector_region_at(circuit_text, 0)?;
-        if actual != "+X" {
+        if actual != "+_X" {
             return Err(format!(
-                "{name}\nactual region: {actual}\nexpected region: +X"
+                "{name}\nactual region: {actual}\nexpected region: +_X"
             ));
         }
     }
@@ -87,74 +87,76 @@ fn detecting_regions_target_shape_supports_cz_sweep_sweep_noop() -> Result<(), S
 }
 
 #[test]
-fn detecting_regions_target_shape_keeps_non_cz_sweep_sweep_fail_closed() -> Result<(), String> {
-    for (name, circuit_text) in [
-        (
-            "CX bit-bit",
-            "CX sweep[0] sweep[1]\nTICK\nM 0\nDETECTOR rec[-1]\n",
-        ),
-        (
-            "CY bit-bit",
-            "CY sweep[0] sweep[1]\nTICK\nM 0\nDETECTOR rec[-1]\n",
-        ),
-        (
-            "XCZ bit-bit",
-            "XCZ sweep[0] sweep[1]\nTICK\nM 0\nDETECTOR rec[-1]\n",
-        ),
-        (
-            "YCZ bit-bit",
-            "YCZ sweep[0] sweep[1]\nTICK\nMY 0\nDETECTOR rec[-1]\n",
-        ),
-    ] {
-        let error = detecting_region_error(circuit_text)?;
-        require_contains(
-            &error,
-            "exactly one sweep bit and one plain qubit target",
-            name,
-        )?;
+fn detecting_regions_target_shape_supports_cz_record_record_noop() -> Result<(), String> {
+    let actual = detector_region_at(
+        "
+        M 0 1
+        RX 2
+        TICK
+        CZ rec[-1] rec[-2]
+        MX 2
+        DETECTOR rec[-1]
+        ",
+        0,
+    )?;
+    if actual != "+__X" {
+        return Err(format!("actual region: {actual}\nexpected region: +__X"));
     }
     Ok(())
 }
 
 #[test]
-fn detecting_regions_target_shape_keeps_non_cz_record_sweep_fail_closed() -> Result<(), String> {
-    for (name, circuit_text, expected_error) in [
+fn detecting_regions_target_shape_cz_classical_noop_skips_record_history() -> Result<(), String> {
+    let actual = detector_region_at(
+        "
+        RX 1
+        TICK
+        CZ rec[-1] sweep[0]
+        MX 1
+        DETECTOR rec[-1]
+        ",
+        0,
+    )?;
+    if actual != "+_X" {
+        return Err(format!("actual region: {actual}\nexpected region: +_X"));
+    }
+    Ok(())
+}
+
+#[test]
+fn detecting_regions_target_shape_cz_classical_noop_keeps_quantum_groups() -> Result<(), String> {
+    let actual = detector_region_at(
+        "
+        R 0 1
+        TICK
+        H 0
+        CZ rec[-1] sweep[0] 0 1
+        TICK
+        MX 0
+        DETECTOR rec[-1]
+        ",
+        0,
+    )?;
+    if actual != "+ZZ" {
+        return Err(format!("actual region: {actual}\nexpected region: +ZZ"));
+    }
+    Ok(())
+}
+
+#[test]
+fn detecting_regions_target_shape_keeps_non_cz_record_record_fail_closed() -> Result<(), String> {
+    for (name, circuit_text) in [
         (
-            "CX record first",
-            "
-            M 0
-            TICK
-            CX rec[-1] sweep[0]
-            M 1
-            DETECTOR rec[-1]
-            ",
-            "sweep-controlled targets",
+            "CX record-record",
+            "M 0 1\nTICK\nCX rec[-1] rec[-2]\nM 2\nDETECTOR rec[-1]\n",
         ),
         (
-            "CX record second",
-            "
-            M 0
-            TICK
-            CX sweep[0] rec[-1]
-            M 1
-            DETECTOR rec[-1]
-            ",
-            "plain qubit target",
-        ),
-        (
-            "YCZ record first",
-            "
-            M 0
-            TICK
-            YCZ rec[-1] sweep[0]
-            MY 1
-            DETECTOR rec[-1]
-            ",
-            "plain qubit targets",
+            "CY record-record",
+            "M 0 1\nTICK\nCY rec[-1] rec[-2]\nMY 2\nDETECTOR rec[-1]\n",
         ),
     ] {
         let error = detecting_region_error(circuit_text)?;
-        require_contains(&error, expected_error, name)?;
+        require_contains(&error, "exactly one plain qubit target", name)?;
     }
     Ok(())
 }

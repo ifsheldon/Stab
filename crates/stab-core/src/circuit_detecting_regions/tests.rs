@@ -1076,10 +1076,10 @@ fn detecting_regions_target_shape_rejects_unsupported_feedback_shapes() {
             "target position",
         ),
         (
-            "CZ record-record",
+            "CY record-record",
             "M 0 1\n\
              TICK\n\
-             CZ rec[-1] rec[-2]\n\
+             CY rec[-1] rec[-2]\n\
              M 2\n\
              DETECTOR rec[-1]\n",
             "exactly one plain qubit target",

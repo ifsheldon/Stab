@@ -798,6 +798,21 @@ DETECTOR rec[-3] rec[-2] rec[-1]
     }
 
     #[test]
+    fn circuit_with_inlined_feedback_keeps_cz_classical_only_groups_unsupported() {
+        for text in [
+            "M 0\n\
+             CZ rec[-1] sweep[0]\n",
+            "M 0 1\n\
+             CZ rec[-1] rec[-2]\n",
+        ] {
+            let circuit = Circuit::from_stim_str(text).unwrap();
+            let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
+
+            assert!(error.to_string().contains("not a qubit"), "{error}");
+        }
+    }
+
+    #[test]
     fn circuit_with_inlined_feedback_rejects_excessive_repeat_work() {
         let circuit = Circuit::from_stim_str(
             "REPEAT 100001 {\n\
