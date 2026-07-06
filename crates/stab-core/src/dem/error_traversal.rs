@@ -22,50 +22,78 @@ impl DetectorErrorModel {
         Ok((counts.detector_count, counts.observable_count))
     }
 
-    pub(crate) fn selected_search_graph_flat_repeat_error_count(
+    pub(crate) fn selected_search_graph_compact_repeat_error_count(
         &self,
     ) -> CircuitResult<Option<u64>> {
+        self.selected_search_graph_compact_repeat_error_count_inner(0)
+    }
+
+    fn selected_search_graph_compact_repeat_error_count_inner(
+        &self,
+        depth: usize,
+    ) -> CircuitResult<Option<u64>> {
+        if depth > MAX_DEM_REPEAT_NESTING {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "DEM search compact repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
+            )));
+        }
         if self.items.is_empty() {
             return Ok(None);
         }
         let mut count = 0_u64;
         for item in &self.items {
-            let DemItem::Instruction(instruction) = item else {
-                return Ok(None);
-            };
-            match instruction.kind() {
-                DemInstructionKind::Error => {
-                    let probability = instruction.args().first().copied().unwrap_or(0.0);
-                    if probability == 0.0 {
-                        return Ok(None);
-                    }
-                    let mut has_any_target = false;
-                    let mut has_search_target = false;
-                    for target in instruction.targets() {
-                        has_any_target = true;
-                        match target {
-                            DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_) => {
-                                has_search_target = true;
+            match item {
+                DemItem::Instruction(instruction) => match instruction.kind() {
+                    DemInstructionKind::Error => {
+                        let probability = instruction.args().first().copied().unwrap_or(0.0);
+                        if probability == 0.0 {
+                            return Ok(None);
+                        }
+                        let mut has_any_target = false;
+                        let mut has_search_target = false;
+                        for target in instruction.targets() {
+                            has_any_target = true;
+                            match target {
+                                DemTarget::RelativeDetector(_)
+                                | DemTarget::LogicalObservable(_) => {
+                                    has_search_target = true;
+                                }
+                                DemTarget::Numeric(_) => return Ok(None),
+                                DemTarget::Separator => {}
                             }
-                            DemTarget::Numeric(_) => return Ok(None),
-                            DemTarget::Separator => {}
+                        }
+                        if !has_search_target && has_any_target {
+                            return Ok(None);
+                        }
+                        if has_search_target {
+                            count = count.checked_add(1).ok_or_else(|| {
+                                CircuitError::invalid_detector_error_model(
+                                    "DEM search compact-repeat error count overflowed",
+                                )
+                            })?;
                         }
                     }
-                    if !has_search_target && has_any_target {
+                    DemInstructionKind::ShiftDetectors if instruction.detector_shift()? == 0 => {}
+                    DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
+                    DemInstructionKind::ShiftDetectors => {
                         return Ok(None);
                     }
-                    if has_search_target {
-                        count = count.checked_add(1).ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(
-                                "DEM search flat-repeat error count overflowed",
-                            )
-                        })?;
+                },
+                DemItem::RepeatBlock(repeat) => {
+                    let Some(child_count) = repeat
+                        .body()
+                        .selected_search_graph_compact_repeat_error_count_inner(depth + 1)?
+                    else {
+                        return Ok(None);
+                    };
+                    if repeat.body().total_detector_shift()? != 0 {
+                        return Ok(None);
                     }
-                }
-                DemInstructionKind::ShiftDetectors if instruction.detector_shift()? == 0 => {}
-                DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
-                DemInstructionKind::ShiftDetectors => {
-                    return Ok(None);
+                    count = count.checked_add(child_count).ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "DEM search compact-repeat error count overflowed",
+                        )
+                    })?;
                 }
             }
         }
@@ -99,7 +127,7 @@ impl DetectorErrorModel {
                 DemItem::RepeatBlock(repeat) => {
                     if let Some(error_count) = repeat
                         .body()
-                        .selected_search_graph_flat_repeat_error_count()?
+                        .selected_search_graph_compact_repeat_error_count()?
                     {
                         let folded_count =
                             multiplier.checked_mul(error_count).ok_or_else(|| {
@@ -209,7 +237,7 @@ impl DetectorErrorModel {
                 DemItem::RepeatBlock(repeat) => {
                     if repeat
                         .body()
-                        .selected_search_graph_flat_repeat_error_count()?
+                        .selected_search_graph_compact_repeat_error_count()?
                         .is_some()
                     {
                         detector_offset = repeat

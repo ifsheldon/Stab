@@ -14,6 +14,7 @@ use crate::report::Measurement;
 
 use super::{measure_stab_batched, stab_runner_error};
 
+mod metadata;
 mod search_repeat;
 
 #[cfg(not(test))]
@@ -124,6 +125,9 @@ pub(super) fn run_dem_transform_compare_row(
         "pf4-dem-search-annotation-repeat" => Ok(Some(
             search_repeat::run_dem_search_annotation_repeat_row(row)?,
         )),
+        "pf4-dem-search-nested-repeat" => {
+            Ok(Some(search_repeat::run_dem_search_nested_repeat_row(row)?))
+        }
         "pf4-dem-sat-flat-repeat-fold" => Ok(Some(run_dem_sat_flat_repeat_row(row)?)),
         "pf4-error-matcher-filter-flat-repeat" => {
             Ok(Some(run_error_matcher_filter_flat_repeat_row(row)?))
@@ -276,70 +280,12 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             SEARCH_FLAT_REPEAT_COUNT as f64,
             "folded-detectorless-logical-errors/s",
         )),
-        ("pf4-dem-hypergraph-no-target-repeat", "stab_pf4_dem_hyper_no_target_repeat_skip") => {
-            Some((
-                SEARCH_FLAT_REPEAT_COUNT as f64,
-                "skipped-no-target-errors/s",
-            ))
-        }
-        ("pf4-dem-search-zero-shift-repeat", "stab_pf4_dem_graphlike_zero_shift_repeat_fold")
-        | ("pf4-dem-search-zero-shift-repeat", "stab_pf4_dem_hyper_zero_shift_repeat_fold") => {
-            Some((
-                SEARCH_FLAT_REPEAT_COUNT as f64,
-                "folded-zero-shift-target-errors/s",
-            ))
-        }
-        ("pf4-dem-search-annotation-repeat", "stab_pf4_dem_graphlike_annotation_repeat_fold")
-        | ("pf4-dem-search-annotation-repeat", "stab_pf4_dem_hyper_annotation_repeat_fold") => {
-            Some((
-                (SEARCH_FLAT_REPEAT_COUNT as f64) * 2.0,
-                "folded-annotated-target-errors/s",
-            ))
-        }
-        _ => None,
+        _ => search_repeat::measurement_work(row_id, name),
     }
 }
 
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
-    match row_id {
-        "pf4-dem-flatten-repeat" => Some(
-            "contract-only: Stab measures the Rust DetectorErrorModel::flattened public API over repeat, tag, detector-shift, coordinate-shift, separator, and observable cases; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
-        ),
-        "pf4-dem-rounded" => Some(
-            "contract-only: Stab measures the Rust DetectorErrorModel::rounded public API over top-level and nested error probabilities while preserving non-error coordinate args; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
-        ),
-        "pf4-dem-coordinate-map" => Some(
-            "contract-only: Stab measures bounded all-detector DEM coordinate maps, selected detector coordinate lookup through a huge-repeat model, sparse flat and nested overlapping selected-coordinate lookups, and many-selected flat-overlap coordinate lookup; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
-        ),
-        "pf4-dem-sampler-folded-repeat" => Some(
-            "contract-only: Stab measures folded CompiledDemSampler compile, stochastic direct sample behavior, zero-probability repeat skipping, deterministic zero-shift repeat parity folding, selected direct detection-event single-stochastic zero-shift repeat parity folding, and selected direct detection-event flat stochastic zero-shift repeat parity folding; sampled-error materialization, replay, and non-selected excessive stochastic repeated-error work remain capped and broader PF4 traversal consumers remain explicit follow-up work",
-        ),
-        "pf4-dem-folded-traversal" => Some(
-            "contract-only: Stab measures current capped-repeat hypergraph search, zero-probability repeat skipping for hypergraph search, selected flat detector-touching zero-shift hypergraph search repeat folding, weighted SAT zero-probability variable elision and repeated-body skipping, capped unselected SAT problem generation, analyzer traversal, and ErrorMatcher circuit traversal; true folded traversal remains an explicit RPF4 follow-up",
-        ),
-        "pf4-dem-folded-graphlike-traversal" => Some(
-            "contract-only: Stab measures current capped-repeat graphlike search behavior, zero-probability repeat skipping, selected flat detector-touching and detectorless logical-only zero-shift graphlike repeat folding, and selected flat no-target graphlike repeat skipping; true folded graphlike traversal remains an explicit RPF4 follow-up",
-        ),
-        "pf4-dem-hypergraph-logical-repeat" => Some(
-            "contract-only: Stab measures selected flat detectorless logical-only zero-shift hypergraph search repeat folding; broader shifted, nested, non-flat, and numeric-target hypergraph repeat traversal remains capped or excluded",
-        ),
-        "pf4-dem-hypergraph-no-target-repeat" => Some(
-            "contract-only: Stab measures selected flat no-target zero-shift hypergraph search repeat skipping; broader shifted, nested, non-flat, numeric-target, and mixed-instruction hypergraph repeat traversal remains capped or excluded",
-        ),
-        "pf4-dem-search-zero-shift-repeat" => Some(
-            "contract-only: Stab measures selected flat zero-detector-shift graphlike and hypergraph search repeat folding; broader nonzero-shift, nested, non-flat, numeric-target, separator-only, and mixed-instruction repeat traversal remains capped or excluded",
-        ),
-        "pf4-dem-search-annotation-repeat" => Some(
-            "contract-only: Stab measures selected flat annotation-bearing graphlike and hypergraph search repeat folding; broader nonzero-shift, nested, non-flat, numeric-target, separator-only, and non-annotation mixed-instruction repeat traversal remains capped or excluded",
-        ),
-        "pf4-dem-sat-flat-repeat-fold" => Some(
-            "contract-only: Stab measures selected SAT/WCNF flat zero-shift repeat folding for unweighted shortest-error SAT including zero-probability structural mechanisms and weighted concrete-MAP SAT; broader shifted, nested, non-flat, and high-index dense-target structural SAT repeat traversal remains capped",
-        ),
-        "pf4-error-matcher-filter-flat-repeat" => Some(
-            "contract-only: Stab measures selected ErrorMatcher filter DEM flat detector-touching zero-shift repeat folding by compact filter-key semantics; broader shifted, nested, mixed-instruction, detectorless logical-only, circuit-repeat provenance, and explain_errors CLI behavior remains scoped out",
-        ),
-        _ => None,
-    }
+    metadata::compare_note(row_id)
 }
 
 fn run_dem_flatten_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {

@@ -261,7 +261,7 @@ impl Graph {
                 DemItem::RepeatBlock(repeat) => {
                     if repeat
                         .body()
-                        .selected_search_graph_flat_repeat_error_count()?
+                        .selected_search_graph_compact_repeat_error_count()?
                         .is_some()
                     {
                         self.add_flattened_dem(repeat.body(), detector_offset, max_weight)?;
