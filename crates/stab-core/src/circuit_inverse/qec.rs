@@ -14,6 +14,9 @@ pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Ci
     if let Some(inverse) = selected_mpp_detector_inverse(circuit)? {
         return Ok(Some(inverse));
     }
+    if let Some(inverse) = selected_noisy_measurement_inverse(circuit)? {
+        return Ok(Some(inverse));
+    }
     if let Some(inverse) = selected_measure_reset_pass_through_inverse(circuit)? {
         return Ok(Some(inverse));
     }
@@ -212,6 +215,52 @@ fn build_selected_mpp_detector_inverse(
         detector.tag(),
     )?;
     Ok(result)
+}
+
+fn selected_noisy_measurement_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+    if circuit.items().is_empty() {
+        return Ok(None);
+    }
+    let mut instructions = Vec::with_capacity(circuit.items().len());
+    for item in circuit.items() {
+        let CircuitItem::Instruction(instruction) = item else {
+            return Ok(None);
+        };
+        match instruction.gate().canonical_name() {
+            "M" | "MX" | "MY" => instructions.push(instruction),
+            _ => return Ok(None),
+        }
+    }
+
+    let mut result = Circuit::new();
+    for instruction in instructions.into_iter().rev() {
+        append_target_instruction(
+            &mut result,
+            instruction.gate(),
+            instruction.args(),
+            reversed_measurement_targets(instruction)?,
+            instruction.tag(),
+        )?;
+    }
+    Ok(Some(result))
+}
+
+fn reversed_measurement_targets(instruction: &CircuitInstruction) -> CircuitResult<Vec<Target>> {
+    let mut targets = Vec::with_capacity(instruction.targets().len());
+    for group in instruction.target_groups().into_iter().rev() {
+        let [target] = group else {
+            return Err(inverse_qec_noisy_measurement_error(
+                "measurement target groups must contain one qubit target",
+            ));
+        };
+        if !target.is_qubit_target() {
+            return Err(inverse_qec_noisy_measurement_error(
+                "measurement targets must be qubit targets",
+            ));
+        }
+        targets.push(target.clone());
+    }
+    Ok(targets)
 }
 
 fn selected_measure_reset_pass_through_inverse(
@@ -775,6 +824,12 @@ fn inverse_qec_measure_reset_pass_through_error(reason: &str) -> CircuitError {
 fn inverse_qec_mpp_detector_error(reason: &str) -> CircuitError {
     CircuitError::invalid_tableau_conversion(format!(
         "inverse_qec selected MPP detector subset requires one noiseless MPP instruction with Hermitian Pauli products and one detector referencing exactly all selected MPP records; {reason}"
+    ))
+}
+
+fn inverse_qec_noisy_measurement_error(reason: &str) -> CircuitError {
+    CircuitError::invalid_tableau_conversion(format!(
+        "inverse_qec selected noisy measurement subset requires only top-level M, MX, and MY instructions with qubit targets; {reason}"
     ))
 }
 
