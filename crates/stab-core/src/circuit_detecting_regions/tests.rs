@@ -99,6 +99,55 @@ fn detecting_regions_target_api_supports_mzz_example() {
 }
 
 #[test]
+fn detecting_regions_target_api_ignores_tags_and_ordinary_noise_like_upstream() {
+    let circuit = Circuit::from_stim_str(
+        "R[test1] 0\n\
+             X_ERROR[test2](0.25) 0\n\
+             TICK\n\
+             M[test3](0.25) 0\n\
+             DETECTOR[test4](1, 2) rec[-1]\n",
+    )
+    .unwrap();
+    let actual = circuit_detecting_regions_for_targets(
+        &circuit,
+        DetectingRegionTargetOptions {
+            targets: all_detecting_region_targets(&circuit).unwrap(),
+            ticks: all_detecting_region_ticks(&circuit).unwrap(),
+            ignore_anticommutation_errors: false,
+        },
+    )
+    .unwrap();
+    let detector = DemTarget::relative_detector(0).unwrap();
+
+    assert_eq!(actual[&detector][&0].to_string(), "+Z");
+}
+
+#[test]
+fn detecting_regions_target_shape_ignores_non_record_noise_instructions() {
+    let actual = regions(
+        "R 0 1\n\
+             X_ERROR(0.125) 0\n\
+             Y_ERROR(0.125) 1\n\
+             Z_ERROR(0.125) 0\n\
+             I_ERROR(0.125) 1\n\
+             II_ERROR(0.125) 0 1\n\
+             DEPOLARIZE1(0.125) 0 1\n\
+             DEPOLARIZE2(0.125) 0 1\n\
+             PAULI_CHANNEL_1(0.01, 0.02, 0.03) 0\n\
+             PAULI_CHANNEL_2(0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01) 0 1\n\
+             E(0.125) X0 Y1\n\
+             ELSE_CORRELATED_ERROR(0.125) Z0\n\
+             TICK\n\
+             MZZ 0 1\n\
+             DETECTOR rec[-1]\n",
+        vec![detector(0)],
+        vec![0],
+    );
+
+    assert_eq!(actual[&detector(0)][&0].to_string(), "+ZZ");
+}
+
+#[test]
 fn detecting_regions_target_shape_supports_inverted_measurement_targets() {
     let single_cases = [
         ("R 0\nTICK\nM !0\nDETECTOR rec[-1]\n", "+Z"),
@@ -458,23 +507,33 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
 
 #[test]
 fn detecting_regions_target_shape_rejects_unpromoted_heralded_record_annotations() {
-    let circuit =
-        Circuit::from_stim_str("TICK\nHERALDED_ERASE(0.125) 0\nDETECTOR rec[-1]\n").unwrap();
-    let error = circuit_detecting_regions_for_targets(
-        &circuit,
-        DetectingRegionTargetOptions {
-            targets: vec![DemTarget::relative_detector(0).unwrap()],
-            ticks: vec![0],
-            ignore_anticommutation_errors: false,
-        },
-    )
-    .unwrap_err();
+    for (text, gate) in [
+        (
+            "TICK\nHERALDED_ERASE(0.125) 0\nDETECTOR rec[-1]\n",
+            "HERALDED_ERASE",
+        ),
+        (
+            "TICK\nHERALDED_PAULI_CHANNEL_1(0.125, 0, 0, 0) 0\nDETECTOR rec[-1]\n",
+            "HERALDED_PAULI_CHANNEL_1",
+        ),
+    ] {
+        let circuit = Circuit::from_stim_str(text).unwrap();
+        let error = circuit_detecting_regions_for_targets(
+            &circuit,
+            DetectingRegionTargetOptions {
+                targets: vec![DemTarget::relative_detector(0).unwrap()],
+                ticks: vec![0],
+                ignore_anticommutation_errors: false,
+            },
+        )
+        .unwrap_err();
 
-    assert!(
-        error
-            .to_string()
-            .contains("does not support gate HERALDED_ERASE")
-    );
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("does not support gate {gate}"))
+        );
+    }
 }
 
 #[test]

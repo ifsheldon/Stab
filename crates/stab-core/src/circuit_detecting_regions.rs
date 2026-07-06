@@ -297,6 +297,11 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
     if instruction.gate().is_two_qubit_gate() && instruction.gate().has_tableau() {
         return validate_plain_qubit_pair_targets(instruction);
     }
+    if instruction.gate().category() == crate::GateCategory::Noise
+        && !is_heralded_record_noise(instruction)
+    {
+        return Ok(());
+    }
     match instruction.gate().canonical_name() {
         "R" | "RX" | "RY" => validate_single_plain_qubit_targets(instruction),
         "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" => {
@@ -313,6 +318,13 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
             "simple detecting-region extraction does not support gate {name}"
         ))),
     }
+}
+
+fn is_heralded_record_noise(instruction: &CircuitInstruction) -> bool {
+    matches!(
+        instruction.gate().canonical_name(),
+        "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
+    )
 }
 
 fn validate_single_plain_qubit_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
