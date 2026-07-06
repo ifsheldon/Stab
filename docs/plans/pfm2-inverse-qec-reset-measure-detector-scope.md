@@ -20,7 +20,7 @@ It remains a narrow PFM2 circuit-transform packet, not a full port of Stim's rev
 - Keep `dont_turn_measurements_into_resets` behavior, Python API shape, and flow-returning overloads out of scope.
 - Keep `TICK`, `QUBIT_COORDS`, `SHIFT_COORDS`, observables, feedback, noise, `MR`, `MXX`, `MYY`, `MZZ`, `MPP`, multi-instruction detector-flow rewrites, and repeat-contained inverse-QEC behavior rejected unless already accepted by the unitary inverse path.
 - Keep duplicate reset or measurement targets rejected through the selected-shape parser.
-- Keep broader Stim `circuit_inverse_qec` cases such as `two_to_one`, `pass_through`, broader noisy measure-reset detector-flow beyond the exact `noisy_mr_det` packet, broader `mzz` beyond the selected exact packet, `mpp`, and `obs_include_pauli` active for later PFM2 or PFM5 slices.
+- Keep broader Stim `circuit_inverse_qec` cases such as `two_to_one`, `pass_through`, broader noisy measure-reset detector-flow beyond the exact `noisy_mr_det` packet, broader `mzz` beyond the selected exact packet, `mpp`, and broader observable-aware QEC inverse behavior beyond the selected exact `obs_include_pauli` packet active for later PFM2 or PFM5 slices.
 
 ## Comparator And Evidence
 

@@ -9,6 +9,7 @@ use super::{is_plain_qubit_target, reset_inverse_gate_and_basis};
 
 mod m_det;
 mod mzz;
+mod obs_include;
 
 pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
     if let Some(inverse) = selected_reset_cx_measure_two_to_one_inverse(circuit)? {
@@ -30,6 +31,9 @@ pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Ci
         return Ok(Some(inverse));
     }
     if let Some(inverse) = mzz::selected_mzz_inverse(circuit)? {
+        return Ok(Some(inverse));
+    }
+    if let Some(inverse) = obs_include::selected_obs_include_pauli_inverse(circuit)? {
         return Ok(Some(inverse));
     }
     if let Some(inverse) = selected_measure_reset_pass_through_inverse(circuit)? {
