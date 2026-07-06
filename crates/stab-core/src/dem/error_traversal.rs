@@ -40,8 +40,10 @@ impl DetectorErrorModel {
             if probability == 0.0 {
                 return Ok(None);
             }
+            let mut has_any_target = false;
             let mut has_search_target = false;
             for target in instruction.targets() {
+                has_any_target = true;
                 match target {
                     DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_) => {
                         has_search_target = true;
@@ -50,14 +52,16 @@ impl DetectorErrorModel {
                     DemTarget::Separator => {}
                 }
             }
-            if !has_search_target {
+            if !has_search_target && has_any_target {
                 return Ok(None);
             }
-            count = count.checked_add(1).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
-                    "DEM search flat-repeat error count overflowed",
-                )
-            })?;
+            if has_search_target {
+                count = count.checked_add(1).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "DEM search flat-repeat error count overflowed",
+                    )
+                })?;
+            }
         }
         Ok(Some(count))
     }

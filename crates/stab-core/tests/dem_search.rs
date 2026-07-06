@@ -7,7 +7,7 @@
 use std::collections::BTreeSet;
 
 use stab_core::{
-    Circuit, CircuitResult, CodeDistance, DemInstructionKind, DemItem, DemTarget,
+    Circuit, CircuitResult, CodeDistance, DemInstruction, DemInstructionKind, DemItem, DemTarget,
     DetectorErrorModel, ErrorAnalyzerOptions, Probability, RepetitionCodeParams,
     RepetitionCodeTask, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
     circuit_to_detector_error_model, find_undetectable_logical_error,
@@ -289,6 +289,83 @@ fn pf4_hypergraph_logical_only_repeat_folds_by_compact_model() {
             .to_dem_string(),
         "error(1) L1\n"
     );
+}
+
+#[test]
+fn pf4_dem_search_skips_flat_nonzero_no_target_repeat_bodies() {
+    let no_target_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0.1)\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n",
+    )
+    .unwrap();
+    let active_compact =
+        DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n").unwrap();
+    assert_eq!(
+        shortest_graphlike_undetectable_logical_error(&no_target_repeat, false)
+            .unwrap()
+            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(&active_compact, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    let mixed_repeat =
+        DetectorErrorModel::from_dem_str("repeat 100001 {\n    error(0.1)\n    error(0.2) L0\n}\n")
+            .unwrap();
+    let mixed_compact = DetectorErrorModel::from_dem_str("error(0.1)\nerror(0.2) L0\n").unwrap();
+    assert_eq!(
+        shortest_graphlike_undetectable_logical_error(&mixed_repeat, false)
+            .unwrap()
+            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(&mixed_compact, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    assert_numeric_error_target_rejected();
+}
+
+#[test]
+fn pf4_hypergraph_no_target_repeat_skips_by_compact_model() {
+    let no_target_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0.1)\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n",
+    )
+    .unwrap();
+    let active_compact =
+        DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n").unwrap();
+    assert_eq!(
+        find_undetectable_logical_error(&no_target_repeat, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string(),
+        find_undetectable_logical_error(&active_compact, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    let mixed_repeat =
+        DetectorErrorModel::from_dem_str("repeat 100001 {\n    error(0.1)\n    error(0.2) L0\n}\n")
+            .unwrap();
+    let mixed_compact = DetectorErrorModel::from_dem_str("error(0.1)\nerror(0.2) L0\n").unwrap();
+    assert_eq!(
+        find_undetectable_logical_error(&mixed_repeat, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string(),
+        find_undetectable_logical_error(&mixed_compact, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    assert_numeric_error_target_rejected();
+}
+
+fn assert_numeric_error_target_rejected() {
+    let error = DemInstruction::error(
+        Probability::try_new(0.1).unwrap(),
+        vec![DemTarget::numeric(5)],
+        None,
+    )
+    .expect_err("numeric error targets should stay rejected at the typed boundary")
+    .to_string();
+    assert!(error.contains("raw numbers"), "{error}");
 }
 
 #[test]

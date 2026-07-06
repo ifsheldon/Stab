@@ -7,7 +7,8 @@ It also hardens direct hypergraph search distance-1 behavior for multiple detect
 
 ## Explicit Non-Scope
 
-This slice does not change shifted, nested, non-flat, zero-probability, numeric-target, detectorless no-target, SAT/WCNF, analyzer, ErrorMatcher, sampled-error, replay, Python, diagram, or deferred simulator-product behavior.
+This slice did not change shifted, nested, non-flat, zero-probability, numeric-target, detectorless no-target, SAT/WCNF, analyzer, ErrorMatcher, sampled-error, replay, Python, diagram, or deferred simulator-product behavior at the time it landed.
+The later no-target follow-up promotes selected flat zero-shift no-target graphlike and hypergraph search repeats without widening this detectorless logical-only slice.
 Dense detector and observable caps remain in force.
 The broad `pf4-dem-folded-traversal` row remains manifest-only because other traversal consumers and repeat shapes still need folded behavior, precise caps, or explicit deferral.
 
@@ -94,7 +95,7 @@ just bench::compare --only pf4-dem-hypergraph-logical-repeat --baseline target/b
 ## Audit And Review
 
 Milestone-audit status: complete for this selected slice.
-The implemented evidence covers compact-model semantic parity for selected detectorless logical-only zero-shift graphlike and hypergraph repeated error bodies, preserves the existing selected detector-touching repeat fold, records the pinned Stim hypergraph detectorless distance-1 overwrite comparator, and keeps shifted, nested, non-flat, numeric-target, detectorless no-target, SAT/WCNF, analyzer, ErrorMatcher, sampled-error, and replay behavior explicitly outside the slice.
+The implemented evidence covers compact-model semantic parity for selected detectorless logical-only zero-shift graphlike and hypergraph repeated error bodies, preserves the existing selected detector-touching repeat fold, records the pinned Stim hypergraph detectorless distance-1 overwrite comparator, and keeps shifted, nested, non-flat, numeric-target, SAT/WCNF, analyzer, ErrorMatcher, sampled-error, and replay behavior explicitly outside the slice.
 The audit found one provenance loophole during review: the hypergraph detectorless evidence was initially grouped under graphlike-sourced oracle and benchmark rows.
 That loophole is fixed by splitting hypergraph evidence into `pf4-dem-hypergraph-logical-repeat-rust`, `pf4-dem-hypergraph-logical-repeat`, and `pf4_hypergraph_logical_only_repeat_folds_by_compact_model`.
 
