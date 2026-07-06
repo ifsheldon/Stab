@@ -36,6 +36,12 @@ fn detector_utility_benchmark_rows_have_stab_compare_runners() {
             &["stab_pf5_detecting_regions_generated_repetition"][..],
         ),
         (
+            "pf5-detecting-regions-generated-surface",
+            "src/stim/gen/gen_surface_code.test.cc",
+            "detecting-regions-generated",
+            &["stab_pf5_detecting_regions_generated_surface"][..],
+        ),
+        (
             "pf5-missing-detectors-mpp",
             "src/stim/util_top/missing_detectors.test.cc",
             "missing-detectors-mpp",

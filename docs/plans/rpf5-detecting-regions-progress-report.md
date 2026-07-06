@@ -2,10 +2,10 @@
 
 ## Summary
 
-This RPF5 report covers bounded repeat traversal, additive detector or logical-observable target filters, generated repetition-code all-target/all-tick selection with selected exact D0, D6, and L0 regions, promoted unsigned Clifford propagation, selected target shapes including inverted measurement targets, `MPAD` measurement pads, `MPP` Pauli-product measurements, and `SPP`/`SPP_DAG` unitary Pauli products, ignored-anticommutation mode, selected measurement-gauge ignored-mode behavior, and product-measurement gauge-cancellation behavior in the Rust `circuit_detecting_regions` utility for the currently supported gate subset.
+This RPF5 report covers bounded repeat traversal, additive detector or logical-observable target filters, generated repetition-code all-target/all-tick selection with selected exact D0, D6, and L0 regions, selected generated rotated surface-code all-target/all-tick helper counts with exact D0, D4, and L0 regions across the first six ticks, promoted unsigned Clifford propagation, selected target shapes including inverted measurement targets, `MPAD` measurement pads, `MPP` Pauli-product measurements, and `SPP`/`SPP_DAG` unitary Pauli products, ignored-anticommutation mode, selected measurement-gauge ignored-mode behavior, and product-measurement gauge-cancellation behavior in the Rust `circuit_detecting_regions` utility for the currently supported gate subset.
 The target-filter slice adds a `DemTarget`-based detecting-region API that can query detector and logical-observable targets, default-like helpers for all detector and logical-observable targets and all ticks, and the pinned Stim `MX` and `MZZ` detecting-region examples.
 The unsigned Clifford slice now adds the full single-qubit Clifford gate set with plain qubit targets plus fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets.
-It is not an RPF5 completion report because detecting-region target shapes beyond the promoted measurement inversions, `MPAD`, `MPP`, and `SPP`/`SPP_DAG` Pauli products, broader generated-code cases beyond the promoted repetition-code shape, broader gauge behavior, missing-detector families, and measurement-rich flow-transform integration remain active work.
+It is not an RPF5 completion report because detecting-region target shapes beyond the promoted measurement inversions, `MPAD`, `MPP`, and `SPP`/`SPP_DAG` Pauli products, broader generated-code cases beyond the promoted repetition-code and selected rotated surface-code shapes, broader gauge behavior, missing-detector families, and measurement-rich flow-transform integration remain active work.
 
 ## Implemented Surfaces
 
@@ -17,7 +17,7 @@ It is not an RPF5 completion report because detecting-region target shapes beyon
 - `all_detecting_region_targets` returns the currently declared detector and logical-observable targets within the dense helper materialization cap, and `all_detecting_region_ticks` returns all tick indices within the documented helper cap.
 - The supported validation set now includes `R`/`RX`/`RY`, `M`/`MX`/`MY`, `MXX`/`MYY`/`MZZ`, `MPAD`, `MPP`, `SPP`, `SPP_DAG`, the full single-qubit Clifford gate set with plain qubit targets, fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets, `TICK`, `DETECTOR`, and `OBSERVABLE_INCLUDE`.
 - The selected target-shape slice accepts inverted targets for the promoted measurement and reset-measurement families, constant-result `MPAD` measurement pads, Pauli-product `MPP` measurement targets, and unsigned `SPP`/`SPP_DAG` unitary Pauli-product propagation while keeping reset and Clifford validation on plain qubit targets.
-- `MR`/`MRX`/`MRY`, `QUBIT_COORDS`, and `SHIFT_COORDS` are accepted for detecting-region traversal, promoting the generated repetition-code shape from pinned Stim's target-filter example while keeping heralded record-producing annotations outside this slice.
+- `MR`/`MRX`/`MRY`, `QUBIT_COORDS`, and `SHIFT_COORDS` are accepted for detecting-region traversal, promoting the generated repetition-code shape from pinned Stim's target-filter example and a selected generated rotated surface-code slice while keeping heralded record-producing annotations outside this slice.
 - `ignore_anticommutation_errors=true` now runs the same reverse traversal with sparse-tracker anticommutations recorded instead of returned as errors, while the default false mode still fails closed on the same incompatible collapses.
 - The selected gauge slice covers public detecting-region behavior for single-measurement gauge collapse under ignored mode plus product-measurement cancellation when the anticommuting sensitivities xor to zero.
 
@@ -36,7 +36,7 @@ The owned positive subcases are `M !0`, `MX !0`, `MY !0`, `MR !0`, `MRX !0`, `MR
 The owned negative scope keeps single-qubit Clifford gates, fixed two-qubit Clifford gates, and `R`/`RX`/`RY` plain-qubit-target-only for the current detecting-region subset, keeps heralded record-producing annotations outside the slice, and rejects anti-Hermitian Pauli products for both measurement and unitary Pauli-product gates.
 The comparator class is structural Rust API parity against pinned Stim v1.16.0 measurement-target semantics and `SparseUnsignedRevFrameTracker` reverse propagation, which already ignores target inversion when deriving qubit sensitivity, owns measurement-pad record dropping, owns Pauli-product measurement undo semantics, and treats `SPP` and `SPP_DAG` as unsigned unitary Pauli-product propagation.
 No separate benchmark row was added for the promoted target-shape subcases because this slice has structural Rust API evidence only and no faithful pinned Stim CLI timing ratio for this Rust API.
-The existing report-only detecting-region benchmark rows cover repeat traversal, target filtering, Clifford propagation, and generated repetition-code extraction, but they should not be cited as direct performance evidence for the `MPAD` record-drop, `MPP` product-measurement, or `SPP`/`SPP_DAG` unitary-product target-shape branches.
+The existing report-only detecting-region benchmark rows cover repeat traversal, target filtering, Clifford propagation, generated repetition-code extraction, and selected generated rotated surface-code extraction, but they should not be cited as direct performance evidence for the `MPAD` record-drop, `MPP` product-measurement, or `SPP`/`SPP_DAG` unitary-product target-shape branches.
 
 ## Generated Repetition-Code Scope
 
@@ -47,6 +47,15 @@ The exact generated-code expectations encoded from pinned Stim are D0 at Stab ti
 The owned negative scope is unchanged except for promoted `MPAD`: broader generated surface-code region tables, coordinate-prefix target filters, non-plain target shapes, heralded record-producing annotations, and broader gauge-specific behavior remain active work or deferred binding ergonomics.
 The benchmark row for this slice is a non-primary report-only Rust utility workload measuring generated repetition-code region extraction through `circuit_detecting_regions_for_targets`.
 
+## Generated Rotated Surface-Code Scope
+
+The generated surface-code slice promotes a narrow source-owned rotated surface-code detecting-region sample for the Rust generator surface, not arbitrary generated-code parity.
+The owned positive subcases are generated `surface_code:rotated_memory_z` with distance 3 and rounds 3, default-like all-detector plus all-observable target count of 25, default-like all-tick selection from 0 through 20, and exact selected-region extraction for D0, D4, and L0 across Stab ticks 0 through 5.
+The source-owned reproduction path is to generate the same circuit with `target/oracle/stim-v1.16.0/out/stim gen --code surface_code --task rotated_memory_z --distance 3 --rounds 3`, then run `target/oracle/stim-v1.16.0/out/stim diagram --type detslice-text --filter_coords <D#|L#> --tick <stim_tick>` and compare Stim diagram tick `n + 1` to Stab detecting-region tick `n` after dropping diagram formatting.
+The encoded exact expectations are D0 at ticks 0 through 5 as `+________Z_____ZZ__________`, `+________Z_____ZZ__________`, `+________Z_____Z___________`, `+______________Z___________`, `+______________Z___________`, and `+______________Z___________`; D4 at ticks 0 through 5 as `+__Z_______________________`, `+__X_______________________`, `+__XX______________________`, `+_XXX_____X________________`, `+_XXX_____X________________`, and `+_XXX______________________`; and L0 at ticks 0 through 5 as `+_Z_Z_Z____________________`, `+_Z_Z_Z____________________`, `+_ZZZ_Z____________________`, `+_Z_Z_Z____________________`, `+_Z_Z_Z_____Z______________`, and `+_Z_Z_Z____________________`.
+The owned negative scope remains broad generated-code parity: full generated surface-code region tables, larger distances, other surface-code tasks, coordinate-prefix target filters, and generated-code gauge-specific behavior remain active work.
+The benchmark row for this slice is a non-primary report-only Rust utility workload measuring the same selected generated rotated surface-code target and tick set through `circuit_detecting_regions_for_targets`.
+
 ## Clifford Gate Scope
 
 The unsigned Clifford slice promotes the full single-qubit Clifford gate set with plain qubit targets plus fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets because the sparse reverse tracker now owns those unsigned transformations.
@@ -55,7 +64,7 @@ The source-owned reproduction path is to write each circuit from `detecting_regi
 The full single-qubit Clifford test table covers `I`, `X`, `Y`, `Z`, `H`, `SQRT_Y_DAG`, `H_NXZ`, `SQRT_Y`, `S`, `H_XY`, `H_NXY`, `S_DAG`, `SQRT_X_DAG`, `SQRT_X`, `H_NYZ`, `H_YZ`, `C_XYZ`, `C_XYNZ`, `C_NXYZ`, `C_XNYZ`, `C_ZYX`, `C_ZNYX`, `C_NZYX`, and `C_ZYNX`.
 The checked two-qubit unsigned expectations include the earlier `CZ` tick 0 `+ZZ` and tick 1 `+X_`, `CY` tick 0 `+XY` and tick 1 `+X_`, plus exact integration checks for `SWAP` as tick 0 `+_Z` and `XCX` as tick 0 `+ZX`.
 The sparse reverse tracker has a tableau-backed all-basis regression for `II`, `XCX`, `XCY`, `XCZ`, `YCX`, `YCY`, `YCZ`, `SWAP`, `ISWAP`, `ISWAP_DAG`, `CXSWAP`, `SWAPCX`, `CZSWAP`, `SQRT_XX`, `SQRT_XX_DAG`, `SQRT_YY`, `SQRT_YY_DAG`, `SQRT_ZZ`, and `SQRT_ZZ_DAG`.
-The owned negative subcases keep non-plain controlled-Pauli target shapes, sweep-shaped targets, broader generated-code regions beyond the promoted repetition-code case, and broader gauge-specific behavior fail-closed or partial until those surfaces are explicitly promoted.
+The owned negative subcases keep non-plain controlled-Pauli target shapes, sweep-shaped targets, broader generated-code regions beyond the promoted repetition-code and selected rotated surface-code cases, and broader gauge-specific behavior fail-closed or partial until those surfaces are explicitly promoted.
 The comparator class is structural Rust API parity against pinned Stim detecting-region semantics; the `detslice-text` command is only the pinned-Stim reproduction tool for the expected Pauli regions, and no diagram API parity is claimed.
 The benchmark row for this slice is a non-primary report-only Rust utility workload measuring the promoted Clifford gates through `circuit_detecting_regions_for_targets`.
 Resource behavior continues to use the existing detecting-region repeat and dense-helper caps.
@@ -94,6 +103,7 @@ Implemented Rust tests:
 - `detecting_regions_target_shape_rejects_unpromoted_heralded_record_annotations`
 - `detecting_regions_target_api_supports_logical_observable_targets`
 - `detecting_regions_generated_repetition_code_filters_and_regions`
+- `detecting_regions_generated_rotated_surface_code_filters_and_regions`
 - `detecting_regions_target_api_rejects_invalid_targets`
 - `detecting_regions_target_api_rejects_dense_helper_expansion`
 - `detecting_regions_clifford_supports_promoted_single_qubit_gates`
@@ -110,7 +120,7 @@ Implemented Rust tests:
 - `detecting_regions_gauge_ignores_measurement_collapse_when_requested`
 - `detecting_regions_gauge_allows_product_measurement_cancellation`
 
-These tests cover bounded repeat tick traversal, expected tick-indexed detecting regions, resource rejection for repeat expansion beyond the current cap, pinned `MX` and `MZZ` detecting-region examples, detector and logical-observable target filters, inverted measurement target shapes, `MPAD` measurement pads with record-index preservation and empty pad-only regions, `MPP` Pauli-product target shapes, `SPP` and `SPP_DAG` unitary Pauli-product target shapes compared to decomposed propagation, anti-Hermitian Pauli-product rejection, reset and Clifford plain-target validation, generated repetition-code all-target and all-tick selection plus selected exact regions, default-like all-target and all-tick helpers, duplicate target deduplication, invalid target rejection, heralded record-producing annotation rejection, dense helper rejection before large allocation, promoted unsigned full single-qubit Clifford propagation, fixed two-qubit tableau-backed Clifford propagation, non-plain controlled-Pauli target-shape rejection, ignored anticommutation output, default false-mode anticommutation rejection, selected measurement-gauge ignored-mode output, and product-measurement gauge cancellation.
+These tests cover bounded repeat tick traversal, expected tick-indexed detecting regions, resource rejection for repeat expansion beyond the current cap, pinned `MX` and `MZZ` detecting-region examples, detector and logical-observable target filters, inverted measurement target shapes, `MPAD` measurement pads with record-index preservation and empty pad-only regions, `MPP` Pauli-product target shapes, `SPP` and `SPP_DAG` unitary Pauli-product target shapes compared to decomposed propagation, anti-Hermitian Pauli-product rejection, reset and Clifford plain-target validation, generated repetition-code all-target and all-tick selection plus selected exact regions, selected generated rotated surface-code all-target and all-tick helper counts plus exact D0, D4, and L0 regions, default-like all-target and all-tick helpers, duplicate target deduplication, invalid target rejection, heralded record-producing annotation rejection, dense helper rejection before large allocation, promoted unsigned full single-qubit Clifford propagation, fixed two-qubit tableau-backed Clifford propagation, non-plain controlled-Pauli target-shape rejection, ignored anticommutation output, default false-mode anticommutation rejection, selected measurement-gauge ignored-mode output, and product-measurement gauge cancellation.
 
 ## Oracle Rows
 
@@ -123,6 +133,7 @@ Implemented row:
 - `pf5-detecting-regions-anticommutation-rust`
 - `pf5-detecting-regions-gauge-rust`
 - `pf5-detecting-regions-generated-repetition-rust`
+- `pf5-detecting-regions-generated-surface-rust`
 
 Still broad and manifest-only:
 
@@ -136,11 +147,13 @@ Report-only runner coverage:
 - `pf5-detecting-regions-targets`
 - `pf5-detecting-regions-clifford`
 - `pf5-detecting-regions-generated-repetition`
+- `pf5-detecting-regions-generated-surface`
 
 The repeat row measures the bounded repeat-tick detecting-region workload through the Rust public utility API.
 The target row uses the default-like helper functions to set up detector, logical-observable, and tick filters, then times detecting-region extraction through the additive `DemTarget` API.
 The Clifford row uses the default-like helper functions to set up filters for representative newly promoted single-qubit Clifford fixtures, the existing `CY` controlled-Pauli fixture, and a fixed two-qubit tableau-backed fixture covering `XCX`, `SWAP`, and `SQRT_XX`, then times extraction through the additive `DemTarget` API.
 The generated repetition-code row uses the default-like helper functions to set up all detector and logical-observable targets plus all ticks for the distance-3 rounds-3 generated repetition-code circuit, then times extraction through the additive `DemTarget` API.
+The generated surface-code row uses the selected D0, D4, and L0 targets plus the first six ticks for the distance-3 rounds-3 generated rotated memory-Z surface-code circuit, then times extraction through the additive `DemTarget` API.
 These rows remain `non-primary-report-only` because pinned Stim does not provide a faithful CLI timing ratio for this Rust utility surface.
 They are not part of the 1.25x primary threshold file.
 The target row is coverage for the promoted helper path, not a claim that all-target/all-tick scaling is representative for large generated-code workloads.
@@ -155,6 +168,7 @@ cargo test -p stab-core detecting_regions_repeat_ --quiet
 cargo test -p stab-core detecting_regions_target_api --quiet
 cargo test -p stab-core detecting_regions_target_shape --quiet
 cargo test -p stab-core detecting_regions_generated_repetition --quiet
+cargo test -p stab-core detecting_regions_generated_rotated_surface_code --quiet
 cargo test -p stab-core detecting_regions_clifford --quiet
 cargo test -p stab-core detecting_regions_anticommutation --quiet
 cargo test -p stab-core detecting_regions_anticommutation -- --list
@@ -165,6 +179,7 @@ cargo test -p stab-oracle fixtures --quiet
 cargo clippy -p stab-core -p stab-bench -p stab-oracle --all-targets -- -D warnings
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --quiet
+just oracle::version
 just oracle::run --milestone PF5 --structural
 just bench::smoke
 just bench::baseline --only pf5-detecting-regions-targets --out target/benchmarks/rpf5-detecting-region-targets-probe
@@ -173,19 +188,23 @@ just bench::baseline --only pf5-detecting-regions-clifford --out target/benchmar
 just bench::compare --only pf5-detecting-regions-clifford --baseline target/benchmarks/rpf5-detecting-region-clifford-fixed-two-qubit-probe/baseline.json --report target/benchmarks/rpf5-detecting-region-clifford-fixed-two-qubit-compare
 just bench::baseline --only pf5-detecting-regions-generated-repetition --out target/benchmarks/rpf5-detecting-region-generated-repetition-probe
 just bench::compare --only pf5-detecting-regions-generated-repetition --baseline target/benchmarks/rpf5-detecting-region-generated-repetition-probe/baseline.json --report target/benchmarks/rpf5-detecting-region-generated-repetition-compare
+just bench::baseline --only pf5-detecting-regions-generated-surface --out target/benchmarks/rpf5-detecting-region-generated-surface-probe
+just bench::compare --only pf5-detecting-regions-generated-surface --baseline target/benchmarks/rpf5-detecting-region-generated-surface-probe/baseline.json --report target/benchmarks/rpf5-detecting-region-generated-surface-compare
 # pinned Stim detslice-text reproduction loop for the full single-qubit Clifford table plus representative fixed two-qubit Clifford circuits
+# pinned Stim detslice-text reproduction loop for generated rotated surface-code D0 D4 and L0 across Stim ticks 1 through 6
 ```
 
 The pinned-Stim `detslice-text` reproduction passed for all 24 single-qubit Clifford table entries with tick `1` matching the expected prepared basis and tick `2` matching `X` after dropping sign; the same reproduction passed for `CY` as `XY` then `X_`, `CZ` as `ZZ` then `X_`, and the promoted `SWAP` and `XCX` integration expectations.
-The pinned-Stim `detslice-text` reproduction also passed for the generated repetition-code selected-region expectations recorded above.
+The pinned-Stim `detslice-text` reproduction also passed for the generated repetition-code selected-region expectations recorded above, and the generated rotated surface-code reproduction passed for the selected D0, D4, and L0 targets across Stim ticks 1 through 6.
 The target-filter benchmark probe reported `stab_pf5_detecting_regions_target_filters=0.006348216s` and `6.452e5 cases/s`, with output written to `target/benchmarks/rpf5-detecting-region-targets-compare`.
 The fixed-two-qubit-inclusive benchmark probe reported `stab_pf5_detecting_regions_clifford_gates=0.041061913s` and `2.993e5 cases/s`, with output written to `target/benchmarks/rpf5-detecting-region-clifford-fixed-two-qubit-compare`.
 The generated repetition-code benchmark probe reported `stab_pf5_detecting_regions_generated_repetition=0.037847554s` and `1.082e5 cases/s`, with output written to `target/benchmarks/rpf5-detecting-region-generated-repetition-compare`.
+The generated rotated surface-code benchmark probe reported `stab_pf5_detecting_regions_generated_surface=0.074829076s` and `5.474e4 cases/s`, with output written to `target/benchmarks/rpf5-detecting-region-generated-surface-compare`.
 These rows remain report-only with the documented note that this Rust utility workload has no faithful pinned Stim CLI timing ratio.
 
 ## Audit And Review
 
-Milestone audit status is complete for the target-filter, generated repetition-code, unsigned Clifford, and ignored-anticommutation slices and incomplete for broader RPF5.
+Milestone audit status is complete for the target-filter, generated repetition-code, generated rotated surface-code, unsigned Clifford, and ignored-anticommutation slices and incomplete for broader RPF5.
 Full-code-review sidecars found one P1 issue in the dense all-target helper, where huge observable ids or detector counts could cause excessive allocation before failure.
 The slice now rejects all-target helper requests beyond the dense materialization cap or representable logical-observable target range before allocation, with `detecting_regions_target_api_rejects_dense_helper_expansion` covering the regression.
 The unsigned Clifford audit found a P2 evidence-provenance gap because the initial report did not preserve the pinned-Stim `detslice-text` reproduction path for the promoted-gate expectations; this report now records the exact command shape and source-owned expected region strings.
@@ -200,6 +219,8 @@ The Pauli-product target-shape audit and GPT-5.5/xhigh full-code-review sidecars
 The unitary Pauli-product target-shape refresh promoted `SPP` and `SPP_DAG` detecting-region validation through the existing sparse reverse tracker unitary-product undo path, with decomposed-propagation equivalence, fixed unsigned-region expectations, and anti-Hermitian rejection coverage.
 The unitary Pauli-product target-shape audit and GPT-5.5/xhigh full-code-review sidecars found no implementation blockers; the documentation stale-wording finding was fixed in this report and in the oracle manifest, and the residual risk is that the `SPP`/`SPP_DAG` detecting-region evidence remains structural Rust API evidence instead of an exact-output CLI oracle row, matching the declared comparator class.
 The generated repetition-code audit found an evidence-provenance gap where the oracle row claimed `MPAD` rejection but only ran the positive generated-region test; the row was narrowed to generated-region evidence before this slice later promoted `MPAD` under the target-shape row, and this report records the exact D0, D6, and L0 detslice translations.
+The generated rotated surface-code refresh adds exact D0, D4, and L0 selected-region evidence plus report-only benchmark metadata while leaving broad surface-code region-table parity active.
+The generated rotated surface-code full-code-review sidecars found no Rust implementation or benchmark-runner defects and one P2 documentation provenance gap where the PF5 source inventories omitted `src/stim/gen/gen_surface_code.test.cc`; the source inventories now list that path beside the detecting-region utility sources.
 The generated repetition-code full-code-review sidecars found no implementation or benchmark-runner defects after the validation set was narrowed to `QUBIT_COORDS` and `SHIFT_COORDS` instead of every annotation gate.
 The `MPAD` target-shape refresh promoted measurement pads through the existing sparse reverse tracker record-drop path, then fixed the GPT-5.5/xhigh full-code-review finding that `circuit_detecting_regions` must use Stim's stats-style qubit count instead of public `Circuit::count_qubits` so `MPAD 1` does not widen reported detecting-region Pauli strings.
 The same review pass found stale benchmark and provenance wording around target-shape evidence; this report and the oracle manifest now state that the `MPAD`, `MPP`, and `SPP`/`SPP_DAG` target-shape branches have structural Rust API evidence only, with no direct report-only benchmark row for those branches.
@@ -207,6 +228,6 @@ The remaining review risk is that the report-only benchmark rows exercise promot
 
 ## Remaining RPF5 Work
 
-- Target-shape support beyond the promoted inverted measurement families, `MPAD`, `MPP`, and `SPP`/`SPP_DAG` Pauli products, broader generated-code regions beyond the promoted repetition-code case, and broader gauge behavior.
+- Target-shape support beyond the promoted inverted measurement families, `MPAD`, `MPP`, and `SPP`/`SPP_DAG` Pauli products, broader generated-code regions beyond the promoted repetition-code and selected rotated surface-code cases, and broader gauge behavior.
 - Missing-detector generated-code suffix analysis beyond the promoted honeycomb and toric cases, plus broader flow-dependent utility behavior.
 - Measurement-rich flows beyond the promoted unsigned `has_flow` and `has_all_flows` Rust helper subset, including broader `flow_generators`, diagnostics, signed sampled checks, and transform integration.
