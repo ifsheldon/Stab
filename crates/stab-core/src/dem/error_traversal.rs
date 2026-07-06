@@ -33,34 +33,41 @@ impl DetectorErrorModel {
             let DemItem::Instruction(instruction) = item else {
                 return Ok(None);
             };
-            if instruction.kind() != DemInstructionKind::Error {
-                return Ok(None);
-            }
-            let probability = instruction.args().first().copied().unwrap_or(0.0);
-            if probability == 0.0 {
-                return Ok(None);
-            }
-            let mut has_any_target = false;
-            let mut has_search_target = false;
-            for target in instruction.targets() {
-                has_any_target = true;
-                match target {
-                    DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_) => {
-                        has_search_target = true;
+            match instruction.kind() {
+                DemInstructionKind::Error => {
+                    let probability = instruction.args().first().copied().unwrap_or(0.0);
+                    if probability == 0.0 {
+                        return Ok(None);
                     }
-                    DemTarget::Numeric(_) => return Ok(None),
-                    DemTarget::Separator => {}
+                    let mut has_any_target = false;
+                    let mut has_search_target = false;
+                    for target in instruction.targets() {
+                        has_any_target = true;
+                        match target {
+                            DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_) => {
+                                has_search_target = true;
+                            }
+                            DemTarget::Numeric(_) => return Ok(None),
+                            DemTarget::Separator => {}
+                        }
+                    }
+                    if !has_search_target && has_any_target {
+                        return Ok(None);
+                    }
+                    if has_search_target {
+                        count = count.checked_add(1).ok_or_else(|| {
+                            CircuitError::invalid_detector_error_model(
+                                "DEM search flat-repeat error count overflowed",
+                            )
+                        })?;
+                    }
                 }
-            }
-            if !has_search_target && has_any_target {
-                return Ok(None);
-            }
-            if has_search_target {
-                count = count.checked_add(1).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
-                        "DEM search flat-repeat error count overflowed",
-                    )
-                })?;
+                DemInstructionKind::ShiftDetectors if instruction.detector_shift()? == 0 => {}
+                DemInstructionKind::ShiftDetectors
+                | DemInstructionKind::Detector
+                | DemInstructionKind::LogicalObservable => {
+                    return Ok(None);
+                }
             }
         }
         Ok(Some(count))

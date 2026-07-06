@@ -50,6 +50,13 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             &["stab_pf4_dem_hyper_no_target_repeat_skip"][..],
         ),
         (
+            "pf4-dem-search-zero-shift-repeat",
+            &[
+                "stab_pf4_dem_graphlike_zero_shift_repeat_fold",
+                "stab_pf4_dem_hyper_zero_shift_repeat_fold",
+            ][..],
+        ),
+        (
             "pf4-dem-sat-flat-repeat-fold",
             &[
                 "stab_pf4_dem_sat_flat_repeat_fold",

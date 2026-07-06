@@ -357,6 +357,110 @@ fn pf4_hypergraph_no_target_repeat_skips_by_compact_model() {
     assert_numeric_error_target_rejected();
 }
 
+#[test]
+fn pf4_dem_search_folds_flat_zero_detector_shift_repeat_bodies() {
+    let no_target_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    shift_detectors 0\n    error(0.1)\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n",
+    )
+    .unwrap();
+    let active_compact =
+        DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n").unwrap();
+    assert_eq!(
+        shortest_graphlike_undetectable_logical_error(&no_target_repeat, false)
+            .unwrap()
+            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(&active_compact, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    let mixed_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0.1)\n    shift_detectors 0\n    error(0.2) L0\n}\n",
+    )
+    .unwrap();
+    let mixed_compact =
+        DetectorErrorModel::from_dem_str("error(0.1)\nshift_detectors 0\nerror(0.2) L0\n").unwrap();
+    assert_eq!(
+        shortest_graphlike_undetectable_logical_error(&mixed_repeat, false)
+            .unwrap()
+            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(&mixed_compact, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    let (detector_touching_repeat, detector_touching_compact) =
+        zero_detector_shift_detector_touching_models();
+    assert_eq!(
+        shortest_graphlike_undetectable_logical_error(&detector_touching_repeat, false)
+            .unwrap()
+            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(&detector_touching_compact, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    assert_nonzero_shift_search_repeat_rejected();
+}
+
+#[test]
+fn pf4_hypergraph_zero_detector_shift_repeat_folds_by_compact_model() {
+    let no_target_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    shift_detectors 0\n    error(0.1)\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n",
+    )
+    .unwrap();
+    let active_compact =
+        DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n").unwrap();
+    assert_eq!(
+        find_undetectable_logical_error(&no_target_repeat, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string(),
+        find_undetectable_logical_error(&active_compact, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    let mixed_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0.1)\n    shift_detectors 0\n    error(0.2) L0\n}\n",
+    )
+    .unwrap();
+    let mixed_compact =
+        DetectorErrorModel::from_dem_str("error(0.1)\nshift_detectors 0\nerror(0.2) L0\n").unwrap();
+    assert_eq!(
+        find_undetectable_logical_error(&mixed_repeat, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string(),
+        find_undetectable_logical_error(&mixed_compact, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    let (detector_touching_repeat, detector_touching_compact) =
+        zero_detector_shift_detector_touching_models();
+    assert_eq!(
+        find_undetectable_logical_error(&detector_touching_repeat, usize::MAX, usize::MAX, false,)
+            .unwrap()
+            .to_dem_string(),
+        find_undetectable_logical_error(&detector_touching_compact, usize::MAX, usize::MAX, false,)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    assert_nonzero_shift_search_repeat_rejected();
+}
+
+fn zero_detector_shift_detector_touching_models() -> (DetectorErrorModel, DetectorErrorModel) {
+    let repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0.1) D0\n    shift_detectors(4, 5) 0\n    error(0.2) D0 L0\n}\n",
+    )
+    .unwrap();
+    let compact = DetectorErrorModel::from_dem_str(
+        "error(0.1) D0\nshift_detectors(4, 5) 0\nerror(0.2) D0 L0\n",
+    )
+    .unwrap();
+    (repeat, compact)
+}
+
 fn assert_numeric_error_target_rejected() {
     let error = DemInstruction::error(
         Probability::try_new(0.1).unwrap(),
@@ -366,6 +470,27 @@ fn assert_numeric_error_target_rejected() {
     .expect_err("numeric error targets should stay rejected at the typed boundary")
     .to_string();
     assert!(error.contains("raw numbers"), "{error}");
+}
+
+fn assert_nonzero_shift_search_repeat_rejected() {
+    let shifted = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0.1)\n    shift_detectors 1\n    error(0.2) D0 L0\n}\n",
+    )
+    .unwrap();
+    let graphlike_error = shortest_graphlike_undetectable_logical_error(&shifted, false)
+        .expect_err("nonzero detector shifts should remain outside the selected graphlike fold")
+        .to_string();
+    assert!(
+        graphlike_error.contains("supports repeat counts"),
+        "{graphlike_error}"
+    );
+    let hyper_error = find_undetectable_logical_error(&shifted, usize::MAX, usize::MAX, false)
+        .expect_err("nonzero detector shifts should remain outside the selected hypergraph fold")
+        .to_string();
+    assert!(
+        hyper_error.contains("supports repeat counts"),
+        "{hyper_error}"
+    );
 }
 
 #[test]
