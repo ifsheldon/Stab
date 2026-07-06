@@ -98,7 +98,7 @@ just bench::compare --milestone PF5
 
 - Broader generated-code missing-detector suffix analysis beyond the promoted honeycomb and toric cases.
 - Folded large-repeat traversal beyond the current materialized caps and generated-code gate families beyond tableau-backed single-qubit and fixed two-qubit Clifford propagation plus `SPP` or `SPP_DAG` decomposition in the invariant tracker.
-- Public measurement-rich flow semantics beyond the promoted unsigned `has_flow`, unsigned `has_all_flows`, unsigned diagnostic Rust helper, and current generator subsets, including signed sampled checks, broader composed `flow_generators`, solver or generator diagnostics, and transform integration.
+- Public measurement-rich flow semantics beyond the promoted unsigned `has_flow`, unsigned `has_all_flows`, unsigned diagnostic Rust helper, scoped signed sampled Rust checker, and current generator subsets, including Python-style signed sampled binding shape, broader composed `flow_generators`, solver or generator diagnostics, and transform integration.
 - Continue keeping benchmark harness smoke tests split out of `ops/bench/src/baseline/tests.rs`, because the file is close to the project’s 1200-line threshold.
 
 ## Audit And Review

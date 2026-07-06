@@ -47,7 +47,7 @@ pub use circuit_flow::{
     check_if_circuit_has_unsigned_stabilizer_flows,
     check_unsigned_stabilizer_flows_with_diagnostics, circuit_flow_generators,
     circuit_has_all_unsigned_stabilizer_flows, circuit_has_unsigned_stabilizer_flow,
-    solve_for_flow_measurements,
+    sample_if_circuit_has_stabilizer_flows, solve_for_flow_measurements,
 };
 pub use circuit_generation::{
     CodeDistance, ColorCodeParams, ColorCodeTask, GeneratedCircuit, RepetitionCodeParams,
