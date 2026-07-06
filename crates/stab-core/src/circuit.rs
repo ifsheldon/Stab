@@ -128,11 +128,12 @@ impl Circuit {
         crate::circuit_inverse_qec(self)
     }
 
-    /// Returns the currently supported unitary time-reversal subset for flows.
+    /// Returns the currently supported time-reversal subset for flows.
     ///
-    /// The scoped Rust API accepts unsigned flows with Pauli input and output
-    /// terms only. Measurement-record and observable flow rewrites are reserved
-    /// for the richer QEC inverse milestone.
+    /// The scoped Rust API accepts unsigned unitary flows plus selected
+    /// measurement-rich flows with measurement-record terms. Broader detector,
+    /// feedback, repeat, noise, and observable rewrites remain active follow-up
+    /// work.
     pub fn time_reversed_for_flows(
         &self,
         flows: &[crate::Flow],
