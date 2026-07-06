@@ -480,6 +480,67 @@ fn pf5_missing_detectors_repeat_rejects_excessive_expansion()
 }
 
 #[test]
+fn missing_detectors_supports_mpp_observable_subset() -> Result<(), Box<dyn std::error::Error>> {
+    // Adapted from Stim v1.16.0 src/stim/util_top/missing_detectors.test.cc.
+    require_missing_eq(
+        "MPP Z0*Z1 X0*X1\n\
+         TICK\n\
+         MPP Z0*Z1 X0*X1\n\
+         DETECTOR rec[-1] rec[-3]\n\
+         DETECTOR rec[-2] rec[-4]\n",
+        false,
+        "DETECTOR rec[-4]\n",
+        "repeated MPP stabilizer products",
+    )?;
+    require_missing_eq(
+        "MPP Z0*Z1 X0*X1\n\
+         TICK\n\
+         MPP Z0*Z1 X0*X1\n\
+         DETECTOR rec[-1] rec[-3]\n\
+         DETECTOR rec[-2] rec[-4]\n\
+         DETECTOR rec[-1] rec[-3] rec[-2] rec[-4]\n",
+        false,
+        "DETECTOR rec[-3] rec[-2] rec[-1]\n",
+        "repeated MPP stabilizer products with combined detector row",
+    )?;
+    require_missing_eq(
+        "MPP Z0*Z1 X0*X1\n\
+         TICK\n\
+         MPP Z0*Z1 X0*X1\n\
+         DETECTOR rec[-1] rec[-3]\n\
+         DETECTOR rec[-2] rec[-4]\n",
+        true,
+        "",
+        "unknown-input repeated MPP stabilizer products",
+    )?;
+    require_missing_eq(
+        "MPP Z0*Z1 X0*X1\n\
+         TICK\n\
+         MPP Z0*Z1 X0*X1\n\
+         OBSERVABLE_INCLUDE(0) rec[-1]\n\
+         DETECTOR rec[-2] rec[-4]\n\
+         OBSERVABLE_INCLUDE(0) rec[-3]\n",
+        true,
+        "",
+        "record-only observable rows",
+    )?;
+    require_missing_eq(
+        "OBSERVABLE_INCLUDE(0) Z0 Z1\n\
+         MPP Z0*Z1 X0*X1\n\
+         TICK\n\
+         MPP Z0*Z1 X0*X1\n\
+         OBSERVABLE_INCLUDE(0) Z0 Z1\n\
+         OBSERVABLE_INCLUDE(0) rec[-1]\n\
+         DETECTOR rec[-2] rec[-4]\n\
+         OBSERVABLE_INCLUDE(0) rec[-3]\n",
+        true,
+        "DETECTOR rec[-3] rec[-1]\n",
+        "Pauli observable rows",
+    )?;
+    Ok(())
+}
+
+#[test]
 fn missing_detectors_supports_honeycomb_generated_code_suffix()
 -> Result<(), Box<dyn std::error::Error>> {
     // Adapted from Stim v1.16.0 src/stim/util_top/missing_detectors.test.cc.
