@@ -36,10 +36,13 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
 /// Returns the currently implemented QEC inverse subset.
 ///
 /// This includes the unitary inverse plus selected Stim-compatible
-/// reset-measure-detector and measure-reset pass-through packets. Broader
-/// QEC-specific inverse rewrites for measurements, resets, detectors, noise,
-/// and feedback remain deferred.
+/// reset-measure-detector, selected two-to-one detector-flow, and measure-reset
+/// pass-through packets. Broader QEC-specific inverse rewrites for
+/// measurements, resets, detectors, noise, and feedback remain deferred.
 pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
+    if let Some(inverse) = selected_reset_cx_measure_two_to_one_inverse(circuit)? {
+        return Ok(inverse);
+    }
     if let Some(inverse) = selected_measure_reset_pass_through_inverse(circuit)? {
         return Ok(inverse);
     }
@@ -47,6 +50,129 @@ pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
         return Ok(inverse);
     }
     circuit_inverse_unitary(circuit)
+}
+
+fn selected_reset_cx_measure_two_to_one_inverse(
+    circuit: &Circuit,
+) -> CircuitResult<Option<Circuit>> {
+    let [
+        CircuitItem::Instruction(reset),
+        CircuitItem::Instruction(cx),
+        CircuitItem::Instruction(measurement),
+        CircuitItem::Instruction(detector),
+    ] = circuit.items()
+    else {
+        return Ok(None);
+    };
+
+    if reset.gate().canonical_name() != "R"
+        || cx.gate().canonical_name() != "CX"
+        || measurement.gate().canonical_name() != "M"
+        || detector.gate().canonical_name() != "DETECTOR"
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(build_selected_reset_cx_measure_two_to_one_inverse(
+        reset,
+        cx,
+        measurement,
+        detector,
+    )?))
+}
+
+fn build_selected_reset_cx_measure_two_to_one_inverse(
+    reset: &CircuitInstruction,
+    cx: &CircuitInstruction,
+    measurement: &CircuitInstruction,
+    detector: &CircuitInstruction,
+) -> CircuitResult<Circuit> {
+    if !reset.args().is_empty() || !cx.args().is_empty() || !measurement.args().is_empty() {
+        return Err(inverse_qec_two_to_one_error(
+            "reset, CX, and measurement instructions must be noiseless",
+        ));
+    }
+
+    let reset_targets = plain_unique_single_qubit_targets(reset)
+        .ok_or_else(|| inverse_qec_two_to_one_error("reset targets must be plain unique qubits"))?;
+    let measurement_targets = plain_unique_single_qubit_targets(measurement).ok_or_else(|| {
+        inverse_qec_two_to_one_error("measurement targets must be plain unique qubits")
+    })?;
+    if reset_targets.len() != 2 {
+        return Err(inverse_qec_two_to_one_error(
+            "reset and measurement must each have exactly two targets",
+        ));
+    }
+    if reset_targets != measurement_targets {
+        return Err(inverse_qec_two_to_one_error(
+            "reset and measurement targets must match exactly",
+        ));
+    }
+
+    let cx_target_groups = cx.target_groups();
+    let [cx_targets] = cx_target_groups.as_slice() else {
+        return Err(inverse_qec_two_to_one_error(
+            "CX must have exactly one target pair",
+        ));
+    };
+    if *cx_targets != reset_targets.as_slice() || !cx_targets.iter().all(is_plain_qubit_target) {
+        return Err(inverse_qec_two_to_one_error(
+            "CX target pair must match the reset and measurement target order exactly",
+        ));
+    }
+
+    let detector_offsets = detector
+        .targets()
+        .iter()
+        .map(|target| {
+            target
+                .measurement_record_offset()
+                .map(MeasureRecordOffset::get)
+        })
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| {
+            inverse_qec_two_to_one_error("detector targets must be measurement records")
+        })?;
+    if detector_offsets.as_slice() != [-1, -2] {
+        return Err(inverse_qec_two_to_one_error(
+            "detector must reference exactly rec[-1] rec[-2]",
+        ));
+    }
+
+    let reversed_reset_targets = reset_targets.iter().rev().cloned().collect::<Vec<_>>();
+    let mut result = Circuit::new();
+    append_target_instruction(
+        &mut result,
+        reset.gate(),
+        measurement.args(),
+        reversed_reset_targets.clone(),
+        measurement.tag(),
+    )?;
+    append_target_instruction(
+        &mut result,
+        cx.gate(),
+        cx.args(),
+        cx.targets().to_vec(),
+        cx.tag(),
+    )?;
+    append_target_instruction(
+        &mut result,
+        measurement.gate(),
+        reset.args(),
+        reversed_reset_targets,
+        reset.tag(),
+    )?;
+    append_target_instruction(
+        &mut result,
+        detector.gate(),
+        detector.args(),
+        vec![Target::measurement_record(MeasureRecordOffset::try_new(
+            -2,
+        )?)],
+        detector.tag(),
+    )?;
+
+    Ok(result)
 }
 
 fn selected_measure_reset_pass_through_inverse(
@@ -456,6 +582,12 @@ fn inverse_qec_reset_measure_detector_error(reason: &str) -> CircuitError {
 fn inverse_qec_measure_reset_pass_through_error(reason: &str) -> CircuitError {
     CircuitError::invalid_tableau_conversion(format!(
         "inverse_qec selected measure-reset pass-through subset requires one noiseless plain reset instruction, one matching noiseless plain measurement instruction, one matching noiseless plain measure-reset instruction, and one detector referencing only those measure-reset records; {reason}"
+    ))
+}
+
+fn inverse_qec_two_to_one_error(reason: &str) -> CircuitError {
+    CircuitError::invalid_tableau_conversion(format!(
+        "inverse_qec selected two_to_one subset requires one noiseless plain two-target R instruction, one matching CX pair, one matching noiseless plain two-target M instruction, and one detector containing exactly rec[-1] rec[-2]; {reason}"
     ))
 }
 

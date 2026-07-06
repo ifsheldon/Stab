@@ -45,7 +45,7 @@ fn circuit_inverse_qec_supports_reset_measure_detector_triplet() {
 }
 
 #[test]
-fn circuit_inverse_qec_supports_selected_bases_and_detector_metadata() {
+fn circuit_inverse_qec_supports_reset_measure_detector_selected_bases_and_metadata() {
     for circuit_text in [
         "
         RX 1
@@ -148,7 +148,7 @@ fn circuit_inverse_qec_supports_multi_target_reset_measure_detector_parity() {
 }
 
 #[test]
-fn circuit_inverse_qec_simplifies_detector_record_parity() {
+fn circuit_inverse_qec_simplifies_reset_measure_detector_record_parity() {
     for (input_text, expected_text) in [
         (
             "
@@ -203,6 +203,94 @@ fn circuit_inverse_qec_simplifies_detector_record_parity() {
             "{input_text}"
         );
     }
+}
+
+#[test]
+fn circuit_inverse_qec_supports_selected_two_to_one_detector_flow() {
+    // Adapted from Stim v1.16.0 circuit_inverse_qec two_to_one behavior.
+    for (input_text, expected_text) in [
+        (
+            "
+            R 0 1
+            CX 0 1
+            M 0 1
+            DETECTOR rec[-1] rec[-2]
+            ",
+            "
+            R 1 0
+            CX 0 1
+            M 1 0
+            DETECTOR rec[-2]
+            ",
+        ),
+        (
+            "
+            R[r] 0 1
+            CX[c] 0 1
+            M[m] 0 1
+            DETECTOR[d](7) rec[-1] rec[-2]
+            ",
+            "
+            R[m] 1 0
+            CX[c] 0 1
+            M[r] 1 0
+            DETECTOR[d](7) rec[-2]
+            ",
+        ),
+    ] {
+        let input = circuit(input_text);
+        let expected = circuit(expected_text);
+
+        assert_eq!(
+            circuit_inverse_qec(&input).expect("inverse selected two_to_one flow"),
+            expected,
+            "{input_text}"
+        );
+        assert_eq!(
+            input
+                .inverse_qec()
+                .expect("method inverse selected two_to_one flow"),
+            expected,
+            "{input_text}"
+        );
+    }
+}
+
+#[test]
+fn circuit_inverse_qec_rejects_unpromoted_two_to_one_shapes() {
+    for circuit_text in [
+        "R 0 1\nCX 0 1\nM 0 1\nDETECTOR\n",
+        "R 0 1\nCX 0 1\nM 0 1\nDETECTOR rec[-2]\n",
+        "R 0 1\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-3]\n",
+        "R 0 1\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-1] rec[-2]\n",
+        "R 0 0\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0 1\nCX 0 1\nM 0 0\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0 1\nCX 0 1\nM 1 2\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0 1 2\nCX 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0 1\nCX 0 1\nM 0 1 2\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0 1\nCX 1 0\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0 1\nCX 0 2\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0 1\nCX 0 1 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0 1 2\nCX 0 1\nM 0 1 2\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0 1\nCX 0 1\nM(0.125) 0 1\nDETECTOR rec[-1] rec[-2]\n",
+        "RX 0 1\nCX 0 1\nMX 0 1\nDETECTOR rec[-1] rec[-2]\n",
+    ] {
+        let error = circuit_inverse_qec(&circuit(circuit_text))
+            .expect_err("unpromoted two_to_one shape is rejected")
+            .to_string();
+
+        assert!(
+            error.contains("inverse_qec selected two_to_one subset")
+                || error.contains("operation R is not unitary")
+                || error.contains("operation RX is not unitary")
+                || error.contains("operation DETECTOR is not unitary"),
+            "{circuit_text}: {error}"
+        );
+    }
+    let detector_error = Circuit::from_stim_str("R 0 1\nCX 0 1\nM 0 1\nDETECTOR 0\n")
+        .expect_err("DETECTOR is record-only at the circuit boundary")
+        .to_string();
+    assert!(detector_error.contains("DETECTOR"), "{detector_error}");
 }
 
 #[test]
