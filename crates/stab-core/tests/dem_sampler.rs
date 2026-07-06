@@ -41,6 +41,19 @@ fn assert_detector_hit_probability(
     );
 }
 
+fn assert_observable_hit_probability(
+    output: &[DetectionEventRecord],
+    observable: usize,
+    expected_probability: f64,
+    tolerance: f64,
+) {
+    let observed_probability = observable_hits(output, observable) as f64 / output.len() as f64;
+    assert!(
+        (observed_probability - expected_probability).abs() < tolerance,
+        "observed {observed_probability}, expected {expected_probability}"
+    );
+}
+
 #[test]
 fn dem_sampler_basic_sizing_matches_upstream_semantics() {
     let empty = compile_dem("");
@@ -440,6 +453,76 @@ fn pf4_dem_sampler_deterministic_repeat_folding_preserves_rng_and_error_order() 
 }
 
 #[test]
+fn pf4_dem_sampler_flat_stochastic_repeat_folds_independent_error_parities() {
+    let repeat_count = 64_000_001_u64;
+    let sampler = compile_dem(&format!(
+        "
+        repeat {repeat_count} {{
+            error(0.25) D0 L0
+            error(0.125) D0
+            error(1) L1
+        }}
+        "
+    ));
+    assert_eq!(sampler.error_count(), 192_000_003);
+
+    let shots = 4096;
+    let output = sampler
+        .sample_detection_events_with_seed(shots, Some(29))
+        .expect("fold huge flat stochastic repeat by independent parity probabilities");
+    assert_eq!(output.detector_count, 1);
+    assert_eq!(output.observable_count, 2);
+    assert_detector_hit_probability(&output.records, 0, 0.5, 0.05);
+    assert_observable_hit_probability(&output.records, 0, 0.5, 0.05);
+    assert!(
+        output
+            .records
+            .iter()
+            .all(|record| record.observables.get(1) == Some(&true)),
+        "odd deterministic repeated observable should always toggle"
+    );
+    let detector_observable_mismatches = output
+        .records
+        .iter()
+        .filter(|record| record.detectors.first() != record.observables.first())
+        .count();
+    let observed_second_error_probability = detector_observable_mismatches as f64 / shots as f64;
+    assert!(
+        (observed_second_error_probability - 0.5).abs() < 0.05,
+        "observed {observed_second_error_probability}, expected 0.5"
+    );
+
+    let distinct_probability_sampler = compile_dem(
+        "
+        repeat 1000000000000000000 {
+            error(1e-18) D0
+            error(0.25) D1
+        }
+        ",
+    );
+    let distinct_probability_output = distinct_probability_sampler
+        .sample_detection_events_with_seed(shots, Some(31))
+        .expect("fold flat stochastic repeat with distinct parity probabilities");
+    assert_detector_hit_probability(
+        &distinct_probability_output.records,
+        0,
+        -0.5 * (-2.0_f64).exp_m1(),
+        0.05,
+    );
+    assert_detector_hit_probability(&distinct_probability_output.records, 1, 0.5, 0.05);
+
+    let error = sampler
+        .sample_detection_events_and_errors_with_seed(1, Some(29))
+        .expect_err("preserve flat sampled-error materialization cap for flat stochastic repeats");
+    assert!(
+        error
+            .to_string()
+            .contains("would require 192000006 buffered units"),
+        "{error}"
+    );
+}
+
+#[test]
 fn pf4_dem_sampler_single_stochastic_repeat_folds_by_parity_distribution() {
     let repeat_count = 64_000_001_u64;
     let probability = 0.25_f64;
@@ -627,18 +710,19 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
             .all(|record| { record.detectors == [false] && record.observables == [false] })
     );
 
-    let mixed_zero_and_stochastic_record = DetectorErrorModel::from_dem_str(
+    let nested_stochastic_record = DetectorErrorModel::from_dem_str(
         "
-        repeat 32000001 {
-            error(0.5) D0
-            error(0) D0
+        repeat 64000001 {
+            repeat 1 {
+                error(0.5) D0
+            }
         }
         ",
     )
-    .expect("parse mixed stochastic and zero-probability DEM");
-    let mixed_zero_and_stochastic_sampler =
-        CompiledDemSampler::compile(&mixed_zero_and_stochastic_record).expect("compile mixed DEM");
-    assert_eq!(mixed_zero_and_stochastic_sampler.error_count(), 64_000_002);
+    .expect("parse nested stochastic DEM");
+    let nested_stochastic_sampler =
+        CompiledDemSampler::compile(&nested_stochastic_record).expect("compile nested DEM");
+    assert_eq!(nested_stochastic_sampler.error_count(), 64_000_001);
     let error = huge_sampler
         .sample_detection_events_and_errors_with_seed(1, Some(5))
         .expect_err("reject materialized sampled-error record");
@@ -666,13 +750,13 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
         "{error}"
     );
 
-    let error = mixed_zero_and_stochastic_sampler
+    let error = nested_stochastic_sampler
         .sample_detection_events_with_seed(1, Some(5))
-        .expect_err("reject mixed zero-probability traversal work");
+        .expect_err("reject nested stochastic traversal work");
     assert!(
         error
             .to_string()
-            .contains("would apply 64000002 sampled errors"),
+            .contains("would apply 64000001 sampled errors"),
         "{error}"
     );
 

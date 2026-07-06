@@ -383,6 +383,7 @@ struct DemSampleRepeat {
     start_detector_shift: u64,
     repeat_count: u64,
     body: DemSampleBlock,
+    folded_flat_errors: Option<Vec<DemSampleError>>,
 }
 
 impl DemSampleError {
@@ -461,12 +462,14 @@ fn compile_items(items: &[DemItem], depth: usize) -> CircuitResult<DemSampleBloc
                             "DEM sampler direct sample work count overflowed",
                         )
                     })?;
+                let folded_flat_errors = folded_flat_zero_shift_repeat_errors(&body, repeat_count);
                 block
                     .operations
                     .push(DemSampleOperation::Repeat(DemSampleRepeat {
                         start_detector_shift: repeat_start_shift,
                         repeat_count,
                         body,
+                        folded_flat_errors,
                     }));
             }
         }
@@ -597,16 +600,11 @@ where
                         )?;
                         continue;
                     }
-                    if let Some(error) = single_stochastic_zero_shift_error(&repeat.body) {
-                        let probability =
-                            odd_parity_probability(error.probability, repeat.repeat_count);
-                        let occurred = sample_probability(probability, rng);
-                        if occurred {
-                            let iteration_shift = detector_shift
-                                .checked_add(repeat.start_detector_shift)
-                                .ok_or_else(detector_shift_overflow_error)?;
-                            apply_error_to_record(error, iteration_shift, record)?;
-                        }
+                    if let Some(folded_errors) = repeat.folded_flat_errors.as_deref() {
+                        let iteration_shift = detector_shift
+                            .checked_add(repeat.start_detector_shift)
+                            .ok_or_else(detector_shift_overflow_error)?;
+                        sample_folded_repeat_errors(folded_errors, iteration_shift, rng, record)?;
                         continue;
                     }
                 }
@@ -727,8 +725,8 @@ fn folded_direct_sample_repeat_work_count(
         }
         return Ok(body.direct_sample_work_count);
     }
-    if single_stochastic_zero_shift_error(body).is_some() {
-        return Ok(1);
+    if flat_zero_shift_error_block(body) {
+        return Ok(body.direct_sample_work_count);
     }
     checked_repeated_count(
         0,
@@ -738,14 +736,49 @@ fn folded_direct_sample_repeat_work_count(
     )
 }
 
-fn single_stochastic_zero_shift_error(block: &DemSampleBlock) -> Option<&DemSampleError> {
-    if block.detector_shift != 0 || block.operations.len() != 1 {
+fn flat_zero_shift_error_block(block: &DemSampleBlock) -> bool {
+    block.detector_shift == 0
+        && !block.operations.is_empty()
+        && block
+            .operations
+            .iter()
+            .all(|operation| matches!(operation, DemSampleOperation::Error(_)))
+}
+
+fn folded_flat_zero_shift_repeat_errors(
+    block: &DemSampleBlock,
+    repeat_count: u64,
+) -> Option<Vec<DemSampleError>> {
+    if !block.direct_sample_has_stochastic_error || !flat_zero_shift_error_block(block) {
         return None;
     }
-    let Some(DemSampleOperation::Error(error)) = block.operations.first() else {
-        return None;
-    };
-    (error.probability > 0.0 && error.probability < 1.0).then_some(error)
+    let mut folded_errors = Vec::with_capacity(block.operations.len());
+    for operation in &block.operations {
+        let DemSampleOperation::Error(error) = operation else {
+            return None;
+        };
+        let mut folded_error = error.clone();
+        folded_error.probability = odd_parity_probability(error.probability, repeat_count);
+        folded_errors.push(folded_error);
+    }
+    Some(folded_errors)
+}
+
+fn sample_folded_repeat_errors<R>(
+    errors: &[DemSampleError],
+    detector_shift: u64,
+    rng: &mut R,
+    record: &mut DetectionEventRecord,
+) -> CircuitResult<()>
+where
+    R: Rng,
+{
+    for error in errors {
+        if sample_probability(error.probability, rng) {
+            apply_error_to_record(error, detector_shift, record)?;
+        }
+    }
+    Ok(())
 }
 
 fn odd_parity_probability(probability: f64, repeat_count: u64) -> f64 {

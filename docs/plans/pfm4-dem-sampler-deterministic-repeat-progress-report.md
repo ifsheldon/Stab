@@ -2,7 +2,7 @@
 
 ## Scope
 
-This PFM4 slice owns one folded DEM sampler subcase: detector-only direct sampling of repeated DEM bodies whose nonzero-probability effects are deterministic and whose body has zero net detector shift.
+This PFM4 slice owns one folded DEM sampler subcase: direct detection-event sampling of repeated DEM bodies whose nonzero-probability effects are deterministic and whose body has zero net detector shift.
 
 The selected behavior is parity folding for direct detector and observable output:
 
@@ -15,21 +15,21 @@ The selected behavior is parity folding for direct detector and observable outpu
 
 This deterministic-repeat slice did not change sampled-error output, sampled-error replay, stochastic repeated bodies, shifted repeated bodies, graphlike search, hypergraph search, SAT/WCNF generation, analyzer traversal, ErrorMatcher traversal, Python APIs, diagrams, or any deferred simulator-product surface.
 
-The later `docs/plans/pfm4-dem-sampler-single-stochastic-repeat-progress-report.md` promotes one selected detector-only single-stochastic zero-shift repeat shape; broader stochastic repeated bodies still use the existing sampled-error application work cap.
+Later `docs/plans/pfm4-dem-sampler-single-stochastic-repeat-progress-report.md` and `docs/plans/pfm4-dem-sampler-flat-stochastic-repeat-progress-report.md` promote selected direct detection-event stochastic zero-shift repeat shapes; nested, shifted, and otherwise non-selected stochastic repeated bodies still use the existing sampled-error application work cap.
 Sampled-error output and replay still use the existing flat sampled-error width caps because Stim-compatible sampled-error records expose one bit per repeated error occurrence.
 
 ## Comparator And Evidence Plan
 
-Comparator class: structural Rust parity with Stim semantics for deterministic DEM errors, plus resource-boundary evidence that the previous sampled-error application cap no longer applies to the selected detector-only direct sampling subcase.
+Comparator class: structural Rust parity with Stim semantics for deterministic DEM errors, plus resource-boundary evidence that the previous sampled-error application cap no longer applies to the selected direct detection-event sampling subcase.
 
 ## Implemented Surface
 
 `CompiledDemSampler` now tracks whether a compiled folded block contains stochastic direct-sampling errors.
-When detector-only direct sampling reaches a repeat body with zero net detector shift and no stochastic errors, it applies parity folding:
+When direct detection-event sampling reaches a repeat body with zero net detector shift and no stochastic errors, it applies parity folding:
 
 - It skips even repeat counts.
 - It samples the body once for odd repeat counts.
-- At the time of this deterministic slice, it kept the normal folded traversal for stochastic bodies, shifted bodies, sampled-error output, and sampled-error replay; the later single-stochastic report promotes one selected detector-only stochastic shape.
+- At the time of this deterministic slice, it kept the normal folded traversal for stochastic bodies, shifted bodies, sampled-error output, and sampled-error replay; later reports promote selected direct detection-event stochastic zero-shift shapes.
 
 The direct-sampling work validator uses the same folded parity work count, so huge deterministic zero-shift repeats no longer fail the stochastic sampled-error application work cap.
 
