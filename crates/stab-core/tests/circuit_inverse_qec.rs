@@ -69,6 +69,143 @@ fn circuit_inverse_qec_supports_selected_bases_and_detector_metadata() {
 }
 
 #[test]
+fn circuit_inverse_qec_supports_multi_target_reset_measure_detector_parity() {
+    // Adapted from Stim v1.16.0 circuit_inverse_qec reset/measure/detector behavior.
+    for (input_text, expected_text) in [
+        (
+            "
+            R 0 1
+            M 0 1
+            DETECTOR rec[-2] rec[-1]
+            ",
+            "
+            R 1 0
+            M 1 0
+            DETECTOR rec[-2] rec[-1]
+            ",
+        ),
+        (
+            "
+            RX 0 1
+            MX 0 1
+            DETECTOR rec[-2] rec[-1]
+            ",
+            "
+            RX 1 0
+            MX 1 0
+            DETECTOR rec[-2] rec[-1]
+            ",
+        ),
+        (
+            "
+            R 0 1
+            M 0 1
+            DETECTOR rec[-2]
+            ",
+            "
+            M 1
+            R 0
+            M 1 0
+            DETECTOR rec[-1]
+            ",
+        ),
+        (
+            "
+            R 0 1
+            M 0 1
+            DETECTOR rec[-1]
+            ",
+            "
+            R 1
+            M 0 1 0
+            DETECTOR rec[-2]
+            ",
+        ),
+        (
+            "
+            R 0 1 2
+            M 0 1 2
+            DETECTOR rec[-3] rec[-1]
+            ",
+            "
+            R 2
+            M 1
+            R 0
+            M 2 1 0
+            DETECTOR rec[-3] rec[-1]
+            ",
+        ),
+    ] {
+        let input = circuit(input_text);
+        let expected = circuit(expected_text);
+
+        assert_eq!(
+            circuit_inverse_qec(&input).expect("inverse multi-target R/M/D"),
+            expected,
+            "{input_text}"
+        );
+    }
+}
+
+#[test]
+fn circuit_inverse_qec_simplifies_detector_record_parity() {
+    for (input_text, expected_text) in [
+        (
+            "
+            R 0
+            M 0
+            DETECTOR[tag](2, 3) rec[-1] rec[-1]
+            ",
+            "
+            R 0
+            M 0
+            ",
+        ),
+        (
+            "
+            R 0
+            M 0
+            DETECTOR[tag](2, 3) rec[-1] rec[-1] rec[-1]
+            ",
+            "
+            R 0
+            M 0
+            DETECTOR[tag](2, 3) rec[-1]
+            ",
+        ),
+        (
+            "
+            R 0
+            M 0
+            DETECTOR
+            ",
+            "
+            M 0 0
+            ",
+        ),
+        (
+            "
+            R 0 1
+            M 0 1
+            DETECTOR
+            ",
+            "
+            M 1 0 1 0
+            ",
+        ),
+    ] {
+        let input = circuit(input_text);
+        let expected = circuit(expected_text);
+
+        assert_eq!(
+            circuit_inverse_qec(&input).expect("inverse detector parity"),
+            expected,
+            "{input_text}"
+        );
+    }
+}
+
+#[test]
 fn circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed() {
     for circuit_text in [
         "
@@ -103,29 +240,9 @@ fn circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed() {
         DETECTOR rec[-1]
         ",
         "
-        R 0 1
-        M 0 1
-        DETECTOR rec[-2] rec[-1]
-        ",
-        "
-        RX 0 1
-        MX 0 1
-        DETECTOR rec[-2] rec[-1]
-        ",
-        "
         R 0 0
         M 0 0
         DETECTOR rec[-1]
-        ",
-        "
-        R 0
-        M 0
-        DETECTOR
-        ",
-        "
-        R 0
-        M 0
-        DETECTOR rec[-1] rec[-1]
         ",
     ] {
         let error = circuit_inverse_qec(&circuit(circuit_text))

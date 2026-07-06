@@ -2,8 +2,8 @@ use std::collections::HashSet;
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, Gate,
-    GateCategory, PauliBasis, PauliSign, PauliString, RepeatBlock, SingleQubitClifford, Tableau,
-    Target, circuit_flow::check_unsigned_flow_with_sparse_tracker,
+    GateCategory, MeasureRecordOffset, PauliBasis, PauliSign, PauliString, RepeatBlock,
+    SingleQubitClifford, Tableau, Target, circuit_flow::check_unsigned_flow_with_sparse_tracker,
 };
 
 const MAX_TIME_REVERSE_TABLEAU_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
@@ -35,10 +35,9 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
 
 /// Returns the currently implemented QEC inverse subset.
 ///
-/// This includes the unitary inverse plus a selected Stim-compatible
-/// single-target reset-measure-detector triplet. Broader QEC-specific inverse
-/// rewrites for measurements, resets, detectors, noise, and feedback remain
-/// deferred.
+/// This includes the unitary inverse plus selected Stim-compatible
+/// reset-measure-detector triplets. Broader QEC-specific inverse rewrites for
+/// measurements, resets, detectors, noise, and feedback remain deferred.
 pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
     if let Some(inverse) = selected_reset_measure_detector_inverse(circuit)? {
         return Ok(inverse);
@@ -67,15 +66,18 @@ fn selected_reset_measure_detector_inverse(circuit: &Circuit) -> CircuitResult<O
         return Ok(None);
     }
 
-    validate_selected_reset_measure_detector(reset, measurement, detector)?;
-    Ok(Some(circuit.clone()))
+    Ok(Some(build_selected_reset_measure_detector_inverse(
+        reset,
+        measurement,
+        detector,
+    )?))
 }
 
-fn validate_selected_reset_measure_detector(
+fn build_selected_reset_measure_detector_inverse(
     reset: &CircuitInstruction,
     measurement: &CircuitInstruction,
     detector: &CircuitInstruction,
-) -> CircuitResult<()> {
+) -> CircuitResult<Circuit> {
     if !reset.args().is_empty() || !measurement.args().is_empty() {
         return Err(inverse_qec_reset_measure_detector_error(
             "reset and measurement instructions must be noiseless",
@@ -93,35 +95,160 @@ fn validate_selected_reset_measure_detector(
             "reset and measurement targets must match exactly",
         ));
     }
-    if reset_targets.len() != 1 {
-        return Err(inverse_qec_reset_measure_detector_error(
-            "selected subset currently supports exactly one reset and measurement target",
-        ));
+
+    let mut detector_record_touched = vec![false; measurement_targets.len()];
+    let mut detector_record_deps = vec![false; measurement_targets.len()];
+    let measurement_count = i64::try_from(measurement_targets.len()).map_err(|_| {
+        inverse_qec_reset_measure_detector_error("measurement target count exceeds supported range")
+    })?;
+    for target in detector.targets() {
+        let Some(offset) = target.measurement_record_offset() else {
+            return Err(inverse_qec_reset_measure_detector_error(
+                "detector targets must be measurement records",
+            ));
+        };
+        let index = measurement_count + i64::from(offset.get());
+        if !(0..measurement_count).contains(&index) {
+            return Err(inverse_qec_reset_measure_detector_error(
+                "detector record target is outside the selected measurement group",
+            ));
+        }
+        let detector_record_index = usize::try_from(index).map_err(|_| {
+            inverse_qec_reset_measure_detector_error(
+                "detector record target index exceeds supported range",
+            )
+        })?;
+        let Some(record_touched) = detector_record_touched.get_mut(detector_record_index) else {
+            return Err(inverse_qec_reset_measure_detector_error(
+                "detector record target index is outside the selected measurement group",
+            ));
+        };
+        *record_touched = true;
+        let Some(record_dep) = detector_record_deps.get_mut(detector_record_index) else {
+            return Err(inverse_qec_reset_measure_detector_error(
+                "detector record target index is outside the selected measurement group",
+            ));
+        };
+        *record_dep = !*record_dep;
     }
 
-    let [detector_target] = detector.targets() else {
-        return Err(inverse_qec_reset_measure_detector_error(
-            "selected subset currently supports exactly one detector target",
-        ));
-    };
-    let Some(offset) = detector_target.measurement_record_offset() else {
-        return Err(inverse_qec_reset_measure_detector_error(
-            "detector target must be a measurement record",
-        ));
-    };
-    if offset.get() != -1 {
-        return Err(inverse_qec_reset_measure_detector_error(
-            "detector target must be rec[-1]",
-        ));
+    let mut result = Circuit::new();
+    let mut qubit_active = vec![false; measurement_targets.len()];
+    let mut detector_measurements = Vec::new();
+    let mut new_measurements = 0usize;
+
+    for (((target, &record_touched), &record_dep), active) in measurement_targets
+        .iter()
+        .zip(detector_record_touched.iter())
+        .zip(detector_record_deps.iter())
+        .zip(qubit_active.iter_mut())
+        .rev()
+    {
+        if record_touched && !*active {
+            append_one_target_instruction(
+                &mut result,
+                reset.gate(),
+                measurement.args(),
+                target.clone(),
+                measurement.tag(),
+            )?;
+        } else {
+            if record_dep {
+                detector_measurements.push(new_measurements);
+            }
+            append_one_target_instruction(
+                &mut result,
+                measurement.gate(),
+                measurement.args(),
+                target.clone(),
+                measurement.tag(),
+            )?;
+            new_measurements += 1;
+        }
+        if record_dep {
+            *active = !*active;
+        }
     }
 
+    for active in qubit_active.iter_mut().rev() {
+        if *active {
+            detector_measurements.push(new_measurements);
+        }
+        *active = false;
+        new_measurements += 1;
+    }
+    append_target_instruction(
+        &mut result,
+        measurement.gate(),
+        reset.args(),
+        reset_targets.iter().rev().cloned().collect(),
+        reset.tag(),
+    )?;
+
+    detector_measurements.sort_unstable();
+    detector_measurements.dedup();
+    if !detector_measurements.is_empty() {
+        let total_measurements = i32::try_from(new_measurements).map_err(|_| {
+            inverse_qec_reset_measure_detector_error(
+                "new measurement count exceeds supported range",
+            )
+        })?;
+        let mut detector_targets = Vec::with_capacity(detector_measurements.len());
+        for measurement_index in detector_measurements {
+            let measurement_index = i32::try_from(measurement_index).map_err(|_| {
+                inverse_qec_reset_measure_detector_error(
+                    "new detector measurement index exceeds supported range",
+                )
+            })?;
+            detector_targets.push(Target::measurement_record(MeasureRecordOffset::try_new(
+                measurement_index - total_measurements,
+            )?));
+        }
+        append_target_instruction(
+            &mut result,
+            detector.gate(),
+            detector.args(),
+            detector_targets,
+            detector.tag(),
+        )?;
+    }
+
+    Ok(result)
+}
+
+fn append_one_target_instruction(
+    circuit: &mut Circuit,
+    gate: Gate,
+    args: &[f64],
+    target: Target,
+    tag: Option<&str>,
+) -> CircuitResult<()> {
+    append_target_instruction(circuit, gate, args, vec![target], tag)
+}
+
+fn append_target_instruction(
+    circuit: &mut Circuit,
+    gate: Gate,
+    args: &[f64],
+    targets: Vec<Target>,
+    tag: Option<&str>,
+) -> CircuitResult<()> {
+    if targets.is_empty() {
+        return Ok(());
+    }
+    circuit.append_instruction(CircuitInstruction::new(
+        gate,
+        args.to_vec(),
+        targets,
+        tag.map(str::to_owned),
+    )?);
     Ok(())
 }
 
-fn plain_unique_single_qubit_targets(instruction: &CircuitInstruction) -> Option<Vec<u32>> {
+fn plain_unique_single_qubit_targets(instruction: &CircuitInstruction) -> Option<Vec<Target>> {
     let groups = instruction.target_groups();
-    if groups.is_empty() {
-        return None;
+    if groups.is_empty() && instruction.targets().is_empty() {
+        return Some(Vec::new());
     }
     let mut seen = HashSet::with_capacity(groups.len());
     let mut targets = Vec::with_capacity(groups.len());
@@ -136,14 +263,14 @@ fn plain_unique_single_qubit_targets(instruction: &CircuitInstruction) -> Option
         if !seen.insert(qubit) {
             return None;
         }
-        targets.push(qubit);
+        targets.push(target.clone());
     }
     Some(targets)
 }
 
 fn inverse_qec_reset_measure_detector_error(reason: &str) -> CircuitError {
     CircuitError::invalid_tableau_conversion(format!(
-        "inverse_qec selected reset-measure-detector subset requires one noiseless plain single-target reset instruction, one matching noiseless plain single-target measurement instruction, and one detector target rec[-1]; {reason}"
+        "inverse_qec selected reset-measure-detector subset requires one noiseless plain reset instruction, one matching noiseless plain measurement instruction, and one detector referencing only those measurement records; {reason}"
     ))
 }
 
