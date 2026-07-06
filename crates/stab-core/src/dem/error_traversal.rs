@@ -5,21 +5,59 @@ use super::{
 use crate::{CircuitError, CircuitResult};
 
 impl DetectorErrorModel {
-    pub(crate) fn validate_effective_error_traversal_budget(
+    pub(crate) fn validate_search_graph_error_traversal_budget(
         &self,
         context: &'static str,
     ) -> CircuitResult<()> {
         let mut budget = DemFlatteningBudget::default();
-        self.validate_effective_error_traversal_budget_items(1, 0, context, &mut budget)
+        self.validate_search_graph_error_traversal_budget_items(1, 0, context, &mut budget)
     }
 
-    pub(crate) fn nonzero_error_target_counts(
+    pub(crate) fn search_graph_nonzero_error_target_counts(
         &self,
         context: &'static str,
     ) -> CircuitResult<(u64, u64)> {
         let mut counts = DemErrorTargetCounts::default();
-        self.collect_nonzero_error_target_counts_from(0, 0, context, &mut counts)?;
+        self.collect_search_graph_nonzero_error_target_counts_from(0, 0, context, &mut counts)?;
         Ok((counts.detector_count, counts.observable_count))
+    }
+
+    pub(crate) fn selected_search_graph_flat_repeat_error_count(
+        &self,
+    ) -> CircuitResult<Option<u64>> {
+        if self.items.is_empty() {
+            return Ok(None);
+        }
+        let mut count = 0_u64;
+        for item in &self.items {
+            let DemItem::Instruction(instruction) = item else {
+                return Ok(None);
+            };
+            if instruction.kind() != DemInstructionKind::Error {
+                return Ok(None);
+            }
+            let probability = instruction.args().first().copied().unwrap_or(0.0);
+            if probability == 0.0 {
+                return Ok(None);
+            }
+            let mut has_detector_target = false;
+            for target in instruction.targets() {
+                match target {
+                    DemTarget::RelativeDetector(_) => has_detector_target = true,
+                    DemTarget::Numeric(_) => return Ok(None),
+                    DemTarget::LogicalObservable(_) | DemTarget::Separator => {}
+                }
+            }
+            if !has_detector_target {
+                return Ok(None);
+            }
+            count = count.checked_add(1).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "DEM search flat-repeat error count overflowed",
+                )
+            })?;
+        }
+        Ok(Some(count))
     }
 
     pub(crate) fn has_nonzero_probability_error(
@@ -29,7 +67,7 @@ impl DetectorErrorModel {
         self.has_nonzero_probability_error_inner(0, context)
     }
 
-    fn validate_effective_error_traversal_budget_items(
+    fn validate_search_graph_error_traversal_budget_items(
         &self,
         multiplier: u64,
         depth: usize,
@@ -47,6 +85,19 @@ impl DetectorErrorModel {
                     budget.add_expanded_instructions(multiplier, context)?;
                 }
                 DemItem::RepeatBlock(repeat) => {
+                    if let Some(error_count) = repeat
+                        .body()
+                        .selected_search_graph_flat_repeat_error_count()?
+                    {
+                        let folded_count =
+                            multiplier.checked_mul(error_count).ok_or_else(|| {
+                                CircuitError::invalid_detector_error_model(format!(
+                                    "DEM {context} folded repeat error count overflowed"
+                                ))
+                            })?;
+                        budget.add_expanded_instructions(folded_count, context)?;
+                        continue;
+                    }
                     if !repeat
                         .body()
                         .has_nonzero_probability_error_inner(depth + 1, context)?
@@ -68,7 +119,7 @@ impl DetectorErrorModel {
                     budget.add_repeat_iterations(repeated_multiplier, context)?;
                     repeat
                         .body()
-                        .validate_effective_error_traversal_budget_items(
+                        .validate_search_graph_error_traversal_budget_items(
                             repeated_multiplier,
                             depth + 1,
                             context,
@@ -112,7 +163,7 @@ impl DetectorErrorModel {
         Ok(false)
     }
 
-    fn collect_nonzero_error_target_counts_from(
+    fn collect_search_graph_nonzero_error_target_counts_from(
         &self,
         mut detector_offset: u64,
         depth: usize,
@@ -144,6 +195,21 @@ impl DetectorErrorModel {
                     DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
                 },
                 DemItem::RepeatBlock(repeat) => {
+                    if repeat
+                        .body()
+                        .selected_search_graph_flat_repeat_error_count()?
+                        .is_some()
+                    {
+                        detector_offset = repeat
+                            .body()
+                            .collect_search_graph_nonzero_error_target_counts_from(
+                                detector_offset,
+                                depth + 1,
+                                context,
+                                counts,
+                            )?;
+                        continue;
+                    }
                     let body_shift = repeat.body().total_detector_shift()?;
                     let repeat_count = repeat.repeat_count().get();
                     if !repeat
@@ -166,12 +232,14 @@ impl DetectorErrorModel {
                         )));
                     }
                     for _ in 0..repeat_count {
-                        detector_offset = repeat.body().collect_nonzero_error_target_counts_from(
-                            detector_offset,
-                            depth + 1,
-                            context,
-                            counts,
-                        )?;
+                        detector_offset = repeat
+                            .body()
+                            .collect_search_graph_nonzero_error_target_counts_from(
+                                detector_offset,
+                                depth + 1,
+                                context,
+                                counts,
+                            )?;
                     }
                 }
             }

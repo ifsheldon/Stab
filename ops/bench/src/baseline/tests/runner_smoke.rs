@@ -24,6 +24,7 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             &[
                 "stab_pf4_dem_hyper_capped_repeat",
                 "stab_pf4_dem_hyper_zero_probability_repeat_skip",
+                "stab_pf4_dem_hyper_flat_repeat_fold",
                 "stab_pf4_dem_sat_capped_repeat",
                 "stab_pf4_dem_weighted_sat_zero_probability_repeat_skip",
                 "stab_pf4_dem_analyzer_capped_repeat",
@@ -35,6 +36,7 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             &[
                 "stab_pf4_dem_graphlike_capped_repeat",
                 "stab_pf4_dem_graphlike_zero_probability_repeat_skip",
+                "stab_pf4_dem_graphlike_flat_repeat_fold",
             ][..],
         ),
         (

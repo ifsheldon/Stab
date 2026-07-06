@@ -288,11 +288,11 @@ impl Graph {
         model: &DetectorErrorModel,
         ignore_ungraphlike_errors: bool,
     ) -> CircuitResult<Self> {
-        model.validate_effective_error_traversal_budget("graphlike search")?;
+        model.validate_search_graph_error_traversal_budget("graphlike search")?;
         let full_detector_count = model.count_detectors()?;
         let full_observable_count = model.count_observables()?;
         let (effective_detector_count, effective_observable_count) =
-            model.nonzero_error_target_counts("graphlike search")?;
+            model.search_graph_nonzero_error_target_counts("graphlike search")?;
         let (detector_count, observable_count) =
             if full_detector_count <= MAX_FULL_DEM_SEARCH_GRAPH_NODES {
                 (full_detector_count, full_observable_count)
@@ -345,6 +345,18 @@ impl Graph {
                     DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
                 },
                 DemItem::RepeatBlock(repeat) => {
+                    if repeat
+                        .body()
+                        .selected_search_graph_flat_repeat_error_count()?
+                        .is_some()
+                    {
+                        self.add_flattened_dem(
+                            repeat.body(),
+                            detector_offset,
+                            ignore_ungraphlike_errors,
+                        )?;
+                        continue;
+                    }
                     if !repeat
                         .body()
                         .has_nonzero_probability_error("graphlike search")?
