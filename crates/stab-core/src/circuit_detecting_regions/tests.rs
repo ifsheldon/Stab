@@ -506,19 +506,30 @@ fn detecting_regions_target_shape_supports_measurement_pads() {
 }
 
 #[test]
-fn detecting_regions_target_shape_rejects_unpromoted_heralded_record_annotations() {
-    for (text, gate) in [
-        (
-            "TICK\nHERALDED_ERASE(0.125) 0\nDETECTOR rec[-1]\n",
-            "HERALDED_ERASE",
-        ),
-        (
-            "TICK\nHERALDED_PAULI_CHANNEL_1(0.125, 0, 0, 0) 0\nDETECTOR rec[-1]\n",
-            "HERALDED_PAULI_CHANNEL_1",
-        ),
+fn detecting_regions_target_shape_supports_heralded_record_noise() {
+    for text in [
+        "R 0\nTICK\nHERALDED_ERASE(0.125) 0\nM 0\nDETECTOR rec[-2] rec[-1]\n",
+        "R 0\nTICK\nHERALDED_PAULI_CHANNEL_1(0.125, 0, 0, 0) 0\nM 0\nDETECTOR rec[-2] rec[-1]\n",
+    ] {
+        let actual = regions(text, vec![detector(0)], vec![0]);
+        assert_eq!(actual[&detector(0)][&0].to_string(), "+Z", "{text}");
+    }
+
+    for text in [
+        "R 0 1\nTICK\nHERALDED_ERASE(0.125) 0 1\nM 0 1\nDETECTOR rec[-4] rec[-1]\nDETECTOR rec[-3] rec[-2]\n",
+        "R 0 1\nTICK\nHERALDED_PAULI_CHANNEL_1(0.125, 0, 0, 0) 0 1\nM 0 1\nDETECTOR rec[-4] rec[-1]\nDETECTOR rec[-3] rec[-2]\n",
+    ] {
+        let actual = regions(text, vec![detector(0), detector(1)], vec![0]);
+        assert_eq!(actual[&detector(0)][&0].to_string(), "+_Z", "{text}");
+        assert_eq!(actual[&detector(1)][&0].to_string(), "+Z_", "{text}");
+    }
+
+    for text in [
+        "TICK\nHERALDED_ERASE(0.125) 0\nDETECTOR rec[-1]\n",
+        "TICK\nHERALDED_PAULI_CHANNEL_1(0.125, 0, 0, 0) 0\nDETECTOR rec[-1]\n",
     ] {
         let circuit = Circuit::from_stim_str(text).unwrap();
-        let error = circuit_detecting_regions_for_targets(
+        let actual = circuit_detecting_regions_for_targets(
             &circuit,
             DetectingRegionTargetOptions {
                 targets: vec![DemTarget::relative_detector(0).unwrap()],
@@ -526,13 +537,42 @@ fn detecting_regions_target_shape_rejects_unpromoted_heralded_record_annotations
                 ignore_anticommutation_errors: false,
             },
         )
-        .unwrap_err();
+        .unwrap();
 
-        assert!(
-            error
-                .to_string()
-                .contains(&format!("does not support gate {gate}"))
-        );
+        assert!(actual[&DemTarget::relative_detector(0).unwrap()].is_empty());
+    }
+}
+
+#[test]
+fn detecting_regions_target_shape_keeps_heralded_noise_plain_qubit_scoped() {
+    for text in [
+        "TICK\nHERALDED_ERASE(0.125) !0\nDETECTOR rec[-1]\n",
+        "TICK\nHERALDED_PAULI_CHANNEL_1(0.125, 0, 0, 0) !0\nDETECTOR rec[-1]\n",
+    ] {
+        match Circuit::from_stim_str(text) {
+            Ok(circuit) => {
+                let error = circuit_detecting_regions_for_targets(
+                    &circuit,
+                    DetectingRegionTargetOptions {
+                        targets: vec![DemTarget::relative_detector(0).unwrap()],
+                        ticks: vec![0],
+                        ignore_anticommutation_errors: false,
+                    },
+                )
+                .unwrap_err();
+
+                assert!(
+                    error.to_string().contains("plain qubit targets"),
+                    "{text}: {error}"
+                );
+            }
+            Err(error) => {
+                assert!(
+                    error.to_string().contains("invalid target"),
+                    "{text}: {error}"
+                );
+            }
+        }
     }
 }
 

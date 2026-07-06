@@ -310,6 +310,9 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
         "MXX" | "MYY" | "MZZ" => validate_measurement_qubit_pair_targets(instruction),
         "MPP" | "SPP" | "SPP_DAG" => validate_pauli_product_targets(instruction),
         "MPAD" => validate_measurement_pad_targets(instruction),
+        "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
+            validate_single_plain_qubit_targets(instruction)
+        }
         "TICK" => validate_target_count(instruction, 0),
         "DETECTOR" => validate_detector_targets(instruction),
         "OBSERVABLE_INCLUDE" => validate_observable_include_targets(instruction),
