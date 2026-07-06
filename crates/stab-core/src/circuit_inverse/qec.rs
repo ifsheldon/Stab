@@ -7,6 +7,8 @@ use crate::{
 
 use super::{is_plain_qubit_target, reset_inverse_gate_and_basis};
 
+mod m_det;
+
 pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
     if let Some(inverse) = selected_reset_cx_measure_two_to_one_inverse(circuit)? {
         return Ok(Some(inverse));
@@ -21,6 +23,9 @@ pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Ci
         return Ok(Some(inverse));
     }
     if let Some(inverse) = selected_noisy_measure_reset_detector_inverse(circuit)? {
+        return Ok(Some(inverse));
+    }
+    if let Some(inverse) = m_det::selected_m_det_inverse(circuit)? {
         return Ok(Some(inverse));
     }
     if let Some(inverse) = selected_measure_reset_pass_through_inverse(circuit)? {
