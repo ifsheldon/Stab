@@ -25,9 +25,9 @@ use crate::{CircuitError, CircuitResult, Probability, RepeatCount};
 const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
 const MAX_DEM_PARSE_LINES: usize = 1_000_000;
 pub(crate) const MAX_DEM_REPEAT_NESTING: usize = 256;
-const MAX_DEM_FLATTEN_REPEAT_UNROLL: u64 = 100_000;
-const MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
-const MAX_DEM_FLATTEN_REPEAT_ITERATIONS: u64 = 1_000_000;
+pub(crate) const MAX_DEM_FLATTEN_REPEAT_UNROLL: u64 = 100_000;
+pub(crate) const MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
+pub(crate) const MAX_DEM_FLATTEN_REPEAT_ITERATIONS: u64 = 1_000_000;
 const DEM_FLOAT_PRECISION: i32 = 34;
 
 #[derive(Clone, Debug, Default, PartialEq)]

@@ -1,15 +1,17 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 mod budget;
+mod filter;
 
 use crate::{
     Circuit, CircuitError, CircuitErrorLocation, CircuitErrorLocationStackFrame,
-    CircuitInstruction, CircuitItem, CircuitResult, CircuitTargetsInsideInstruction, DemItem,
-    DemTarget, DetectorErrorModel, ErrorAnalyzerOptions, ExplainedError, FlippedMeasurement, Gate,
+    CircuitInstruction, CircuitItem, CircuitResult, CircuitTargetsInsideInstruction,
+    DetectorErrorModel, ErrorAnalyzerOptions, ExplainedError, FlippedMeasurement, Gate,
     GateTargetWithCoords, Pauli, Probability, QubitId, RepeatBlock, Target,
     circuit_to_detector_error_model,
 };
 use budget::validate_error_matcher_circuit;
+use filter::error_keys_from_dem;
 
 pub fn explain_errors_from_circuit(
     circuit: &Circuit,
@@ -922,78 +924,6 @@ fn append_sanitized_instruction(
         _ => circuit.append_instruction(instruction.clone()),
     }
     Ok(())
-}
-
-fn error_keys_from_dem(model: &DetectorErrorModel) -> CircuitResult<Vec<Vec<DemTarget>>> {
-    model.validate_flattening_budget("ErrorMatcher filter")?;
-    let mut keys = Vec::new();
-    collect_error_keys_from_dem(model, 0, &mut keys)?;
-    Ok(keys)
-}
-
-fn collect_error_keys_from_dem(
-    model: &DetectorErrorModel,
-    detector_offset: u64,
-    keys: &mut Vec<Vec<DemTarget>>,
-) -> CircuitResult<()> {
-    let mut current_detector_offset = detector_offset;
-    for item in model.items() {
-        match item {
-            DemItem::Instruction(instruction) => match instruction.kind() {
-                crate::DemInstructionKind::Error => {
-                    keys.push(canonical_error_key(
-                        instruction.targets(),
-                        current_detector_offset,
-                    )?);
-                }
-                crate::DemInstructionKind::ShiftDetectors => {
-                    current_detector_offset = current_detector_offset
-                        .checked_add(instruction.detector_shift()?)
-                        .ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model("detector shift overflowed")
-                        })?;
-                }
-                crate::DemInstructionKind::Detector
-                | crate::DemInstructionKind::LogicalObservable => {}
-            },
-            DemItem::RepeatBlock(repeat) => {
-                let body_shift = repeat.body().total_detector_shift()?;
-                for _ in 0..repeat.repeat_count().get() {
-                    collect_error_keys_from_dem(repeat.body(), current_detector_offset, keys)?;
-                    current_detector_offset = current_detector_offset
-                        .checked_add(body_shift)
-                        .ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(
-                                "repeat detector shift overflowed",
-                            )
-                        })?;
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-fn canonical_error_key(
-    targets: &[DemTarget],
-    detector_offset: u64,
-) -> CircuitResult<Vec<DemTarget>> {
-    let mut toggled = BTreeSet::new();
-    for target in targets {
-        let shifted = match *target {
-            DemTarget::RelativeDetector(detector) => DemTarget::relative_detector(
-                detector.get().checked_add(detector_offset).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model("detector id overflowed")
-                })?,
-            )?,
-            DemTarget::LogicalObservable(_) => *target,
-            DemTarget::Separator | DemTarget::Numeric(_) => continue,
-        };
-        if !toggled.insert(shifted) {
-            toggled.remove(&shifted);
-        }
-    }
-    Ok(toggled.into_iter().collect())
 }
 
 fn shifted_coordinates(args: &[f64], coord_offset: &[f64]) -> Vec<f64> {

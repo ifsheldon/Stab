@@ -67,7 +67,7 @@ The command was used here as a metadata/listing health check, not as a claim tha
 
 The next implementation slice should be selected from one of these active, source-owned gaps:
 
-- PFM4 folded DEM traversal: broader folded graphlike, hypergraph, SAT/WCNF, analyzer, matcher-adjacent, or sampled-error traversal work beyond the selected graphlike, hypergraph, SAT/WCNF, and sampler repeat folds already recorded, while preserving Stim-compatible unweighted shortest-error semantics and existing dense target caps.
+- PFM4 folded DEM traversal: broader folded graphlike, hypergraph, SAT/WCNF, analyzer, matcher-adjacent, or sampled-error traversal work beyond the selected graphlike, hypergraph, ErrorMatcher filter DEM, SAT/WCNF, and sampler repeat folds already recorded, while preserving Stim-compatible unweighted shortest-error semantics and existing dense target caps.
 - PFM2 or PFM3 active parity slices: a selected transform, feedback, time-reversal, sweep-conditioned execution, analyzer sweep-shape, or legal-gate execution case with exact owned subcases and fail-closed unsupported shapes.
 - PFM5 detector utilities and flows: a named generated-code detector-utility slice, broader measurement-rich flow generator or solver diagnostic slice, or transform-integration slice with exact positive, negative, and resource-boundary tests.
 - PFM6 analyzer/search: a named true folded generated-loop analyzer-output slice, broader loop-folded decomposition family, broader generated search/SAT/WCNF family, or sparse-tracker analyzer/search consumption slice.

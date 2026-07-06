@@ -112,7 +112,10 @@ fn pf4_error_matcher_repeat_resource_policy_is_source_owned() {
         .expect_err("reject nested expansion")
         .to_string();
     assert!(error.contains("expanded repeat iterations"), "{error}");
+}
 
+#[test]
+fn pf4_error_matcher_filter_rejects_shifted_repeat() {
     let circuit = Circuit::from_stim_str(
         "
         M 0
@@ -136,4 +139,78 @@ fn pf4_error_matcher_repeat_resource_policy_is_source_owned() {
         error.contains("DEM ErrorMatcher filter currently supports repeat counts"),
         "{error}"
     );
+}
+
+#[test]
+fn pf4_error_matcher_filter_folds_flat_detector_repeat() {
+    let circuit = Circuit::from_stim_str(
+        "
+        M(0.125) 0
+        DETECTOR rec[-1]
+        ",
+    )
+    .unwrap();
+    let compact_filter = DetectorErrorModel::from_dem_str("error(0.1) D0\n").unwrap();
+    let flat_repeat_filter =
+        DetectorErrorModel::from_dem_str("repeat 100001 {\n    error(0.1) D0\n}\n").unwrap();
+
+    let expected = explain_errors_from_circuit(&circuit, Some(&compact_filter), false)
+        .unwrap()
+        .into_iter()
+        .map(|error| error.to_string())
+        .collect::<Vec<_>>();
+    let actual = explain_errors_from_circuit(&circuit, Some(&flat_repeat_filter), false)
+        .unwrap()
+        .into_iter()
+        .map(|error| error.to_string())
+        .collect::<Vec<_>>();
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn pf4_error_matcher_filter_folds_rich_flat_detector_repeat() {
+    let circuit = Circuit::from_stim_str(
+        "
+        MPAD 0
+        DETECTOR rec[-1]
+        M(0.125) 0
+        M(0.25) 1
+        DETECTOR rec[-2]
+        DETECTOR rec[-1]
+        OBSERVABLE_INCLUDE(0) rec[-1]
+        ",
+    )
+    .unwrap();
+    let compact_filter = DetectorErrorModel::from_dem_str(
+        "
+        shift_detectors 1
+        error(0.1) D0
+        error(0.1) D0 D0 D1 ^ L0
+        ",
+    )
+    .unwrap();
+    let flat_repeat_filter = DetectorErrorModel::from_dem_str(
+        "
+        shift_detectors 1
+        repeat 100001 {
+            error(0.1) D0
+            error(0.1) D0 D0 D1 ^ L0
+        }
+        ",
+    )
+    .unwrap();
+
+    let expected = explain_errors_from_circuit(&circuit, Some(&compact_filter), false)
+        .unwrap()
+        .into_iter()
+        .map(|error| error.to_string())
+        .collect::<Vec<_>>();
+    let actual = explain_errors_from_circuit(&circuit, Some(&flat_repeat_filter), false)
+        .unwrap()
+        .into_iter()
+        .map(|error| error.to_string())
+        .collect::<Vec<_>>();
+
+    assert_eq!(actual, expected);
 }

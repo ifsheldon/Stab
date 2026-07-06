@@ -47,6 +47,10 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             ][..],
         ),
         (
+            "pf4-error-matcher-filter-flat-repeat",
+            &["stab_pf4_error_matcher_filter_flat_repeat_fold"][..],
+        ),
+        (
             "pf4-dem-sampler-folded-repeat",
             &[
                 "stab_pf4_dem_sampler_compile_folded_repeat",
