@@ -11,6 +11,7 @@ use crate::{
 };
 
 mod pauli_product;
+mod shifted_repeat;
 mod unitary_repeat;
 
 use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_terms_reversed};
@@ -52,9 +53,7 @@ impl SparseReverseFrameTracker {
                     if unitary_repeat::try_undo_supported_unitary_repeat(self, repeat)? {
                         continue;
                     }
-                    for _ in 0..repeat.repeat_count().get() {
-                        self.undo_circuit(repeat.body())?;
-                    }
+                    shifted_repeat::undo_loop(self, repeat.body(), repeat.repeat_count().get())?;
                 }
             }
         }

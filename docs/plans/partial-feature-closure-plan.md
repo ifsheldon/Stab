@@ -239,7 +239,7 @@ Tests:
 - Port owned cases from `vendor/stim/src/stim/simulators/error_analyzer.test.cc`, `vendor/stim/src/stim/simulators/error_matcher.test.cc`, `vendor/stim/src/stim/search/*_test.cc`, `vendor/stim/src/stim/util_top/circuit_to_dem.test.cc`, and generated-circuit analyzer tests.
 - Add exact `.dem` output tests for deterministic analyzer cases.
 - Add structural tests for decomposed errors, gauge detectors, approximate disjoint handling, generated circuits, loop folding, and search results where exact ordering is not stable.
-- Add generated or property-style tests for sparse reverse tracking when new supported unitary families, repeated loops, detectors with coordinates, and observable frame changes are promoted.
+- Add generated or property-style tests for sparse reverse tracking when new supported unitary families, shifted repeated loops, detectors with coordinates, and observable frame changes are promoted.
 
 Benchmarks:
 

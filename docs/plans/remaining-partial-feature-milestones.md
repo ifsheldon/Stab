@@ -415,7 +415,7 @@ Oracle rows:
 
 Benchmarks:
 
-- Implement or extend `pf6-analyze-errors-generated-surface`, `pf6-error-decomp-loop-folded`, `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, `pf6-generated-sat-wcnf`, and `pf6-sparse-rev-frame-loop`. The generated-surface analyzer, loop-folded decomposition, generated graphlike search, generated hypergraph search, generated SAT/WCNF encoding, and supported-Clifford sparse reverse frame loop rows have report-only Rust runners.
+- Implement or extend `pf6-analyze-errors-generated-surface`, `pf6-error-decomp-loop-folded`, `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, `pf6-generated-sat-wcnf`, and `pf6-sparse-rev-frame-loop`. The generated-surface analyzer, loop-folded decomposition, generated graphlike search, generated hypergraph search, generated SAT/WCNF encoding, and sparse reverse frame unitary-repeat plus shifted measurement-repeat rows have report-only Rust runners.
 - Do not add a benchmark for matched-error canonicalization unless a future analyzer or search surface puts it on a measured throughput path.
 - Use schema-version-2 submeasurement thresholds for bundled analyzer or search rows.
 - Promote only rows with faithful pinned Stim evidence and repeated stable ratios.

@@ -104,7 +104,10 @@ fn pf6_analyzer_benchmark_rows_have_stab_compare_runners() {
             "pf6-sparse-rev-frame-loop",
             "src/stim/simulators/sparse_rev_frame_tracker.test.cc",
             "sparse-rev-frame",
-            &["stab_pf6_sparse_rev_unitary_repeat_flow"][..],
+            &[
+                "stab_pf6_sparse_rev_unitary_repeat_flow",
+                "stab_pf6_sparse_rev_shifted_measurement_flow",
+            ][..],
         ),
     ] {
         let row = BenchmarkRow {

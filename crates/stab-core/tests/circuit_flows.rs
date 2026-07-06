@@ -106,6 +106,62 @@ fn circuit_has_unsigned_stabilizer_flow_helpers_match_supported_batch_semantics(
 }
 
 #[test]
+fn check_if_circuit_has_unsigned_stabilizer_flows_folds_shifted_measurement_repeats() {
+    let circuit = circuit(
+        "
+        REPEAT 17 {
+            CX 0 1 1 2 2 3 3 0
+            M 0 0 1
+            DETECTOR rec[-2] rec[-3]
+            OBSERVABLE_INCLUDE(3) rec[-1]
+        }
+        ",
+    );
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(
+            &circuit,
+            &[
+                flow("Z___ -> rec[-7] xor rec[-4]"),
+                flow("X___ -> rec[-7] xor rec[-4]")
+            ]
+        ),
+        vec![true, false]
+    );
+}
+
+#[test]
+fn check_if_circuit_has_unsigned_stabilizer_flows_marker_avoids_flow_observables() {
+    let circuit = circuit("M 0\n");
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(
+            &circuit,
+            &[flow("Z -> rec[-1]"), flow("1 -> rec[-1] xor obs[0]")]
+        ),
+        vec![true, false]
+    );
+}
+
+#[test]
+fn check_if_circuit_has_unsigned_stabilizer_flows_marker_handles_max_observable() {
+    let circuit = circuit(
+        "
+        M 0
+        OBSERVABLE_INCLUDE(4294967295) rec[-1]
+        ",
+    );
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(
+            &circuit,
+            &[
+                flow("Z -> rec[-1]"),
+                flow("1 -> rec[-1] xor obs[4294967295]")
+            ]
+        ),
+        vec![true, true]
+    );
+}
+
+#[test]
 fn pf6_sparse_rev_spp_circuit_has_unsigned_stabilizer_flow_helpers_support_unsigned_semantics() {
     let spp_circuit = circuit("SPP X0*Y1*Z2\n");
     let spp_dag_circuit = circuit("SPP_DAG X0*Y1*Z2\n");

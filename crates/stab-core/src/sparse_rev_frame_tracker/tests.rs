@@ -73,6 +73,10 @@ fn single_pauli_set(id: u64) -> BTreeSet<DemTarget> {
     BTreeSet::from([DemTarget::logical_observable(id).unwrap()])
 }
 
+fn detector_set(id: u64) -> BTreeSet<DemTarget> {
+    BTreeSet::from([DemTarget::relative_detector(id).unwrap()])
+}
+
 #[test]
 fn sparse_rev_frame_tracker_undo_tableau_cx_subset() {
     assert_undo_tableau(
@@ -512,7 +516,89 @@ fn sparse_rev_frame_tracker_observable_include_paulis_subset() {
 }
 
 #[test]
-fn sparse_rev_frame_tracker_unrolls_repeat_blocks_for_now() {
+fn sparse_rev_frame_tracker_shifted_copy_matches_record_and_detector_offsets() {
+    let mut actual = SparseReverseFrameTracker::new(10, 200, 300, true);
+    let mut expected = SparseReverseFrameTracker::new(10, 2000, 3000, true);
+    assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
+
+    actual.rec_bits.insert(195, single_pauli_set(2));
+    assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
+    expected.rec_bits.insert(1995, single_pauli_set(2));
+    assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
+
+    actual
+        .rec_bits
+        .get_mut(&195)
+        .unwrap()
+        .insert(DemTarget::relative_detector(293).unwrap());
+    assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
+    expected
+        .rec_bits
+        .get_mut(&1995)
+        .unwrap()
+        .insert(DemTarget::relative_detector(293).unwrap());
+    assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
+    expected
+        .rec_bits
+        .get_mut(&1995)
+        .unwrap()
+        .remove(&DemTarget::relative_detector(293).unwrap());
+    expected
+        .rec_bits
+        .get_mut(&1995)
+        .unwrap()
+        .insert(DemTarget::relative_detector(2993).unwrap());
+    assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
+
+    actual.xs[5] = single_pauli_set(3);
+    assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
+    expected.xs[5] = single_pauli_set(3);
+    assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
+
+    actual.zs[6] = single_pauli_set(3);
+    assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
+    expected.zs[6] = single_pauli_set(3);
+    assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
+
+    actual.xs[5].insert(DemTarget::relative_detector(287).unwrap());
+    assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
+    expected.xs[5].insert(DemTarget::relative_detector(2987).unwrap());
+    assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
+
+    actual.zs[6].insert(DemTarget::relative_detector(287).unwrap());
+    assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
+    expected.zs[6].insert(DemTarget::relative_detector(2987).unwrap());
+    assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
+
+    shifted_repeat::shift(&mut actual, 1800, 2700).unwrap();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period() {
+    let body = circuit(
+        "
+        CX 0 1 1 2 2 3 3 0
+        M 0 0 1
+        DETECTOR rec[-2] rec[-3]
+        OBSERVABLE_INCLUDE(3) rec[-1]
+        ",
+    );
+
+    let mut folded = SparseReverseFrameTracker::new(20, 5_000_000_000_000, 4_000_000_000_000, true);
+    let mut unrolled = folded.clone();
+    shifted_repeat::undo_loop(&mut folded, &body, 500).unwrap();
+    shifted_repeat::undo_loop_by_unrolling(&mut unrolled, &body, 500).unwrap();
+    assert_eq!(folded, unrolled);
+
+    shifted_repeat::undo_loop(&mut folded, &body, 1_000_000_000_001).unwrap();
+    assert_eq!(folded.zs[0], single_pauli_set(3));
+    assert_eq!(folded.measurement_count, 1_999_999_998_497);
+    assert_eq!(folded.detector_count, 2_999_999_999_499);
+}
+
+#[test]
+fn sparse_rev_frame_tracker_repeat_blocks_track_measurements_and_detectors() {
     let circuit = circuit(
         "
         REPEAT 2 {
@@ -530,7 +616,7 @@ fn sparse_rev_frame_tracker_unrolls_repeat_blocks_for_now() {
     tracker.undo_circuit(&circuit).unwrap();
 
     let mut expected = SparseReverseFrameTracker::new(1, 0, 0, true);
-    expected.zs[0].insert(DemTarget::relative_detector(0).unwrap());
+    expected.zs[0] = detector_set(0);
     expected.zs[0].insert(DemTarget::relative_detector(1).unwrap());
     assert_eq!(tracker, expected);
 }

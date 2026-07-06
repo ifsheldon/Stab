@@ -59,7 +59,7 @@ pub(crate) fn check_unsigned_flow_with_sparse_tracker(
         )
     })?;
     let detector_count = circuit.count_detectors()?;
-    let tracked_target = DemTarget::relative_detector(detector_count)?;
+    let tracked_target = DemTarget::numeric(0);
     let qubit_count = circuit
         .count_qubits()
         .max(flow.input().len())

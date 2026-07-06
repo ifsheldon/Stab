@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use stab_core::{
     Circuit, CodeDistance, DetectorErrorModel, ErrorAnalyzerOptions, Flow, Probability, RoundCount,
     SurfaceCodeParams, SurfaceCodeTask, check_if_circuit_has_unsigned_stabilizer_flows,
-    circuit_to_detector_error_model, find_undetectable_logical_error,
+    circuit_flow_generators, circuit_to_detector_error_model, find_undetectable_logical_error,
     generate_surface_code_circuit, independent_to_disjoint_xyz_errors, likeliest_error_sat_problem,
     shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
     try_disjoint_to_independent_xyz_errors,
@@ -56,6 +56,10 @@ const ERROR_DECOMP_LOOP_REPEAT_COUNT: u64 = 5;
 const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 1_000_001;
 #[cfg(test)]
 const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 17;
+#[cfg(not(test))]
+const SPARSE_REVERSE_SHIFTED_REPEAT_COUNT: u64 = 1025;
+#[cfg(test)]
+const SPARSE_REVERSE_SHIFTED_REPEAT_COUNT: u64 = 17;
 
 pub(super) fn run_dem_compare_row(
     row: &BenchmarkRow,
@@ -121,6 +125,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             SPARSE_REVERSE_UNITARY_REPEAT_COUNT as f64,
             "folded-rounds/s",
         )),
+        ("pf6-sparse-rev-frame-loop", "stab_pf6_sparse_rev_shifted_measurement_flow") => Some((
+            SPARSE_REVERSE_SHIFTED_REPEAT_COUNT as f64,
+            "folded-rounds/s",
+        )),
         ("pf3-analyze-errors-sweep", "stab_analyze_errors_sweep_control") => {
             Some((1.0, "circuits/s"))
         }
@@ -179,7 +187,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures shortest and weighted WCNF generation for a generated rotated-surface-code DEM after source-owned Rust analysis and decomposition; pinned Stim exposes SAT encoding as C++ API behavior, not a faithful public CLI baseline",
         ),
         "pf6-sparse-rev-frame-loop" => Some(
-            "report-only: Stab measures public unsigned-flow checking over a measurement-dependent fixed two-qubit Clifford unitary repeat so the sparse reverse frame tracker must use loop folding; broader sparse tracker parity and provenance remain outside this row",
+            "report-only: Stab measures public unsigned-flow checking over a measurement-dependent fixed two-qubit Clifford unitary repeat and a shifted measurement/detector repeat so the sparse reverse frame tracker must use loop folding; broader sparse tracker parity and provenance remain outside this row",
         ),
         "pf3-analyze-errors-sweep" => Some(
             "report-only: Stab measures in-process analyzer handling for selected sweep-controlled Clifford gates and CZ bit-bit no-op groups that are semantically ignored by the error analyzer",
@@ -437,31 +445,71 @@ fn run_analyze_sweep_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchEr
 }
 
 fn run_sparse_reverse_frame_loop_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = Circuit::from_stim_str(&sparse_reverse_frame_loop_fixture())
+    let unitary_circuit = Circuit::from_stim_str(&sparse_reverse_unitary_frame_loop_fixture())
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let flows = [
-        Flow::from_str("Z_ -> rec[-1]").map_err(|error| BenchError::StabRunner {
-            row_id: row.id.clone(),
-            message: format!("failed to parse sparse reverse flow benchmark fixture: {error}"),
-        })?,
-    ];
-    Ok(vec![measure_stab_iterations(
-        "stab_pf6_sparse_rev_unitary_repeat_flow",
-        ERROR_ANALYZER_COMPARE_ITERATIONS,
-        || {
-            let result = check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows);
-            if result != [true] {
-                return Err(BenchError::StabRunner {
-                    row_id: row.id.clone(),
-                    message: format!(
-                        "sparse reverse flow benchmark expected [true], got {result:?}"
-                    ),
-                });
-            }
-            black_box(result);
-            Ok(())
-        },
-    )?])
+    let unitary_flows =
+        [
+            Flow::from_str("Z_ -> rec[-1]").map_err(|error| BenchError::StabRunner {
+                row_id: row.id.clone(),
+                message: format!("failed to parse sparse reverse flow benchmark fixture: {error}"),
+            })?,
+        ];
+    let shifted_circuit = Circuit::from_stim_str(&sparse_reverse_shifted_frame_loop_fixture())
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let shifted_flows = [generated_z_prefix_flow(&row.id, &shifted_circuit)?];
+    Ok(vec![
+        measure_stab_iterations(
+            "stab_pf6_sparse_rev_unitary_repeat_flow",
+            ERROR_ANALYZER_COMPARE_ITERATIONS,
+            || {
+                let result = check_if_circuit_has_unsigned_stabilizer_flows(
+                    &unitary_circuit,
+                    &unitary_flows,
+                );
+                if result != [true] {
+                    return Err(BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: format!(
+                            "sparse reverse unitary flow benchmark expected [true], got {result:?}"
+                        ),
+                    });
+                }
+                black_box(result);
+                Ok(())
+            },
+        )?,
+        measure_stab_iterations(
+            "stab_pf6_sparse_rev_shifted_measurement_flow",
+            ERROR_ANALYZER_COMPARE_ITERATIONS,
+            || {
+                let result = check_if_circuit_has_unsigned_stabilizer_flows(
+                    &shifted_circuit,
+                    &shifted_flows,
+                );
+                if result != [true] {
+                    return Err(BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: format!(
+                            "sparse reverse shifted flow benchmark expected [true], got {result:?}"
+                        ),
+                    });
+                }
+                black_box(result);
+                Ok(())
+            },
+        )?,
+    ])
+}
+
+fn generated_z_prefix_flow(row_id: &str, circuit: &Circuit) -> Result<Flow, BenchError> {
+    circuit_flow_generators(circuit)
+        .map_err(|error| stab_runner_error(row_id, error))?
+        .into_iter()
+        .find(|flow| flow.to_string().starts_with("Z___ ->"))
+        .ok_or_else(|| BenchError::StabRunner {
+            row_id: row_id.to_string(),
+            message: "shifted sparse reverse benchmark fixture produced no Z___ flow".to_string(),
+        })
 }
 
 #[derive(Default)]
@@ -688,8 +736,14 @@ fn graphlike_search_model(row_id: &str) -> Result<DetectorErrorModel, BenchError
     DetectorErrorModel::from_dem_str(&text).map_err(|error| stab_runner_error(row_id, error))
 }
 
-fn sparse_reverse_frame_loop_fixture() -> String {
+fn sparse_reverse_unitary_frame_loop_fixture() -> String {
     format!("REPEAT {SPARSE_REVERSE_UNITARY_REPEAT_COUNT} {{\n    SWAP 0 1\n}}\nM 1\n")
+}
+
+fn sparse_reverse_shifted_frame_loop_fixture() -> String {
+    format!(
+        "REPEAT {SPARSE_REVERSE_SHIFTED_REPEAT_COUNT} {{\n    CX 0 1 1 2 2 3 3 0\n    M 0 0 1\n    DETECTOR rec[-2] rec[-3]\n    OBSERVABLE_INCLUDE(3) rec[-1]\n}}\n"
+    )
 }
 
 fn error_decomp_loop_folded_fixture() -> String {
