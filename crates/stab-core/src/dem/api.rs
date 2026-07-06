@@ -454,10 +454,9 @@ fn find_selected_detector_coordinates_in_repeat(
     detector_offset: u64,
     coordinate_shift: &[f64],
 ) -> CircuitResult<()> {
-    let body_declared_detectors = count_declared_detectors_from(repeat.body(), 0)?;
-    if body_declared_detectors == 0 {
+    let Some(body_declared_bounds) = declared_detector_bounds_from(repeat.body(), 0)? else {
         return Ok(());
-    }
+    };
 
     let body_detector_shift = repeat.body().total_detector_shift_inner()?;
     let body_coordinate_shift = coordinate_shift_of(repeat.body())?;
@@ -465,7 +464,7 @@ fn find_selected_detector_coordinates_in_repeat(
 
     if body_detector_shift == 0 {
         if detector_set.iter().any(|detector| {
-            detector_in_repeat_body_range(*detector, detector_offset, 0, body_declared_detectors)
+            detector_in_repeat_body_bounds(*detector, detector_offset, body_declared_bounds)
         }) {
             find_selected_detector_coordinates(
                 repeat.body(),
@@ -519,7 +518,7 @@ fn find_selected_detector_coordinates_in_repeat(
         coordinates,
         detector_offset,
         body_detector_shift,
-        body_declared_detectors,
+        body_declared_bounds,
         repeat_count,
     )?;
     for iteration in iterations {
@@ -727,16 +726,17 @@ impl FlatRepeatOrder {
     }
 }
 
-fn detector_in_repeat_body_range(
+fn detector_in_repeat_body_bounds(
     detector: DemDetectorId,
     detector_offset: u64,
-    body_detector_shift: u64,
-    body_declared_detectors: u64,
+    body_declared_bounds: DetectorDeclarationBounds,
 ) -> bool {
     detector
         .get()
-        .checked_sub(detector_offset.saturating_add(body_detector_shift))
-        .is_some_and(|relative| relative < body_declared_detectors)
+        .checked_sub(detector_offset)
+        .is_some_and(|relative| {
+            (body_declared_bounds.min..=body_declared_bounds.max).contains(&relative)
+        })
 }
 
 fn selected_repeat_iterations(
@@ -744,7 +744,7 @@ fn selected_repeat_iterations(
     coordinates: &BTreeMap<DemDetectorId, Vec<f64>>,
     detector_offset: u64,
     body_detector_shift: u64,
-    body_declared_detectors: u64,
+    body_declared_bounds: DetectorDeclarationBounds,
     repeat_count: u64,
 ) -> CircuitResult<SelectedRepeatIterations> {
     let mut iterations = BTreeSet::new();
@@ -757,12 +757,15 @@ fn selected_repeat_iterations(
         let Some(relative) = detector.get().checked_sub(detector_offset) else {
             continue;
         };
-        let min_iteration = if relative < body_declared_detectors {
+        if relative < body_declared_bounds.min {
+            continue;
+        }
+        let min_iteration = if relative <= body_declared_bounds.max {
             0
         } else {
             ceil_div(
                 relative
-                    .checked_sub(body_declared_detectors - 1)
+                    .checked_sub(body_declared_bounds.max)
                     .ok_or_else(|| {
                         CircuitError::invalid_detector_error_model(
                             "selected detector repeat range underflowed",
@@ -774,7 +777,8 @@ fn selected_repeat_iterations(
         if min_iteration >= repeat_count {
             continue;
         }
-        let max_iteration = (relative / body_detector_shift).min(repeat_count - 1);
+        let max_iteration =
+            ((relative - body_declared_bounds.min) / body_detector_shift).min(repeat_count - 1);
         if min_iteration > max_iteration {
             continue;
         }
@@ -802,11 +806,36 @@ struct SelectedRepeatIterations {
     truncated_detectors: BTreeSet<DemDetectorId>,
 }
 
-fn count_declared_detectors_from(
+#[derive(Clone, Copy, Debug)]
+struct DetectorDeclarationBounds {
+    min: u64,
+    max: u64,
+}
+
+impl DetectorDeclarationBounds {
+    fn include(&mut self, detector: u64) {
+        self.min = self.min.min(detector);
+        self.max = self.max.max(detector);
+    }
+}
+
+fn include_detector_bound(bounds: &mut Option<DetectorDeclarationBounds>, detector: u64) {
+    match bounds {
+        Some(bounds) => bounds.include(detector),
+        None => {
+            *bounds = Some(DetectorDeclarationBounds {
+                min: detector,
+                max: detector,
+            });
+        }
+    }
+}
+
+fn declared_detector_bounds_from(
     model: &DetectorErrorModel,
     mut detector_offset: u64,
-) -> CircuitResult<u64> {
-    let mut count = detector_offset;
+) -> CircuitResult<Option<DetectorDeclarationBounds>> {
+    let mut bounds = None;
     for item in model.items() {
         match item {
             DemItem::Instruction(instruction) => match instruction.kind() {
@@ -819,11 +848,7 @@ fn count_declared_detectors_from(
                                         "detector id overflowed",
                                     )
                                 })?;
-                            count = count.max(detector_id.checked_add(1).ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
-                                    "detector count overflowed",
-                                )
-                            })?);
+                            include_detector_bound(&mut bounds, detector_id);
                         }
                     }
                 }
@@ -839,8 +864,9 @@ fn count_declared_detectors_from(
             DemItem::RepeatBlock(repeat) => {
                 let body_shift = repeat.body().total_detector_shift_inner()?;
                 let repeat_count = repeat.repeat_count().get();
-                if repeat_count > 0 {
-                    let body_count = count_declared_detectors_from(repeat.body(), 0)?;
+                if repeat_count > 0
+                    && let Some(body_bounds) = declared_detector_bounds_from(repeat.body(), 0)?
+                {
                     let last_offset = body_shift
                         .checked_mul(repeat_count.saturating_sub(1))
                         .and_then(|shift| detector_offset.checked_add(shift))
@@ -849,13 +875,30 @@ fn count_declared_detectors_from(
                                 "repeat detector shift overflowed",
                             )
                         })?;
-                    if body_count > 0 {
-                        count =
-                            count.max(last_offset.checked_add(body_count).ok_or_else(|| {
+                    let first_min =
+                        detector_offset
+                            .checked_add(body_bounds.min)
+                            .ok_or_else(|| {
                                 CircuitError::invalid_detector_error_model(
-                                    "repeat detector count overflowed",
+                                    "repeat detector id overflowed",
                                 )
-                            })?);
+                            })?;
+                    let first_max =
+                        detector_offset
+                            .checked_add(body_bounds.max)
+                            .ok_or_else(|| {
+                                CircuitError::invalid_detector_error_model(
+                                    "repeat detector id overflowed",
+                                )
+                            })?;
+                    let last_min = last_offset.checked_add(body_bounds.min).ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model("repeat detector id overflowed")
+                    })?;
+                    let last_max = last_offset.checked_add(body_bounds.max).ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model("repeat detector id overflowed")
+                    })?;
+                    for detector_id in [first_min, first_max, last_min, last_max] {
+                        include_detector_bound(&mut bounds, detector_id);
                     }
                 }
                 detector_offset = body_shift
@@ -869,7 +912,7 @@ fn count_declared_detectors_from(
             }
         }
     }
-    Ok(count)
+    Ok(bounds)
 }
 
 pub(super) fn detector_offset_with_repeat(

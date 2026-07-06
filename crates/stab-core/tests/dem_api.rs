@@ -760,6 +760,26 @@ fn pf4_dem_coordinates_flat_sparse_repeat_hole_returns_empty() {
 }
 
 #[test]
+fn pf4_dem_coordinates_nested_sparse_repeat_hole_uses_declared_bounds() {
+    let dem = DetectorErrorModel::from_dem_str(
+        "repeat 3000001 {\n\
+             repeat 1000001 {\n\
+                 detector(10) D2000000\n\
+             }\n\
+             shift_detectors(1) 1\n\
+         }\n",
+    )
+    .expect("parse nested sparse coordinate DEM");
+    let detector = DemDetectorId::try_new(1_500_000).expect("D1500000");
+
+    assert_eq!(
+        dem.coordinates_of_detector(detector)
+            .expect("nested sparse selected detector hole is empty"),
+        Vec::<f64>::new()
+    );
+}
+
+#[test]
 fn pf4_dem_coordinates_huge_flat_repeat_does_not_overvalidate_far_endpoint() {
     let dem = DetectorErrorModel::from_dem_str(
         "repeat 4611686018427387905 {\n\
