@@ -1,14 +1,16 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, GateCategory,
-    Pauli, PauliBasis, PauliSign, PauliString, Target,
+    PauliBasis, PauliSign, PauliString, Target,
 };
 
 mod helpers;
 
 use helpers::{
-    apply_local_tableau_to_global_pauli, instruction_qubit_count, internal_flow_error,
-    measurement_indices_reversed, pair_measurement_target_index, plain_tableau_targets,
-    record_index_i32, stabilizer_to_circuit_error, sweep_controlled_pauli_is_sign_only_noop,
+    apply_local_tableau_to_global_pauli, input_measurement_flow, instruction_qubit_count,
+    internal_flow_error, measurement_indices_reversed, negative_record_flow,
+    pair_measurement_target_index, pauli_basis, plain_tableau_targets, positive_record_flow,
+    record_index_i32, reset_flow, stabilizer_to_circuit_error,
+    sweep_controlled_pauli_is_sign_only_noop, unique_measure_reset_targets,
     unique_plain_target_indices,
 };
 
@@ -169,23 +171,33 @@ fn simple_measure_reset_flows(
     basis: PauliBasis,
 ) -> CircuitResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
-    let qubits = match unique_plain_target_indices(instruction) {
-        Some(qubits) => qubits,
+    let targets = match unique_measure_reset_targets(instruction)? {
+        Some(targets) => targets,
         None => return Ok(None),
     };
-    validate_measurement_rich_flow_generator_rows(qubit_count, qubits.len())?;
+    validate_measurement_rich_flow_generator_rows(qubit_count, targets.len())?;
     let mut flows = Vec::with_capacity(instruction.targets().len() * 2);
-    for &qubit in &qubits {
+    for &(qubit, _) in &targets {
         flows.push(reset_flow(qubit_count, qubit, basis));
     }
-    for (record_index, qubit) in qubits.into_iter().enumerate() {
+    for (record_index, (qubit, inverted)) in targets.into_iter().enumerate() {
         flows.push(input_measurement_flow(
             qubit_count,
             qubit,
             basis,
             record_index,
+            if inverted {
+                PauliSign::Minus
+            } else {
+                PauliSign::Plus
+            },
         )?);
     }
+    final_canonicalize_measurement_generators(
+        &mut flows,
+        qubit_count,
+        instruction.targets().len(),
+    )?;
     Ok(Some(flows))
 }
 
@@ -457,19 +469,25 @@ impl MeasurementFeedbackFlowSolver {
         instruction: &CircuitInstruction,
         basis: PauliBasis,
     ) -> CircuitResult<bool> {
-        let qubits = match unique_plain_target_indices(instruction) {
-            Some(qubits) => qubits,
+        let targets = match unique_measure_reset_targets(instruction)? {
+            Some(targets) => targets,
             None => return Ok(false),
         };
-        for (&qubit, record_index) in qubits.iter().rev().zip(measurement_indices_reversed(
-            &mut self.measurements_in_past,
-            qubits.len(),
-        )?) {
+        for (&(qubit, inverted), record_index) in targets.iter().rev().zip(
+            measurement_indices_reversed(&mut self.measurements_in_past, targets.len())?,
+        ) {
             remove_single_anticommutations(&mut self.flows, qubit, basis)?;
             clear_input_term(&mut self.flows, qubit)?;
             self.flows.push(Flow::new(
                 single_pauli(self.qubit_count, qubit, basis),
-                PauliString::identity(self.qubit_count),
+                PauliString::from_bases(
+                    if inverted {
+                        PauliSign::Minus
+                    } else {
+                        PauliSign::Plus
+                    },
+                    vec![PauliBasis::I; self.qubit_count],
+                ),
                 [record_index],
                 [],
             ));
@@ -1124,55 +1142,6 @@ fn xor_sign(left: PauliSign, right: PauliSign) -> PauliSign {
         PauliSign::Minus
     } else {
         PauliSign::Plus
-    }
-}
-
-fn input_measurement_flow(
-    qubit_count: usize,
-    qubit: usize,
-    basis: PauliBasis,
-    record_index: usize,
-) -> CircuitResult<Flow> {
-    Ok(Flow::new(
-        single_pauli(qubit_count, qubit, basis),
-        PauliString::identity(0),
-        [record_index_i32(record_index)?],
-        [],
-    ))
-}
-
-fn reset_flow(qubit_count: usize, qubit: usize, basis: PauliBasis) -> Flow {
-    Flow::new(
-        PauliString::identity(0),
-        single_pauli(qubit_count, qubit, basis),
-        [],
-        [],
-    )
-}
-
-fn positive_record_flow(record_index: usize) -> CircuitResult<Flow> {
-    Ok(Flow::new(
-        PauliString::identity(0),
-        PauliString::identity(0),
-        [record_index_i32(record_index)?],
-        [],
-    ))
-}
-
-fn negative_record_flow(record_index: usize) -> CircuitResult<Flow> {
-    Ok(Flow::new(
-        PauliString::identity(0),
-        PauliString::from_bases(PauliSign::Minus, []),
-        [record_index_i32(record_index)?],
-        [],
-    ))
-}
-
-fn pauli_basis(pauli: Pauli) -> PauliBasis {
-    match pauli {
-        Pauli::X => PauliBasis::X,
-        Pauli::Y => PauliBasis::Y,
-        Pauli::Z => PauliBasis::Z,
     }
 }
 

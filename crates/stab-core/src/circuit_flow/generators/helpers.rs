@@ -1,4 +1,9 @@
-use crate::{CircuitError, CircuitInstruction, CircuitResult, PauliBasis, PauliString, Target};
+use crate::{
+    CircuitError, CircuitInstruction, CircuitResult, Flow, Pauli, PauliBasis, PauliSign,
+    PauliString, Target,
+};
+
+use super::single_pauli;
 
 pub(super) fn plain_tableau_targets(targets: &[Target]) -> Option<Vec<usize>> {
     let mut qubits = Vec::with_capacity(targets.len());
@@ -93,6 +98,20 @@ pub(super) fn unique_plain_target_indices(instruction: &CircuitInstruction) -> O
     Some(qubits)
 }
 
+pub(super) fn unique_measure_reset_targets(
+    instruction: &CircuitInstruction,
+) -> CircuitResult<Option<Vec<(usize, bool)>>> {
+    let mut targets = Vec::with_capacity(instruction.targets().len());
+    for target in instruction.targets() {
+        let parsed = pair_measurement_target_index(target)?;
+        if targets.iter().any(|&(qubit, _)| qubit == parsed.0) {
+            return Ok(None);
+        }
+        targets.push(parsed);
+    }
+    Ok(Some(targets))
+}
+
 pub(super) fn measurement_indices_reversed(
     measurements_in_past: &mut usize,
     count: usize,
@@ -132,4 +151,54 @@ pub(super) fn stabilizer_to_circuit_error(error: crate::StabilizerError) -> Circ
 
 pub(super) fn internal_flow_error(message: &'static str) -> CircuitError {
     CircuitError::invalid_tableau_conversion(message)
+}
+
+pub(super) fn input_measurement_flow(
+    qubit_count: usize,
+    qubit: usize,
+    basis: PauliBasis,
+    record_index: usize,
+    record_sign: PauliSign,
+) -> CircuitResult<Flow> {
+    Ok(Flow::new(
+        single_pauli(qubit_count, qubit, basis),
+        PauliString::from_bases(record_sign, []),
+        [record_index_i32(record_index)?],
+        [],
+    ))
+}
+
+pub(super) fn reset_flow(qubit_count: usize, qubit: usize, basis: PauliBasis) -> Flow {
+    Flow::new(
+        PauliString::identity(0),
+        single_pauli(qubit_count, qubit, basis),
+        [],
+        [],
+    )
+}
+
+pub(super) fn positive_record_flow(record_index: usize) -> CircuitResult<Flow> {
+    Ok(Flow::new(
+        PauliString::identity(0),
+        PauliString::identity(0),
+        [record_index_i32(record_index)?],
+        [],
+    ))
+}
+
+pub(super) fn negative_record_flow(record_index: usize) -> CircuitResult<Flow> {
+    Ok(Flow::new(
+        PauliString::identity(0),
+        PauliString::from_bases(PauliSign::Minus, []),
+        [record_index_i32(record_index)?],
+        [],
+    ))
+}
+
+pub(super) fn pauli_basis(pauli: Pauli) -> PauliBasis {
+    match pauli {
+        Pauli::X => PauliBasis::X,
+        Pauli::Y => PauliBasis::Y,
+        Pauli::Z => PauliBasis::Z,
+    }
 }

@@ -87,6 +87,19 @@ fn circuit_flow_generators_promotes_single_instruction_measurement_subset() {
     assert_eq!(generator_strings("MR 0\n"), vec!["1 -> Z", "Z -> rec[0]"]);
     assert_eq!(generator_strings("MRX 0\n"), vec!["1 -> X", "X -> rec[0]"]);
     assert_eq!(generator_strings("MRY 0\n"), vec!["1 -> Y", "Y -> rec[0]"]);
+    assert_eq!(generator_strings("MR !0\n"), vec!["1 -> Z", "Z -> -rec[0]"]);
+    assert_eq!(
+        generator_strings("MRX !0\n"),
+        vec!["1 -> X", "X -> -rec[0]"]
+    );
+    assert_eq!(
+        generator_strings("MRY !0\n"),
+        vec!["1 -> Y", "Y -> -rec[0]"]
+    );
+    assert_eq!(
+        generator_strings("MR !0 1\n"),
+        vec!["1 -> _Z", "1 -> Z_", "_Z -> rec[1]", "Z_ -> -rec[0]"]
+    );
     assert_eq!(
         generator_strings("MPAD 0 1 1 0\n"),
         vec!["1 -> rec[0]", "1 -> rec[3]", "1 -> -rec[1]", "1 -> -rec[2]"]
@@ -314,6 +327,10 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
         "MR 0\n",
         "MRX 0\n",
         "MRY 0\n",
+        "MR !0\n",
+        "MRX !0\n",
+        "MRY !0\n",
+        "MR !0 1\n",
         "MXX 2 0\n",
         "MXX !0 1\n",
         "MYY 3 1 2 3\n",
@@ -508,6 +525,173 @@ fn circuit_flow_generators_measurement_subset_composes_spp_unitaries() {
             "{text}"
         );
     }
+}
+
+#[test]
+fn circuit_flow_generators_measurement_subset_promotes_generated_all_operations_fixture() {
+    // Adapted from Stim v1.16.0 generate_test_circuit_with_all_operations plus the
+    // circuit_flow_generators all_operations property check.
+    let sections = [
+        "
+        QUBIT_COORDS(1, 2, 3) 0
+
+        I 0
+        X 1
+        Y 2
+        Z 3
+        TICK
+
+        ",
+        "
+        C_XYZ 0
+        C_NXYZ 1
+        C_XNYZ 2
+        C_XYNZ 3
+        C_ZYX 4
+        C_NZYX 5
+        C_ZNYX 6
+        C_ZYNX 7
+        H_XY 0
+        H_XZ 1
+        H_YZ 2
+        H_NXY 3
+        H_NXZ 4
+        H_NYZ 5
+        SQRT_X 0
+        SQRT_X_DAG 1
+        SQRT_Y 2
+        SQRT_Y_DAG 3
+        SQRT_Z 4
+        SQRT_Z_DAG 5
+        TICK
+
+        ",
+        "
+        CXSWAP 0 1
+        ISWAP 2 3
+        ISWAP_DAG 4 5
+        SWAP 6 7
+        SWAPCX 8 9
+        CZSWAP 10 11
+        SQRT_XX 0 1
+        SQRT_XX_DAG 2 3
+        SQRT_YY 4 5
+        SQRT_YY_DAG 6 7
+        SQRT_ZZ 8 9
+        SQRT_ZZ_DAG 10 11
+        II 12 13
+        XCX 0 1
+        XCY 2 3
+        XCZ 4 5
+        YCX 6 7
+        YCY 8 9
+        YCZ 10 11
+        ZCX 12 13
+        ZCY 14 15
+        ZCZ 16 17
+        TICK
+
+        ",
+        "
+        CORRELATED_ERROR(0.01) X1 Y2 Z3
+        ELSE_CORRELATED_ERROR(0.02) X4 Y7 Z6
+        DEPOLARIZE1(0.02) 0
+        DEPOLARIZE2(0.03) 1 2
+        PAULI_CHANNEL_1(0.01, 0.02, 0.03) 3
+        PAULI_CHANNEL_2(0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.010, 0.011, 0.012, 0.013, 0.014, 0.015) 4 5
+        X_ERROR(0.01) 0
+        Y_ERROR(0.02) 1
+        Z_ERROR(0.03) 2
+        HERALDED_ERASE(0.04) 3
+        HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 6
+        I_ERROR(0.06) 7
+        II_ERROR(0.07) 8 9
+        TICK
+
+        ",
+        "
+        MPP X0*Y1*Z2 Z0*Z1
+        SPP X0*Y1*Z2 X3
+        SPP_DAG X0*Y1*Z2 X2
+        TICK
+
+        ",
+        "
+        MRX 0
+        MRY 1
+        MRZ 2
+        MX 3
+        MY 4
+        MZ 5 6
+        RX 7
+        RY 8
+        RZ 9
+        TICK
+
+        ",
+        "
+        MXX 0 1 2 3
+        MYY 4 5
+        MZZ 6 7
+        TICK
+
+        ",
+        "
+        REPEAT 3 {
+            H 0
+            CX 0 1
+            S 1
+            TICK
+        }
+        TICK
+
+        ",
+        "
+        MR 0
+        X_ERROR(0.1) 0
+        MR(0.01) 0
+        SHIFT_COORDS(1, 2, 3)
+        DETECTOR(1, 2, 3) rec[-1]
+        OBSERVABLE_INCLUDE(0) rec[-1]
+        MPAD 0 1 0
+        OBSERVABLE_INCLUDE(1) Z2 Z3
+        TICK
+
+        ",
+        "
+        MRX !0
+        MY !1
+        MZZ !2 3
+        OBSERVABLE_INCLUDE(1) rec[-1]
+        MYY !4 !5
+        MPP X6*!Y7*Z8
+        TICK
+
+        ",
+        "
+        CX rec[-1] 0
+        CY sweep[0] 1
+        CZ 2 rec[-1]
+        ",
+    ];
+    let mut text = String::new();
+    for (index, section) in sections.iter().enumerate() {
+        text.push_str(section);
+        let circuit = circuit(&text);
+        let result = circuit_flow_generators(&circuit);
+        assert!(
+            result.is_ok(),
+            "all-operations prefix section {index} failed: {:?}",
+            result.err()
+        );
+    }
+    let circuit = circuit(&text);
+    let flows = circuit_flow_generators(&circuit).expect("all-operations generators");
+    assert!(!flows.is_empty());
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+        vec![true; flows.len()]
+    );
 }
 
 #[test]
