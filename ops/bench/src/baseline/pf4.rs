@@ -121,6 +121,9 @@ pub(super) fn run_dem_transform_compare_row(
         "pf4-dem-search-zero-shift-repeat" => Ok(Some(
             search_repeat::run_dem_search_zero_shift_repeat_row(row)?,
         )),
+        "pf4-dem-search-annotation-repeat" => Ok(Some(
+            search_repeat::run_dem_search_annotation_repeat_row(row)?,
+        )),
         "pf4-dem-sat-flat-repeat-fold" => Ok(Some(run_dem_sat_flat_repeat_row(row)?)),
         "pf4-error-matcher-filter-flat-repeat" => {
             Ok(Some(run_error_matcher_filter_flat_repeat_row(row)?))
@@ -286,6 +289,13 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
                 "folded-zero-shift-target-errors/s",
             ))
         }
+        ("pf4-dem-search-annotation-repeat", "stab_pf4_dem_graphlike_annotation_repeat_fold")
+        | ("pf4-dem-search-annotation-repeat", "stab_pf4_dem_hyper_annotation_repeat_fold") => {
+            Some((
+                (SEARCH_FLAT_REPEAT_COUNT as f64) * 2.0,
+                "folded-annotated-target-errors/s",
+            ))
+        }
         _ => None,
     }
 }
@@ -318,6 +328,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf4-dem-search-zero-shift-repeat" => Some(
             "contract-only: Stab measures selected flat zero-detector-shift graphlike and hypergraph search repeat folding; broader nonzero-shift, nested, non-flat, numeric-target, separator-only, and mixed-instruction repeat traversal remains capped or excluded",
+        ),
+        "pf4-dem-search-annotation-repeat" => Some(
+            "contract-only: Stab measures selected flat annotation-bearing graphlike and hypergraph search repeat folding; broader nonzero-shift, nested, non-flat, numeric-target, separator-only, and non-annotation mixed-instruction repeat traversal remains capped or excluded",
         ),
         "pf4-dem-sat-flat-repeat-fold" => Some(
             "contract-only: Stab measures selected SAT/WCNF flat zero-shift repeat folding for unweighted shortest-error SAT including zero-probability structural mechanisms and weighted concrete-MAP SAT; broader shifted, nested, non-flat, and high-index dense-target structural SAT repeat traversal remains capped",

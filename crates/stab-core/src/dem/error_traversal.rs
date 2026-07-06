@@ -63,9 +63,8 @@ impl DetectorErrorModel {
                     }
                 }
                 DemInstructionKind::ShiftDetectors if instruction.detector_shift()? == 0 => {}
-                DemInstructionKind::ShiftDetectors
-                | DemInstructionKind::Detector
-                | DemInstructionKind::LogicalObservable => {
+                DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
+                DemInstructionKind::ShiftDetectors => {
                     return Ok(None);
                 }
             }

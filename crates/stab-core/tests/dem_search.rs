@@ -461,6 +461,80 @@ fn zero_detector_shift_detector_touching_models() -> (DetectorErrorModel, Detect
     (repeat, compact)
 }
 
+#[test]
+fn pf4_dem_search_folds_flat_annotation_repeat_bodies() {
+    let (detector_touching_repeat, detector_touching_compact) = annotation_repeat_models();
+    assert_eq!(
+        shortest_graphlike_undetectable_logical_error(&detector_touching_repeat, false)
+            .unwrap()
+            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(&detector_touching_compact, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    let (logical_only_repeat, logical_only_compact) = annotation_logical_only_repeat_models();
+    assert_eq!(
+        shortest_graphlike_undetectable_logical_error(&logical_only_repeat, false)
+            .unwrap()
+            .to_dem_string(),
+        shortest_graphlike_undetectable_logical_error(&logical_only_compact, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    assert_nonzero_shift_search_repeat_rejected();
+}
+
+#[test]
+fn pf4_hypergraph_annotation_repeat_folds_by_compact_model() {
+    let (detector_touching_repeat, detector_touching_compact) = annotation_repeat_models();
+    assert_eq!(
+        find_undetectable_logical_error(&detector_touching_repeat, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string(),
+        find_undetectable_logical_error(&detector_touching_compact, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    let (logical_only_repeat, logical_only_compact) = annotation_logical_only_repeat_models();
+    assert_eq!(
+        find_undetectable_logical_error(&logical_only_repeat, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string(),
+        find_undetectable_logical_error(&logical_only_compact, usize::MAX, usize::MAX, false)
+            .unwrap()
+            .to_dem_string()
+    );
+
+    assert_nonzero_shift_search_repeat_rejected();
+}
+
+fn annotation_repeat_models() -> (DetectorErrorModel, DetectorErrorModel) {
+    let repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    detector(1, 2) D0\n    logical_observable L2\n    error(0.1) D0\n    error(0.2) D0 L0\n}\n",
+    )
+    .unwrap();
+    let compact = DetectorErrorModel::from_dem_str(
+        "detector(1, 2) D0\nlogical_observable L2\nerror(0.1) D0\nerror(0.2) D0 L0\n",
+    )
+    .unwrap();
+    (repeat, compact)
+}
+
+fn annotation_logical_only_repeat_models() -> (DetectorErrorModel, DetectorErrorModel) {
+    let repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    detector(3, 4) D0\n    logical_observable L3\n    error(0.1) L0\n}\n",
+    )
+    .unwrap();
+    let compact = DetectorErrorModel::from_dem_str(
+        "detector(3, 4) D0\nlogical_observable L3\nerror(0.1) L0\n",
+    )
+    .unwrap();
+    (repeat, compact)
+}
+
 fn assert_numeric_error_target_rejected() {
     let error = DemInstruction::error(
         Probability::try_new(0.1).unwrap(),
@@ -474,7 +548,7 @@ fn assert_numeric_error_target_rejected() {
 
 fn assert_nonzero_shift_search_repeat_rejected() {
     let shifted = DetectorErrorModel::from_dem_str(
-        "repeat 100001 {\n    error(0.1)\n    shift_detectors 1\n    error(0.2) D0 L0\n}\n",
+        "repeat 100001 {\n    detector D0\n    logical_observable L1\n    error(0.1)\n    shift_detectors 1\n    error(0.2) D0 L0\n}\n",
     )
     .unwrap();
     let graphlike_error = shortest_graphlike_undetectable_logical_error(&shifted, false)
