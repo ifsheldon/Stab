@@ -38,6 +38,13 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             ][..],
         ),
         (
+            "pf4-dem-sat-flat-repeat-fold",
+            &[
+                "stab_pf4_dem_sat_flat_repeat_fold",
+                "stab_pf4_dem_weighted_sat_flat_repeat_fold",
+            ][..],
+        ),
+        (
             "pf4-dem-sampler-folded-repeat",
             &[
                 "stab_pf4_dem_sampler_compile_folded_repeat",

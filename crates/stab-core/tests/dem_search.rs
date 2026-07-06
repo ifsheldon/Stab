@@ -136,6 +136,52 @@ fn pf4_dem_search_weighted_sat_skips_zero_probability_repeat_bodies() {
 }
 
 #[test]
+fn pf4_dem_search_sat_folds_flat_nonzero_zero_shift_repeat_bodies() {
+    let flat_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0.1) D0 L0\n    error(0.2) D0\n}\n",
+    )
+    .unwrap();
+    let expected_shortest = shortest_error_sat_problem(
+        &DetectorErrorModel::from_dem_str("error(0.1) D0 L0\nerror(0.2) D0\n").unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        shortest_error_sat_problem(&flat_repeat).unwrap(),
+        expected_shortest
+    );
+
+    let weighted_flat_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0.000001) D0 L0\n    error(0.25) D1 L1\n}\nerror(0.1) D0\nerror(0.1) D0 L0\nerror(0.1) D1 L1\n",
+    )
+    .unwrap();
+    let expected_weighted = likeliest_error_sat_problem(
+        &DetectorErrorModel::from_dem_str(
+            "error(0.000001) D0 L0\nerror(0.25) D1 L1\nerror(0.1) D0\nerror(0.1) D0 L0\nerror(0.1) D1 L1\n",
+        )
+        .unwrap(),
+        100,
+    )
+    .unwrap();
+    assert_eq!(
+        likeliest_error_sat_problem(&weighted_flat_repeat, 100).unwrap(),
+        expected_weighted
+    );
+
+    let shifted_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    error(0.1) D0 L0\n    shift_detectors 1\n}\n",
+    )
+    .unwrap();
+    let shifted_error = shortest_error_sat_problem(&shifted_repeat)
+        .expect_err("shifted active SAT repeats should retain the cap")
+        .to_string();
+    assert!(
+        shifted_error
+            .contains("DEM SAT problem generation currently supports repeat counts up to 100000"),
+        "{shifted_error}"
+    );
+}
+
+#[test]
 fn pf4_dem_search_weighted_sat_rejects_shifted_zero_probability_repeat_node_explosion() {
     let hostile = DetectorErrorModel::from_dem_str(
         "repeat 1000001 {\n    error(0) D0\n    shift_detectors 1\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n",

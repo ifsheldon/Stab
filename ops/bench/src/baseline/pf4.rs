@@ -67,6 +67,10 @@ const SAT_REPEAT_COUNT: u64 = 512;
 #[cfg(test)]
 const SAT_REPEAT_COUNT: u64 = 2;
 #[cfg(not(test))]
+const SAT_FLAT_REPEAT_COUNT: u64 = 1_000_000;
+#[cfg(test)]
+const SAT_FLAT_REPEAT_COUNT: u64 = 100_001;
+#[cfg(not(test))]
 const ANALYZER_REPEAT_COUNT: u64 = 1024;
 #[cfg(test)]
 const ANALYZER_REPEAT_COUNT: u64 = 2;
@@ -98,6 +102,7 @@ pub(super) fn run_dem_transform_compare_row(
         "pf4-dem-coordinate-map" => Ok(Some(run_dem_coordinate_map_row(row)?)),
         "pf4-dem-folded-traversal" => Ok(Some(run_dem_search_sat_repeat_row(row)?)),
         "pf4-dem-folded-graphlike-traversal" => Ok(Some(run_dem_graphlike_repeat_row(row)?)),
+        "pf4-dem-sat-flat-repeat-fold" => Ok(Some(run_dem_sat_flat_repeat_row(row)?)),
         "pf4-dem-sampler-folded-repeat" => Ok(Some(run_dem_sampler_repeat_row(row)?)),
         _ => Ok(None),
     }
@@ -176,11 +181,17 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             search_expanded_errors(SAT_REPEAT_COUNT) as f64,
             "expanded-errors/s",
         )),
+        ("pf4-dem-sat-flat-repeat-fold", "stab_pf4_dem_sat_flat_repeat_fold") => {
+            Some(((SAT_FLAT_REPEAT_COUNT as f64) * 2.0, "folded-errors/s"))
+        }
         ("pf4-dem-folded-traversal", "stab_pf4_dem_weighted_sat_zero_probability_repeat_skip") => {
             Some((
                 SEARCH_ZERO_REPEAT_COUNT as f64,
                 "skipped-zero-probability-errors/s",
             ))
+        }
+        ("pf4-dem-sat-flat-repeat-fold", "stab_pf4_dem_weighted_sat_flat_repeat_fold") => {
+            Some(((SAT_FLAT_REPEAT_COUNT as f64) * 2.0, "folded-errors/s"))
         }
         ("pf4-dem-folded-traversal", "stab_pf4_dem_analyzer_capped_repeat") => Some((
             analyzer_expanded_instructions() as f64,
@@ -220,10 +231,13 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures folded CompiledDemSampler compile, stochastic direct sample behavior, zero-probability repeat skipping, deterministic zero-shift repeat parity folding, selected direct detection-event single-stochastic zero-shift repeat parity folding, and selected direct detection-event flat stochastic zero-shift repeat parity folding; sampled-error materialization, replay, and non-selected excessive stochastic repeated-error work remain capped and broader PF4 traversal consumers remain explicit follow-up work",
         ),
         "pf4-dem-folded-traversal" => Some(
-            "contract-only: Stab measures current capped-repeat hypergraph search, zero-probability repeat skipping for hypergraph search, weighted SAT zero-probability variable elision and repeated-body skipping, capped unweighted SAT problem generation, analyzer, and ErrorMatcher traversal behavior; true folded traversal remains an explicit RPF4 follow-up",
+            "contract-only: Stab measures current capped-repeat hypergraph search, zero-probability repeat skipping for hypergraph search, weighted SAT zero-probability variable elision and repeated-body skipping, capped unselected SAT problem generation, analyzer, and ErrorMatcher traversal behavior; true folded traversal remains an explicit RPF4 follow-up",
         ),
         "pf4-dem-folded-graphlike-traversal" => Some(
             "contract-only: Stab measures current capped-repeat graphlike search behavior plus zero-probability repeat skipping; true folded graphlike traversal remains an explicit RPF4 follow-up",
+        ),
+        "pf4-dem-sat-flat-repeat-fold" => Some(
+            "contract-only: Stab measures selected SAT/WCNF flat all-nonzero zero-shift repeat folding for unweighted shortest-error SAT and weighted concrete-MAP SAT; broader shifted, nested, non-flat, and zero-probability unweighted SAT repeat traversal remains capped",
         ),
         _ => None,
     }
@@ -533,6 +547,34 @@ fn run_dem_search_sat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
     ])
 }
 
+fn run_dem_sat_flat_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let sat_flat_fixture = sat_flat_repeat_fixture(SAT_FLAT_REPEAT_COUNT);
+    let sat_flat_model = DetectorErrorModel::from_dem_str(&sat_flat_fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(vec![
+        measure_stab_batched(
+            "stab_pf4_dem_sat_flat_repeat_fold",
+            TRANSFORM_REPETITIONS,
+            || {
+                let problem = shortest_error_sat_problem(&sat_flat_model)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(problem.len());
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_weighted_sat_flat_repeat_fold",
+            TRANSFORM_REPETITIONS,
+            || {
+                let problem = likeliest_error_sat_problem(&sat_flat_model, 100)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(problem.len());
+                Ok(())
+            },
+        )?,
+    ])
+}
+
 fn run_dem_graphlike_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let fixture = search_repeat_fixture(SEARCH_REPEAT_COUNT);
     let model = DetectorErrorModel::from_dem_str(&fixture)
@@ -602,6 +644,20 @@ repeat {repeat_count} {{
 }}
 error(0.1) D0
 error(0.1) D0 L0
+"
+    )
+}
+
+fn sat_flat_repeat_fixture(repeat_count: u64) -> String {
+    format!(
+        "\
+repeat {repeat_count} {{
+    error(0.000001) D0 L0
+    error(0.25) D1 L1
+}}
+error(0.1) D0
+error(0.1) D0 L0
+error(0.1) D1 L1
 "
     )
 }

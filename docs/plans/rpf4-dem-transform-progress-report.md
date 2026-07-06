@@ -49,11 +49,9 @@ Report-only runner coverage:
 - `pf4-dem-rounded`
 - `pf4-dem-coordinate-map`, tracked in `docs/plans/rpf4-dem-coordinate-progress-report.md`
 - `pf4-dem-sampler-folded-repeat`, tracking folded sampler compilation, stochastic direct sampling, zero-probability repeat skipping, and sampled-error caps in `docs/plans/rpf4-dem-sampler-progress-report.md`
-
-Still placeholder rows:
-
-- `pf4-dem-folded-traversal`
-- `pf4-dem-folded-graphlike-traversal`
+- `pf4-dem-folded-traversal`, tracking current capped search/analyzer traversal, graphlike and hypergraph zero-probability repeat skipping, and weighted SAT/WCNF zero-probability handling in `docs/plans/rpf4-dem-search-sat-progress-report.md`
+- `pf4-dem-folded-graphlike-traversal`, tracking current capped graphlike traversal and graphlike zero-probability repeat skipping in `docs/plans/rpf4-dem-search-sat-progress-report.md`
+- `pf4-dem-sat-flat-repeat-fold`, tracking selected flat zero-shift SAT/WCNF repeat folding in `docs/plans/rpf4-dem-search-sat-progress-report.md`
 
 The implemented rows remain `non-primary-report-only` because they measure Rust public APIs and pinned Stim does not provide a faithful Rust direct timing baseline in this harness.
 They are not part of the 1.25x primary threshold file.
@@ -77,6 +75,6 @@ just bench::smoke
 ## Remaining RPF4 Work
 
 - Finish folded coordinate-map resource policy where current APIs still require caps or do not prove non-flat selected-coordinate lookup through very large repeats; the all-coordinate map cap, folded selected-query behavior, flat sparse-overlap fast path, bounded nested sparse-overlap fast path, valid flat sparse-hole behavior, and many-selected flat-overlap scan are tracked separately in `docs/plans/rpf4-dem-coordinate-progress-report.md`.
-- Finish folded or capped traversal evidence for graphlike search, hypergraph search, SAT or WCNF encoding, matcher-adjacent operations, remaining sampled-error sampler work, and analyzer-adjacent operations.
+- Finish folded or capped traversal evidence for graphlike search, hypergraph search, SAT or WCNF encoding beyond selected flat zero-shift repeat folding, matcher-adjacent operations, remaining sampled-error sampler work, and analyzer-adjacent operations.
 - Decide whether any Rust-specific copy, concat, repetition, or mutation helpers beyond existing `Clone`, `push_instruction`, `push_repeat_block`, and `append_from_dem_text` are still worth adding.
 - Add remaining resource-boundary cases only if later RPF4 work promotes high-detector or high-observable behavior beyond the current public validation and coordinate-resource subsets.

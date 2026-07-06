@@ -43,6 +43,7 @@ They are acceptable only because each current implemented subcase is supplemente
 PFM4's unweighted SAT zero-probability behavior should not be "fixed" by simply skipping `error(0)` mechanisms.
 The current `shortest_error_sat_problem` tests intentionally match Stim-style shortest-error semantics that ignore probabilities, including zero-probability error mechanisms, so skipping them would change parity instead of improving it.
 The correct future PFM4 work is true folded traversal or a sharper documented cap for the SAT consumer, not probability-based elision in the unweighted shortest-error problem.
+The selected flat zero-shift SAT repeat folding work preserves this boundary by folding only all-nonzero bodies in unweighted shortest-error SAT, where structural clauses remain representable without probability-based elision.
 
 ## Tooling Evidence
 

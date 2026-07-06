@@ -1,5 +1,6 @@
 use super::{
-    DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemTarget, DetectorErrorModel,
+    DemFlatteningBudget, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemTarget,
+    DetectorErrorModel, MAX_DEM_FLATTEN_REPEAT_UNROLL, MAX_DEM_REPEAT_NESTING,
 };
 use crate::{CircuitError, CircuitResult};
 
@@ -283,19 +284,14 @@ fn sat_problem_as_wcnf_string(
     mode: SatProblemMode,
 ) -> CircuitResult<String> {
     let include_zero_probability_errors = mode.includes_zero_probability_errors();
-    if include_zero_probability_errors {
-        model.validate_flattening_budget("SAT problem generation")?;
-    } else {
-        model.validate_effective_error_traversal_budget("SAT problem generation")?;
-    }
-    let errors = flattened_error_instructions(model, include_zero_probability_errors)?;
+    let errors = flattened_error_instructions(model, mode)?;
     if errors.is_empty() {
         return Ok(UNSAT_WDIMACS.to_string());
     }
     let (detector_count, observable_count) = if include_zero_probability_errors {
         (model.count_detectors()?, model.count_observables()?)
     } else {
-        model.nonzero_error_target_counts("SAT problem generation")?
+        flattened_error_target_counts(&errors)?
     };
     if observable_count == 0 {
         return Ok(UNSAT_WDIMACS.to_string());
@@ -420,7 +416,11 @@ fn add_error_soft_clause(
     match mode {
         SatProblemMode::Unweighted => instance.add_clause(Clause::soft(error_ref.not(), 1.0)),
         SatProblemMode::Weighted { .. } => {
-            if probability < 0.5 {
+            if probability <= 0.0 {
+                Ok(())
+            } else if probability >= 1.0 {
+                instance.add_clause(Clause::hard(vec![error_ref]))
+            } else if probability < 0.5 {
                 let weight = -(probability / (1.0 - probability)).ln();
                 instance.add_clause(Clause::soft(error_ref.not(), weight))
             } else if probability == 0.5 {
@@ -435,33 +435,43 @@ fn add_error_soft_clause(
 
 fn flattened_error_instructions(
     model: &DetectorErrorModel,
-    include_zero_probability_errors: bool,
+    mode: SatProblemMode,
 ) -> CircuitResult<Vec<FlattenedError>> {
     let mut errors = Vec::new();
-    collect_flattened_error_instructions(model, 0, include_zero_probability_errors, &mut errors)?;
+    let mut budget = DemFlatteningBudget::default();
+    collect_flattened_error_instructions(model, 0, mode, 0, &mut budget, &mut errors)?;
     Ok(errors)
 }
 
 fn collect_flattened_error_instructions(
     model: &DetectorErrorModel,
     mut detector_offset: u64,
-    include_zero_probability_errors: bool,
+    mode: SatProblemMode,
+    depth: usize,
+    budget: &mut DemFlatteningBudget,
     errors: &mut Vec<FlattenedError>,
 ) -> CircuitResult<u64> {
+    if depth > MAX_DEM_REPEAT_NESTING {
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "DEM SAT problem generation repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
+        )));
+    }
     for item in model.items() {
         match item {
             DemItem::Instruction(instruction) => match instruction.kind() {
                 DemInstructionKind::Error => {
+                    budget.add_expanded_instructions(1, "SAT problem generation")?;
                     let probability = instruction.args().first().copied().ok_or_else(|| {
                         CircuitError::invalid_detector_error_model(
                             "SAT error instruction is missing probability",
                         )
                     })?;
-                    if include_zero_probability_errors || probability != 0.0 {
+                    if mode.includes_zero_probability_errors() || probability != 0.0 {
                         errors.push(flatten_error(instruction, detector_offset)?);
                     }
                 }
                 DemInstructionKind::ShiftDetectors => {
+                    budget.add_expanded_instructions(1, "SAT problem generation")?;
                     detector_offset = detector_offset
                         .checked_add(instruction.detector_shift()?)
                         .ok_or_else(|| {
@@ -473,7 +483,36 @@ fn collect_flattened_error_instructions(
                 DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
             },
             DemItem::RepeatBlock(repeat) => {
-                if !include_zero_probability_errors
+                let repeat_count = repeat.repeat_count().get();
+                if repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL
+                    && let Some(folded_errors) = folded_flat_sat_repeat_errors(
+                        repeat.body(),
+                        repeat_count,
+                        detector_offset,
+                        mode,
+                    )?
+                {
+                    budget.add_expanded_instructions(
+                        u64::try_from(folded_errors.len()).map_err(|_| {
+                            CircuitError::invalid_detector_error_model(
+                                "SAT folded repeat error count does not fit u64",
+                            )
+                        })?,
+                        "SAT problem generation",
+                    )?;
+                    errors.extend(folded_errors);
+                    let body_shift = repeat.body().total_detector_shift()?;
+                    detector_offset = body_shift
+                        .checked_mul(repeat_count)
+                        .and_then(|shift| detector_offset.checked_add(shift))
+                        .ok_or_else(|| {
+                            CircuitError::invalid_detector_error_model(
+                                "SAT repeat detector offset overflowed",
+                            )
+                        })?;
+                    continue;
+                }
+                if !mode.includes_zero_probability_errors()
                     && !repeat
                         .body()
                         .has_nonzero_probability_error("SAT problem generation")?
@@ -489,11 +528,19 @@ fn collect_flattened_error_instructions(
                         })?;
                     continue;
                 }
-                for _ in 0..repeat.repeat_count().get() {
+                if repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL {
+                    return Err(CircuitError::invalid_detector_error_model(format!(
+                        "DEM SAT problem generation currently supports repeat counts up to {MAX_DEM_FLATTEN_REPEAT_UNROLL}, got {repeat_count}"
+                    )));
+                }
+                budget.add_repeat_iterations(repeat_count, "SAT problem generation")?;
+                for _ in 0..repeat_count {
                     detector_offset = collect_flattened_error_instructions(
                         repeat.body(),
                         detector_offset,
-                        include_zero_probability_errors,
+                        mode,
+                        depth + 1,
+                        budget,
                         errors,
                     )?;
                 }
@@ -501,6 +548,57 @@ fn collect_flattened_error_instructions(
         }
     }
     Ok(detector_offset)
+}
+
+fn folded_flat_sat_repeat_errors(
+    body: &DetectorErrorModel,
+    repeat_count: u64,
+    detector_offset: u64,
+    mode: SatProblemMode,
+) -> CircuitResult<Option<Vec<FlattenedError>>> {
+    if body.total_detector_shift()? != 0 || body.items().is_empty() {
+        return Ok(None);
+    }
+    let mut folded_errors = Vec::with_capacity(body.items().len());
+    let mut has_nonzero_probability_error = false;
+    for item in body.items() {
+        let DemItem::Instruction(instruction) = item else {
+            return Ok(None);
+        };
+        if instruction.kind() != DemInstructionKind::Error {
+            return Ok(None);
+        }
+        let probability = instruction.args().first().copied().ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "SAT error instruction is missing probability",
+            )
+        })?;
+        has_nonzero_probability_error |= probability != 0.0;
+        match mode {
+            SatProblemMode::Unweighted => {
+                if probability == 0.0 {
+                    return Ok(None);
+                }
+                folded_errors.push(flatten_error(instruction, detector_offset)?);
+            }
+            SatProblemMode::Weighted { .. } => {
+                if probability == 0.0 {
+                    continue;
+                }
+                let mut folded_error = flatten_error(instruction, detector_offset)?;
+                folded_error.probability =
+                    weighted_repeat_map_probability(probability, repeat_count);
+                if folded_error.probability != 0.0 {
+                    folded_errors.push(folded_error);
+                }
+            }
+        }
+    }
+    if has_nonzero_probability_error {
+        Ok(Some(folded_errors))
+    } else {
+        Ok(None)
+    }
 }
 
 fn flatten_error(
@@ -535,6 +633,35 @@ fn shifted_targets(targets: &[DemTarget], detector_offset: u64) -> CircuitResult
         .collect()
 }
 
+fn flattened_error_target_counts(errors: &[FlattenedError]) -> CircuitResult<(u64, u64)> {
+    let mut detector_count = 0_u64;
+    let mut observable_count = 0_u64;
+    for error in errors {
+        for target in &error.targets {
+            match *target {
+                DemTarget::RelativeDetector(detector) => {
+                    detector_count =
+                        detector_count.max(detector.get().checked_add(1).ok_or_else(|| {
+                            CircuitError::invalid_detector_error_model(
+                                "SAT detector count overflowed",
+                            )
+                        })?);
+                }
+                DemTarget::LogicalObservable(observable) => {
+                    observable_count =
+                        observable_count.max(observable.get().checked_add(1).ok_or_else(|| {
+                            CircuitError::invalid_detector_error_model(
+                                "SAT observable count overflowed",
+                            )
+                        })?);
+                }
+                DemTarget::Separator | DemTarget::Numeric(_) => {}
+            }
+        }
+    }
+    Ok((detector_count, observable_count))
+}
+
 fn dem_detector_index(detector: super::DemDetectorId) -> CircuitResult<usize> {
     usize::try_from(detector.get()).map_err(|_| {
         CircuitError::invalid_detector_error_model(format!(
@@ -562,6 +689,30 @@ fn rounded_nonnegative_usize(value: f64) -> CircuitResult<usize> {
     format!("{:.0}", value.round())
         .parse::<usize>()
         .map_err(|_| CircuitError::invalid_detector_error_model("SAT quantized weight overflowed"))
+}
+
+fn weighted_repeat_map_probability(probability: f64, repeat_count: u64) -> f64 {
+    if repeat_count == 0 || probability <= 0.0 {
+        return 0.0;
+    }
+    if probability >= 1.0 {
+        return if repeat_count.is_multiple_of(2) {
+            0.0
+        } else {
+            1.0
+        };
+    }
+    if probability == 0.5 {
+        return 0.5;
+    }
+    if probability < 0.5 {
+        return probability;
+    }
+    if repeat_count.is_multiple_of(2) {
+        1.0 - probability
+    } else {
+        probability
+    }
 }
 
 #[cfg(test)]
@@ -687,6 +838,115 @@ error(0.1) D0 L0
             unweighted_error
                 .contains("DEM SAT problem generation currently supports repeat counts up to"),
             "{unweighted_error}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sat_problem_shortest_folds_large_flat_zero_shift_repeats() -> CircuitResult<()> {
+        let model = dem("\
+repeat 100001 {
+    error(0.1) D0 L0
+    error(0.2) D0
+}
+")?;
+        let expected = shortest_error_sat_problem(&dem("error(0.1) D0 L0\nerror(0.2) D0\n")?)?;
+        assert_eq!(shortest_error_sat_problem(&model)?, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn sat_problem_likeliest_folds_large_flat_zero_shift_repeats_by_map_cost() -> CircuitResult<()>
+    {
+        let model = dem("\
+repeat 100001 {
+    error(0.000001) D0 L0
+    error(0.25) D1 L1
+}
+error(0.1) D0
+error(0.1) D0 L0
+error(0.1) D1 L1
+")?;
+        let expected = likeliest_error_sat_problem(
+            &dem("\
+error(0.000001) D0 L0
+error(0.25) D1 L1
+error(0.1) D0
+error(0.1) D0 L0
+error(0.1) D1 L1
+")?,
+            100,
+        )?;
+        assert_eq!(likeliest_error_sat_problem(&model, 100)?, expected);
+
+        let small_probability_counterexample = dem("\
+repeat 100001 {
+    error(0.000001) L0
+}
+error(0.01) L0
+")?;
+        let compact_counterexample =
+            likeliest_error_sat_problem(&dem("error(0.000001) L0\nerror(0.01) L0\n")?, 100)?;
+        assert_eq!(
+            likeliest_error_sat_problem(&small_probability_counterexample, 100)?,
+            compact_counterexample
+        );
+
+        let even_high_probability = dem("\
+repeat 100002 {
+    error(0.9) D0 L0
+}
+error(0.1) D0
+error(0.1) D0 L0
+")?;
+        let even_high_probability_compact = likeliest_error_sat_problem(
+            &dem("error(0.1) D0 L0\nerror(0.1) D0\nerror(0.1) D0 L0\n")?,
+            100,
+        )?;
+        assert_eq!(
+            likeliest_error_sat_problem(&even_high_probability, 100)?,
+            even_high_probability_compact
+        );
+
+        let odd_high_probability = dem("\
+repeat 100001 {
+    error(0.9) D0 L0
+}
+error(0.1) D0
+error(0.1) D0 L0
+")?;
+        let odd_high_probability_compact = likeliest_error_sat_problem(
+            &dem("error(0.9) D0 L0\nerror(0.1) D0\nerror(0.1) D0 L0\n")?,
+            100,
+        )?;
+        assert_eq!(
+            likeliest_error_sat_problem(&odd_high_probability, 100)?,
+            odd_high_probability_compact
+        );
+
+        let even_deterministic = dem("\
+repeat 100002 {
+    error(1) D0 L0
+}
+error(0.1) D0
+error(0.1) D0 L0
+")?;
+        let without_even_deterministic =
+            likeliest_error_sat_problem(&dem("error(0.1) D0\nerror(0.1) D0 L0\n")?, 100)?;
+        assert_eq!(
+            likeliest_error_sat_problem(&even_deterministic, 100)?,
+            without_even_deterministic
+        );
+
+        let odd_deterministic = dem("\
+repeat 100001 {
+    error(1) D0 L0
+}
+")?;
+        let one_deterministic = likeliest_error_sat_problem(&dem("error(1) D0 L0\n")?, 100)?;
+        assert_eq!(
+            likeliest_error_sat_problem(&odd_deterministic, 100)?,
+            one_deterministic
         );
         Ok(())
     }
@@ -869,6 +1129,19 @@ error(0.1) D0 L0
     #[test]
     fn sat_problem_weighted_quantization_must_be_positive() -> CircuitResult<()> {
         assert!(likeliest_error_sat_problem(&dem("error(0.1) L0")?, 0).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn sat_problem_likeliest_treats_deterministic_error_as_hard() -> CircuitResult<()> {
+        assert_eq!(
+            likeliest_error_sat_problem(&dem("error(1) L0")?, 10)?,
+            "\
+p wcnf 1 2 21
+21 1 0
+21 1 0
+"
+        );
         Ok(())
     }
 }
