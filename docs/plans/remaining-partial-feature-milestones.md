@@ -360,7 +360,7 @@ Tests:
 - Port owned cases from `vendor/stim/src/stim/util_top/circuit_to_detecting_regions.test.cc`, `vendor/stim/src/stim/gen/gen_surface_code.test.cc`, `vendor/stim/src/stim/util_top/missing_detectors.test.cc`, `vendor/stim/src/stim/stabilizers/flow.test.cc`, `vendor/stim/src/stim/util_top/circuit_flow_generators.test.cc`, `vendor/stim/src/stim/util_top/circuit_flow_generators_test.py`, and `vendor/stim/src/stim/util_top/has_flow.test.cc`.
 - Add positive tests for every promoted detecting-region gate and target shape.
 - Add positive and negative tests for missing-detector row reduction, repeated MPP products, observables, gauge detectors, honeycomb suffixes, and toric suffixes when promoted.
-- Add flow tests for measurement indices, observables, multiplication, validation, generator solving, negative cases, and diagnostics.
+- Keep the existing `coverage-stabilizers-flow` tests for basic `Flow` measurement indices, observables, multiplication, validation, and sign behavior current, and add new flow tests only for promoted `has_flow`, generator solving, solve-for-measurements, negative cases, transform integration, and diagnostics.
 - Add transform-integration tests proving flow-aware transforms preserve or intentionally rewrite flow data.
 
 Oracle rows:
