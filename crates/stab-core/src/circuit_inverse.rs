@@ -39,11 +39,11 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
 ///
 /// This includes the unitary inverse plus selected Stim-compatible
 /// reset-measure-detector, selected two-to-one detector-flow, selected `m_det`,
-/// selected MPP identity-parity detector-flow, noisy measurement-only, noisy
-/// measure-reset-only, exact noisy measure-reset detector-flow, and
-/// measure-reset pass-through packets. Broader QEC-specific inverse rewrites
-/// for measurements, resets, detectors, noise, and feedback remain active
-/// follow-up work.
+/// selected MPP identity-parity detector-flow, selected noisy MZZ detector-flow,
+/// noisy measurement-only, noisy measure-reset-only, exact noisy measure-reset
+/// detector-flow, and measure-reset pass-through packets. Broader QEC-specific
+/// inverse rewrites for measurements, resets, detectors, noise, and feedback
+/// remain active follow-up work.
 pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
     if let Some(inverse) = qec::selected_qec_inverse(circuit)? {
         return Ok(inverse);
