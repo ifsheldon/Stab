@@ -20,6 +20,9 @@ pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Ci
     if let Some(inverse) = selected_noisy_measure_reset_inverse(circuit)? {
         return Ok(Some(inverse));
     }
+    if let Some(inverse) = selected_noisy_measure_reset_detector_inverse(circuit)? {
+        return Ok(Some(inverse));
+    }
     if let Some(inverse) = selected_measure_reset_pass_through_inverse(circuit)? {
         return Ok(Some(inverse));
     }
@@ -388,6 +391,106 @@ fn noisy_measure_reset_error_gate(gate_name: &str) -> CircuitResult<&'static str
             "unsupported measure-reset gate",
         )),
     }
+}
+
+fn selected_noisy_measure_reset_detector_inverse(
+    circuit: &Circuit,
+) -> CircuitResult<Option<Circuit>> {
+    let [
+        CircuitItem::Instruction(pre_tick),
+        CircuitItem::Instruction(tick),
+        CircuitItem::Instruction(middle),
+        CircuitItem::Instruction(last),
+        CircuitItem::Instruction(detector),
+    ] = circuit.items()
+    else {
+        return Ok(None);
+    };
+
+    if !is_measure_reset_gate(pre_tick.gate().canonical_name())
+        || tick.gate().canonical_name() != "TICK"
+        || !is_measure_reset_gate(middle.gate().canonical_name())
+        || !is_measure_reset_gate(last.gate().canonical_name())
+        || detector.gate().canonical_name() != "DETECTOR"
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(build_selected_noisy_measure_reset_detector_inverse(
+        pre_tick, tick, middle, last, detector,
+    )?))
+}
+
+fn build_selected_noisy_measure_reset_detector_inverse(
+    pre_tick: &CircuitInstruction,
+    tick: &CircuitInstruction,
+    middle: &CircuitInstruction,
+    last: &CircuitInstruction,
+    detector: &CircuitInstruction,
+) -> CircuitResult<Circuit> {
+    if !tick.args().is_empty() || !tick.targets().is_empty() {
+        return Err(inverse_qec_noisy_measure_reset_detector_error(
+            "TICK must not have arguments or targets",
+        ));
+    }
+    let basis = pre_tick.gate().canonical_name();
+    if middle.gate().canonical_name() != basis || last.gate().canonical_name() != basis {
+        return Err(inverse_qec_noisy_measure_reset_detector_error(
+            "measure-reset instructions must use the same basis",
+        ));
+    }
+
+    let pre_tick_target = single_noisy_measure_reset_target(pre_tick)?;
+    let middle_target = single_noisy_measure_reset_target(middle)?;
+    let last_target = single_noisy_measure_reset_target(last)?;
+    if pre_tick_target != middle_target || pre_tick_target != last_target {
+        return Err(inverse_qec_noisy_measure_reset_detector_error(
+            "measure-reset instructions must target the same single plain qubit",
+        ));
+    }
+
+    let detector_record_offsets =
+        detector_offsets(detector, inverse_qec_noisy_measure_reset_detector_error)?;
+    if detector_record_offsets.as_slice() != [-1] {
+        return Err(inverse_qec_noisy_measure_reset_detector_error(
+            "detector must reference exactly rec[-1]",
+        ));
+    }
+
+    let mut result = Circuit::new();
+    append_measure_reset_inverse(&mut result, last)?;
+    append_measure_reset_inverse(&mut result, middle)?;
+    append_target_instruction(
+        &mut result,
+        detector.gate(),
+        detector.args(),
+        vec![Target::measurement_record(MeasureRecordOffset::try_new(
+            -1,
+        )?)],
+        detector.tag(),
+    )?;
+    result.append_instruction(tick.clone());
+    append_measure_reset_inverse(&mut result, pre_tick)?;
+    Ok(result)
+}
+
+fn is_measure_reset_gate(gate_name: &str) -> bool {
+    matches!(gate_name, "MR" | "MRX" | "MRY")
+}
+
+fn single_noisy_measure_reset_target(instruction: &CircuitInstruction) -> CircuitResult<Target> {
+    if instruction.args().len() != 1 {
+        return Err(inverse_qec_noisy_measure_reset_detector_error(
+            "measure-reset instructions must have exactly one probability argument",
+        ));
+    }
+    let targets = reversed_measure_reset_targets(instruction, false)?;
+    let [target] = targets.as_slice() else {
+        return Err(inverse_qec_noisy_measure_reset_detector_error(
+            "measure-reset instructions must each have exactly one target",
+        ));
+    };
+    Ok(target.clone())
 }
 
 fn selected_measure_reset_pass_through_inverse(
@@ -963,6 +1066,12 @@ fn inverse_qec_noisy_measurement_error(reason: &str) -> CircuitError {
 fn inverse_qec_noisy_measure_reset_error(reason: &str) -> CircuitError {
     CircuitError::invalid_tableau_conversion(format!(
         "inverse_qec selected noisy measure-reset subset requires only top-level MR, MRX, and MRY instructions with qubit targets; {reason}"
+    ))
+}
+
+fn inverse_qec_noisy_measure_reset_detector_error(reason: &str) -> CircuitError {
+    CircuitError::invalid_tableau_conversion(format!(
+        "inverse_qec selected noisy measure-reset detector subset requires one noisy single-target MR, MRX, or MRY instruction, one TICK, two matching noisy single-target measure-reset instructions, and one detector containing exactly rec[-1]; {reason}"
     ))
 }
 

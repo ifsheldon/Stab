@@ -114,7 +114,6 @@ fn circuit_inverse_qec_rejects_unpromoted_noisy_measure_reset_shapes() {
         "MR(0.125) !0\n",
         "MRX(0.25) !0\n",
         "MRY(0.375) !0\n",
-        "MR(0.125) 0\nTICK\nMR(0.25) 0\nMR(0.375) 0\nDETECTOR rec[-1]\n",
         "MR(0.125) 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
         "REPEAT 2 {\n    MR(0.125) 0\n}\n",
     ] {

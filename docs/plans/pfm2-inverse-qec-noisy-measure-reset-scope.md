@@ -20,7 +20,7 @@ It is a narrow measure-reset-only packet, not a general noisy detector-flow algo
 ## Explicit Rejections And Deferrals
 
 - Reject noisy inverted `MR`, `MRX`, and `MRY` targets instead of emitting invalid `X_ERROR` or `Z_ERROR` targets.
-- Keep noisy measure-reset plus detector rewrites such as pinned `noisy_mr_det`, pair measurements, `MPP`, detectors, observables, feedback, ordinary noise instructions, repeat blocks, `TICK`, coordinates, `SHIFT_COORDS`, and interleaved Clifford or detector-flow rewrites out of scope for this packet.
+- Keep broader noisy measure-reset plus detector rewrites, pair measurements, `MPP`, observables, feedback, ordinary noise instructions, repeat blocks beyond the exact `noisy_mr_det` packet, `TICK` placements beyond the exact packet, coordinates outside detector declarations, `SHIFT_COORDS`, and interleaved Clifford or detector-flow rewrites out of scope for this packet. The selected exact `noisy_mr_det` packet is owned by `docs/plans/pfm2-inverse-qec-noisy-measure-reset-detector-scope.md`.
 - Keep `dont_turn_measurements_into_resets`, Python API shape, and flow-returning overloads out of scope.
 
 ## Comparator And Evidence
