@@ -294,6 +294,9 @@ fn validate_supported_instruction(instruction: &CircuitInstruction) -> CircuitRe
     if SingleQubitClifford::from_gate(instruction.gate()).is_ok() {
         return validate_single_plain_qubit_targets(instruction);
     }
+    if is_feedback_capable_controlled_pauli(instruction.gate().canonical_name()) {
+        return validate_controlled_pauli_targets(instruction);
+    }
     if instruction.gate().is_two_qubit_gate() && instruction.gate().has_tableau() {
         return validate_plain_qubit_pair_targets(instruction);
     }
@@ -330,6 +333,10 @@ fn is_heralded_record_noise(instruction: &CircuitInstruction) -> bool {
     )
 }
 
+fn is_feedback_capable_controlled_pauli(gate_name: &str) -> bool {
+    matches!(gate_name, "CX" | "CY" | "CZ" | "XCZ" | "YCZ")
+}
+
 fn validate_single_plain_qubit_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
     for target in instruction.targets() {
         validate_qubit_target(instruction, target, false)?;
@@ -358,6 +365,59 @@ fn validate_plain_qubit_pair_targets(instruction: &CircuitInstruction) -> Circui
         validate_qubit_target(instruction, right, false)?;
     }
     Ok(())
+}
+
+fn validate_controlled_pauli_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {
+    for group in instruction.target_groups() {
+        let [left, right] = group else {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "simple detecting-region extraction only supports {} with paired targets",
+                instruction.gate().canonical_name()
+            )));
+        };
+        if left.is_sweep_bit_target() || right.is_sweep_bit_target() {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "simple detecting-region extraction does not support sweep-controlled {} targets",
+                instruction.gate().canonical_name()
+            )));
+        }
+        let left_is_record = left.is_measurement_record_target();
+        let right_is_record = right.is_measurement_record_target();
+        match (left_is_record, right_is_record) {
+            (false, false) => {
+                validate_qubit_target(instruction, left, false)?;
+                validate_qubit_target(instruction, right, false)?;
+            }
+            (true, false) | (false, true) => {
+                validate_feedback_position(instruction.gate().canonical_name(), left_is_record)?;
+                let feedback_target = if left_is_record { right } else { left };
+                validate_qubit_target(instruction, feedback_target, false)?;
+            }
+            (true, true) => {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "simple detecting-region extraction only supports {} measurement-record feedback with exactly one plain qubit target",
+                    instruction.gate().canonical_name()
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_feedback_position(gate_name: &str, record_is_first: bool) -> CircuitResult<()> {
+    let valid = match gate_name {
+        "CX" | "CY" => record_is_first,
+        "XCZ" | "YCZ" => !record_is_first,
+        "CZ" => true,
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(CircuitError::invalid_detector_error_model(format!(
+            "simple detecting-region extraction does not support {gate_name} measurement-record feedback in this target position"
+        )))
+    }
 }
 
 fn validate_measurement_qubit_pair_targets(instruction: &CircuitInstruction) -> CircuitResult<()> {

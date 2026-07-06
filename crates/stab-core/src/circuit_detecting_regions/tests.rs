@@ -961,20 +961,128 @@ fn detecting_regions_clifford_supports_promoted_controlled_pauli_gate() {
 }
 
 #[test]
-fn detecting_regions_clifford_rejects_feedback_controlled_cx() {
-    let circuit =
-        Circuit::from_stim_str("MXX 0 1\nCX rec[-1] 2\nTICK\nMXX 2 3\nDETECTOR rec[-1]\n").unwrap();
-    let error = circuit_detecting_regions(
-        &circuit,
-        DetectingRegionOptions {
-            detectors: vec![detector(0)],
-            ticks: vec![0],
-            ignore_anticommutation_errors: false,
-        },
-    )
-    .unwrap_err();
+fn detecting_regions_target_shape_supports_measurement_record_feedback() {
+    let cases = [
+        (
+            "CX record-first",
+            "R 0 1\n\
+             M 0\n\
+             TICK\n\
+             CX rec[-1] 1\n\
+             M 1\n\
+             DETECTOR rec[-1]\n",
+            "+_Z",
+        ),
+        (
+            "CY record-first",
+            "RY 0 1\n\
+             MY 0\n\
+             TICK\n\
+             CY rec[-1] 1\n\
+             MY 1\n\
+             DETECTOR rec[-1]\n",
+            "+_Y",
+        ),
+        (
+            "CZ record-first",
+            "RX 0 1\n\
+             MX 0\n\
+             TICK\n\
+             CZ rec[-1] 1\n\
+             MX 1\n\
+             DETECTOR rec[-1]\n",
+            "+_X",
+        ),
+        (
+            "CZ record-second",
+            "RX 0 1\n\
+             MX 0\n\
+             TICK\n\
+             CZ 1 rec[-1]\n\
+             MX 1\n\
+             DETECTOR rec[-1]\n",
+            "+_X",
+        ),
+        (
+            "XCZ record-second",
+            "R 0 1\n\
+             M 0\n\
+             TICK\n\
+             XCZ 1 rec[-1]\n\
+             M 1\n\
+             DETECTOR rec[-1]\n",
+            "+_Z",
+        ),
+        (
+            "YCZ record-second",
+            "RY 0 1\n\
+             MY 0\n\
+             TICK\n\
+             YCZ 1 rec[-1]\n\
+             MY 1\n\
+             DETECTOR rec[-1]\n",
+            "+_Y",
+        ),
+    ];
 
-    assert!(error.to_string().contains("plain qubit targets"));
+    for (name, circuit, expected) in cases {
+        let actual = regions(circuit, vec![detector(0)], vec![0]);
+
+        assert_eq!(actual[&detector(0)][&0].to_string(), expected, "{name}");
+    }
+}
+
+#[test]
+fn detecting_regions_target_shape_rejects_unsupported_feedback_shapes() {
+    let cases = [
+        (
+            "CX record-second",
+            "R 0 1\n\
+             M 0\n\
+             TICK\n\
+             CX 1 rec[-1]\n\
+             M 1\n\
+             DETECTOR rec[-1]\n",
+            "target position",
+        ),
+        (
+            "XCZ record-first",
+            "R 0 1\n\
+             M 0\n\
+             TICK\n\
+             XCZ rec[-1] 1\n\
+             M 1\n\
+             DETECTOR rec[-1]\n",
+            "target position",
+        ),
+        (
+            "CZ record-record",
+            "M 0 1\n\
+             TICK\n\
+             CZ rec[-1] rec[-2]\n\
+             M 2\n\
+             DETECTOR rec[-1]\n",
+            "exactly one plain qubit target",
+        ),
+    ];
+
+    for (name, circuit, expected_error) in cases {
+        let circuit = Circuit::from_stim_str(circuit).unwrap();
+        let error = circuit_detecting_regions(
+            &circuit,
+            DetectingRegionOptions {
+                detectors: vec![detector(0)],
+                ticks: vec![0],
+                ignore_anticommutation_errors: false,
+            },
+        )
+        .unwrap_err();
+
+        assert!(
+            error.to_string().contains(expected_error),
+            "{name}: {error}"
+        );
+    }
 }
 
 #[test]
@@ -991,7 +1099,7 @@ fn detecting_regions_clifford_rejects_sweep_controlled_cx() {
     )
     .unwrap_err();
 
-    assert!(error.to_string().contains("plain qubit targets"));
+    assert!(error.to_string().contains("sweep-controlled"));
 }
 
 #[test]
