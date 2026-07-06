@@ -43,7 +43,9 @@ pub use circuit_detecting_regions::{
 };
 pub use circuit_feedback::circuit_with_inlined_feedback;
 pub use circuit_flow::{
-    check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
+    UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,
+    check_if_circuit_has_unsigned_stabilizer_flows,
+    check_unsigned_stabilizer_flows_with_diagnostics, circuit_flow_generators,
     circuit_has_all_unsigned_stabilizer_flows, circuit_has_unsigned_stabilizer_flow,
     solve_for_flow_measurements,
 };
@@ -94,8 +96,9 @@ pub use reference_sample_tree::ReferenceSampleTree;
 pub use result_formats::SampleFormat;
 pub use sampling::{CompiledSampler, count_determined_measurements};
 pub use stabilizers::{
-    CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, PauliBasis, PauliPhase,
-    PauliSign, PauliString, PauliStringIterator, SingleQubitClifford, StabilizerError,
-    StabilizerResult, Tableau, TableauIterator, stabilizers_to_tableau, unitary_to_tableau,
+    CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, FlowMeasurementIndex,
+    PauliBasis, PauliPhase, PauliSign, PauliString, PauliStringIterator, SingleQubitClifford,
+    StabilizerError, StabilizerResult, Tableau, TableauIterator, stabilizers_to_tableau,
+    unitary_to_tableau,
 };
 pub use target::{Pauli, Target};

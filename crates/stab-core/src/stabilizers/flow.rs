@@ -7,11 +7,21 @@ use super::{
     StabilizerResult,
 };
 
+/// Measurement-record term inside a stabilizer flow.
+///
+/// Nonnegative values refer to absolute measurement indices, and negative values refer to
+/// Stim-style relative `rec[...]` offsets.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-struct FlowMeasurementIndex(i32);
+pub struct FlowMeasurementIndex(i32);
 
 impl FlowMeasurementIndex {
-    fn get(self) -> i32 {
+    /// Creates a flow measurement-record term while preserving its absolute or relative sign.
+    pub fn new(value: i32) -> Self {
+        Self(value)
+    }
+
+    /// Returns the raw absolute or relative flow measurement-record value.
+    pub fn get(self) -> i32 {
         self.0
     }
 }
@@ -43,7 +53,10 @@ impl Flow {
         let mut result = Self {
             input,
             output,
-            measurements: measurements.into_iter().map(FlowMeasurementIndex).collect(),
+            measurements: measurements
+                .into_iter()
+                .map(FlowMeasurementIndex::new)
+                .collect(),
             observables: observables.into_iter().map(FlowObservableIndex).collect(),
         };
         result.canonicalize();

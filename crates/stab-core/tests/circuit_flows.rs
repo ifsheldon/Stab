@@ -6,9 +6,10 @@
 use std::str::FromStr;
 
 use stab_core::{
-    Circuit, Flow, check_if_circuit_has_unsigned_stabilizer_flows,
-    circuit_has_all_unsigned_stabilizer_flows, circuit_has_unsigned_stabilizer_flow,
-    solve_for_flow_measurements,
+    Circuit, Flow, FlowMeasurementIndex, PauliString, UnsignedStabilizerFlowFailure,
+    check_if_circuit_has_unsigned_stabilizer_flows,
+    check_unsigned_stabilizer_flows_with_diagnostics, circuit_has_all_unsigned_stabilizer_flows,
+    circuit_has_unsigned_stabilizer_flow, solve_for_flow_measurements,
 };
 
 #[test]
@@ -40,6 +41,133 @@ fn check_if_circuit_has_unsigned_stabilizer_flows_ignores_signs() {
         check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
         vec![true, true, true]
     );
+}
+
+#[test]
+fn unsigned_stabilizer_flow_diagnostics_explain_unitary_mismatches() {
+    let circuit = circuit("H 0\n");
+    let checks = check_unsigned_stabilizer_flows_with_diagnostics(
+        &circuit,
+        &[flow("X -> Z"), flow("X -> X")],
+    );
+    let mut checks = checks.iter();
+    let first = checks.next().expect("first diagnostic check");
+    let second = checks.next().expect("second diagnostic check");
+    assert!(checks.next().is_none());
+
+    assert!(first.has_flow());
+    assert_eq!(first.failure(), None);
+    assert!(!second.has_flow());
+    assert_eq!(
+        second.failure(),
+        Some(&UnsignedStabilizerFlowFailure::OutputMismatch {
+            expected_output: pauli("X"),
+            actual_output: pauli("Z"),
+        })
+    );
+
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &[flow("X -> Z"), flow("X -> X")]),
+        vec![true, false]
+    );
+}
+
+#[test]
+fn unsigned_stabilizer_flow_diagnostics_explain_sparse_tracker_failures() {
+    let circuit = circuit("M 0\n");
+    let checks = check_unsigned_stabilizer_flows_with_diagnostics(
+        &circuit,
+        &[
+            flow("Z -> rec[-1]"),
+            flow("X -> rec[-1]"),
+            flow("Z -> rec[-2]"),
+        ],
+    );
+    let mut checks = checks.iter();
+    let first = checks.next().expect("first diagnostic check");
+    let second = checks.next().expect("second diagnostic check");
+    let third = checks.next().expect("third diagnostic check");
+    assert!(checks.next().is_none());
+
+    assert!(first.has_flow());
+    assert_eq!(first.failure(), None);
+    assert!(!second.has_flow());
+    assert_eq!(
+        second.failure(),
+        Some(&UnsignedStabilizerFlowFailure::InputMismatch {
+            expected_input: pauli("X"),
+            actual_input: pauli("Z"),
+        })
+    );
+    assert!(!third.has_flow());
+    assert_eq!(
+        third.failure(),
+        Some(
+            &UnsignedStabilizerFlowFailure::MeasurementRecordOutOfRange {
+                record: FlowMeasurementIndex::new(-2),
+                measurement_count: 1,
+            }
+        )
+    );
+}
+
+#[test]
+fn unsigned_stabilizer_flow_diagnostics_keep_unsupported_circuits_fail_closed() {
+    let checks = check_unsigned_stabilizer_flows_with_diagnostics(
+        &circuit("SPP X0*Z0\n"),
+        &[flow("Z -> Z")],
+    );
+    let mut checks = checks.iter();
+    let check = checks.next().expect("diagnostic check");
+    assert!(checks.next().is_none());
+
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(&circuit("SPP X0*Z0\n"), &[flow("Z -> Z")]),
+        vec![false]
+    );
+    assert!(!check.has_flow());
+    let failure = check.failure().expect("unsupported diagnostic");
+    assert!(matches!(
+        failure,
+        UnsignedStabilizerFlowFailure::UnsupportedCircuit { .. }
+    ));
+    if let UnsignedStabilizerFlowFailure::UnsupportedCircuit { reason } = failure {
+        assert!(!reason.is_empty());
+    }
+}
+
+#[test]
+fn unsigned_stabilizer_flow_diagnostics_match_bool_checker() {
+    let cases = [
+        (
+            circuit("H 0\n"),
+            vec![flow("X -> Z"), flow("Y -> Y"), flow("X -> X")],
+        ),
+        (
+            circuit(
+                "
+                M 0
+                OBSERVABLE_INCLUDE(0) rec[-1]
+                ",
+            ),
+            vec![
+                flow("Z -> rec[-1]"),
+                flow("1 -> rec[-1] xor obs[0]"),
+                flow("X -> rec[-1]"),
+                flow("Z -> rec[-2]"),
+            ],
+        ),
+        (circuit("SPP X0*Z0\n"), vec![flow("Z -> Z")]),
+    ];
+
+    for (circuit, flows) in cases {
+        let bool_checks = check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows);
+        let diagnostic_checks = check_unsigned_stabilizer_flows_with_diagnostics(&circuit, &flows)
+            .iter()
+            .map(|check| check.has_flow())
+            .collect::<Vec<_>>();
+        assert_eq!(diagnostic_checks, bool_checks);
+    }
 }
 
 #[test]
@@ -564,4 +692,8 @@ fn circuit(text: &str) -> Circuit {
 
 fn flow(text: &str) -> Flow {
     Flow::from_str(text).expect("parse flow")
+}
+
+fn pauli(text: &str) -> PauliString {
+    PauliString::from_str(text).expect("parse pauli")
 }

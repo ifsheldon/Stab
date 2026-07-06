@@ -10,7 +10,7 @@ mod unitary;
 pub use clifford::{CliffordString, SingleQubitClifford};
 pub use conversions::stabilizers_to_tableau;
 pub use error::{StabilizerError, StabilizerResult};
-pub use flow::Flow;
+pub use flow::{Flow, FlowMeasurementIndex};
 pub use iter::{CommutingPauliStringIterator, PauliStringIterator, TableauIterator};
 pub use pauli::{FlexPauliString, PauliBasis, PauliPhase, PauliSign, PauliString};
 pub use tableau::Tableau;

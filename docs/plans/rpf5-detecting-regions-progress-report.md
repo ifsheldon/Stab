@@ -256,4 +256,4 @@ The remaining review risk is that the report-only benchmark rows exercise promot
 
 - Target-shape support beyond the promoted inverted measurement families, selected feedback placements, `MPAD`, heralded record-producing noise, `MPP`, and `SPP`/`SPP_DAG` Pauli products, broader generated-code regions beyond the promoted repetition-code and selected rotated surface-code cases, and broader gauge behavior.
 - Missing-detector generated-code suffix analysis beyond the promoted honeycomb and toric cases, plus broader flow-dependent utility behavior.
-- Measurement-rich flows beyond the promoted unsigned `has_flow` and `has_all_flows` Rust helper subset, including broader `flow_generators`, diagnostics, signed sampled checks, and transform integration.
+- Measurement-rich flows beyond the promoted unsigned `has_flow`, `has_all_flows`, and unsigned diagnostic Rust helper subset, including broader `flow_generators`, solver or generator diagnostics, signed sampled checks, and transform integration.
