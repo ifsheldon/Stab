@@ -19,15 +19,11 @@ pub fn missing_detectors(
     circuit: &Circuit,
     options: MissingDetectorOptions,
 ) -> CircuitResult<Circuit> {
+    if let Some(folded) = try_missing_detectors_folded_final_repeat(circuit, options)? {
+        return Ok(folded);
+    }
     validate_repeat_budget(circuit)?;
-    let mut finder = MissingDetectorFinder {
-        tracker: InvariantTracker::new(circuit.count_qubits(), options)?,
-        measurement_count: 0,
-        known_rows: Vec::new(),
-        invariants: Vec::new(),
-        logical_rows: BTreeMap::new(),
-        ignored_logical_rows: BTreeSet::new(),
-    };
+    let mut finder = MissingDetectorFinder::new(circuit.count_qubits(), options)?;
     finder.process_circuit(circuit)?;
     finder.build_output()
 }
@@ -42,6 +38,17 @@ struct MissingDetectorFinder {
 }
 
 impl MissingDetectorFinder {
+    fn new(qubit_count: usize, options: MissingDetectorOptions) -> CircuitResult<Self> {
+        Ok(Self {
+            tracker: InvariantTracker::new(qubit_count, options)?,
+            measurement_count: 0,
+            known_rows: Vec::new(),
+            invariants: Vec::new(),
+            logical_rows: BTreeMap::new(),
+            ignored_logical_rows: BTreeSet::new(),
+        })
+    }
+
     fn process_circuit(&mut self, circuit: &Circuit) -> CircuitResult<()> {
         for item in circuit.items() {
             match item {
@@ -357,6 +364,114 @@ impl MissingDetectorFinder {
         }
         Ok(result)
     }
+}
+
+fn try_missing_detectors_folded_final_repeat(
+    circuit: &Circuit,
+    options: MissingDetectorOptions,
+) -> CircuitResult<Option<Circuit>> {
+    let Some((prefix, repeat)) = final_repeat_with_prefix(circuit) else {
+        return Ok(None);
+    };
+    if !repeat_body_record_targets_are_local(repeat.body())? {
+        return Ok(None);
+    }
+    if !repeat_exceeds_materialized_budget(repeat)? {
+        return Ok(None);
+    }
+
+    validate_repeat_budget(&prefix)?;
+    validate_repeat_budget(repeat.body())?;
+
+    let mut finder = MissingDetectorFinder::new(circuit.count_qubits(), options)?;
+    if finder.process_circuit(&prefix).is_err() {
+        return Ok(None);
+    }
+    if !matches!(finder.build_output(), Ok(output) if output.is_empty()) {
+        return Ok(None);
+    }
+
+    let tracker_before_repeat = finder.tracker.clone();
+    if finder.process_circuit(repeat.body()).is_err() {
+        return Ok(None);
+    }
+    if finder.tracker != tracker_before_repeat {
+        return Ok(None);
+    }
+    if !matches!(finder.build_output(), Ok(output) if output.is_empty()) {
+        return Ok(None);
+    }
+
+    Ok(Some(Circuit::new()))
+}
+
+fn final_repeat_with_prefix(circuit: &Circuit) -> Option<(Circuit, &RepeatBlock)> {
+    let (last, prefix_items) = circuit.items().split_last()?;
+    let CircuitItem::RepeatBlock(repeat) = last else {
+        return None;
+    };
+    Some((Circuit::from_unfused_items(prefix_items.to_vec()), repeat))
+}
+
+fn repeat_exceeds_materialized_budget(repeat: &RepeatBlock) -> CircuitResult<bool> {
+    let repeat_count = repeat.repeat_count().get();
+    if repeat_count > MAX_MISSING_DETECTOR_REPEAT_ITERATIONS {
+        return Ok(true);
+    }
+    let body_work_units = expanded_circuit_work_units(repeat.body())?;
+    let expanded_work_units = body_work_units.checked_mul(repeat_count).ok_or_else(|| {
+        CircuitError::invalid_detector_error_model(
+            "missing-detector repeat work-unit expansion count overflowed",
+        )
+    })?;
+    Ok(expanded_work_units > MAX_MISSING_DETECTOR_EXPANDED_WORK_UNITS)
+}
+
+fn repeat_body_record_targets_are_local(circuit: &Circuit) -> CircuitResult<bool> {
+    let mut measurements_seen = 0_i64;
+    for item in circuit.items() {
+        let CircuitItem::Instruction(instruction) = item else {
+            return Ok(false);
+        };
+        // Observable rows merge by observable id across iterations, so one folded body is not proof.
+        if instruction.gate().canonical_name() == "OBSERVABLE_INCLUDE" {
+            return Ok(false);
+        }
+        for target in instruction.targets() {
+            let Some(offset) = target.measurement_record_offset() else {
+                continue;
+            };
+            let absolute_index = measurements_seen
+                .checked_add(i64::from(offset.get()))
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "measurement record offset overflowed during folded missing-detector repeat validation",
+                    )
+                })?;
+            if absolute_index < 0 || absolute_index >= measurements_seen {
+                return Ok(false);
+            }
+        }
+        let produced =
+            i64::try_from(instruction_measurement_result_count(instruction)?).map_err(|_| {
+                CircuitError::invalid_detector_error_model(
+                    "folded missing-detector repeat measurement count does not fit i64",
+                )
+            })?;
+        measurements_seen = measurements_seen.checked_add(produced).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "folded missing-detector repeat measurement count overflowed",
+            )
+        })?;
+    }
+    Ok(true)
+}
+
+fn instruction_measurement_result_count(instruction: &CircuitInstruction) -> CircuitResult<usize> {
+    if !instruction.gate().produces_measurements() {
+        return Ok(0);
+    }
+    Ok(instruction.target_groups().len())
 }
 
 #[derive(Default)]

@@ -341,6 +341,101 @@ fn pf5_missing_detectors_repeat_handles_nested_rows_and_known_rows()
 }
 
 #[test]
+fn pf5_missing_detectors_repeat_folds_final_covered_deterministic_loop()
+-> Result<(), Box<dyn std::error::Error>> {
+    require_missing_eq(
+        "REPEAT 1000001 {\n    M 0\n    DETECTOR rec[-1]\n}\n",
+        false,
+        "",
+        "known-input final repeat with local detector rows",
+    )?;
+    require_missing_eq(
+        "R 0\nREPEAT 1000001 {\n    M 0\n    DETECTOR rec[-1]\n}\n",
+        true,
+        "",
+        "reset-prefix final repeat with local detector rows",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn pf5_missing_detectors_repeat_keeps_unselected_large_repeats_capped()
+-> Result<(), Box<dyn std::error::Error>> {
+    let cross_iteration = Circuit::from_stim_str(
+        "R 0\nM 0\nREPEAT 1000001 {\n    M 0\n    DETECTOR rec[-1] rec[-2]\n}\n",
+    )?;
+    let Err(error) = missing_detectors(
+        &cross_iteration,
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements: true,
+        },
+    ) else {
+        return Err(std::io::Error::other("expected cross-iteration repeat rejection").into());
+    };
+    if !error.to_string().contains("expanded repeat iterations") {
+        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
+    }
+
+    let observable_merging = Circuit::from_stim_str(
+        "R 0\nREPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
+    )?;
+    let Err(error) = missing_detectors(
+        &observable_merging,
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements: true,
+        },
+    ) else {
+        return Err(std::io::Error::other("expected observable-row repeat rejection").into());
+    };
+    if !error.to_string().contains("expanded repeat iterations") {
+        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
+    }
+
+    for (context, text) in [
+        (
+            "unsupported shift coords",
+            "REPEAT 1000001 {\n    SHIFT_COORDS(1)\n}\n",
+        ),
+        (
+            "unsupported measurement pad",
+            "REPEAT 1000001 {\n    MPAD 0\n}\n",
+        ),
+    ] {
+        let circuit = Circuit::from_stim_str(text)?;
+        let Err(error) = missing_detectors(
+            &circuit,
+            MissingDetectorOptions {
+                ignore_non_deterministic_measurements: true,
+            },
+        ) else {
+            return Err(
+                std::io::Error::other(format!("expected {context} repeat rejection")).into(),
+            );
+        };
+        if !error.to_string().contains("expanded repeat iterations") {
+            return Err(
+                std::io::Error::other(format!("{context}: unexpected error: {error}")).into(),
+            );
+        }
+    }
+
+    let tracker_changing =
+        Circuit::from_stim_str("REPEAT 1000001 {\n    R 0\n    M 0\n    DETECTOR rec[-1]\n}\n")?;
+    let Err(error) = missing_detectors(
+        &tracker_changing,
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements: true,
+        },
+    ) else {
+        return Err(std::io::Error::other("expected tracker-changing repeat rejection").into());
+    };
+    if !error.to_string().contains("expanded repeat iterations") {
+        return Err(std::io::Error::other(format!("unexpected error: {error}")).into());
+    }
+    Ok(())
+}
+
+#[test]
 fn pf5_missing_detectors_repeat_rejects_excessive_expansion()
 -> Result<(), Box<dyn std::error::Error>> {
     let circuit = Circuit::from_stim_str("REPEAT 1000001 {\n    M 0\n}\n")?;

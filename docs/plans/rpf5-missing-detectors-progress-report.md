@@ -6,8 +6,8 @@ This RPF5 slice promotes the Rust `missing_detectors` utility beyond the M9 basi
 It adds Gaussian row reduction over detector and observable rows plus a scoped internal stabilizer-invariant tracker for deterministic reset, measurement, MPP, and pair-measurement cases.
 It also promotes tableau-backed single-qubit and fixed two-qubit Clifford propagation for plain qubit target groups.
 It also promotes `SPP` and `SPP_DAG` unitary Pauli-product instructions by analyzing their existing decomposition into the supported Clifford subset.
-It also promotes bounded repeat traversal with explicit expansion caps for the current materialized Rust utility surface.
-It is not an RPF5 completion report because broader generated-code workloads, folded large-repeat traversal beyond the current caps, public measurement-rich flow solving, and transform integration remain active work.
+It also promotes bounded repeat traversal with explicit expansion caps for the current materialized Rust utility surface plus a selected folded final-repeat fast path for covered deterministic measurement loops that prove an empty suffix without materializing every iteration.
+It is not an RPF5 completion report because broader generated-code workloads, broader folded large-repeat traversal beyond the selected final-repeat empty-suffix case, public measurement-rich flow solving, and transform integration remain active work.
 
 ## Implemented Surfaces
 
@@ -41,9 +41,11 @@ Implemented Rust tests:
 - `pf5_missing_detectors_spp_rejects_anti_hermitian_unitary_products`
 - `pf5_missing_detectors_repeat_tracks_deterministic_measurements`
 - `pf5_missing_detectors_repeat_handles_nested_rows_and_known_rows`
+- `pf5_missing_detectors_repeat_folds_final_covered_deterministic_loop`
+- `pf5_missing_detectors_repeat_keeps_unselected_large_repeats_capped`
 - `pf5_missing_detectors_repeat_rejects_excessive_expansion`
 
-These tests cover Gaussian cleanup for multi-record detector rows, repeated MPP stabilizer-product constraints, unknown-input behavior, record-only observable rows, ignored Pauli observable rows, the promoted honeycomb and toric generated-code suffixes, all single-qubit Clifford gates, every canonical fixed two-qubit tableau gate, hand-pinned non-self-inverse `S`, signed `ISWAP_DAG`, exact expected outputs for representative `SPP`, `SPP_DAG`, inverted, multi-group, and unknown-input cases, `SPP` and `SPP_DAG` parity against explicit decomposition for complex products, anti-Hermitian `SPP` and `SPP_DAG` rejection, nondeterministic post-Clifford measurement cases, bounded repeat traversal through deterministic measurements, nested repeats, known detector and observable rows after repeats, excessive repeat rejection including decomposed `SPP` repeat work, and fail-closed behavior for non-plain unitary targets.
+These tests cover Gaussian cleanup for multi-record detector rows, repeated MPP stabilizer-product constraints, unknown-input behavior, record-only observable rows, ignored Pauli observable rows, the promoted honeycomb and toric generated-code suffixes, all single-qubit Clifford gates, every canonical fixed two-qubit tableau gate, hand-pinned non-self-inverse `S`, signed `ISWAP_DAG`, exact expected outputs for representative `SPP`, `SPP_DAG`, inverted, multi-group, and unknown-input cases, `SPP` and `SPP_DAG` parity against explicit decomposition for complex products, anti-Hermitian `SPP` and `SPP_DAG` rejection, nondeterministic post-Clifford measurement cases, bounded repeat traversal through deterministic measurements, nested repeats, known detector and observable rows after repeats, selected folded final-repeat traversal for covered deterministic measurement loops with body-local record references and unchanged tracker state, fallback rejection for cross-iteration record references, observable rows, unsupported local bodies, and tracker-changing repeated bodies, excessive repeat rejection including decomposed `SPP` repeat work, and fail-closed behavior for non-plain unitary targets.
 
 ## Oracle Rows
 
@@ -73,9 +75,23 @@ The generated-code row measures the promoted honeycomb and toric generated-code 
 Both rows remain `non-primary-report-only` because pinned Stim does not provide a faithful CLI timing ratio for this Rust utility surface.
 They are not part of the 1.25x primary threshold file.
 The `SPP` and `SPP_DAG` slice is structural parity work that reuses the existing decomposition path and is not separately benchmarked; the generated-code row remains the performance-oriented missing-detectors workload.
-The bounded repeat traversal slice is structural resource-boundary work and is not separately benchmarked.
+The bounded and selected folded final-repeat traversal slices are structural resource-boundary work and are not separately benchmarked.
 
 ## Verification Evidence
+
+Current folded-final-repeat slice checks:
+
+```sh
+cargo fmt --all --check
+cargo clippy -p stab-core -p stab-cli -p stab-oracle -p stab-bench --all-targets -- -D warnings
+cargo test --workspace --quiet
+cargo test -p stab-core --test missing_detectors pf5_missing_detectors_repeat --quiet
+cargo test -p stab-oracle fixtures --quiet
+just oracle::run --milestone PF5 --structural
+just oracle::run --implemented-only
+just bench::smoke
+just maintenance::pre-commit
+```
 
 Target checks for this slice:
 
@@ -97,15 +113,15 @@ just bench::compare --milestone PF5
 ## Remaining RPF5 Work
 
 - Broader generated-code missing-detector suffix analysis beyond the promoted honeycomb and toric cases.
-- Folded large-repeat traversal beyond the current materialized caps and generated-code gate families beyond tableau-backed single-qubit and fixed two-qubit Clifford propagation plus `SPP` or `SPP_DAG` decomposition in the invariant tracker.
+- Broader folded large-repeat traversal beyond the selected final covered deterministic measurement-loop fast path and generated-code gate families beyond tableau-backed single-qubit and fixed two-qubit Clifford propagation plus `SPP` or `SPP_DAG` decomposition in the invariant tracker.
 - Public measurement-rich flow semantics beyond the promoted unsigned `has_flow`, unsigned `has_all_flows`, unsigned diagnostic Rust helper, scoped signed sampled Rust checker, and current generator subsets, including Python-style signed sampled binding shape, broader composed `flow_generators`, solver or generator diagnostics, and transform integration.
 - Continue keeping benchmark harness smoke tests split out of `ops/bench/src/baseline/tests.rs`, because the file is close to the project’s 1200-line threshold.
 
 ## Audit And Review
 
-Local milestone-audit found no blocking implementation, evidence, benchmark, or spec-loop findings for this SPP missing-detectors slice after the oracle row and documentation updates.
+Local milestone-audit for the selected folded-final-repeat slice found the scope complete after fixing two proof-boundary issues: observable rows are now explicit fold non-goals because they merge by observable id across iterations, and proof-run analyzer errors now fall back to the original repeat-budget path instead of changing the public error class.
 
 Full-code-review used GPT-5.5/xhigh sidecars for Rust compatibility and docs or oracle evidence.
-The docs or oracle sidecar found that summary docs omitted the new `SPP` and `SPP_DAG` missing-detectors slice and that anti-Hermitian rejection evidence covered only `SPP`; the summaries now include the slice and the negative test now covers both `SPP` and `SPP_DAG`.
-The Rust sidecar found that repeat-budget validation undercharged decomposed `SPP` and `SPP_DAG` work and that positive tests were mostly self-oracled through decomposition; the budget now charges decomposed work units, exact-output tests cover representative simple cases, and complex-product tests still compare against the explicit decomposition path.
-No remaining P0, P1, or P2 findings are known for this slice.
+The Rust sidecar found a P2 fallback bug where unsupported local bodies such as `SHIFT_COORDS` or `MPAD` could return proof-run analyzer errors before the original expanded-repeat budget error; the fold proof now treats processing errors as ineligibility and the regression covers unsupported local bodies.
+The docs or oracle sidecar found a P2 scope-alignment gap where the positive scope under-specified the observable-row exclusion and the audit block still described an older SPP slice; the scope note, report, inventory, checklist, roadmap, and oracle metadata now describe selected folded final-repeat traversal plus explicit observable-row fallback.
+No remaining P0, P1, or P2 findings are known for this folded-final-repeat slice.
