@@ -116,9 +116,10 @@ impl Circuit {
 
     /// Returns the currently supported QEC inverse subset.
     ///
-    /// This is intentionally equivalent to `inverse_unitary` in M6. Stim's richer
-    /// measurement, detector, feedback, and noise rewrites are deferred until those
-    /// semantic dependencies exist in Stab.
+    /// This includes `inverse_unitary` plus selected single-target
+    /// reset-measure-detector identity rewrites. Stim's richer measurement,
+    /// detector, feedback, and noise rewrites are deferred until those semantic
+    /// dependencies exist in Stab.
     pub fn inverse_qec(&self) -> CircuitResult<Self> {
         crate::circuit_inverse_qec(self)
     }

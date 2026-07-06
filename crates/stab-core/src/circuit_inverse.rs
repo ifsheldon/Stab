@@ -35,10 +35,116 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
 
 /// Returns the currently implemented QEC inverse subset.
 ///
-/// In M6 this delegates to `circuit_inverse_unitary`. Stim's QEC-specific inverse
-/// rewrites for measurements, resets, detectors, noise, and feedback are deferred.
+/// This includes the unitary inverse plus a selected Stim-compatible
+/// single-target reset-measure-detector triplet. Broader QEC-specific inverse
+/// rewrites for measurements, resets, detectors, noise, and feedback remain
+/// deferred.
 pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
+    if let Some(inverse) = selected_reset_measure_detector_inverse(circuit)? {
+        return Ok(inverse);
+    }
     circuit_inverse_unitary(circuit)
+}
+
+fn selected_reset_measure_detector_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+    let [
+        CircuitItem::Instruction(reset),
+        CircuitItem::Instruction(measurement),
+        CircuitItem::Instruction(detector),
+    ] = circuit.items()
+    else {
+        return Ok(None);
+    };
+
+    let Some((measurement_gate, _basis)) =
+        reset_inverse_gate_and_basis(reset.gate().canonical_name())
+    else {
+        return Ok(None);
+    };
+    if measurement.gate().canonical_name() != measurement_gate
+        || detector.gate().canonical_name() != "DETECTOR"
+    {
+        return Ok(None);
+    }
+
+    validate_selected_reset_measure_detector(reset, measurement, detector)?;
+    Ok(Some(circuit.clone()))
+}
+
+fn validate_selected_reset_measure_detector(
+    reset: &CircuitInstruction,
+    measurement: &CircuitInstruction,
+    detector: &CircuitInstruction,
+) -> CircuitResult<()> {
+    if !reset.args().is_empty() || !measurement.args().is_empty() {
+        return Err(inverse_qec_reset_measure_detector_error(
+            "reset and measurement instructions must be noiseless",
+        ));
+    }
+
+    let reset_targets = plain_unique_single_qubit_targets(reset).ok_or_else(|| {
+        inverse_qec_reset_measure_detector_error("reset targets must be plain unique qubits")
+    })?;
+    let measurement_targets = plain_unique_single_qubit_targets(measurement).ok_or_else(|| {
+        inverse_qec_reset_measure_detector_error("measurement targets must be plain unique qubits")
+    })?;
+    if reset_targets != measurement_targets {
+        return Err(inverse_qec_reset_measure_detector_error(
+            "reset and measurement targets must match exactly",
+        ));
+    }
+    if reset_targets.len() != 1 {
+        return Err(inverse_qec_reset_measure_detector_error(
+            "selected subset currently supports exactly one reset and measurement target",
+        ));
+    }
+
+    let [detector_target] = detector.targets() else {
+        return Err(inverse_qec_reset_measure_detector_error(
+            "selected subset currently supports exactly one detector target",
+        ));
+    };
+    let Some(offset) = detector_target.measurement_record_offset() else {
+        return Err(inverse_qec_reset_measure_detector_error(
+            "detector target must be a measurement record",
+        ));
+    };
+    if offset.get() != -1 {
+        return Err(inverse_qec_reset_measure_detector_error(
+            "detector target must be rec[-1]",
+        ));
+    }
+
+    Ok(())
+}
+
+fn plain_unique_single_qubit_targets(instruction: &CircuitInstruction) -> Option<Vec<u32>> {
+    let groups = instruction.target_groups();
+    if groups.is_empty() {
+        return None;
+    }
+    let mut seen = HashSet::with_capacity(groups.len());
+    let mut targets = Vec::with_capacity(groups.len());
+    for group in groups {
+        let [target] = group else {
+            return None;
+        };
+        if !is_plain_qubit_target(target) {
+            return None;
+        }
+        let qubit = target.qubit_id()?.get();
+        if !seen.insert(qubit) {
+            return None;
+        }
+        targets.push(qubit);
+    }
+    Some(targets)
+}
+
+fn inverse_qec_reset_measure_detector_error(reason: &str) -> CircuitError {
+    CircuitError::invalid_tableau_conversion(format!(
+        "inverse_qec selected reset-measure-detector subset requires one noiseless plain single-target reset instruction, one matching noiseless plain single-target measurement instruction, and one detector target rec[-1]; {reason}"
+    ))
 }
 
 /// Returns the currently supported time-reversal subset for flows.

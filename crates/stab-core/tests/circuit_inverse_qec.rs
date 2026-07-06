@@ -30,7 +30,8 @@ fn circuit_inverse_qec_unitary_matches_stim() {
 }
 
 #[test]
-fn circuit_inverse_qec_rejects_measurement_rewrite_cases_for_later_slices() {
+fn circuit_inverse_qec_supports_reset_measure_detector_triplet() {
+    // Adapted from Stim v1.16.0 src/stim/util_top/circuit_inverse_qec.test.cc.
     let input = circuit(
         "
         R 0
@@ -39,7 +40,106 @@ fn circuit_inverse_qec_rejects_measurement_rewrite_cases_for_later_slices() {
     ",
     );
 
-    assert!(circuit_inverse_qec(&input).is_err());
+    assert_eq!(circuit_inverse_qec(&input).expect("inverse R/M/D"), input);
+    assert_eq!(input.inverse_qec().expect("method inverse R/M/D"), input);
+}
+
+#[test]
+fn circuit_inverse_qec_supports_selected_bases_and_detector_metadata() {
+    for circuit_text in [
+        "
+        RX 1
+        MX 1
+        DETECTOR[tag](2, 3) rec[-1]
+        ",
+        "
+        RY 2
+        MY 2
+        DETECTOR(5) rec[-1]
+        ",
+    ] {
+        let input = circuit(circuit_text);
+
+        assert_eq!(
+            circuit_inverse_qec(&input).expect("inverse selected basis R/M/D"),
+            input,
+            "{circuit_text}"
+        );
+    }
+}
+
+#[test]
+fn circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed() {
+    for circuit_text in [
+        "
+        R 0
+        TICK
+        M 0
+        DETECTOR rec[-1]
+        ",
+        "
+        R 0
+        M 1
+        DETECTOR rec[-1]
+        ",
+        "
+        R 0
+        M 0
+        DETECTOR rec[-2]
+        ",
+        "
+        R 0
+        M(0.125) 0
+        DETECTOR rec[-1]
+        ",
+        "
+        R 0
+        MX 0
+        DETECTOR rec[-1]
+        ",
+        "
+        R 0
+        M !0
+        DETECTOR rec[-1]
+        ",
+        "
+        R 0 1
+        M 0 1
+        DETECTOR rec[-2] rec[-1]
+        ",
+        "
+        RX 0 1
+        MX 0 1
+        DETECTOR rec[-2] rec[-1]
+        ",
+        "
+        R 0 0
+        M 0 0
+        DETECTOR rec[-1]
+        ",
+        "
+        R 0
+        M 0
+        DETECTOR
+        ",
+        "
+        R 0
+        M 0
+        DETECTOR rec[-1] rec[-1]
+        ",
+    ] {
+        let error = circuit_inverse_qec(&circuit(circuit_text))
+            .expect_err("unpromoted inverse-QEC measurement rewrite is rejected")
+            .to_string();
+
+        assert!(
+            error.contains("inverse_qec selected reset-measure-detector subset")
+                || error.contains("operation R is not unitary")
+                || error.contains("operation TICK is not unitary")
+                || error.contains("operation DETECTOR is not unitary"),
+            "{circuit_text}: {error}"
+        );
+    }
 }
 
 #[test]
