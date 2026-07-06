@@ -386,6 +386,47 @@ fn pf4_dem_sampler_preserves_flat_error_order_through_nested_repeats() {
 }
 
 #[test]
+fn pf4_dem_sampler_deterministic_repeat_folding_preserves_rng_and_error_order() {
+    let folded = compile_dem(
+        "
+        repeat 101 {
+            error(1) D0 L0
+        }
+        error(0.25) D1
+        ",
+    );
+    let expanded_equivalent = compile_dem(
+        "
+        error(1) D0 L0
+        error(0.25) D1
+        ",
+    );
+    let folded_output = folded
+        .sample_detection_events_with_seed(64, Some(11))
+        .expect("sample folded deterministic repeat");
+    let expanded_output = expanded_equivalent
+        .sample_detection_events_with_seed(64, Some(11))
+        .expect("sample expanded deterministic equivalent");
+    assert_eq!(folded_output.records, expanded_output.records);
+
+    let flat_error_order = compile_dem(
+        "
+        repeat 3 {
+            error(1) D0
+            error(0) D0
+        }
+        ",
+    );
+    let (_output, error_records) = flat_error_order
+        .sample_detection_events_and_errors_with_seed(1, Some(11))
+        .expect("sample repeated deterministic error records");
+    assert_eq!(
+        error_records,
+        vec![vec![true, false, true, false, true, false]]
+    );
+}
+
+#[test]
 fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
     let sampler = compile_dem(
         "
@@ -442,6 +483,55 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
     let huge_stochastic_sampler =
         CompiledDemSampler::compile(&huge_stochastic_record).expect("compile stochastic DEM");
     assert_eq!(huge_stochastic_sampler.error_count(), 64_000_001);
+    let huge_deterministic_odd_record = DetectorErrorModel::from_dem_str(
+        "
+        repeat 64000001 {
+            error(1) D0 L0
+            error(0) D0
+        }
+        ",
+    )
+    .expect("parse huge deterministic odd repeat DEM");
+    let huge_deterministic_odd_sampler =
+        CompiledDemSampler::compile(&huge_deterministic_odd_record)
+            .expect("compile deterministic odd repeat DEM");
+    assert_eq!(huge_deterministic_odd_sampler.error_count(), 128_000_002);
+    let output = huge_deterministic_odd_sampler
+        .sample_detection_events_with_seed(2, Some(5))
+        .expect("fold odd deterministic repeat by parity");
+    assert_eq!(output.detector_count, 1);
+    assert_eq!(output.observable_count, 1);
+    assert_eq!(output.records.len(), 2);
+    assert!(
+        output
+            .records
+            .iter()
+            .all(|record| { record.detectors == [true] && record.observables == [true] })
+    );
+
+    let huge_deterministic_even_record = DetectorErrorModel::from_dem_str(
+        "
+        repeat 64000000 {
+            error(1) D0 L0
+        }
+        ",
+    )
+    .expect("parse huge deterministic even repeat DEM");
+    let huge_deterministic_even_sampler =
+        CompiledDemSampler::compile(&huge_deterministic_even_record)
+            .expect("compile deterministic even repeat DEM");
+    assert_eq!(huge_deterministic_even_sampler.error_count(), 64_000_000);
+    let output = huge_deterministic_even_sampler
+        .sample_detection_events_with_seed(2, Some(5))
+        .expect("fold even deterministic repeat by parity");
+    assert_eq!(output.records.len(), 2);
+    assert!(
+        output
+            .records
+            .iter()
+            .all(|record| { record.detectors == [false] && record.observables == [false] })
+    );
+
     let mixed_zero_and_stochastic_record = DetectorErrorModel::from_dem_str(
         "
         repeat 32000001 {
@@ -471,6 +561,16 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
         error
             .to_string()
             .contains("would apply 64000001 sampled errors"),
+        "{error}"
+    );
+
+    let error = huge_deterministic_odd_sampler
+        .sample_detection_events_and_errors_with_seed(1, Some(5))
+        .expect_err("preserve flat sampled-error materialization cap for deterministic repeats");
+    assert!(
+        error
+            .to_string()
+            .contains("would require 128000004 buffered units"),
         "{error}"
     );
 

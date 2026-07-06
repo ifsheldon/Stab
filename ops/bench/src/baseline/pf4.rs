@@ -38,6 +38,10 @@ const SAMPLER_NO_OP_REPEAT_COUNT: u64 = 1_000_000;
 #[cfg(test)]
 const SAMPLER_NO_OP_REPEAT_COUNT: u64 = 64;
 #[cfg(not(test))]
+const SAMPLER_DETERMINISTIC_REPEAT_COUNT: u64 = 64_000_001;
+#[cfg(test)]
+const SAMPLER_DETERMINISTIC_REPEAT_COUNT: u64 = 65;
+#[cfg(not(test))]
 const SAMPLER_SHOTS: usize = 64;
 #[cfg(test)]
 const SAMPLER_SHOTS: usize = 2;
@@ -130,6 +134,13 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             (SAMPLER_NO_OP_REPEAT_COUNT as f64) * (SAMPLER_SHOTS as f64),
             "skipped-detector-error-occurrences/s",
         )),
+        (
+            "pf4-dem-sampler-folded-repeat",
+            "stab_pf4_dem_sampler_sample_deterministic_parity_repeat",
+        ) => Some((
+            (SAMPLER_DETERMINISTIC_REPEAT_COUNT as f64) * (SAMPLER_SHOTS as f64),
+            "folded-deterministic-error-occurrences/s",
+        )),
         ("pf4-dem-folded-traversal", "stab_pf4_dem_hyper_capped_repeat") => Some((
             search_expanded_errors(SEARCH_REPEAT_COUNT) as f64,
             "expanded-errors/s",
@@ -183,7 +194,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures bounded all-detector DEM coordinate maps, selected detector coordinate lookup through a huge-repeat model, sparse flat and nested overlapping selected-coordinate lookups, and many-selected flat-overlap coordinate lookup; pinned Stim exposes equivalent behavior but not a faithful Rust direct baseline",
         ),
         "pf4-dem-sampler-folded-repeat" => Some(
-            "contract-only: Stab measures folded CompiledDemSampler compile, stochastic direct sample behavior, and zero-probability repeat skipping; sampled-error materialization and excessive stochastic repeated-error work remain capped and broader PF4 traversal consumers remain explicit follow-up work",
+            "contract-only: Stab measures folded CompiledDemSampler compile, stochastic direct sample behavior, zero-probability repeat skipping, and deterministic zero-shift repeat parity folding; sampled-error materialization and excessive stochastic repeated-error work remain capped and broader PF4 traversal consumers remain explicit follow-up work",
         ),
         "pf4-dem-folded-traversal" => Some(
             "contract-only: Stab measures current capped-repeat hypergraph search, zero-probability repeat skipping for hypergraph search, weighted SAT zero-probability variable elision and repeated-body skipping, capped unweighted SAT problem generation, analyzer, and ErrorMatcher traversal behavior; true folded traversal remains an explicit RPF4 follow-up",
@@ -320,6 +331,11 @@ fn run_dem_sampler_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let no_op_sampler = CompiledDemSampler::compile(&no_op_model)
         .map_err(|error| stab_runner_error(&row.id, error))?;
+    let deterministic_fixture = sampler_deterministic_repeat_fixture();
+    let deterministic_model = DetectorErrorModel::from_dem_str(&deterministic_fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let deterministic_sampler = CompiledDemSampler::compile(&deterministic_model)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
 
     Ok(vec![
         measure_stab_batched(
@@ -348,6 +364,17 @@ fn run_dem_sampler_repeat_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
             TRANSFORM_REPETITIONS,
             || {
                 let output = no_op_sampler
+                    .sample_detection_events_with_seed(SAMPLER_SHOTS, Some(5))
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(output.records.len());
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_sampler_sample_deterministic_parity_repeat",
+            TRANSFORM_REPETITIONS,
+            || {
+                let output = deterministic_sampler
                     .sample_detection_events_with_seed(SAMPLER_SHOTS, Some(5))
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 black_box(output.records.len());
@@ -614,6 +641,16 @@ fn sampler_no_op_repeat_fixture() -> String {
         "\
 repeat {SAMPLER_NO_OP_REPEAT_COUNT} {{
     error(0) D0
+}}
+"
+    )
+}
+
+fn sampler_deterministic_repeat_fixture() -> String {
+    format!(
+        "\
+repeat {SAMPLER_DETERMINISTIC_REPEAT_COUNT} {{
+    error(1) D0 L0
 }}
 "
     )

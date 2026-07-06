@@ -362,6 +362,7 @@ struct DemSampleBlock {
     error_count: usize,
     direct_sample_effect_count: usize,
     direct_sample_work_count: usize,
+    direct_sample_has_stochastic_error: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -450,16 +451,8 @@ fn compile_items(items: &[DemItem], depth: usize) -> CircuitResult<DemSampleBloc
                     repeat_count,
                     "DEM sampler direct sample effect count",
                 )?;
-                let repeated_work = if body.direct_sample_effect_count == 0 {
-                    0
-                } else {
-                    checked_repeated_count(
-                        0,
-                        body.direct_sample_work_count,
-                        repeat_count,
-                        "DEM sampler direct sample work count",
-                    )?
-                };
+                block.direct_sample_has_stochastic_error |= body.direct_sample_has_stochastic_error;
+                let repeated_work = folded_direct_sample_repeat_work_count(&body, repeat_count)?;
                 block.direct_sample_work_count = block
                     .direct_sample_work_count
                     .checked_add(repeated_work)
@@ -542,6 +535,9 @@ fn compile_instruction(
                 )
             })?;
     }
+    if probability > 0.0 && probability < 1.0 {
+        block.direct_sample_has_stochastic_error = true;
+    }
     block.operations.push(DemSampleOperation::Error(operation));
     Ok(())
 }
@@ -579,8 +575,28 @@ where
                 }
             }
             DemSampleOperation::Repeat(repeat) => {
-                if error_output.is_discard() && repeat.body.direct_sample_effect_count == 0 {
-                    continue;
+                if error_output.is_discard() {
+                    if repeat.body.direct_sample_effect_count == 0 {
+                        continue;
+                    }
+                    if repeat.body.detector_shift == 0
+                        && !repeat.body.direct_sample_has_stochastic_error
+                    {
+                        if repeat.repeat_count.is_multiple_of(2) {
+                            continue;
+                        }
+                        let iteration_shift = detector_shift
+                            .checked_add(repeat.start_detector_shift)
+                            .ok_or_else(detector_shift_overflow_error)?;
+                        sample_block_into(
+                            &repeat.body,
+                            iteration_shift,
+                            rng,
+                            record,
+                            SampledErrorOutput::Discard,
+                        )?;
+                        continue;
+                    }
                 }
                 let mut iteration_shift = detector_shift
                     .checked_add(repeat.start_detector_shift)
@@ -684,6 +700,27 @@ fn checked_repeated_count(
     current
         .checked_add(repeated)
         .ok_or_else(|| CircuitError::invalid_sampler_compilation(format!("{kind} overflowed")))
+}
+
+fn folded_direct_sample_repeat_work_count(
+    body: &DemSampleBlock,
+    repeat_count: u64,
+) -> CircuitResult<usize> {
+    if body.direct_sample_effect_count == 0 {
+        return Ok(0);
+    }
+    if body.detector_shift == 0 && !body.direct_sample_has_stochastic_error {
+        if repeat_count.is_multiple_of(2) {
+            return Ok(0);
+        }
+        return Ok(body.direct_sample_work_count);
+    }
+    checked_repeated_count(
+        0,
+        body.direct_sample_work_count,
+        repeat_count,
+        "DEM sampler direct sample work count",
+    )
 }
 
 fn reset_detection_record(
