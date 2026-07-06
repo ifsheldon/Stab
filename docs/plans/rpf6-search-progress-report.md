@@ -2,11 +2,13 @@
 
 ## Summary
 
-This report records the promoted PF6 generated-QEC graphlike, hypergraph, and SAT/WCNF search subset.
-It adds executable Rust evidence, selected ordering-insensitive target-signature comparators, and report-only benchmark runners for generated rotated-surface-code and repetition-code logical-error search and selected generated-QEC SAT/WCNF encoding without claiming full PF6 search parity.
+This report records the promoted PF6 direct DEM graphlike and hypergraph exact-output subset plus the generated-QEC graphlike, hypergraph, and SAT/WCNF search subset.
+It adds executable Rust evidence, selected exact direct DEM cases, selected ordering-insensitive target-signature comparators, and report-only benchmark runners for generated rotated-surface-code and repetition-code logical-error search and selected generated-QEC SAT/WCNF encoding without claiming full PF6 search parity.
 
 ## Implemented Surfaces
 
+- Direct DEM graphlike search rejection for models without an undetectable logical error and exact canonical output for the pinned Stim v1.16.0 distance-one, distance-two, distance-three, and canonical-ordering cases.
+- Direct DEM hypergraph search rejection for models without an undetectable logical error and exact canonical output for the pinned Stim v1.16.0 distance-one, distance-two, distance-three, canonical-ordering, and bounded hyper-error cases.
 - Generated rotated-surface-code graphlike search with decomposed graphlike DEMs, matching the pinned Stim v1.16.0 generated-search instruction count of 5.
 - Generated repetition-code graphlike search with decomposed graphlike DEMs, matching the pinned Stim v1.16.0 generated-search instruction count of 7.
 - Generated rotated-surface-code graphlike search with ungraphlike DEMs and `ignore_ungraphlike_errors=true`, matching the pinned Stim v1.16.0 instruction count of 5.
@@ -24,9 +26,11 @@ Implemented Rust tests:
 - `pf6_generated_qec_graphlike_search_has_structural_signature`
 - `pf6_generated_qec_hypergraph_search_has_structural_signature`
 - `pf6_generated_sat_wcnf_qec_encoding_is_structural`
+- `pf6_direct_dem_graphlike_search_matches_upstream_distance_cases`
+- `pf6_direct_dem_hypergraph_search_matches_upstream_distance_cases`
 
 The tests live in `crates/stab-core/tests/dem_search.rs` and are derived from `vendor/stim/src/stim/search/graphlike/algo.test.cc`, `vendor/stim/src/stim/search/hyper/algo.test.cc`, and `vendor/stim/src/stim/search/sat/wcnf.test.cc`.
-They assert the generated-code search result sizes that pinned Stim v1.16.0 asserts, require deterministic error-only DEM output, canonicalize each returned target set, reject duplicate target sets, require detector parity to cancel, require exactly `L0` observable parity, cover the ungraphlike generated surface-code rejection path, and structurally verify WDIMACS headers, emitted clause counts, soft clauses, hard clauses, and weighted top weights for selected generated-QEC SAT/WCNF encodings.
+They assert exact canonical direct DEM outputs for the selected pinned direct search cases, assert the generated-code search result sizes that pinned Stim v1.16.0 asserts, require deterministic error-only DEM output, canonicalize each returned target set, reject duplicate target sets, require detector parity to cancel, require exactly `L0` observable parity, cover the ungraphlike generated surface-code rejection path, and structurally verify WDIMACS headers, emitted clause counts, soft clauses, hard clauses, and weighted top weights for selected generated-QEC SAT/WCNF encodings.
 
 ## Oracle Rows
 
@@ -34,6 +38,8 @@ Implemented rows:
 
 - `pf6-search-generated-qec-rust`
 - `pf6-search-generated-sat-wcnf-rust`
+- `pf6-search-direct-dem-graphlike-rust`
+- `pf6-search-direct-dem-hypergraph-rust`
 
 The broad row `pf6-search-generated` remains manifest-only because full generated-circuit search parity still includes broader generated-code families, exact or structural target-set comparators for broader tie-sensitive outputs, broader SAT or WCNF families, additional resource behavior, and sparse reverse tracker integration.
 
@@ -49,10 +55,12 @@ These rows measure generated rotated-surface-code DEM search or SAT/WCNF encodin
 They remain `non-primary-report-only` and `contract-only` because pinned Stim exposes these search and SAT APIs through C++ API and perf surfaces, not a faithful public CLI baseline for Stab.
 They were not added to `benchmarks/m12-primary-thresholds.json`.
 Fresh local probe command `just bench::compare --only pf6-generated-sat-wcnf --baseline target/benchmarks/pf6-generated-sat-wcnf-probe/baseline.json --report target/benchmarks/pf6-generated-sat-wcnf-compare` measured `stab_pf6_shortest_sat_generated_surface=0.002952415s`, or approximately `8.129e3 detectors/s`, and `stab_pf6_likeliest_sat_generated_surface=0.001445527s`, or approximately `1.660e4 detectors/s`, as report-only evidence on the local machine.
+The direct DEM exact-output tests are tiny compatibility fixtures rather than throughput paths, so they do not add separate benchmark rows or threshold entries.
 
 ## Remaining PF6 Search Work
 
 - Broader generated-circuit search families beyond the promoted rotated-surface-code and repetition-code cases.
+- Broader direct DEM search resource and tie-sensitive families beyond the selected pinned distance and hyper-error exact cases.
 - Exact or structural target-set comparators for broader generated families and tie-sensitive outputs beyond the selected generated-QEC structural signature-invariant checks.
 - Broader generated SAT or WCNF encoding families beyond the selected generated-QEC structural row.
 - Loop-folded generated search behavior.

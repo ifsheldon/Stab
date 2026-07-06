@@ -182,6 +182,150 @@ fn pf4_dem_search_rejects_shifted_zero_probability_repeat_node_explosion() {
 }
 
 #[test]
+fn pf6_direct_dem_graphlike_search_matches_upstream_distance_cases() {
+    for dem_text in [
+        "",
+        "error(0.1) D0 L0\n",
+        "error(0.1) D0\nerror(0.1) D0 D1\nerror(0.1) D1\n",
+    ] {
+        let model = DetectorErrorModel::from_dem_str(dem_text).unwrap();
+        assert!(
+            shortest_graphlike_undetectable_logical_error(&model, false).is_err(),
+            "direct graphlike search should reject model without an undetectable logical error: {dem_text:?}"
+        );
+    }
+
+    let cases = [
+        ("error(0.1) L0\n", "error(1) L0\n"),
+        (
+            "error(0.1) D0\nerror(0.1) D0 L0\n",
+            "error(1) D0\nerror(1) D0 L0\n",
+        ),
+        (
+            "error(0.1) D0 L0\nerror(0.1) D0 L1\n",
+            "error(1) D0 L0\nerror(1) D0 L1\n",
+        ),
+        (
+            "error(0.1) D0 D1 L0\nerror(0.1) D0 D1 L1\n",
+            "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n",
+        ),
+        (
+            "error(0.1) D0 D1 L1\nerror(0.1) D0 D1 L0\n",
+            "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n",
+        ),
+        (
+            "error(0.1) D0\nerror(0.1) D0 D1 L0\nerror(0.1) D1\n",
+            "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n",
+        ),
+        (
+            "error(0.1) D1\nerror(0.1) D1 D0 L0\nerror(0.1) D0\n",
+            "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n",
+        ),
+    ];
+    for (dem_text, expected) in cases {
+        let model = DetectorErrorModel::from_dem_str(dem_text).unwrap();
+        assert_eq!(
+            shortest_graphlike_undetectable_logical_error(&model, false)
+                .unwrap()
+                .to_dem_string(),
+            expected,
+            "direct graphlike search mismatch for {dem_text:?}"
+        );
+    }
+}
+
+#[test]
+fn pf6_direct_dem_hypergraph_search_matches_upstream_distance_cases() {
+    for dem_text in [
+        "",
+        "error(0.1) D0 L0\n",
+        "error(0.1) D0\nerror(0.1) D0 D1\nerror(0.1) D1\n",
+    ] {
+        let model = DetectorErrorModel::from_dem_str(dem_text).unwrap();
+        assert!(
+            find_undetectable_logical_error(&model, usize::MAX, usize::MAX, false).is_err(),
+            "direct hypergraph search should reject model without an undetectable logical error: {dem_text:?}"
+        );
+    }
+
+    let cases = [
+        (
+            "error(0.1) L0\n",
+            "error(1) L0\n",
+            usize::MAX,
+            usize::MAX,
+            false,
+        ),
+        (
+            "error(0.1) D0\nerror(0.1) D0 L0\n",
+            "error(1) D0\nerror(1) D0 L0\n",
+            usize::MAX,
+            usize::MAX,
+            false,
+        ),
+        (
+            "error(0.1) D0 L0\nerror(0.1) D0 L1\n",
+            "error(1) D0 L0\nerror(1) D0 L1\n",
+            usize::MAX,
+            usize::MAX,
+            false,
+        ),
+        (
+            "error(0.1) D0 D1 L0\nerror(0.1) D0 D1 L1\n",
+            "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n",
+            usize::MAX,
+            usize::MAX,
+            false,
+        ),
+        (
+            "error(0.1) D0 D1 L1\nerror(0.1) D0 D1 L0\n",
+            "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n",
+            usize::MAX,
+            usize::MAX,
+            false,
+        ),
+        (
+            "error(0.1) D0\nerror(0.1) D0 D1 L0\nerror(0.1) D1\n",
+            "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n",
+            usize::MAX,
+            usize::MAX,
+            false,
+        ),
+        (
+            "error(0.1) D1\nerror(0.1) D1 D0 L0\nerror(0.1) D0\n",
+            "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n",
+            usize::MAX,
+            usize::MAX,
+            false,
+        ),
+        (
+            "error(0.1) D0 D1\nerror(0.1) D0 D1 D2 D3\nerror(0.1) D2 D3 D4 D5 L0\nerror(0.1) D4 D5 D6 D7\nerror(0.1) D6 D7 D8 D9\nerror(0.1) D8\nerror(0.1) D9\n",
+            "error(1) D0 D1\nerror(1) D0 D1 D2 D3\nerror(1) D2 D3 D4 D5 L0\nerror(1) D4 D5 D6 D7\nerror(1) D6 D7 D8 D9\nerror(1) D8\nerror(1) D9\n",
+            4,
+            4,
+            true,
+        ),
+    ];
+    for (dem_text, expected, max_event_count, max_edge_degree, allow_increasing_error_degree) in
+        cases
+    {
+        let model = DetectorErrorModel::from_dem_str(dem_text).unwrap();
+        assert_eq!(
+            find_undetectable_logical_error(
+                &model,
+                max_event_count,
+                max_edge_degree,
+                allow_increasing_error_degree
+            )
+            .unwrap()
+            .to_dem_string(),
+            expected,
+            "direct hypergraph search mismatch for {dem_text:?}"
+        );
+    }
+}
+
+#[test]
 fn pf6_generated_qec_graphlike_search_has_structural_signature() {
     let surface = generated_rotated_surface_code_dem().unwrap();
     assert_graphlike_search_signature(
