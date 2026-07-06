@@ -38,9 +38,10 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
 /// Returns the currently implemented QEC inverse subset.
 ///
 /// This includes the unitary inverse plus selected Stim-compatible
-/// reset-measure-detector, selected two-to-one detector-flow, and measure-reset
-/// pass-through packets. Broader QEC-specific inverse rewrites for
-/// measurements, resets, detectors, noise, and feedback remain deferred.
+/// reset-measure-detector, selected two-to-one detector-flow, selected MPP
+/// identity-parity detector-flow, and measure-reset pass-through packets.
+/// Broader QEC-specific inverse rewrites for measurements, resets, detectors,
+/// noise, and feedback remain deferred.
 pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
     if let Some(inverse) = qec::selected_qec_inverse(circuit)? {
         return Ok(inverse);

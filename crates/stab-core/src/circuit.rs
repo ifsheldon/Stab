@@ -117,11 +117,10 @@ impl Circuit {
     /// Returns the currently supported QEC inverse subset.
     ///
     /// This includes `inverse_unitary` plus selected reset-measure-detector,
-    /// two-to-one detector-flow, and measure-reset pass-through rewrites for one
-    /// plain reset group, one matching measurement group, one optional matching
-    /// measure-reset group, and one detector. Stim's richer measurement,
-    /// detector, feedback, and noise rewrites are deferred until those semantic
-    /// dependencies exist in Stab.
+    /// two-to-one detector-flow, selected MPP identity-parity detector-flow,
+    /// and measure-reset pass-through rewrites for one detector. Stim's richer
+    /// measurement, detector, feedback, and noise rewrites are deferred until
+    /// those semantic dependencies exist in Stab.
     pub fn inverse_qec(&self) -> CircuitResult<Self> {
         crate::circuit_inverse_qec(self)
     }

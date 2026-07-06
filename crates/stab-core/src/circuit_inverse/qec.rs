@@ -2,13 +2,16 @@ use std::collections::HashSet;
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Gate,
-    MeasureRecordOffset, PauliBasis, Target,
+    MeasureRecordOffset, Pauli, PauliBasis, Target,
 };
 
 use super::{is_plain_qubit_target, reset_inverse_gate_and_basis};
 
 pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
     if let Some(inverse) = selected_reset_cx_measure_two_to_one_inverse(circuit)? {
+        return Ok(Some(inverse));
+    }
+    if let Some(inverse) = selected_mpp_detector_inverse(circuit)? {
         return Ok(Some(inverse));
     }
     if let Some(inverse) = selected_measure_reset_pass_through_inverse(circuit)? {
@@ -140,6 +143,74 @@ fn build_selected_reset_cx_measure_two_to_one_inverse(
         detector.tag(),
     )?;
 
+    Ok(result)
+}
+
+fn selected_mpp_detector_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+    let [
+        CircuitItem::Instruction(mpp),
+        CircuitItem::Instruction(detector),
+    ] = circuit.items()
+    else {
+        return Ok(None);
+    };
+
+    if mpp.gate().canonical_name() != "MPP" || detector.gate().canonical_name() != "DETECTOR" {
+        return Ok(None);
+    }
+
+    Ok(Some(build_selected_mpp_detector_inverse(mpp, detector)?))
+}
+
+fn build_selected_mpp_detector_inverse(
+    mpp: &CircuitInstruction,
+    detector: &CircuitInstruction,
+) -> CircuitResult<Circuit> {
+    if !mpp.args().is_empty() {
+        return Err(inverse_qec_mpp_detector_error(
+            "MPP instruction must be noiseless",
+        ));
+    }
+
+    let product_groups = mpp.target_groups();
+    if product_groups.is_empty() {
+        return Err(inverse_qec_mpp_detector_error(
+            "MPP must contain at least one Pauli product",
+        ));
+    }
+    for group in &product_groups {
+        validate_hermitian_mpp_product(group)?;
+    }
+    validate_selected_mpp_detector_parity_determined(&product_groups)?;
+
+    let detector_offsets = detector_offsets(detector, inverse_qec_mpp_detector_error)?;
+    let expected_detector_offsets =
+        consecutive_negative_offsets(product_groups.len(), inverse_qec_mpp_detector_error)?;
+    if detector_offsets != expected_detector_offsets {
+        return Err(inverse_qec_mpp_detector_error(
+            "detector must reference exactly every selected MPP record in order",
+        ));
+    }
+
+    let mut result = Circuit::new();
+    append_target_instruction(
+        &mut result,
+        mpp.gate(),
+        mpp.args(),
+        reversed_pauli_product_targets(&product_groups)?,
+        mpp.tag(),
+    )?;
+    append_target_instruction(
+        &mut result,
+        detector.gate(),
+        detector.args(),
+        expected_detector_offsets
+            .iter()
+            .rev()
+            .map(|offset| MeasureRecordOffset::try_new(*offset).map(Target::measurement_record))
+            .collect::<CircuitResult<Vec<_>>>()?,
+        detector.tag(),
+    )?;
     Ok(result)
 }
 
@@ -541,6 +612,145 @@ fn plain_unique_single_qubit_targets(instruction: &CircuitInstruction) -> Option
     Some(targets)
 }
 
+fn detector_offsets(
+    detector: &CircuitInstruction,
+    error: fn(&str) -> CircuitError,
+) -> CircuitResult<Vec<i32>> {
+    detector
+        .targets()
+        .iter()
+        .map(|target| {
+            target
+                .measurement_record_offset()
+                .map(MeasureRecordOffset::get)
+        })
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| error("detector targets must be measurement records"))
+}
+
+fn consecutive_negative_offsets(
+    count: usize,
+    error: fn(&str) -> CircuitError,
+) -> CircuitResult<Vec<i32>> {
+    (1..=count)
+        .map(|index| {
+            i32::try_from(index)
+                .map(|index| -index)
+                .map_err(|_| error("selected measurement count exceeds supported range"))
+        })
+        .collect()
+}
+
+fn reversed_pauli_product_targets(groups: &[&[Target]]) -> CircuitResult<Vec<Target>> {
+    let mut targets = Vec::new();
+    for group in groups.iter().rev() {
+        let factors = group
+            .iter()
+            .filter(|target| !target.is_combiner())
+            .collect::<Vec<_>>();
+        if factors.is_empty() {
+            return Err(inverse_qec_mpp_detector_error(
+                "MPP products must be non-empty",
+            ));
+        }
+        for (index, target) in factors.iter().rev().enumerate() {
+            if index > 0 {
+                targets.push(Target::combiner());
+            }
+            targets.push((*target).clone());
+        }
+    }
+    Ok(targets)
+}
+
+fn validate_hermitian_mpp_product(group: &[Target]) -> CircuitResult<()> {
+    let mut terms = Vec::new();
+    let mut phase = 0u8;
+    for target in group {
+        if target.is_combiner() {
+            continue;
+        }
+        let pauli = target.pauli_type().ok_or_else(|| {
+            inverse_qec_mpp_detector_error("MPP product targets must be Pauli targets")
+        })?;
+        let qubit = target
+            .qubit_id()
+            .ok_or_else(|| inverse_qec_mpp_detector_error("MPP product targets must have qubits"))?
+            .get();
+        multiply_mpp_term(&mut terms, qubit, pauli, &mut phase);
+    }
+    match phase {
+        0 | 2 => Ok(()),
+        _ => Err(inverse_qec_mpp_detector_error(
+            "MPP Pauli product is anti-Hermitian",
+        )),
+    }
+}
+
+fn validate_selected_mpp_detector_parity_determined(groups: &[&[Target]]) -> CircuitResult<()> {
+    let mut terms = Vec::new();
+    let mut phase = 0u8;
+    for group in groups {
+        for target in *group {
+            if target.is_combiner() {
+                continue;
+            }
+            let pauli = target.pauli_type().ok_or_else(|| {
+                inverse_qec_mpp_detector_error("MPP product targets must be Pauli targets")
+            })?;
+            let qubit = target
+                .qubit_id()
+                .ok_or_else(|| {
+                    inverse_qec_mpp_detector_error("MPP product targets must have qubits")
+                })?
+                .get();
+            if target.is_inverted_result_target() {
+                phase = (phase + 2) % 4;
+            }
+            multiply_mpp_term(&mut terms, qubit, pauli, &mut phase);
+        }
+    }
+    if !terms.is_empty() {
+        return Err(inverse_qec_mpp_detector_error(
+            "combined selected MPP detector parity must reduce to identity",
+        ));
+    }
+    match phase {
+        0 | 2 => Ok(()),
+        _ => Err(inverse_qec_mpp_detector_error(
+            "combined selected MPP detector parity is anti-Hermitian",
+        )),
+    }
+}
+
+fn multiply_mpp_term(terms: &mut Vec<(u32, Pauli)>, qubit: u32, incoming: Pauli, phase: &mut u8) {
+    let Some(index) = terms
+        .iter()
+        .position(|(existing_qubit, _)| *existing_qubit == qubit)
+    else {
+        terms.push((qubit, incoming));
+        return;
+    };
+    let (_, existing) = terms.remove(index);
+    let (product, phase_delta) = multiply_pauli_bases(existing, incoming);
+    *phase = (*phase + phase_delta) % 4;
+    if let Some(product) = product {
+        terms.insert(index, (qubit, product));
+    }
+}
+
+fn multiply_pauli_bases(left: Pauli, right: Pauli) -> (Option<Pauli>, u8) {
+    match (left, right) {
+        (Pauli::X, Pauli::X) | (Pauli::Y, Pauli::Y) | (Pauli::Z, Pauli::Z) => (None, 0),
+        (Pauli::X, Pauli::Y) => (Some(Pauli::Z), 1),
+        (Pauli::Y, Pauli::Z) => (Some(Pauli::X), 1),
+        (Pauli::Z, Pauli::X) => (Some(Pauli::Y), 1),
+        (Pauli::Y, Pauli::X) => (Some(Pauli::Z), 3),
+        (Pauli::Z, Pauli::Y) => (Some(Pauli::X), 3),
+        (Pauli::X, Pauli::Z) => (Some(Pauli::Y), 3),
+    }
+}
+
 fn measure_reset_gate_for_basis(basis: PauliBasis) -> &'static str {
     match basis {
         PauliBasis::X => "MRX",
@@ -559,6 +769,12 @@ fn inverse_qec_reset_measure_detector_error(reason: &str) -> CircuitError {
 fn inverse_qec_measure_reset_pass_through_error(reason: &str) -> CircuitError {
     CircuitError::invalid_tableau_conversion(format!(
         "inverse_qec selected measure-reset pass-through subset requires one noiseless plain reset instruction, one matching noiseless plain measurement instruction, one matching noiseless plain measure-reset instruction, and one detector referencing only those measure-reset records; {reason}"
+    ))
+}
+
+fn inverse_qec_mpp_detector_error(reason: &str) -> CircuitError {
+    CircuitError::invalid_tableau_conversion(format!(
+        "inverse_qec selected MPP detector subset requires one noiseless MPP instruction with Hermitian Pauli products and one detector referencing exactly all selected MPP records; {reason}"
     ))
 }
 
