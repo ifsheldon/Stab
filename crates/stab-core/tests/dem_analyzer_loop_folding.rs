@@ -53,6 +53,53 @@ fn analyze_folding_with_decomposition_and_approximation(text: &str) -> Result<St
     .map_err(|error| error.to_string())
 }
 
+fn detector_declarations(first: u64, last: u64) -> String {
+    let mut text = String::new();
+    for detector in first..=last {
+        text.push_str(&format!("detector D{detector}\n"));
+    }
+    text
+}
+
+fn indented_detector_declarations(first: u64, last: u64) -> String {
+    let mut text = String::new();
+    for detector in first..=last {
+        text.push_str(&format!("    detector D{detector}\n"));
+    }
+    text
+}
+
+fn period127_observable_circuit(repeat_count: u64) -> String {
+    format!(
+        "
+        R 0 1 2 3 4 5 6
+        REPEAT {repeat_count} {{
+            CNOT 0 1 1 2 2 3 3 4 4 5 5 6 6 0
+            DETECTOR
+        }}
+        M 6
+        OBSERVABLE_INCLUDE(9) rec[-1]
+        R 7
+        X_ERROR(1) 7
+        M 7
+        DETECTOR rec[-1]
+        "
+    )
+}
+
+fn period127_observable_expected(middle_repeat_count: u64) -> String {
+    [
+        detector_declarations(0, 85),
+        format!("repeat {middle_repeat_count} {{\n"),
+        indented_detector_declarations(86, 212),
+        "    shift_detectors 127\n}\n".to_string(),
+        "error(1) D211\n".to_string(),
+        detector_declarations(86, 210),
+        "logical_observable L9\n".to_string(),
+    ]
+    .concat()
+}
+
 #[test]
 fn dem_analyzer_fold_loops_preserves_simple_nested_repeat_like_stim() {
     let dem = analyze_folding_loops(
@@ -255,6 +302,88 @@ fn pf6_dem_analyzer_period8_observable_folds_like_upstream() {
         dem,
         "detector D0\ndetector D1\ndetector D2\nrepeat 1543209873456789 {\n    detector D3\n    detector D4\n    detector D5\n    detector D6\n    detector D7\n    detector D8\n    detector D9\n    detector D10\n    shift_detectors 8\n}\ndetector D3\ndetector D4\ndetector D5\ndetector D6\ndetector D7\ndetector D8\nlogical_observable L9\n"
     );
+}
+
+#[test]
+fn pf6_dem_analyzer_period127_observable_folds_like_upstream() {
+    let dem = analyze_folding_loops(&period127_observable_circuit(12345678987654321));
+
+    assert_eq!(dem, period127_observable_expected(97210070768930));
+}
+
+#[test]
+fn pf6_dem_analyzer_period127_observable_folds_minimum_compact_shape_like_upstream() {
+    let dem = analyze_folding_loops(&period127_observable_circuit(465));
+
+    assert_eq!(dem, period127_observable_expected(2));
+}
+
+#[test]
+fn pf6_dem_analyzer_period127_observable_keeps_single_middle_repeat_unfolded() {
+    let circuit =
+        Circuit::from_stim_str(&period127_observable_circuit(338)).expect("period-127 circuit");
+    let expected = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .expect("non-folded analysis")
+        .to_dem_string();
+    let actual = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect("fold-loop bounded fallback")
+    .to_dem_string();
+
+    assert_eq!(actual, expected);
+    assert!(
+        actual.starts_with("error(1) D338\ndetector D0\n"),
+        "{actual}"
+    );
+    assert!(!actual.contains("repeat 1"), "{actual}");
+    assert!(actual.ends_with("logical_observable L9\n"), "{actual}");
+}
+
+#[test]
+fn pf6_dem_analyzer_period127_observable_keeps_adjacent_residue_unfolded() {
+    let circuit =
+        Circuit::from_stim_str(&period127_observable_circuit(466)).expect("period-127 circuit");
+    let expected = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
+        .expect("non-folded analysis")
+        .to_dem_string();
+    let actual = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect("fold-loop bounded fallback")
+    .to_dem_string();
+
+    assert_eq!(actual, expected);
+    assert!(
+        actual.starts_with("error(1) D466\ndetector D0\n"),
+        "{actual}"
+    );
+    assert!(!actual.contains("repeat 466"), "{actual}");
+}
+
+#[test]
+fn pf6_dem_analyzer_period127_observable_rejects_huge_adjacent_residue() {
+    let circuit = Circuit::from_stim_str(&period127_observable_circuit(1_000_083))
+        .expect("period-127 circuit");
+
+    let error = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("unsupported huge residue should not use generic compact folding");
+
+    assert!(error.to_string().contains("repeat counts up to 100000"));
 }
 
 #[test]

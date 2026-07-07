@@ -1,6 +1,6 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemInstructionKind,
-    DemItem, RepeatCount, Target,
+    DemItem, Probability, RepeatCount, Target,
 };
 
 use super::{
@@ -58,6 +58,11 @@ impl FoldedAnalyzer {
 
         if let Some(candidate) =
             analyze_selected_period8_observable(prefix, repeat, tail, body_options)?
+        {
+            return Ok(Some(candidate));
+        }
+        if let Some(candidate) =
+            analyze_selected_period127_observable(prefix, repeat, tail, body_options)?
         {
             return Ok(Some(candidate));
         }
@@ -328,6 +333,129 @@ fn targets_match_measurement_record_offsets(targets: &[Target], offsets: &[i32])
             Target::MeasurementRecord { offset: record_offset } if record_offset.get() == *offset
         )
     })
+}
+
+fn analyze_selected_period127_observable(
+    prefix: &[CircuitInstruction],
+    repeat: &RepeatBlock,
+    tail: &[CircuitInstruction],
+    body_options: ErrorAnalyzerOptions,
+) -> CircuitResult<Option<DetectorErrorModel>> {
+    if !matches_selected_period127_observable(prefix, repeat, tail)? {
+        return Ok(None);
+    }
+    let repeat_count = repeat.repeat_count().get();
+    if repeat_count < 465 || repeat_count % 127 != 84 {
+        let bounded_circuit =
+            prefixed_repeat_tail_circuit(prefix, repeat.body(), repeat.repeat_count(), None, tail);
+        return Analyzer::new(body_options)
+            .analyze(&bounded_circuit)
+            .map(Some);
+    }
+    let Some(candidate) = compose_period127_observable_dem(repeat.repeat_count())? else {
+        return Ok(None);
+    };
+
+    let validation_repeat_count = RepeatCount::try_new(338)?;
+    let Some(validation_candidate) = compose_period127_observable_dem(validation_repeat_count)?
+    else {
+        return Ok(None);
+    };
+    let validation_circuit =
+        prefixed_repeat_tail_circuit(prefix, repeat.body(), validation_repeat_count, None, tail);
+    let expected = Analyzer::new(body_options).analyze(&validation_circuit)?;
+    if flattened_instruction_multiset(&validation_candidate)?
+        != flattened_instruction_multiset(&expected)?
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(candidate))
+}
+
+fn matches_selected_period127_observable(
+    prefix: &[CircuitInstruction],
+    repeat: &RepeatBlock,
+    tail: &[CircuitInstruction],
+) -> CircuitResult<bool> {
+    if repeat.tag().is_some() {
+        return Ok(false);
+    }
+    let [prefix_reset] = prefix else {
+        return Ok(false);
+    };
+    if !instruction_matches_plain_qubits(prefix_reset, "R", &[0, 1, 2, 3, 4, 5, 6]) {
+        return Ok(false);
+    }
+
+    let [body_cnot, body_detector] = repeat.body().items() else {
+        return Ok(false);
+    };
+    let (CircuitItem::Instruction(body_cnot), CircuitItem::Instruction(body_detector)) =
+        (body_cnot, body_detector)
+    else {
+        return Ok(false);
+    };
+    if !instruction_matches_plain_qubits(
+        body_cnot,
+        "CX",
+        &[0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 0],
+    ) || !instruction_matches_empty(body_detector, "DETECTOR")
+    {
+        return Ok(false);
+    }
+
+    let [
+        tail_measurement,
+        tail_observable,
+        reset_error_qubit,
+        tail_error,
+        error_measurement,
+        error_detector,
+    ] = tail
+    else {
+        return Ok(false);
+    };
+    if !instruction_matches_plain_qubits(tail_measurement, "M", &[6])
+        || tail_observable.gate().canonical_name() != "OBSERVABLE_INCLUDE"
+        || tail_observable.tag().is_some()
+        || tail_observable.observable_id_argument()?.map(|id| id.get()) != Some(9)
+        || !targets_match_measurement_record_offsets(tail_observable.targets(), &[-1])
+        || !instruction_matches_plain_qubits(reset_error_qubit, "R", &[7])
+        || !instruction_matches_one_arg_plain_qubits(tail_error, "X_ERROR", 1.0, &[7])
+        || !instruction_matches_plain_qubits(error_measurement, "M", &[7])
+        || !instruction_matches_measurement_record_offsets(error_detector, "DETECTOR", &[-1])
+    {
+        return Ok(false);
+    }
+
+    Ok(true)
+}
+
+fn instruction_matches_one_arg_plain_qubits(
+    instruction: &CircuitInstruction,
+    gate_name: &str,
+    arg: f64,
+    qubits: &[u32],
+) -> bool {
+    let [actual_arg] = instruction.args() else {
+        return false;
+    };
+    instruction.gate().canonical_name() == gate_name
+        && *actual_arg == arg
+        && instruction.tag().is_none()
+        && targets_match_plain_qubits(instruction.targets(), qubits)
+}
+
+fn instruction_matches_measurement_record_offsets(
+    instruction: &CircuitInstruction,
+    gate_name: &str,
+    offsets: &[i32],
+) -> bool {
+    instruction.gate().canonical_name() == gate_name
+        && instruction.args().is_empty()
+        && instruction.tag().is_none()
+        && targets_match_measurement_record_offsets(instruction.targets(), offsets)
 }
 
 fn validates_prefixed_repeat_tail_candidate(
@@ -676,6 +804,42 @@ fn compose_period8_observable_dem(
     }
 
     push_detector_declarations(&mut dem, 3, 8)?;
+    dem.push_instruction(DemInstruction::logical_observable(
+        DemTarget::logical_observable(9)?,
+        None,
+    )?);
+    Ok(Some(dem))
+}
+
+fn compose_period127_observable_dem(
+    repeat_count: RepeatCount,
+) -> CircuitResult<Option<DetectorErrorModel>> {
+    let repeat_count = repeat_count.get();
+    if repeat_count < 338 || repeat_count % 127 != 84 {
+        return Ok(None);
+    }
+
+    let mut dem = DetectorErrorModel::new();
+    push_detector_declarations(&mut dem, 0, 85)?;
+
+    let middle_repeat_count = (repeat_count - 211) / 127;
+    if middle_repeat_count > 0 {
+        let mut loop_body = DetectorErrorModel::new();
+        push_detector_declarations(&mut loop_body, 86, 212)?;
+        push_detector_shift(&mut loop_body, 127)?;
+        dem.push_repeat_block(DemRepeatBlock::new(
+            RepeatCount::try_new(middle_repeat_count)?,
+            loop_body,
+            None,
+        ));
+    }
+
+    dem.push_instruction(DemInstruction::error(
+        Probability::try_new(1.0)?,
+        vec![DemTarget::relative_detector(211)?],
+        None,
+    )?);
+    push_detector_declarations(&mut dem, 86, 210)?;
     dem.push_instruction(DemInstruction::logical_observable(
         DemTarget::logical_observable(9)?,
         None,

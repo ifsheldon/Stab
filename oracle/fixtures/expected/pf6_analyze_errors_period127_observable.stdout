@@ -1,0 +1,343 @@
+detector D0
+detector D1
+detector D2
+detector D3
+detector D4
+detector D5
+detector D6
+detector D7
+detector D8
+detector D9
+detector D10
+detector D11
+detector D12
+detector D13
+detector D14
+detector D15
+detector D16
+detector D17
+detector D18
+detector D19
+detector D20
+detector D21
+detector D22
+detector D23
+detector D24
+detector D25
+detector D26
+detector D27
+detector D28
+detector D29
+detector D30
+detector D31
+detector D32
+detector D33
+detector D34
+detector D35
+detector D36
+detector D37
+detector D38
+detector D39
+detector D40
+detector D41
+detector D42
+detector D43
+detector D44
+detector D45
+detector D46
+detector D47
+detector D48
+detector D49
+detector D50
+detector D51
+detector D52
+detector D53
+detector D54
+detector D55
+detector D56
+detector D57
+detector D58
+detector D59
+detector D60
+detector D61
+detector D62
+detector D63
+detector D64
+detector D65
+detector D66
+detector D67
+detector D68
+detector D69
+detector D70
+detector D71
+detector D72
+detector D73
+detector D74
+detector D75
+detector D76
+detector D77
+detector D78
+detector D79
+detector D80
+detector D81
+detector D82
+detector D83
+detector D84
+detector D85
+repeat 97210070768930 {
+    detector D86
+    detector D87
+    detector D88
+    detector D89
+    detector D90
+    detector D91
+    detector D92
+    detector D93
+    detector D94
+    detector D95
+    detector D96
+    detector D97
+    detector D98
+    detector D99
+    detector D100
+    detector D101
+    detector D102
+    detector D103
+    detector D104
+    detector D105
+    detector D106
+    detector D107
+    detector D108
+    detector D109
+    detector D110
+    detector D111
+    detector D112
+    detector D113
+    detector D114
+    detector D115
+    detector D116
+    detector D117
+    detector D118
+    detector D119
+    detector D120
+    detector D121
+    detector D122
+    detector D123
+    detector D124
+    detector D125
+    detector D126
+    detector D127
+    detector D128
+    detector D129
+    detector D130
+    detector D131
+    detector D132
+    detector D133
+    detector D134
+    detector D135
+    detector D136
+    detector D137
+    detector D138
+    detector D139
+    detector D140
+    detector D141
+    detector D142
+    detector D143
+    detector D144
+    detector D145
+    detector D146
+    detector D147
+    detector D148
+    detector D149
+    detector D150
+    detector D151
+    detector D152
+    detector D153
+    detector D154
+    detector D155
+    detector D156
+    detector D157
+    detector D158
+    detector D159
+    detector D160
+    detector D161
+    detector D162
+    detector D163
+    detector D164
+    detector D165
+    detector D166
+    detector D167
+    detector D168
+    detector D169
+    detector D170
+    detector D171
+    detector D172
+    detector D173
+    detector D174
+    detector D175
+    detector D176
+    detector D177
+    detector D178
+    detector D179
+    detector D180
+    detector D181
+    detector D182
+    detector D183
+    detector D184
+    detector D185
+    detector D186
+    detector D187
+    detector D188
+    detector D189
+    detector D190
+    detector D191
+    detector D192
+    detector D193
+    detector D194
+    detector D195
+    detector D196
+    detector D197
+    detector D198
+    detector D199
+    detector D200
+    detector D201
+    detector D202
+    detector D203
+    detector D204
+    detector D205
+    detector D206
+    detector D207
+    detector D208
+    detector D209
+    detector D210
+    detector D211
+    detector D212
+    shift_detectors 127
+}
+error(1) D211
+detector D86
+detector D87
+detector D88
+detector D89
+detector D90
+detector D91
+detector D92
+detector D93
+detector D94
+detector D95
+detector D96
+detector D97
+detector D98
+detector D99
+detector D100
+detector D101
+detector D102
+detector D103
+detector D104
+detector D105
+detector D106
+detector D107
+detector D108
+detector D109
+detector D110
+detector D111
+detector D112
+detector D113
+detector D114
+detector D115
+detector D116
+detector D117
+detector D118
+detector D119
+detector D120
+detector D121
+detector D122
+detector D123
+detector D124
+detector D125
+detector D126
+detector D127
+detector D128
+detector D129
+detector D130
+detector D131
+detector D132
+detector D133
+detector D134
+detector D135
+detector D136
+detector D137
+detector D138
+detector D139
+detector D140
+detector D141
+detector D142
+detector D143
+detector D144
+detector D145
+detector D146
+detector D147
+detector D148
+detector D149
+detector D150
+detector D151
+detector D152
+detector D153
+detector D154
+detector D155
+detector D156
+detector D157
+detector D158
+detector D159
+detector D160
+detector D161
+detector D162
+detector D163
+detector D164
+detector D165
+detector D166
+detector D167
+detector D168
+detector D169
+detector D170
+detector D171
+detector D172
+detector D173
+detector D174
+detector D175
+detector D176
+detector D177
+detector D178
+detector D179
+detector D180
+detector D181
+detector D182
+detector D183
+detector D184
+detector D185
+detector D186
+detector D187
+detector D188
+detector D189
+detector D190
+detector D191
+detector D192
+detector D193
+detector D194
+detector D195
+detector D196
+detector D197
+detector D198
+detector D199
+detector D200
+detector D201
+detector D202
+detector D203
+detector D204
+detector D205
+detector D206
+detector D207
+detector D208
+detector D209
+detector D210
+logical_observable L9

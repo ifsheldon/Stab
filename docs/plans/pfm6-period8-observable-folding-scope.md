@@ -55,7 +55,7 @@ logical_observable L9
 
 ## Non-Goals
 
-- The period-127 loop-folding example from the same upstream test is not implemented by this slice.
+- The period-127 loop-folding example from the same upstream test is implemented by the separate [pfm6-period127-observable-folding-scope.md](pfm6-period127-observable-folding-scope.md) slice, not by this period-8 slice.
 - Nested loop-folding cases from `ErrorAnalyzer.loop_folding_nested_loop` are not implemented by this slice.
 - Arbitrary logical-observable periods, arbitrary CNOT graphs, other final measurement observables, tagged variants, generated-code true folded analyzer output, full ErrorMatcher provenance, heralded matching, repeat-contained noise provenance, and `stim explain_errors` remain outside this slice.
 

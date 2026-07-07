@@ -2,8 +2,8 @@
 
 ## Summary
 
-This RPF6 report makes the generated-QEC analyzer subset, the selected prefix/repeat/tail true-folded analyzer subset, the selected loop-carried observable true-folded analyzer subset, the selected period-8 observable true-folded analyzer subset, the selected loop-folded error-decomposition subset, the selected folded observable-dependency rejection guard, the bounded mixed-top-level `fold_loops=true` fallback, and the selected matched-error canonicalization hardening explicit in the source-owned evidence.
-It does not complete RPF6 because broad true folded generated-loop output beyond the selected detector-chain, loop-carried observable, and period-8 observable slices, graphlike and hypergraph generated search beyond the promoted QEC subset, and sparse reverse tracker work beyond supported-Clifford unitary repeats remain open; additional matched-error value-object hardening belongs to future analyzer or search slices only when those outputs require it.
+This RPF6 report makes the generated-QEC analyzer subset, the selected prefix/repeat/tail true-folded analyzer subset, the selected loop-carried observable true-folded analyzer subset, the selected period-8 observable true-folded analyzer subset, the selected period-127 observable true-folded analyzer subset, the selected loop-folded error-decomposition subset, the selected folded observable-dependency rejection guard, the bounded mixed-top-level `fold_loops=true` fallback, and the selected matched-error canonicalization hardening explicit in the source-owned evidence.
+It does not complete RPF6 because broad true folded generated-loop output beyond the selected detector-chain, loop-carried observable, period-8 observable, and period-127 observable slices, graphlike and hypergraph generated search beyond the promoted QEC subset, and sparse reverse tracker work beyond supported-Clifford unitary repeats remain open; additional matched-error value-object hardening belongs to future analyzer or search slices only when those outputs require it.
 
 ## Implemented Evidence Slice
 
@@ -13,10 +13,11 @@ It does not complete RPF6 because broad true folded generated-loop output beyond
 - `circuit_to_detector_error_model` now emits true compact folded DEM output for the selected top-level prefix, repeat, and tail detector-chain shape after validating the compact candidate against a measurement-record-lookback-sized non-folded expansion, including selected tail-error output and repeat counts above the bounded fallback unroll cap.
 - `circuit_to_detector_error_model` now emits true compact folded DEM output for the selected pinned loop-carried observable case where a huge odd repeat has a tail `OBSERVABLE_INCLUDE` that annotates the repeated body errors, after validating the compact candidate against a measurement-record-lookback-sized non-folded expansion.
 - `circuit_to_detector_error_model` now emits the exact Stim-style compact folded DEM output for the selected pinned period-8 logical-observable oscillation case after validating the candidate against a non-folded nine-iteration expansion.
+- `circuit_to_detector_error_model` now emits the exact Stim-style compact folded DEM output for the selected pinned period-127 logical-observable oscillation case with a deterministic tail detector after validating the candidate against a non-folded 338-iteration expansion.
 - `circuit_to_detector_error_model` is covered for the selected upstream `fold_loops + decompose_errors + approximate_disjoint_errors` rejection case where `OBSERVABLE_INCLUDE` omits loop-carried measurement dependencies across folded iterations and must fail with nondeterministic-observable evidence instead of producing a folded DEM.
 - `circuit_to_detector_error_model` handles unsafe or still-unsupported mixed top-level `fold_loops=true` shapes through the existing capped non-folded analyzer. This selected bounded fallback covers the pinned generated surface-code prefix, repeat, and tail coordinate case without claiming true folded output for broader generated-loop families.
 - `ExplainedError::canonicalize` and `CircuitErrorLocation::canonicalize` now sort DEM terms, circuit error locations, flipped Pauli products, and flipped measured observables like pinned Stim, while `ErrorMatcher` preserves upstream-like returned location order by avoiding implicit location canonicalization.
-- The promoted evidence is primarily Rust-core analyzer evidence. The selected loop-carried and period-8 observable slices also have narrow exact-output `stab analyze_errors --fold_loops` CLI fixtures, but this report does not claim full public `stab analyze_errors` CLI parity.
+- The promoted evidence is primarily Rust-core analyzer evidence. The selected loop-carried, period-8, and period-127 observable slices also have narrow exact-output `stab analyze_errors --fold_loops` CLI fixtures, but this report does not claim full public `stab analyze_errors` CLI parity.
 
 ## Tests
 
@@ -32,6 +33,11 @@ Implemented Rust tests:
 - `pf6_dem_analyzer_prefix_repeat_tail_folds_large_detector_chain`
 - `pf6_dem_analyzer_loop_carried_observable_folds_like_upstream`
 - `pf6_dem_analyzer_period8_observable_folds_like_upstream`
+- `pf6_dem_analyzer_period127_observable_folds_like_upstream`
+- `pf6_dem_analyzer_period127_observable_folds_minimum_compact_shape_like_upstream`
+- `pf6_dem_analyzer_period127_observable_keeps_single_middle_repeat_unfolded`
+- `pf6_dem_analyzer_period127_observable_keeps_adjacent_residue_unfolded`
+- `pf6_dem_analyzer_period127_observable_rejects_huge_adjacent_residue`
 - `pf6_dem_analyzer_rejects_folded_observables_crossing_iterations`
 - `pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_unsafe_tail_dependency`
 - `pf6_dem_analyzer_fallback_preserves_delayed_rec_dependency`
@@ -43,7 +49,7 @@ Implemented Rust tests:
 - `pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit`
 - `matched_error_canonicalize_sorts_terms_like_upstream`
 
-These tests run under `cargo test -p stab-core generated_qec_dem`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_loops_`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_prefix_repeat_tail_`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_loop_carried_observable`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_period8_observable`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_rejects_folded_observables_crossing_iterations`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fallback_`, `cargo test -p stab-core --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit`, and `cargo test -p stab-core matched_error_canonicalize_sorts_terms_like_upstream`.
+These tests run under `cargo test -p stab-core generated_qec_dem`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_loops_`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_prefix_repeat_tail_`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_loop_carried_observable`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_period8_observable`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_period127_observable`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_rejects_folded_observables_crossing_iterations`, `cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fallback_`, `cargo test -p stab-core --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit`, and `cargo test -p stab-core matched_error_canonicalize_sorts_terms_like_upstream`.
 
 ## Oracle Rows
 
@@ -55,6 +61,8 @@ Implemented rows:
 - `pf6-analyze-errors-loop-carried-observable-cli`
 - `pf6-analyzer-period8-observable-rust`
 - `pf6-analyze-errors-period8-observable-cli`
+- `pf6-analyzer-period127-observable-rust`
+- `pf6-analyze-errors-period127-observable-cli`
 - `pf6-error-decomp-loop-folded-rust`
 
 Implemented bounded fallback row:
@@ -85,6 +93,7 @@ Report-only runner coverage:
 - `pf6-error-decomp-loop-folded`
 - `pf6-analyzer-loop-observable-folded`
 - `pf6-analyzer-period8-observable-folded`
+- `pf6-analyzer-period127-observable-folded`
 
 The row measures the Rust core generated d3/r3 rotated-memory-z analyzer workload through `circuit_to_detector_error_model`.
 It reports `stab_pf6_analyze_errors_generated_surface`, normalized as detectors per second.
@@ -97,6 +106,9 @@ It reports `stab_pf6_analyzer_loop_observable_folded`, normalized as folded roun
 It remains `non-primary-report-only` because it is a selected Rust core contract workload without a faithful pinned Stim direct Rust timing ratio in the current harness.
 The period-8 observable row measures the Rust core analyzer over the selected pinned period-8 logical-observable oscillation shape with `fold_loops` enabled.
 It reports `stab_pf6_analyzer_period8_observable_folded`, normalized as folded rounds per second.
+It remains `non-primary-report-only` because it is a selected Rust core contract workload without a faithful pinned Stim direct Rust timing ratio in the current harness.
+The period-127 observable row measures the Rust core analyzer over the selected pinned period-127 logical-observable oscillation shape with `fold_loops` enabled.
+It reports `stab_pf6_analyzer_period127_observable_folded`, normalized as folded rounds per second.
 It remains `non-primary-report-only` because it is a selected Rust core contract workload without a faithful pinned Stim direct Rust timing ratio in the current harness.
 
 Related PF6 report-only runner coverage tracked in search and sparse-tracker reports:
@@ -121,6 +133,7 @@ cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fold_l
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_prefix_repeat_tail_ --quiet
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_loop_carried_observable --quiet
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_period8_observable --quiet
+cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_period127_observable --quiet
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_rejects_folded_observables_crossing_iterations --quiet
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fallback_ --quiet
 cargo test -p stab-core --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit --quiet
@@ -137,11 +150,13 @@ just bench::baseline --only pf6-analyzer-loop-observable-folded --out target/ben
 just bench::compare --only pf6-analyzer-loop-observable-folded --baseline target/benchmarks/pf6-analyzer-loop-observable-folded-probe/baseline.json --report target/benchmarks/pf6-analyzer-loop-observable-folded-compare
 just bench::baseline --only pf6-analyzer-period8-observable-folded --out target/benchmarks/pf6-analyzer-period8-observable-folded-probe
 just bench::compare --only pf6-analyzer-period8-observable-folded --baseline target/benchmarks/pf6-analyzer-period8-observable-folded-probe/baseline.json --report target/benchmarks/pf6-analyzer-period8-observable-folded-compare
+just bench::baseline --only pf6-analyzer-period127-observable-folded --out target/benchmarks/pf6-analyzer-period127-observable-folded-probe
+just bench::compare --only pf6-analyzer-period127-observable-folded --baseline target/benchmarks/pf6-analyzer-period127-observable-folded-probe/baseline.json --report target/benchmarks/pf6-analyzer-period127-observable-folded-compare
 ```
 
 ## Remaining RPF6 Work
 
-- True folded generated-loop analyzer behavior beyond the promoted prefix/repeat/tail detector-chain slice, selected loop-carried observable slice, selected period-8 observable slice, generated-QEC semantic subset, and bounded mixed-top-level fallback.
+- True folded generated-loop analyzer behavior beyond the promoted prefix/repeat/tail detector-chain slice, selected loop-carried observable slice, selected period-8 observable slice, selected period-127 observable slice, generated-QEC semantic subset, and bounded mixed-top-level fallback.
 - Broader loop-folded error decomposition subcases beyond the promoted repeated composite-error and remnant-edge blocking fixtures.
 - Broader generated-circuit graphlike, hypergraph, shortest-error, SAT, and WCNF search evidence beyond the promoted generated-QEC search rows.
 - Sparse reverse detector-frame tracker analyzer/search-specific consumption beyond the supported-Clifford generated repeat-folding evidence.

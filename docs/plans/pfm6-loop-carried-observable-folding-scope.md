@@ -45,9 +45,9 @@ error(0.25) D2 L9
 ## Non-Goals
 
 - The period-8 loop-folding example from the same upstream test is implemented by the separate [pfm6-period8-observable-folding-scope.md](pfm6-period8-observable-folding-scope.md) slice, not by this loop-carried-error slice.
-- The period-127 loop-folding example from the same upstream test is not implemented by this slice.
+- The period-127 loop-folding example from the same upstream test is implemented by the separate [pfm6-period127-observable-folding-scope.md](pfm6-period127-observable-folding-scope.md) slice, not by this loop-carried-error slice.
 - Nested loop-folding cases from `ErrorAnalyzer.loop_folding_nested_loop` are not implemented by this slice.
-- Generated-code true folded analyzer output remains under-specified outside the selected detector-chain, loop-carried observable, and period-8 observable shapes.
+- Generated-code true folded analyzer output remains under-specified outside the selected detector-chain, loop-carried observable, period-8 observable, and period-127 observable shapes.
 - Even repeat-count loop-carried observable behavior, arbitrary loop-carried observable periods, full ErrorMatcher provenance, heralded matching, repeat-contained noise provenance, and `stim explain_errors` remain outside this slice.
 
 ## Evidence
