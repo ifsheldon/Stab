@@ -154,6 +154,14 @@ fn detecting_regions_target_shape_keeps_non_cz_record_record_fail_closed() -> Re
             "CY record-record",
             "M 0 1\nTICK\nCY rec[-1] rec[-2]\nMY 2\nDETECTOR rec[-1]\n",
         ),
+        (
+            "XCZ record-record",
+            "M 0 1\nTICK\nXCZ rec[-1] rec[-2]\nM 2\nDETECTOR rec[-1]\n",
+        ),
+        (
+            "YCZ record-record",
+            "M 0 1\nTICK\nYCZ rec[-1] rec[-2]\nMY 2\nDETECTOR rec[-1]\n",
+        ),
     ] {
         let error = detecting_region_error(circuit_text)?;
         require_contains(&error, "exactly one plain qubit target", name)?;

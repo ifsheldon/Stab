@@ -142,6 +142,50 @@ fn detecting_regions_target_shape_keeps_non_cz_record_sweep_fail_closed() -> Res
             "plain qubit target",
         ),
         (
+            "CY record first",
+            "
+            M 0
+            TICK
+            CY rec[-1] sweep[0]
+            MY 1
+            DETECTOR rec[-1]
+            ",
+            "sweep-controlled targets",
+        ),
+        (
+            "CY record second",
+            "
+            M 0
+            TICK
+            CY sweep[0] rec[-1]
+            MY 1
+            DETECTOR rec[-1]
+            ",
+            "plain qubit target",
+        ),
+        (
+            "XCZ record first",
+            "
+            M 0
+            TICK
+            XCZ rec[-1] sweep[0]
+            M 1
+            DETECTOR rec[-1]
+            ",
+            "plain qubit target",
+        ),
+        (
+            "XCZ record second",
+            "
+            M 0
+            TICK
+            XCZ sweep[0] rec[-1]
+            M 1
+            DETECTOR rec[-1]
+            ",
+            "sweep-controlled targets",
+        ),
+        (
             "YCZ record first",
             "
             M 0
@@ -151,6 +195,17 @@ fn detecting_regions_target_shape_keeps_non_cz_record_sweep_fail_closed() -> Res
             DETECTOR rec[-1]
             ",
             "plain qubit targets",
+        ),
+        (
+            "YCZ record second",
+            "
+            M 0
+            TICK
+            YCZ sweep[0] rec[-1]
+            MY 1
+            DETECTOR rec[-1]
+            ",
+            "sweep-controlled targets",
         ),
     ] {
         let error = detecting_region_error(circuit_text)?;
