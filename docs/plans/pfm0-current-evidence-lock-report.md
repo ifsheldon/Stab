@@ -74,3 +74,13 @@ The next implementation slice should be selected from one of these active, sourc
 
 Do not start from a whole upstream file.
 The next slice must name exact owned subcases, explicit rejections, comparator class, oracle rows, benchmark rows or no-benchmark rationale, and resource behavior before implementation.
+
+## 2026-07-07 Addendum: PF1 Spec-Gap Closure
+
+This addendum resolves two stale PF1 specification gaps for the current Rust API scope without changing production behavior.
+The path-based circuit file-helper boundary is no longer an active non-deferred gap because `Circuit::from_stim_file` is intentionally bounded by a 64 MiB read cap, `Circuit::write_stim_file` streams canonical output through IO, `pf1_circuit_file_helpers_read_and_write_canonical_stim_text` and `pf1_circuit_file_helpers_report_read_and_write_errors` prove the selected behavior, and oracle row `pf1-circuit-file-helpers` selects the evidence.
+Unbounded streaming `.stim` file-read parity remains future parser work and must not block the current PF1 Rust API closure.
+
+The Rust circuit coordinate non-finite behavior is also resolved for the current Rust API scope.
+`pf1_circuit_stats_coordinate_queries_reject_non_finite_folded_shift` proves Stab rejects non-finite folded coordinate results, and the checklist, inventory, and PF1 progress report document that exact Python-style coordinate API shape plus exact C++ infinity side-effect parity remain deferred binding-compatibility work.
+These closures keep the open under-specification log focused on active decisions rather than already documented deferrals.

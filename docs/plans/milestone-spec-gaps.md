@@ -46,25 +46,25 @@ Gap: Stim v1.16.0 gives coherent self-validating inverse flows for inverted meas
 Proposed amendment: keep duplicate measure-reset targets fail-closed in Stab's selected measurement-rich `time_reversed_for_flows` subset until a later compatibility decision explicitly chooses bug-compatible invalid flows, corrected semantic flows, or permanent rejection. Inverted result-target measure-reset support remains implemented and source-owned by exact tests.
 Resolution: Pending a compatibility decision for bug-compatible versus corrected duplicate measure-reset flow semantics.
 
+## Resolved Entries
+
 ## 2026-07-04 - PF1: Path-Based Circuit File Helper Streaming Boundary
 
-Status: Open
+Status: Resolved
 Revealed by: full-code-review of the PF1 circuit file-helper API slice.
 Current text: PF1 asks for circuit file constructor and writer helpers where they are useful Rust APIs, but it does not define whether path-based Rust helpers must stream through the parser or may use a bounded string-backed parser until a streaming `.stim` parser exists.
 Gap: `Circuit::write_stim_file` can stream canonical output through an `io::Write`, but `Circuit::from_stim_file` still delegates to the existing string-backed parser. The current Rust API rejects files larger than 64 MiB before parsing to avoid unbounded allocation, so it is bounded but not a full replacement for Stim v1.16.0's streaming `FILE*` reader.
 Proposed amendment: keep path-based Rust file helpers in PF1 with the documented 64 MiB read cap, and add a later parser milestone before claiming unbounded streaming `.stim` file-read parity for Rust APIs or future bindings.
-Resolution: Pending future streaming parser milestone.
+Resolution: Resolved for the current Rust PF1 scope by the selected file-helper evidence. `Circuit::from_stim_file` keeps the documented 64 MiB path-read cap while the `.stim` parser remains string-backed, `Circuit::write_stim_file` writes canonical text through an IO writer, `pf1_circuit_file_helpers_read_and_write_canonical_stim_text` proves canonical read/write behavior with tags and repeats, `pf1_circuit_file_helpers_report_read_and_write_errors` proves missing-file, parse-error, oversized-file, and write-error reporting, oracle row `pf1-circuit-file-helpers` selects those tests, and `docs/plans/pf1-circuit-api-progress-report.md`, `docs/plans/partial-feature-inventory.md`, and `docs/stab-feature-checklist.md` document bounded path reads. Unbounded streaming `.stim` file-read parity remains future parser work and is not part of the current non-deferred PF1 closure.
 
 ## 2026-07-04 - PF1: Rust Coordinate Query Non-Finite Results
 
-Status: Open
+Status: Resolved
 Revealed by: full-code-review of the PF1 circuit detector-coordinate API slice.
 Current text: PF1 requires Rust circuit coordinate query parity for final qubit coordinates and detector coordinates, but it does not define whether Rust APIs should exactly mirror Stim v1.16.0 C++ double-overflow behavior or reject non-finite folded coordinate results.
 Gap: Stim v1.16.0's C++ coordinate helpers can return infinities when finite coordinate inputs overflow during folded repeat arithmetic, while Stab's current Rust coordinate APIs reject non-finite folded coordinate results as a deliberate hardening choice.
 Proposed amendment: keep the Rust API hardening documented for PF1, and require a later binding-parity decision before claiming exact Python or C++ coordinate-query side-effect parity.
-Resolution: Pending future binding-parity decision.
-
-## Resolved Entries
+Resolution: Resolved for the current Rust PF1 scope by the documented hardening decision and executable evidence. `pf1_circuit_stats_coordinate_queries_reject_non_finite_folded_shift` proves Rust circuit coordinate queries reject non-finite folded coordinate results, oracle rows `pf1-circuit-stats-coordinates` and `pf1-circuit-rust-api` select the PF1 coordinate tests, and `docs/plans/pf1-circuit-api-progress-report.md`, `docs/plans/partial-feature-inventory.md`, and `docs/stab-feature-checklist.md` document the hardening. Exact Python-style coordinate API shape and exact C++ infinity side-effect parity remain deferred binding-compatibility work, not active current Rust API work.
 
 ## 2026-07-05 - PFM4/PFM6: Generated Surface-Code Folded Coordinate Boundary
 
