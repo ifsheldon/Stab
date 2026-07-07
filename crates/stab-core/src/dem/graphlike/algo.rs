@@ -38,11 +38,7 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
                 "graphlike search reached a state without an active detector",
             ));
         };
-        let active_index = usize::try_from(active.get()).map_err(|_| {
-            CircuitError::invalid_detector_error_model(
-                "graphlike active detector does not fit usize",
-            )
-        })?;
+        let active_index = graph.node_index_for_detector(active)?;
         let Some(node) = graph.nodes.get(active_index) else {
             return Err(CircuitError::invalid_detector_error_model(
                 "graphlike active detector is outside the graph",
@@ -123,7 +119,7 @@ fn no_graphlike_logical_error_message(
             "\n    WARNING: NO OBSERVABLES. The circuit or detector error model didn't define any observables, making it vacuously impossible to find a logical error.",
         );
     }
-    if graph.nodes.is_empty() {
+    if !graph.has_declared_detectors {
         message.push_str(
             "\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors.",
         );

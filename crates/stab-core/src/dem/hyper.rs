@@ -8,11 +8,11 @@ use std::fmt::{Display, Formatter};
 
 use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemTarget,
-    DetectorErrorModel,
+    DetectorErrorModel, error_traversal::SearchGraphTargetPolicy,
 };
 use crate::{CircuitError, CircuitResult, Probability};
 
-const MAX_FULL_DEM_SEARCH_GRAPH_NODES: u64 = 1_000_000;
+const MAX_FULL_DEM_SEARCH_GRAPH_NODES: usize = 1_000_000;
 
 #[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 struct ObservableMask {
@@ -129,14 +129,27 @@ impl Display for Node {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Graph {
     nodes: Vec<Node>,
+    detector_index: DetectorIndex,
+    has_declared_detectors: bool,
     num_observables: usize,
     distance_1_error_mask: ObservableMask,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum DetectorIndex {
+    Identity,
+    Sparse {
+        node_to_detector: Vec<DemDetectorId>,
+        detector_to_node: BTreeMap<DemDetectorId, usize>,
+    },
 }
 
 impl Graph {
     fn new(node_count: usize, num_observables: usize) -> Self {
         Self {
             nodes: vec![Node::default(); node_count],
+            detector_index: DetectorIndex::Identity,
+            has_declared_detectors: node_count > 0,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
         }
@@ -152,6 +165,41 @@ impl Graph {
         nodes.resize(node_count, Node::default());
         Ok(Self {
             nodes,
+            detector_index: DetectorIndex::Identity,
+            has_declared_detectors: node_count > 0,
+            num_observables,
+            distance_1_error_mask: ObservableMask::new(),
+        })
+    }
+
+    fn try_new_sparse(
+        detectors: BTreeSet<DemDetectorId>,
+        num_observables: usize,
+        has_declared_detectors: bool,
+    ) -> CircuitResult<Self> {
+        let node_count = detectors.len();
+        let mut nodes = Vec::new();
+        nodes.try_reserve_exact(node_count).map_err(|_| {
+            CircuitError::invalid_detector_error_model(format!(
+                "hypergraph search cannot allocate {node_count} sparse detector nodes"
+            ))
+        })?;
+        nodes.resize(node_count, Node::default());
+
+        let node_to_detector: Vec<_> = detectors.into_iter().collect();
+        let detector_to_node = node_to_detector
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(index, detector)| (detector, index))
+            .collect();
+        Ok(Self {
+            nodes,
+            detector_index: DetectorIndex::Sparse {
+                node_to_detector,
+                detector_to_node,
+            },
+            has_declared_detectors,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
         })
@@ -163,9 +211,50 @@ impl Graph {
         distance_1_error_mask: ObservableMask,
     ) -> Self {
         Self {
+            has_declared_detectors: !nodes.is_empty(),
             nodes,
+            detector_index: DetectorIndex::Identity,
             num_observables,
             distance_1_error_mask,
+        }
+    }
+
+    fn detector_for_node_index(&self, index: usize) -> CircuitResult<DemDetectorId> {
+        match &self.detector_index {
+            DetectorIndex::Identity => {
+                let index = u64::try_from(index).map_err(|_| {
+                    CircuitError::invalid_detector_error_model(
+                        "hypergraph node index does not fit detector id",
+                    )
+                })?;
+                DemDetectorId::try_new(index)
+            }
+            DetectorIndex::Sparse {
+                node_to_detector, ..
+            } => node_to_detector.get(index).copied().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "hypergraph sparse node index {index} is outside the graph"
+                ))
+            }),
+        }
+    }
+
+    fn node_index_for_detector(&self, detector: DemDetectorId) -> CircuitResult<usize> {
+        match &self.detector_index {
+            DetectorIndex::Identity => usize::try_from(detector.get()).map_err(|_| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "hypergraph detector D{} does not fit usize",
+                    detector.get()
+                ))
+            }),
+            DetectorIndex::Sparse {
+                detector_to_node, ..
+            } => detector_to_node.get(&detector).copied().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "hypergraph detector D{} is outside the sparse graph",
+                    detector.get()
+                ))
+            }),
         }
     }
 
@@ -187,12 +276,7 @@ impl Graph {
 
         let edge = Edge::new(detectors.clone(), observables);
         for detector in detectors {
-            let index = usize::try_from(detector.get()).map_err(|_| {
-                CircuitError::invalid_detector_error_model(format!(
-                    "hypergraph detector D{} does not fit usize",
-                    detector.get()
-                ))
-            })?;
+            let index = self.node_index_for_detector(detector)?;
             let Some(node) = self.nodes.get_mut(index) else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
                     "hypergraph detector D{} is outside the graph",
@@ -208,26 +292,35 @@ impl Graph {
         model.validate_search_graph_error_traversal_budget("hypergraph search")?;
         let full_detector_count = model.count_detectors()?;
         let full_observable_count = model.count_observables()?;
-        let (effective_detector_count, effective_observable_count) =
-            model.search_graph_nonzero_error_target_counts("hypergraph search")?;
-        let (detector_count, observable_count) =
-            if full_detector_count <= MAX_FULL_DEM_SEARCH_GRAPH_NODES {
-                (full_detector_count, full_observable_count)
-            } else {
-                (effective_detector_count, effective_observable_count)
-            };
-        if detector_count > MAX_FULL_DEM_SEARCH_GRAPH_NODES {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "hypergraph search currently supports at most {MAX_FULL_DEM_SEARCH_GRAPH_NODES} effective detector nodes, got {detector_count}"
-            )));
-        }
-        let node_count = usize::try_from(detector_count).map_err(|_| {
-            CircuitError::invalid_detector_error_model("detector count does not fit usize")
-        })?;
-        let num_observables = usize::try_from(observable_count).map_err(|_| {
-            CircuitError::invalid_detector_error_model("observable count does not fit usize")
-        })?;
-        let mut graph = Self::try_new(node_count, num_observables)?;
+        let effective_detectors = model.search_graph_nonzero_error_targets(
+            "hypergraph search",
+            SearchGraphTargetPolicy::Hypergraph { max_weight },
+            MAX_FULL_DEM_SEARCH_GRAPH_NODES,
+        )?;
+        let mut graph = if full_detector_count <= MAX_FULL_DEM_SEARCH_GRAPH_NODES as u64 {
+            let node_count = usize::try_from(full_detector_count).map_err(|_| {
+                CircuitError::invalid_detector_error_model("detector count does not fit usize")
+            })?;
+            let num_observables = usize::try_from(full_observable_count).map_err(|_| {
+                CircuitError::invalid_detector_error_model("observable count does not fit usize")
+            })?;
+            Self::try_new(node_count, num_observables)?
+        } else {
+            let effective_detector_count = effective_detectors.len();
+            if effective_detector_count > MAX_FULL_DEM_SEARCH_GRAPH_NODES {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "hypergraph search currently supports at most {MAX_FULL_DEM_SEARCH_GRAPH_NODES} effective detector nodes, got {effective_detector_count}"
+                )));
+            }
+            let num_observables = usize::try_from(full_observable_count).map_err(|_| {
+                CircuitError::invalid_detector_error_model("observable count does not fit usize")
+            })?;
+            Self::try_new_sparse(
+                effective_detectors,
+                num_observables,
+                full_detector_count > 0,
+            )?
+        };
         graph.add_flattened_dem(model, 0, max_weight)?;
         Ok(graph)
     }
@@ -403,7 +496,7 @@ pub(super) fn find_undetectable_logical_error(
     back_map.insert(empty.clone(), empty.clone());
 
     for (node_index, node) in graph.nodes.iter().enumerate() {
-        let source = detector_for_node_index(node_index)?;
+        let source = graph.detector_for_node_index(node_index)?;
         for edge in &node.edges {
             if edge.observables.is_empty() || edge.detectors.iter().next() != Some(&source) {
                 continue;
@@ -422,11 +515,7 @@ pub(super) fn find_undetectable_logical_error(
                 "hypergraph search reached a state without an active detector",
             ));
         };
-        let active_index = usize::try_from(active.get()).map_err(|_| {
-            CircuitError::invalid_detector_error_model(
-                "hypergraph active detector does not fit usize",
-            )
-        })?;
+        let active_index = graph.node_index_for_detector(active)?;
         let Some(node) = graph.nodes.get(active_index) else {
             return Err(CircuitError::invalid_detector_error_model(
                 "hypergraph active detector is outside the graph",
@@ -527,7 +616,7 @@ fn no_hypergraph_logical_error_message(
             "\n    WARNING: NO OBSERVABLES. The circuit or detector error model didn't define any observables, making it vacuously impossible to find a logical error.",
         );
     }
-    if graph.nodes.is_empty() {
+    if !graph.has_declared_detectors {
         message.push_str(
             "\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors.",
         );
@@ -620,13 +709,6 @@ fn format_detector(detector: DemDetectorId) -> String {
 
 fn format_observable(observable: DemObservableId) -> String {
     format!("L{}", observable.get())
-}
-
-fn detector_for_node_index(index: usize) -> CircuitResult<DemDetectorId> {
-    let index = u64::try_from(index).map_err(|_| {
-        CircuitError::invalid_detector_error_model("hypergraph node index does not fit detector id")
-    })?;
-    DemDetectorId::try_new(index)
 }
 
 #[cfg(test)]

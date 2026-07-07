@@ -586,34 +586,6 @@ fn pf4_dem_search_weighted_sat_rejects_shifted_zero_probability_repeat_node_expl
 }
 
 #[test]
-fn pf4_dem_search_rejects_shifted_zero_probability_repeat_node_explosion() {
-    let hostile = DetectorErrorModel::from_dem_str(
-        "repeat 1000001 {\n    error(0) D0\n    shift_detectors 1\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n",
-    )
-    .unwrap();
-
-    let graphlike_error = shortest_graphlike_undetectable_logical_error(&hostile, false)
-        .expect_err("graphlike search should reject excessive effective detector nodes")
-        .to_string();
-    assert!(
-        graphlike_error.contains(
-            "graphlike search currently supports at most 1000000 effective detector nodes"
-        ),
-        "{graphlike_error}"
-    );
-
-    let hyper_error = find_undetectable_logical_error(&hostile, usize::MAX, usize::MAX, false)
-        .expect_err("hypergraph search should reject excessive effective detector nodes")
-        .to_string();
-    assert!(
-        hyper_error.contains(
-            "hypergraph search currently supports at most 1000000 effective detector nodes"
-        ),
-        "{hyper_error}"
-    );
-}
-
-#[test]
 fn pf6_direct_dem_graphlike_search_matches_upstream_distance_cases() {
     for dem_text in [
         "",

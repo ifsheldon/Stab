@@ -1,5 +1,7 @@
+use std::collections::BTreeSet;
+
 use super::{
-    DemFlatteningBudget, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
+    DemDetectorId, DemFlatteningBudget, DemInstructionKind, DemItem, DemTarget, DetectorErrorModel,
     MAX_DEM_FLATTEN_REPEAT_UNROLL, MAX_DEM_REPEAT_NESTING,
 };
 use crate::{CircuitError, CircuitResult};
@@ -13,13 +15,21 @@ impl DetectorErrorModel {
         self.validate_search_graph_error_traversal_budget_items(1, 0, context, &mut budget)
     }
 
-    pub(crate) fn search_graph_nonzero_error_target_counts(
+    pub(in crate::dem) fn search_graph_nonzero_error_targets(
         &self,
         context: &'static str,
-    ) -> CircuitResult<(u64, u64)> {
-        let mut counts = DemErrorTargetCounts::default();
-        self.collect_search_graph_nonzero_error_target_counts_from(0, 0, context, &mut counts)?;
-        Ok((counts.detector_count, counts.observable_count))
+        policy: SearchGraphTargetPolicy,
+        max_detector_nodes: usize,
+    ) -> CircuitResult<BTreeSet<DemDetectorId>> {
+        let mut counts = DemErrorTargetCounts::new(max_detector_nodes);
+        self.collect_search_graph_nonzero_error_target_counts_from(
+            0,
+            0,
+            context,
+            policy,
+            &mut counts,
+        )?;
+        Ok(counts.detectors)
     }
 
     pub(crate) fn selected_search_graph_compact_repeat_error_count(
@@ -208,6 +218,7 @@ impl DetectorErrorModel {
         mut detector_offset: u64,
         depth: usize,
         context: &'static str,
+        policy: SearchGraphTargetPolicy,
         counts: &mut DemErrorTargetCounts,
     ) -> CircuitResult<u64> {
         if depth > MAX_DEM_REPEAT_NESTING {
@@ -220,7 +231,12 @@ impl DetectorErrorModel {
                 DemItem::Instruction(instruction) => match instruction.kind() {
                     DemInstructionKind::Error => {
                         if instruction.args().first().copied().unwrap_or(0.0) != 0.0 {
-                            counts.include_error_targets(instruction.targets(), detector_offset)?;
+                            policy.include_error_targets(
+                                instruction.targets(),
+                                detector_offset,
+                                context,
+                                counts,
+                            )?;
                         }
                     }
                     DemInstructionKind::ShiftDetectors => {
@@ -246,6 +262,7 @@ impl DetectorErrorModel {
                                 detector_offset,
                                 depth + 1,
                                 context,
+                                policy,
                                 counts,
                             )?;
                         continue;
@@ -278,6 +295,7 @@ impl DetectorErrorModel {
                                 detector_offset,
                                 depth + 1,
                                 context,
+                                policy,
                                 counts,
                             )?;
                     }
@@ -288,46 +306,186 @@ impl DetectorErrorModel {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::dem) enum SearchGraphTargetPolicy {
+    Graphlike { ignore_ungraphlike_errors: bool },
+    Hypergraph { max_weight: usize },
+}
+
+impl SearchGraphTargetPolicy {
+    fn include_error_targets(
+        self,
+        targets: &[DemTarget],
+        detector_offset: u64,
+        context: &'static str,
+        counts: &mut DemErrorTargetCounts,
+    ) -> CircuitResult<()> {
+        match self {
+            SearchGraphTargetPolicy::Graphlike {
+                ignore_ungraphlike_errors,
+            } => include_graphlike_error_targets(
+                targets,
+                detector_offset,
+                ignore_ungraphlike_errors,
+                context,
+                counts,
+            ),
+            SearchGraphTargetPolicy::Hypergraph { max_weight } => include_hypergraph_error_targets(
+                targets,
+                detector_offset,
+                max_weight,
+                context,
+                counts,
+            ),
+        }
+    }
+}
+
+fn include_graphlike_error_targets(
+    targets: &[DemTarget],
+    detector_offset: u64,
+    ignore_ungraphlike_errors: bool,
+    context: &'static str,
+    counts: &mut DemErrorTargetCounts,
+) -> CircuitResult<()> {
+    if ignore_ungraphlike_errors
+        && targets
+            .iter()
+            .any(|target| matches!(target, DemTarget::Separator))
+    {
+        return Ok(());
+    }
+
+    let mut start = 0;
+    for (index, target) in targets.iter().enumerate() {
+        if matches!(target, DemTarget::Separator) {
+            let component = targets.get(start..index).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "graphlike target component range is invalid",
+                )
+            })?;
+            include_graphlike_target_component(
+                component,
+                detector_offset,
+                ignore_ungraphlike_errors,
+                context,
+                counts,
+            )?;
+            start = index + 1;
+        }
+    }
+    let component = targets.get(start..).ok_or_else(|| {
+        CircuitError::invalid_detector_error_model("graphlike target component range is invalid")
+    })?;
+    include_graphlike_target_component(
+        component,
+        detector_offset,
+        ignore_ungraphlike_errors,
+        context,
+        counts,
+    )
+}
+
+fn include_graphlike_target_component(
+    targets: &[DemTarget],
+    detector_offset: u64,
+    ignore_ungraphlike_errors: bool,
+    context: &'static str,
+    counts: &mut DemErrorTargetCounts,
+) -> CircuitResult<()> {
+    let mut detectors = Vec::new();
+    for target in targets {
+        if let DemTarget::RelativeDetector(detector) = *target {
+            if detectors.len() == 2 {
+                if ignore_ungraphlike_errors {
+                    return Ok(());
+                }
+                return Err(CircuitError::invalid_detector_error_model(
+                    "The detector error model contained a non-graphlike error mechanism.\nYou can ignore such errors using `ignore_ungraphlike_errors`.\nYou can use `decompose_errors` when converting a circuit into a model to ensure no such errors are present.",
+                ));
+            }
+            detectors.push(detector);
+        }
+    }
+
+    for detector in detectors {
+        counts.include_detector(shifted_detector(detector, detector_offset)?, context)?;
+    }
+    Ok(())
+}
+
+fn include_hypergraph_error_targets(
+    targets: &[DemTarget],
+    detector_offset: u64,
+    max_weight: usize,
+    context: &'static str,
+    counts: &mut DemErrorTargetCounts,
+) -> CircuitResult<()> {
+    let mut detectors = BTreeSet::new();
+    for target in targets {
+        match *target {
+            DemTarget::RelativeDetector(detector) => {
+                let detector = shifted_detector(detector, detector_offset)?;
+                if !detectors.insert(detector) {
+                    detectors.remove(&detector);
+                }
+            }
+            DemTarget::LogicalObservable(_) | DemTarget::Separator => {}
+            DemTarget::Numeric(_) => {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "hypergraph error targets cannot include numeric targets",
+                ));
+            }
+        }
+    }
+
+    if detectors.len() > max_weight {
+        return Ok(());
+    }
+    for detector in detectors {
+        counts.include_detector(detector, context)?;
+    }
+    Ok(())
+}
+
+fn shifted_detector(detector: DemDetectorId, detector_offset: u64) -> CircuitResult<DemDetectorId> {
+    let detector_id = detector_offset.checked_add(detector.get()).ok_or_else(|| {
+        CircuitError::invalid_detector_error_model("DEM nonzero-error detector target overflowed")
+    })?;
+    DemDetectorId::try_new(detector_id)
+}
+
+#[derive(Clone, Debug)]
 struct DemErrorTargetCounts {
-    detector_count: u64,
-    observable_count: u64,
+    detectors: BTreeSet<DemDetectorId>,
+    max_detector_nodes: usize,
 }
 
 impl DemErrorTargetCounts {
-    fn include_error_targets(
+    fn new(max_detector_nodes: usize) -> Self {
+        Self {
+            detectors: BTreeSet::new(),
+            max_detector_nodes,
+        }
+    }
+
+    fn include_detector(
         &mut self,
-        targets: &[DemTarget],
-        detector_offset: u64,
+        detector: DemDetectorId,
+        context: &'static str,
     ) -> CircuitResult<()> {
-        for target in targets {
-            match *target {
-                DemTarget::RelativeDetector(id) => {
-                    let detector_id = detector_offset.checked_add(id.get()).ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
-                            "DEM nonzero-error detector target overflowed",
-                        )
-                    })?;
-                    self.detector_count =
-                        self.detector_count
-                            .max(detector_id.checked_add(1).ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
-                                    "DEM nonzero-error detector count overflowed",
-                                )
-                            })?);
-                }
-                DemTarget::LogicalObservable(id) => {
-                    self.observable_count =
-                        self.observable_count
-                            .max(id.get().checked_add(1).ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
-                                    "DEM nonzero-error observable count overflowed",
-                                )
-                            })?);
-                }
-                DemTarget::Separator | DemTarget::Numeric(_) => {}
-            }
+        self.detectors.insert(detector);
+        if self.detectors.len() > self.max_detector_nodes {
+            return Err(self.too_many_detectors_error(context));
         }
         Ok(())
+    }
+
+    fn too_many_detectors_error(&self, context: &'static str) -> CircuitError {
+        CircuitError::invalid_detector_error_model(format!(
+            "{context} currently supports at most {} effective detector nodes, got {}",
+            self.max_detector_nodes,
+            self.detectors.len()
+        ))
     }
 }
