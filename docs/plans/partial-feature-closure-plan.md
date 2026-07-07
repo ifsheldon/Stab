@@ -173,7 +173,7 @@ Included features:
 
 - DEM introspection for error counts, instruction counts, final detector shifts, final coordinate shifts, detector coordinate maps, and flattened iterators.
 - DEM transforms `flattened`, `rounded`, and `without_tags` for owned cases.
-- Folded traversal for graphlike search, hypergraph search, SAT encoding, analyzer-adjacent operations, matcher-adjacent operations, and nested or shifted repeated stochastic direct DEM sampling where current expansion or sampled-work limits are product limitations; flat sampled-error output and replay keep a separate Stim-compatible error-bit cap contract.
+- Folded traversal for graphlike search, hypergraph search, SAT encoding, analyzer-adjacent operations, matcher-adjacent operations, and shifted or otherwise non-selected repeated stochastic direct DEM sampling where current expansion or sampled-work limits are product limitations; flat sampled-error output and replay keep a separate Stim-compatible error-bit cap contract.
 - Clear public behavior for decomposition separators, tags, coordinate shifts, repeat blocks, and numerical rounding.
 
 Tests:

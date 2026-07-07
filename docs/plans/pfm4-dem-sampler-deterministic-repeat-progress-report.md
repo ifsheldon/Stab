@@ -15,7 +15,7 @@ The selected behavior is parity folding for direct detector and observable outpu
 
 This deterministic-repeat slice did not change sampled-error output, sampled-error replay, stochastic repeated bodies, shifted repeated bodies, graphlike search, hypergraph search, SAT/WCNF generation, analyzer traversal, ErrorMatcher traversal, Python APIs, diagrams, or any deferred simulator-product surface.
 
-Later `docs/plans/pfm4-dem-sampler-single-stochastic-repeat-progress-report.md` and `docs/plans/pfm4-dem-sampler-flat-stochastic-repeat-progress-report.md` promote selected direct detection-event stochastic zero-shift repeat shapes; nested, shifted, and otherwise non-selected stochastic repeated bodies still use the existing sampled-error application work cap.
+Later `docs/plans/pfm4-dem-sampler-single-stochastic-repeat-progress-report.md`, `docs/plans/pfm4-dem-sampler-flat-stochastic-repeat-progress-report.md`, and `docs/plans/pfm4-dem-sampler-nested-stochastic-repeat-progress-report.md` promote selected direct detection-event stochastic zero-shift repeat shapes; shifted and otherwise non-selected stochastic repeated bodies still use the existing sampled-error application work cap.
 Sampled-error output and replay still use the existing flat sampled-error width caps because Stim-compatible sampled-error records expose one bit per repeated error occurrence.
 
 ## Comparator And Evidence Plan

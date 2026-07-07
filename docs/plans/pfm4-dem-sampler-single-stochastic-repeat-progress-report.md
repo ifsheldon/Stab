@@ -29,7 +29,7 @@ When direct detection-event sampling reaches that shape, it samples the repeated
 The direct-sampling work validator uses the same selected-shape recognition, so a huge selected direct detection-event single-stochastic zero-shift repeat no longer fails the sampled-error application work cap.
 Sampled-error output and replay still walk the flat error-bit path.
 At the time of this single-stochastic slice, repeat bodies with multiple operations, shifted bodies, and mixed stochastic/deterministic bodies still used the existing capped traversal.
-The later `docs/plans/pfm4-dem-sampler-flat-stochastic-repeat-progress-report.md` promotes selected direct detection-event flat stochastic zero-shift repeat bodies with multiple error operations.
+The later `docs/plans/pfm4-dem-sampler-flat-stochastic-repeat-progress-report.md` promotes selected direct detection-event flat stochastic zero-shift repeat bodies with multiple error operations, and `docs/plans/pfm4-dem-sampler-nested-stochastic-repeat-progress-report.md` promotes selected nested zero-shift stochastic repeat bodies.
 
 ## Tests
 
@@ -38,7 +38,7 @@ Implemented test coverage:
 - Add direct detection-event sampling coverage for huge zero-shift repeated single stochastic errors above the previous work cap.
 - Check the observed detector and observable parity frequency against the closed-form odd-parity probability with fixed seeds and tolerances, including tiny-probability and near-one-probability regressions.
 - Keep sampled-error output caps for the same repeated stochastic error shape.
-- At the time of this slice, keep non-selected mixed stochastic repeat bodies capped; the later flat-stochastic slice promotes the selected flat multi-error shape while nested and shifted stochastic bodies remain capped.
+- At the time of this slice, keep non-selected mixed stochastic repeat bodies capped; later flat and nested stochastic slices promote selected zero-shift shapes while shifted and otherwise non-selected stochastic bodies remain capped.
 
 Concrete test functions:
 

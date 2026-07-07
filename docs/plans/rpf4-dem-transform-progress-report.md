@@ -75,6 +75,6 @@ just bench::smoke
 ## Remaining RPF4 Work
 
 - Finish folded coordinate-map resource policy where current APIs still require caps or do not prove non-flat selected-coordinate lookup through very large repeats; the all-coordinate map cap, folded selected-query behavior, flat sparse-overlap fast path, bounded nested sparse-overlap fast path, valid flat sparse-hole behavior, and many-selected flat-overlap scan are tracked separately in `docs/plans/rpf4-dem-coordinate-progress-report.md`.
-- Finish folded or capped traversal evidence for graphlike search, hypergraph search, SAT or WCNF encoding beyond selected flat zero-shift repeat folding, matcher-adjacent operations, analyzer-adjacent operations, and nested or shifted repeated stochastic direct DEM sampling beyond the selected sampler folds.
+- Finish folded or capped traversal evidence for graphlike search, hypergraph search, SAT or WCNF encoding beyond selected flat zero-shift repeat folding, matcher-adjacent operations, analyzer-adjacent operations, and shifted or otherwise non-selected repeated stochastic direct DEM sampling beyond the selected sampler folds.
 - Decide whether any Rust-specific copy, concat, repetition, or mutation helpers beyond existing `Clone`, `push_instruction`, `push_repeat_block`, and `append_from_dem_text` are still worth adding.
 - Add remaining resource-boundary cases only if later RPF4 work promotes high-detector or high-observable behavior beyond the current public validation and coordinate-resource subsets.

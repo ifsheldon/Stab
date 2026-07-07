@@ -111,7 +111,7 @@ The Rust/API GPT-5.5/xhigh sidecar reported no code findings; the docs/metadata 
 
 ## Remaining RPF4 Work
 
-- Finish folded traversal or explicit caps for graphlike search, hypergraph search, SAT or WCNF encoding beyond selected flat zero-shift repeat folding, matcher-adjacent operations, analyzer-adjacent operations, and nested or shifted repeated stochastic direct DEM sampling beyond the selected sampler folds.
+- Finish folded traversal or explicit caps for graphlike search, hypergraph search, SAT or WCNF encoding beyond selected flat zero-shift repeat folding, matcher-adjacent operations, analyzer-adjacent operations, and shifted or otherwise non-selected repeated stochastic direct DEM sampling beyond the selected sampler folds.
 - Broader true folded generated-loop analyzer output remains PFM6 work; the selected pinned `surface_code_coords_dont_infinite_loop` coordinate case is covered through bounded fallback evidence.
 - Finish or explicitly cap any later-promoted nested or non-flat ambiguous overlapping selected-coordinate ranges that need more than the current bounded flattened-declaration scan, declared-bound pruning, or fallback search.
 - Decide whether any Rust-specific copy, concat, repetition, or mutation helpers beyond existing `Clone`, `push_instruction`, `push_repeat_block`, and `append_from_dem_text` are still worth adding.

@@ -13,6 +13,7 @@ It is not an RPF4 completion report because sampled-error records still use Stim
 - Direct detection-event sampling folds deterministic zero-shift repeat bodies by parity, so huge odd counts apply the body once and huge even counts apply no net effect.
 - Direct detection-event sampling folds the selected single-stochastic zero-shift repeat body by odd-parity probability, so that shape no longer consumes one sampled-error application per repeated occurrence.
 - Direct detection-event sampling folds selected flat stochastic zero-shift repeat bodies by per-error odd-parity probability, so flat multi-error shapes no longer consume one sampled-error application per repeated occurrence.
+- Direct detection-event sampling folds selected nested zero-shift stochastic repeat bodies by recursively summarizing one body pass into effective error toggles, so that shape no longer consumes one sampled-error application per repeated occurrence.
 - Flat sampled-error output and replay preserve the existing public error-bit order, including repeated errors, through the folded operation tree.
 - Non-selected direct detection-event stochastic sampling and sampled-error sampling reject per-shot repeated error work above the current sampled-error application limit before walking the folded tree.
 - Materialized sampled-error APIs and sampled-error streaming still reject per-shot flat error records that exceed the existing buffer limits before allocating the record.
@@ -27,11 +28,13 @@ Implemented Rust test:
 - `pf4_dem_sampler_deterministic_repeat_folding_preserves_rng_and_error_order`
 - `pf4_dem_sampler_single_stochastic_repeat_folds_by_parity_distribution`
 - `pf4_dem_sampler_flat_stochastic_repeat_folds_independent_error_parities`
+- `pf4_dem_sampler_nested_stochastic_repeat_folds_independent_error_parities`
 - `pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps`
 - `pf4_dem_sampler_rejects_excessive_buffered_outputs_before_sampling`
 - `pf4_dem_sampler_rejects_programmatic_deep_repeat_nesting`
 
-These tests cover folded compilation past the previous repeat-count and expanded-iteration caps, shifted repeated detector sampling, observable parity through repeated errors, flat error-bit order and replay through nested repeats, direct detection-event zero-probability repeat skipping, deterministic zero-shift parity folding above the previous work cap, selected single-stochastic zero-shift parity folding above the previous work cap including tiny-probability and near-one-probability regressions, selected flat stochastic zero-shift parity folding above the previous work cap, non-selected nested stochastic sampled-work cap enforcement, sampled-error streaming and materialized buffer cap enforcement, and deep repeat-nesting rejection.
+These tests cover folded compilation past the previous repeat-count and expanded-iteration caps, shifted repeated detector sampling, observable parity through repeated errors, flat error-bit order and replay through nested repeats, direct detection-event zero-probability repeat skipping, deterministic zero-shift parity folding above the previous work cap, selected single-stochastic zero-shift parity folding above the previous work cap including tiny-probability and near-one-probability regressions, selected flat stochastic zero-shift parity folding above the previous work cap, selected nested zero-shift stochastic parity folding above the previous work cap, shifted stochastic sampled-work cap enforcement, sampled-error streaming and materialized buffer cap enforcement, and deep repeat-nesting rejection.
+After [pfm4-dem-sampler-nested-stochastic-repeat-progress-report.md](pfm4-dem-sampler-nested-stochastic-repeat-progress-report.md), the selected nested zero-shift stochastic direct-sampling case is folded; the remaining sampler cap evidence is for shifted or otherwise non-selected stochastic bodies plus flat sampled-error output and replay.
 
 ## Oracle Rows
 
@@ -49,7 +52,7 @@ Report-only runner coverage:
 
 - `pf4-dem-sampler-folded-repeat`
 
-The row measures folded `CompiledDemSampler` compile, stochastic direct sample behavior, zero-probability repeat skipping, deterministic zero-shift repeat parity folding, selected direct detection-event single-stochastic zero-shift repeat parity folding, and selected direct detection-event flat stochastic zero-shift repeat parity folding while sampled-error materialization, replay, and non-selected excessive stochastic repeated-error work remain capped.
+The row measures folded `CompiledDemSampler` compile, stochastic direct sample behavior, zero-probability repeat skipping, deterministic zero-shift repeat parity folding, selected direct detection-event single-stochastic zero-shift repeat parity folding, selected direct detection-event flat stochastic zero-shift repeat parity folding, and selected direct detection-event nested zero-shift stochastic repeat parity folding while sampled-error materialization, replay, and non-selected excessive stochastic repeated-error work remain capped.
 It remains `non-primary-report-only` because it is a Rust public API contract workload and because broad PF4 traversal consumers still need folded or explicitly capped treatment.
 It is not part of the 1.25x primary threshold file.
 
@@ -70,6 +73,6 @@ just bench::smoke
 
 ## Remaining RPF4 Work
 
-- Optimize folded DEM sampler execution for nested or shifted repeated stochastic nonzero-probability bodies whose dense detector outputs do not require per-occurrence work, then tighten or remove the current direct-sampling work cap for those selected shapes without changing the flat sampled-error record contract locked in `docs/plans/pfm4-dem-sampler-error-bit-cap-evidence-lock.md`.
+- Optimize folded DEM sampler execution for shifted or otherwise non-selected repeated stochastic nonzero-probability bodies where a safe dense-output resource boundary can be defined, then tighten or remove the current direct-sampling work cap for those selected shapes without changing the flat sampled-error record contract locked in `docs/plans/pfm4-dem-sampler-error-bit-cap-evidence-lock.md`.
 - Finish folded traversal or explicit caps for graphlike search, hypergraph search, SAT or WCNF encoding, matcher-adjacent operations, and analyzer-adjacent operations beyond the current graphlike and hypergraph zero-probability repeat skip, weighted SAT/WCNF zero-probability variable elision and repeated-body skip, and selected SAT/WCNF flat and nested zero-shift repeat folding.
 - Keep benchmark runners for `pf4-dem-folded-traversal` and `pf4-dem-folded-graphlike-traversal` synchronized when additional implementation or explicit cap behavior becomes source-owned enough to measure honestly.

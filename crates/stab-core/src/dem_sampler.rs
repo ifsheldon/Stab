@@ -383,7 +383,7 @@ struct DemSampleRepeat {
     start_detector_shift: u64,
     repeat_count: u64,
     body: DemSampleBlock,
-    folded_flat_errors: Option<Vec<DemSampleError>>,
+    folded_zero_shift_errors: Option<Vec<DemSampleError>>,
 }
 
 impl DemSampleError {
@@ -453,7 +453,13 @@ fn compile_items(items: &[DemItem], depth: usize) -> CircuitResult<DemSampleBloc
                     "DEM sampler direct sample effect count",
                 )?;
                 block.direct_sample_has_stochastic_error |= body.direct_sample_has_stochastic_error;
-                let repeated_work = folded_direct_sample_repeat_work_count(&body, repeat_count)?;
+                let folded_zero_shift_errors =
+                    folded_zero_shift_repeat_errors(&body, repeat_count)?;
+                let repeated_work = folded_direct_sample_repeat_work_count(
+                    &body,
+                    repeat_count,
+                    folded_zero_shift_errors.as_deref(),
+                )?;
                 block.direct_sample_work_count = block
                     .direct_sample_work_count
                     .checked_add(repeated_work)
@@ -462,14 +468,13 @@ fn compile_items(items: &[DemItem], depth: usize) -> CircuitResult<DemSampleBloc
                             "DEM sampler direct sample work count overflowed",
                         )
                     })?;
-                let folded_flat_errors = folded_flat_zero_shift_repeat_errors(&body, repeat_count);
                 block
                     .operations
                     .push(DemSampleOperation::Repeat(DemSampleRepeat {
                         start_detector_shift: repeat_start_shift,
                         repeat_count,
                         body,
-                        folded_flat_errors,
+                        folded_zero_shift_errors,
                     }));
             }
         }
@@ -600,7 +605,7 @@ where
                         )?;
                         continue;
                     }
-                    if let Some(folded_errors) = repeat.folded_flat_errors.as_deref() {
+                    if let Some(folded_errors) = repeat.folded_zero_shift_errors.as_deref() {
                         let iteration_shift = detector_shift
                             .checked_add(repeat.start_detector_shift)
                             .ok_or_else(detector_shift_overflow_error)?;
@@ -715,9 +720,13 @@ fn checked_repeated_count(
 fn folded_direct_sample_repeat_work_count(
     body: &DemSampleBlock,
     repeat_count: u64,
+    folded_zero_shift_errors: Option<&[DemSampleError]>,
 ) -> CircuitResult<usize> {
     if body.direct_sample_effect_count == 0 {
         return Ok(0);
+    }
+    if let Some(errors) = folded_zero_shift_errors {
+        return Ok(errors.len());
     }
     if body.detector_shift == 0 && !body.direct_sample_has_stochastic_error {
         if repeat_count.is_multiple_of(2) {
@@ -745,23 +754,88 @@ fn flat_zero_shift_error_block(block: &DemSampleBlock) -> bool {
             .all(|operation| matches!(operation, DemSampleOperation::Error(_)))
 }
 
-fn folded_flat_zero_shift_repeat_errors(
+fn folded_zero_shift_repeat_errors(
     block: &DemSampleBlock,
     repeat_count: u64,
-) -> Option<Vec<DemSampleError>> {
-    if !block.direct_sample_has_stochastic_error || !flat_zero_shift_error_block(block) {
-        return None;
+) -> CircuitResult<Option<Vec<DemSampleError>>> {
+    if !block.direct_sample_has_stochastic_error {
+        return Ok(None);
     }
-    let mut folded_errors = Vec::with_capacity(block.operations.len());
+    let mut one_pass_errors = Vec::new();
+    if !collect_zero_shift_effect_errors(block, 0, &mut one_pass_errors)? {
+        return Ok(None);
+    }
+    let mut folded_errors = Vec::with_capacity(one_pass_errors.len());
+    for mut folded_error in one_pass_errors {
+        folded_error.probability = odd_parity_probability(folded_error.probability, repeat_count);
+        if folded_error.probability > 0.0 {
+            folded_errors.push(folded_error);
+        }
+    }
+    Ok(Some(folded_errors))
+}
+
+fn collect_zero_shift_effect_errors(
+    block: &DemSampleBlock,
+    detector_offset: u64,
+    errors: &mut Vec<DemSampleError>,
+) -> CircuitResult<bool> {
+    if block.detector_shift != 0 {
+        return Ok(false);
+    }
     for operation in &block.operations {
-        let DemSampleOperation::Error(error) = operation else {
-            return None;
-        };
-        let mut folded_error = error.clone();
-        folded_error.probability = odd_parity_probability(error.probability, repeat_count);
-        folded_errors.push(folded_error);
+        match operation {
+            DemSampleOperation::Error(error) => {
+                errors.push(shifted_sample_error(error, detector_offset)?);
+            }
+            DemSampleOperation::Repeat(repeat) => {
+                if repeat.body.detector_shift != 0 {
+                    return Ok(false);
+                }
+                let nested_offset = detector_offset
+                    .checked_add(repeat.start_detector_shift)
+                    .ok_or_else(detector_shift_overflow_error)?;
+                if repeat.body.direct_sample_has_stochastic_error {
+                    let Some(nested_errors) =
+                        folded_zero_shift_repeat_errors(&repeat.body, repeat.repeat_count)?
+                    else {
+                        return Ok(false);
+                    };
+                    for nested_error in nested_errors {
+                        errors.push(shifted_sample_error(&nested_error, nested_offset)?);
+                    }
+                } else if !repeat.repeat_count.is_multiple_of(2)
+                    && !collect_zero_shift_effect_errors(&repeat.body, nested_offset, errors)?
+                {
+                    return Ok(false);
+                }
+            }
+        }
     }
-    Some(folded_errors)
+    Ok(true)
+}
+
+fn shifted_sample_error(
+    error: &DemSampleError,
+    detector_offset: u64,
+) -> CircuitResult<DemSampleError> {
+    if detector_offset == 0 {
+        return Ok(error.clone());
+    }
+    let detectors = error
+        .detectors
+        .iter()
+        .map(|detector| {
+            detector
+                .checked_add(detector_offset)
+                .ok_or_else(|| detector_index_overflow_error("detector"))
+        })
+        .collect::<CircuitResult<Vec<_>>>()?;
+    Ok(DemSampleError {
+        probability: error.probability,
+        detectors,
+        observables: error.observables.clone(),
+    })
 }
 
 fn sample_folded_repeat_errors<R>(

@@ -12,7 +12,8 @@ The selected behavior is semantic and statistical equivalence, not exact random-
 This slice does not change sampled-error output, sampled-error replay, shifted repeated bodies, nested repeated bodies, repeat bodies containing non-error compiled sampler operations, graphlike search, hypergraph search, SAT/WCNF generation, analyzer traversal, ErrorMatcher traversal, Python APIs, diagrams, or deferred simulator-product surfaces.
 
 Sampled-error output and replay still use flat repeated error-bit order and their existing materialized width caps because Stim-compatible sampled-error records expose one bit per repeated error occurrence.
-Nested, shifted, and otherwise non-selected stochastic repeated bodies still use the existing sampled-error application work cap.
+At the time of this flat-stochastic slice, nested, shifted, and otherwise non-selected stochastic repeated bodies still used the existing sampled-error application work cap.
+The later [pfm4-dem-sampler-nested-stochastic-repeat-progress-report.md](pfm4-dem-sampler-nested-stochastic-repeat-progress-report.md) promotes selected nested zero-shift stochastic bodies; shifted and otherwise non-selected stochastic bodies remain capped.
 
 ## Comparator And Evidence Plan
 
@@ -34,7 +35,7 @@ Implemented test coverage:
 - Add direct detection-event sampling coverage for a huge zero-shift repeated flat body with multiple stochastic and deterministic errors above the previous work cap.
 - Check observed detector and observable frequencies against the closed-form independent odd-parity probabilities with fixed seeds and tolerances, including a non-saturated tiny-probability error and a saturated error in the same flat body.
 - Keep sampled-error output caps for the same repeated flat stochastic shape.
-- Keep nested stochastic repeat bodies capped as the non-selected shape.
+- Keep nested stochastic repeat bodies capped as the non-selected shape for this flat-stochastic slice.
 
 Concrete test functions:
 
@@ -81,8 +82,8 @@ The focused compare report measured `stab_pf4_dem_sampler_sample_flat_stochastic
 ## Audit And Review Closure
 
 Milestone-audit status: complete for this selected PFM4 slice.
-The audit found the selected direct detection-event flat stochastic zero-shift sampler subcase implemented with direct statistical tests, distinct per-error parity-probability evidence, sampled-error cap preservation, nested-repeat cap preservation, oracle metadata, report-only benchmark runner coverage, and synchronized docs.
-It did not mark the broader PFM4 folded-traversal milestone complete because sampled-error output and replay, shifted stochastic bodies, nested stochastic bodies, graphlike search, hypergraph search, SAT/WCNF generation, analyzer traversal, and ErrorMatcher traversal remain scoped separately.
+The audit found the selected direct detection-event flat stochastic zero-shift sampler subcase implemented with direct statistical tests, distinct per-error parity-probability evidence, sampled-error cap preservation, nested-repeat cap preservation for that slice, oracle metadata, report-only benchmark runner coverage, and synchronized docs.
+It did not mark the broader PFM4 folded-traversal milestone complete because sampled-error output and replay, shifted stochastic bodies, graphlike search, hypergraph search, SAT/WCNF generation, analyzer traversal, and ErrorMatcher traversal remain scoped separately.
 No milestone under-specification issue needed a new spec-gap log entry for this slice because the non-scope and remaining work are explicit.
 
 Full-code-review status: complete after GPT-5.5/xhigh sidecar review.

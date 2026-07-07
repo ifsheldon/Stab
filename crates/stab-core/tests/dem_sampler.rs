@@ -523,6 +523,69 @@ fn pf4_dem_sampler_flat_stochastic_repeat_folds_independent_error_parities() {
 }
 
 #[test]
+fn pf4_dem_sampler_nested_stochastic_repeat_folds_independent_error_parities() {
+    let repeat_count = 64_000_001_u64;
+    let sampler = compile_dem(&format!(
+        "
+        repeat {repeat_count} {{
+            repeat 3 {{
+                error(0.25) D0 L0
+                error(0.125) D1
+            }}
+            error(1) L1
+        }}
+        "
+    ));
+    assert_eq!(sampler.error_count(), 448_000_007);
+
+    let shots = 4096;
+    let output = sampler
+        .sample_detection_events_with_seed(shots, Some(37))
+        .expect("fold huge nested stochastic repeat by independent parity probabilities");
+    assert_eq!(output.detector_count, 2);
+    assert_eq!(output.observable_count, 2);
+    assert_detector_hit_probability(&output.records, 0, 0.5, 0.05);
+    assert_detector_hit_probability(&output.records, 1, 0.5, 0.05);
+    assert_observable_hit_probability(&output.records, 0, 0.5, 0.05);
+    assert!(
+        output
+            .records
+            .iter()
+            .all(|record| record.detectors.first() == record.observables.first()),
+        "nested detector and observable targets should toggle together"
+    );
+    assert!(
+        output
+            .records
+            .iter()
+            .all(|record| record.observables.get(1) == Some(&true)),
+        "odd deterministic repeated observable should always toggle"
+    );
+
+    let deterministic_inner = compile_dem(
+        "
+        repeat 64000001 {
+            repeat 3 {
+                error(1) D0
+            }
+            error(0.25) D1
+        }
+        ",
+    );
+    let output = deterministic_inner
+        .sample_detection_events_with_seed(shots, Some(37))
+        .expect("fold deterministic nested body with stochastic sibling");
+    assert!(
+        output
+            .records
+            .iter()
+            .all(|record| record.detectors.first() == Some(&true)),
+        "odd outer and inner repeat parity should preserve deterministic nested effects"
+    );
+    assert_detector_hit_probability(&output.records, 1, 0.5, 0.05);
+}
+
+#[test]
 fn pf4_dem_sampler_single_stochastic_repeat_folds_by_parity_distribution() {
     let repeat_count = 64_000_001_u64;
     let probability = 0.25_f64;
@@ -762,15 +825,12 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
         "{error}"
     );
 
-    let error = nested_stochastic_sampler
+    let output = nested_stochastic_sampler
         .sample_detection_events_with_seed(1, Some(5))
-        .expect_err("reject nested stochastic traversal work");
-    assert!(
-        error
-            .to_string()
-            .contains("would apply 64000001 sampled errors"),
-        "{error}"
-    );
+        .expect("fold nested stochastic traversal work");
+    assert_eq!(output.detector_count, 1);
+    assert_eq!(output.observable_count, 0);
+    assert_eq!(output.records.len(), 1);
     let error = shifted_stochastic_sampler
         .try_for_each_detection_event_with_seed(1, Some(5), |_record| Ok::<(), CircuitError>(()))
         .expect_err("reject shifted stochastic traversal work before allocating output");
