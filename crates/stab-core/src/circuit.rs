@@ -118,12 +118,12 @@ impl Circuit {
     ///
     /// This includes `inverse_unitary` plus selected reset-measure-detector,
     /// two-to-one detector-flow, selected `m_det`, selected MPP
-    /// identity-parity detector-flow, selected noisy MZZ detector-flow, noisy
-    /// measurement-only, noisy measure-reset-only, exact noisy measure-reset
-    /// detector-flow, selected observable Pauli include, and measure-reset
-    /// pass-through rewrites for one detector. Stim's broader measurement,
-    /// detector, observable, feedback, and noise rewrites remain active
-    /// follow-up work.
+    /// identity-parity detector-flow, selected MPAD record-tail, selected noisy
+    /// MZZ detector-flow, noisy measurement-only, noisy measure-reset-only,
+    /// exact noisy measure-reset detector-flow, selected observable Pauli
+    /// include, and measure-reset pass-through rewrites for one detector.
+    /// Stim's broader measurement, detector, observable, feedback, and noise
+    /// rewrites remain active follow-up work.
     pub fn inverse_qec(&self) -> CircuitResult<Self> {
         crate::circuit_inverse_qec(self)
     }

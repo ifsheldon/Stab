@@ -18,7 +18,7 @@ It adds an explicit Rust options API instead of changing the default `Circuit::i
 
 - Python API shape or exact Python binding spelling.
 - Flow-returning overloads of Stim's C++ helper.
-- Applying `keep_measurements` to selected `two_to_one`, `m_det`, `mpp`, `mzz`, noisy measurement, noisy measure-reset, noisy measure-reset detector, observable Pauli include, measure-reset pass-through, feedback, repeat-contained, or broader multi-instruction QEC inverse packets.
+- Applying `keep_measurements` to selected `two_to_one`, `m_det`, `mpp`, `mpad`, `mzz`, noisy measurement, noisy measure-reset, noisy measure-reset detector, observable Pauli include, measure-reset pass-through, feedback, repeat-contained, or broader multi-instruction QEC inverse packets.
 - Applying `keep_measurements` to same-basis, tagged, coordinated, multi-target, sparse-detector, duplicate-record, empty-detector, or other broader reset-measure-detector variants.
 - Changing `circuit_inverse_qec` or `Circuit::inverse_qec` default output.
 - New benchmark coverage, because this is one branch in an existing narrow transform selector and not a distinct throughput workload.

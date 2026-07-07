@@ -62,12 +62,12 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
 ///
 /// This includes the unitary inverse plus selected Stim-compatible
 /// reset-measure-detector, selected two-to-one detector-flow, selected `m_det`,
-/// selected MPP identity-parity detector-flow, selected noisy MZZ detector-flow,
-/// noisy measurement-only, noisy measure-reset-only, exact noisy measure-reset
-/// detector-flow, selected observable Pauli include, and measure-reset
-/// pass-through packets. Broader QEC-specific inverse rewrites for
-/// measurements, resets, detectors, observables, noise, and feedback remain
-/// active follow-up work.
+/// selected MPP identity-parity detector-flow, selected MPAD record-tail,
+/// selected noisy MZZ detector-flow, noisy measurement-only,
+/// noisy measure-reset-only, exact noisy measure-reset detector-flow, selected
+/// observable Pauli include, and measure-reset pass-through packets.
+/// Broader QEC-specific inverse rewrites for measurements, resets, detectors,
+/// observables, noise, and feedback remain active follow-up work.
 pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
     circuit_inverse_qec_with_options(circuit, InverseQecOptions::default())
 }
@@ -139,6 +139,11 @@ pub fn circuit_time_reversed_for_flows_with_options(
     }
     for (index, flow) in flows.iter().enumerate() {
         reject_non_unitary_flow_terms(index, flow)?;
+    }
+    if !flows.is_empty() && qec::selected_mpad_record_tail_inverse(circuit)?.is_some() {
+        return Err(CircuitError::invalid_tableau_conversion(
+            "time_reversed_for_flows selected MPAD record-tail subset currently supports only empty flows",
+        ));
     }
     let inverse = circuit_inverse_qec(circuit).map_err(|error| {
         CircuitError::invalid_tableau_conversion(format!(

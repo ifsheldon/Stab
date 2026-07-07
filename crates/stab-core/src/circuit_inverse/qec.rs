@@ -8,11 +8,15 @@ use crate::{
 use super::{InverseQecOptions, is_plain_qubit_target, reset_inverse_gate_and_basis};
 
 mod m_det;
+mod mpad;
 mod mzz;
 mod obs_include;
 
 pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
     if let Some(inverse) = selected_reset_cx_measure_two_to_one_inverse(circuit)? {
+        return Ok(Some(inverse));
+    }
+    if let Some(inverse) = mpad::selected_mpad_record_tail_inverse(circuit)? {
         return Ok(Some(inverse));
     }
     if let Some(inverse) = selected_mpp_detector_inverse(circuit)? {
@@ -45,6 +49,12 @@ pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Ci
         return Ok(Some(inverse));
     }
     Ok(None)
+}
+
+pub(super) fn selected_mpad_record_tail_inverse(
+    circuit: &Circuit,
+) -> CircuitResult<Option<Circuit>> {
+    mpad::selected_mpad_record_tail_inverse(circuit)
 }
 
 pub(super) fn selected_keep_measurements_qec_inverse(
