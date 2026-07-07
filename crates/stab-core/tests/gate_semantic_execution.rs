@@ -133,6 +133,98 @@ fn mpad_executes_across_current_public_surfaces() {
 }
 
 #[test]
+fn mpp_executes_across_current_public_surfaces() {
+    let circuit = Circuit::from_stim_str(
+        "H 0\nCX 0 1\nMPP X0*X1 !Z0*Z1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .expect("parse MPP circuit");
+
+    let sampler = CompiledSampler::compile(&circuit).expect("compile MPP sampler");
+    assert_eq!(
+        sampler.sample_zero_one(2),
+        vec![vec![false, true], vec![false, true]]
+    );
+
+    let converter = CompiledDetectionConverter::compile(
+        &circuit,
+        DetectionConversionOptions {
+            skip_reference_sample: false,
+        },
+    )
+    .expect("compile MPP detection converter");
+    assert_eq!(converter.measurement_count(), 2);
+    assert_eq!(converter.detector_count(), 2);
+    assert_eq!(converter.observable_count(), 1);
+    assert_eq!(
+        converter
+            .convert_record(&[false, true])
+            .expect("convert MPP reference record"),
+        DetectionEventRecord {
+            detectors: vec![false, false],
+            observables: vec![false],
+        }
+    );
+
+    let skip_reference_converter = CompiledDetectionConverter::compile(
+        &circuit,
+        DetectionConversionOptions {
+            skip_reference_sample: true,
+        },
+    )
+    .expect("compile skip-reference MPP detection converter");
+    assert_eq!(
+        skip_reference_converter
+            .convert_record(&[false, true])
+            .expect("convert skip-reference MPP record"),
+        DetectionEventRecord {
+            detectors: vec![false, true],
+            observables: vec![true],
+        }
+    );
+
+    let detection_output =
+        sample_detection_events(&circuit, 2, Some(3)).expect("sample MPP detection events");
+    assert_eq!(detection_output.detector_count, 2);
+    assert_eq!(detection_output.observable_count, 1);
+    assert_eq!(
+        detection_output.records,
+        vec![
+            DetectionEventRecord {
+                detectors: vec![false, false],
+                observables: vec![false],
+            };
+            2
+        ]
+    );
+
+    let frame_circuit = Circuit::from_stim_str(
+        "MPP !Z0 Z0\nOBSERVABLE_INCLUDE(0) rec[-2]\nOBSERVABLE_INCLUDE(1) Z0\n",
+    )
+    .expect("parse frame-path MPP circuit");
+    let frame_output = sample_detection_events(&frame_circuit, 2, Some(5))
+        .expect("sample frame-path MPP detection events");
+    assert_eq!(frame_output.detector_count, 0);
+    assert_eq!(frame_output.observable_count, 2);
+    assert_eq!(
+        frame_output.records,
+        vec![
+            DetectionEventRecord {
+                detectors: vec![],
+                observables: vec![false, false],
+            };
+            2
+        ]
+    );
+
+    let analyzer_circuit =
+        Circuit::from_stim_str("MPP X0*X1 X0\nTICK\nMPP X0\nDETECTOR rec[-1] rec[-2]\n")
+            .expect("parse analyzer MPP circuit");
+    let dem = circuit_to_detector_error_model(&analyzer_circuit, ErrorAnalyzerOptions::default())
+        .expect("analyze MPP circuit");
+    assert_eq!(dem.to_string(), "detector D0\n");
+}
+
+#[test]
 fn variable_target_spp_execution_matches_decomposed_circuit() {
     let cases = [
         "SPP X0\nM 0\nDETECTOR rec[-1]\n",
