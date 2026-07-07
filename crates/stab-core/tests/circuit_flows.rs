@@ -404,6 +404,25 @@ fn sample_if_circuit_has_stabilizer_flows_checks_signed_observables() {
 }
 
 #[test]
+fn sample_if_circuit_has_stabilizer_flows_checks_inverted_record_observables() {
+    // Adapted from Stim v1.16.0 src/stim/util_top/has_flow.test.cc
+    // sample_if_circuit_has_stabilizer_flows_inverted_obs_rec.
+    let circuit = circuit(
+        "
+        M !0
+        OBSERVABLE_INCLUDE(3) rec[-1]
+        ",
+    );
+    let flows = [flow("-Z0 -> obs[3]"), flow("Z0 -> obs[3]")];
+
+    assert_eq!(
+        sample_if_circuit_has_stabilizer_flows(&circuit, &flows, 256, Some(23))
+            .expect("sample signed inverted record-backed observable flows"),
+        vec![true, false]
+    );
+}
+
+#[test]
 fn sample_if_circuit_has_stabilizer_flows_rejects_malformed_measurement_refs() {
     let error = sample_if_circuit_has_stabilizer_flows(
         &circuit("M 0\n"),

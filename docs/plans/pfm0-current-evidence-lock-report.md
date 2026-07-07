@@ -47,6 +47,12 @@ The current `shortest_error_sat_problem` tests intentionally match Stim-style sh
 The correct PFM4 work is true folded traversal or a sharper documented cap for the SAT consumer, not probability-based elision in the unweighted shortest-error problem.
 The selected flat and nested zero-shift SAT repeat folding work preserves this boundary by folding unweighted repeated bodies structurally, including zero-probability mechanisms, where the compact folded body represents the same minimum structural parity cost without probability-based skipping.
 
+## 2026-07-07 Addendum: PFM5 Inverted Record-Backed Observable Signed Flow
+
+This addendum records a source-owned PF5 evidence-hardening slice for pinned Stim v1.16.0 `sample_if_circuit_has_stabilizer_flows_inverted_obs_rec`.
+`sample_if_circuit_has_stabilizer_flows_checks_inverted_record_observables` now proves the Rust signed sampled-flow checker accepts `M !0` followed by `OBSERVABLE_INCLUDE(3) rec[-1]` for `-Z0 -> obs[3]` and rejects `Z0 -> obs[3]`.
+The scope is locked in `docs/plans/pfm5-signed-sampled-flow-inverted-record-observable-scope.md`; it does not expand Python binding parity, exact random-stream parity, signed-flow diagnostics, or benchmark coverage.
+
 ## Tooling Evidence
 
 The PFM0 metadata and manifest checks passed from the current worktree:
