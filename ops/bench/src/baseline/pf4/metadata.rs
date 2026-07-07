@@ -40,10 +40,13 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures selected SAT/WCNF flat and nested zero-shift repeat folding for unweighted shortest-error SAT including zero-probability structural mechanisms and weighted concrete-MAP SAT; broader shifted, non-flat, and high-index dense-target structural SAT repeat traversal remains capped",
         ),
         "pf4-error-matcher-filter-flat-repeat" => Some(
-            "contract-only: Stab measures selected ErrorMatcher filter DEM flat detector-touching zero-shift repeat folding by compact filter-key semantics; broader shifted, mixed-instruction, detectorless logical-only, circuit-repeat provenance, full ErrorMatcher provenance, and explain_errors CLI behavior remains scoped out",
+            "contract-only: Stab measures selected ErrorMatcher filter DEM flat detector-touching zero-shift repeat folding by compact filter-key semantics; detectorless logical-observable-only filter repeats are measured by pf4-error-matcher-filter-logical-repeat, while broader shifted, mixed-instruction, circuit-repeat provenance, full ErrorMatcher provenance, and explain_errors CLI behavior remains scoped out",
         ),
         "pf4-error-matcher-filter-nested-repeat" => Some(
-            "contract-only: Stab measures selected ErrorMatcher filter DEM nested detector-touching zero-shift repeat folding by compact filter-key semantics; broader shifted, detectorless logical-only, circuit-repeat provenance, full ErrorMatcher provenance, and explain_errors CLI behavior remains scoped out",
+            "contract-only: Stab measures selected ErrorMatcher filter DEM nested detector-touching zero-shift repeat folding by compact filter-key semantics; detectorless logical-observable-only filter repeats are measured by pf4-error-matcher-filter-logical-repeat, while broader shifted, circuit-repeat provenance, full ErrorMatcher provenance, and explain_errors CLI behavior remains scoped out",
+        ),
+        "pf4-error-matcher-filter-logical-repeat" => Some(
+            "contract-only: Stab measures selected ErrorMatcher filter DEM flat and nested detectorless logical-observable-only zero-shift repeat folding by compact filter-key semantics; broader shifted, annotation-only or mixed-instruction, circuit-repeat provenance, full ErrorMatcher provenance, and explain_errors CLI behavior remains scoped out",
         ),
         _ => None,
     }

@@ -137,15 +137,17 @@ fn selected_filter_compact_repeat_error_count_inner(
         match item {
             DemItem::Instruction(instruction) => match instruction.kind() {
                 DemInstructionKind::Error => {
-                    let mut has_detector_target = false;
+                    let mut has_filter_key_target = false;
                     for target in instruction.targets() {
                         match target {
-                            DemTarget::RelativeDetector(_) => has_detector_target = true,
+                            DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_) => {
+                                has_filter_key_target = true;
+                            }
                             DemTarget::Numeric(_) => return Ok(None),
-                            DemTarget::LogicalObservable(_) | DemTarget::Separator => {}
+                            DemTarget::Separator => {}
                         }
                     }
-                    if !has_detector_target {
+                    if !has_filter_key_target {
                         return Ok(None);
                     }
                     count = count.checked_add(1).ok_or_else(|| {

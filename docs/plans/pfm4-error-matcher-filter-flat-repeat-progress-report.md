@@ -25,7 +25,8 @@ Filter-key collection also recognizes the same selected body and visits it once 
 
 Filter probabilities remain ignored, matching the existing ErrorMatcher filter-key semantics.
 The selected body must contain only error instructions with at least one detector target and no numeric targets.
-Shifted, nested, mixed-instruction, detectorless logical-only, analyzer, circuit-repeat noise, stack-frame provenance, and `explain_errors` CLI paths keep the previous caps or explicit rejections.
+At this slice boundary, shifted, nested, mixed-instruction, detectorless logical-only, analyzer, circuit-repeat noise, stack-frame provenance, and `explain_errors` CLI paths kept the previous caps or explicit rejections.
+Later PFM4 slices promote selected nested detector-touching and detectorless logical-observable-only filter repeats.
 
 ## Tests
 
@@ -78,5 +79,5 @@ just bench::baseline --only pf4-error-matcher-filter-flat-repeat --out target/be
 just bench::compare --only pf4-error-matcher-filter-flat-repeat --baseline target/benchmarks/pfm4-error-matcher-filter-flat-repeat-baseline/baseline.json --report target/benchmarks/pfm4-error-matcher-filter-flat-repeat-compare
 ```
 
-Milestone-audit status: complete for this selected slice. No blocking implementation defects or milestone loopholes were found; broader shifted, nested, mixed-instruction, detectorless logical-only, analyzer traversal, ErrorMatcher circuit-repeat provenance, and `explain_errors` CLI work remains explicitly outside this slice.
+Milestone-audit status: complete for this selected slice. No blocking implementation defects or milestone loopholes were found; broader shifted, nested, mixed-instruction, detectorless logical-only, analyzer traversal, ErrorMatcher circuit-repeat provenance, and `explain_errors` CLI work remained explicitly outside this slice.
 Full-code-review status: complete with two GPT-5.5/xhigh sidecars. The core reviewer found no blocking issues and noted residual future coverage for richer filter bodies; this slice added a richer folded filter regression covering multiple body errors, logical terms, duplicate detector cancellation, separators, and nonzero outer detector offsets. The docs and benchmark reviewer found a P2 provenance issue where the filter evidence was attached to broad analyzer and graphlike rows; that was fixed by splitting focused `pf4-error-matcher-filter-repeat-rust` oracle evidence and `pf4-error-matcher-filter-flat-repeat` benchmark evidence sourced to `src/stim/simulators/error_matcher.test.cc`.
