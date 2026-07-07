@@ -245,7 +245,7 @@ Acceptance criteria:
 
 Objective: close active sweep-conditioned behavior and legal gate execution gaps in sampler, detector conversion, detection sampling, and analyzer paths.
 
-Progress: non-frame and selected frame-path `detect` sampling with omitted all-false sweep bits, selected analyzer sweep-control and `CZ` classical-only no-op behavior, sampler target-order rejection, and fixed-tableau gate classification are implemented and tracked in [rpf3-sweep-gate-progress-report.md](rpf3-sweep-gate-progress-report.md). Broader sweep target placements and legal-gate execution remain active only when exact subcases are selected, while broader analyzer sweep-shape parity is under-specified until exact remaining gate-target shapes, comparator, CLI and Rust surfaces, oracle metadata, resource behavior, and benchmark policy are selected.
+Progress: non-frame and selected frame-path `detect` sampling with omitted all-false sweep bits, selected analyzer sweep-control and `CZ` classical-only no-op behavior, sampler target-order rejection, fixed-tableau gate classification, supported Hermitian `SPP` and `SPP_DAG` execution, and selected deterministic `MPAD` execution are implemented and tracked in [rpf3-sweep-gate-progress-report.md](rpf3-sweep-gate-progress-report.md). Broader sweep target placements and legal-gate execution remain active only when exact subcases are selected, while broader analyzer sweep-shape parity is under-specified until exact remaining gate-target shapes, comparator, CLI and Rust surfaces, oracle metadata, resource behavior, and benchmark policy are selected.
 
 Owned checklist rows:
 
@@ -278,7 +278,7 @@ Oracle rows:
 
 Benchmarks:
 
-- Keep `pf3-m2d-sweep-b8`, `pf3-m2d-sweep-ptb64-input`, `pf3-detect-sweep-sampling`, and `pf3-analyze-errors-sweep` scoped to their selected behavior; add or expand benchmark rows only when a future exact-subcase plan promotes additional sweep behavior with a no-benchmark rationale or measurement policy, and keep `pf3-gate-semantic-wide` current as the fixed-tableau gate execution contract expands.
+- Keep `pf3-m2d-sweep-b8`, `pf3-m2d-sweep-ptb64-input`, `pf3-detect-sweep-sampling`, and `pf3-analyze-errors-sweep` scoped to their selected behavior; add or expand benchmark rows only when a future exact-subcase plan promotes additional sweep behavior with a no-benchmark rationale or measurement policy, and keep `pf3-gate-semantic-wide` current as selected gate-semantic execution coverage expands.
 - Classify CLI rows as `cli-baseline` when Stim v1.16.0 exposes the same public command shape.
 - Keep core-only rows `contract-representative` or `report-only` unless a faithful direct baseline exists.
 

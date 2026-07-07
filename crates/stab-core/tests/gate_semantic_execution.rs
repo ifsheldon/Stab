@@ -6,7 +6,8 @@
 
 use stab_core::{
     Circuit, CircuitError, CompiledDetectionConverter, CompiledSampler, DetectionConversionOptions,
-    ErrorAnalyzerOptions, Gate, circuit_to_detector_error_model, sample_detection_events,
+    DetectionEventRecord, ErrorAnalyzerOptions, Gate, circuit_to_detector_error_model,
+    sample_detection_events,
 };
 
 #[test]
@@ -36,6 +37,99 @@ fn fixed_tableau_gates_execute_across_current_public_surfaces() {
         circuit_to_detector_error_model(&case.circuit, ErrorAnalyzerOptions::default())
             .unwrap_or_else(|error| panic!("analyzer rejected {}: {error}", case.gate_name));
     }
+}
+
+#[test]
+fn mpad_executes_across_current_public_surfaces() {
+    let circuit = Circuit::from_stim_str(
+        "MPAD 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .expect("parse MPAD circuit");
+
+    let sampler = CompiledSampler::compile(&circuit).expect("compile MPAD sampler");
+    assert_eq!(
+        sampler.sample_zero_one(2),
+        vec![vec![false, true], vec![false, true]]
+    );
+
+    let converter = CompiledDetectionConverter::compile(
+        &circuit,
+        DetectionConversionOptions {
+            skip_reference_sample: false,
+        },
+    )
+    .expect("compile MPAD detection converter");
+    assert_eq!(converter.measurement_count(), 2);
+    assert_eq!(converter.detector_count(), 2);
+    assert_eq!(converter.observable_count(), 1);
+    assert_eq!(
+        converter
+            .convert_record(&[false, true])
+            .expect("convert MPAD reference record"),
+        DetectionEventRecord {
+            detectors: vec![false, false],
+            observables: vec![false],
+        }
+    );
+
+    let skip_reference_converter = CompiledDetectionConverter::compile(
+        &circuit,
+        DetectionConversionOptions {
+            skip_reference_sample: true,
+        },
+    )
+    .expect("compile skip-reference MPAD detection converter");
+    assert_eq!(
+        skip_reference_converter
+            .convert_record(&[false, true])
+            .expect("convert skip-reference MPAD record"),
+        DetectionEventRecord {
+            detectors: vec![false, true],
+            observables: vec![true],
+        }
+    );
+
+    let detection_output =
+        sample_detection_events(&circuit, 2, Some(3)).expect("sample MPAD detection events");
+    assert_eq!(detection_output.detector_count, 2);
+    assert_eq!(detection_output.observable_count, 1);
+    assert_eq!(
+        detection_output.records,
+        vec![
+            DetectionEventRecord {
+                detectors: vec![false, false],
+                observables: vec![false],
+            };
+            2
+        ]
+    );
+
+    let frame_circuit = Circuit::from_stim_str(
+        "MPAD 0 1\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) Z0\n",
+    )
+    .expect("parse frame-path MPAD circuit");
+    let frame_output = sample_detection_events(&frame_circuit, 2, Some(5))
+        .expect("sample frame-path MPAD detection events");
+    assert_eq!(frame_output.detector_count, 0);
+    assert_eq!(frame_output.observable_count, 2);
+    assert_eq!(
+        frame_output.records,
+        vec![
+            DetectionEventRecord {
+                detectors: vec![],
+                observables: vec![false, false],
+            };
+            2
+        ]
+    );
+
+    let analyzer_circuit = Circuit::from_stim_str(
+        "M(0.125) 5\nMPAD 0 1\nDETECTOR rec[-1] rec[-2]\nDETECTOR rec[-3]\n",
+    )
+    .expect("parse analyzer MPAD circuit");
+    let dem = circuit_to_detector_error_model(&analyzer_circuit, ErrorAnalyzerOptions::default())
+        .expect("analyze MPAD circuit");
+    assert_eq!(dem.to_string(), "error(0.125) D1\ndetector D0\n");
 }
 
 #[test]

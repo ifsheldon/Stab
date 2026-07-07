@@ -229,7 +229,7 @@ Tasks:
 - Expand analyzer sweep behavior beyond the original single no-op sweep-control subset only for selected exact subcases. The selected analyzer sweep-control matrix now covers `CX`, `CY`, `CZ`, `XCZ`, and `YCZ` no-op behavior, including `CZ` sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, plus invalid controlled-Pauli target-position rejections; the boundary is locked in `docs/plans/pfm3-analyzer-sweep-boundary-scope.md`, and any broader analyzer sweep-shape parity is under-specified in `docs/plans/milestone-spec-gaps.md` until exact remaining gate-target shapes, comparator, CLI and Rust surfaces, oracle metadata, resource behavior, and benchmark policy are selected.
 - Keep `m2d --sweep` and `--sweep_format` behavior synchronized with core converter behavior for every accepted input format. The current public CLI matrix covers `01`, `b8`, `r8`, `hits`, `dets`, and input-only `ptb64` sweep records under `pf3-m2d-sweep-format-matrix-cli`.
 - Close sampler-backed target-order drift for Stim-parsed sweep targets: `CX q sweep[k]` and `CY q sweep[k]` must reject in reference sampling, detection conversion, non-frame detection sampling validation, and `stab m2d --sweep`, while sweep-first `CX` or `CY` and both-order `CZ` sweep/qubit groups must remain accepted.
-- Classify legal gate execution support across sampler, converter, detection, and analyzer paths. The fixed-tableau gate contract is implemented for current sampler, detection-conversion, and analyzer surfaces, supported Hermitian `SPP` and `SPP_DAG` products are implemented for the promoted sampler, detection-conversion, detector-frame, and analyzer paths, and the selected boundary is locked in `docs/plans/pfm3-gate-semantic-boundary-scope.md`; broader legal non-tableau execution remains under-specified in `docs/plans/milestone-spec-gaps.md` until exact gate families, execution surfaces, comparator, resource behavior, oracle metadata, and benchmark policy are selected.
+- Classify legal gate execution support across sampler, converter, detection, and analyzer paths. The fixed-tableau gate contract is implemented for current sampler, detection-conversion, and analyzer surfaces, supported Hermitian `SPP` and `SPP_DAG` products are implemented for the promoted sampler, detection-conversion, detector-frame, and analyzer paths, selected deterministic `MPAD` measurement-pad execution is implemented for the promoted sampler, detection-conversion, non-frame detection-sampling, frame detection-sampling, and analyzer paths, and the selected boundary is locked in `docs/plans/pfm3-gate-semantic-boundary-scope.md`; broader legal non-tableau execution remains under-specified in `docs/plans/milestone-spec-gaps.md` until exact gate families, execution surfaces, comparator, resource behavior, oracle metadata, and benchmark policy are selected.
 - Add precise errors for unsupported sweep target shapes, unsupported gate families, unsupported mixed feedback and sweep cases, and unsupported public output formats.
 - Preserve streaming or documented caps for public inputs and outputs.
 
@@ -240,11 +240,11 @@ Tests:
 - Add semantic tests comparing sweep-conditioned circuits to explicit small-circuit expansions.
 - Add target-order tests for sampler-backed sweep Pauli operations, including both rejected `CX q sweep[k]` and `CY q sweep[k]` cases and accepted sweep-first `CX` or `CY` plus both-order `CZ` cases.
 - Add omitted-sweep default tests, width-mismatch tests, invalid-record-count tests, unsupported-format tests, unsupported-target-shape tests, and writer-error tests.
-- Add gate execution tests that prove parser validation, sampler execution, detector conversion, and analyzer propagation do not drift.
+- Add gate execution tests that prove parser validation, sampler execution, detector conversion, detection sampling, and analyzer propagation do not drift.
 
 Oracle rows:
 
-- Supplement `pf3-sweep-m2d-detect`, `pf3-sweep-analyzer`, and `pf3-gate-semantic-execution` with executable rows for promoted subcases. `pf3-m2d-sweep-format-matrix-cli` is the executable row for the accepted public `m2d --sweep_format` input matrix.
+- Supplement `pf3-sweep-m2d-detect`, `pf3-sweep-analyzer`, and `pf3-gate-semantic-execution` with executable rows for promoted subcases. `pf3-m2d-sweep-format-matrix-cli` is the executable row for the accepted public `m2d --sweep_format` input matrix, and `pf3-gate-mpad-execution-rust` is the executable row for selected deterministic `MPAD` execution evidence.
 - `pf3-sampler-sweep-target-order-rust` is the executable structural row for sampler-backed `CX q sweep[k]` and `CY q sweep[k]` rejection plus accepted neighboring target orders.
 - CLI rows must prove stdout, stderr class, exit status, accepted flags, rejected flags, path behavior, and resource behavior.
 
@@ -254,6 +254,7 @@ Benchmarks:
 - Keep the implemented `pf3-gate-semantic-wide` row report-only unless a faithful pinned-Stim comparator is added.
 - Classify CLI rows as `cli-baseline` only when pinned Stim exposes the same command shape.
 - Do not add a benchmark row for pure target-order rejection slices unless implementation changes a hot validation path.
+- Do not add a benchmark row for selected deterministic `MPAD` execution unless implementation changes a hot sampler, converter, detection-sampling, or analyzer path.
 
 Acceptance criteria:
 
