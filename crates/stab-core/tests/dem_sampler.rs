@@ -723,6 +723,18 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
     let nested_stochastic_sampler =
         CompiledDemSampler::compile(&nested_stochastic_record).expect("compile nested DEM");
     assert_eq!(nested_stochastic_sampler.error_count(), 64_000_001);
+    let shifted_stochastic_record = DetectorErrorModel::from_dem_str(
+        "
+        repeat 64000001 {
+            error(0.5) D0
+            shift_detectors 1
+        }
+        ",
+    )
+    .expect("parse shifted stochastic DEM");
+    let shifted_stochastic_sampler =
+        CompiledDemSampler::compile(&shifted_stochastic_record).expect("compile shifted DEM");
+    assert_eq!(shifted_stochastic_sampler.error_count(), 64_000_001);
     let error = huge_sampler
         .sample_detection_events_and_errors_with_seed(1, Some(5))
         .expect_err("reject materialized sampled-error record");
@@ -759,6 +771,15 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
             .contains("would apply 64000001 sampled errors"),
         "{error}"
     );
+    let error = shifted_stochastic_sampler
+        .try_for_each_detection_event_with_seed(1, Some(5), |_record| Ok::<(), CircuitError>(()))
+        .expect_err("reject shifted stochastic traversal work before allocating output");
+    assert!(
+        error
+            .to_string()
+            .contains("would apply 64000001 sampled errors"),
+        "{error}"
+    );
 
     let error = huge_sampler
         .try_for_each_detection_event_and_error_with_seed(1, Some(5), |_record, _error_record| {
@@ -774,7 +795,7 @@ fn pf4_dem_sampler_folded_repeat_sampling_and_materialized_error_caps() {
 }
 
 #[test]
-fn dem_sampler_rejects_excessive_buffered_outputs_before_sampling() {
+fn pf4_dem_sampler_rejects_excessive_buffered_outputs_before_sampling() {
     let empty = compile_dem("");
     let error = empty
         .sample_detection_events_with_seed(64_000_001, Some(5))
