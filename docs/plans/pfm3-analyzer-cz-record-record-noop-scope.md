@@ -52,7 +52,7 @@ Pinned Stim v1.16.0 rejects the second target as non-qubit, and Stab must contin
 - Other non-`CZ` record-record controlled-Pauli spellings are rejected by gate target validation before analyzer execution.
 - Non-`CZ` record-sweep and sweep-record groups remain governed by the existing invalid target-position rejection tests.
 - No `detect --sweep`, typed detector-sampler sweep API, Python API, JS/WASM, diagram, GPU, or deprecated `--detector_hypergraph` surface is added.
-- Broader analyzer sweep-shape parity and broader legal non-tableau gate execution remain active PFM3 work.
+- Broader analyzer sweep-shape parity remains under-specified and governed by `docs/plans/pfm3-analyzer-sweep-boundary-scope.md`; broader legal non-tableau gate execution remains active PFM3 work only when exact subcases are selected.
 
 ## Tests
 

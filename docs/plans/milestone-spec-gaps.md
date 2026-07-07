@@ -44,7 +44,7 @@ Revealed by: PFM0 evidence-lock refresh after comparing the implemented PF3 anal
 Current text: PFM3 says broader analyzer sweep-shape parity remains active after the selected analyzer sweep-control and `CZ` classical-only matrix landed.
 Gap: pinned Stim v1.16.0 `src/stim/simulators/error_analyzer.test.cc` names only the `CNOT sweep[0] 0` analyzer no-op case, while current Stab evidence already covers that case plus selected `CY`, `CZ`, `XCZ`, and `YCZ` no-ops, selected `CZ` sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, public `stab analyze_errors` behavior, and invalid controlled-Pauli target-position rejections. The remaining broad phrase does not name any additional legal gate-target shapes, accepted or rejected behavior, comparator class, CLI or Rust surface, oracle metadata, resource behavior, or benchmark policy. Treating it as implementation-ready would require inventing scope after the fact.
 Proposed amendment: keep the selected PF3 analyzer sweep-control and `CZ` classical-only matrix as the complete analyzer sweep evidence currently selected by PFM3. Do not add another analyzer sweep row until a future plan names exact gate-target shapes, expected no-op or rejection behavior, CLI and Rust surfaces, comparator class, positive and negative tests, oracle metadata, resource behavior, and benchmark or no-benchmark rationale.
-Resolution: Pending an exact-subcase plan for analyzer sweep-shape parity beyond the selected PF3 matrix.
+Resolution: Pending an exact-subcase plan for analyzer sweep-shape parity beyond the selected PF3 matrix. The current selected matrix boundary is locked in `docs/plans/pfm3-analyzer-sweep-boundary-scope.md`.
 
 ## 2026-07-07 - PFM5: Generated Missing-Detector Suffix Boundary
 

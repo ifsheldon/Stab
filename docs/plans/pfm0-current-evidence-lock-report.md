@@ -106,6 +106,6 @@ Pinned Stim v1.16.0 `src/stim/simulators/error_analyzer.test.cc` contains the na
 Current Stab evidence already promotes that case plus selected `CY`, `CZ`, `XCZ`, and `YCZ` no-ops, selected `CZ` sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, public `stab analyze_errors` behavior, and invalid controlled-Pauli target-position rejections.
 No additional analyzer sweep-shape family is currently named with exact gate-target shapes, expected no-op or rejection behavior, comparator, CLI or Rust surface, resource boundary, oracle row, or benchmark policy.
 
-The broader analyzer sweep-shape phrase is therefore now logged as an open under-specification in `docs/plans/milestone-spec-gaps.md`.
+The broader analyzer sweep-shape phrase is therefore now logged as an open under-specification in `docs/plans/milestone-spec-gaps.md`, and the current selected matrix boundary is locked in `docs/plans/pfm3-analyzer-sweep-boundary-scope.md`.
 Future agents should not implement or claim another analyzer sweep row until a plan selects exact remaining gate-target shapes and comparator policy.
 The existing report-only `pf3-analyze-errors-sweep` benchmark remains scoped to the promoted analyzer sweep-control and `CZ` classical-only matrix only.
