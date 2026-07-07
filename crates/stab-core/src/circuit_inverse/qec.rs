@@ -5,7 +5,7 @@ use crate::{
     MeasureRecordOffset, Pauli, PauliBasis, Target,
 };
 
-use super::{is_plain_qubit_target, reset_inverse_gate_and_basis};
+use super::{InverseQecOptions, is_plain_qubit_target, reset_inverse_gate_and_basis};
 
 mod m_det;
 mod mzz;
@@ -39,10 +39,75 @@ pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Ci
     if let Some(inverse) = selected_measure_reset_pass_through_inverse(circuit)? {
         return Ok(Some(inverse));
     }
-    if let Some(inverse) = selected_reset_measure_detector_inverse(circuit)? {
+    if let Some(inverse) =
+        selected_reset_measure_detector_inverse(circuit, InverseQecOptions::default())?
+    {
         return Ok(Some(inverse));
     }
     Ok(None)
+}
+
+pub(super) fn selected_keep_measurements_qec_inverse(
+    circuit: &Circuit,
+) -> CircuitResult<Option<Circuit>> {
+    let [
+        CircuitItem::Instruction(reset),
+        CircuitItem::Instruction(measurement),
+        CircuitItem::Instruction(detector),
+    ] = circuit.items()
+    else {
+        return Ok(None);
+    };
+
+    if !is_exact_keep_measurements_reset_measure_detector_packet(reset, measurement, detector)? {
+        return Ok(None);
+    }
+
+    Ok(Some(build_selected_reset_measure_detector_inverse(
+        reset,
+        measurement,
+        detector,
+        InverseQecOptions {
+            keep_measurements: true,
+        },
+    )?))
+}
+
+fn is_exact_keep_measurements_reset_measure_detector_packet(
+    reset: &CircuitInstruction,
+    measurement: &CircuitInstruction,
+    detector: &CircuitInstruction,
+) -> CircuitResult<bool> {
+    if reset.gate().canonical_name() != "R"
+        || measurement.gate().canonical_name() != "M"
+        || detector.gate().canonical_name() != "DETECTOR"
+        || !reset.args().is_empty()
+        || !measurement.args().is_empty()
+        || !detector.args().is_empty()
+        || reset.tag().is_some()
+        || measurement.tag().is_some()
+        || detector.tag().is_some()
+    {
+        return Ok(false);
+    }
+
+    let Some(reset_targets) = plain_unique_single_qubit_targets(reset) else {
+        return Ok(false);
+    };
+    let Some(measurement_targets) = plain_unique_single_qubit_targets(measurement) else {
+        return Ok(false);
+    };
+    let [detector_target] = detector.targets() else {
+        return Ok(false);
+    };
+    if reset_targets.len() != 1 || reset_targets != measurement_targets {
+        return Ok(false);
+    }
+
+    let Some(offset) = detector_target.measurement_record_offset() else {
+        return Ok(false);
+    };
+    Ok(offset == MeasureRecordOffset::try_new(-1)?)
 }
 
 fn selected_reset_cx_measure_two_to_one_inverse(
@@ -681,7 +746,10 @@ fn build_selected_measure_reset_pass_through_inverse(
     Ok(result)
 }
 
-fn selected_reset_measure_detector_inverse(circuit: &Circuit) -> CircuitResult<Option<Circuit>> {
+fn selected_reset_measure_detector_inverse(
+    circuit: &Circuit,
+    options: InverseQecOptions,
+) -> CircuitResult<Option<Circuit>> {
     let [
         CircuitItem::Instruction(reset),
         CircuitItem::Instruction(measurement),
@@ -706,6 +774,7 @@ fn selected_reset_measure_detector_inverse(circuit: &Circuit) -> CircuitResult<O
         reset,
         measurement,
         detector,
+        options,
     )?))
 }
 
@@ -713,6 +782,7 @@ fn build_selected_reset_measure_detector_inverse(
     reset: &CircuitInstruction,
     measurement: &CircuitInstruction,
     detector: &CircuitInstruction,
+    options: InverseQecOptions,
 ) -> CircuitResult<Circuit> {
     if !reset.args().is_empty() || !measurement.args().is_empty() {
         return Err(inverse_qec_reset_measure_detector_error(
@@ -781,13 +851,27 @@ fn build_selected_reset_measure_detector_inverse(
         .rev()
     {
         if record_touched && !*active {
-            append_one_target_instruction(
-                &mut result,
-                reset.gate(),
-                measurement.args(),
-                target.clone(),
-                measurement.tag(),
-            )?;
+            if options.keep_measurements {
+                if record_dep {
+                    detector_measurements.push(new_measurements);
+                }
+                append_one_target_instruction(
+                    &mut result,
+                    measurement.gate(),
+                    measurement.args(),
+                    target.clone(),
+                    measurement.tag(),
+                )?;
+                new_measurements += 1;
+            } else {
+                append_one_target_instruction(
+                    &mut result,
+                    reset.gate(),
+                    measurement.args(),
+                    target.clone(),
+                    measurement.tag(),
+                )?;
+            }
         } else {
             if record_dep {
                 detector_measurements.push(new_measurements);

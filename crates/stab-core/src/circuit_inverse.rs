@@ -10,6 +10,17 @@ mod qec;
 
 const MAX_TIME_REVERSE_TABLEAU_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct InverseQecOptions {
+    /// Preserve selected measurement records instead of turning them into resets.
+    ///
+    /// The current Rust API implements this only for the exact one-qubit
+    /// reset-measure-detector `r_m_det_keep_m` packet. Other selected QEC packets
+    /// and broader reset-measure-detector variants reject this option instead of
+    /// silently ignoring it.
+    pub keep_measurements: bool,
+}
+
 /// Returns the inverse of a circuit made only from supported unitary Clifford gates.
 ///
 /// Repeat blocks are inverted recursively. Non-unitary instructions return a circuit
@@ -46,6 +57,28 @@ pub fn circuit_inverse_unitary(circuit: &Circuit) -> CircuitResult<Circuit> {
 /// measurements, resets, detectors, observables, noise, and feedback remain
 /// active follow-up work.
 pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
+    circuit_inverse_qec_with_options(circuit, InverseQecOptions::default())
+}
+
+/// Returns the currently implemented QEC inverse subset with explicit options.
+///
+/// `keep_measurements` is currently implemented only for the exact one-qubit
+/// reset-measure-detector packet matching Stim v1.16.0 `r_m_det_keep_m`.
+pub fn circuit_inverse_qec_with_options(
+    circuit: &Circuit,
+    options: InverseQecOptions,
+) -> CircuitResult<Circuit> {
+    if options.keep_measurements {
+        if let Some(inverse) = qec::selected_keep_measurements_qec_inverse(circuit)? {
+            return Ok(inverse);
+        }
+        if qec::selected_qec_inverse(circuit)?.is_some() {
+            return Err(CircuitError::invalid_tableau_conversion(
+                "inverse_qec keep_measurements is currently supported only for the exact one-qubit reset-measure-detector subset",
+            ));
+        }
+        return circuit_inverse_unitary(circuit);
+    }
     if let Some(inverse) = qec::selected_qec_inverse(circuit)? {
         return Ok(inverse);
     }

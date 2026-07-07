@@ -128,6 +128,16 @@ impl Circuit {
         crate::circuit_inverse_qec(self)
     }
 
+    /// Returns the currently implemented QEC inverse subset with explicit options.
+    ///
+    /// See [`crate::InverseQecOptions`] for the currently selected exact option scope.
+    pub fn inverse_qec_with_options(
+        &self,
+        options: crate::InverseQecOptions,
+    ) -> CircuitResult<Self> {
+        crate::circuit_inverse_qec_with_options(self, options)
+    }
+
     /// Returns the currently supported time-reversal subset for flows.
     ///
     /// The scoped Rust API accepts unsigned unitary flows plus selected
