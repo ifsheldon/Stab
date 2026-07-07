@@ -117,6 +117,10 @@ fn dem_analyzer_spp_matches_explicit_phase_product_expansions() {
             "SPP X0*X1\nH 0\nH 1\nCX 1 0\nS_DAG 0\nCX 1 0\nH 1\nH 0\nX_ERROR(0.125) 0\nM 0\nDETECTOR rec[-1]\n",
             "H 0\nH 1\nCX 1 0\nS 0\nCX 1 0\nH 1\nH 0\nH 0\nH 1\nCX 1 0\nS_DAG 0\nCX 1 0\nH 1\nH 0\nX_ERROR(0.125) 0\nM 0\nDETECTOR rec[-1]\n",
         ),
+        (
+            "SPP Z0 Z1\nS_DAG 0\nS_DAG 1\nX_ERROR(0.125) 0\nX_ERROR(0.25) 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+            "S 0\nS 1\nS_DAG 0\nS_DAG 1\nX_ERROR(0.125) 0\nX_ERROR(0.25) 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+        ),
     ] {
         assert_eq!(analyze(direct), analyze(explicit), "{direct}");
     }

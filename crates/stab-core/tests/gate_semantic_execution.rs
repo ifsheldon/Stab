@@ -128,14 +128,18 @@ fn variable_target_spp_matches_hard_coded_phase_product_decompositions() {
 
 #[test]
 fn variable_target_spp_executes_in_frame_detection_path() {
-    let circuit = Circuit::from_stim_str("SPP X0*X1\nOBSERVABLE_INCLUDE(0) X0\n")
-        .expect("parse frame-detection SPP circuit");
+    for gate_name in ["SPP", "SPP_DAG"] {
+        let circuit =
+            Circuit::from_stim_str(&format!("{gate_name} X0*X1\nOBSERVABLE_INCLUDE(0) X0\n"))
+                .expect("parse frame-detection SPP circuit");
 
-    let output = sample_detection_events(&circuit, 4, Some(0))
-        .expect("frame detector sampling should execute SPP");
-    assert_eq!(output.detector_count, 0);
-    assert_eq!(output.observable_count, 1);
-    assert_eq!(output.records.len(), 4);
+        let output = sample_detection_events(&circuit, 4, Some(0)).unwrap_or_else(|error| {
+            panic!("frame detector sampling rejected {gate_name}: {error}")
+        });
+        assert_eq!(output.detector_count, 0, "{gate_name}");
+        assert_eq!(output.observable_count, 1, "{gate_name}");
+        assert_eq!(output.records.len(), 4, "{gate_name}");
+    }
 }
 
 #[test]

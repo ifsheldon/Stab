@@ -46,6 +46,15 @@ Gap: pinned Stim v1.16.0 `src/stim/simulators/error_analyzer.test.cc` names only
 Proposed amendment: keep the selected PF3 analyzer sweep-control and `CZ` classical-only matrix as the complete analyzer sweep evidence currently selected by PFM3. Do not add another analyzer sweep row until a future plan names exact gate-target shapes, expected no-op or rejection behavior, CLI and Rust surfaces, comparator class, positive and negative tests, oracle metadata, resource behavior, and benchmark or no-benchmark rationale.
 Resolution: Pending an exact-subcase plan for analyzer sweep-shape parity beyond the selected PF3 matrix. The current selected matrix boundary is locked in `docs/plans/pfm3-analyzer-sweep-boundary-scope.md`.
 
+## 2026-07-07 - PFM3: Remaining Legal Non-Tableau Execution Boundary
+
+Status: Open
+Revealed by: PFM3 evidence-lock refresh after comparing the implemented fixed-tableau and `SPP` or `SPP_DAG` execution evidence against the broad "remaining legal-gate execution" wording.
+Current text: PFM3 says non-tableau legal operations remain active or explicitly rejected after the fixed-tableau gate contract and supported Hermitian `SPP` or `SPP_DAG` execution slices landed.
+Gap: the selected evidence now covers all 46 fixed-tableau gates across sampler, detection-conversion, and analyzer circuits plus supported Hermitian `SPP` or `SPP_DAG` execution and anti-Hermitian rejection across the promoted sampler, detection-conversion, detector-frame, and analyzer surfaces. The remaining broad phrase does not name additional legal gate families, execution surfaces, accepted or rejected target shapes, comparator class, resource behavior, oracle metadata, or benchmark policy. Treating it as implementation-ready would require inventing scope after the fact.
+Proposed amendment: keep the fixed-tableau plus supported Hermitian `SPP` or `SPP_DAG` execution contract as the complete gate semantic evidence currently selected by PFM3. Do not add another legal-gate execution row until a future plan names exact gate families, execution surfaces, accepted and rejected behavior, positive and negative tests, resource-boundary behavior, oracle metadata, and benchmark or no-benchmark rationale.
+Resolution: Pending an exact-subcase plan for legal non-tableau execution beyond the selected PF3 gate semantic boundary. The current selected boundary is locked in `docs/plans/pfm3-gate-semantic-boundary-scope.md`.
+
 ## 2026-07-07 - PFM5: Generated Missing-Detector Suffix Boundary
 
 Status: Open

@@ -281,7 +281,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures the Rust sweep-conditioned detection sampler using omitted all-false sweep bits for non-frame and frame-path workloads; no faithful pinned Stim CLI ratio is claimed for this partial PF3 surface",
         ),
         "pf3-gate-semantic-wide" => Some(
-            "report-only: Stab measures fixed-tableau gate execution contract coverage plus promoted SPP sampler, detection-conversion, and analyzer checks without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures fixed-tableau gate execution contract coverage plus promoted supported Hermitian SPP/SPP_DAG sampler, detection-conversion, and analyzer checks without a faithful pinned Stim CLI timing ratio",
         ),
         _ => detecting_region_rows::compare_note(row_id)
             .or_else(|| missing_detector_rows::compare_note(row_id)),

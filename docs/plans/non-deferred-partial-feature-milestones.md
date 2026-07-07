@@ -229,7 +229,7 @@ Tasks:
 - Expand analyzer sweep behavior beyond the original single no-op sweep-control subset only for selected exact subcases. The selected analyzer sweep-control matrix now covers `CX`, `CY`, `CZ`, `XCZ`, and `YCZ` no-op behavior, including `CZ` sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, plus invalid controlled-Pauli target-position rejections; the boundary is locked in `docs/plans/pfm3-analyzer-sweep-boundary-scope.md`, and any broader analyzer sweep-shape parity is under-specified in `docs/plans/milestone-spec-gaps.md` until exact remaining gate-target shapes, comparator, CLI and Rust surfaces, oracle metadata, resource behavior, and benchmark policy are selected.
 - Keep `m2d --sweep` and `--sweep_format` behavior synchronized with core converter behavior for every accepted input format. The current public CLI matrix covers `01`, `b8`, `r8`, `hits`, `dets`, and input-only `ptb64` sweep records under `pf3-m2d-sweep-format-matrix-cli`.
 - Close sampler-backed target-order drift for Stim-parsed sweep targets: `CX q sweep[k]` and `CY q sweep[k]` must reject in reference sampling, detection conversion, non-frame detection sampling validation, and `stab m2d --sweep`, while sweep-first `CX` or `CY` and both-order `CZ` sweep/qubit groups must remain accepted.
-- Classify legal gate execution support across sampler, converter, detection, and analyzer paths. The fixed-tableau gate contract is implemented for current sampler, detection-conversion, and analyzer surfaces; non-tableau legal operations remain active or explicitly rejected.
+- Classify legal gate execution support across sampler, converter, detection, and analyzer paths. The fixed-tableau gate contract is implemented for current sampler, detection-conversion, and analyzer surfaces, supported Hermitian `SPP` and `SPP_DAG` products are implemented for the promoted sampler, detection-conversion, detector-frame, and analyzer paths, and the selected boundary is locked in `docs/plans/pfm3-gate-semantic-boundary-scope.md`; broader legal non-tableau execution remains under-specified in `docs/plans/milestone-spec-gaps.md` until exact gate families, execution surfaces, comparator, resource behavior, oracle metadata, and benchmark policy are selected.
 - Add precise errors for unsupported sweep target shapes, unsupported gate families, unsupported mixed feedback and sweep cases, and unsupported public output formats.
 - Preserve streaming or documented caps for public inputs and outputs.
 
@@ -260,7 +260,7 @@ Acceptance criteria:
 - Every accepted sweep-conditioned path has core and public CLI evidence where the CLI exposes it.
 - Every unsupported sweep shape fails before producing partial or misleading output.
 - The sampler-backed `CX` or `CY` sweep target-order boundary matches pinned Stim execution behavior without narrowing flow-generator no-op semantics.
-- Parser-accepted gates have documented execution behavior for every implemented execution surface.
+- Parser-accepted gates have documented execution behavior for every implemented execution surface, and broader legal non-tableau execution is not selected until an exact-subcase plan updates `docs/plans/pfm3-gate-semantic-boundary-scope.md` or replaces it with a sharper scope note.
 
 ## PFM4: DEM APIs, Coordinates, Transforms, And Folded Traversal
 
