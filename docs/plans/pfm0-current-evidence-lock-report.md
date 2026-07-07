@@ -2,8 +2,8 @@
 
 ## Summary
 
-This PFM0 pass rechecked the current partial-feature closure state after the PF5 signed sampled flow slice.
-No production code change was selected because the inspected candidate surfaces already had source-owned executable evidence, explicit owner milestones, or deliberately scoped parity contracts.
+This PFM0 pass rechecked the current partial-feature closure state after the PF5 signed sampled flow slice, later PF2/PF5/PF6 evidence slices, and the selected generated surface-code memory-X detecting-region evidence.
+No production code change is selected by this report because the inspected candidate surfaces already have source-owned executable evidence, explicit owner milestones, deliberately scoped parity contracts, or an under-specification entry that must be resolved before implementation.
 
 This is not a final PFM8 completion report.
 It is a current-state evidence lock for scope classification, metadata health, and next implementation selection.
@@ -22,6 +22,7 @@ It is a current-state evidence lock for scope classification, metadata health, a
 - `docs/plans/rpf4-dem-search-sat-progress-report.md`.
 - `docs/plans/rpf4-dem-coordinate-progress-report.md`.
 - `docs/plans/rpf5-missing-detectors-progress-report.md`.
+- `docs/plans/pfm5-detecting-regions-surface-memory-x-scope.md`.
 - `docs/plans/rpf6-analyzer-progress-report.md`.
 - Pinned Stim v1.16.0 source paths named by the touched inventory rows and feature inventory, including command, DEM, detector-conversion, analyzer, search, simulator, diagram, Python, JavaScript/WASM, and ecosystem source directories.
 - Current oracle and benchmark manifests.
@@ -33,6 +34,7 @@ The remaining rows fall into these buckets:
 
 - Rollup-only rows that depend on child evidence, such as the Rust core library equivalent, broad `.stim`, `.dem`, and result-format compatibility status, CLI binary regression status, and highest-priority feature-gap rollups. These rows may change status only after their active child rows have executable evidence or named deferrals.
 - Active Rust and CLI work with exact owner milestones: PFM2 owns full circuit transform API parity and full feedback-inlining transform parity; PFM3 owns broader sweep-conditioned simulator and analysis parity plus remaining legal-gate execution support for implemented execution surfaces; PFM4 owns full DEM public API parity for DEM API, coordinate, transform, and folded-traversal gaps; PFM5 owns detector utilities, generated-code detector utility behavior, measurement-rich flows, and transform integration; PFM6 owns analyzer, search, sparse-tracker, and active matched-error value-object gaps.
+- Under-specified active phrases that are not ready for implementation until exact subcases are selected. The current example is broader generated-code `missing_detectors` suffix analysis beyond the pinned honeycomb and toric examples, now logged in `docs/plans/milestone-spec-gaps.md`.
 - Deferred-only surfaces that must not block the current Rust and CLI beta closure, including Python binding ergonomics, JS/WASM, diagram and rendering APIs, ecosystem integrations, simulator-product APIs, GPU, exact random-stream parity, C++ header compatibility, deprecated `--detector_hypergraph`, `explain_errors`, and `repl`.
 
 The manifest-only PF rows remain extraction contracts, not implementation evidence.
@@ -74,6 +76,7 @@ The next implementation slice should be selected from one of these active, sourc
 
 Do not start from a whole upstream file.
 The next slice must name exact owned subcases, explicit rejections, comparator class, oracle rows, benchmark rows or no-benchmark rationale, and resource behavior before implementation.
+Do not select broader generated-code `missing_detectors` suffix analysis until a future plan names exact generated families, suffix comparators, resource behavior, oracle metadata, and benchmark policy.
 
 ## 2026-07-07 Addendum: PF1 Spec-Gap Closure
 
@@ -84,3 +87,13 @@ Unbounded streaming `.stim` file-read parity remains future parser work and must
 The Rust circuit coordinate non-finite behavior is also resolved for the current Rust API scope.
 `pf1_circuit_stats_coordinate_queries_reject_non_finite_folded_shift` proves Stab rejects non-finite folded coordinate results, and the checklist, inventory, and PF1 progress report document that exact Python-style coordinate API shape plus exact C++ infinity side-effect parity remain deferred binding-compatibility work.
 These closures keep the open under-specification log focused on active decisions rather than already documented deferrals.
+
+## 2026-07-07 Addendum: PFM5 Generated Missing-Detector Boundary
+
+This addendum records a PFM5 scope correction discovered while selecting the next implementation slice after the generated surface-code memory-X detecting-region evidence.
+Pinned Stim v1.16.0 `src/stim/util_top/missing_detectors.test.cc` provides the honeycomb and toric generated-code suffix cases already promoted by `pf5-missing-detectors-generated-honeycomb-rust` and `pf5-missing-detectors-generated-toric-rust`.
+No additional generated-code `missing_detectors` suffix family is currently named with an exact circuit, expected suffix, known-input mode, comparator, resource boundary, oracle row, or benchmark policy.
+
+The broader generated-code missing-detector suffix phrase is therefore now logged as an open under-specification in `docs/plans/milestone-spec-gaps.md`.
+Future agents should not implement or claim another generated-code missing-detector row until a plan selects exact generated families and suffix comparators.
+The existing report-only `pf5-missing-detectors-generated-code` benchmark remains scoped to the promoted honeycomb and toric workloads only.
