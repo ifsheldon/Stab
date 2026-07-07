@@ -35,7 +35,7 @@ fn build_selected_mpad_record_tail_inverse(
         .map_err(|_| inverse_qec_mpad_error("MPAD target count exceeds supported range"))?;
 
     let mut detector_outputs = Vec::new();
-    let mut observable_outputs = BTreeMap::new();
+    let mut observable_outputs: BTreeMap<u64, RecordTailOutput> = BTreeMap::new();
     for item in tail {
         let CircuitItem::Instruction(instruction) = item else {
             return Err(inverse_qec_mpad_error(
@@ -61,13 +61,10 @@ fn build_selected_mpad_record_tail_inverse(
                         inverse_qec_mpad_error("OBSERVABLE_INCLUDE is missing an observable id")
                     })?
                     .get();
-                if observable_outputs.contains_key(&observable) {
-                    return Err(inverse_qec_mpad_error(
-                        "duplicate OBSERVABLE_INCLUDE ids after MPAD are not selected",
-                    ));
-                }
                 let targets = remapped_mpad_record_targets(instruction, measurement_count)?;
-                if !targets.is_empty() {
+                if let Some(output) = observable_outputs.get_mut(&observable) {
+                    merge_record_targets_by_parity(&mut output.targets, targets)?;
+                } else {
                     observable_outputs.insert(
                         observable,
                         RecordTailOutput {
@@ -98,6 +95,9 @@ fn build_selected_mpad_record_tail_inverse(
         .into_iter()
         .chain(observable_outputs.into_values())
     {
+        if output.targets.is_empty() {
+            continue;
+        }
         result.append_instruction(CircuitInstruction::new(
             output.gate,
             output.args,
@@ -154,8 +154,30 @@ fn remapped_mpad_record_targets(
         .collect()
 }
 
+fn merge_record_targets_by_parity(
+    existing: &mut Vec<Target>,
+    incoming: Vec<Target>,
+) -> CircuitResult<()> {
+    let mut parity = BTreeSet::new();
+    for target in existing.iter().chain(incoming.iter()) {
+        let offset = target
+            .measurement_record_offset()
+            .ok_or_else(|| inverse_qec_mpad_error("merged observable targets must be records"))?
+            .get();
+        if !parity.insert(offset) {
+            parity.remove(&offset);
+        }
+    }
+
+    *existing = parity
+        .into_iter()
+        .map(|offset| MeasureRecordOffset::try_new(offset).map(Target::measurement_record))
+        .collect::<CircuitResult<_>>()?;
+    Ok(())
+}
+
 fn inverse_qec_mpad_error(reason: &str) -> CircuitError {
     CircuitError::invalid_tableau_conversion(format!(
-        "inverse_qec selected MPAD record-tail subset requires a top-level MPAD followed only by record-only DETECTOR or unique-id OBSERVABLE_INCLUDE instructions referencing that MPAD packet; {reason}"
+        "inverse_qec selected MPAD record-tail subset requires a top-level MPAD followed only by record-only DETECTOR or OBSERVABLE_INCLUDE instructions referencing that MPAD packet; {reason}"
     ))
 }

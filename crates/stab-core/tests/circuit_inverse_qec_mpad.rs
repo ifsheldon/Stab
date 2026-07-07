@@ -50,6 +50,54 @@ fn circuit_inverse_qec_supports_selected_mpad_record_tail() {
             OBSERVABLE_INCLUDE(2) rec[-1]
             ",
         ),
+        (
+            "
+            MPAD 0 1
+            OBSERVABLE_INCLUDE[a](0) rec[-2]
+            OBSERVABLE_INCLUDE[b](0) rec[-1]
+            ",
+            "
+            MPAD 1 0
+            OBSERVABLE_INCLUDE[a](0) rec[-2] rec[-1]
+            ",
+        ),
+        (
+            "
+            MPAD 0 1
+            OBSERVABLE_INCLUDE[b](2) rec[-2]
+            OBSERVABLE_INCLUDE[a](0) rec[-1]
+            OBSERVABLE_INCLUDE[c](1) rec[-2]
+            OBSERVABLE_INCLUDE[d](2) rec[-1]
+            ",
+            "
+            MPAD 1 0
+            OBSERVABLE_INCLUDE[a](0) rec[-2]
+            OBSERVABLE_INCLUDE[c](1) rec[-1]
+            OBSERVABLE_INCLUDE[b](2) rec[-2] rec[-1]
+            ",
+        ),
+        (
+            "
+            MPAD 0 1
+            OBSERVABLE_INCLUDE[a](0) rec[-2]
+            OBSERVABLE_INCLUDE[b](0) rec[-2]
+            OBSERVABLE_INCLUDE[c](0) rec[-1]
+            ",
+            "
+            MPAD 1 0
+            OBSERVABLE_INCLUDE[a](0) rec[-2]
+            ",
+        ),
+        (
+            "
+            MPAD 0 1
+            OBSERVABLE_INCLUDE[a](0) rec[-2]
+            OBSERVABLE_INCLUDE[b](0) rec[-2]
+            ",
+            "
+            MPAD 1 0
+            ",
+        ),
     ] {
         let input = circuit(input_text);
         let expected = circuit(expected_text);
@@ -220,6 +268,23 @@ fn time_reversed_for_flows_supports_selected_mpad_observable_flows() {
             ",
             vec!["1 -> 1", "1 -> 1", "1 -> 1", "1 -> rec[-2]", "1 -> rec[-1]"],
         ),
+        (
+            "
+            MPAD 0 1
+            OBSERVABLE_INCLUDE(0) rec[-2]
+            OBSERVABLE_INCLUDE(0) rec[-1]
+            ",
+            vec![
+                "1 -> obs[0]",
+                "1 -> rec[-1] xor obs[0]",
+                "1 -> rec[-2] xor obs[0]",
+            ],
+            "
+            MPAD 1 0
+            OBSERVABLE_INCLUDE(0) rec[-2] rec[-1]
+            ",
+            vec!["1 -> 1", "1 -> rec[-2]", "1 -> rec[-1]"],
+        ),
     ] {
         let input = circuit(circuit_text);
         let expected_circuit = circuit(expected_circuit_text);
@@ -323,7 +388,7 @@ fn circuit_inverse_qec_rejects_unpromoted_mpad_shapes() {
     for circuit_text in [
         "MPAD 0 1\nDETECTOR rec[-3]\n",
         "MPAD 0 1\nOBSERVABLE_INCLUDE(0) X0\n",
-        "MPAD 0 1\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-2]\n",
+        "MPAD 0 1\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(0) X0\n",
         "MPAD 0 1\nH 0\n",
         "MPAD 0 1\nREPEAT 2 {\n    DETECTOR rec[-1]\n}\n",
     ] {
