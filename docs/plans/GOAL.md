@@ -15,6 +15,7 @@ The recurring failure to avoid is claiming completion from broad checklist wordi
 - Stim feature inventory: `docs/stim-feature-list.md`.
 - Partial-row extraction map: `docs/plans/partial-feature-inventory.md`.
 - Historical RPF plan and reports: `docs/plans/remaining-partial-feature-milestones.md` and `docs/plans/rpf*-*.md`.
+- Current PFM8 rollup evidence report: `docs/plans/pfm8-rollup-evidence-report.md`.
 - Historical roadmap and benchmark policy: `docs/plans/rust-stim-drop-in-rewrite.md`.
 - Test-porting map: `docs/plans/stim-test-porting-plan.md`.
 - Lessons and known spec gaps: `docs/plans/lessons-learned.md` and `docs/plans/milestone-spec-gaps.md`.

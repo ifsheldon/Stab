@@ -508,6 +508,10 @@ Acceptance criteria:
 - Every remaining partial row either has a concrete active owner or is partial only because of an explicitly deferred surface.
 - Rollup rows do not imply Python, JS/WASM, diagram, ecosystem, or simulator-product parity.
 
+Current evidence:
+
+- `docs/plans/pfm8-rollup-evidence-report.md` records the current PFM8 rollup evidence snapshot. It is intentionally not a final PFM8 completion report because broad PFM2 through PFM6 under-specification entries still need exact-subcase plans before implementation or deferral.
+
 ## Final Verification
 
 Before claiming the whole plan complete, run:

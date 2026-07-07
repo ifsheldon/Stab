@@ -224,3 +224,4 @@ RPF0 is complete when:
 Current evidence-lock report:
 
 - `docs/plans/pfm0-current-evidence-lock-report.md` records the latest PFM0 pass over the active partial rows, manifest-only extraction contracts, deferred-only exclusions, and metadata health checks.
+- `docs/plans/pfm8-rollup-evidence-report.md` records the current PFM8 rollup evidence snapshot and confirms that rollup rows should stay conservative until broad PFM2 through PFM6 under-specification entries are selected as exact subcases, implemented, or explicitly deferred.
