@@ -8,7 +8,7 @@ It also promotes tableau-backed single-qubit and fixed two-qubit Clifford propag
 It also promotes `SPP` and `SPP_DAG` unitary Pauli-product instructions by analyzing their existing decomposition into the supported Clifford subset.
 It also promotes bounded repeat traversal with explicit expansion caps for the current materialized Rust utility surface plus a selected folded final-repeat fast path for covered deterministic measurement loops, including bounded nested local repeat bodies, that prove an empty suffix without materializing every iteration.
 It is not an RPF5 completion report because broader folded large-repeat traversal beyond the selected final-repeat empty-suffix cases, public measurement-rich flow solving, and transform integration remain active work.
-Broader generated-code missing-detector suffix analysis beyond the pinned honeycomb and toric cases is now logged as under-specified until a future plan names exact generated families and suffix comparators.
+Broader generated-code missing-detector suffix analysis beyond the pinned honeycomb and toric cases is locked by [pfm5-missing-detectors-generated-boundary-scope.md](pfm5-missing-detectors-generated-boundary-scope.md) and remains under-specified until a future plan names exact generated families and suffix comparators.
 
 ## Implemented Surfaces
 
@@ -147,7 +147,7 @@ just bench::compare --milestone PF5
 
 ## Remaining RPF5 Work
 
-- Broader generated-code missing-detector suffix analysis beyond the promoted honeycomb and toric cases is under-specified in `docs/plans/milestone-spec-gaps.md`; do not implement or claim another generated-code suffix row until exact generated families, suffix comparators, resource behavior, oracle metadata, and benchmark policy are selected.
+- Broader generated-code missing-detector suffix analysis beyond the promoted honeycomb and toric cases is locked by [pfm5-missing-detectors-generated-boundary-scope.md](pfm5-missing-detectors-generated-boundary-scope.md) and remains under-specified in `docs/plans/milestone-spec-gaps.md`; do not implement or claim another generated-code suffix row until exact generated families, suffix comparators, resource behavior, oracle metadata, and benchmark policy are selected.
 - Broader folded large-repeat traversal beyond the selected final covered deterministic measurement-loop fast paths with flat or bounded nested local bodies, and generated-code gate families beyond tableau-backed single-qubit and fixed two-qubit Clifford propagation plus `SPP` or `SPP_DAG` decomposition in the invariant tracker.
 - Public measurement-rich flow semantics beyond the promoted unsigned `has_flow`, unsigned `has_all_flows`, unsigned diagnostic Rust helper, scoped signed sampled Rust checker, and current generator subsets, including Python-style signed sampled binding shape, broader composed `flow_generators`, solver or generator diagnostics, and transform integration.
 - Continue keeping benchmark harness smoke tests split out of `ops/bench/src/baseline/tests.rs`, because the file is close to the project’s 1200-line threshold.

@@ -95,7 +95,7 @@ This addendum records a PFM5 scope correction discovered while selecting the nex
 Pinned Stim v1.16.0 `src/stim/util_top/missing_detectors.test.cc` provides the honeycomb and toric generated-code suffix cases already promoted by `pf5-missing-detectors-generated-honeycomb-rust` and `pf5-missing-detectors-generated-toric-rust`.
 No additional generated-code `missing_detectors` suffix family is currently named with an exact circuit, expected suffix, known-input mode, comparator, resource boundary, oracle row, or benchmark policy.
 
-The broader generated-code missing-detector suffix phrase is therefore now logged as an open under-specification in `docs/plans/milestone-spec-gaps.md`.
+The broader generated-code missing-detector suffix phrase is therefore now logged as an open under-specification in `docs/plans/milestone-spec-gaps.md`, and the current selected generated-code suffix boundary is locked in `docs/plans/pfm5-missing-detectors-generated-boundary-scope.md`.
 Future agents should not implement or claim another generated-code missing-detector row until a plan selects exact generated families and suffix comparators.
 The existing report-only `pf5-missing-detectors-generated-code` benchmark remains scoped to the promoted honeycomb and toric workloads only.
 
