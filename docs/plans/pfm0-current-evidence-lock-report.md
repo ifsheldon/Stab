@@ -34,7 +34,7 @@ The remaining rows fall into these buckets:
 
 - Rollup-only rows that depend on child evidence, such as the Rust core library equivalent, broad `.stim`, `.dem`, and result-format compatibility status, CLI binary regression status, and highest-priority feature-gap rollups. These rows may change status only after their active child rows have executable evidence or named deferrals.
 - Active Rust and CLI work with exact owner milestones: PFM2 owns full circuit transform API parity and full feedback-inlining transform parity; PFM3 owns broader sweep-conditioned simulator and analysis parity plus remaining legal-gate execution support for implemented execution surfaces after the selected fixed-tableau and supported Hermitian `SPP` or `SPP_DAG` boundary; PFM4 owns full DEM public API parity for DEM API, coordinate, transform, and folded-traversal gaps; PFM5 owns detector utilities, generated-code detector utility behavior, measurement-rich flows, and transform integration; PFM6 owns analyzer, search, sparse-tracker, and active matched-error value-object gaps.
-- Under-specified active phrases that are not ready for implementation until exact subcases are selected. Current examples are broader analyzer sweep-shape parity beyond the selected PF3 matrix, broader legal non-tableau execution beyond the selected PF3 gate semantic boundary, and broader generated-code `missing_detectors` suffix analysis beyond the pinned honeycomb and toric examples, all logged in `docs/plans/milestone-spec-gaps.md`.
+- Under-specified active phrases that are not ready for implementation until exact subcases are selected. Current examples include broader analyzer sweep-shape parity beyond the selected PF3 matrix, broader legal non-tableau execution beyond the selected PF3 gate semantic boundary, broader `missing_detectors` utility families including generated-code suffix analysis beyond the pinned honeycomb and toric examples, broader repeat-contained feedback parity, broader QEC inverse and measurement-rich transform behavior, broader DEM folded traversal and coordinate behavior, broader detecting-region and gauge behavior, broader flow-generator, solver, diagnostic, folded-repeat, and transform-integration behavior, and broader PFM6 analyzer, search, sparse-tracker, and value-object hardening behavior, all logged in `docs/plans/milestone-spec-gaps.md`.
 - Deferred-only surfaces that must not block the current Rust and CLI beta closure, including Python binding ergonomics, JS/WASM, diagram and rendering APIs, ecosystem integrations, simulator-product APIs, GPU, exact random-stream parity, C++ header compatibility, deprecated `--detector_hypergraph`, `explain_errors`, and `repl`.
 
 The manifest-only PF rows remain extraction contracts, not implementation evidence.
@@ -84,7 +84,8 @@ Do not start from a whole upstream file.
 The next slice must name exact owned subcases, explicit rejections, comparator class, oracle rows, benchmark rows or no-benchmark rationale, and resource behavior before implementation.
 Do not select broader analyzer sweep-shape parity until a future plan names exact remaining gate-target shapes, comparator, CLI and Rust surfaces, oracle metadata, resource behavior, and benchmark policy.
 Do not select broader legal non-tableau execution until a future plan names exact gate families, execution surfaces, comparator, resource behavior, oracle metadata, and benchmark policy.
-Do not select broader generated-code `missing_detectors` suffix analysis until a future plan names exact generated families, suffix comparators, resource behavior, oracle metadata, and benchmark policy.
+Do not select broader `missing_detectors` utility families, including generated-code suffix analysis, until a future plan names exact circuits or generated families, comparator behavior, resource behavior, oracle metadata, and benchmark policy.
+Do not select broader PFM2 QEC inverse, PFM4 DEM folded traversal, PFM5 detector utility or flow, or PFM6 analyzer/search/sparse-tracker work from broad status prose alone; use `docs/plans/milestone-spec-gaps.md` to choose exact subcases before implementation.
 
 ## 2026-07-07 Addendum: PF1 Spec-Gap Closure
 
@@ -102,8 +103,8 @@ This addendum records a PFM5 scope correction discovered while selecting the nex
 Pinned Stim v1.16.0 `src/stim/util_top/missing_detectors.test.cc` provides the honeycomb and toric generated-code suffix cases already promoted by `pf5-missing-detectors-generated-honeycomb-rust` and `pf5-missing-detectors-generated-toric-rust`.
 No additional generated-code `missing_detectors` suffix family is currently named with an exact circuit, expected suffix, known-input mode, comparator, resource boundary, oracle row, or benchmark policy.
 
-The broader generated-code missing-detector suffix phrase is therefore now logged as an open under-specification in `docs/plans/milestone-spec-gaps.md`, and the current selected generated-code suffix boundary is locked in `docs/plans/pfm5-missing-detectors-generated-boundary-scope.md`.
-Future agents should not implement or claim another generated-code missing-detector row until a plan selects exact generated families and suffix comparators.
+The broader generated-code missing-detector suffix phrase is therefore logged as an open under-specification in `docs/plans/milestone-spec-gaps.md`, and the current selected generated-code suffix boundary is locked in `docs/plans/pfm5-missing-detectors-generated-boundary-scope.md`.
+The broader non-generated `missing_detectors` utility families are now also logged as an open under-specification, so future agents should not implement or claim another missing-detector row until a plan selects exact circuits or generated families, suffix comparators or source-owned invariants, resource behavior, oracle metadata, and benchmark policy.
 The existing report-only `pf5-missing-detectors-generated-code` benchmark remains scoped to the promoted honeycomb and toric workloads only.
 
 ## 2026-07-07 Addendum: PFM3 Analyzer Sweep-Shape Boundary
@@ -137,3 +138,13 @@ The selected measurement-rich time-reversal subset supports unique-target reset 
 Pinned Stim v1.16.0 probing recorded in `docs/plans/rpf5-flow-progress-report.md` returned malformed out-of-range inverse flows for duplicate reset-only and duplicate measure-reset examples.
 Future work should not clone that behavior or silently "fix" it without a compatibility decision that chooses bug-compatible malformed flows, corrected semantic flows, or permanent rejection.
 The current boundary is locked in `docs/plans/pfm2-time-reverse-duplicate-target-boundary-scope.md`.
+
+## 2026-07-08 Addendum: PFM0 Broad Active-Wording Reconciliation
+
+This addendum records a documentation-only PFM0 evidence-lock cleanup after the selected PFM2, PFM4, PFM5, and PFM6 exact subcases landed.
+The broad roadmap phrases for remaining QEC inverse, measurement-rich transform, DEM folded traversal, coordinate traversal, detecting-region, `missing_detectors`, flow-generator, solver, analyzer, search, sparse-tracker, and matched-error hardening work are no longer treated as implementation-ready active scope.
+They are now explicitly logged as open under-specification entries in `docs/plans/milestone-spec-gaps.md`.
+
+No production behavior changed in this cleanup.
+The purpose is to prevent the next implementation slice from reopening whole upstream files or vague feature families after the current exact evidence packets have already been promoted.
+Future work in these areas must first name exact circuits or models, positive and negative tests, comparator behavior, resource boundaries, oracle metadata, benchmark policy or no-benchmark rationale, and documentation updates.
