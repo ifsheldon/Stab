@@ -698,6 +698,22 @@ REPEAT 2 {
 
 #[test]
 fn with_inlined_feedback_rejects_unimplemented_control_shapes_and_excessive_repeat_work() {
+    for text in [
+        "
+        M 0
+        CZ rec[-1] sweep[0]
+    ",
+        "
+        M 0 1
+        CZ rec[-1] rec[-2]
+    ",
+    ] {
+        let error = circuit(text)
+            .with_inlined_feedback()
+            .expect_err("reject unsupported classical controlled feedback gate");
+        assert!(error.to_string().contains("not a qubit"), "{error}");
+    }
+
     let repeat_error = circuit(
         "
         REPEAT 100001 {

@@ -4,7 +4,7 @@
 
 The M9 detector utility closure implemented the bounded follow-up scope from `docs/plans/m9-detector-utility-closure-plan.md`.
 Stab now exposes typed Rust APIs for the simple detecting-regions case and the basic single-record missing-detectors subset, and `circuit_with_inlined_feedback` now has source-owned MPP feedback-transform parity evidence for the scoped transform.
-Broader detecting-region target-shape support, broader gauge handling, multi-record missing-detector row reduction, repeated MPP stabilizer-product missing-detector analysis, observable-interaction missing-detector analysis, honeycomb suffix analysis, toric suffix analysis, broader repeat-contained feedback, unsupported classical feedback gates, and full transform API parity remain future work. Later PF5 slices added selected detecting-region gauge evidence, and later PF2 feedback slices added selected bounded loop-refolding and nested bounded-repeat detector-parity evidence.
+Broader detecting-region target-shape support, broader gauge handling, multi-record missing-detector row reduction, repeated MPP stabilizer-product missing-detector analysis, observable-interaction missing-detector analysis, honeycomb suffix analysis, toric suffix analysis, unsupported classical feedback gates, and full transform API parity remain future work. Later PF5 slices added selected detecting-region gauge evidence, and later PF2 feedback slices added selected bounded loop-refolding and nested bounded-repeat detector-parity evidence; broader repeat-contained feedback beyond those selected cases is under-specified in `docs/plans/milestone-spec-gaps.md` until exact repeat structures, comparator behavior, resource behavior, oracle metadata, and benchmark policy are selected.
 
 ## Implemented Surfaces
 
@@ -126,7 +126,7 @@ The manual pre-commit hook reported no staged changes, which is expected because
 ## Remaining Exclusions After Later PF2 Feedback Work
 
 - Full public `Circuit.with_inlined_feedback` parity.
-- Broader repeat-contained feedback beyond the selected bounded loop-refolding and nested bounded-repeat detector-parity cases.
+- Broader repeat-contained feedback beyond the selected bounded loop-refolding and nested bounded-repeat detector-parity cases, which is under-specified until exact repeat structures, comparator behavior, resource behavior, oracle metadata, and benchmark policy are selected.
 - Unsupported classical feedback gates.
 - Full MPP stabilizer-product missing-detector analysis.
 - Multi-record missing-detector row reduction and deterministic invariant solving.

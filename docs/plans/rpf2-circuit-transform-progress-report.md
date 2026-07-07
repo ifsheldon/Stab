@@ -20,7 +20,7 @@ Implemented behavior:
 Remaining RPF2 work:
 
 - Broader flow-dependent decomposition checks remain open when new RPF5 measurement-rich flow families are promoted beyond the selected MPP and pair-measurement flow-generator preservation cases.
-- Full public feedback-inlining transform parity remains open beyond the scoped method, especially broader repeat-contained feedback behavior beyond the selected pinned loop-refolding and nested bounded-repeat detector-parity cases.
+- Full public feedback-inlining transform parity remains open beyond the scoped method. Broader repeat-contained feedback behavior beyond the selected pinned loop-refolding and nested bounded-repeat detector-parity cases is under-specified in `docs/plans/milestone-spec-gaps.md` until exact repeat structures, comparator behavior, resource behavior, oracle metadata, and benchmark policy are selected.
 - Broader measurement-rich `time_reversed_for_flows` and `inverse_qec` rewrites for parser-rejected inverted reset targets, detector-flow rewrites beyond the selected no-flow, exact two-to-one, selected exact `m_det`, selected MPP identity-parity, selected noisy `MZZ`, selected noisy measurement-only, selected noisy measure-reset-only, selected exact noisy measure-reset detector-flow, and pass-through packets, broader observable-aware QEC inverse rewrites beyond the selected observable Pauli include packet, feedback, broader noisy measure-reset detector-flow, repeats, broader multi-instruction measurement-rich circuits, and larger QEC inverse behavior remain active follow-up work and stay logged in `docs/plans/milestone-spec-gaps.md`. Duplicate reset-only and duplicate measure-reset targets remain explicitly fail-closed until `docs/plans/milestone-spec-gaps.md` resolves whether Stab should clone Stim v1.16.0's malformed duplicate-target inverse flows, return corrected semantic flows, or keep rejecting them.
 - QASM, Quirk, Crumble, diagrams, and Python-specific ergonomics remain explicitly deferred.
 
@@ -168,7 +168,8 @@ The Rust/test sidecar found one helper precision issue: the recursive assertion 
 That issue is fixed by checking only measurement-record controls.
 The docs/oracle sidecar found one evidence-row mismatch: the M9 `coverage-util-top-transform-without-feedback` row claimed the nested-repeat evidence even though its selector does not run the integration test.
 That issue is fixed by leaving the nested-repeat claim on PF2 row `pf2-feedback-inline-scoped-rust`, whose selector runs `cargo test -p stab-core --test circuit_transforms feedback`.
-Residual risk remains that the nested bounded-repeat case is source-owned DEM-equivalence evidence rather than an exact pinned upstream nested fixture, so broader repeat-contained feedback stays open.
+The follow-up scope reconciliation is recorded in `docs/plans/pfm2-feedback-repeat-boundary-scope.md`.
+Residual risk remains that the nested bounded-repeat case is source-owned DEM-equivalence evidence rather than an exact pinned upstream nested fixture, so broader repeat-contained feedback stays under-specified until a future exact-subcase plan exists.
 Milestone-audit for the selected decomposition flow-generator preservation slice found the promoted scope complete against the current PFM2 text after limiting the claim to selected MPP and pair-measurement decomposition cases.
 Full-code-review used GPT-5.5/xhigh sidecars for Rust/test correctness and docs/oracle alignment.
 The Rust/test sidecar found one test-quality issue: the flow-preservation assertions could pass if `Circuit::decomposed` accidentally returned the original product-measurement circuit unchanged.

@@ -32,7 +32,7 @@ Rows whose only remaining gap is intentionally deferred are recorded as exclusio
 | Circuit mutation, introspection, coordinates, repeats, transforms, reference samples, and determined measurements | PF1 and PF2 | Rust API closure for non-deferred methods plus transform semantics and resource boundaries. | QASM, Quirk, Crumble, diagrams, and Python operator ergonomics. |
 | DEM construction, mutation, introspection, transforms, and analysis | PF4 and PF6 | Rust DEM methods needed by sampling, analyzer, search, and CLI workflows. | Match-graph diagrams and Python class operators. |
 | Measurement-to-detection conversion | PF3 and PF7 | Remaining `m2d` and converter semantics for sweep-conditioned and feedback-related implemented surfaces. | Full Python converter class parity. |
-| Detector-analysis utility APIs | PF5 | Detecting regions, missing detectors, feedback inlining, broader repeat-contained feedback decisions, and typed Rust APIs for owned subcases. | Honeycomb or toric suffix parity unless specifically promoted by PF5 subcase extraction. |
+| Detector-analysis utility APIs | PF5 | Detecting regions, missing detectors, feedback inlining, typed Rust APIs for owned subcases, and documented under-specification for broader repeat-contained feedback until exact subcases are selected. | Honeycomb or toric suffix parity unless specifically promoted by PF5 subcase extraction. |
 | Circuit-to-DEM analysis and `analyze_errors` flags | PF6 and PF7 | Analyzer behavior, CLI flags, decomposition behavior, loop folding, and generated-circuit parity where owned by Rust/CLI. | `stim explain_errors` CLI and full ErrorMatcher provenance. |
 | Shortest graphlike and hypergraph logical-error search | PF6 | Broader Rust search parity and generated-circuit evidence for non-deferred search APIs. | New public graph/vector simulator APIs. |
 | Sparse reverse detector-frame tracking | PF6 | Optimized loop folding, deterministic generated supported-unitary coverage, and analyzer/search integration needed by implemented APIs. | Full ErrorMatcher provenance if it only serves deferred `explain_errors`. |
@@ -106,7 +106,7 @@ Acceptance criteria:
 
 ## Milestone PF2: Circuit Transform And Repeat Traversal Closure
 
-Objective: finish active circuit transform parity while preserving explicit deferrals for exports, diagrams, Python ergonomics, and broader repeat-contained feedback beyond selected loop-refolding and nested bounded-repeat detector-parity cases.
+Objective: finish active circuit transform parity while preserving explicit deferrals for exports, diagrams, Python ergonomics, and keeping broader repeat-contained feedback beyond selected loop-refolding and nested bounded-repeat detector-parity cases under-specified until exact repeat structures, comparator behavior, resource behavior, oracle metadata, and benchmark policy are selected.
 
 Included features:
 
