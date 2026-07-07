@@ -214,3 +214,56 @@ fn pf4_error_matcher_filter_folds_rich_flat_detector_repeat() {
 
     assert_eq!(actual, expected);
 }
+
+#[test]
+fn pf4_error_matcher_filter_folds_nested_detector_repeat() {
+    let circuit = Circuit::from_stim_str(
+        "
+        MPAD 0
+        DETECTOR rec[-1]
+        M(0.125) 0
+        M(0.25) 1
+        DETECTOR rec[-2]
+        DETECTOR rec[-1]
+        OBSERVABLE_INCLUDE(0) rec[-1]
+        ",
+    )
+    .unwrap();
+    let compact_filter = DetectorErrorModel::from_dem_str(
+        "
+        shift_detectors 1
+        error(0.1) D0
+        error(0.1) D0 D0 D1 ^ L0
+        ",
+    )
+    .unwrap();
+    let nested_repeat_filter = DetectorErrorModel::from_dem_str(
+        "
+        shift_detectors 1
+        repeat 100001 {
+            shift_detectors(4, 5) 0
+            repeat 17 {
+                error(0.1) D0
+            }
+            repeat 19 {
+                error(0.1) D0 D0 D1 ^ L0
+                shift_detectors 0
+            }
+        }
+        ",
+    )
+    .unwrap();
+
+    let expected = explain_errors_from_circuit(&circuit, Some(&compact_filter), false)
+        .unwrap()
+        .into_iter()
+        .map(|error| error.to_string())
+        .collect::<Vec<_>>();
+    let actual = explain_errors_from_circuit(&circuit, Some(&nested_repeat_filter), false)
+        .unwrap()
+        .into_iter()
+        .map(|error| error.to_string())
+        .collect::<Vec<_>>();
+
+    assert_eq!(actual, expected);
+}

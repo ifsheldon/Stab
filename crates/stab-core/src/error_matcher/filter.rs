@@ -78,7 +78,9 @@ fn validate_error_matcher_filter_budget_items(
         match item {
             DemItem::Instruction(_) => budget.add_expanded_instructions(multiplier)?,
             DemItem::RepeatBlock(repeat) => {
-                if let Some(error_count) = selected_filter_flat_repeat_error_count(repeat.body())? {
+                if let Some(error_count) =
+                    selected_filter_compact_repeat_error_count(repeat.body())?
+                {
                     let folded_count = multiplier.checked_mul(error_count).ok_or_else(|| {
                         CircuitError::invalid_detector_error_model(
                             "DEM ErrorMatcher filter folded repeat error count overflowed",
@@ -112,38 +114,73 @@ fn validate_error_matcher_filter_budget_items(
     Ok(())
 }
 
-fn selected_filter_flat_repeat_error_count(
+fn selected_filter_compact_repeat_error_count(
     model: &DetectorErrorModel,
 ) -> CircuitResult<Option<u64>> {
+    selected_filter_compact_repeat_error_count_inner(model, 0)
+}
+
+fn selected_filter_compact_repeat_error_count_inner(
+    model: &DetectorErrorModel,
+    depth: usize,
+) -> CircuitResult<Option<u64>> {
+    if depth > MAX_DEM_REPEAT_NESTING {
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "DEM ErrorMatcher filter compact-repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
+        )));
+    }
     if model.items().is_empty() {
         return Ok(None);
     }
     let mut count = 0_u64;
     for item in model.items() {
-        let DemItem::Instruction(instruction) = item else {
-            return Ok(None);
-        };
-        if instruction.kind() != DemInstructionKind::Error {
-            return Ok(None);
-        }
-        let mut has_detector_target = false;
-        for target in instruction.targets() {
-            match target {
-                DemTarget::RelativeDetector(_) => has_detector_target = true,
-                DemTarget::Numeric(_) => return Ok(None),
-                DemTarget::LogicalObservable(_) | DemTarget::Separator => {}
+        match item {
+            DemItem::Instruction(instruction) => match instruction.kind() {
+                DemInstructionKind::Error => {
+                    let mut has_detector_target = false;
+                    for target in instruction.targets() {
+                        match target {
+                            DemTarget::RelativeDetector(_) => has_detector_target = true,
+                            DemTarget::Numeric(_) => return Ok(None),
+                            DemTarget::LogicalObservable(_) | DemTarget::Separator => {}
+                        }
+                    }
+                    if !has_detector_target {
+                        return Ok(None);
+                    }
+                    count = count.checked_add(1).ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "DEM ErrorMatcher filter compact-repeat error count overflowed",
+                        )
+                    })?;
+                }
+                DemInstructionKind::ShiftDetectors if instruction.detector_shift()? == 0 => {}
+                DemInstructionKind::Detector
+                | DemInstructionKind::LogicalObservable
+                | DemInstructionKind::ShiftDetectors => return Ok(None),
+            },
+            DemItem::RepeatBlock(repeat) => {
+                if repeat.body().total_detector_shift()? != 0 {
+                    return Ok(None);
+                }
+                let Some(child_count) =
+                    selected_filter_compact_repeat_error_count_inner(repeat.body(), depth + 1)?
+                else {
+                    return Ok(None);
+                };
+                count = count.checked_add(child_count).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "DEM ErrorMatcher filter compact-repeat error count overflowed",
+                    )
+                })?;
             }
         }
-        if !has_detector_target {
-            return Ok(None);
-        }
-        count = count.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
-                "DEM ErrorMatcher filter flat-repeat error count overflowed",
-            )
-        })?;
     }
-    Ok(Some(count))
+    if count == 0 {
+        Ok(None)
+    } else {
+        Ok(Some(count))
+    }
 }
 
 fn collect_error_keys_from_dem(
@@ -171,7 +208,7 @@ fn collect_error_keys_from_dem(
                 DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
             },
             DemItem::RepeatBlock(repeat) => {
-                if selected_filter_flat_repeat_error_count(repeat.body())?.is_some() {
+                if selected_filter_compact_repeat_error_count(repeat.body())?.is_some() {
                     collect_error_keys_from_dem(repeat.body(), current_detector_offset, keys)?;
                     continue;
                 }
