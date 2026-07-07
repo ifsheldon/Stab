@@ -109,12 +109,11 @@ pub fn circuit_inverse_qec_with_options(
 /// to one noiseless plain unique-target measurement instruction group, one
 /// selected plain reset instruction over one or more unique qubit targets, one
 /// selected measure-reset instruction over one or more unique qubit targets, one
-/// selected MPAD record-tail packet with Pauli-only or measurement-record flows,
-/// one noiseless plain `MZZ` group followed by plain-qubit unitary instructions,
-/// or the exact pinned `MY 0; MRX 0; MR 1; R 0` `flow_flip` packet. MPAD
-/// observable flow terms, non-selected detector or observable rewrites,
-/// feedback, noise, repeats, and broader multi-instruction QEC rewrites remain
-/// deferred.
+/// selected MPAD record-tail packet with Pauli-only, measurement-record, or
+/// selected observable flows, one noiseless plain `MZZ` group followed by
+/// plain-qubit unitary instructions, or the exact pinned `MY 0; MRX 0; MR 1; R
+/// 0` `flow_flip` packet. Non-selected MPAD observable rewrites, feedback,
+/// noise, repeats, and broader multi-instruction QEC rewrites remain deferred.
 pub fn circuit_time_reversed_for_flows(
     circuit: &Circuit,
     flows: &[Flow],
@@ -596,11 +595,6 @@ fn time_reverse_selected_mpad_record_tail_flows(
         )
     })?;
     for (index, flow) in flows.iter().enumerate() {
-        if flow.observables().next().is_some() {
-            return Err(CircuitError::invalid_tableau_conversion(format!(
-                "time_reversed_for_flows selected MPAD record-tail subset does not support observable terms in flow {index}: {flow}"
-            )));
-        }
         let flow_check =
             diagnose_unsigned_flow_with_sparse_tracker(circuit, flow).map_err(|error| {
                 CircuitError::invalid_tableau_conversion(format!(
@@ -823,7 +817,7 @@ fn has_classical_flow_terms(flows: &[Flow]) -> bool {
 
 fn measurement_rich_time_reversal_error() -> CircuitError {
     CircuitError::invalid_tableau_conversion(
-        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain unique-target measurement instruction group from M, MX, MY, MXX, MYY, or MZZ, one noiseless plain reset instruction from R, RX, or RY over one or more unique qubit targets, one noiseless measure-reset instruction from MR, MRX, or MRY over one or more unique qubit targets including inverted result targets, one selected MPAD record-tail packet with Pauli-only or measurement-record flows, one noiseless plain MZZ group followed by plain-qubit unitary instructions, or the exact pinned MY 0; MRX 0; MR 1; R 0 flow_flip packet; MPAD observable flow terms, feedback, noise, repeats, and broader detector, observable, or multi-instruction rewrites remain unsupported",
+        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain unique-target measurement instruction group from M, MX, MY, MXX, MYY, or MZZ, one noiseless plain reset instruction from R, RX, or RY over one or more unique qubit targets, one noiseless measure-reset instruction from MR, MRX, or MRY over one or more unique qubit targets including inverted result targets, one selected MPAD record-tail packet with Pauli-only, measurement-record, or selected observable flows, one noiseless plain MZZ group followed by plain-qubit unitary instructions, or the exact pinned MY 0; MRX 0; MR 1; R 0 flow_flip packet; non-selected MPAD observable rewrites, feedback, noise, repeats, and broader detector, observable, or multi-instruction rewrites remain unsupported",
     )
 }
 
