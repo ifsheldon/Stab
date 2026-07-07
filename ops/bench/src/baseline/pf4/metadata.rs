@@ -48,6 +48,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "pf4-error-matcher-filter-logical-repeat" => Some(
             "contract-only: Stab measures selected ErrorMatcher filter DEM flat and nested detectorless logical-observable-only zero-shift repeat folding by compact filter-key semantics; broader shifted, annotation-only or mixed-instruction, circuit-repeat provenance, full ErrorMatcher provenance, and explain_errors CLI behavior remains scoped out",
         ),
+        "pf4-error-matcher-filter-annotation-repeat" => Some(
+            "contract-only: Stab measures selected ErrorMatcher filter DEM flat and nested annotation-bearing zero-shift repeat folding by compact filter-key semantics; annotation-only bodies, broader mixed-instruction bodies, shifted repeats, circuit-repeat provenance, full ErrorMatcher provenance, and explain_errors CLI behavior remains scoped out",
+        ),
         _ => None,
     }
 }

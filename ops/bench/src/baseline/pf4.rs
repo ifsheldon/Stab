@@ -13,6 +13,7 @@ use crate::report::Measurement;
 
 use super::{measure_stab_batched, stab_runner_error};
 
+mod matcher_filter;
 mod metadata;
 mod sampler;
 mod search_repeat;
@@ -62,21 +63,6 @@ const MATCHER_REPEAT_COUNT: u64 = 2048;
 #[cfg(test)]
 const MATCHER_REPEAT_COUNT: u64 = 2;
 #[cfg(not(test))]
-const MATCHER_FILTER_FLAT_REPEAT_COUNT: u64 = 1_000_000;
-#[cfg(test)]
-const MATCHER_FILTER_FLAT_REPEAT_COUNT: u64 = 100_001;
-#[cfg(not(test))]
-const MATCHER_FILTER_NESTED_REPEAT_COUNT: u64 = 1_000_000;
-#[cfg(test)]
-const MATCHER_FILTER_NESTED_REPEAT_COUNT: u64 = 100_001;
-const MATCHER_FILTER_NESTED_LEFT_COUNT: u64 = 17;
-const MATCHER_FILTER_NESTED_RIGHT_COUNT: u64 = 19;
-#[cfg(not(test))]
-const MATCHER_FILTER_LOGICAL_REPEAT_COUNT: u64 = 1_000_000;
-#[cfg(test)]
-const MATCHER_FILTER_LOGICAL_REPEAT_COUNT: u64 = 100_001;
-const MATCHER_FILTER_LOGICAL_INNER_COUNT: u64 = 17;
-#[cfg(not(test))]
 const FLAT_OVERLAP_REPEAT_COUNT: u64 = 4096;
 #[cfg(test)]
 const FLAT_OVERLAP_REPEAT_COUNT: u64 = 4;
@@ -119,15 +105,10 @@ pub(super) fn run_dem_transform_compare_row(
             Ok(Some(search_repeat::run_dem_search_nested_repeat_row(row)?))
         }
         "pf4-dem-sat-flat-repeat-fold" => Ok(Some(run_dem_sat_flat_repeat_row(row)?)),
-        "pf4-error-matcher-filter-flat-repeat" => {
-            Ok(Some(run_error_matcher_filter_flat_repeat_row(row)?))
-        }
-        "pf4-error-matcher-filter-nested-repeat" => {
-            Ok(Some(run_error_matcher_filter_nested_repeat_row(row)?))
-        }
-        "pf4-error-matcher-filter-logical-repeat" => {
-            Ok(Some(run_error_matcher_filter_logical_repeat_row(row)?))
-        }
+        "pf4-error-matcher-filter-flat-repeat"
+        | "pf4-error-matcher-filter-nested-repeat"
+        | "pf4-error-matcher-filter-logical-repeat"
+        | "pf4-error-matcher-filter-annotation-repeat" => matcher_filter::run_row(row),
         "pf4-dem-sampler-folded-repeat" => Ok(Some(sampler::run_dem_sampler_repeat_row(row)?)),
         _ => Ok(None),
     }
@@ -206,27 +187,6 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             matcher_expanded_instructions() as f64,
             "expanded-instructions/s",
         )),
-        (
-            "pf4-error-matcher-filter-flat-repeat",
-            "stab_pf4_error_matcher_filter_flat_repeat_fold",
-        ) => Some((
-            MATCHER_FILTER_FLAT_REPEAT_COUNT as f64,
-            "folded-filter-keys/s",
-        )),
-        (
-            "pf4-error-matcher-filter-nested-repeat",
-            "stab_pf4_error_matcher_filter_nested_repeat_fold",
-        ) => Some((
-            matcher_filter_nested_expanded_keys(),
-            "folded-nested-filter-keys/s",
-        )),
-        (
-            "pf4-error-matcher-filter-logical-repeat",
-            "stab_pf4_error_matcher_filter_logical_repeat_fold",
-        ) => Some((
-            matcher_filter_logical_expanded_keys(),
-            "folded-logical-filter-keys/s",
-        )),
         ("pf4-dem-folded-graphlike-traversal", "stab_pf4_dem_graphlike_capped_repeat") => Some((
             search_expanded_errors(SEARCH_REPEAT_COUNT) as f64,
             "expanded-errors/s",
@@ -261,7 +221,8 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             SEARCH_FLAT_REPEAT_COUNT as f64,
             "folded-detectorless-logical-errors/s",
         )),
-        _ => sampler::measurement_work(row_id, name)
+        _ => matcher_filter::measurement_work(row_id, name)
+            .or_else(|| sampler::measurement_work(row_id, name))
             .or_else(|| search_repeat::measurement_work(row_id, name)),
     }
 }
@@ -511,75 +472,6 @@ fn run_dem_hypergraph_logical_repeat_row(
                 find_undetectable_logical_error(&model, usize::MAX, usize::MAX, false)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
             black_box(dem_model_checksum(&logical_error));
-            Ok(())
-        },
-    )?])
-}
-
-fn run_error_matcher_filter_flat_repeat_row(
-    row: &BenchmarkRow,
-) -> Result<Vec<Measurement>, BenchError> {
-    let matcher_filter_circuit = Circuit::from_stim_str(MATCHER_FILTER_CIRCUIT)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-    let matcher_filter_fixture =
-        matcher_filter_flat_repeat_fixture(MATCHER_FILTER_FLAT_REPEAT_COUNT);
-    let matcher_filter = DetectorErrorModel::from_dem_str(&matcher_filter_fixture)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-
-    Ok(vec![measure_stab_batched(
-        "stab_pf4_error_matcher_filter_flat_repeat_fold",
-        TRANSFORM_REPETITIONS,
-        || {
-            let explained =
-                explain_errors_from_circuit(&matcher_filter_circuit, Some(&matcher_filter), false)
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(explained.len());
-            Ok(())
-        },
-    )?])
-}
-
-fn run_error_matcher_filter_nested_repeat_row(
-    row: &BenchmarkRow,
-) -> Result<Vec<Measurement>, BenchError> {
-    let matcher_filter_circuit = Circuit::from_stim_str(MATCHER_FILTER_RICH_CIRCUIT)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-    let matcher_filter_fixture =
-        matcher_filter_nested_repeat_fixture(MATCHER_FILTER_NESTED_REPEAT_COUNT);
-    let matcher_filter = DetectorErrorModel::from_dem_str(&matcher_filter_fixture)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-
-    Ok(vec![measure_stab_batched(
-        "stab_pf4_error_matcher_filter_nested_repeat_fold",
-        TRANSFORM_REPETITIONS,
-        || {
-            let explained =
-                explain_errors_from_circuit(&matcher_filter_circuit, Some(&matcher_filter), false)
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(explained.len());
-            Ok(())
-        },
-    )?])
-}
-
-fn run_error_matcher_filter_logical_repeat_row(
-    row: &BenchmarkRow,
-) -> Result<Vec<Measurement>, BenchError> {
-    let matcher_filter_circuit = Circuit::from_stim_str(MATCHER_FILTER_LOGICAL_CIRCUIT)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-    let matcher_filter_fixture =
-        matcher_filter_logical_repeat_fixture(MATCHER_FILTER_LOGICAL_REPEAT_COUNT);
-    let matcher_filter = DetectorErrorModel::from_dem_str(&matcher_filter_fixture)
-        .map_err(|error| stab_runner_error(&row.id, error))?;
-
-    Ok(vec![measure_stab_batched(
-        "stab_pf4_error_matcher_filter_logical_repeat_fold",
-        TRANSFORM_REPETITIONS,
-        || {
-            let explained =
-                explain_errors_from_circuit(&matcher_filter_circuit, Some(&matcher_filter), false)
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(explained.len());
             Ok(())
         },
     )?])
@@ -872,79 +764,6 @@ M 0
 DETECTOR rec[-1]
 "
     )
-}
-
-const MATCHER_FILTER_CIRCUIT: &str = "\
-M(0.125) 0
-DETECTOR rec[-1]
-";
-
-const MATCHER_FILTER_RICH_CIRCUIT: &str = "\
-MPAD 0
-DETECTOR rec[-1]
-M(0.125) 0
-M(0.25) 1
-DETECTOR rec[-2]
-DETECTOR rec[-1]
-OBSERVABLE_INCLUDE(0) rec[-1]
-";
-
-const MATCHER_FILTER_LOGICAL_CIRCUIT: &str = "\
-M(0.125) 0
-OBSERVABLE_INCLUDE(0) rec[-1]
-M(0.25) 1
-OBSERVABLE_INCLUDE(1) rec[-1]
-";
-
-fn matcher_filter_flat_repeat_fixture(repeat_count: u64) -> String {
-    format!(
-        "\
-repeat {repeat_count} {{
-    error(0.1) D0
-}}
-"
-    )
-}
-
-fn matcher_filter_nested_repeat_fixture(repeat_count: u64) -> String {
-    format!(
-        "\
-shift_detectors 1
-repeat {repeat_count} {{
-    shift_detectors(4, 5) 0
-    repeat {MATCHER_FILTER_NESTED_LEFT_COUNT} {{
-        error(0.1) D0
-    }}
-    repeat {MATCHER_FILTER_NESTED_RIGHT_COUNT} {{
-        error(0.1) D0 D0 D1 ^ L0
-        shift_detectors 0
-    }}
-}}
-"
-    )
-}
-
-fn matcher_filter_nested_expanded_keys() -> f64 {
-    (MATCHER_FILTER_NESTED_REPEAT_COUNT
-        * (MATCHER_FILTER_NESTED_LEFT_COUNT + MATCHER_FILTER_NESTED_RIGHT_COUNT)) as f64
-}
-
-fn matcher_filter_logical_repeat_fixture(repeat_count: u64) -> String {
-    format!(
-        "\
-repeat {repeat_count} {{
-    error(0.1) L0
-    repeat {MATCHER_FILTER_LOGICAL_INNER_COUNT} {{
-        shift_detectors 0
-        error(0.1) L1
-    }}
-}}
-"
-    )
-}
-
-fn matcher_filter_logical_expanded_keys() -> f64 {
-    (MATCHER_FILTER_LOGICAL_REPEAT_COUNT * (1 + MATCHER_FILTER_LOGICAL_INNER_COUNT)) as f64
 }
 
 fn coordinate_map_fixture() -> String {

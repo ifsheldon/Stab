@@ -316,3 +316,92 @@ fn pf4_error_matcher_filter_folds_logical_only_repeat() {
 
     assert_eq!(actual, expected);
 }
+
+#[test]
+fn pf4_error_matcher_filter_folds_annotation_repeat() {
+    let circuit = Circuit::from_stim_str(
+        "
+        MPAD 0
+        DETECTOR rec[-1]
+        M(0.125) 0
+        M(0.25) 1
+        DETECTOR rec[-2]
+        DETECTOR rec[-1]
+        OBSERVABLE_INCLUDE(0) rec[-1]
+        ",
+    )
+    .unwrap();
+    let compact_filter = DetectorErrorModel::from_dem_str(
+        "
+        shift_detectors 1
+        detector(2, 3) D0
+        logical_observable L0
+        error(0.1) D0
+        error(0.1) D0 D0 D1 ^ L0
+        ",
+    )
+    .unwrap();
+    let annotation_repeat_filter = DetectorErrorModel::from_dem_str(
+        "
+        shift_detectors 1
+        repeat 100001 {
+            detector(2, 3) D0
+            logical_observable L0
+            error(0.1) D0
+            repeat 17 {
+                detector(7) D1
+                logical_observable L0
+                shift_detectors 0
+                error(0.1) D0 D0 D1 ^ L0
+            }
+        }
+        ",
+    )
+    .unwrap();
+
+    let expected = explain_errors_from_circuit(&circuit, Some(&compact_filter), false)
+        .unwrap()
+        .into_iter()
+        .map(|error| error.to_string())
+        .collect::<Vec<_>>();
+    assert!(
+        !expected.is_empty(),
+        "annotation-bearing filter should select errors"
+    );
+    let actual = explain_errors_from_circuit(&circuit, Some(&annotation_repeat_filter), false)
+        .unwrap()
+        .into_iter()
+        .map(|error| error.to_string())
+        .collect::<Vec<_>>();
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn pf4_error_matcher_filter_rejects_annotation_only_repeat() {
+    let circuit = Circuit::from_stim_str(
+        "
+        M 0
+        DETECTOR rec[-1]
+        ",
+    )
+    .unwrap();
+    let annotation_only_filter = DetectorErrorModel::from_dem_str(
+        "
+        repeat 100001 {
+            detector(2) D0
+            logical_observable L0
+            shift_detectors 0
+        }
+        ",
+    )
+    .unwrap();
+
+    let error = explain_errors_from_circuit(&circuit, Some(&annotation_only_filter), false)
+        .expect_err("reject annotation-only oversized filter DEM")
+        .to_string();
+    assert!(
+        error.contains("DEM ErrorMatcher filter currently supports repeat counts"),
+        "{error}"
+    );
+}

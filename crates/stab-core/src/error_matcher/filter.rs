@@ -157,9 +157,8 @@ fn selected_filter_compact_repeat_error_count_inner(
                     })?;
                 }
                 DemInstructionKind::ShiftDetectors if instruction.detector_shift()? == 0 => {}
-                DemInstructionKind::Detector
-                | DemInstructionKind::LogicalObservable
-                | DemInstructionKind::ShiftDetectors => return Ok(None),
+                DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
+                DemInstructionKind::ShiftDetectors => return Ok(None),
             },
             DemItem::RepeatBlock(repeat) => {
                 if repeat.body().total_detector_shift()? != 0 {

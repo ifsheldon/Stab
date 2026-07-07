@@ -100,6 +100,10 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             &["stab_pf4_error_matcher_filter_logical_repeat_fold"][..],
         ),
         (
+            "pf4-error-matcher-filter-annotation-repeat",
+            &["stab_pf4_error_matcher_filter_annotation_repeat_fold"][..],
+        ),
+        (
             "pf4-dem-sampler-folded-repeat",
             &[
                 "stab_pf4_dem_sampler_compile_folded_repeat",
