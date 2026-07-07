@@ -849,14 +849,6 @@ fn compile_sweep_pauli_group(
             });
             Ok(())
         }
-        ("CX" | "CY", None, Some(sweep_id)) if first.qubit_id().is_some() => {
-            operations.push(SampleOperation::SweepPauli {
-                sweep_id,
-                qubit: qubit_index(instruction, first)?,
-                basis,
-            });
-            Ok(())
-        }
         ("CZ", Some(sweep_id), None) if second.qubit_id().is_some() => {
             operations.push(SampleOperation::SweepPauli {
                 sweep_id,

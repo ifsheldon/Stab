@@ -414,6 +414,45 @@ fn m2d_rejects_sweep_record_count_mismatches() {
 }
 
 #[test]
+fn m2d_rejects_invalid_sampler_sweep_target_order() {
+    let temp_dir = tempdir().expect("temp dir");
+    let sweep_path = temp_dir.path().join("sweep.01");
+    std::fs::write(&sweep_path, "1\n").expect("write sweep");
+
+    for (gate, circuit_text) in [
+        ("CX", "CX 0 sweep[0]\nM 0\nDETECTOR rec[-1]\n"),
+        ("CY", "CY 0 sweep[0]\nM 0\nDETECTOR rec[-1]\n"),
+    ] {
+        let circuit_path = temp_dir.path().join(format!("invalid-{gate}.stim"));
+        std::fs::write(&circuit_path, circuit_text).expect("write circuit");
+
+        let mut stdout = Vec::new();
+        let mut stderr = Vec::new();
+        let status = run_from(
+            [
+                "stab",
+                "m2d",
+                "--in_format=01",
+                "--out_format=dets",
+                "--sweep",
+                sweep_path.to_str().expect("utf-8 path"),
+                "--sweep_format=01",
+                "--circuit",
+                circuit_path.to_str().expect("utf-8 path"),
+            ],
+            b"0\n".as_slice(),
+            &mut stdout,
+            &mut stderr,
+        );
+
+        assert_eq!(status, 1, "{gate}");
+        assert_eq!(stdout, b"", "{gate}");
+        let stderr = String::from_utf8(stderr).expect("stderr is UTF-8");
+        assert!(stderr.contains("does not support"), "{stderr}");
+    }
+}
+
+#[test]
 fn m2d_rejects_missing_and_malformed_sweep_input() {
     let temp_dir = tempdir().expect("temp dir");
     let circuit_path = temp_dir.path().join("input.stim");

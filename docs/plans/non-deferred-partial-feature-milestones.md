@@ -228,6 +228,7 @@ Tasks:
 - Finish or explicitly reject frame-path sweep-conditioned detector sampling for the current public detection surface. Selected frame-path Pauli-observable `detect` sampling with sweep-controlled `CX` and `CY` qubit targets, sweep-controlled `CZ`, `CZ` bit/bit no-op groups, and `XCZ` or `YCZ` qubit/sweep groups now uses omitted all-false sweep bits, and measurement-record `XCZ` or `YCZ` target feedback is accepted as X or Y feedback equivalent to `CX` or `CY` feedback. Pinned Stim v1.16.0 does not expose `stim detect --sweep`, so typed `detect` sweep files are not a CLI parity target; Python detector-sampler sweep-bit APIs and future explicit Rust detector-sampler APIs remain deferred unless a later plan selects them.
 - Expand analyzer sweep behavior beyond the original single no-op sweep-control subset only for selected exact subcases. The selected analyzer sweep-control matrix now covers `CX`, `CY`, `CZ`, `XCZ`, and `YCZ` no-op behavior, including `CZ` sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, plus invalid controlled-Pauli target-position rejections; broader analyzer sweep-shape parity remains active.
 - Keep `m2d --sweep` and `--sweep_format` behavior synchronized with core converter behavior for every accepted input format. The current public CLI matrix covers `01`, `b8`, `r8`, `hits`, `dets`, and input-only `ptb64` sweep records under `pf3-m2d-sweep-format-matrix-cli`.
+- Close sampler-backed target-order drift for Stim-parsed sweep targets: `CX q sweep[k]` and `CY q sweep[k]` must reject in reference sampling, detection conversion, non-frame detection sampling validation, and `stab m2d --sweep`, while sweep-first `CX` or `CY` and both-order `CZ` sweep/qubit groups must remain accepted.
 - Classify legal gate execution support across sampler, converter, detection, and analyzer paths. The fixed-tableau gate contract is implemented for current sampler, detection-conversion, and analyzer surfaces; non-tableau legal operations remain active or explicitly rejected.
 - Add precise errors for unsupported sweep target shapes, unsupported gate families, unsupported mixed feedback and sweep cases, and unsupported public output formats.
 - Preserve streaming or documented caps for public inputs and outputs.
@@ -237,12 +238,14 @@ Tests:
 - Port owned cases from `vendor/stim/src/stim/simulators/measurements_to_detection_events.test.cc`, `vendor/stim/src/stim/simulators/frame_simulator.test.cc`, `vendor/stim/src/stim/simulators/error_analyzer.test.cc`, `vendor/stim/src/stim/cmd/command_detect.test.cc`, and `vendor/stim/src/stim/cmd/command_m2d.test.cc`.
 - Add sweep-record tests for `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` wherever accepted. The accepted public `m2d --sweep_format` matrix is implemented by `m2d_accepts_sweep_records_in_all_text_and_byte_formats` and `m2d_accepts_sweep_records_in_ptb64_format`.
 - Add semantic tests comparing sweep-conditioned circuits to explicit small-circuit expansions.
+- Add target-order tests for sampler-backed sweep Pauli operations, including both rejected `CX q sweep[k]` and `CY q sweep[k]` cases and accepted sweep-first `CX` or `CY` plus both-order `CZ` cases.
 - Add omitted-sweep default tests, width-mismatch tests, invalid-record-count tests, unsupported-format tests, unsupported-target-shape tests, and writer-error tests.
 - Add gate execution tests that prove parser validation, sampler execution, detector conversion, and analyzer propagation do not drift.
 
 Oracle rows:
 
 - Supplement `pf3-sweep-m2d-detect`, `pf3-sweep-analyzer`, and `pf3-gate-semantic-execution` with executable rows for promoted subcases. `pf3-m2d-sweep-format-matrix-cli` is the executable row for the accepted public `m2d --sweep_format` input matrix.
+- `pf3-sampler-sweep-target-order-rust` is the executable structural row for sampler-backed `CX q sweep[k]` and `CY q sweep[k]` rejection plus accepted neighboring target orders.
 - CLI rows must prove stdout, stderr class, exit status, accepted flags, rejected flags, path behavior, and resource behavior.
 
 Benchmarks:
@@ -250,11 +253,13 @@ Benchmarks:
 - Keep or refresh report-only rows `pf3-m2d-sweep-b8`, `pf3-m2d-sweep-ptb64-input`, `pf3-detect-sweep-sampling`, and `pf3-analyze-errors-sweep`.
 - Keep the implemented `pf3-gate-semantic-wide` row report-only unless a faithful pinned-Stim comparator is added.
 - Classify CLI rows as `cli-baseline` only when pinned Stim exposes the same command shape.
+- Do not add a benchmark row for pure target-order rejection slices unless implementation changes a hot validation path.
 
 Acceptance criteria:
 
 - Every accepted sweep-conditioned path has core and public CLI evidence where the CLI exposes it.
 - Every unsupported sweep shape fails before producing partial or misleading output.
+- The sampler-backed `CX` or `CY` sweep target-order boundary matches pinned Stim execution behavior without narrowing flow-generator no-op semantics.
 - Parser-accepted gates have documented execution behavior for every implemented execution surface.
 
 ## PFM4: DEM APIs, Coordinates, Transforms, And Folded Traversal

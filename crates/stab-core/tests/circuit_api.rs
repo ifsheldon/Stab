@@ -722,6 +722,16 @@ fn pf1_circuit_reference_determined_reference_sample_matches_compiled_sampler() 
     );
     assert_eq!(sweep_controlled.count_sweep_bits().expect("sweep bits"), 1);
 
+    for source in ["X 0\nCX 0 sweep[0]\nM 0\n", "X 0\nCY 0 sweep[0]\nM 0\n"] {
+        let invalid_sweep_order =
+            Circuit::from_stim_str(source).expect("parse invalid sweep order");
+        let error = invalid_sweep_order
+            .reference_sample()
+            .expect_err("reject invalid sampler sweep target order")
+            .to_string();
+        assert!(error.contains("does not support"), "{source}\n{error}");
+    }
+
     let circuit = Circuit::from_stim_str(
         "H 0 1\n\
          CX 0 2 1 3\n\

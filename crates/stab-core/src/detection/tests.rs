@@ -465,6 +465,40 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
         "{unsupported_shape_error}"
     );
 
+    for source in [
+        "CX 0 sweep[0]\nM 0\nDETECTOR rec[-1]\n",
+        "CY 0 sweep[0]\nM 0\nDETECTOR rec[-1]\n",
+    ] {
+        let invalid_sweep_order =
+            Circuit::from_stim_str(source).expect("parse invalid sweep order");
+        let conversion_error = convert_measurements_to_detection_events_with_sweep(
+            &invalid_sweep_order,
+            &[vec![false]],
+            &[vec![true]],
+            DetectionConversionOptions {
+                skip_reference_sample: false,
+            },
+        )
+        .expect_err("reject invalid sampler sweep target order");
+        assert!(
+            conversion_error.to_string().contains("does not support"),
+            "{source}\n{conversion_error}"
+        );
+
+        let validation_error = validate_detection_sampling_circuit(&invalid_sweep_order)
+            .expect_err("reject invalid sampler sweep target order during validation");
+        assert!(
+            validation_error.to_string().contains("does not support"),
+            "{source}\n{validation_error}"
+        );
+        let sampling_error = sample_detection_events(&invalid_sweep_order, 1, Some(5))
+            .expect_err("reject invalid sampler sweep target order during sampling");
+        assert!(
+            sampling_error.to_string().contains("does not support"),
+            "{source}\n{sampling_error}"
+        );
+    }
+
     for (source, gate) in [
         ("RX 0\nCX 0 sweep[0]\nOBSERVABLE_INCLUDE(0) X0\n", "CX"),
         (
