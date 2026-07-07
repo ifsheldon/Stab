@@ -78,7 +78,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | Rust core library equivalent for core Stim semantics | Rollup | RPF8 | Complete only after RPF1 through RPF6 close active Rust rows and docs no longer imply Python or simulator product parity. |
 | CLI binary | Implemented for selected Stab CLI surface | RPF7 and RPF8 | Section 11 checklist command rows and PF7 evidence prove the selected `stab` CLI surface; deferred commands and drop-in `stim` packaging remain excluded unless a later release plan promotes them. |
 | `.stim`, `.dem`, and result-format compatibility | Rollup | RPF2, RPF4, RPF7, RPF8 | Complete only after active transform, DEM, and CLI format gaps are closed or explicitly deferred. |
-| Target kinds | Active | RPF3 | Broader sweep-conditioned execution and analysis behavior must be implemented or explicitly rejected with tests. |
+| Target kinds | Active | RPF3 | Broader sweep-conditioned execution and analysis behavior must be implemented for exact selected subcases, explicitly rejected with tests, or logged as under-specified before coding. |
 | Full semantic execution of every legal circuit operation | Active rollup | RPF1, RPF3, RPF6 | Parser acceptance must not imply execution support; execution coverage and unsupported legal shapes must be documented. |
 | DEM parser and canonical printer | Done, evidence lock | RPF4 | Closed by M10 exact and structural parse-print evidence plus PF4 validation coverage; remaining DEM API transform and folded traversal work stays in the separate DEM introspection, transform, traversal, and full API rows. |
 | DEM detector shifts, observables, coordinates, and counts | Active | RPF4 | Finish folded coordinate/count behavior and large-repeat resource policy. |
@@ -245,7 +245,7 @@ Acceptance criteria:
 
 Objective: close active sweep-conditioned behavior and legal gate execution gaps in sampler, detector conversion, detection sampling, and analyzer paths.
 
-Progress: non-frame `detect` sampling with omitted all-false sweep bits is implemented and tracked in [rpf3-sweep-gate-progress-report.md](rpf3-sweep-gate-progress-report.md). Frame-path sweep sampling, analyzer sweep behavior, and broad gate execution classification remain active.
+Progress: non-frame and selected frame-path `detect` sampling with omitted all-false sweep bits, selected analyzer sweep-control and `CZ` classical-only no-op behavior, sampler target-order rejection, and fixed-tableau gate classification are implemented and tracked in [rpf3-sweep-gate-progress-report.md](rpf3-sweep-gate-progress-report.md). Broader sweep target placements and legal-gate execution remain active only when exact subcases are selected, while broader analyzer sweep-shape parity is under-specified until exact remaining gate-target shapes, comparator, CLI and Rust surfaces, oracle metadata, resource behavior, and benchmark policy are selected.
 
 Owned checklist rows:
 
@@ -258,7 +258,7 @@ Owned checklist rows:
 Implementation tasks:
 
 - Extend sweep-conditioned semantics beyond the current detector-conversion subset only for exact subcases selected by RPF0.
-- Add sweep-aware behavior for `detect` and analyzer paths when selected as active Rust or CLI scope.
+- Add sweep-aware behavior for `detect` and analyzer paths only when a plan selects exact Rust or CLI subcases; broader analyzer sweep-shape parity must stay logged as under-specified until the missing comparator, evidence, resource, and benchmark policy is named.
 - Add legal-gate execution for parser-accepted gates in sampler, converter, detection, and analyzer paths where Stim semantics are non-deferred.
 - Maintain explicit rejection for sweep target shapes, gate families, or mixed feedback/sweep cases not selected by the milestone.
 - Keep streaming or bounded behavior for all public inputs and outputs.
@@ -266,7 +266,7 @@ Implementation tasks:
 Tests:
 
 - Port owned cases from `vendor/stim/src/stim/simulators/measurements_to_detection_events.test.cc`, `vendor/stim/src/stim/simulators/frame_simulator.test.cc`, `vendor/stim/src/stim/simulators/error_analyzer.test.cc`, `vendor/stim/src/stim/cmd/command_detect.test.cc`, and `vendor/stim/src/stim/cmd/command_m2d.test.cc`.
-- Add sweep record tests for `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` wherever accepted. The selected public `m2d --sweep_format` matrix is implemented by `pf3-m2d-sweep-format-matrix-cli`, while broader sweep execution and analyzer-shape work remains open.
+- Add sweep record tests for `01`, `b8`, `r8`, `hits`, `dets`, and `ptb64` wherever accepted. The selected public `m2d --sweep_format` matrix is implemented by `pf3-m2d-sweep-format-matrix-cli`; broader sweep execution remains open only for selected exact subcases, and broader analyzer-shape work remains under-specified.
 - Add semantic tests comparing sweep-conditioned circuits to explicit small-circuit expansions.
 - Add tests for omitted sweep defaults, width mismatch, invalid sweep record counts, unsupported formats, unsupported sweep target shapes, and writer errors.
 - Add gate execution tests that separate parser validation, sampler execution, detector conversion, and analyzer propagation.
@@ -278,7 +278,7 @@ Oracle rows:
 
 Benchmarks:
 
-- Implement `pf3-m2d-sweep-b8`, `pf3-m2d-sweep-ptb64-input`, `pf3-detect-sweep-sampling`, and `pf3-analyze-errors-sweep` when their corresponding behavior is active, and keep `pf3-gate-semantic-wide` current as the fixed-tableau gate execution contract expands.
+- Keep `pf3-m2d-sweep-b8`, `pf3-m2d-sweep-ptb64-input`, `pf3-detect-sweep-sampling`, and `pf3-analyze-errors-sweep` scoped to their selected behavior; add or expand benchmark rows only when a future exact-subcase plan promotes additional sweep behavior with a no-benchmark rationale or measurement policy, and keep `pf3-gate-semantic-wide` current as the fixed-tableau gate execution contract expands.
 - Classify CLI rows as `cli-baseline` when Stim v1.16.0 exposes the same public command shape.
 - Keep core-only rows `contract-representative` or `report-only` unless a faithful direct baseline exists.
 

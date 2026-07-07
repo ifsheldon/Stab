@@ -34,7 +34,7 @@ The remaining rows fall into these buckets:
 
 - Rollup-only rows that depend on child evidence, such as the Rust core library equivalent, broad `.stim`, `.dem`, and result-format compatibility status, CLI binary regression status, and highest-priority feature-gap rollups. These rows may change status only after their active child rows have executable evidence or named deferrals.
 - Active Rust and CLI work with exact owner milestones: PFM2 owns full circuit transform API parity and full feedback-inlining transform parity; PFM3 owns broader sweep-conditioned simulator and analysis parity plus remaining legal-gate execution support for implemented execution surfaces; PFM4 owns full DEM public API parity for DEM API, coordinate, transform, and folded-traversal gaps; PFM5 owns detector utilities, generated-code detector utility behavior, measurement-rich flows, and transform integration; PFM6 owns analyzer, search, sparse-tracker, and active matched-error value-object gaps.
-- Under-specified active phrases that are not ready for implementation until exact subcases are selected. The current example is broader generated-code `missing_detectors` suffix analysis beyond the pinned honeycomb and toric examples, now logged in `docs/plans/milestone-spec-gaps.md`.
+- Under-specified active phrases that are not ready for implementation until exact subcases are selected. Current examples are broader analyzer sweep-shape parity beyond the selected PF3 matrix and broader generated-code `missing_detectors` suffix analysis beyond the pinned honeycomb and toric examples, both logged in `docs/plans/milestone-spec-gaps.md`.
 - Deferred-only surfaces that must not block the current Rust and CLI beta closure, including Python binding ergonomics, JS/WASM, diagram and rendering APIs, ecosystem integrations, simulator-product APIs, GPU, exact random-stream parity, C++ header compatibility, deprecated `--detector_hypergraph`, `explain_errors`, and `repl`.
 
 The manifest-only PF rows remain extraction contracts, not implementation evidence.
@@ -70,12 +70,13 @@ The command was used here as a metadata/listing health check, not as a claim tha
 The next implementation slice should be selected from one of these active, source-owned gaps:
 
 - PFM4 folded DEM traversal: broader folded graphlike, hypergraph, SAT/WCNF, analyzer, matcher-adjacent, or sampled-error traversal work beyond the selected graphlike, hypergraph, ErrorMatcher filter DEM, SAT/WCNF, and sampler repeat folds already recorded, while preserving Stim-compatible unweighted shortest-error semantics and existing dense target caps.
-- PFM2 or PFM3 active parity slices: a selected transform, feedback, time-reversal, sweep-conditioned execution, analyzer sweep-shape, or legal-gate execution case with exact owned subcases and fail-closed unsupported shapes.
+- PFM2 or PFM3 active parity slices: a selected transform, feedback, time-reversal, sweep-conditioned execution, or legal-gate execution case with exact owned subcases and fail-closed unsupported shapes.
 - PFM5 detector utilities and flows: a named generated-code detector-utility slice, broader measurement-rich flow generator or solver diagnostic slice, or transform-integration slice with exact positive, negative, and resource-boundary tests.
 - PFM6 analyzer/search: a named true folded generated-loop analyzer-output slice, broader loop-folded decomposition family, broader generated search/SAT/WCNF family, or sparse-tracker analyzer/search consumption slice.
 
 Do not start from a whole upstream file.
 The next slice must name exact owned subcases, explicit rejections, comparator class, oracle rows, benchmark rows or no-benchmark rationale, and resource behavior before implementation.
+Do not select broader analyzer sweep-shape parity until a future plan names exact remaining gate-target shapes, comparator, CLI and Rust surfaces, oracle metadata, resource behavior, and benchmark policy.
 Do not select broader generated-code `missing_detectors` suffix analysis until a future plan names exact generated families, suffix comparators, resource behavior, oracle metadata, and benchmark policy.
 
 ## 2026-07-07 Addendum: PF1 Spec-Gap Closure
@@ -97,3 +98,14 @@ No additional generated-code `missing_detectors` suffix family is currently name
 The broader generated-code missing-detector suffix phrase is therefore now logged as an open under-specification in `docs/plans/milestone-spec-gaps.md`.
 Future agents should not implement or claim another generated-code missing-detector row until a plan selects exact generated families and suffix comparators.
 The existing report-only `pf5-missing-detectors-generated-code` benchmark remains scoped to the promoted honeycomb and toric workloads only.
+
+## 2026-07-07 Addendum: PFM3 Analyzer Sweep-Shape Boundary
+
+This addendum records a PFM3 scope correction discovered while selecting the next implementation slice after the generated missing-detector evidence lock.
+Pinned Stim v1.16.0 `src/stim/simulators/error_analyzer.test.cc` contains the narrow `ErrorAnalyzer, ignores_sweep_controls` case for `CNOT sweep[0] 0`.
+Current Stab evidence already promotes that case plus selected `CY`, `CZ`, `XCZ`, and `YCZ` no-ops, selected `CZ` sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, public `stab analyze_errors` behavior, and invalid controlled-Pauli target-position rejections.
+No additional analyzer sweep-shape family is currently named with exact gate-target shapes, expected no-op or rejection behavior, comparator, CLI or Rust surface, resource boundary, oracle row, or benchmark policy.
+
+The broader analyzer sweep-shape phrase is therefore now logged as an open under-specification in `docs/plans/milestone-spec-gaps.md`.
+Future agents should not implement or claim another analyzer sweep row until a plan selects exact remaining gate-target shapes and comparator policy.
+The existing report-only `pf3-analyze-errors-sweep` benchmark remains scoped to the promoted analyzer sweep-control and `CZ` classical-only matrix only.
