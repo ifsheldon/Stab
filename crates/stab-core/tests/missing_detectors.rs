@@ -1,6 +1,6 @@
 use stab_core::{
-    Circuit, Gate, MissingDetectorOptions, PauliBasis, PauliSign, PauliString, SingleQubitClifford,
-    missing_detectors,
+    Circuit, Gate, MissingDetectorOptions, PauliBasis, PauliSign, PauliString, RepeatBlock,
+    RepeatCount, SingleQubitClifford, missing_detectors,
 };
 
 fn missing_with_options(
@@ -38,6 +38,44 @@ fn require_missing_eq(
     if actual != expected {
         return Err(std::io::Error::other(format!(
             "{context}: expected {expected:?}, got {actual:?}"
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn require_missing_error_contains(
+    text: &str,
+    ignore_non_deterministic_measurements: bool,
+    expected_fragment: &str,
+    context: impl std::fmt::Display,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let circuit = Circuit::from_stim_str(text)?;
+    require_missing_circuit_error_contains(
+        &circuit,
+        ignore_non_deterministic_measurements,
+        expected_fragment,
+        context,
+    )
+}
+
+fn require_missing_circuit_error_contains(
+    circuit: &Circuit,
+    ignore_non_deterministic_measurements: bool,
+    expected_fragment: &str,
+    context: impl std::fmt::Display,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let Err(error) = missing_detectors(
+        circuit,
+        MissingDetectorOptions {
+            ignore_non_deterministic_measurements,
+        },
+    ) else {
+        return Err(std::io::Error::other(format!("expected {context} rejection")).into());
+    };
+    if !error.to_string().contains(expected_fragment) {
+        return Err(std::io::Error::other(format!(
+            "{context}: expected error containing {expected_fragment:?}, got {error}"
         ))
         .into());
     }
@@ -354,6 +392,67 @@ fn pf5_missing_detectors_repeat_folds_final_covered_deterministic_loop()
         true,
         "",
         "reset-prefix final repeat with local detector rows",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn pf5_missing_detectors_nested_final_repeat_folds_local_bodies()
+-> Result<(), Box<dyn std::error::Error>> {
+    require_missing_eq(
+        "REPEAT 1000001 {\n    REPEAT 2 {\n        M 0\n        DETECTOR rec[-1]\n    }\n}\n",
+        false,
+        "",
+        "known-input final repeat with bounded nested local detector rows",
+    )?;
+    require_missing_eq(
+        "REPEAT 1000001 {\n    REPEAT 2 {\n        M 0\n    }\n    DETECTOR rec[-1]\n    DETECTOR rec[-2]\n}\n",
+        false,
+        "",
+        "known-input final repeat with detector rows after bounded nested measurements",
+    )?;
+    Ok(())
+}
+
+fn over_depth_nested_repeat_circuit(depth: usize) -> Result<Circuit, Box<dyn std::error::Error>> {
+    let mut body = Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n")?;
+    for _ in 0..depth {
+        let mut wrapper = Circuit::new();
+        wrapper.append_repeat_block(RepeatBlock::new(RepeatCount::try_new(1)?, body, None));
+        body = wrapper;
+    }
+    let mut circuit = Circuit::new();
+    circuit.append_repeat_block(RepeatBlock::new(
+        RepeatCount::try_new(1_000_001)?,
+        body,
+        None,
+    ));
+    Ok(circuit)
+}
+
+#[test]
+fn pf5_missing_detectors_nested_final_repeat_keeps_unselected_bodies_capped()
+-> Result<(), Box<dyn std::error::Error>> {
+    require_missing_error_contains(
+        "REPEAT 1000001 {\n    REPEAT 2 {\n        M 0\n        DETECTOR rec[-1] rec[-2]\n    }\n}\n",
+        true,
+        "expanded repeat iterations",
+        "nested cross-iteration repeat",
+    )?;
+
+    require_missing_error_contains(
+        "REPEAT 1000001 {\n    REPEAT 1000001 {\n        M 0\n        DETECTOR rec[-1]\n    }\n}\n",
+        true,
+        "expanded repeat iterations",
+        "nested large-repeat",
+    )?;
+
+    let circuit = over_depth_nested_repeat_circuit(257)?;
+    require_missing_circuit_error_contains(
+        &circuit,
+        true,
+        "repeat nesting exceeds current limit",
+        "public API over-depth nested repeat",
     )?;
     Ok(())
 }

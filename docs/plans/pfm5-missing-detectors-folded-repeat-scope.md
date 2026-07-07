@@ -2,7 +2,7 @@
 
 ## Summary
 
-This PFM5 slice promotes one bounded proof of folded repeat traversal in the Rust `missing_detectors` utility.
+This PFM5 slice promoted the first bounded proof of folded repeat traversal in the Rust `missing_detectors` utility, and [pfm5-missing-detectors-nested-final-repeat-scope.md](pfm5-missing-detectors-nested-final-repeat-scope.md) extends that proof to bounded nested local repeat bodies.
 It does not claim general folded missing-detector output, generated-code suffix closure, Python API parity, or arbitrary repeat-contained flow solving.
 
 ## Owned Surface
@@ -18,7 +18,7 @@ It does not claim general folded missing-detector output, generated-code suffix 
 
 Stab should accept a final top-level `REPEAT` whose expanded count would exceed the current materialized repeat budget when all of the following are true:
 
-- The repeat has only bounded, flat body traversal in this slice.
+- The repeat has only flat body traversal from this original slice, or bounded nested local repeat body traversal from the follow-up nested-final-repeat slice.
 - Every measurement-record target inside the repeat body refers to a measurement produced inside the same repeat body iteration.
 - The repeat body contains no `OBSERVABLE_INCLUDE` instruction.
 - The bounded prefix has no missing-detector suffix before the repeat.
