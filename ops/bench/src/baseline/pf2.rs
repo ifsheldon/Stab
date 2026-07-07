@@ -339,7 +339,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures the scoped Rust Circuit::time_reversed_for_flows unitary subset; broader measurement-rich QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         "pf2-time-reverse-flow-measurement" => Some(
-            "contract-only: Stab measures the selected Rust Circuit::time_reversed_for_flows measurement-rich instruction, selected MZZ plus plain-unitary suffix, measurement-ordering, plain unique-target reset-to-measurement, measurement-to-reset, and unique-target measure-reset subset including inverted result targets; broader QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures the selected Rust Circuit::time_reversed_for_flows measurement-rich instruction, selected MZZ plus plain-unitary suffix, measurement-ordering, plain reset-to-measurement over one or more unique qubit targets, measurement-to-reset, and measure-reset over one or more unique qubit targets including inverted result targets; broader QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         _ => None,
     }

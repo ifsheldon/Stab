@@ -57,8 +57,9 @@ pub fn circuit_inverse_qec(circuit: &Circuit) -> CircuitResult<Circuit> {
 /// This additive API validates that every provided unsigned flow is satisfied by
 /// the original circuit, returns the selected QEC inverse subset, and swaps each
 /// flow's input and output Pauli terms. The measurement-rich subset is limited
-/// to one noiseless plain unique-target measurement group, selected plain
-/// unique-target reset, selected unique-target measure-reset instruction, or
+/// to one noiseless plain unique-target measurement instruction group, one
+/// selected plain reset instruction over one or more unique qubit targets, one
+/// selected measure-reset instruction over one or more unique qubit targets, or
 /// one noiseless plain `MZZ` group followed by plain-qubit unitary instructions;
 /// detectors, feedback, noise, repeats, and broader multi-instruction QEC
 /// rewrites remain deferred.
@@ -577,7 +578,7 @@ fn has_classical_flow_terms(flows: &[Flow]) -> bool {
 
 fn measurement_rich_time_reversal_error() -> CircuitError {
     CircuitError::invalid_tableau_conversion(
-        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain unique-target measurement instruction group from M, MX, MY, MXX, MYY, or MZZ, one noiseless plain unique-target reset instruction from R, RX, or RY, one noiseless unique-target measure-reset instruction from MR, MRX, or MRY, or one noiseless plain MZZ group followed by plain-qubit unitary instructions; detectors, feedback, noise, repeats, and broader multi-instruction rewrites remain unsupported",
+        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain unique-target measurement instruction group from M, MX, MY, MXX, MYY, or MZZ, one noiseless plain reset instruction from R, RX, or RY over one or more unique qubit targets, one noiseless measure-reset instruction from MR, MRX, or MRY over one or more unique qubit targets including inverted result targets, or one noiseless plain MZZ group followed by plain-qubit unitary instructions; detectors, feedback, noise, repeats, and broader multi-instruction rewrites remain unsupported",
     )
 }
 
