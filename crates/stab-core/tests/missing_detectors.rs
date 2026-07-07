@@ -343,6 +343,74 @@ fn pf5_missing_detectors_spp_rejects_anti_hermitian_unitary_products()
 }
 
 #[test]
+fn pf5_missing_detectors_mpad_measurement_pads_match_pinned_stim()
+-> Result<(), Box<dyn std::error::Error>> {
+    for ignore_non_deterministic_measurements in [true, false] {
+        require_missing_eq(
+            "MPAD 0\n",
+            ignore_non_deterministic_measurements,
+            "DETECTOR rec[-1]\n",
+            format!("MPAD 0 ignore_non_deterministic={ignore_non_deterministic_measurements}"),
+        )?;
+        require_missing_eq(
+            "MPAD 1\n",
+            ignore_non_deterministic_measurements,
+            "DETECTOR rec[-1]\n",
+            format!("MPAD 1 ignore_non_deterministic={ignore_non_deterministic_measurements}"),
+        )?;
+        require_missing_eq(
+            "MPAD 0 1\n",
+            ignore_non_deterministic_measurements,
+            "DETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+            format!(
+                "multi-target MPAD ignore_non_deterministic={ignore_non_deterministic_measurements}"
+            ),
+        )?;
+        require_missing_eq(
+            "MPAD(0.5) 0\n",
+            ignore_non_deterministic_measurements,
+            "DETECTOR rec[-1]\n",
+            format!(
+                "probabilistic MPAD ignore_non_deterministic={ignore_non_deterministic_measurements}"
+            ),
+        )?;
+        require_missing_eq(
+            "MPAD 0\nDETECTOR rec[-1]\n",
+            ignore_non_deterministic_measurements,
+            "",
+            format!(
+                "covered MPAD detector ignore_non_deterministic={ignore_non_deterministic_measurements}"
+            ),
+        )?;
+        require_missing_eq(
+            "MPAD 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+            ignore_non_deterministic_measurements,
+            "",
+            format!(
+                "covered MPAD observable ignore_non_deterministic={ignore_non_deterministic_measurements}"
+            ),
+        )?;
+        require_missing_eq(
+            "MPAD 0 1\nDETECTOR rec[-2] rec[-1]\n",
+            ignore_non_deterministic_measurements,
+            "DETECTOR rec[-2]\n",
+            format!(
+                "MPAD row cleanup ignore_non_deterministic={ignore_non_deterministic_measurements}"
+            ),
+        )?;
+        require_missing_eq(
+            "REPEAT 2 {\n    MPAD 0\n}\n",
+            ignore_non_deterministic_measurements,
+            "DETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+            format!(
+                "repeated MPAD ignore_non_deterministic={ignore_non_deterministic_measurements}"
+            ),
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
 fn pf5_missing_detectors_repeat_tracks_deterministic_measurements()
 -> Result<(), Box<dyn std::error::Error>> {
     require_missing_eq(
@@ -496,7 +564,7 @@ fn pf5_missing_detectors_repeat_keeps_unselected_large_repeats_capped()
             "REPEAT 1000001 {\n    SHIFT_COORDS(1)\n}\n",
         ),
         (
-            "unsupported measurement pad",
+            "capped measurement pad",
             "REPEAT 1000001 {\n    MPAD 0\n}\n",
         ),
     ] {

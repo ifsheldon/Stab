@@ -84,6 +84,7 @@ impl MissingDetectorFinder {
             "MRX" => self.process_measurement(instruction, PauliBasis::X, true),
             "MRY" => self.process_measurement(instruction, PauliBasis::Y, true),
             "MPP" => self.process_mpp(instruction),
+            "MPAD" => self.process_mpad(instruction),
             "MXX" => self.process_pair_measurement(instruction, PauliBasis::X),
             "MYY" => self.process_pair_measurement(instruction, PauliBasis::Y),
             "MZZ" => self.process_pair_measurement(instruction, PauliBasis::Z),
@@ -218,6 +219,23 @@ impl MissingDetectorFinder {
             }
             let (terms, inverted) = normalize_pauli_product_terms(raw_terms)?;
             self.record_measurement(terms, inverted)?;
+        }
+        Ok(())
+    }
+
+    fn process_mpad(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        for target in instruction.targets() {
+            let pad = target.qubit_id().ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "MPAD target {target} is not a measurement pad"
+                ))
+            })?;
+            if pad.get() > 1 || target.is_inverted_result_target() {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "MPAD target {target} is not a measurement pad"
+                )));
+            }
+            self.record_measurement(Vec::new(), pad.get() != 0)?;
         }
         Ok(())
     }

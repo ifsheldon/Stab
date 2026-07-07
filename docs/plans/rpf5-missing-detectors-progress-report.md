@@ -6,6 +6,7 @@ This RPF5 slice promotes the Rust `missing_detectors` utility beyond the M9 basi
 It adds Gaussian row reduction over detector and observable rows plus a scoped internal stabilizer-invariant tracker for deterministic reset, measurement, MPP, and pair-measurement cases.
 It also promotes tableau-backed single-qubit and fixed two-qubit Clifford propagation for plain qubit target groups.
 It also promotes `SPP` and `SPP_DAG` unitary Pauli-product instructions by analyzing their existing decomposition into the supported Clifford subset.
+It also promotes `MPAD` measurement-pad records for missing-detector suggestions, including deterministic and probabilistic pad records, detector or observable coverage, Gaussian cleanup, and bounded repeat traversal.
 It also promotes bounded repeat traversal with explicit expansion caps for the current materialized Rust utility surface plus a selected folded final-repeat fast path for covered deterministic measurement loops, including bounded nested local repeat bodies, that prove an empty suffix without materializing every iteration.
 It is not an RPF5 completion report because broader folded large-repeat traversal beyond the selected final-repeat empty-suffix cases, public measurement-rich flow solving, and transform integration remain active work.
 Broader generated-code missing-detector suffix analysis beyond the pinned honeycomb and toric cases is locked by [pfm5-missing-detectors-generated-boundary-scope.md](pfm5-missing-detectors-generated-boundary-scope.md) and remains under-specified until a future plan names exact generated families and suffix comparators.
@@ -19,6 +20,7 @@ Broader generated-code missing-detector suffix analysis beyond the pinned honeyc
 - The pinned Stim big honeycomb-code and toric global-stabilizer generated-code suffix cases are promoted under unknown-input semantics.
 - Tableau-backed single-qubit Clifford gates, fixed two-qubit Clifford gates, and SWAP-family gates propagate tracked invariants when their target groups are plain qubit targets.
 - `SPP` and `SPP_DAG` unitary Pauli-product gates reuse the existing single-instruction decomposition path, so supported Hermitian Pauli products are analyzed equivalently to their decomposed `H`/`S`/`CX` circuit and anti-Hermitian products fail closed with a domain error.
+- `MPAD` measurement-pad records produce missing-detector suggestions for uncovered deterministic and probabilistic pad records, and existing detector or record-only observable rows reduce them like pinned Stim.
 - Repeat blocks are traversed by bounded materialized expansion, with explicit rejection for excessive expanded work units or repeat iterations before traversal mutates analysis state; `SPP` and `SPP_DAG` instructions are charged by their decomposed work in this budget.
 - Ordinary noise gates are ignored by this diagnostic utility for the promoted cases, while unsupported gates and non-plain unitary target groups still fail closed.
 
@@ -41,6 +43,7 @@ Implemented Rust tests:
 - `pf5_missing_detectors_spp_has_pinned_outputs`
 - `pf5_missing_detectors_spp_supports_unitary_products`
 - `pf5_missing_detectors_spp_rejects_anti_hermitian_unitary_products`
+- `pf5_missing_detectors_mpad_measurement_pads_match_pinned_stim`
 - `pf5_missing_detectors_repeat_tracks_deterministic_measurements`
 - `pf5_missing_detectors_repeat_handles_nested_rows_and_known_rows`
 - `pf5_missing_detectors_repeat_folds_final_covered_deterministic_loop`
@@ -49,7 +52,7 @@ Implemented Rust tests:
 - `pf5_missing_detectors_repeat_keeps_unselected_large_repeats_capped`
 - `pf5_missing_detectors_repeat_rejects_excessive_expansion`
 
-These tests cover Gaussian cleanup for multi-record detector rows, repeated MPP stabilizer-product constraints, unknown-input behavior, record-only observable rows, ignored Pauli observable rows, the promoted honeycomb and toric generated-code suffixes, all single-qubit Clifford gates, every canonical fixed two-qubit tableau gate, hand-pinned non-self-inverse `S`, signed `ISWAP_DAG`, exact expected outputs for representative `SPP`, `SPP_DAG`, inverted, multi-group, and unknown-input cases, `SPP` and `SPP_DAG` parity against explicit decomposition for complex products, anti-Hermitian `SPP` and `SPP_DAG` rejection, nondeterministic post-Clifford measurement cases, bounded repeat traversal through deterministic measurements, nested repeats, known detector and observable rows after repeats, selected folded final-repeat traversal for covered deterministic measurement loops with body-local record references, bounded nested local repeat bodies, detector rows after nested bounded measurements, and unchanged tracker state, fallback rejection for cross-iteration record references, nested cross-iteration record references, observable rows, unsupported local bodies, tracker-changing repeated bodies, nested large repeats, excessive repeat rejection including decomposed `SPP` repeat work, and fail-closed behavior for non-plain unitary targets.
+These tests cover Gaussian cleanup for multi-record detector rows, repeated MPP stabilizer-product constraints, unknown-input behavior, record-only observable rows, ignored Pauli observable rows, `MPAD` measurement-pad suggestions for deterministic and probabilistic pad records, detector and observable coverage of `MPAD` records, the promoted honeycomb and toric generated-code suffixes, all single-qubit Clifford gates, every canonical fixed two-qubit tableau gate, hand-pinned non-self-inverse `S`, signed `ISWAP_DAG`, exact expected outputs for representative `SPP`, `SPP_DAG`, inverted, multi-group, and unknown-input cases, `SPP` and `SPP_DAG` parity against explicit decomposition for complex products, anti-Hermitian `SPP` and `SPP_DAG` rejection, nondeterministic post-Clifford measurement cases, bounded repeat traversal through deterministic measurements and measurement pads, nested repeats, known detector and observable rows after repeats, selected folded final-repeat traversal for covered deterministic measurement loops with body-local record references, bounded nested local repeat bodies, detector rows after nested bounded measurements, and unchanged tracker state, fallback rejection for cross-iteration record references, nested cross-iteration record references, observable rows, unsupported local bodies, tracker-changing repeated bodies, nested large repeats, excessive repeat rejection including decomposed `SPP` repeat work, and fail-closed behavior for non-plain unitary targets.
 
 ## Oracle Rows
 
@@ -61,6 +64,7 @@ Implemented rows:
 - `pf5-missing-detectors-generated-toric-rust`
 - `pf5-missing-detectors-clifford-rust`
 - `pf5-missing-detectors-spp-rust`
+- `pf5-missing-detectors-mpad-rust`
 - `pf5-missing-detectors-repeat-rust`
 - `pf5-missing-detectors-nested-final-repeat-rust`
 
@@ -73,14 +77,16 @@ Still broad and manifest-only:
 Report-only runner coverage:
 
 - `pf5-missing-detectors-mpp`
+- `pf5-missing-detectors-mpad`
 - `pf5-missing-detectors-generated-code`
 
-The row measures the promoted MPP and observable-row workload through the Rust public utility API.
+The MPP row measures the promoted MPP and observable-row workload through the Rust public utility API.
+The MPAD row measures the promoted measurement-pad workload through the Rust public utility API.
 The generated-code row measures the promoted honeycomb and toric generated-code suffix workloads through the Rust public utility API.
 No additional generated-code suffix benchmark row should be added until broader generated-code missing-detector subcases are specified with exact workloads.
-Both rows remain `non-primary-report-only` because pinned Stim does not provide a faithful CLI timing ratio for this Rust utility surface.
+These rows remain `non-primary-report-only` because pinned Stim does not provide a faithful CLI timing ratio for this Rust utility surface.
 They are not part of the 1.25x primary threshold file.
-The `SPP` and `SPP_DAG` slice is structural parity work that reuses the existing decomposition path and is not separately benchmarked; the generated-code row remains the performance-oriented missing-detectors workload.
+The `SPP` and `SPP_DAG` slice is structural parity work that reuses the existing decomposition path and is not separately benchmarked; the MPAD row covers the selected measurement-pad workload and the generated-code row remains the performance-oriented generated-code workload.
 The bounded and selected folded final-repeat traversal slices are structural resource-boundary work and are not separately benchmarked.
 
 ## Evidence Repair
@@ -134,9 +140,10 @@ cargo test -p stab-core missing_detectors --quiet
 cargo test -p stab-core --test missing_detectors --quiet
 cargo test -p stab-core --test missing_detectors pf5_missing_detectors_clifford --quiet
 cargo test -p stab-core --test missing_detectors pf5_missing_detectors_spp --quiet
+cargo test -p stab-core --test missing_detectors pf5_missing_detectors_mpad --quiet
 cargo test -p stab-core --test missing_detectors pf5_missing_detectors_repeat --quiet
 cargo test -p stab-core --test missing_detectors pf5_missing_detectors_nested_final_repeat --quiet
-cargo test -p stab-bench pf5::detector_utility_benchmark_rows_have_stab_compare_runners --quiet
+cargo test -p stab-bench detector_utility_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-bench --quiet
 cargo test -p stab-oracle fixtures --quiet
 cargo clippy -p stab-core -p stab-bench --all-targets -- -D warnings
@@ -182,3 +189,12 @@ Local milestone-audit for the bounded nested final-repeat slice found two P2 iss
 The implementation now validates the prefix and one bounded final-repeat body before recursive fold eligibility checks, adds a public-API over-depth nested-repeat regression, splits the nested-final cases into `pf5_missing_detectors_nested_final_repeat_` tests, and adds `pf5-missing-detectors-nested-final-repeat-rust` as focused oracle evidence.
 Full-code-review used GPT-5.5/xhigh sidecars for Rust compatibility and docs or oracle evidence; no P0 or P1 findings were reported, and the P2 findings above are fixed.
 No remaining P0, P1, or P2 findings are known for this bounded nested final-repeat slice.
+
+Local milestone-audit for the selected MPAD measurement-pad slice found the scope complete after confirming the implementation, focused integration test, oracle row, report-only benchmark row, and docs all target only the selected `missing_detectors` MPAD utility behavior.
+The audit found no new under-specification requiring a new entry; the existing broader `missing_detectors` utility boundary entry now includes MPAD in the promoted evidence list.
+
+Full-code-review used GPT-5.5/xhigh sidecars for Rust or benchmark evidence and docs or oracle alignment.
+The Rust or benchmark sidecar found no P0, P1, or P2 issues and confirmed the MPAD expected outputs against pinned Stim v1.16.0; its watch-list note about `ops/bench/src/baseline/tests.rs` growing near 1200 lines was handled by placing the new PF5 runner expectation in `ops/bench/src/baseline/tests/pf5.rs`.
+The docs or oracle sidecar found three P2 alignment issues: the scope note described the structural oracle row as an exact comparator, the manifest-only PF5 missing-detectors rollup omitted MPAD, and the broader utility spec-gap entry omitted MPAD from the promoted evidence list.
+The scope note, oracle manifest rollup, and spec-gap entry now use aligned structural-parity wording and name MPAD as promoted evidence.
+No remaining P0, P1, or P2 findings are known for this MPAD measurement-pad slice.

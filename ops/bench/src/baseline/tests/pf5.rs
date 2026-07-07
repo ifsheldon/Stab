@@ -51,6 +51,15 @@ fn detector_utility_benchmark_rows_have_stab_compare_runners() {
             ][..],
         ),
         (
+            "pf5-missing-detectors-mpad",
+            "src/stim/util_top/missing_detectors.test.cc",
+            "missing-detectors-mpad",
+            &[
+                "stab_pf5_missing_detectors_mpad_cases",
+                "stab_pf5_missing_detectors_mpad_suggestions",
+            ][..],
+        ),
+        (
             "pf5-missing-detectors-generated-code",
             "src/stim/util_top/missing_detectors.test.cc",
             "missing-detectors-generated",

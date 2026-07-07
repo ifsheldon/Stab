@@ -20,6 +20,8 @@ const BASIC_CASES: usize = 10;
 const BASIC_SUGGESTIONS: usize = 4;
 const MPP_CASES: usize = 4;
 const MPP_SUGGESTIONS: usize = 3;
+const MPAD_CASES: usize = 8;
+const MPAD_SUGGESTIONS: usize = 8;
 const GENERATED_CASES: usize = 2;
 const GENERATED_SUGGESTIONS: usize = 2;
 const HONEYCOMB_MISSING_DETECTOR: &str = include_str!(
@@ -37,6 +39,13 @@ pub(super) fn run_mpp_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, Benc
     Ok(vec![
         measure_mpp(row, "stab_pf5_missing_detectors_mpp_cases")?,
         measure_mpp(row, "stab_pf5_missing_detectors_mpp_suggestions")?,
+    ])
+}
+
+pub(super) fn run_mpad_batch(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    Ok(vec![
+        measure_mpad(row, "stab_pf5_missing_detectors_mpad_cases")?,
+        measure_mpad(row, "stab_pf5_missing_detectors_mpad_suggestions")?,
     ])
 }
 
@@ -61,6 +70,12 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf5-missing-detectors-mpp", "stab_pf5_missing_detectors_mpp_suggestions") => {
             Some(((UTILITY_BATCH * MPP_SUGGESTIONS) as f64, "suggestions/s"))
         }
+        ("pf5-missing-detectors-mpad", "stab_pf5_missing_detectors_mpad_cases") => {
+            Some(((UTILITY_BATCH * MPAD_CASES) as f64, "cases/s"))
+        }
+        ("pf5-missing-detectors-mpad", "stab_pf5_missing_detectors_mpad_suggestions") => {
+            Some(((UTILITY_BATCH * MPAD_SUGGESTIONS) as f64, "suggestions/s"))
+        }
         ("pf5-missing-detectors-generated-code", "stab_pf5_missing_detectors_generated_cases") => {
             Some(((GENERATED_BATCH * GENERATED_CASES) as f64, "cases/s"))
         }
@@ -82,6 +97,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf5-missing-detectors-mpp" => Some(
             "report-only: Stab measures the Rust missing-detectors MPP and observable row-reduction subset without a faithful pinned Stim CLI timing ratio",
+        ),
+        "pf5-missing-detectors-mpad" => Some(
+            "report-only: Stab measures the Rust missing-detectors MPAD measurement-pad subset without a faithful pinned Stim CLI timing ratio",
         ),
         "pf5-missing-detectors-generated-code" => Some(
             "report-only: Stab measures the Rust missing-detectors generated-code honeycomb and toric suffix subset without a faithful pinned Stim CLI timing ratio",
@@ -111,6 +129,18 @@ fn measure_mpp(
         measurement_name,
         mpp_corpus(&row.id)?,
         "missing-detectors MPP benchmark suggestion count overflowed",
+    )
+}
+
+fn measure_mpad(
+    row: &BenchmarkRow,
+    measurement_name: &'static str,
+) -> Result<Measurement, BenchError> {
+    measure_cases(
+        row,
+        measurement_name,
+        mpad_corpus(&row.id)?,
+        "missing-detectors MPAD benchmark suggestion count overflowed",
     )
 }
 
@@ -253,6 +283,22 @@ fn mpp_corpus(row_id: &str) -> Result<Vec<(Circuit, bool)>, BenchError> {
              OBSERVABLE_INCLUDE(0) rec[-3]\n",
             true,
         ),
+    ]
+    .into_iter()
+    .map(|(text, ignore)| parse_circuit(row_id, text).map(|circuit| (circuit, ignore)))
+    .collect()
+}
+
+fn mpad_corpus(row_id: &str) -> Result<Vec<(Circuit, bool)>, BenchError> {
+    [
+        ("MPAD 0\n", true),
+        ("MPAD 1\n", false),
+        ("MPAD 0 1\n", true),
+        ("MPAD(0.5) 0\n", true),
+        ("MPAD 0\nDETECTOR rec[-1]\n", true),
+        ("MPAD 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n", true),
+        ("MPAD 0 1\nDETECTOR rec[-2] rec[-1]\n", true),
+        ("REPEAT 2 {\n    MPAD 0\n}\n", false),
     ]
     .into_iter()
     .map(|(text, ignore)| parse_circuit(row_id, text).map(|circuit| (circuit, ignore)))
