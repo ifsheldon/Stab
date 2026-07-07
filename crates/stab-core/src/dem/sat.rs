@@ -283,16 +283,11 @@ fn sat_problem_as_wcnf_string(
     model: &DetectorErrorModel,
     mode: SatProblemMode,
 ) -> CircuitResult<String> {
-    let include_zero_probability_errors = mode.includes_zero_probability_errors();
     let errors = flattened_error_instructions(model, mode)?;
     if errors.is_empty() {
         return Ok(UNSAT_WDIMACS.to_string());
     }
-    let (detector_count, observable_count) = if include_zero_probability_errors {
-        (model.count_detectors()?, model.count_observables()?)
-    } else {
-        flattened_error_target_counts(&errors)?
-    };
+    let (detector_count, observable_count) = flattened_error_target_counts(&errors)?;
     if observable_count == 0 {
         return Ok(UNSAT_WDIMACS.to_string());
     }

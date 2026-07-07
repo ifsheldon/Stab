@@ -117,29 +117,44 @@ fn pf4_dem_search_skips_annotation_only_repeat_bodies() {
     .unwrap();
     let compact = DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n").unwrap();
 
+    assert_search_and_sat_match_compact(&annotation_only_repeat, &compact);
+}
+
+#[test]
+fn pf4_dem_search_skips_high_id_annotation_only_repeat_bodies() {
+    let annotation_only_repeat = DetectorErrorModel::from_dem_str(
+        "repeat 100001 {\n    detector(2, 3) D1000001\n    logical_observable L1000001\n    shift_detectors(5, 7) 0\n    repeat 100001 {\n        detector(11) D1000002\n        logical_observable L1000002\n        shift_detectors 0\n    }\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n",
+    )
+    .unwrap();
+    let compact = DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n").unwrap();
+
+    assert_search_and_sat_match_compact(&annotation_only_repeat, &compact);
+}
+
+fn assert_search_and_sat_match_compact(model: &DetectorErrorModel, compact: &DetectorErrorModel) {
     assert_eq!(
-        shortest_graphlike_undetectable_logical_error(&annotation_only_repeat, false)
+        shortest_graphlike_undetectable_logical_error(model, false)
             .unwrap()
             .to_dem_string(),
-        shortest_graphlike_undetectable_logical_error(&compact, false)
+        shortest_graphlike_undetectable_logical_error(compact, false)
             .unwrap()
             .to_dem_string()
     );
     assert_eq!(
-        find_undetectable_logical_error(&annotation_only_repeat, usize::MAX, usize::MAX, false)
+        find_undetectable_logical_error(model, usize::MAX, usize::MAX, false)
             .unwrap()
             .to_dem_string(),
-        find_undetectable_logical_error(&compact, usize::MAX, usize::MAX, false)
+        find_undetectable_logical_error(compact, usize::MAX, usize::MAX, false)
             .unwrap()
             .to_dem_string()
     );
     assert_eq!(
-        shortest_error_sat_problem(&annotation_only_repeat).unwrap(),
-        shortest_error_sat_problem(&compact).unwrap()
+        shortest_error_sat_problem(model).unwrap(),
+        shortest_error_sat_problem(compact).unwrap()
     );
     assert_eq!(
-        likeliest_error_sat_problem(&annotation_only_repeat, 10).unwrap(),
-        likeliest_error_sat_problem(&compact, 10).unwrap()
+        likeliest_error_sat_problem(model, 10).unwrap(),
+        likeliest_error_sat_problem(compact, 10).unwrap()
     );
 }
 
