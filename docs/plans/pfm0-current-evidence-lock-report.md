@@ -121,3 +121,13 @@ Oracle row `pf4-dem-validation-negative-rust` now names raw numeric error target
 The correct next step is not to add graphlike or hypergraph traversal for those malformed shapes.
 Future PFM4 search traversal work should select valid DEM repeat bodies with detector or logical-observable targets, explicit comparator policy, oracle rows, benchmark rows or a no-benchmark rationale, and resource behavior.
 The boundary is locked in `docs/plans/pfm4-dem-search-invalid-target-boundary-scope.md`.
+
+## 2026-07-07 Addendum: PFM2 Duplicate Measurement-Rich Time-Reversal Targets
+
+This addendum records a PFM2 and PFM5 compatibility boundary for duplicate-target measurement-rich `time_reversed_for_flows`.
+The selected measurement-rich time-reversal subset supports unique-target reset and measure-reset groups, including inverted measure-reset result targets, but rejects duplicate reset-only and duplicate measure-reset groups.
+`time_reversed_for_flows_measurement_rich_subset_rejects_duplicate_reset_targets` and `time_reversed_for_flows_measurement_rich_subset_rejects_duplicate_measure_reset_targets` are the source-owned fail-closed evidence, selected by oracle row `pf2-time-reverse-flow-measurement-rust`.
+
+Pinned Stim v1.16.0 probing recorded in `docs/plans/rpf5-flow-progress-report.md` returned malformed out-of-range inverse flows for duplicate reset-only and duplicate measure-reset examples.
+Future work should not clone that behavior or silently "fix" it without a compatibility decision that chooses bug-compatible malformed flows, corrected semantic flows, or permanent rejection.
+The current boundary is locked in `docs/plans/pfm2-time-reverse-duplicate-target-boundary-scope.md`.
