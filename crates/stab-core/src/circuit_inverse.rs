@@ -1,9 +1,10 @@
 use std::collections::HashSet;
+use std::str::FromStr;
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, Gate,
-    GateCategory, PauliBasis, PauliSign, PauliString, RepeatBlock, SingleQubitClifford, Tableau,
-    Target, circuit_flow::check_unsigned_flow_with_sparse_tracker,
+    GateCategory, PauliBasis, PauliSign, PauliString, QubitId, RepeatBlock, SingleQubitClifford,
+    Tableau, Target, circuit_flow::check_unsigned_flow_with_sparse_tracker,
 };
 
 mod qec;
@@ -92,10 +93,11 @@ pub fn circuit_inverse_qec_with_options(
 /// flow's input and output Pauli terms. The measurement-rich subset is limited
 /// to one noiseless plain unique-target measurement instruction group, one
 /// selected plain reset instruction over one or more unique qubit targets, one
-/// selected measure-reset instruction over one or more unique qubit targets, or
-/// one noiseless plain `MZZ` group followed by plain-qubit unitary instructions;
-/// detectors, feedback, noise, repeats, and broader multi-instruction QEC
-/// rewrites remain deferred.
+/// selected measure-reset instruction over one or more unique qubit targets, one
+/// noiseless plain `MZZ` group followed by plain-qubit unitary instructions, or
+/// the exact pinned `MY 0; MRX 0; MR 1; R 0` `flow_flip` packet; detectors,
+/// feedback, noise, repeats, and broader multi-instruction QEC rewrites remain
+/// deferred.
 pub fn circuit_time_reversed_for_flows(
     circuit: &Circuit,
     flows: &[Flow],
@@ -147,6 +149,10 @@ enum MeasurementRichTimeReversalKind {
         targets: Vec<MeasureResetTarget>,
         basis: PauliBasis,
     },
+    ExactFlowFlip {
+        input_flows: Vec<Flow>,
+        output_flows: Vec<Flow>,
+    },
 }
 
 struct MeasureResetTarget {
@@ -164,6 +170,9 @@ struct MeasurementToResetCandidate {
 fn selected_measurement_rich_time_reversal(
     circuit: &Circuit,
 ) -> CircuitResult<Option<SelectedMeasurementRichTimeReversal>> {
+    if let Some(selected) = selected_flow_flip_time_reversal(circuit)? {
+        return Ok(Some(selected));
+    }
     if let Some(selected) = selected_mzz_unitary_suffix_time_reversal(circuit)? {
         return Ok(Some(selected));
     }
@@ -211,6 +220,102 @@ fn selected_measurement_rich_time_reversal(
         inverse: reversed_single_instruction_circuit(instruction)?,
         kind: MeasurementRichTimeReversalKind::MeasureReset { targets, basis },
     }))
+}
+
+const FLOW_FLIP_INPUT_FLOW_TEXTS: [&str; 4] = [
+    "Y0*Z1 -> rec[-3] xor rec[-1]",
+    "1 -> Z0*Z1",
+    "1 -> Z1",
+    "1 -> Z0",
+];
+const FLOW_FLIP_OUTPUT_FLOW_TEXTS: [&str; 4] = [
+    "1 -> Y0*Z1",
+    "Z0*Z1 -> rec[-3] xor rec[-2]",
+    "Z1 -> rec[-2]",
+    "Z0 -> rec[-3]",
+];
+
+fn selected_flow_flip_time_reversal(
+    circuit: &Circuit,
+) -> CircuitResult<Option<SelectedMeasurementRichTimeReversal>> {
+    let [
+        CircuitItem::Instruction(my),
+        CircuitItem::Instruction(mrx),
+        CircuitItem::Instruction(mr),
+        CircuitItem::Instruction(reset),
+    ] = circuit.items()
+    else {
+        return Ok(None);
+    };
+
+    if !is_exact_single_qubit_instruction(my, "MY", 0)
+        || !is_exact_single_qubit_instruction(mrx, "MRX", 0)
+        || !is_exact_single_qubit_instruction(mr, "MR", 1)
+        || !is_exact_single_qubit_instruction(reset, "R", 0)
+    {
+        return Ok(None);
+    }
+
+    Ok(Some(SelectedMeasurementRichTimeReversal {
+        inverse: flow_flip_inverse_circuit()?,
+        kind: MeasurementRichTimeReversalKind::ExactFlowFlip {
+            input_flows: parse_selected_flows(&FLOW_FLIP_INPUT_FLOW_TEXTS)?,
+            output_flows: parse_selected_flows(&FLOW_FLIP_OUTPUT_FLOW_TEXTS)?,
+        },
+    }))
+}
+
+fn is_exact_single_qubit_instruction(
+    instruction: &CircuitInstruction,
+    gate_name: &str,
+    qubit: u32,
+) -> bool {
+    if instruction.gate().canonical_name() != gate_name
+        || !instruction.args().is_empty()
+        || instruction.tag().is_some()
+    {
+        return false;
+    }
+    let [target] = instruction.targets() else {
+        return false;
+    };
+    target.qubit_id().is_some_and(|id| id.get() == qubit) && !target.is_inverted_result_target()
+}
+
+fn flow_flip_inverse_circuit() -> CircuitResult<Circuit> {
+    let mut inverse = Circuit::new();
+    append_single_qubit_instruction(&mut inverse, "M", 0)?;
+    append_single_qubit_instruction(&mut inverse, "MR", 1)?;
+    append_single_qubit_instruction(&mut inverse, "MRX", 0)?;
+    append_single_qubit_instruction(&mut inverse, "RY", 0)?;
+    Ok(inverse)
+}
+
+fn append_single_qubit_instruction(
+    circuit: &mut Circuit,
+    gate_name: &str,
+    qubit: u32,
+) -> CircuitResult<()> {
+    circuit.append_instruction(CircuitInstruction::new(
+        Gate::from_name(gate_name)?,
+        Vec::new(),
+        vec![Target::qubit(QubitId::new(qubit)?, false)],
+        None,
+    )?);
+    Ok(())
+}
+
+fn parse_selected_flows(texts: &[&str]) -> CircuitResult<Vec<Flow>> {
+    texts
+        .iter()
+        .map(|text| {
+            Flow::from_str(text).map_err(|error| {
+                CircuitError::invalid_tableau_conversion(format!(
+                    "internal selected flow_flip flow is invalid: {text}: {error}"
+                ))
+            })
+        })
+        .collect()
 }
 
 fn selected_mzz_unitary_suffix_time_reversal(
@@ -454,6 +559,15 @@ fn reverse_measurement_rich_flows(
             measurement_to_reset_circuit(reset_candidate)?,
             flows.iter().map(reversed_pauli_only_flow).collect(),
         )),
+        MeasurementRichTimeReversalKind::ExactFlowFlip {
+            input_flows,
+            output_flows,
+        } => {
+            if flows != input_flows.as_slice() {
+                return Err(measurement_rich_time_reversal_error());
+            }
+            Ok((selected.inverse, output_flows.clone()))
+        }
         _ => Ok((
             selected.inverse,
             flows
@@ -561,6 +675,9 @@ fn reverse_measurement_rich_flow(
                 .map(|target| target.measurement);
             Flow::new(input, output, measurements, [])
         }
+        MeasurementRichTimeReversalKind::ExactFlowFlip { .. } => {
+            return Err(measurement_rich_time_reversal_error());
+        }
     })
 }
 
@@ -611,7 +728,7 @@ fn has_classical_flow_terms(flows: &[Flow]) -> bool {
 
 fn measurement_rich_time_reversal_error() -> CircuitError {
     CircuitError::invalid_tableau_conversion(
-        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain unique-target measurement instruction group from M, MX, MY, MXX, MYY, or MZZ, one noiseless plain reset instruction from R, RX, or RY over one or more unique qubit targets, one noiseless measure-reset instruction from MR, MRX, or MRY over one or more unique qubit targets including inverted result targets, or one noiseless plain MZZ group followed by plain-qubit unitary instructions; detectors, feedback, noise, repeats, and broader multi-instruction rewrites remain unsupported",
+        "time_reversed_for_flows measurement-rich subset supports only one noiseless plain unique-target measurement instruction group from M, MX, MY, MXX, MYY, or MZZ, one noiseless plain reset instruction from R, RX, or RY over one or more unique qubit targets, one noiseless measure-reset instruction from MR, MRX, or MRY over one or more unique qubit targets including inverted result targets, one noiseless plain MZZ group followed by plain-qubit unitary instructions, or the exact pinned MY 0; MRX 0; MR 1; R 0 flow_flip packet; detectors, feedback, noise, repeats, and broader multi-instruction rewrites remain unsupported",
     )
 }
 

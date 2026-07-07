@@ -815,6 +815,102 @@ fn time_reversed_for_flows_measurement_rich_subset_reverses_multi_target_resets(
 }
 
 #[test]
+fn time_reversed_for_flows_measurement_rich_subset_supports_flow_flip() {
+    // Adapted from Stim v1.16.0 circuit_inverse_qec flow_flip coverage.
+    let input = circuit(
+        "
+        MY 0
+        MRX 0
+        MR 1
+        R 0
+    ",
+    );
+    let input_flows = [
+        flow("Y0*Z1 -> rec[-3] xor rec[-1]"),
+        flow("1 -> Z0*Z1"),
+        flow("1 -> Z1"),
+        flow("1 -> Z0"),
+    ];
+
+    let (actual_circuit, actual_flows) =
+        circuit_time_reversed_for_flows(&input, &input_flows).expect("time reverse flow_flip");
+
+    assert_eq!(
+        actual_circuit,
+        circuit(
+            "
+            M 0
+            MR 1
+            MRX 0
+            RY 0
+            "
+        )
+    );
+    assert_eq!(
+        actual_flows,
+        vec![
+            flow("1 -> Y0*Z1"),
+            flow("Z0*Z1 -> rec[-3] xor rec[-2]"),
+            flow("Z1 -> rec[-2]"),
+            flow("Z0 -> rec[-3]"),
+        ]
+    );
+}
+
+#[test]
+fn time_reversed_for_flows_measurement_rich_subset_rejects_unpromoted_flow_flip_variants() {
+    for (circuit_text, flow_texts) in [
+        (
+            "
+            MY 0
+            MRX 0
+            MR 1
+            RY 0
+            ",
+            vec![
+                "Y0*Z1 -> rec[-3] xor rec[-1]",
+                "1 -> Z0*Z1",
+                "1 -> Z1",
+                "1 -> Z0",
+            ],
+        ),
+        (
+            "
+            MY 0
+            MRX 0
+            MR 1
+            R 0
+            ",
+            vec!["1 -> Z0"],
+        ),
+        (
+            "
+            MY 0
+            MRX 0
+            MR 1
+            R 0
+            ",
+            vec![
+                "1 -> Z0",
+                "1 -> Z1",
+                "1 -> Z0*Z1",
+                "Y0*Z1 -> rec[-3] xor rec[-1]",
+            ],
+        ),
+    ] {
+        let input_flows = flow_texts.into_iter().map(flow).collect::<Vec<_>>();
+        let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &input_flows)
+            .expect_err("unpromoted flow_flip variants are exact-scope rejected")
+            .to_string();
+
+        assert!(
+            error.contains("measurement-rich subset supports only"),
+            "{circuit_text}\n{error}"
+        );
+    }
+}
+
+#[test]
 fn time_reversed_for_flows_unitary_subset_rejects_unsatisfied_general_unitary_flow() {
     let error = circuit_time_reversed_for_flows(&circuit("SWAP 0 1\n"), &[flow("X0 -> X0")])
         .expect_err("swap does not preserve X0")
