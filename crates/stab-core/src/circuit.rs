@@ -140,7 +140,7 @@ impl Circuit {
 
     /// Returns the currently supported time-reversal subset for flows.
     ///
-    /// Supports unsigned unitary flows and selected measurement-rich flows; broader detector, feedback, repeat, noise, and observable rewrites remain follow-up work.
+    /// Supports unsigned unitary flows, selected measurement-rich flows, and selected MPAD record-tail Pauli-only flows; broader detector, feedback, repeat, noise, MPAD record/observable flow terms, and observable rewrites remain follow-up work.
     pub fn time_reversed_for_flows(
         &self,
         flows: &[crate::Flow],
