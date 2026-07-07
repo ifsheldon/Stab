@@ -59,6 +59,10 @@ const LOOP_CARRIED_OBSERVABLE_REPEAT_COUNT: u64 = 1_000_001;
 #[cfg(test)]
 const LOOP_CARRIED_OBSERVABLE_REPEAT_COUNT: u64 = 5;
 #[cfg(not(test))]
+const PERIOD8_OBSERVABLE_REPEAT_COUNT: u64 = 1_000_001;
+#[cfg(test)]
+const PERIOD8_OBSERVABLE_REPEAT_COUNT: u64 = 9;
+#[cfg(not(test))]
 const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 1_000_001;
 #[cfg(test)]
 const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 17;
@@ -84,6 +88,9 @@ pub(super) fn run_dem_compare_row(
         "pf6-error-decomp-loop-folded" => run_error_decomp_loop_folded_row(row).map(Some),
         "pf6-analyzer-loop-observable-folded" => {
             run_loop_carried_observable_folded_row(row).map(Some)
+        }
+        "pf6-analyzer-period8-observable-folded" => {
+            run_period8_observable_folded_row(row).map(Some)
         }
         "pf6-graphlike-search-generated" => run_generated_graphlike_search_row(row).map(Some),
         "pf6-hypergraph-search-generated" => run_generated_hypergraph_search_row(row).map(Some),
@@ -128,6 +135,10 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
                 "folded-rounds/s",
             ))
         }
+        (
+            "pf6-analyzer-period8-observable-folded",
+            "stab_pf6_analyzer_period8_observable_folded",
+        ) => Some((PERIOD8_OBSERVABLE_REPEAT_COUNT as f64, "folded-rounds/s")),
         ("pf6-graphlike-search-generated", "stab_pf6_graphlike_search_generated_surface")
         | ("pf6-hypergraph-search-generated", "stab_pf6_hypergraph_search_generated_surface") => {
             Some((error_analyzer_detector_count(), "detectors/s"))
@@ -194,6 +205,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         ),
         "pf6-analyzer-loop-observable-folded" => Some(
             "report-only: Stab measures Rust analyze_errors fold_loops over the selected loop-carried observable giant-repeat shape from pinned ErrorAnalyzer.loop_folding; pinned Stim exposes equivalent analyzer behavior but not a faithful Rust direct baseline in this harness",
+        ),
+        "pf6-analyzer-period8-observable-folded" => Some(
+            "report-only: Stab measures Rust analyze_errors fold_loops over the selected period-8 observable giant-repeat shape from pinned ErrorAnalyzer.loop_folding; pinned Stim exposes equivalent analyzer behavior but not a faithful Rust direct baseline in this harness",
         ),
         "pf6-graphlike-search-generated" => Some(
             "report-only: Stab measures generated rotated-surface-code DEM graphlike search after source-owned Rust analysis and decomposition; pinned Stim exposes this as C++ API/perf behavior, not a faithful public CLI baseline",
@@ -427,6 +441,40 @@ fn loop_carried_observable_circuit_text(repeat_count: u64) -> String {
              DETECTOR rec[-2] rec[-1]\n\
          }}\n\
          M 0\n\
+         OBSERVABLE_INCLUDE(9) rec[-1]\n"
+    )
+}
+
+fn run_period8_observable_folded_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+    let fixture = period8_observable_circuit_text(PERIOD8_OBSERVABLE_REPEAT_COUNT);
+    let circuit =
+        Circuit::from_stim_str(&fixture).map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(vec![measure_stab_iterations(
+        "stab_pf6_analyzer_period8_observable_folded",
+        ERROR_ANALYZER_COMPARE_ITERATIONS,
+        || {
+            let dem = circuit_to_detector_error_model(
+                &circuit,
+                ErrorAnalyzerOptions {
+                    fold_loops: true,
+                    ..ErrorAnalyzerOptions::default()
+                },
+            )
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+            black_box(dem.items().len());
+            Ok(())
+        },
+    )?])
+}
+
+fn period8_observable_circuit_text(repeat_count: u64) -> String {
+    format!(
+        "R 0 1 2 3 4\n\
+         REPEAT {repeat_count} {{\n\
+             CNOT 0 1 1 2 2 3 3 4\n\
+             DETECTOR\n\
+         }}\n\
+         M 4\n\
          OBSERVABLE_INCLUDE(9) rec[-1]\n"
     )
 }

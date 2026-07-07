@@ -238,6 +238,26 @@ fn pf6_dem_analyzer_loop_carried_observable_folds_like_upstream() {
 }
 
 #[test]
+fn pf6_dem_analyzer_period8_observable_folds_like_upstream() {
+    let dem = analyze_folding_loops(
+        "
+        R 0 1 2 3 4
+        REPEAT 12345678987654321 {
+            CNOT 0 1 1 2 2 3 3 4
+            DETECTOR
+        }
+        M 4
+        OBSERVABLE_INCLUDE(9) rec[-1]
+        ",
+    );
+
+    assert_eq!(
+        dem,
+        "detector D0\ndetector D1\ndetector D2\nrepeat 1543209873456789 {\n    detector D3\n    detector D4\n    detector D5\n    detector D6\n    detector D7\n    detector D8\n    detector D9\n    detector D10\n    shift_detectors 8\n}\ndetector D3\ndetector D4\ndetector D5\ndetector D6\ndetector D7\ndetector D8\nlogical_observable L9\n"
+    );
+}
+
+#[test]
 fn pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_unsafe_tail_dependency() {
     let circuit = Circuit::from_stim_str(
         "

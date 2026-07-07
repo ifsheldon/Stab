@@ -144,6 +144,12 @@ fn pf6_analyzer_benchmark_rows_have_stab_compare_runners() {
             &["stab_pf6_analyzer_loop_observable_folded"][..],
         ),
         (
+            "pf6-analyzer-period8-observable-folded",
+            "src/stim/simulators/error_analyzer.test.cc",
+            "analyze-errors-period8-observable",
+            &["stab_pf6_analyzer_period8_observable_folded"][..],
+        ),
+        (
             "pf6-graphlike-search-generated",
             "src/stim/search/graphlike/algo.perf.cc",
             "graphlike-search-generated",

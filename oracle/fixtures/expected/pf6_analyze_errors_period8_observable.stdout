@@ -1,0 +1,21 @@
+detector D0
+detector D1
+detector D2
+repeat 1543209873456789 {
+    detector D3
+    detector D4
+    detector D5
+    detector D6
+    detector D7
+    detector D8
+    detector D9
+    detector D10
+    shift_detectors 8
+}
+detector D3
+detector D4
+detector D5
+detector D6
+detector D7
+detector D8
+logical_observable L9
