@@ -19,22 +19,22 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures current capped-repeat graphlike search behavior, zero-probability repeat skipping, selected flat detector-touching and detectorless logical-only zero-shift graphlike repeat folding, and selected flat no-target graphlike repeat skipping; true folded graphlike traversal remains an explicit RPF4 follow-up",
         ),
         "pf4-dem-hypergraph-logical-repeat" => Some(
-            "contract-only: Stab measures selected flat detectorless logical-only zero-shift hypergraph search repeat folding; broader shifted, nested, non-flat, and numeric-target hypergraph repeat traversal remains capped or excluded",
+            "contract-only: Stab measures selected flat detectorless logical-only zero-shift hypergraph search repeat folding; broader shifted, nested, and non-flat hypergraph repeat traversal remains capped or excluded, while raw numeric error targets are validation-owned instead of traversal-owned",
         ),
         "pf4-dem-hypergraph-no-target-repeat" => Some(
-            "contract-only: Stab measures selected flat no-target zero-shift hypergraph search repeat skipping; broader shifted, nested, non-flat, numeric-target, and mixed-instruction hypergraph repeat traversal remains capped or excluded",
+            "contract-only: Stab measures selected flat no-target zero-shift hypergraph search repeat skipping; broader shifted, nested, non-flat, and mixed-instruction hypergraph repeat traversal remains capped or excluded, while raw numeric error targets are validation-owned instead of traversal-owned",
         ),
         "pf4-dem-search-zero-shift-repeat" => Some(
-            "contract-only: Stab measures selected flat zero-detector-shift graphlike and hypergraph search repeat folding; broader nonzero-shift, nested, non-flat, numeric-target, separator-only, and mixed-instruction repeat traversal remains capped or excluded",
+            "contract-only: Stab measures selected flat zero-detector-shift graphlike and hypergraph search repeat folding; broader nonzero-shift, nested, non-flat, and mixed-instruction repeat traversal remains capped or excluded, while raw numeric and separator-only error target lists are validation-owned instead of traversal-owned",
         ),
         "pf4-dem-search-annotation-repeat" => Some(
-            "contract-only: Stab measures selected flat annotation-bearing graphlike and hypergraph search repeat folding; broader nonzero-shift, nested, non-flat, numeric-target, separator-only, and non-annotation mixed-instruction repeat traversal remains capped or excluded",
+            "contract-only: Stab measures selected flat annotation-bearing graphlike and hypergraph search repeat folding; broader nonzero-shift, nested, non-flat, and non-annotation mixed-instruction repeat traversal remains capped or excluded, while raw numeric and separator-only error target lists are validation-owned instead of traversal-owned",
         ),
         "pf4-dem-search-mixed-zero-probability-repeat" => Some(
             "contract-only: Stab measures selected mixed zero-probability plus active zero-shift graphlike and hypergraph search repeat folding; SAT/WCNF, nonzero-shift, non-flat, analyzer, ErrorMatcher, sampler, and broader DEM traversal remain scoped separately",
         ),
         "pf4-dem-search-nested-repeat" => Some(
-            "contract-only: Stab measures selected nested zero-detector-shift graphlike and hypergraph search repeat folding; broader nonzero-shift, shifted nested, non-flat, numeric-target, SAT/WCNF, analyzer, ErrorMatcher, and sampler repeat traversal remains capped or excluded",
+            "contract-only: Stab measures selected nested zero-detector-shift graphlike and hypergraph search repeat folding; broader nonzero-shift, shifted nested, non-flat, SAT/WCNF, analyzer, ErrorMatcher, and sampler repeat traversal remains capped or excluded, while raw numeric error targets are validation-owned instead of traversal-owned",
         ),
         "pf4-dem-sat-flat-repeat-fold" => Some(
             "contract-only: Stab measures selected SAT/WCNF flat and nested zero-shift repeat folding for unweighted shortest-error SAT including zero-probability structural mechanisms and weighted concrete-MAP SAT; broader shifted, non-flat, and high-index dense-target structural SAT repeat traversal remains capped",

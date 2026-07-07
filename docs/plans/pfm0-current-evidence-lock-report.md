@@ -110,3 +110,14 @@ No additional analyzer sweep-shape family is currently named with exact gate-tar
 The broader analyzer sweep-shape phrase is therefore now logged as an open under-specification in `docs/plans/milestone-spec-gaps.md`, and the current selected matrix boundary is locked in `docs/plans/pfm3-analyzer-sweep-boundary-scope.md`.
 Future agents should not implement or claim another analyzer sweep row until a plan selects exact remaining gate-target shapes and comparator policy.
 The existing report-only `pf3-analyze-errors-sweep` benchmark remains scoped to the promoted analyzer sweep-control and `CZ` classical-only matrix only.
+
+## 2026-07-07 Addendum: PFM4 Invalid DEM Search Target Boundary
+
+This addendum records a PFM4 scope correction discovered while selecting a follow-up DEM search traversal slice.
+Raw numeric `error` targets and separator-only `error` target lists are not valid public DEM search inputs in Stab.
+`pf4_dem_public_validation_rejects_malformed_inputs` covers malformed text and typed programmatic constructor rejection, including invalid separators, separator-only target lists, and raw numeric error targets.
+Oracle row `pf4-dem-validation-negative-rust` now names raw numeric error targets and separator-only target lists as validation-owned evidence.
+
+The correct next step is not to add graphlike or hypergraph traversal for those malformed shapes.
+Future PFM4 search traversal work should select valid DEM repeat bodies with detector or logical-observable targets, explicit comparator policy, oracle rows, benchmark rows or a no-benchmark rationale, and resource behavior.
+The boundary is locked in `docs/plans/pfm4-dem-search-invalid-target-boundary-scope.md`.

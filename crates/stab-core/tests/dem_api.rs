@@ -230,6 +230,7 @@ fn pf4_dem_public_validation_rejects_malformed_inputs() {
     for (text, expected) in [
         ("error(1.5) D0\n", "probability"),
         ("error(0.25) ^ D0\n", "separators cannot be first"),
+        ("error(0.25) ^\n", "separators cannot be first"),
         ("error(0.25) D0 ^\n", "separators cannot be last"),
         (
             "error(0.25) D0 ^ ^ D1\n",
@@ -270,6 +271,20 @@ fn pf4_dem_public_validation_rejects_malformed_inputs() {
             .to_string()
             .contains("separators cannot be first"),
         "{programmatic_error}"
+    );
+
+    let programmatic_separator_only = DemInstruction::new(
+        DemInstructionKind::Error,
+        vec![0.25],
+        vec![DemTarget::separator()],
+        None,
+    )
+    .expect_err("reject programmatic separator-only target list");
+    assert!(
+        programmatic_separator_only
+            .to_string()
+            .contains("separators cannot be first"),
+        "{programmatic_separator_only}"
     );
 
     let programmatic_detector = DemInstruction::new(
