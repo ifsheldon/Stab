@@ -216,6 +216,28 @@ fn pf6_dem_analyzer_prefix_repeat_tail_folds_large_detector_chain() {
 }
 
 #[test]
+fn pf6_dem_analyzer_loop_carried_observable_folds_like_upstream() {
+    let dem = analyze_folding_loops(
+        "
+        MR 1
+        REPEAT 12345678987654321 {
+            X_ERROR(0.25) 0
+            CX 0 1
+            MR 1
+            DETECTOR rec[-2] rec[-1]
+        }
+        M 0
+        OBSERVABLE_INCLUDE(9) rec[-1]
+        ",
+    );
+
+    assert_eq!(
+        dem,
+        "error(0.25) D0 L9\nrepeat 6172839493827159 {\n    error(0.25) D1 L9\n    error(0.25) D2 L9\n    shift_detectors 2\n}\nerror(0.25) D1 L9\nerror(0.25) D2 L9\n"
+    );
+}
+
+#[test]
 fn pf6_dem_analyzer_fallback_uses_bounded_unfolded_for_unsafe_tail_dependency() {
     let circuit = Circuit::from_stim_str(
         "

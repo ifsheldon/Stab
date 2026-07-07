@@ -1,0 +1,8 @@
+error(0.25) D0 L9
+repeat 6172839493827159 {
+    error(0.25) D1 L9
+    error(0.25) D2 L9
+    shift_detectors 2
+}
+error(0.25) D1 L9
+error(0.25) D2 L9

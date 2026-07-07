@@ -1,0 +1,9 @@
+MR 1
+REPEAT 12345678987654321 {
+    X_ERROR(0.25) 0
+    CX 0 1
+    MR 1
+    DETECTOR rec[-2] rec[-1]
+}
+M 0
+OBSERVABLE_INCLUDE(9) rec[-1]

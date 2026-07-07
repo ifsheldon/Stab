@@ -1,9 +1,10 @@
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemItem, RepeatCount,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemInstructionKind,
+    DemItem, RepeatCount,
 };
 
 use super::{
-    Analyzer, DemInstruction, DemRepeatBlock, DetectorErrorModel, ErrorAnalyzerOptions,
+    Analyzer, DemInstruction, DemRepeatBlock, DemTarget, DetectorErrorModel, ErrorAnalyzerOptions,
     MAX_ANALYZER_REPEAT_UNROLL, RepeatBlock,
 };
 
@@ -88,6 +89,22 @@ impl FoldedAnalyzer {
         };
         if body_dem.is_empty() {
             return Ok(None);
+        }
+        let loop_carried_tail = LoopCarriedTailObservableInput {
+            prefix,
+            repeat_body: repeat.body(),
+            repeat_count: repeat.repeat_count(),
+            repeat_tag: repeat.tag(),
+            tail,
+            prefix_dem: &prefix_result.dem,
+            body_dem: &body_dem,
+            body_detector_shift,
+            one_result_dem: &one_result.dem,
+            body_options,
+            validation_repeat_count,
+        };
+        if let Some(candidate) = analyze_loop_carried_tail_observable(&loop_carried_tail)? {
+            return Ok(Some(candidate));
         }
         let Some(tail_absolute_dem) =
             subtract_dem_item_multiset(&one_result.dem, &first_result.dem)
@@ -397,6 +414,65 @@ fn prefixed_repeat_tail_circuit(
     circuit
 }
 
+struct LoopCarriedTailObservableInput<'a> {
+    prefix: &'a [CircuitInstruction],
+    repeat_body: &'a Circuit,
+    repeat_count: RepeatCount,
+    repeat_tag: Option<&'a str>,
+    tail: &'a [CircuitInstruction],
+    prefix_dem: &'a DetectorErrorModel,
+    body_dem: &'a DetectorErrorModel,
+    body_detector_shift: u64,
+    one_result_dem: &'a DetectorErrorModel,
+    body_options: ErrorAnalyzerOptions,
+    validation_repeat_count: RepeatCount,
+}
+
+fn analyze_loop_carried_tail_observable(
+    input: &LoopCarriedTailObservableInput<'_>,
+) -> CircuitResult<Option<DetectorErrorModel>> {
+    let Some(body_with_tail_observable) =
+        subtract_dem_item_multiset(input.one_result_dem, input.prefix_dem)
+    else {
+        return Ok(None);
+    };
+    if !same_error_terms_with_added_observables(input.body_dem, &body_with_tail_observable) {
+        return Ok(None);
+    }
+
+    let Some(validation_candidate) = compose_odd_period_loop_dem(
+        input.prefix_dem,
+        &body_with_tail_observable,
+        input.body_detector_shift,
+        input.validation_repeat_count,
+        input.repeat_tag,
+    )?
+    else {
+        return Ok(None);
+    };
+    let validation_circuit = prefixed_repeat_tail_circuit(
+        input.prefix,
+        input.repeat_body,
+        input.validation_repeat_count,
+        input.repeat_tag,
+        input.tail,
+    );
+    let expected = Analyzer::new(input.body_options).analyze(&validation_circuit)?;
+    if flattened_instruction_multiset(&validation_candidate)?
+        != flattened_instruction_multiset(&expected)?
+    {
+        return Ok(None);
+    }
+
+    compose_odd_period_loop_dem(
+        input.prefix_dem,
+        &body_with_tail_observable,
+        input.body_detector_shift,
+        input.repeat_count,
+        input.repeat_tag,
+    )
+}
+
 fn subtract_trailing_body_dem(
     first_iteration: &DetectorErrorModel,
     body: &DetectorErrorModel,
@@ -471,6 +547,142 @@ fn rebase_dem_detector_targets(
     Ok(Some(rebased))
 }
 
+fn compose_odd_period_loop_dem(
+    prefix_dem: &DetectorErrorModel,
+    body_dem: &DetectorErrorModel,
+    body_detector_shift: u64,
+    repeat_count: RepeatCount,
+    repeat_tag: Option<&str>,
+) -> CircuitResult<Option<DetectorErrorModel>> {
+    if body_detector_shift == 0 {
+        return Ok(None);
+    }
+    let repeat_count = repeat_count.get();
+    if repeat_count < 3 || repeat_count.is_multiple_of(2) {
+        return Ok(None);
+    }
+    if !model_contains_only_error_instructions(body_dem) {
+        return Ok(None);
+    }
+
+    let mut dem = DetectorErrorModel::new();
+    push_dem_items(&mut dem, prefix_dem.items());
+    push_shifted_dem_items(&mut dem, body_dem.items(), 0)?;
+
+    let middle_repeat_count = (repeat_count - 3) / 2;
+    if middle_repeat_count > 0 {
+        let mut loop_body = DetectorErrorModel::new();
+        push_shifted_dem_items(&mut loop_body, body_dem.items(), body_detector_shift)?;
+        let second_shift = body_detector_shift.checked_mul(2).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "analyze_errors folded loop detector shift overflowed",
+            )
+        })?;
+        push_shifted_dem_items(&mut loop_body, body_dem.items(), second_shift)?;
+        push_detector_shift(&mut loop_body, second_shift)?;
+        dem.push_repeat_block(DemRepeatBlock::new(
+            RepeatCount::try_new(middle_repeat_count)?,
+            loop_body,
+            repeat_tag.map(ToOwned::to_owned),
+        ));
+    }
+
+    push_shifted_dem_items(&mut dem, body_dem.items(), body_detector_shift)?;
+    let second_shift = body_detector_shift.checked_mul(2).ok_or_else(|| {
+        CircuitError::invalid_detector_error_model(
+            "analyze_errors folded loop detector shift overflowed",
+        )
+    })?;
+    push_shifted_dem_items(&mut dem, body_dem.items(), second_shift)?;
+    Ok(Some(dem))
+}
+
+fn same_error_terms_with_added_observables(
+    body: &DetectorErrorModel,
+    candidate: &DetectorErrorModel,
+) -> bool {
+    body.items().len() == candidate.items().len()
+        && body
+            .items()
+            .iter()
+            .zip(candidate.items())
+            .all(|(left, right)| same_error_term_with_added_observables(left, right))
+}
+
+fn same_error_term_with_added_observables(left: &DemItem, right: &DemItem) -> bool {
+    let (DemItem::Instruction(left), DemItem::Instruction(right)) = (left, right) else {
+        return false;
+    };
+    if left.kind() != DemInstructionKind::Error
+        || right.kind() != DemInstructionKind::Error
+        || left.args() != right.args()
+        || left.tag() != right.tag()
+    {
+        return false;
+    }
+
+    let left_non_observable = left
+        .targets()
+        .iter()
+        .filter(|target| !matches!(target, DemTarget::LogicalObservable(_)))
+        .collect::<Vec<_>>();
+    let right_non_observable = right
+        .targets()
+        .iter()
+        .filter(|target| !matches!(target, DemTarget::LogicalObservable(_)))
+        .collect::<Vec<_>>();
+    let mut left_observables = left
+        .targets()
+        .iter()
+        .filter_map(|target| match target {
+            DemTarget::LogicalObservable(observable) => Some(observable.get()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let mut right_observables = right
+        .targets()
+        .iter()
+        .filter_map(|target| match target {
+            DemTarget::LogicalObservable(observable) => Some(observable.get()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    left_observables.sort_unstable();
+    right_observables.sort_unstable();
+
+    left_non_observable == right_non_observable
+        && right_observables.len() > left_observables.len()
+        && sorted_observables_are_subset(&left_observables, &right_observables)
+}
+
+fn model_contains_only_error_instructions(model: &DetectorErrorModel) -> bool {
+    !model.items().is_empty()
+        && model.items().iter().all(|item| {
+            matches!(
+                item,
+                DemItem::Instruction(instruction)
+                    if instruction.kind() == DemInstructionKind::Error
+            )
+        })
+}
+
+fn sorted_observables_are_subset(left: &[u64], right: &[u64]) -> bool {
+    let mut right_iter = right.iter();
+    for left_observable in left {
+        loop {
+            let Some(right_observable) = right_iter.next() else {
+                return false;
+            };
+            match right_observable.cmp(left_observable) {
+                std::cmp::Ordering::Less => continue,
+                std::cmp::Ordering::Equal => break,
+                std::cmp::Ordering::Greater => return false,
+            }
+        }
+    }
+    true
+}
+
 fn rebase_dem_item_detector_targets(
     item: &DemItem,
     detector_offset: u64,
@@ -525,6 +737,45 @@ fn rebase_dem_targets(
     Ok(Some(rebased))
 }
 
+fn shift_dem_item_detector_targets(item: &DemItem, detector_offset: u64) -> CircuitResult<DemItem> {
+    match item {
+        DemItem::Instruction(instruction) => {
+            let shifted_targets = shift_dem_targets(instruction.targets(), detector_offset)?;
+            Ok(DemItem::Instruction(DemInstruction::new(
+                instruction.kind(),
+                instruction.args().to_vec(),
+                shifted_targets,
+                instruction.tag().map(ToOwned::to_owned),
+            )?))
+        }
+        DemItem::RepeatBlock(_) => Err(CircuitError::invalid_detector_error_model(
+            "analyze_errors selected loop-carried observable fold does not support nested DEM repeats",
+        )),
+    }
+}
+
+fn shift_dem_targets(targets: &[DemTarget], detector_offset: u64) -> CircuitResult<Vec<DemTarget>> {
+    let mut shifted = Vec::with_capacity(targets.len());
+    for target in targets {
+        match target {
+            DemTarget::RelativeDetector(detector) => {
+                let detector = detector.get().checked_add(detector_offset).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "analyze_errors folded detector target overflowed",
+                    )
+                })?;
+                shifted.push(DemTarget::relative_detector(detector)?);
+            }
+            DemTarget::LogicalObservable(observable) => {
+                shifted.push(DemTarget::logical_observable(observable.get())?);
+            }
+            DemTarget::Separator => shifted.push(DemTarget::separator()),
+            DemTarget::Numeric(value) => shifted.push(DemTarget::numeric(*value)),
+        }
+    }
+    Ok(shifted)
+}
+
 fn flattened_instruction_multiset(model: &DetectorErrorModel) -> CircuitResult<Vec<String>> {
     let mut flattened = Vec::new();
     for instruction in model.iter_flattened_instructions() {
@@ -560,4 +811,18 @@ fn push_dem_items(model: &mut DetectorErrorModel, items: &[DemItem]) {
             DemItem::RepeatBlock(repeat) => model.push_repeat_block(repeat.clone()),
         }
     }
+}
+
+fn push_shifted_dem_items(
+    model: &mut DetectorErrorModel,
+    items: &[DemItem],
+    detector_offset: u64,
+) -> CircuitResult<()> {
+    for item in items {
+        match shift_dem_item_detector_targets(item, detector_offset)? {
+            DemItem::Instruction(instruction) => model.push_instruction(instruction),
+            DemItem::RepeatBlock(repeat) => model.push_repeat_block(repeat),
+        }
+    }
+    Ok(())
 }
