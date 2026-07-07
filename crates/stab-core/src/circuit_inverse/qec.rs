@@ -51,6 +51,12 @@ pub(super) fn selected_qec_inverse(circuit: &Circuit) -> CircuitResult<Option<Ci
     Ok(None)
 }
 
+pub(super) fn selected_mpad_record_tail_inverse(
+    circuit: &Circuit,
+) -> CircuitResult<Option<Circuit>> {
+    mpad::selected_mpad_record_tail_inverse(circuit)
+}
+
 pub(super) fn selected_keep_measurements_qec_inverse(
     circuit: &Circuit,
 ) -> CircuitResult<Option<Circuit>> {

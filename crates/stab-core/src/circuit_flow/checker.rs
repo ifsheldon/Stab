@@ -212,7 +212,7 @@ pub(crate) fn check_unsigned_flow_with_sparse_tracker(
     Ok(diagnose_unsigned_flow_with_sparse_tracker(circuit, flow)?.has_flow)
 }
 
-fn diagnose_unsigned_flow_with_sparse_tracker(
+pub(crate) fn diagnose_unsigned_flow_with_sparse_tracker(
     circuit: &Circuit,
     flow: &Flow,
 ) -> CircuitResult<UnsignedStabilizerFlowCheck> {
