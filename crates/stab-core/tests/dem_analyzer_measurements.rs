@@ -108,6 +108,44 @@ fn dem_analyzer_mpad_matches_upstream_subset() {
 }
 
 #[test]
+fn dem_analyzer_noisy_mpad_matches_upstream_subset() {
+    let dem = analyze(
+        "
+        MPAD(0.25) 0 1
+        DETECTOR rec[-2]
+        DETECTOR rec[-1]
+        ",
+    );
+    assert_eq!(dem, "error(0.25) D0\nerror(0.25) D1\n");
+
+    let dem = analyze(
+        "
+        MPAD(0.25) 0
+        OBSERVABLE_INCLUDE(0) rec[-1]
+        ",
+    );
+    assert_eq!(dem, "error(0.25) L0\n");
+
+    let dem = analyze(
+        "
+        MPAD(0.25) 0 1
+        DETECTOR rec[-2]
+        OBSERVABLE_INCLUDE(0) rec[-1]
+        DETECTOR rec[-1]
+        ",
+    );
+    assert_eq!(dem, "error(0.25) D0\nerror(0.25) D1 L0\n");
+
+    let dem = analyze(
+        "
+        MPAD(0) 0
+        DETECTOR rec[-1]
+        ",
+    );
+    assert_eq!(dem, "detector D0\n");
+}
+
+#[test]
 fn dem_analyzer_pair_measurements_match_upstream_subset() {
     for (circuit, expected) in [
         (

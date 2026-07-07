@@ -790,12 +790,40 @@ impl Analyzer {
     }
 
     fn record_measurement_pads(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
-        self.measurement_count = self
-            .measurement_count
-            .checked_add(instruction.target_groups().len())
-            .ok_or_else(|| {
+        let probability = instruction.probability_argument()?;
+        for group in instruction.target_groups() {
+            let [target] = group else {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "MPAD expected single pad targets",
+                ));
+            };
+            let Some(pad_value) = target.qubit_id() else {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "MPAD target {target} is not a measurement pad"
+                )));
+            };
+            if pad_value.get() > 1 || target.is_inverted_result_target() {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "MPAD target {target} is not a measurement pad"
+                )));
+            }
+            let measurement_index = self.measurement_count;
+            self.measurement_count = self.measurement_count.checked_add(1).ok_or_else(|| {
                 CircuitError::invalid_detector_error_model("measurement count overflowed")
             })?;
+            if let Some(probability) = probability
+                && probability.get() > 0.0
+            {
+                self.completed_errors.push(PendingError {
+                    probability,
+                    effects: Vec::new(),
+                    measurements: vec![measurement_index],
+                    observables: Vec::new(),
+                    disjoint_group: None,
+                    tag: instruction.tag().map(str::to_owned),
+                });
+            }
+        }
         Ok(())
     }
 
