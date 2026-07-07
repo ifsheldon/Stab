@@ -73,24 +73,6 @@ Gap: the promoted PFM6 evidence is exact and source-owned, but the remaining bro
 Proposed amendment: keep the current PFM6 slices as the selected analyzer, search, sparse-tracker, and matched-error evidence. Do not add broader generated analyzer, search, SAT/WCNF, sparse-tracker consumption, variable-target unitary, or value-object hardening rows until a future plan names exact subcases, positive and negative tests, comparator behavior, resource boundaries, oracle metadata, and benchmark or no-benchmark rationale.
 Resolution: Pending exact-subcase plans for broader PFM6 analyzer, search, sparse-tracker, or matched-error families beyond the selected promoted evidence.
 
-## 2026-07-07 - PFM2: Broader Repeat-Contained Feedback Boundary
-
-Status: Open
-Revealed by: PFM2 scope reconciliation after comparing the selected `Circuit::with_inlined_feedback` evidence against pinned Stim v1.16.0 `src/stim/util_top/transform_without_feedback.test.cc`.
-Current text: PFM2 and the checklist say broader repeat-contained feedback parity remains open beyond the selected bounded repeat-loop and nested bounded-repeat detector-parity cases.
-Gap: pinned Stim v1.16.0 `transform_without_feedback.test.cc` contains `basic`, `demolition_feedback`, `loop`, `mpp`, and interleaved-ordering tests, and current Stab evidence already covers those upstream cases plus selected `XCZ` or `YCZ` measurement-record feedback, bounded repeat-loop refolding, selected nested bounded-repeat `CY` and `CZ` detector-parity preservation, unsupported classical-control rejection, and excessive repeat-work rejection. The remaining broad phrase does not name additional repeat-body shapes, exact input circuits, exact output or semantic comparator, accepted or rejected feedback gates, resource limits, oracle metadata, or benchmark policy. Treating it as implementation-ready would require inventing repeat-contained feedback scope after the fact.
-Proposed amendment: keep the pinned loop-refolding case and selected nested bounded-repeat detector-parity case as the complete repeat-contained feedback evidence currently selected by PFM2. Do not add another repeat-contained feedback row until a future plan names exact repeat structures, feedback gate and target shapes, canonical-output or semantic DEM comparator behavior, resource-boundary behavior, oracle metadata, and benchmark or no-benchmark rationale.
-Resolution: Pending an exact-subcase plan for repeat-contained feedback parity beyond the selected loop-refolding and nested detector-parity cases.
-
-## 2026-07-07 - PFM5: Broader Heralded-Noise Flow-Generator Boundary
-
-Status: Open
-Revealed by: PFM5 multi-target heralded flow-generator evidence hardening after promoting selected `HERALDED_ERASE` and `HERALDED_PAULI_CHANNEL_1` MPP cases.
-Current text: PFM5 says broader heralded-noise generator synthesis remains active after the pinned single-target heralded-noise MPP fixture landed.
-Gap: the selected evidence now covers pinned single-target heralded-noise MPP behavior plus exact multi-target `HERALDED_ERASE`, exact multi-target `HERALDED_PAULI_CHANNEL_1`, and a combined multi-target heralded-noise MPP case against pinned Stim v1.16.0 generator strings and checker satisfaction. The remaining broad phrase does not name additional legal circuits, invalid target shapes, comparator behavior, checker semantics for noisy flows, resource limits, oracle metadata, or benchmark policy. Treating it as implementation-ready would require inventing scope after the fact.
-Proposed amendment: keep selected single- and multi-target heralded-noise MPP cases as the complete heralded-noise `circuit_flow_generators` evidence currently selected by PFM5. Do not add another heralded-noise flow-generator row until a future plan names exact circuits, positive and negative target-shape behavior, exact or semantic comparator rules, checker expectations, resource-boundary behavior, oracle metadata, and benchmark or no-benchmark rationale.
-Resolution: Pending an exact-subcase plan for heralded-noise flow-generator parity beyond the selected MPP cases.
-
 ## 2026-07-07 - PFM3: Analyzer Sweep-Shape Boundary
 
 Status: Open
@@ -109,43 +91,61 @@ Gap: the selected evidence now covers all 46 fixed-tableau gates across sampler,
 Proposed amendment: keep the fixed-tableau plus supported Hermitian `SPP` or `SPP_DAG` execution contract as the complete gate semantic evidence currently selected by PFM3. Do not add another legal-gate execution row until a future plan names exact gate families, execution surfaces, accepted and rejected behavior, positive and negative tests, resource-boundary behavior, oracle metadata, and benchmark or no-benchmark rationale.
 Resolution: Pending an exact-subcase plan for legal non-tableau execution beyond the selected PF3 gate semantic boundary. The current selected boundary is locked in `docs/plans/pfm3-gate-semantic-boundary-scope.md`.
 
+## Resolved Entries
+
+## 2026-07-07 - PFM2: Broader Repeat-Contained Feedback Boundary
+
+Status: Superseded
+Revealed by: PFM2 scope reconciliation after comparing the selected `Circuit::with_inlined_feedback` evidence against pinned Stim v1.16.0 `src/stim/util_top/transform_without_feedback.test.cc`.
+Current text: PFM2 and the checklist say broader repeat-contained feedback parity remains open beyond the selected bounded repeat-loop and nested bounded-repeat detector-parity cases.
+Gap: pinned Stim v1.16.0 `transform_without_feedback.test.cc` contains `basic`, `demolition_feedback`, `loop`, `mpp`, and interleaved-ordering tests, and current Stab evidence already covers those upstream cases plus selected `XCZ` or `YCZ` measurement-record feedback, bounded repeat-loop refolding, selected nested bounded-repeat `CY` and `CZ` detector-parity preservation, unsupported classical-control rejection, and excessive repeat-work rejection. The remaining broad phrase does not name additional repeat-body shapes, exact input circuits, exact output or semantic comparator, accepted or rejected feedback gates, resource limits, oracle metadata, or benchmark policy. Treating it as implementation-ready would require inventing repeat-contained feedback scope after the fact.
+Proposed amendment: keep the pinned loop-refolding case and selected nested bounded-repeat detector-parity case as the complete repeat-contained feedback evidence currently selected by PFM2. Do not add another repeat-contained feedback row until a future plan names exact repeat structures, feedback gate and target shapes, canonical-output or semantic DEM comparator behavior, resource-boundary behavior, oracle metadata, and benchmark or no-benchmark rationale.
+Resolution: Superseded by the 2026-07-08 PFM2 broader QEC inverse and measurement-rich transform boundary entry. The selected loop-refolding and nested detector-parity cases remain locked by `docs/plans/pfm2-feedback-repeat-boundary-scope.md`, and future repeat-contained feedback work beyond those selected cases must be named by a new exact-subcase plan.
+
+## 2026-07-07 - PFM5: Broader Heralded-Noise Flow-Generator Boundary
+
+Status: Superseded
+Revealed by: PFM5 multi-target heralded flow-generator evidence hardening after promoting selected `HERALDED_ERASE` and `HERALDED_PAULI_CHANNEL_1` MPP cases.
+Current text: PFM5 says broader heralded-noise generator synthesis remains active after the pinned single-target heralded-noise MPP fixture landed.
+Gap: the selected evidence now covers pinned single-target heralded-noise MPP behavior plus exact multi-target `HERALDED_ERASE`, exact multi-target `HERALDED_PAULI_CHANNEL_1`, and a combined multi-target heralded-noise MPP case against pinned Stim v1.16.0 generator strings and checker satisfaction. The remaining broad phrase does not name additional legal circuits, invalid target shapes, comparator behavior, checker semantics for noisy flows, resource limits, oracle metadata, or benchmark policy. Treating it as implementation-ready would require inventing scope after the fact.
+Proposed amendment: keep selected single- and multi-target heralded-noise MPP cases as the complete heralded-noise `circuit_flow_generators` evidence currently selected by PFM5. Do not add another heralded-noise flow-generator row until a future plan names exact circuits, positive and negative target-shape behavior, exact or semantic comparator rules, checker expectations, resource-boundary behavior, oracle metadata, and benchmark or no-benchmark rationale.
+Resolution: Superseded by the 2026-07-08 PFM5 broader flow-generator solver and transform-integration boundary entry. The selected single- and multi-target heralded-noise MPP cases remain the current heralded-noise flow-generator evidence, and future heralded-noise generator work beyond those selected cases must be named by a new exact-subcase plan.
+
 ## 2026-07-07 - PFM5: Generated Missing-Detector Suffix Boundary
 
-Status: Open
+Status: Superseded
 Revealed by: PFM0 evidence-lock refresh after promoting the pinned honeycomb and toric `missing_detectors` generated-code suffix cases.
 Current text: PFM5 says to extend `missing_detectors` for selected generated honeycomb and toric suffix cases, then leaves "broader generated-code suffix analysis" as active remaining work.
 Gap: pinned Stim v1.16.0 `src/stim/util_top/missing_detectors.test.cc` contains the honeycomb and toric generated-code suffix cases already promoted by `pf5-missing-detectors-generated-honeycomb-rust` and `pf5-missing-detectors-generated-toric-rust`, but the current milestone does not name any additional generated families, exact circuits, expected suffixes, known-input mode, comparator class, negative cases, resource boundaries, or benchmark policy. Treating the broad phrase as an implementation target would require inventing acceptance criteria after the fact or implying whole-file parity from already promoted cases.
 Proposed amendment: keep the honeycomb and toric suffix cases as the complete generated-code `missing_detectors` evidence currently selected by PFM5. Do not add another generated-code missing-detector row until a future plan names exact generated circuits or semantic-mining fixtures, expected suffix behavior against pinned Stim or source-owned invariants, positive and negative tests, resource-boundary behavior, oracle metadata, and benchmark or no-benchmark rationale.
-Resolution: Pending an exact-subcase plan for any generated-code missing-detector family beyond the pinned honeycomb and toric suffix cases. The current selected generated-code suffix boundary is locked in `docs/plans/pfm5-missing-detectors-generated-boundary-scope.md`.
+Resolution: Superseded by the 2026-07-08 PFM5 broader missing-detector utility boundary entry, which now owns any future generated-code missing-detector work beyond the pinned honeycomb and toric suffix cases. The current selected generated-code suffix boundary remains locked in `docs/plans/pfm5-missing-detectors-generated-boundary-scope.md`.
 
 ## 2026-07-04 - RPF2: Flow-Time-Reversal Dependency Boundary
 
-Status: Open
+Status: Superseded
 Revealed by: implementation of the RPF2 circuit transform slices.
 Current text: RPF2 asks to implement `time_reversed_for_flows` only after RPF5 defines required flow semantics, while also listing flow-time-reversal under the RPF2 transform objective.
 Gap: RPF2 now has a scoped unitary `time_reversed_for_flows` bridge, but it still cannot specify or test the broader measurement-rich form without the RPF5 measurement-rich `has_flow`, flow-generator, solver, diagnostic, folded-traversal, and transform-integration semantics. Basic `Flow` parsing, included-observable terms, measurement-index terms, and multiplication are closed separately by `coverage-stabilizers-flow`, so treating those basics as part of this open dependency would misstate the remaining gap.
 Proposed amendment: keep measurement-rich `time_reversed_for_flows` manifest-only under RPF2 until RPF5 closes the measurement-rich flow contract, then add a follow-up transform slice with exact public API shape, flow-semantic tests, and benchmark classification.
-Resolution: Partially narrowed by the selected measurement-rich `time_reversed_for_flows` slices, which promote pinned `M` and `MZZ` examples with selected measurement-ordering evidence, selected plain `R`, `RX`, and `RY` reset-to-measurement conversion over one or more unique qubit targets, selected single-target `M`, `MX`, and `MY` measurement-to-reset conversion including the selected `dont_turn_measurements_into_resets` single-measurement option, selected `MR`, `MRX`, and `MRY` measure-reset flow reversal over one or more unique qubit targets with inverted result-target support, the selected `MZZ` plus plain-qubit unitary suffix packet matching pinned `flow_through_mzz_h_cx_s`, and the exact pinned `flow_flip` packet using the existing sparse flow verifier. Duplicate reset-only and duplicate measure-reset behavior is governed by `docs/plans/pfm2-time-reverse-duplicate-target-boundary-scope.md`. Detectors, feedback, noise, repeats, and broader multi-instruction QEC inverse behavior are now governed by the 2026-07-08 PFM2 broader QEC inverse and measurement-rich transform open entry until exact subcases are selected. The selected pinned feedback loop-refolding and nested bounded-repeat detector-parity cases are covered separately by `Circuit::with_inlined_feedback`.
+Resolution: Superseded by the selected measurement-rich `time_reversed_for_flows` slices, the 2026-07-08 PFM2 broader QEC inverse and measurement-rich transform boundary entry, and the 2026-07-08 PFM5 broader flow-generator solver and transform-integration boundary entry. The selected slices promote pinned `M` and `MZZ` examples with selected measurement-ordering evidence, selected plain `R`, `RX`, and `RY` reset-to-measurement conversion over one or more unique qubit targets, selected single-target `M`, `MX`, and `MY` measurement-to-reset conversion including the selected `dont_turn_measurements_into_resets` single-measurement option, selected `MR`, `MRX`, and `MRY` measure-reset flow reversal over one or more unique qubit targets with inverted result-target support, the selected `MZZ` plus plain-qubit unitary suffix packet matching pinned `flow_through_mzz_h_cx_s`, and the exact pinned `flow_flip` packet using the existing sparse flow verifier. Duplicate reset-only and duplicate measure-reset behavior is governed by `docs/plans/pfm2-time-reverse-duplicate-target-boundary-scope.md`. Detectors, feedback, noise, repeats, and broader multi-instruction QEC inverse behavior are governed by the 2026-07-08 PFM2 broader entry, while broader flow-generator, solver, diagnostic, folded-repeat, and transform-integration work is governed by the 2026-07-08 PFM5 broader entry until exact subcases are selected. The selected pinned feedback loop-refolding and nested bounded-repeat detector-parity cases are covered separately by `Circuit::with_inlined_feedback`.
 
 ## 2026-07-06 - PFM2/PFM5: Duplicate Reset-Only Time-Reversal Semantics
 
-Status: Open
+Status: Resolved
 Revealed by: scope reconciliation after promoting selected plain reset-to-measurement `time_reversed_for_flows` over one or more unique qubit targets.
 Current text: PFM2 and PFM5 listed duplicate reset-only operations as remaining active measurement-rich `time_reversed_for_flows` work after the selected plain reset slice landed.
 Gap: Stim v1.16.0 accepts duplicate reset-only targets, but direct pinned-version probing with `uv run --with stim==1.16.0 python` shows malformed inverse flows for duplicate reset-only examples. For example, `R 0 0` with flow `1 -> Z0` returns inverse circuit `M 0 0` and flow `Z -> rec[-4] xor rec[-3]`, even though the inverse circuit has only two measurements. Blindly cloning that behavior would violate Stab's contract that returned flows are meaningful for the returned circuit, while silently "fixing" the behavior would no longer be Stim v1.16.0 output parity.
 Proposed amendment: keep duplicate reset-only targets fail-closed in Stab's selected measurement-rich `time_reversed_for_flows` subset until a later compatibility decision explicitly chooses bug-compatible invalid flows, corrected semantic flows, or permanent rejection. The selected plain reset support over one or more unique qubit targets remains implemented, and duplicate reset target rejection remains source-owned test evidence.
-Resolution: Boundary behavior is locked in `docs/plans/pfm2-time-reverse-duplicate-target-boundary-scope.md` as fail-closed until a compatibility decision chooses bug-compatible malformed flows, corrected semantic flows, or permanent rejection.
+Resolution: Resolved for the current PFM2 and PFM5 scope by `docs/plans/pfm2-time-reverse-duplicate-target-boundary-scope.md`. Duplicate reset-only targets remain fail-closed and are a named future compatibility decision, not an active current implementation target.
 
 ## 2026-07-06 - PFM2/PFM5: Duplicate Measure-Reset Time-Reversal Semantics
 
-Status: Open
+Status: Resolved
 Revealed by: implementation of inverted result-target measure-reset `time_reversed_for_flows`.
 Current text: PFM2 and PFM5 listed duplicate or inverted measure-reset shapes together as active measurement-rich `time_reversed_for_flows` work.
 Gap: Stim v1.16.0 gives coherent self-validating inverse flows for inverted measure-reset targets, but direct pinned-version probing with `uv run --with stim==1.16.0 python` shows malformed inverse flows for duplicate measure-reset targets. For example, `MR 0 0` with satisfied flows `1 -> Z0` and `Z0 -> rec[-2]` returns inverse circuit `MR 0 0` and a flow `Z -> rec[-4] xor rec[-3]`, even though the inverse circuit has only two measurements. Blindly cloning that behavior would violate Stab's contract that returned flows are meaningful for the returned circuit, while silently "fixing" it would no longer be Stim v1.16.0 output parity.
 Proposed amendment: keep duplicate measure-reset targets fail-closed in Stab's selected measurement-rich `time_reversed_for_flows` subset until a later compatibility decision explicitly chooses bug-compatible invalid flows, corrected semantic flows, or permanent rejection. Inverted result-target measure-reset support remains implemented and source-owned by exact tests.
-Resolution: Boundary behavior is locked in `docs/plans/pfm2-time-reverse-duplicate-target-boundary-scope.md` as fail-closed until a compatibility decision chooses bug-compatible malformed flows, corrected semantic flows, or permanent rejection.
-
-## Resolved Entries
+Resolution: Resolved for the current PFM2 and PFM5 scope by `docs/plans/pfm2-time-reverse-duplicate-target-boundary-scope.md`. Duplicate measure-reset targets remain fail-closed and are a named future compatibility decision, not an active current implementation target.
 
 ## 2026-07-04 - PF1: Path-Based Circuit File Helper Streaming Boundary
 
