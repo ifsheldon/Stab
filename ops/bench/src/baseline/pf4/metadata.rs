@@ -30,6 +30,9 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "pf4-dem-search-annotation-repeat" => Some(
             "contract-only: Stab measures selected flat annotation-bearing graphlike and hypergraph search repeat folding; broader nonzero-shift, nested, non-flat, numeric-target, separator-only, and non-annotation mixed-instruction repeat traversal remains capped or excluded",
         ),
+        "pf4-dem-search-mixed-zero-probability-repeat" => Some(
+            "contract-only: Stab measures selected mixed zero-probability plus active zero-shift graphlike and hypergraph search repeat folding; SAT/WCNF, nonzero-shift, non-flat, analyzer, ErrorMatcher, sampler, and broader DEM traversal remain scoped separately",
+        ),
         "pf4-dem-search-nested-repeat" => Some(
             "contract-only: Stab measures selected nested zero-detector-shift graphlike and hypergraph search repeat folding; broader nonzero-shift, shifted nested, non-flat, numeric-target, SAT/WCNF, analyzer, ErrorMatcher, and sampler repeat traversal remains capped or excluded",
         ),

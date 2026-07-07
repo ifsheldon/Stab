@@ -47,7 +47,7 @@ impl DetectorErrorModel {
                     DemInstructionKind::Error => {
                         let probability = instruction.args().first().copied().unwrap_or(0.0);
                         if probability == 0.0 {
-                            return Ok(None);
+                            continue;
                         }
                         let mut has_any_target = false;
                         let mut has_search_target = false;

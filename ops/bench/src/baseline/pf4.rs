@@ -125,6 +125,9 @@ pub(super) fn run_dem_transform_compare_row(
         "pf4-dem-search-annotation-repeat" => Ok(Some(
             search_repeat::run_dem_search_annotation_repeat_row(row)?,
         )),
+        "pf4-dem-search-mixed-zero-probability-repeat" => Ok(Some(
+            search_repeat::run_dem_search_mixed_zero_probability_repeat_row(row)?,
+        )),
         "pf4-dem-search-nested-repeat" => {
             Ok(Some(search_repeat::run_dem_search_nested_repeat_row(row)?))
         }

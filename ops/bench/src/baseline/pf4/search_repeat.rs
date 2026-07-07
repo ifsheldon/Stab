@@ -99,6 +99,38 @@ pub(super) fn run_dem_search_annotation_repeat_row(
     ])
 }
 
+pub(super) fn run_dem_search_mixed_zero_probability_repeat_row(
+    row: &BenchmarkRow,
+) -> Result<Vec<Measurement>, BenchError> {
+    let fixture = search_mixed_zero_probability_repeat_fixture(SEARCH_FLAT_REPEAT_COUNT);
+    let model = DetectorErrorModel::from_dem_str(&fixture)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+
+    Ok(vec![
+        measure_stab_batched(
+            "stab_pf4_dem_graphlike_mixed_zero_probability_repeat_fold",
+            TRANSFORM_REPETITIONS,
+            || {
+                let logical_error = shortest_graphlike_undetectable_logical_error(&model, false)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(dem_model_checksum(&logical_error));
+                Ok(())
+            },
+        )?,
+        measure_stab_batched(
+            "stab_pf4_dem_hyper_mixed_zero_probability_repeat_fold",
+            TRANSFORM_REPETITIONS,
+            || {
+                let logical_error =
+                    find_undetectable_logical_error(&model, usize::MAX, usize::MAX, false)
+                        .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(dem_model_checksum(&logical_error));
+                Ok(())
+            },
+        )?,
+    ])
+}
+
 pub(super) fn run_dem_search_nested_repeat_row(
     row: &BenchmarkRow,
 ) -> Result<Vec<Measurement>, BenchError> {
@@ -153,6 +185,17 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
                 "folded-annotated-target-errors/s",
             ))
         }
+        (
+            "pf4-dem-search-mixed-zero-probability-repeat",
+            "stab_pf4_dem_graphlike_mixed_zero_probability_repeat_fold",
+        )
+        | (
+            "pf4-dem-search-mixed-zero-probability-repeat",
+            "stab_pf4_dem_hyper_mixed_zero_probability_repeat_fold",
+        ) => Some((
+            (SEARCH_FLAT_REPEAT_COUNT as f64) * 2.0,
+            "folded-active-target-errors/s",
+        )),
         ("pf4-dem-search-nested-repeat", "stab_pf4_dem_graphlike_nested_repeat_fold")
         | ("pf4-dem-search-nested-repeat", "stab_pf4_dem_hyper_nested_repeat_fold") => Some((
             (SEARCH_FLAT_REPEAT_COUNT as f64) * (SEARCH_FLAT_REPEAT_COUNT as f64) * 2.0,
@@ -197,6 +240,19 @@ repeat {repeat_count} {{
     logical_observable L2
     error(0.1) D0
     error(0.2) D0 L0
+}}
+"
+    )
+}
+
+fn search_mixed_zero_probability_repeat_fixture(repeat_count: u64) -> String {
+    format!(
+        "\
+repeat {repeat_count} {{
+    error(0) D1000000 L1000
+    error(0.1) D0
+    shift_detectors 0
+    error(0.1) D0 L0
 }}
 "
     )

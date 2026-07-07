@@ -64,6 +64,13 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             ][..],
         ),
         (
+            "pf4-dem-search-mixed-zero-probability-repeat",
+            &[
+                "stab_pf4_dem_graphlike_mixed_zero_probability_repeat_fold",
+                "stab_pf4_dem_hyper_mixed_zero_probability_repeat_fold",
+            ][..],
+        ),
+        (
             "pf4-dem-search-nested-repeat",
             &[
                 "stab_pf4_dem_graphlike_nested_repeat_fold",
