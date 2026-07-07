@@ -172,3 +172,131 @@ fn detecting_regions_generated_unrotated_surface_code_filters_and_regions() {
         assert_eq!(actual[&logical][&tick].to_string(), expected);
     }
 }
+
+#[test]
+fn detecting_regions_generated_surface_code_memory_x_basis_regions() {
+    assert_surface_code_regions(
+        SurfaceCodeTask::RotatedMemoryX,
+        25,
+        &[
+            (
+                DemTarget::relative_detector(0).unwrap(),
+                [
+                    "+_XZX______________________",
+                    "+_XXX______________________",
+                    "+_XX_______________________",
+                    "+__X_______________________",
+                    "+__X_______________________",
+                    "+__X_______________________",
+                ],
+            ),
+            (
+                DemTarget::relative_detector(4).unwrap(),
+                [
+                    "+__Z_______________________",
+                    "+__X_______________________",
+                    "+__XX______________________",
+                    "+_XXX_____X________________",
+                    "+_XXX_____X________________",
+                    "+_XXX______________________",
+                ],
+            ),
+            (
+                DemTarget::logical_observable(0).unwrap(),
+                [
+                    "+_X______X______X__________",
+                    "+_X______X______X__________",
+                    "+_X______X_____XX__________",
+                    "+_X______X______X__________",
+                    "+_X______XX_____X__________",
+                    "+_X______X______X__________",
+                ],
+            ),
+        ],
+    );
+
+    assert_surface_code_regions(
+        SurfaceCodeTask::UnrotatedMemoryX,
+        37,
+        &[
+            (
+                DemTarget::relative_detector(0).unwrap(),
+                [
+                    "+XZX___X__________________",
+                    "+XXX___X__________________",
+                    "+XX___XX__________________",
+                    "+XX___X___________________",
+                    "+XX_______________________",
+                    "+_X_______________________",
+                ],
+            ),
+            (
+                DemTarget::relative_detector(4).unwrap(),
+                [
+                    "+________X___XZX___X______",
+                    "+________X___XXX___X______",
+                    "+_______XX___XX___XX______",
+                    "+________X___XX___X_______",
+                    "+____________XX___________",
+                    "+_____________X___________",
+                ],
+            ),
+            (
+                DemTarget::logical_observable(0).unwrap(),
+                [
+                    "+X_________X_________X____",
+                    "+X_________X_________X____",
+                    "+X_________X_________X____",
+                    "+X____X____X____X____X____",
+                    "+X_________X_________X____",
+                    "+X_________X_________X____",
+                ],
+            ),
+        ],
+    );
+}
+
+fn assert_surface_code_regions(
+    task: SurfaceCodeTask,
+    expected_target_count: usize,
+    expected_regions: &[(DemTarget, [&str; 6])],
+) {
+    let params = SurfaceCodeParams::new(
+        RoundCount::try_new(3).unwrap(),
+        CodeDistance::try_new(3).unwrap(),
+        task,
+    )
+    .unwrap();
+    let generated = generate_surface_code_circuit(&params).unwrap();
+    let circuit = generated.circuit();
+
+    let all_targets = all_detecting_region_targets(circuit).unwrap();
+    let all_ticks = all_detecting_region_ticks(circuit).unwrap();
+    assert_eq!(all_targets.len(), expected_target_count);
+    assert_eq!(all_ticks, (0..=20).collect::<Vec<_>>());
+
+    let selected_targets = expected_regions
+        .iter()
+        .map(|(target, _)| *target)
+        .collect::<Vec<_>>();
+    let actual = circuit_detecting_regions_for_targets(
+        circuit,
+        DetectingRegionTargetOptions {
+            targets: selected_targets,
+            ticks: all_ticks.iter().copied().take(6).collect(),
+            ignore_anticommutation_errors: false,
+        },
+    )
+    .unwrap();
+    assert_eq!(actual.len(), expected_regions.len());
+
+    for (target, per_tick) in expected_regions {
+        for (tick, expected) in per_tick.iter().enumerate() {
+            assert_eq!(
+                actual[target][&(tick as u64)].to_string(),
+                *expected,
+                "{task:?} {target} tick {tick}"
+            );
+        }
+    }
+}
