@@ -1,7 +1,9 @@
 use std::hint::black_box;
 use std::str::FromStr;
 
-use stab_core::{Circuit, CircuitInstruction, CircuitItem, Flow, Target};
+use stab_core::{
+    Circuit, CircuitInstruction, CircuitItem, Flow, Target, TimeReversedForFlowsOptions,
+};
 
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
@@ -118,47 +120,82 @@ const TIME_REVERSE_FLOW_MEASUREMENT_FLOW_FLIP_TEXTS: [&str; 4] = [
     "1 -> Z1",
     "1 -> Z0",
 ];
-const TIME_REVERSE_FLOW_MEASUREMENT_CASES: [(&str, &[&str]); 23] = [
-    ("MZZ 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_MZZ_TEXTS),
+const TIME_REVERSE_FLOW_MEASUREMENT_CASES: [(&str, &[&str], bool); 24] = [
+    ("MZZ 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_MZZ_TEXTS, false),
     (
         "MZZ 0 1\nH 0\nCX 0 1\nS 1\n",
         &TIME_REVERSE_FLOW_MEASUREMENT_MZZ_SUFFIX_TEXTS,
+        false,
     ),
-    ("M 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_M_MULTI_TEXTS),
+    (
+        "M 0 1\n",
+        &TIME_REVERSE_FLOW_MEASUREMENT_M_MULTI_TEXTS,
+        false,
+    ),
     (
         "MZZ 0 1 2 3\n",
         &TIME_REVERSE_FLOW_MEASUREMENT_MZZ_MULTI_TEXTS,
+        false,
     ),
-    ("M 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_M_TEXTS),
-    ("MX 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MX_TEXTS),
-    ("MY 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MY_TEXTS),
-    ("R 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_R_TEXTS),
-    ("RX 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_RX_TEXTS),
-    ("RY 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_RY_TEXTS),
-    ("R 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_R_MULTI_TEXTS),
-    ("RX 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_RX_MULTI_TEXTS),
-    ("RY 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_RY_MULTI_TEXTS),
-    ("MR 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MR_TEXTS),
-    ("MRX 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRX_TEXTS),
-    ("MRY 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRY_TEXTS),
-    ("MR 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_MR_MULTI_TEXTS),
-    ("MRX 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRX_MULTI_TEXTS),
-    ("MRY 0 1\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRY_MULTI_TEXTS),
+    ("M 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_M_TEXTS, false),
+    ("M 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_M_TEXTS, true),
+    ("MX 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MX_TEXTS, false),
+    ("MY 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MY_TEXTS, false),
+    ("R 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_R_TEXTS, false),
+    ("RX 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_RX_TEXTS, false),
+    ("RY 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_RY_TEXTS, false),
+    (
+        "R 0 1\n",
+        &TIME_REVERSE_FLOW_MEASUREMENT_R_MULTI_TEXTS,
+        false,
+    ),
+    (
+        "RX 0 1\n",
+        &TIME_REVERSE_FLOW_MEASUREMENT_RX_MULTI_TEXTS,
+        false,
+    ),
+    (
+        "RY 0 1\n",
+        &TIME_REVERSE_FLOW_MEASUREMENT_RY_MULTI_TEXTS,
+        false,
+    ),
+    ("MR 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MR_TEXTS, false),
+    ("MRX 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRX_TEXTS, false),
+    ("MRY 0\n", &TIME_REVERSE_FLOW_MEASUREMENT_MRY_TEXTS, false),
+    (
+        "MR 0 1\n",
+        &TIME_REVERSE_FLOW_MEASUREMENT_MR_MULTI_TEXTS,
+        false,
+    ),
+    (
+        "MRX 0 1\n",
+        &TIME_REVERSE_FLOW_MEASUREMENT_MRX_MULTI_TEXTS,
+        false,
+    ),
+    (
+        "MRY 0 1\n",
+        &TIME_REVERSE_FLOW_MEASUREMENT_MRY_MULTI_TEXTS,
+        false,
+    ),
     (
         "MR !0 1\n",
         &TIME_REVERSE_FLOW_MEASUREMENT_MR_INVERTED_TEXTS,
+        false,
     ),
     (
         "MRX !0\n",
         &TIME_REVERSE_FLOW_MEASUREMENT_MRX_INVERTED_TEXTS,
+        false,
     ),
     (
         "MRY 0 !1\n",
         &TIME_REVERSE_FLOW_MEASUREMENT_MRY_INVERTED_TEXTS,
+        false,
     ),
     (
         "MY 0\nMRX 0\nMR 1\nR 0\n",
         &TIME_REVERSE_FLOW_MEASUREMENT_FLOW_FLIP_TEXTS,
+        false,
     ),
 ];
 
@@ -284,9 +321,9 @@ pub(super) fn run_time_reverse_flow_measurement_row(
         || {
             let mut checksum = 0_u64;
             let mut reversed_flow_count = 0_usize;
-            for (circuit, flows) in &cases {
+            for (circuit, flows, options) in &cases {
                 let (reversed, reversed_flows) = circuit
-                    .time_reversed_for_flows(flows)
+                    .time_reversed_for_flows_with_options(flows, *options)
                     .map_err(|error| stab_runner_error(&row.id, error))?;
                 checksum ^= circuit_checksum(&reversed);
                 reversed_flow_count += reversed_flows.len();
@@ -349,7 +386,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "contract-only: Stab measures the scoped Rust Circuit::time_reversed_for_flows unitary subset; broader measurement-rich QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         "pf2-time-reverse-flow-measurement" => Some(
-            "contract-only: Stab measures the selected Rust Circuit::time_reversed_for_flows measurement-rich instruction, selected MZZ plus plain-unitary suffix, measurement-ordering, plain reset-to-measurement over one or more unique qubit targets, measurement-to-reset, measure-reset over one or more unique qubit targets including inverted result targets, and exact flow_flip packet; broader QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
+            "contract-only: Stab measures the selected Rust Circuit::time_reversed_for_flows measurement-rich instruction, selected MZZ plus plain-unitary suffix, measurement-ordering, plain reset-to-measurement over one or more unique qubit targets, measurement-to-reset including the selected dont_turn_measurements_into_resets option, measure-reset over one or more unique qubit targets including inverted result targets, and exact flow_flip packet; broader QEC inverse rewrites remain active follow-up work and pinned Stim has no faithful Rust direct baseline in this harness",
         ),
         _ => None,
     }
@@ -407,22 +444,27 @@ fn parse_flow_slice(row_id: &str, texts: &[&str]) -> Result<Vec<Flow>, BenchErro
 
 fn parse_time_reverse_measurement_cases(
     row_id: &str,
-) -> Result<Vec<(Circuit, Vec<Flow>)>, BenchError> {
+) -> Result<Vec<(Circuit, Vec<Flow>, TimeReversedForFlowsOptions)>, BenchError> {
     TIME_REVERSE_FLOW_MEASUREMENT_CASES
         .iter()
-        .map(|(circuit_text, flow_texts)| {
-            Ok((
-                parse_circuit(row_id, circuit_text)?,
-                parse_flow_slice(row_id, flow_texts)?,
-            ))
-        })
+        .map(
+            |(circuit_text, flow_texts, dont_turn_measurements_into_resets)| {
+                Ok((
+                    parse_circuit(row_id, circuit_text)?,
+                    parse_flow_slice(row_id, flow_texts)?,
+                    TimeReversedForFlowsOptions {
+                        dont_turn_measurements_into_resets: *dont_turn_measurements_into_resets,
+                    },
+                ))
+            },
+        )
         .collect()
 }
 
 fn time_reverse_measurement_flow_count() -> usize {
     TIME_REVERSE_FLOW_MEASUREMENT_CASES
         .iter()
-        .map(|(_, flows)| flows.len())
+        .map(|(_, flows, _)| flows.len())
         .sum()
 }
 

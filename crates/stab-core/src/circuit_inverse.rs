@@ -22,6 +22,17 @@ pub struct InverseQecOptions {
     pub keep_measurements: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct TimeReversedForFlowsOptions {
+    /// Keep selected measurements as measurements instead of converting them to resets.
+    ///
+    /// The current Rust API implements this option for the selected single-target
+    /// measurement-rich packet matching Stim v1.16.0's
+    /// `dont_turn_measurements_into_resets` example. Broader measurement-rich
+    /// time-reversal shapes remain governed by the existing selected subset.
+    pub dont_turn_measurements_into_resets: bool,
+}
+
 /// Returns the inverse of a circuit made only from supported unitary Clifford gates.
 ///
 /// Repeat blocks are inverted recursively. Non-unitary instructions return a circuit
@@ -102,8 +113,23 @@ pub fn circuit_time_reversed_for_flows(
     circuit: &Circuit,
     flows: &[Flow],
 ) -> CircuitResult<(Circuit, Vec<Flow>)> {
+    circuit_time_reversed_for_flows_with_options(
+        circuit,
+        flows,
+        TimeReversedForFlowsOptions::default(),
+    )
+}
+
+/// Returns the currently supported time-reversal subset for flows with explicit options.
+///
+/// See [`TimeReversedForFlowsOptions`] for the currently selected option scope.
+pub fn circuit_time_reversed_for_flows_with_options(
+    circuit: &Circuit,
+    flows: &[Flow],
+    options: TimeReversedForFlowsOptions,
+) -> CircuitResult<(Circuit, Vec<Flow>)> {
     if let Some(selected) = selected_measurement_rich_time_reversal(circuit)? {
-        return time_reverse_flows_with_sparse_validation(circuit, selected, flows);
+        return time_reverse_flows_with_sparse_validation(circuit, selected, flows, options);
     }
     if is_single_unpromoted_measurement_rich_instruction(circuit) {
         return Err(measurement_rich_time_reversal_error());
@@ -500,6 +526,7 @@ fn time_reverse_flows_with_sparse_validation(
     circuit: &Circuit,
     selected: SelectedMeasurementRichTimeReversal,
     flows: &[Flow],
+    options: TimeReversedForFlowsOptions,
 ) -> CircuitResult<(Circuit, Vec<Flow>)> {
     for (index, flow) in flows.iter().enumerate() {
         reject_unsupported_selected_reversal_terms(index, flow, &selected.kind)?;
@@ -515,7 +542,7 @@ fn time_reverse_flows_with_sparse_validation(
             )));
         }
     }
-    reverse_measurement_rich_flows(selected, flows)
+    reverse_measurement_rich_flows(selected, flows, options)
 }
 
 fn reject_unsupported_selected_reversal_terms(
@@ -550,15 +577,20 @@ fn reversed_pauli_only_flow(flow: &Flow) -> Flow {
 fn reverse_measurement_rich_flows(
     selected: SelectedMeasurementRichTimeReversal,
     flows: &[Flow],
+    options: TimeReversedForFlowsOptions,
 ) -> CircuitResult<(Circuit, Vec<Flow>)> {
     match &selected.kind {
         MeasurementRichTimeReversalKind::Measurement {
             reset_candidate: Some(reset_candidate),
             ..
-        } if should_turn_measurement_into_reset(reset_candidate, flows) => Ok((
-            measurement_to_reset_circuit(reset_candidate)?,
-            flows.iter().map(reversed_pauli_only_flow).collect(),
-        )),
+        } if !options.dont_turn_measurements_into_resets
+            && should_turn_measurement_into_reset(reset_candidate, flows) =>
+        {
+            Ok((
+                measurement_to_reset_circuit(reset_candidate)?,
+                flows.iter().map(reversed_pauli_only_flow).collect(),
+            ))
+        }
         MeasurementRichTimeReversalKind::ExactFlowFlip {
             input_flows,
             output_flows,

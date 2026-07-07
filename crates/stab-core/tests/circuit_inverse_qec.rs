@@ -5,7 +5,10 @@
 
 use std::str::FromStr;
 
-use stab_core::{Circuit, Flow, circuit_inverse_qec, circuit_time_reversed_for_flows};
+use stab_core::{
+    Circuit, Flow, TimeReversedForFlowsOptions, circuit_inverse_qec,
+    circuit_time_reversed_for_flows, circuit_time_reversed_for_flows_with_options,
+};
 
 #[test]
 fn circuit_inverse_qec_unitary_matches_stim() {
@@ -602,6 +605,29 @@ fn time_reversed_for_flows_measurement_rich_subset_turns_measurements_into_reset
         assert_eq!(actual_circuit, circuit(expected_circuit), "{circuit_text}");
         assert_eq!(actual_flows, vec![flow(expected_flow)], "{circuit_text}");
     }
+}
+
+#[test]
+fn time_reversed_for_flows_measurement_rich_subset_can_keep_measurements() {
+    // Adapted from Stim v1.16.0 Python time_reversed_for_flows
+    // dont_turn_measurements_into_resets example.
+    let options = TimeReversedForFlowsOptions {
+        dont_turn_measurements_into_resets: true,
+    };
+    let input = circuit("M 0\n");
+    let flows = [flow("Z0 -> rec[-1]")];
+
+    let (actual_circuit, actual_flows) =
+        circuit_time_reversed_for_flows_with_options(&input, &flows, options)
+            .expect("time reverse measurement without converting to reset");
+
+    assert_eq!(actual_circuit, input);
+    assert_eq!(actual_flows, vec![flow("1 -> Z0 xor rec[-1]")]);
+
+    let method_result = input
+        .time_reversed_for_flows_with_options(&flows, options)
+        .expect("method time reverse measurement without converting to reset");
+    assert_eq!(method_result, (actual_circuit, actual_flows));
 }
 
 #[test]

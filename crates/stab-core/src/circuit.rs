@@ -140,15 +140,21 @@ impl Circuit {
 
     /// Returns the currently supported time-reversal subset for flows.
     ///
-    /// The scoped Rust API accepts unsigned unitary flows plus selected
-    /// measurement-rich flows with measurement-record terms. Broader detector,
-    /// feedback, repeat, noise, and observable rewrites remain active follow-up
-    /// work.
+    /// Supports unsigned unitary flows and selected measurement-rich flows; broader detector, feedback, repeat, noise, and observable rewrites remain follow-up work.
     pub fn time_reversed_for_flows(
         &self,
         flows: &[crate::Flow],
     ) -> CircuitResult<(Self, Vec<crate::Flow>)> {
         crate::circuit_time_reversed_for_flows(self, flows)
+    }
+
+    /// Returns the selected time-reversal subset with explicit options.
+    pub fn time_reversed_for_flows_with_options(
+        &self,
+        flows: &[crate::Flow],
+        options: crate::TimeReversedForFlowsOptions,
+    ) -> CircuitResult<(Self, Vec<crate::Flow>)> {
+        crate::circuit_time_reversed_for_flows_with_options(self, flows, options)
     }
 
     /// Returns a circuit rewritten into the current base-gate simplification subset.
