@@ -19,6 +19,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
+## 2026-07-07 - PFM5: Broader Heralded-Noise Flow-Generator Boundary
+
+Status: Open
+Revealed by: PFM5 multi-target heralded flow-generator evidence hardening after promoting selected `HERALDED_ERASE` and `HERALDED_PAULI_CHANNEL_1` MPP cases.
+Current text: PFM5 says broader heralded-noise generator synthesis remains active after the pinned single-target heralded-noise MPP fixture landed.
+Gap: the selected evidence now covers pinned single-target heralded-noise MPP behavior plus exact multi-target `HERALDED_ERASE`, exact multi-target `HERALDED_PAULI_CHANNEL_1`, and a combined multi-target heralded-noise MPP case against pinned Stim v1.16.0 generator strings and checker satisfaction. The remaining broad phrase does not name additional legal circuits, invalid target shapes, comparator behavior, checker semantics for noisy flows, resource limits, oracle metadata, or benchmark policy. Treating it as implementation-ready would require inventing scope after the fact.
+Proposed amendment: keep selected single- and multi-target heralded-noise MPP cases as the complete heralded-noise `circuit_flow_generators` evidence currently selected by PFM5. Do not add another heralded-noise flow-generator row until a future plan names exact circuits, positive and negative target-shape behavior, exact or semantic comparator rules, checker expectations, resource-boundary behavior, oracle metadata, and benchmark or no-benchmark rationale.
+Resolution: Pending an exact-subcase plan for heralded-noise flow-generator parity beyond the selected MPP cases.
+
 ## 2026-07-07 - PFM3: Analyzer Sweep-Shape Boundary
 
 Status: Open

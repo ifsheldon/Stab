@@ -268,6 +268,68 @@ fn circuit_flow_generators_promotes_single_instruction_measurement_subset() {
 }
 
 #[test]
+fn circuit_flow_generators_measurement_promotes_multi_target_heralded_noise_mpp_subset() {
+    // Expected strings were probed from pinned Stim v1.16.0.
+    assert_eq!(
+        generator_strings(
+            "
+            HERALDED_ERASE(0.04) 0 2
+            MPP X0*X1*Z2
+        ",
+        ),
+        vec![
+            "1 -> rec[0]",
+            "1 -> rec[1]",
+            "1 -> XXZ xor rec[2]",
+            "__Z -> __Z",
+            "_X_ -> _X_",
+            "_ZX -> _ZX",
+            "X__ -> _XZ xor rec[2]",
+            "Z_X -> Z_X",
+        ]
+    );
+    assert_eq!(
+        generator_strings(
+            "
+            HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 0 2
+            MPP X0*Y1*Z2
+        ",
+        ),
+        vec![
+            "1 -> rec[0]",
+            "1 -> rec[1]",
+            "1 -> XYZ xor rec[2]",
+            "__Z -> __Z",
+            "_XX -> _XX",
+            "_ZX -> _ZX",
+            "X__ -> _YZ xor rec[2]",
+            "Z_X -> Z_X",
+        ]
+    );
+    assert_eq!(
+        generator_strings(
+            "
+            HERALDED_ERASE(0.04) 0 2
+            HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 1 2
+            MPP X0*Y1*Z2
+        ",
+        ),
+        vec![
+            "1 -> rec[0]",
+            "1 -> rec[1]",
+            "1 -> rec[2]",
+            "1 -> rec[3]",
+            "1 -> XYZ xor rec[4]",
+            "__Z -> __Z",
+            "_XX -> _XX",
+            "_ZX -> _ZX",
+            "X__ -> _YZ xor rec[4]",
+            "Z_X -> Z_X",
+        ]
+    );
+}
+
+#[test]
 fn circuit_flow_generators_promotes_python_multi_target_examples() {
     // Adapted from Stim v1.16.0 src/stim/util_top/circuit_flow_generators_test.py.
     assert_eq!(
@@ -354,6 +416,19 @@ fn circuit_flow_generators_measurement_subset_flows_satisfy_checker() {
         HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 1
         TICK
         MPP X0*Y1*Z2 Z0*Z1
+        ",
+        "
+        HERALDED_ERASE(0.04) 0 2
+        MPP X0*X1*Z2
+        ",
+        "
+        HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 0 2
+        MPP X0*Y1*Z2
+        ",
+        "
+        HERALDED_ERASE(0.04) 0 2
+        HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 1 2
+        MPP X0*Y1*Z2
         ",
     ] {
         let circuit = circuit(text);

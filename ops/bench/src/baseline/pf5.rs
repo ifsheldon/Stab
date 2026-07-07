@@ -13,8 +13,8 @@ use super::{measure_stab_iterations, stab_runner_error};
 const UTILITY_BATCH: usize = 4096;
 #[cfg(test)]
 const UTILITY_BATCH: usize = 2;
-const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 50;
-const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 158;
+const FLOW_GENERATOR_MEASUREMENT_CASES: usize = 51;
+const FLOW_GENERATOR_MEASUREMENT_FLOWS: usize = 168;
 const FLOW_GENERATOR_MEASUREMENT_PYTHON_CASES: usize = 4;
 const FLOW_GENERATOR_MEASUREMENT_PYTHON_FLOWS: usize = 32;
 const FLOW_SOLVE_MEASUREMENT_CASES: usize = 2;
@@ -93,7 +93,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     match row_id {
         "pf5-flow-generators-measurement-rich" => Some(
-            "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/inverted-measure-reset/pair-measurement/MPP/SPP/composed-measurement/unitary-mixed/annotation-noise-noop/bounded-repeat/feedback/sweep-controlled-Pauli/MPAD/heralded-noise subset without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/inverted-measure-reset/pair-measurement/MPP/SPP/composed-measurement/unitary-mixed/annotation-noise-noop/bounded-repeat/feedback/sweep-controlled-Pauli/MPAD/single-and-multi-target-heralded-noise subset without a faithful pinned Stim CLI timing ratio",
         ),
         "pf5-flow-generators-measurement-python" => Some(
             "report-only: Stab measures the Rust circuit_flow_generators promoted Python multi-target examples without a faithful pinned Stim CLI timing ratio",
@@ -316,6 +316,14 @@ fn flow_generator_measurement_rich_corpus(
             MPP X0*Y1*Z2 Z0*Z1
             ",
             8,
+        ),
+        (
+            "
+            HERALDED_ERASE(0.04) 0 2
+            HERALDED_PAULI_CHANNEL_1(0.01, 0.02, 0.03, 0.04) 1 2
+            MPP X0*Y1*Z2
+            ",
+            10,
         ),
     ]
     .into_iter()
