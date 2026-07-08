@@ -338,6 +338,125 @@ fn mpp_executes_across_current_public_surfaces() {
 }
 
 #[test]
+fn stochastic_mpp_executes_across_sampler_and_detection_surfaces() {
+    const SHOTS: usize = 4000;
+
+    let circuit = Circuit::from_stim_str("X 1\nMPP(0.25) Z0 Z1\n")
+        .expect("parse stochastic MPP sampler circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile stochastic MPP sampler");
+    let shots = sampler.sample_zero_one_with_seed(SHOTS, Some(31));
+
+    let first_flips = shots
+        .iter()
+        .filter(|shot| shot.first() == Some(&true))
+        .count();
+    let second_flips = shots
+        .iter()
+        .filter(|shot| shot.get(1) == Some(&false))
+        .count();
+    assert_binomial_5_sigma("MPP(0.25) Z0 flips", first_flips, SHOTS, 0.25);
+    assert_binomial_5_sigma("MPP(0.25) Z1 flips", second_flips, SHOTS, 0.25);
+    let mut sampler_buckets = [0usize; 4];
+    for shot in &shots {
+        let [first, second] = shot.as_slice() else {
+            panic!("expected two MPP sample bits, got {shot:?}");
+        };
+        let bucket = ((*first as usize) << 1) | (*second as usize);
+        *sampler_buckets
+            .get_mut(bucket)
+            .expect("two boolean bits produce a four-bucket index") += 1;
+    }
+    assert_binomial_5_sigma("MPP outputs 00", sampler_buckets[0], SHOTS, 0.1875);
+    assert_binomial_5_sigma("MPP outputs 01", sampler_buckets[1], SHOTS, 0.5625);
+    assert_binomial_5_sigma("MPP outputs 10", sampler_buckets[2], SHOTS, 0.0625);
+    assert_binomial_5_sigma("MPP outputs 11", sampler_buckets[3], SHOTS, 0.1875);
+
+    let converter_circuit =
+        Circuit::from_stim_str("MPP(0.25) Z0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n")
+            .expect("parse stochastic MPP converter circuit");
+    let converter = CompiledDetectionConverter::compile(
+        &converter_circuit,
+        DetectionConversionOptions {
+            skip_reference_sample: false,
+        },
+    )
+    .expect("compile stochastic MPP detection converter");
+    assert_eq!(
+        converter
+            .convert_record(&[false])
+            .expect("convert unflipped stochastic MPP record"),
+        DetectionEventRecord {
+            detectors: vec![false],
+            observables: vec![false],
+        }
+    );
+    assert_eq!(
+        converter
+            .convert_record(&[true])
+            .expect("convert flipped stochastic MPP record"),
+        DetectionEventRecord {
+            detectors: vec![true],
+            observables: vec![true],
+        }
+    );
+
+    let detection_output = sample_detection_events(&converter_circuit, SHOTS, Some(37))
+        .expect("sample stochastic MPP detection events");
+    assert_eq!(detection_output.detector_count, 1);
+    assert_eq!(detection_output.observable_count, 1);
+    let detector_flips = detection_output
+        .records
+        .iter()
+        .filter(|record| {
+            let [detector] = record.detectors.as_slice() else {
+                panic!("expected one detector bit, got {:?}", record.detectors);
+            };
+            let [observable] = record.observables.as_slice() else {
+                panic!("expected one observable bit, got {:?}", record.observables);
+            };
+            assert_eq!(
+                detector, observable,
+                "detector and observable should be sourced by the same stochastic product record"
+            );
+            *detector
+        })
+        .count();
+    assert_binomial_5_sigma("stochastic MPP detector flips", detector_flips, SHOTS, 0.25);
+
+    let frame_circuit = Circuit::from_stim_str(
+        "MPP(0.25) Z0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) Z1\n",
+    )
+    .expect("parse frame-path stochastic MPP circuit");
+    let frame_output = sample_detection_events(&frame_circuit, SHOTS, Some(41))
+        .expect("sample frame-path stochastic MPP detection events");
+    assert_eq!(frame_output.detector_count, 0);
+    assert_eq!(frame_output.observable_count, 2);
+    let frame_record_flips = frame_output
+        .records
+        .iter()
+        .filter(|record| {
+            let [record_observable, pauli_observable] = record.observables.as_slice() else {
+                panic!(
+                    "expected record-backed and Pauli-backed observables, got {:?}",
+                    record.observables
+                );
+            };
+            assert!(
+                !*pauli_observable,
+                "stochastic MPP should not introduce an unrelated Pauli-frame observable flip"
+            );
+            *record_observable
+        })
+        .count();
+    assert_binomial_5_sigma(
+        "frame-path stochastic MPP observable flips",
+        frame_record_flips,
+        SHOTS,
+        0.25,
+    );
+}
+
+#[test]
 fn variable_target_spp_execution_matches_decomposed_circuit() {
     let cases = [
         "SPP X0\nM 0\nDETECTOR rec[-1]\n",

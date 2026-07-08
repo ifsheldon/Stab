@@ -42,6 +42,6 @@ The goal is to prove the already implemented sampler and detection paths treat `
 ## Done Criteria
 
 - The focused Rust test passes without weakening deterministic `MPAD` or analyzer `MPAD(p)` coverage.
-- `oracle/fixtures/manifest.csv` includes `pf3-gate-mpad-stochastic-rust` as implemented structural evidence.
+- `oracle/fixtures/manifest.csv` includes `pf3-gate-mpad-stochastic-rust` as implemented statistical parity evidence with a structural Rust runner.
 - `docs/plans/pfm3-gate-semantic-boundary-scope.md`, `docs/plans/rpf3-sweep-gate-progress-report.md`, `docs/plans/non-deferred-partial-feature-milestones.md`, `docs/plans/partial-feature-inventory.md`, `docs/plans/rust-stim-drop-in-rewrite.md`, `docs/stab-feature-checklist.md`, and `docs/plans/milestone-spec-gaps.md` describe the selected stochastic sampler and detection evidence without claiming full legal non-tableau parity.
 - `cargo test -p stab-core --test gate_semantic_execution stochastic_mpad --quiet`, `cargo test -p stab-core --test gate_semantic_execution mpad --quiet`, `cargo test -p stab-oracle fixtures --quiet`, `just oracle::run --milestone PF3 --structural`, and `just bench::smoke` pass before commit.
