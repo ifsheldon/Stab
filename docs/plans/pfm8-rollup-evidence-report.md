@@ -6,7 +6,7 @@ Status: In progress, not a final PFM8 completion report.
 
 ## Scope
 
-This report records the current PFM8 evidence state after the PFM0 evidence-lock cleanup committed as `1f80348 docs(plans): lock broad partial-feature scope`.
+This report records the current PFM8 evidence state after the PFM0 evidence-lock cleanup committed as `1f80348 docs(plans): lock broad partial-feature scope` and the selected PFM2 MPAD duplicate observable-id record parity slice committed as `3e30552 fix(core): merge duplicate MPAD observable records`.
 It covers the rollup layer only: `Rust core library equivalent for core Stim semantics`, `.stim`/`.dem`/result-format compatibility, `Full semantic execution of every legal circuit operation`, `Highest-priority remaining feature gaps`, and the selected CLI binary status.
 It does not add production behavior, promote a new active feature subcase, or claim full Stim parity.
 
@@ -25,9 +25,10 @@ The original PFM8 snapshot passed `just oracle::run --implemented-only` on 2026-
 After the selected deterministic `MPAD` evidence row was added, `just oracle::run --implemented-only` passed again on 2026-07-08 from `HEAD=e8d16e722145` with `local_modifications=true` for the PF3 `MPAD` test, oracle metadata, and documentation synchronization edits, including `pf3-gate-mpad-execution-rust` plus the selected PF1 through PF7 executable rows for circuit APIs, gate metadata, transforms, sweep handling, DEM APIs, folded traversal subsets, detector utilities, measurement-rich flows, analyzer/search/sparse-tracker slices, selected CLI parity, and selected legacy dispatch.
 After the selected noisy `MPAD(p)` analyzer evidence row was added, `just oracle::run --implemented-only` passed again locally with `local_modifications=true` for the analyzer fix, PF3 exact-output row `pf3-analyze-errors-mpad-noisy-cli`, and documentation synchronization edits.
 After the selected deterministic `MPP` evidence row was added, PF3 structural oracle evidence passed on 2026-07-08 from `HEAD=efb4d47` with `local_modifications=true` for the PF3 `MPP` test, oracle metadata, and documentation synchronization edits, including `pf3-gate-mpp-execution-rust`.
+After the selected PFM2 MPAD duplicate observable-id record parity slice was committed, `just oracle::run --implemented-only` passed on 2026-07-08 from clean committed `HEAD=3e305525bc9c` with `local_modifications=false`, including `pf2-inverse-qec-mpad-rust`.
 
 Metadata evidence is healthy for the current manifests.
-The current PFM8 verification pass reran oracle, matrix, and benchmark metadata checks after the PFM0 evidence-lock commit and the PF3 `MPP` and `MPAD` evidence updates, and found no implemented oracle drift or manifest parsing failure.
+The current PFM8 verification pass reran oracle, matrix, and benchmark metadata checks after the PFM0 evidence-lock commit, the PF3 `MPP` and `MPAD` evidence updates, and the PFM2 MPAD duplicate observable-id record parity slice, and found no implemented oracle drift or manifest parsing failure.
 
 ## Rollup Classification
 
@@ -44,7 +45,7 @@ The current PFM8 verification pass reran oracle, matrix, and benchmark metadata 
 The current blockers are no longer hidden broad upstream files.
 They are named under-specification entries that require future exact-subcase plans before implementation:
 
-- PFM2 broader QEC inverse, measurement-rich transform, and repeat-contained feedback behavior beyond the selected packets.
+- PFM2 broader QEC inverse, measurement-rich transform, and repeat-contained feedback behavior beyond the selected packets, including broader MPAD inverse-QEC shapes beyond selected record-only duplicate observable-id merging.
 - PFM3 broader analyzer sweep-shape behavior and legal non-tableau execution beyond the selected sweep matrix, fixed-tableau execution, supported Hermitian `SPP` or `SPP_DAG`, deterministic `MPP`, deterministic `MPAD`, and selected noisy `MPAD(p)` analyzer boundary.
 - PFM4 broader DEM folded traversal, coordinate traversal, and generated-loop analyzer-output dependencies beyond the selected consumers and documented caps.
 - PFM5 broader detecting-region, `missing_detectors`, flow-generator, solver, diagnostic, folded-repeat, and transform-integration families beyond promoted evidence.
@@ -66,7 +67,7 @@ The correct next implementation step is not to mark broad rows done, but to choo
 
 ## Verification
 
-Completed in this PFM8 evidence pass:
+Completed in the original PFM8 evidence pass before this refresh:
 
 - `cargo test -p stab-oracle fixtures --quiet`
 - `cargo test -p stab-bench --quiet`
@@ -77,6 +78,15 @@ Completed in this PFM8 evidence pass:
 - `just bench::smoke`
 - `git diff --check`
 - `git diff --cached --check`
+
+The latest PFM0 refresh subset below was rerun before this documentation update from clean committed `HEAD=3e305525bc9c` with `local_modifications=false`:
+
+- `cargo test -p stab-oracle fixtures --quiet`
+- `just oracle::list`
+- `just oracle::matrix --check`
+- `just bench::list`
+- `just bench::smoke`
+- `just oracle::run --implemented-only`
 
 Still required before any final PFM8 completion claim:
 

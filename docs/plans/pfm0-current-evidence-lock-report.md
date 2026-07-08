@@ -2,7 +2,7 @@
 
 ## Summary
 
-This PFM0 pass rechecked the current partial-feature closure state after the PF5 signed sampled flow slice, later PF2/PF5/PF6 evidence slices, and the selected generated surface-code memory-X detecting-region evidence.
+This PFM0 pass rechecked the current partial-feature closure state after the PF5 signed sampled flow slice, later PF2/PF5/PF6 evidence slices, the selected generated surface-code memory-X detecting-region evidence, and the selected PFM2 MPAD duplicate observable-id record parity slice.
 No production code change is selected by this report because the inspected candidate surfaces already have source-owned executable evidence, explicit owner milestones, deliberately scoped parity contracts, or an under-specification entry that must be resolved before implementation.
 
 This is not a final PFM8 completion report.
@@ -55,13 +55,15 @@ The scope is locked in `docs/plans/pfm5-signed-sampled-flow-inverted-record-obse
 
 ## Tooling Evidence
 
-The PFM0 metadata and manifest checks passed from the current worktree:
+The PFM0 metadata, manifest, benchmark-smoke, and implemented-oracle checks passed from clean committed `HEAD=3e305525bc9c` with `local_modifications=false` before this documentation refresh:
 
 ```sh
 cargo test -p stab-oracle fixtures --quiet
 just oracle::list
 just oracle::matrix --check
 just bench::list
+just bench::smoke
+just oracle::run --implemented-only
 ```
 
 `just oracle::list` still lists red or manifest-only rows where expected, such as exact upstream help text and broad future extraction contracts.
@@ -70,6 +72,8 @@ The command was used here as a metadata/listing health check, not as a claim tha
 `just oracle::matrix --check` passed with 313 compatibility-matrix rows.
 `cargo test -p stab-oracle fixtures --quiet` passed 45 fixture tests.
 `just bench::list` parsed and listed the primary, report-only, non-primary, and PF placeholder benchmark metadata without adding PF report-only rows to the primary performance gate.
+`just bench::smoke` passed with 153 planned benchmark rows.
+`just oracle::run --implemented-only` passed, including the selected `pf2-inverse-qec-mpad-rust` row and the existing PF1 through PF7 executable evidence rows.
 
 ## Next Implementation Candidates
 
@@ -148,3 +152,13 @@ They are now explicitly logged as open under-specification entries in `docs/plan
 No production behavior changed in this cleanup.
 The purpose is to prevent the next implementation slice from reopening whole upstream files or vague feature families after the current exact evidence packets have already been promoted.
 Future work in these areas must first name exact circuits or models, positive and negative tests, comparator behavior, resource boundaries, oracle metadata, benchmark policy or no-benchmark rationale, and documentation updates.
+
+## 2026-07-08 Addendum: PFM2 MPAD Duplicate Observable-Id Evidence
+
+This addendum records the selected PFM2 evidence-hardening slice committed as `3e30552 fix(core): merge duplicate MPAD observable records`.
+The slice implements and proves record-only duplicate `OBSERVABLE_INCLUDE` id merging after MPAD-generated measurement records for the currently selected inverse-QEC boundary.
+The source-owned Rust test evidence includes the MPAD inverse-QEC cases for duplicate observable ids, separated observable ids, existing-detector tails, and out-of-order observable ids, and oracle row `pf2-inverse-qec-mpad-rust` now selects the behavior.
+
+The evidence is intentionally narrow.
+It does not implement broader MPAD Pauli-observable tails, duplicate observable-id merging with non-record targets, repeat-contained MPAD/QEC inverse behavior, feedback-interleaved MPAD inverse behavior, or a full multi-instruction QEC inverse contract.
+Those broader shapes remain governed by `docs/plans/milestone-spec-gaps.md` and require a future exact-subcase plan before coding.
