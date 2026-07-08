@@ -6,7 +6,7 @@ Status: In progress, not a final PFM8 completion report.
 
 ## Scope
 
-This report records the current PFM8 evidence state after the PFM0 evidence-lock cleanup committed as `1f80348 docs(plans): lock broad partial-feature scope` and the selected PFM2 MPAD duplicate observable-id record parity slice committed as `3e30552 fix(core): merge duplicate MPAD observable records`.
+This report records the current PFM8 evidence state after the PFM0 broad active-wording reconciliation committed as `1f80348 docs(plans): lock broad partial-feature scope`, the clean PFM0 evidence refresh committed as `8f80612 docs(plans): refresh PFM0 evidence lock`, the selected PFM2 MPAD duplicate observable-id record parity slice committed as `3e30552 fix(core): merge duplicate MPAD observable records`, the selected PFM5 observable-neutral final-repeat missing-detector slice committed as `525d734 fix(core): fold observable-neutral missing-detector repeats`, and the selected PFM2 pinned feedback public-method evidence repair committed as `0cf2d3e test(core): pin feedback transform evidence`.
 It covers the rollup layer only: `Rust core library equivalent for core Stim semantics`, `.stim`/`.dem`/result-format compatibility, `Full semantic execution of every legal circuit operation`, `Highest-priority remaining feature gaps`, and the selected CLI binary status.
 It does not add production behavior, promote a new active feature subcase, or claim full Stim parity.
 
@@ -21,14 +21,12 @@ It does not add production behavior, promote a new active feature subcase, or cl
 ## Current Evidence Snapshot
 
 Implemented oracle evidence is healthy for the current selected Rust and CLI surface.
-The original PFM8 snapshot passed `just oracle::run --implemented-only` on 2026-07-08 from `HEAD=1f80348` with `local_modifications=true` for docs-only PFM8 report and cross-link edits.
-After the selected deterministic `MPAD` evidence row was added, `just oracle::run --implemented-only` passed again on 2026-07-08 from `HEAD=e8d16e722145` with `local_modifications=true` for the PF3 `MPAD` test, oracle metadata, and documentation synchronization edits, including `pf3-gate-mpad-execution-rust` plus the selected PF1 through PF7 executable rows for circuit APIs, gate metadata, transforms, sweep handling, DEM APIs, folded traversal subsets, detector utilities, measurement-rich flows, analyzer/search/sparse-tracker slices, selected CLI parity, and selected legacy dispatch.
-After the selected noisy `MPAD(p)` analyzer evidence row was added, `just oracle::run --implemented-only` passed again locally with `local_modifications=true` for the analyzer fix, PF3 exact-output row `pf3-analyze-errors-mpad-noisy-cli`, and documentation synchronization edits.
-After the selected deterministic `MPP` evidence row was added, PF3 structural oracle evidence passed on 2026-07-08 from `HEAD=efb4d47` with `local_modifications=true` for the PF3 `MPP` test, oracle metadata, and documentation synchronization edits, including `pf3-gate-mpp-execution-rust`.
+Earlier PFM8 snapshots recorded local-modification evidence while the report, PF3 `MPAD`, noisy `MPAD(p)`, and deterministic `MPP` evidence rows were still being synchronized.
 After the selected PFM2 MPAD duplicate observable-id record parity slice was committed, `just oracle::run --implemented-only` passed on 2026-07-08 from clean committed `HEAD=3e305525bc9c` with `local_modifications=false`, including `pf2-inverse-qec-mpad-rust`.
+After the PFM0 evidence-lock cleanup, selected PFM5 observable-neutral final-repeat missing-detector slice, and selected PFM2 pinned feedback public-method evidence repair landed, the current refresh passed again on 2026-07-08 from clean committed `HEAD=0cf2d3eee423` with `local_modifications=false`, including `pf5-missing-detectors-observable-neutral-final-repeat-rust` and `pf2-feedback-inline-pinned-upstream-rust`.
 
 Metadata evidence is healthy for the current manifests.
-The current PFM8 verification pass reran oracle, matrix, and benchmark metadata checks after the PFM0 evidence-lock commit, the PF3 `MPP` and `MPAD` evidence updates, and the PFM2 MPAD duplicate observable-id record parity slice, and found no implemented oracle drift or manifest parsing failure.
+The current PFM8 verification pass reran oracle, matrix, and benchmark metadata checks after the latest committed PFM0, PFM2, and PFM5 evidence slices, and found no implemented oracle drift or manifest parsing failure.
 
 ## Rollup Classification
 
@@ -45,7 +43,7 @@ The current PFM8 verification pass reran oracle, matrix, and benchmark metadata 
 The current blockers are no longer hidden broad upstream files.
 They are named under-specification entries that require future exact-subcase plans before implementation:
 
-- PFM2 broader QEC inverse, measurement-rich transform, and repeat-contained feedback behavior beyond the selected packets, including broader MPAD inverse-QEC shapes beyond selected record-only duplicate observable-id merging.
+- PFM2 broader QEC inverse, measurement-rich transform, and repeat-contained feedback behavior beyond the selected packets, including broader MPAD inverse-QEC shapes beyond selected record-only duplicate observable-id merging and broader feedback shapes beyond pinned public-method exact-output evidence.
 - PFM3 broader analyzer sweep-shape behavior and legal non-tableau execution beyond the selected sweep matrix, fixed-tableau execution, supported Hermitian `SPP` or `SPP_DAG`, deterministic `MPP`, deterministic `MPAD`, and selected noisy `MPAD(p)` analyzer boundary.
 - PFM4 broader DEM folded traversal, coordinate traversal, and generated-loop analyzer-output dependencies beyond the selected consumers and documented caps.
 - PFM5 broader detecting-region, `missing_detectors`, flow-generator, solver, diagnostic, folded-repeat, and transform-integration families beyond promoted evidence.
@@ -79,7 +77,7 @@ Completed in the original PFM8 evidence pass before this refresh:
 - `git diff --check`
 - `git diff --cached --check`
 
-The latest PFM0 refresh subset below was rerun before this documentation update from clean committed `HEAD=3e305525bc9c` with `local_modifications=false`:
+The latest source-of-truth refresh subset below was rerun before this documentation update from clean committed `HEAD=0cf2d3eee423` with `local_modifications=false`:
 
 - `cargo test -p stab-oracle fixtures --quiet`
 - `just oracle::list`

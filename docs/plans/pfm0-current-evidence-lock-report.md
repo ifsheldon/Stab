@@ -2,7 +2,7 @@
 
 ## Summary
 
-This PFM0 pass rechecked the current partial-feature closure state after the PF5 signed sampled flow slice, later PF2/PF5/PF6 evidence slices, the selected generated surface-code memory-X detecting-region evidence, and the selected PFM2 MPAD duplicate observable-id record parity slice.
+This PFM0 pass rechecked the current partial-feature closure state after the PF5 signed sampled flow slice, later PF2/PF5/PF6 evidence slices, the selected generated surface-code memory-X detecting-region evidence, the selected PFM2 MPAD duplicate observable-id record parity slice, the selected PFM5 observable-neutral final-repeat missing-detector slice, and the selected PFM2 pinned feedback public-method evidence repair.
 No production code change is selected by this report because the inspected candidate surfaces already have source-owned executable evidence, explicit owner milestones, deliberately scoped parity contracts, or an under-specification entry that must be resolved before implementation.
 
 This is not a final PFM8 completion report.
@@ -55,7 +55,7 @@ The scope is locked in `docs/plans/pfm5-signed-sampled-flow-inverted-record-obse
 
 ## Tooling Evidence
 
-The PFM0 metadata, manifest, benchmark-smoke, and implemented-oracle checks passed from clean committed `HEAD=3e305525bc9c` with `local_modifications=false` before this documentation refresh:
+The PFM0 metadata, manifest, benchmark-smoke, and implemented-oracle checks passed from clean committed `HEAD=0cf2d3eee423` with `local_modifications=false` before this documentation refresh:
 
 ```sh
 cargo test -p stab-oracle fixtures --quiet
@@ -73,7 +73,7 @@ The command was used here as a metadata/listing health check, not as a claim tha
 `cargo test -p stab-oracle fixtures --quiet` passed 45 fixture tests.
 `just bench::list` parsed and listed the primary, report-only, non-primary, and PF placeholder benchmark metadata without adding PF report-only rows to the primary performance gate.
 `just bench::smoke` passed with 153 planned benchmark rows.
-`just oracle::run --implemented-only` passed, including the selected `pf2-inverse-qec-mpad-rust` row and the existing PF1 through PF7 executable evidence rows.
+`just oracle::run --implemented-only` passed, including the selected `pf2-inverse-qec-mpad-rust`, `pf5-missing-detectors-observable-neutral-final-repeat-rust`, and `pf2-feedback-inline-pinned-upstream-rust` rows and the existing PF1 through PF7 executable evidence rows.
 
 ## Next Implementation Candidates
 
@@ -162,3 +162,23 @@ The source-owned Rust test evidence includes the MPAD inverse-QEC cases for dupl
 The evidence is intentionally narrow.
 It does not implement broader MPAD Pauli-observable tails, duplicate observable-id merging with non-record targets, repeat-contained MPAD/QEC inverse behavior, feedback-interleaved MPAD inverse behavior, or a full multi-instruction QEC inverse contract.
 Those broader shapes remain governed by `docs/plans/milestone-spec-gaps.md` and require a future exact-subcase plan before coding.
+
+## 2026-07-08 Addendum: PFM5 Observable-Neutral Final-Repeat Evidence
+
+This addendum records the selected PFM5 folded-repeat evidence slice committed as `525d734 fix(core): fold observable-neutral missing-detector repeats`.
+The slice proves that `missing_detectors` may fold a huge final repeat body with top-level record-only `OBSERVABLE_INCLUDE` rows only when those observable rows are redundant under independent detector evidence and the stripped proof body still produces an empty suffix with an unchanged tracker.
+The source-owned Rust tests cover known-input and reset-prefix positive cases plus observable-only, observable-dependent, Pauli-observable, and nested-observable fallback cases, and oracle row `pf5-missing-detectors-observable-neutral-final-repeat-rust` selects the evidence.
+
+The evidence is intentionally narrow.
+It does not implement arbitrary observable-row folding, nested observable folding, observable-dependent repeat proofs, generated-code suffix closure, Python API parity, or broad flow-dependent missing-detector solving.
+Those broader shapes remain governed by `docs/plans/milestone-spec-gaps.md` and require a future exact-subcase plan before coding.
+
+## 2026-07-08 Addendum: PFM2 Pinned Feedback Public-Method Evidence
+
+This addendum records the selected PFM2 evidence repair committed as `0cf2d3e test(core): pin feedback transform evidence`.
+The slice ports pinned Stim v1.16.0 `demolition_feedback` and `interleaved_feedback_does_not_reorder_operations` cases as exact canonical-output public `Circuit::with_inlined_feedback` tests.
+Oracle row `pf2-feedback-inline-pinned-upstream-rust` now selects that focused evidence, while `pf2-feedback-inline-scoped-rust` remains the broader selected integration and rejection row.
+
+The evidence is intentionally narrow.
+It does not add new feedback gate families, change repeat-contained feedback behavior, alter `m2d --ran_without_feedback`, or claim full `Circuit.with_inlined_feedback` parity.
+Broader repeat-contained feedback remains governed by `docs/plans/milestone-spec-gaps.md` and requires a future exact-subcase plan before coding.
