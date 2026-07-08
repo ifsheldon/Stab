@@ -482,6 +482,54 @@ fn pf5_missing_detectors_nested_final_repeat_folds_local_bodies()
     Ok(())
 }
 
+#[test]
+fn pf5_missing_detectors_observable_neutral_final_repeat_folds_redundant_observables()
+-> Result<(), Box<dyn std::error::Error>> {
+    require_missing_eq(
+        "REPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) rec[-1]\n    DETECTOR rec[-1]\n}\n",
+        false,
+        "",
+        "final repeat with detector-covered record-only observable row",
+    )?;
+    require_missing_eq(
+        "R 0\nREPEAT 1000001 {\n    M 0\n    M 0\n    OBSERVABLE_INCLUDE(0) rec[-1] rec[-2]\n    DETECTOR rec[-1]\n    DETECTOR rec[-2]\n}\n",
+        true,
+        "",
+        "reset-prefix final repeat with detector-covered multi-record observable row",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn pf5_missing_detectors_observable_neutral_final_repeat_keeps_dependent_bodies_capped()
+-> Result<(), Box<dyn std::error::Error>> {
+    require_missing_error_contains(
+        "REPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
+        true,
+        "expanded repeat iterations",
+        "observable-dependent final repeat",
+    )?;
+    require_missing_error_contains(
+        "REPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) rec[-1]\n    OBSERVABLE_INCLUDE(0) rec[-1]\n}\n",
+        true,
+        "expanded repeat iterations",
+        "duplicate observable-dependent final repeat",
+    )?;
+    require_missing_error_contains(
+        "REPEAT 1000001 {\n    M 0\n    OBSERVABLE_INCLUDE(0) X0\n    DETECTOR rec[-1]\n}\n",
+        true,
+        "expanded repeat iterations",
+        "Pauli observable target in final repeat",
+    )?;
+    require_missing_error_contains(
+        "REPEAT 1000001 {\n    REPEAT 2 {\n        M 0\n        OBSERVABLE_INCLUDE(0) rec[-1]\n        DETECTOR rec[-1]\n    }\n}\n",
+        true,
+        "expanded repeat iterations",
+        "nested observable row in final repeat body",
+    )?;
+    Ok(())
+}
+
 fn over_depth_nested_repeat_circuit(depth: usize) -> Result<Circuit, Box<dyn std::error::Error>> {
     let mut body = Circuit::from_stim_str("M 0\nDETECTOR rec[-1]\n")?;
     for _ in 0..depth {

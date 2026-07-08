@@ -2,7 +2,7 @@
 
 ## Summary
 
-This PFM5 slice promoted the first bounded proof of folded repeat traversal in the Rust `missing_detectors` utility, and [pfm5-missing-detectors-nested-final-repeat-scope.md](pfm5-missing-detectors-nested-final-repeat-scope.md) extends that proof to bounded nested local repeat bodies.
+This PFM5 slice promoted the first bounded proof of folded repeat traversal in the Rust `missing_detectors` utility, [pfm5-missing-detectors-nested-final-repeat-scope.md](pfm5-missing-detectors-nested-final-repeat-scope.md) extends that proof to bounded nested local repeat bodies, and [pfm5-missing-detectors-observable-neutral-final-repeat-scope.md](pfm5-missing-detectors-observable-neutral-final-repeat-scope.md) extends it to selected top-level record-only observable rows that are redundant under independent detector evidence.
 It does not claim general folded missing-detector output, generated-code suffix closure, Python API parity, or arbitrary repeat-contained flow solving.
 
 ## Owned Surface
@@ -11,7 +11,7 @@ It does not claim general folded missing-detector output, generated-code suffix 
 - Checklist row: detector-analysis utility APIs.
 - Active plan row: PFM5 `missing_detectors` folded large-repeat traversal.
 - Comparator class: structural Rust parity and resource-boundary evidence.
-- Oracle row: extend the existing `pf5-missing-detectors-repeat-rust` structural row.
+- Oracle row: extend the existing `pf5-missing-detectors-repeat-rust` structural row for the original slice, with focused follow-up rows for nested-final-repeat and observable-neutral final-repeat evidence.
 - Benchmark row: no new benchmark row because this slice changes a resource-boundary fast path that returns an empty suffix and does not introduce a representative throughput workload separate from `pf5-missing-detectors-generated-code` or `pf5-missing-detectors-mpp`.
 
 ## Selected Positive Scope
@@ -20,7 +20,7 @@ Stab should accept a final top-level `REPEAT` whose expanded count would exceed 
 
 - The repeat has only flat body traversal from this original slice, or bounded nested local repeat body traversal from the follow-up nested-final-repeat slice.
 - Every measurement-record target inside the repeat body refers to a measurement produced inside the same repeat body iteration.
-- The repeat body contains no `OBSERVABLE_INCLUDE` instruction.
+- The repeat body contains no `OBSERVABLE_INCLUDE` instruction, except for the selected observable-neutral follow-up where top-level record-only observable rows are removed from the proof body and detector rows independently prove coverage.
 - The bounded prefix has no missing-detector suffix before the repeat.
 - Processing one iteration of the repeat body produces no missing-detector suffix.
 - Processing one iteration leaves the invariant tracker unchanged from the state immediately before the repeat.
@@ -33,7 +33,7 @@ The selected positive examples are deterministic measurement loops whose local d
 - Repeats that would produce a non-empty missing-detector suffix remain capped instead of materializing enormous output.
 - Repeats whose body changes tracker state remain capped unless a later slice proves a separate fold rule.
 - Repeats whose body references measurement records from before the body remain capped because one folded body is not enough evidence for cross-iteration or prefix-dependent row behavior.
-- Repeats whose body contains `OBSERVABLE_INCLUDE` remain capped because observable rows merge by observable id across iterations.
+- Repeats whose body contains `OBSERVABLE_INCLUDE` remain capped unless the observable-neutral follow-up proves top-level record-only observable rows are redundant under independent detector evidence; observable-only bodies, observable-dependent bodies, Pauli observable targets, and nested observable rows remain capped because observable rows merge by observable id across iterations.
 - Repeats whose prefix or body cannot be processed by the current missing-detector analyzer remain capped by the original repeat budget instead of returning proof-run errors.
 - Nested large repeats remain capped by the existing repeat budget.
 - Generated honeycomb, toric, and broader generated-code suffix analysis are not expanded by this slice.
@@ -44,7 +44,7 @@ The selected positive examples are deterministic measurement loops whose local d
 - Add a positive resource-boundary test proving a large final deterministic repeat with local detector rows returns an empty suffix instead of failing the expanded-repeat budget.
 - Add a positive test for the reset-in-prefix form to cover the tracker-unchanged proof shape selected by this slice.
 - Keep the existing excessive-repeat tests for non-selected output-heavy and work-heavy repeat bodies.
-- Add negative tests proving cross-iteration record references, observable rows, unsupported local bodies, and tracker-changing repeated bodies remain capped.
+- Add negative tests proving cross-iteration record references, observable-dependent rows, unsupported local bodies, and tracker-changing repeated bodies remain capped.
 
 ## Done Criteria
 

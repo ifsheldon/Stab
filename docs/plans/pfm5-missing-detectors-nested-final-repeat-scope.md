@@ -33,7 +33,7 @@ The selected positive examples are deterministic final-repeat loops where nested
 - Nested repeat bodies that reference measurement records from before the nested body remain capped because one nested folded body is not enough evidence for cross-iteration or prefix-dependent row behavior.
 - Nested large repeats inside the proof body remain capped by the existing repeat budget.
 - Repeats whose body changes tracker state remain capped unless a later slice proves a separate fold rule.
-- Repeats whose body contains `OBSERVABLE_INCLUDE` remain capped because observable rows merge by observable id across iterations.
+- Repeats whose body contains `OBSERVABLE_INCLUDE` remain capped for this nested-final-repeat slice because observable rows merge by observable id across iterations; the later [pfm5-missing-detectors-observable-neutral-final-repeat-scope.md](pfm5-missing-detectors-observable-neutral-final-repeat-scope.md) selects only top-level record-only observable rows that are redundant under independent detector evidence.
 - Repeats whose prefix or body cannot be processed by the current missing-detector analyzer remain capped by the original repeat budget instead of returning proof-run errors.
 - Generated honeycomb, toric, and broader generated-code suffix analysis are not expanded by this slice.
 - Python binding behavior and exact C++ implementation internals remain out of scope.
@@ -43,7 +43,7 @@ The selected positive examples are deterministic final-repeat loops where nested
 - Add `pf5_missing_detectors_nested_final_repeat_folds_local_bodies` proving a final large deterministic repeat with bounded nested local detector rows returns an empty suffix instead of failing the expanded-repeat budget.
 - Add `pf5_missing_detectors_nested_final_repeat_folds_local_bodies` coverage proving detector rows after a bounded nested repeat may refer to records produced by that nested repeat within the same outer body.
 - Add `pf5_missing_detectors_nested_final_repeat_keeps_unselected_bodies_capped` proving nested cross-iteration record references, nested large repeats, and public-API over-depth nested repeats remain capped.
-- Keep the existing fallback tests for observable rows, unsupported local bodies, tracker-changing bodies, and excessive repeat expansion.
+- Keep the existing fallback tests for observable-dependent rows, nested observable rows, unsupported local bodies, tracker-changing bodies, and excessive repeat expansion.
 
 ## Done Criteria
 
