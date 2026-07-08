@@ -20,7 +20,7 @@ The CLI comparator is exact-output oracle parity against pinned Stim v1.16.0 for
 ## Negative Scope
 
 - This slice does not claim exact random-stream parity for stochastic pad sampling.
-- This slice does not promote broader stochastic `MPAD(p)` behavior outside the analyzer and already implemented sampler or detection-conversion surfaces.
+- This slice does not promote broader stochastic `MPAD(p)` behavior outside the analyzer. The selected sampler and detection-sampling record-flip behavior is owned separately by `docs/plans/pfm3-stochastic-mpad-sampler-detection-scope.md`.
 - This slice does not select another legal non-tableau gate family.
 
 ## Resource Behavior

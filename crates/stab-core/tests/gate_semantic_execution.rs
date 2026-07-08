@@ -133,6 +133,119 @@ fn mpad_executes_across_current_public_surfaces() {
 }
 
 #[test]
+fn stochastic_mpad_executes_across_sampler_and_detection_surfaces() {
+    const SHOTS: usize = 4000;
+
+    let circuit = Circuit::from_stim_str("MPAD(0.25) 0 1\n").expect("parse stochastic MPAD");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile stochastic MPAD sampler");
+    let shots = sampler.sample_zero_one_with_seed(SHOTS, Some(17));
+
+    let first_flips = shots
+        .iter()
+        .filter(|shot| shot.first() == Some(&true))
+        .count();
+    let second_flips = shots
+        .iter()
+        .filter(|shot| shot.get(1) == Some(&false))
+        .count();
+    assert_binomial_5_sigma("MPAD(0.25) 0 flips", first_flips, SHOTS, 0.25);
+    assert_binomial_5_sigma("MPAD(0.25) 1 flips", second_flips, SHOTS, 0.25);
+    let mut sampler_buckets = [0usize; 4];
+    for shot in &shots {
+        let [first, second] = shot.as_slice() else {
+            panic!("expected two MPAD sample bits, got {shot:?}");
+        };
+        let bucket = ((*first as usize) << 1) | (*second as usize);
+        *sampler_buckets
+            .get_mut(bucket)
+            .expect("two boolean bits produce a four-bucket index") += 1;
+    }
+    assert_binomial_5_sigma("MPAD outputs 00", sampler_buckets[0], SHOTS, 0.1875);
+    assert_binomial_5_sigma("MPAD outputs 01", sampler_buckets[1], SHOTS, 0.5625);
+    assert_binomial_5_sigma("MPAD outputs 10", sampler_buckets[2], SHOTS, 0.0625);
+    assert_binomial_5_sigma("MPAD outputs 11", sampler_buckets[3], SHOTS, 0.1875);
+
+    let converter_circuit =
+        Circuit::from_stim_str("MPAD(0.25) 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n")
+            .expect("parse stochastic MPAD converter circuit");
+    let converter = CompiledDetectionConverter::compile(
+        &converter_circuit,
+        DetectionConversionOptions {
+            skip_reference_sample: false,
+        },
+    )
+    .expect("compile stochastic MPAD detection converter");
+    assert_eq!(
+        converter
+            .convert_record(&[false])
+            .expect("convert unflipped stochastic MPAD record"),
+        DetectionEventRecord {
+            detectors: vec![false],
+            observables: vec![false],
+        }
+    );
+    assert_eq!(
+        converter
+            .convert_record(&[true])
+            .expect("convert flipped stochastic MPAD record"),
+        DetectionEventRecord {
+            detectors: vec![true],
+            observables: vec![true],
+        }
+    );
+
+    let detection_output = sample_detection_events(&converter_circuit, SHOTS, Some(23))
+        .expect("sample stochastic MPAD detection events");
+    let detector_flips = detection_output
+        .records
+        .iter()
+        .filter(|record| record.detectors.first() == Some(&true))
+        .count();
+    let observable_flips = detection_output
+        .records
+        .iter()
+        .filter(|record| record.observables.first() == Some(&true))
+        .count();
+    assert_binomial_5_sigma(
+        "stochastic MPAD detector flips",
+        detector_flips,
+        SHOTS,
+        0.25,
+    );
+    assert_eq!(
+        detector_flips, observable_flips,
+        "detector and observable should be sourced by the same stochastic pad record"
+    );
+
+    let frame_circuit = Circuit::from_stim_str(
+        "MPAD(0.25) 0\nOBSERVABLE_INCLUDE(0) rec[-1]\nOBSERVABLE_INCLUDE(1) Z0\n",
+    )
+    .expect("parse frame-path stochastic MPAD circuit");
+    let frame_output = sample_detection_events(&frame_circuit, SHOTS, Some(29))
+        .expect("sample frame-path stochastic MPAD detection events");
+    let frame_record_flips = frame_output
+        .records
+        .iter()
+        .filter(|record| record.observables.first() == Some(&true))
+        .count();
+    let frame_pauli_flips = frame_output
+        .records
+        .iter()
+        .filter(|record| record.observables.get(1) == Some(&true))
+        .count();
+    assert_binomial_5_sigma(
+        "frame-path stochastic MPAD observable flips",
+        frame_record_flips,
+        SHOTS,
+        0.25,
+    );
+    assert_eq!(
+        frame_pauli_flips, 0,
+        "stochastic MPAD should not introduce an unrelated Pauli-frame observable flip"
+    );
+}
+
+#[test]
 fn mpp_executes_across_current_public_surfaces() {
     let circuit = Circuit::from_stim_str(
         "H 0\nCX 0 1\nMPP X0*X1 !Z0*Z1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
@@ -392,6 +505,18 @@ fn anti_hermitian_spp_execution_is_rejected_by_sampler_and_detection_conversion(
 struct GateExecutionCase {
     gate_name: &'static str,
     circuit: Circuit,
+}
+
+fn assert_binomial_5_sigma(label: &str, count: usize, trials: usize, probability: f64) {
+    let mean = trials as f64 * probability;
+    let stddev = (trials as f64 * probability * (1.0 - probability)).sqrt();
+    let lower = (mean - 5.0 * stddev).floor().max(0.0);
+    let upper = (mean + 5.0 * stddev).ceil().min(trials as f64);
+    let count = count as f64;
+    assert!(
+        lower <= count && count <= upper,
+        "{label}: expected count in {lower:.0}..={upper:.0} for n={trials}, p={probability}, got {count:.0}"
+    );
 }
 
 fn fixed_tableau_gate_cases() -> Vec<GateExecutionCase> {
