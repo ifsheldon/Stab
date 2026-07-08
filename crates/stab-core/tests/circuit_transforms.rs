@@ -530,6 +530,73 @@ DETECTOR rec[-3] rec[-1]
 }
 
 #[test]
+fn with_inlined_feedback_matches_pinned_demolition_feedback() {
+    let input = circuit(
+        "
+        CX 0 1
+        M 1
+        CX rec[-1] 1
+        CX 0 1
+        M 1
+        DETECTOR rec[-1] rec[-2]
+        OBSERVABLE_INCLUDE(0) rec[-1]
+    ",
+    );
+    let inlined = input.with_inlined_feedback().expect("inline feedback");
+
+    assert_eq!(
+        inlined.to_stim_string(),
+        "\
+CX 0 1
+M 1
+OBSERVABLE_INCLUDE(0) rec[-1]
+CX 0 1
+M 1
+DETECTOR rec[-1]
+OBSERVABLE_INCLUDE(0) rec[-1]
+"
+    );
+}
+
+#[test]
+fn with_inlined_feedback_matches_pinned_interleaved_ordering() {
+    for (text, expected) in [
+        (
+            "
+            H 0
+            CZ
+            H 1
+            ",
+            "H 0 1\n",
+        ),
+        (
+            "
+            M 0
+            CX
+            M 1
+            ",
+            "M 0 1\n",
+        ),
+        (
+            "
+            M 0 1
+            CX
+            M 2
+            CX rec[-1] 3
+            M 3
+            DETECTOR rec[-1]
+            ",
+            "M 0 1 2 3\nDETECTOR rec[-2] rec[-1]\n",
+        ),
+    ] {
+        let inlined = circuit(text)
+            .with_inlined_feedback()
+            .expect("inline feedback");
+        assert_eq!(inlined.to_stim_string(), expected, "{text}");
+    }
+}
+
+#[test]
 fn with_inlined_feedback_refolds_repeat_loop_like_upstream() {
     let input = circuit(
         "
