@@ -3,6 +3,7 @@ use std::path::{Component, Path};
 
 use serde::{Deserialize, Serialize};
 
+use crate::comparability::ComparabilityClass;
 use crate::error::BenchError;
 use crate::root::RepoRoot;
 
@@ -10,7 +11,7 @@ use crate::root::RepoRoot;
 pub(crate) struct BenchmarkRow {
     pub(crate) id: String,
     pub(crate) milestone: Milestone,
-    pub(crate) threshold_class: String,
+    pub(crate) threshold_class: ThresholdClass,
     pub(crate) runner: Runner,
     pub(crate) upstream_source: String,
     pub(crate) stim_perf_filter: String,
@@ -19,6 +20,30 @@ pub(crate) struct BenchmarkRow {
     pub(crate) phase: String,
     pub(crate) measurement: String,
     pub(crate) description: String,
+    pub(crate) comparability: ComparabilityClass,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+pub(crate) enum ThresholdClass {
+    #[serde(rename = "baseline-metadata")]
+    BaselineMetadata,
+    #[serde(rename = "non-primary-report-only")]
+    NonPrimaryReportOnly,
+    #[serde(rename = "performance-gate")]
+    PerformanceGate,
+    #[serde(rename = "report-only")]
+    ReportOnly,
+}
+
+impl ThresholdClass {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::BaselineMetadata => "baseline-metadata",
+            Self::NonPrimaryReportOnly => "non-primary-report-only",
+            Self::PerformanceGate => "performance-gate",
+            Self::ReportOnly => "report-only",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -205,7 +230,6 @@ impl BenchmarkManifest {
                 ));
             }
             for (field, value) in [
-                ("threshold_class", &row.threshold_class),
                 ("upstream_source", &row.upstream_source),
                 ("phase", &row.phase),
                 ("measurement", &row.measurement),
@@ -214,6 +238,20 @@ impl BenchmarkManifest {
                 if value.is_empty() {
                     violations.push(format!("{} has empty {field}", row.id));
                 }
+            }
+            let resolved_comparability = ComparabilityClass::from_note_and_runner(
+                crate::baseline::compare_note(&row.id),
+                row.runner,
+            );
+            if row.comparability == ComparabilityClass::Unspecified {
+                violations.push(format!("{} has unspecified comparability", row.id));
+            } else if row.comparability != resolved_comparability {
+                violations.push(format!(
+                    "{} manifest comparability {} disagrees with compare-note class {}",
+                    row.id,
+                    row.comparability.as_str(),
+                    resolved_comparability.as_str()
+                ));
             }
             validate_vendor_source(&stim_source, row, &mut violations);
             match row.runner {
@@ -263,13 +301,14 @@ impl BenchmarkManifest {
     }
 
     pub(crate) fn list(&self, milestone: Option<&str>) {
-        let mut groups: BTreeMap<(Milestone, String, Runner), Vec<&BenchmarkRow>> = BTreeMap::new();
+        let mut groups: BTreeMap<(Milestone, ThresholdClass, Runner), Vec<&BenchmarkRow>> =
+            BTreeMap::new();
         for row in &self.rows {
             if milestone.is_some_and(|milestone| milestone != row.milestone.as_str()) {
                 continue;
             }
             groups
-                .entry((row.milestone, row.threshold_class.clone(), row.runner))
+                .entry((row.milestone, row.threshold_class, row.runner))
                 .or_default()
                 .push(row);
         }
@@ -277,13 +316,17 @@ impl BenchmarkManifest {
             println!(
                 "{} / {} / {}:",
                 milestone.as_str(),
-                threshold_class,
+                threshold_class.as_str(),
                 runner.as_str()
             );
             for row in rows {
                 println!(
-                    "- {} [{}] {} -> {}",
-                    row.id, row.phase, row.measurement, row.upstream_source
+                    "- {} [{}; {}] {} -> {}",
+                    row.id,
+                    row.phase,
+                    row.comparability.as_str(),
+                    row.measurement,
+                    row.upstream_source
                 );
             }
         }
@@ -575,6 +618,38 @@ mod tests {
     }
 
     #[test]
+    fn benchmark_manifest_rejects_comparability_drift_from_compare_note() {
+        let mut reader = csv::ReaderBuilder::new()
+            .trim(csv::Trim::All)
+            .from_reader(MANIFEST_CSV.as_bytes());
+        let rows = reader
+            .deserialize()
+            .collect::<Result<Vec<_>, _>>()
+            .expect("parse manifest");
+        let mut manifest = BenchmarkManifest { rows };
+        manifest
+            .rows
+            .iter_mut()
+            .find(|row| row.id == "m4-circuit-parse")
+            .expect("parser benchmark")
+            .comparability = ComparabilityClass::ReportOnly;
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(std::path::Path::parent)
+            .expect("repo root");
+        let root = crate::root::RepoRoot::resolve(root).expect("resolve repo root");
+
+        let error = manifest
+            .check(&root)
+            .expect_err("comparability drift must fail");
+        assert!(
+            error
+                .to_string()
+                .contains("disagrees with compare-note class")
+        );
+    }
+
+    #[test]
     fn primary_compare_rows_freeze_m4_through_m11_without_metadata_or_m12_placeholders() {
         let mut reader = csv::ReaderBuilder::new()
             .trim(csv::Trim::All)
@@ -634,11 +709,7 @@ mod tests {
 
         for row in primary {
             let class = ComparabilityClass::from_note_and_runner(compare_note(&row.id), row.runner);
-            assert!(
-                class != ComparabilityClass::Unspecified,
-                "{} should have a machine-readable comparability class",
-                row.id
-            );
+            assert_eq!(row.comparability, class, "{} comparability", row.id);
         }
     }
 

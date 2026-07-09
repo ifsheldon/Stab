@@ -27,3 +27,8 @@ record *args:
 [working-directory: '..']
 matrix *args:
     cargo run -q -p stab-oracle -- matrix {{args}}
+
+# Validate and inspect the non-deferred blocker closure ledger.
+[working-directory: '..']
+blockers *args:
+    cargo run -q -p stab-oracle -- blockers {{args}}

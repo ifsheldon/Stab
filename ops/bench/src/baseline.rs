@@ -995,7 +995,7 @@ fn run_baseline_row(
         Runner::ContractOnly => Ok(BaselineRowResult {
             id: row.id.clone(),
             milestone: row.milestone,
-            threshold_class: row.threshold_class.clone(),
+            threshold_class: row.threshold_class.as_str().to_string(),
             runner: row.runner,
             upstream_source: row.upstream_source.clone(),
             phase: row.phase.clone(),
@@ -1036,7 +1036,7 @@ fn run_stim_perf_row(
     Ok(BaselineRowResult {
         id: row.id.clone(),
         milestone: row.milestone,
-        threshold_class: row.threshold_class.clone(),
+        threshold_class: row.threshold_class.as_str().to_string(),
         runner: row.runner,
         upstream_source: row.upstream_source.clone(),
         phase: row.phase.clone(),
@@ -1089,7 +1089,7 @@ fn run_stim_cli_row(
     Ok(BaselineRowResult {
         id: row.id.clone(),
         milestone: row.milestone,
-        threshold_class: row.threshold_class.clone(),
+        threshold_class: row.threshold_class.as_str().to_string(),
         runner: row.runner,
         upstream_source: row.upstream_source.clone(),
         phase: row.phase.clone(),

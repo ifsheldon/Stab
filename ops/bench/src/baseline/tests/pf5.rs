@@ -117,7 +117,7 @@ fn detector_utility_benchmark_rows_have_stab_compare_runners() {
         let row = BenchmarkRow {
             id: id.to_string(),
             milestone: Milestone::Pf5,
-            threshold_class: "non-primary-report-only".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::NonPrimaryReportOnly,
             runner: Runner::ContractOnly,
             upstream_source: upstream_source.to_string(),
             stim_perf_filter: String::new(),
@@ -126,6 +126,7 @@ fn detector_utility_benchmark_rows_have_stab_compare_runners() {
             phase: "analysis".to_string(),
             measurement: measurement.to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         };
 
         let measurements = run_stab_compare_row(&row)

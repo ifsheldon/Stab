@@ -14,6 +14,7 @@ The central lesson is that ambiguity must be removed before coding and that near
 ## Active Sources Of Truth
 
 - Execution plan: `docs/plans/non-deferred-partial-feature-milestones.md`, especially PFM-B0 through PFM-B6.
+- Executable closure ledger: `docs/plans/blocker-closure-ledger.json`, validated with `just oracle::blockers --check-selectors`.
 - Open blocker log: `docs/plans/milestone-spec-gaps.md`.
 - Current rollup evidence: `docs/plans/pfm8-rollup-evidence-report.md`.
 - Feature status: `docs/stab-feature-checklist.md`.
@@ -28,11 +29,18 @@ The central lesson is that ambiguity must be removed before coding and that near
 
 If these sources disagree, fix the disagreement before implementation continues.
 
+## Current Checkpoint
+
+PFM-B0 is complete as of 2026-07-10.
+The source-owned closure ledger now freezes 124 cases across all eight blocker families, and `just oracle::blockers --check-selectors` validates its evidence contracts and current executable selectors.
+Begin with PFM-B2 contract groundwork next; do not reopen PFM-B0 unless the ledger schema, frozen inventory, evidence signatures, or selector-validation contract changes.
+
 ## Scope Decisions
 
 The following decisions are fixed for this goal:
 
 - Implement general reverse-flow and QEC transform semantics for the selected Rust APIs.
+- Keep broader repeat-contained feedback-inlining beyond the already selected bounded loop cases deferred unless a later plan explicitly reopens it.
 - Evidence-close analyzer sweep behavior at the current pinned matrix instead of inventing additional sweep shapes.
 - Implement an exhaustive gate-by-surface semantic contract for legal execution behavior.
 - Implement one shared folded DEM traversal for bounded-result consumers.
@@ -96,11 +104,13 @@ If implementation cannot satisfy these guardrails, stop and revise the milestone
 
 ## Test Rules
 
-- Every blocker ledger row must select an executable Rust test or an explicit evidence-close check.
+- Every blocker ledger row must name a planned test selector, and every row claimed as implemented or evidence-closed must select an executable Rust test or explicit evidence-close check.
 - Multi-example upstream tests must be split into stable subcase ids before they count as complete.
+- PFM-B0 may record a selector shared by several stable subcase ids only as explicit evidence-splitting debt; the owning implementation or evidence-close milestone cannot complete until every owned case has an independently selectable test.
 - Use exact comparators for canonical circuit text, deterministic DEM text, stable WCNF text, deterministic flow lists, and CLI output where order is contractual.
 - Use structural comparators for detecting-region maps, flow spans, and tie-sensitive logical-error target sets.
 - Use statistical comparators only for probabilistic behavior, with source-owned shot counts, seeds, tolerances, bucket definitions, and false-positive budgets.
+- For blocker-ledger statistical plans, compare each observed bucket probability against its pinned expectation using `max(absolute_probability_floor, sigma_multiplier * sqrt(p * (1 - p) / shots))`; apply the declared familywise false-positive budget across all named buckets, and reject a plan during its owner milestone if an exact binomial-tail check shows that the declared budget is not met.
 - Add positive, negative, malformed-input, overflow, unsupported-shape, visitor-error, and resource-boundary tests for each relevant public or internal surface.
 - Add small generated differential tests whenever a folded or optimized path has a straightforward materialized reference implementation.
 - Property tests must use deterministic seeds and print enough minimized context to reproduce failures.
@@ -189,6 +199,7 @@ Run before claiming the goal complete:
 cargo fmt --all --check
 cargo clippy -p stab-core -p stab-cli -p stab-oracle -p stab-bench --all-targets -- -D warnings
 cargo test --workspace --quiet
+just oracle::blockers --check-selectors
 just oracle::run --implemented-only
 just bench::smoke
 just maintenance::pre-commit

@@ -119,7 +119,7 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
         let row = BenchmarkRow {
             id: id.to_string(),
             milestone: Milestone::Pf4,
-            threshold_class: "non-primary-report-only".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::NonPrimaryReportOnly,
             runner: Runner::ContractOnly,
             upstream_source: "src/stim/dem/detector_error_model.test.cc".to_string(),
             stim_perf_filter: String::new(),
@@ -128,6 +128,7 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
             phase: "analysis".to_string(),
             measurement: "dem-transform".to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         };
 
         assert_benchmark_measurements(id, row, expected_measurements);
@@ -201,7 +202,7 @@ fn pf6_analyzer_benchmark_rows_have_stab_compare_runners() {
         let row = BenchmarkRow {
             id: id.to_string(),
             milestone: Milestone::Pf6,
-            threshold_class: "non-primary-report-only".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::NonPrimaryReportOnly,
             runner: Runner::ContractOnly,
             upstream_source: upstream_source.to_string(),
             stim_perf_filter: String::new(),
@@ -210,6 +211,7 @@ fn pf6_analyzer_benchmark_rows_have_stab_compare_runners() {
             phase: "analysis".to_string(),
             measurement: measurement.to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         };
 
         assert_benchmark_measurements(id, row, expected_measurements);

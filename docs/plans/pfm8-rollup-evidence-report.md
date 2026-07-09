@@ -1,6 +1,6 @@
 # PFM8 Rollup Evidence Report
 
-Date: 2026-07-08
+Date: 2026-07-10
 
 Status: In progress, not a final PFM8 completion report.
 
@@ -15,7 +15,8 @@ It does not add production behavior, promote a new active feature subcase, or cl
 - `docs/plans/GOAL.md` says the goal is complete only when every non-deferred partial row has implemented evidence or a named deferred subcase, documentation agrees with behavior, and milestone-audit plus full-code-review findings are fixed or logged as true under-specification.
 - `docs/plans/non-deferred-partial-feature-milestones.md` says PFM8 may update rollup rows only after every active child row is implemented or explicitly deferred with a named reason.
 - `docs/plans/partial-feature-inventory.md` maps current partial rows to active PFM owners, implemented child evidence, deferred-only exclusions, and manifest-only extraction contracts.
-- `docs/plans/milestone-spec-gaps.md` now records the broad active wording that is not safe to implement without a future exact-subcase plan.
+- `docs/plans/milestone-spec-gaps.md` records the original broad active wording, the planning loophole it exposed, and the PFM-B milestone now selected to resolve it.
+- `docs/plans/blocker-closure-ledger.json` assigns every remaining blocker to a finite PFM-B subcase with comparator, evidence state, test selector, oracle disposition, benchmark disposition, and resource contract.
 - `docs/stab-feature-checklist.md` remains the user-facing feature status document and still marks rollup or broad scoped rows as `Partial` where broader Stim parity is not proven.
 
 ## Current Evidence Snapshot
@@ -32,25 +33,48 @@ The current PFM8 verification pass reran oracle, matrix, and benchmark metadata 
 
 | Checklist row | Current rollup state | PFM8 conclusion |
 | --- | --- | --- |
-| `Rust core library equivalent for core Stim semantics` | Rollup over active Rust APIs, transforms, DEMs, utilities, flows, analyzer, search, and sparse-tracker rows. | Keep `Partial`; selected child evidence is healthy, but broader active under-specification remains in PFM2 through PFM6. |
+| `Rust core library equivalent for core Stim semantics` | Rollup over active Rust APIs, transforms, DEMs, utilities, flows, analyzer, search, and sparse-tracker rows. | Keep `Partial`; selected child evidence is healthy, but the finite ledger-owned implementation and evidence-splitting work in PFM-B1 through PFM-B5 remains open. |
 | `.stim`, `.dem`, and result-format compatibility` | `.stim` and implemented result-format paths are strong; DEM behavior is scoped by active DEM API, folded traversal, analyzer, search, and sampler evidence. | Keep `Partial`; current implemented format paths are tested, but full DEM public API and folded traversal parity are not proven. |
-| `Full semantic execution of every legal circuit operation` | Selected sampler, detector-conversion, detection, analyzer, `SPP`, `SPP_DAG`, fixed-tableau, deterministic `MPP`, stochastic `MPP(p)` sampler or detection-sampling, deterministic `MPAD`, stochastic `MPAD(p)` sampler or detection-sampling, and noisy `MPAD(p)` analyzer evidence is green. | Keep `Partial`; broader legal non-tableau execution is explicitly under-specified until exact gate families and execution surfaces are selected. |
+| `Full semantic execution of every legal circuit operation` | Selected sampler, detector-conversion, detection, analyzer, `SPP`, `SPP_DAG`, fixed-tableau, deterministic `MPP`, stochastic `MPP(p)` sampler or detection-sampling, deterministic `MPAD`, stochastic `MPAD(p)` sampler or detection-sampling, and noisy `MPAD(p)` analyzer evidence is green. | Keep `Partial`; PFM-B2 now owns 12 exact gate-family contract cases that must be implemented before this rollup can close. |
 | `CLI binary` | Selected `stab` commands and selected legacy aliases are implemented with PF7 evidence. | Keep `Done for selected Stab CLI surface`; no stale PFM8 blocker found for the selected CLI surface. |
-| `Highest-priority remaining feature gaps` | The section correctly lists active partial rollups and deferred surfaces. | Keep `Partial` rows; they should not move to `Done` while their remaining broad non-deferred work is under-specified rather than implemented or explicitly deferred. |
+| `Highest-priority remaining feature gaps` | The section correctly lists active partial rollups and deferred surfaces. | Keep active rows `Partial` until their ledger-backed PFM-B cases are implemented or evidence-closed; deferred products remain separate. |
+
+## PFM-B0 Blocker Ledger
+
+PFM-B0 replaces broad under-specification with a schema-versioned, machine-checked ledger.
+`just oracle::blockers` currently validates 124 cases across all eight open blocker families.
+
+| Blocker | Milestone | Decision | Cases | Planned | Implemented | Evidence close |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| PFM2 QEC transforms | PFM-B1 | Implement | 19 | 7 | 12 | 0 |
+| PFM3 analyzer sweep | PFM-B2 | Evidence close | 1 | 0 | 0 | 1 |
+| PFM3 gate execution | PFM-B2 | Implement | 12 | 12 | 0 | 0 |
+| PFM4 DEM traversal | PFM-B3 | Implement | 7 | 7 | 0 | 0 |
+| PFM5 detecting regions | PFM-B4 | Evidence close | 2 | 0 | 0 | 2 |
+| PFM5 missing detectors | PFM-B4 | Evidence close | 14 | 0 | 0 | 14 |
+| PFM5 flow engine | PFM-B4 | Implement | 33 | 1 | 32 | 0 |
+| PFM6 analyzer and search | PFM-B5 | Implement | 36 | 14 | 22 | 0 |
+
+The three evidence-close blocker records also freeze 17 additional promoted supporting oracle rows: one analyzer CLI row, ten detecting-region rows, and six missing-detector rows.
+They freeze five supporting benchmark rows as well: four detecting-region rows and one missing-detector MPAD row, all retaining their source-owned `contract-only` runner, `non-primary-report-only` threshold class, and `report-only` comparability class.
+Fifty-six owned cases currently share a Rust selector with at least one other case, including eleven missing-detector evidence-close cases; the ledger makes that evidence-splitting debt visible, and the owning PFM-B milestone must replace shared filters with independently selectable tests before closure.
+
+The validator rejects missing required blockers, any semantic change to the canonical SHA-256 ledger inventory, deleted owned-case floors, duplicate ids, unanchored or completed test-family aggregations, missing statistical plans, changed evidence-close supporting rows, supporting-oracle evidence-signature drift, unsafe, untracked, or symlinked upstream paths, non-pinned Stim sources, non-implemented oracle rows, stale benchmark rows, typed oracle runner drift, distinct benchmark runner, threshold-class, or comparability drift, dishonest planned versus existing test state, completion claims backed only by planned artifacts, and unstable, non-regular, or oversized ledger, manifest, and upstream evidence inputs.
+`just oracle::blockers --check-selectors` additionally proves every claimed existing selector resolves to at least one Rust test without executing arbitrary ledger commands; it rejects option-shaped filters and runs Cargo through the oracle harness's timeout and bounded-output controls.
 
 ## Remaining Non-Deferred Blockers
 
-The current blockers are no longer hidden broad upstream files.
-They are named under-specification entries that require future exact-subcase plans before implementation:
+The current blockers are no longer hidden broad upstream files or pending exact-subcase plans.
+They are finite ledger-backed implementation and evidence-splitting programs:
 
-- PFM2 broader QEC inverse, measurement-rich transform, and repeat-contained feedback behavior beyond the selected packets, including broader MPAD inverse-QEC shapes beyond selected record-only duplicate observable-id merging and broader feedback shapes beyond pinned public-method exact-output evidence.
-- PFM3 broader analyzer sweep-shape behavior and legal non-tableau execution beyond the selected sweep matrix, fixed-tableau execution, supported Hermitian `SPP` or `SPP_DAG`, deterministic `MPP`, selected stochastic `MPP(p)` sampler or detection-sampling, deterministic `MPAD`, selected stochastic `MPAD(p)` sampler or detection-sampling, and selected noisy `MPAD(p)` analyzer boundary.
-- PFM4 broader DEM folded traversal, coordinate traversal, and generated-loop analyzer-output dependencies beyond the selected consumers and documented caps.
-- PFM5 broader detecting-region, `missing_detectors`, flow-generator, solver, diagnostic, folded-repeat, and transform-integration families beyond promoted evidence.
-- PFM6 broader analyzer, search, SAT/WCNF, sparse-tracker, and matched-error value-object hardening families beyond selected exact slices.
+- PFM-B1 owns the seven planned QEC-transform cases and must split the four implemented cases that still share broad selectors.
+- PFM-B2 evidence-closes analyzer sweep behavior at the selected matrix and implements the twelve planned gate-family execution contracts.
+- PFM-B3 implements the seven selected shared folded-DEM traversal contracts.
+- PFM-B4 evidence-closes the selected detecting-region and missing-detector cases, splits the eleven missing-detector and twenty-eight flow cases that still share selectors, and implements the one planned over-sixteen-measurement flow-solver case.
+- PFM-B5 implements the fourteen planned analyzer and SAT/WCNF cases and splits the thirteen implemented analyzer/search cases that still share selectors.
 
-These blockers are legitimate remaining work for the full GOAL.
-They must not be turned into implementation tasks from checklist prose alone; each needs a scope note naming exact circuits or models, positive and negative tests, comparator behavior, resource boundaries, oracle metadata, benchmark policy or no-benchmark rationale, and documentation updates.
+These exact ledger-owned items are the legitimate remaining work for the full GOAL and must be executed from `docs/plans/blocker-closure-ledger.json`, not reconstructed from checklist prose.
+Broader repeat-contained feedback, future analyzer sweep shapes, and detecting-region or missing-detector behavior outside the selected evidence-close cases remain deferred or require an explicit plan revision; they are not active PFM8 blockers.
 
 ## Benchmarks
 
@@ -61,7 +85,7 @@ Before PFM8 can become a completion report, the commands in `docs/plans/GOAL.md`
 ## Audit Notes
 
 This PFM8 pass confirms that the current rollup rows should stay conservative.
-The correct next implementation step is not to mark broad rows done, but to choose one exact remaining subcase from `docs/plans/milestone-spec-gaps.md`, write a scope note, and then implement the GOAL work loop for that slice.
+The next implementation step is PFM-B2 contract groundwork, followed by PFM-B3 shared DEM traversal, using ledger state changes as completion evidence.
 
 ## Verification
 
@@ -77,7 +101,7 @@ Completed in the original PFM8 evidence pass before this refresh:
 - `git diff --check`
 - `git diff --cached --check`
 
-The latest source-of-truth refresh subset below was rerun before this documentation update from clean committed `HEAD=0cf2d3eee423` with `local_modifications=false`:
+The historical source-of-truth refresh subset below was rerun from clean committed `HEAD=0cf2d3eee423` with `local_modifications=false`:
 
 - `cargo test -p stab-oracle fixtures --quiet`
 - `just oracle::list`
@@ -86,6 +110,9 @@ The latest source-of-truth refresh subset below was rerun before this documentat
 - `just bench::smoke`
 - `just oracle::run --implemented-only`
 
+That historical refresh predates later MPP and MPAD evidence and is not current PFM8 completion evidence.
+During PFM-B0 on 2026-07-10, `just oracle::run --implemented-only` passed against the current worktree with `local_modifications=true`; PFM-B6 must regenerate final evidence from committed `HEAD` before this report can claim completion.
+
 Still required before any final PFM8 completion claim:
 
 - The authoritative final PFM8 checklist remains the Tests, Benchmarks, and Acceptance criteria sections in `docs/plans/non-deferred-partial-feature-milestones.md`.
@@ -93,6 +120,7 @@ Still required before any final PFM8 completion claim:
 - `cargo fmt --all --check`
 - `cargo clippy -p stab-core -p stab-cli -p stab-oracle -p stab-bench --all-targets -- -D warnings`
 - `cargo test --workspace --quiet`
+- `just oracle::blockers --check-selectors`
 - `just oracle::run --implemented-only`
 - `just bench::smoke`
 - `just maintenance::pre-commit`

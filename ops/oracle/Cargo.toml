@@ -14,10 +14,12 @@ workspace = true
 [dependencies]
 clap = { workspace = true }
 csv = { workspace = true }
+rustix = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
 stab-core = { path = "../../crates/stab-core" }
 thiserror = { workspace = true }
-wait-timeout = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

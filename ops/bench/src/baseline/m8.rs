@@ -690,7 +690,7 @@ mod tests {
             let row = BenchmarkRow {
                 id: id.to_string(),
                 milestone: Milestone::M8,
-                threshold_class: "report-only".to_string(),
+                threshold_class: crate::manifest::ThresholdClass::ReportOnly,
                 runner: Runner::StimCli,
                 upstream_source: "src/stim/cmd/command_sample.test.cc".to_string(),
                 stim_perf_filter: String::new(),
@@ -699,6 +699,7 @@ mod tests {
                 phase: "throughput".to_string(),
                 measurement: "sample".to_string(),
                 description: "test row".to_string(),
+                comparability: crate::comparability::ComparabilityClass::Unspecified,
             };
 
             let measurements = run_sample_compare_row(&row)

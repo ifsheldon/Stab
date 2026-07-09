@@ -257,7 +257,7 @@ mod tests {
             let row = BenchmarkRow {
                 id: id.to_string(),
                 milestone: Milestone::M11,
-                threshold_class: "report-only".to_string(),
+                threshold_class: crate::manifest::ThresholdClass::ReportOnly,
                 runner,
                 upstream_source: "src/stim/cmd/command_sample_dem.test.cc".to_string(),
                 stim_perf_filter: String::new(),
@@ -266,6 +266,7 @@ mod tests {
                 phase: "throughput".to_string(),
                 measurement: "sample-dem".to_string(),
                 description: "test row".to_string(),
+                comparability: crate::comparability::ComparabilityClass::Unspecified,
             };
 
             let measurements = run_dem_sampling_compare_row(&row)

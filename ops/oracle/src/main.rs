@@ -9,19 +9,19 @@
     )
 )]
 
+mod blocker_ledger;
 mod fixtures;
 mod matrix;
+mod process;
 
 use std::ffi::{OsStr, OsString};
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{ExitCode, Stdio};
-use std::thread::JoinHandle;
-use std::time::Duration;
+use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use thiserror::Error;
-use wait_timeout::ChildExt;
+
+use process::{render_bytes_for_diagnostics, run_checked, run_process};
 
 const PREFIX: &str = "stab-oracle";
 const STIM_TAG: &str = "v1.16.0";
@@ -29,9 +29,6 @@ const STIM_COMMIT: &str = "e2fc1eca7fd21684d433aa5f10f4504ea4860d07";
 const VENDOR_STIM_PATH: &str = "vendor/stim";
 const BUILD_DIR: &str = "target/oracle/stim-v1.16.0";
 const BUILD_STAMP_FILE: &str = "stab-oracle-build-stamp.txt";
-const COMMAND_TIMEOUT: Duration = Duration::from_secs(120);
-const OUTPUT_LIMIT_BYTES: usize = 1024 * 1024;
-const DIAGNOSTIC_LIMIT_BYTES: usize = 4096;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -118,6 +115,17 @@ enum Command {
         #[arg(long)]
         milestone: Option<String>,
     },
+
+    /// Validate and inspect the non-deferred blocker closure ledger.
+    Blockers {
+        /// Print every owned subcase after validation.
+        #[arg(long)]
+        list: bool,
+
+        /// Resolve every claimed existing Cargo test selector and reject zero matches.
+        #[arg(long)]
+        check_selectors: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -133,6 +141,9 @@ enum OracleCase {
 
 #[derive(Debug, Error)]
 enum OracleError {
+    #[error(transparent)]
+    BlockerLedger(#[from] blocker_ledger::BlockerLedgerError),
+
     #[error(transparent)]
     Fixture(#[from] fixtures::FixtureError),
 
@@ -199,12 +210,18 @@ enum OracleError {
         source: std::io::Error,
     },
 
-    #[error("{program} timed out after {seconds}s\nstdout:\n{stdout}\nstderr:\n{stderr}")]
+    #[error("{program} timed out after {milliseconds}ms\nstdout:\n{stdout}\nstderr:\n{stderr}")]
     TimedOut {
         program: String,
-        seconds: u64,
+        milliseconds: u128,
         stdout: Box<str>,
         stderr: Box<str>,
+    },
+
+    #[error("failed to terminate process group for {program}: {source}")]
+    TerminateProcessGroup {
+        program: String,
+        source: std::io::Error,
     },
 
     #[error("{program} failed with status {status}\nstdout:\n{stdout}\nstderr:\n{stderr}")]
@@ -269,6 +286,17 @@ impl RepoRoot {
             .join("oracle")
             .join("fixtures")
             .join("manifest.csv")
+    }
+
+    fn blocker_ledger(&self) -> PathBuf {
+        self.path
+            .join("docs")
+            .join("plans")
+            .join("blocker-closure-ledger.json")
+    }
+
+    fn benchmark_manifest(&self) -> PathBuf {
+        self.path.join("benchmarks").join("manifest.csv")
     }
 
     fn stab_cli_binary(&self) -> PathBuf {
@@ -402,6 +430,13 @@ fn run(cli: Cli) -> Result<(), OracleError> {
         }
         Command::Matrix { check, milestone } => {
             run_matrix_command(&root, check, milestone.as_deref())?;
+        }
+        Command::Blockers {
+            list,
+            check_selectors,
+        } => {
+            validate_stim_source(&root)?;
+            blocker_ledger::validate_and_print(&root, list, check_selectors)?;
         }
     }
     Ok(())
@@ -737,177 +772,6 @@ fn compare_exact(stim: &ProcessOutput, stab: &ProcessOutput) -> Option<String> {
     None
 }
 
-fn run_checked<I, S>(
-    program: &str,
-    args: I,
-    stdin: &[u8],
-    working_dir: Option<&Path>,
-) -> Result<ProcessOutput, OracleError>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let output = run_process(Path::new(program), args, stdin, working_dir)?;
-    if output.success() {
-        return Ok(output);
-    }
-    Err(OracleError::CommandFailed {
-        program: program.to_string(),
-        status: display_status(output.status),
-        stdout: output.stdout.render_for_diagnostics().into_boxed_str(),
-        stderr: output.stderr.render_for_diagnostics().into_boxed_str(),
-    })
-}
-
-fn run_process<I, S>(
-    program: &Path,
-    args: I,
-    stdin: &[u8],
-    working_dir: Option<&Path>,
-) -> Result<ProcessOutput, OracleError>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let mut command = std::process::Command::new(program);
-    command.args(args);
-    if let Some(working_dir) = working_dir {
-        command.current_dir(working_dir);
-    }
-    command
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    let program_name = program.display().to_string();
-    let mut child = command.spawn().map_err(|source| OracleError::Spawn {
-        program: program_name.clone(),
-        source,
-    })?;
-    let stdout = child
-        .stdout
-        .take()
-        .map(spawn_output_reader)
-        .ok_or_else(|| OracleError::CaptureOutput {
-            program: program_name.clone(),
-            source: std::io::Error::other("child stdout was not piped"),
-        })?;
-    let stderr = child
-        .stderr
-        .take()
-        .map(spawn_output_reader)
-        .ok_or_else(|| OracleError::CaptureOutput {
-            program: program_name.clone(),
-            source: std::io::Error::other("child stderr was not piped"),
-        })?;
-
-    let child_stdin = child.stdin.take();
-    if let Some(mut child_stdin) = child_stdin {
-        child_stdin
-            .write_all(stdin)
-            .map_err(|source| OracleError::WriteStdin {
-                program: program.display().to_string(),
-                source,
-            })?;
-    }
-    let status = match child
-        .wait_timeout(COMMAND_TIMEOUT)
-        .map_err(|source| OracleError::Wait {
-            program: program.display().to_string(),
-            source,
-        })? {
-        Some(status) => status,
-        None => {
-            let _kill_result = child.kill();
-            let _wait_result = child.wait();
-            let stdout = join_output_reader(&program_name, stdout)?;
-            let stderr = join_output_reader(&program_name, stderr)?;
-            return Err(OracleError::TimedOut {
-                program: program_name,
-                seconds: COMMAND_TIMEOUT.as_secs(),
-                stdout: stdout.render_for_diagnostics().into_boxed_str(),
-                stderr: stderr.render_for_diagnostics().into_boxed_str(),
-            });
-        }
-    };
-    let stdout = join_output_reader(&program_name, stdout)?;
-    let stderr = join_output_reader(&program_name, stderr)?;
-    Ok(ProcessOutput {
-        status: status.code(),
-        stdout,
-        stderr,
-    })
-}
-
-fn spawn_output_reader<R>(mut reader: R) -> JoinHandle<Result<CapturedOutput, std::io::Error>>
-where
-    R: Read + Send + 'static,
-{
-    std::thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let mut buffer = [0u8; 8192];
-        let mut truncated = false;
-        loop {
-            let bytes_read = reader.read(&mut buffer)?;
-            if bytes_read == 0 {
-                break;
-            }
-            let chunk = buffer.get(..bytes_read).ok_or_else(|| {
-                std::io::Error::other("bounded output reader exceeded buffer bounds")
-            })?;
-            let remaining = OUTPUT_LIMIT_BYTES.saturating_sub(bytes.len());
-            if bytes_read <= remaining {
-                bytes.extend_from_slice(chunk);
-            } else {
-                let kept = chunk.get(..remaining).ok_or_else(|| {
-                    std::io::Error::other("bounded output reader exceeded keep bounds")
-                })?;
-                bytes.extend_from_slice(kept);
-                truncated = true;
-            }
-        }
-        Ok(CapturedOutput { bytes, truncated })
-    })
-}
-
-fn join_output_reader(
-    program: &str,
-    handle: JoinHandle<Result<CapturedOutput, std::io::Error>>,
-) -> Result<CapturedOutput, OracleError> {
-    match handle.join() {
-        Ok(Ok(output)) => Ok(output),
-        Ok(Err(source)) => Err(OracleError::CaptureOutput {
-            program: program.to_string(),
-            source,
-        }),
-        Err(_panic) => Err(OracleError::CaptureOutput {
-            program: program.to_string(),
-            source: std::io::Error::other("output reader thread panicked"),
-        }),
-    }
-}
-
-fn render_bytes_for_diagnostics(bytes: &[u8], truncated: bool) -> String {
-    let mut rendered = String::new();
-    let display_len = bytes.len().min(DIAGNOSTIC_LIMIT_BYTES);
-    let display_bytes = bytes.get(..display_len).unwrap_or(bytes);
-    for byte in display_bytes {
-        for escaped in std::ascii::escape_default(*byte) {
-            rendered.push(char::from(escaped));
-        }
-    }
-    if truncated || bytes.len() > display_len {
-        rendered.push_str("\n[truncated]");
-    }
-    rendered
-}
-
-fn display_status(status: Option<i32>) -> String {
-    match status {
-        Some(status) => status.to_string(),
-        None => "terminated by signal".to_string(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use clap::Parser;
@@ -916,7 +780,6 @@ mod tests {
         Cli, Command, Comparator, OracleCase, ProcessOutput, SmokeCase, StderrClass, compare_exact,
         compare_help_health, smoke_case,
     };
-
     #[test]
     fn smoke_tiny_circuit_uses_exact_sampling_comparator() {
         let case = smoke_case(OracleCase::SmokeTinyCircuit);

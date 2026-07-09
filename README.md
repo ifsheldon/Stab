@@ -66,6 +66,9 @@ Inspect and check the M2 fixture corpus with:
 ```sh
 just oracle::list
 just oracle::list --milestone M4
+just oracle::blockers
+just oracle::blockers --list
+just oracle::blockers --check-selectors
 just oracle::record --check-clean
 just oracle::run --implemented-only
 just oracle::run --milestone M4
@@ -81,6 +84,9 @@ Statistical fixture rows default to `source=stdout`; `source=fixture_output` req
 During oracle runs, fixture-output placeholders are rewritten to fresh scratch paths under `target/oracle/fixture-outputs`; the scratch parent is rejected if any path component is a symlink, and exact-output row side-output bytes are compared in addition to stdout.
 `just oracle::run --milestone Mx` scopes execution to implemented fixture rows for that milestone and reports pending red, ignored, or manifest-only rows in the same milestone.
 `just oracle::record --check-clean` checks runnable exact-output rows against pinned Stim; library-only parser/printer rows are run in-process by `stab-oracle` and are skipped by recording because they do not have a Stim CLI command.
+`just oracle::blockers` validates the schema-versioned blocker closure ledger against the pinned Stim tag and commit, tracked regular upstream source files, exact test and symbol anchors, planned test-family anchors, reproducible statistical plans, required PFM-B owners, test evidence state, implemented primary and supporting oracle rows, typed oracle and benchmark runners, benchmark comparability classes, resource contracts, resource limits, and the frozen SHA-256 semantic inventory.
+`just oracle::blockers --check-selectors` additionally runs allowlisted `cargo test ... -- --list` commands through timed, bounded process capture and rejects claimed existing selectors that match no tests.
+The blocker-ledger validator currently requires Unix file-identity support and fails closed on other targets instead of accepting a symlink race.
 
 Validate the M1 compatibility matrix with:
 
@@ -92,6 +98,7 @@ just oracle::matrix --milestone M4
 The matrix lives at `oracle/compatibility-matrix.csv` and records upstream source paths, owners, milestones, priorities, parity modes, comparators, status, acceptance checks, and deferred future buckets.
 
 Benchmark contracts live at `benchmarks/manifest.csv`.
+Each benchmark row owns its runner, threshold class, and comparability class; `just bench::list` prints all three, and manifest validation requires the comparability field to agree with the source-owned compare-note prefix.
 The M3 benchmark workflow validates those contracts, records pinned C++ Stim baseline results, and writes generated reports under `target/benchmarks/`.
 Any explicit `--out` path must be repository-relative and under `target/benchmarks/`.
 `--only` filters use exact benchmark row ids or milestone names such as `M7` on both baseline and compare commands.

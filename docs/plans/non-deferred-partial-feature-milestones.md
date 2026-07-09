@@ -92,22 +92,27 @@ An implementation milestone may preserve a documented cap when output size or al
 
 Objective: turn the blocker decisions into an executable, subcase-level evidence ledger before production code changes.
 
+Status: Complete as of 2026-07-10. The 124-case source ledger, selector validation, exact oracle evidence signatures, typed benchmark runner, threshold, and comparability classifications, milestone audit, and full code review are recorded in `docs/plans/pfm-b0-blocker-ledger-progress-report.md`.
+
 Tasks:
 
 - Add a schema-versioned `docs/plans/blocker-closure-ledger.json` with one record per owned upstream subcase, not one record per upstream file, and render its human-readable summary in the PFM8 progress report.
 - Give each row a stable id, owning blocker, public or internal surface, Stim source and test name, expected comparator, implementation status, Rust test filter, oracle row, benchmark row or no-benchmark rationale, resource contract, and disposition.
 - Split multi-example upstream tests such as `circuit_flow_generators.various`, `missing_detectors.circuit`, and Python `test_inv_circuit` into stable named subcases before counting them.
 - Mark already implemented subcases as evidence verification work instead of scheduling duplicate implementation.
+- Record selector reuse explicitly in the generated summary; shared selectors are allowed only as PFM-B0 evidence-splitting debt and do not satisfy the later owner milestone's independently selectable evidence criterion.
+- Freeze every promoted supporting oracle row required by an evidence-close decision, including public CLI, generated-code, target-shape, MPAD, and repeat/resource evidence that is not the primary pinned subcase row.
 - Mark Python binding shape, file-like Python behavior, diagrams, public simulator products, exact randomness, and full ErrorMatcher provenance as deferred without using those deferrals to hide Rust semantic gaps.
 - Reject any proposed row whose expected behavior cannot be obtained from pinned Stim v1.16.0, a stated Stab hardening decision, or a precise semantic invariant.
 
 Tests and operational checks:
 
 - `cargo test -p stab-oracle fixtures --quiet`
+- `just oracle::blockers --check-selectors`
 - `just oracle::list`
 - `just oracle::matrix --check`
 - `just bench::list`
-- Add a `stab-oracle` validation test that rejects a blocker-ledger record without a comparator, executable test selector, resource contract, and benchmark disposition.
+- Add a `stab-oracle` validation test that rejects a blocker-ledger record without a comparator, resource contract, benchmark disposition, and either a planned selector for planned work or an executable selector for implemented and evidence-closed work.
 
 Benchmarks:
 
@@ -119,6 +124,7 @@ Acceptance criteria:
 - All eight open spec-gap entries have an implementation or evidence-close owner in this program.
 - No owned row cites a whole upstream file as sufficient completion evidence.
 - No blocker remains open solely because the checklist says `broader`, `full`, or `every other consumer`.
+- Shared broad test filters remain visible with exact owning case ids and cannot be mistaken for independently selectable completion evidence.
 
 ### PFM-B1: General Reverse-Flow And QEC Transform Closure
 
@@ -379,6 +385,11 @@ Acceptance criteria:
 - Every blocker has a resolved spec-gap entry and completion evidence.
 - No active checklist row is partial merely because its wording once contained an unbounded adjective.
 - Deferred Python, JS/WASM, diagram, ecosystem, simulator-product, GPU, exact-randomness, C++ header, full ErrorMatcher provenance, and deprecated `--detector_hypergraph` surfaces remain clearly separated from active Rust and CLI completion.
+
+## Historical Detailed PFM Sections
+
+The PFM0 through PFM8 sections below preserve the detailed evidence history that produced this blocker program.
+Their phrases saying a surface is under-specified or awaits exact subcases are superseded by PFM-B0 through PFM-B6 and `docs/plans/blocker-closure-ledger.json`; use the ledger and blocker milestones for current execution and use the older sections only for implementation history, linked tests, and prior boundaries.
 
 ## Required Packet For Every Implementation Slice
 
@@ -831,7 +842,7 @@ Acceptance criteria:
 
 Current evidence:
 
-- `docs/plans/pfm8-rollup-evidence-report.md` records the current PFM8 rollup evidence snapshot. It is intentionally not a final PFM8 completion report because broad PFM2 through PFM6 under-specification entries still need exact-subcase plans before implementation or deferral.
+- `docs/plans/pfm8-rollup-evidence-report.md` records the current PFM8 rollup evidence snapshot. It is intentionally not a final PFM8 completion report because `docs/plans/blocker-closure-ledger.json` has selected the exact PFM2 through PFM6 closure cases but PFM-B1 through PFM-B5 still need implementation or evidence closure.
 
 ## Final Verification
 
@@ -841,6 +852,7 @@ Before claiming the whole plan complete, run:
 cargo fmt --all --check
 cargo clippy -p stab-core -p stab-cli -p stab-oracle -p stab-bench --all-targets -- -D warnings
 cargo test --workspace --quiet
+just oracle::blockers --check-selectors
 just oracle::run --implemented-only
 just bench::smoke
 just maintenance::pre-commit

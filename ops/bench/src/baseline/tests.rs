@@ -218,16 +218,16 @@ fn primary_baseline_selection_excludes_metadata_and_m12_placeholder_rows() {
     let m4_row = benchmark_row("m4-circuit-parse", Runner::StimPerf);
     let mut metadata_row = benchmark_row("m7-perf-harness", Runner::ContractOnly);
     metadata_row.milestone = Milestone::M7;
-    metadata_row.threshold_class = "baseline-metadata".to_string();
+    metadata_row.threshold_class = crate::manifest::ThresholdClass::BaselineMetadata;
     let mut non_primary_row =
         benchmark_row("m9-detecting-regions-basic-batch", Runner::ContractOnly);
     non_primary_row.milestone = Milestone::M9;
-    non_primary_row.threshold_class = "non-primary-report-only".to_string();
+    non_primary_row.threshold_class = crate::manifest::ThresholdClass::NonPrimaryReportOnly;
     let mut m12_row = benchmark_row("m12-primary-performance-matrix", Runner::ContractOnly);
     m12_row.milestone = Milestone::M12;
     let mut pf_row = benchmark_row("pf1-circuit-coordinate-query", Runner::ContractOnly);
     pf_row.milestone = Milestone::Pf1;
-    pf_row.threshold_class = "non-primary-report-only".to_string();
+    pf_row.threshold_class = crate::manifest::ThresholdClass::NonPrimaryReportOnly;
     let manifest = BenchmarkManifest {
         rows: vec![m4_row, metadata_row, non_primary_row, m12_row, pf_row],
     };
@@ -243,7 +243,7 @@ fn m4_gate_lookup_benchmark_splits_lookup_surfaces() {
     let row = BenchmarkRow {
         id: "m4-gate-lookup".to_string(),
         milestone: Milestone::M4,
-        threshold_class: "report-only".to_string(),
+        threshold_class: crate::manifest::ThresholdClass::ReportOnly,
         runner: Runner::StimPerf,
         upstream_source: "src/stim/gates/gates.perf.cc".to_string(),
         stim_perf_filter: "gate_data_hash_all_gate_names".to_string(),
@@ -252,6 +252,7 @@ fn m4_gate_lookup_benchmark_splits_lookup_surfaces() {
         phase: "analysis".to_string(),
         measurement: "gate-lookup".to_string(),
         description: "test row".to_string(),
+        comparability: crate::comparability::ComparabilityClass::Unspecified,
     };
 
     let measurements = run_stab_compare_row(&row)
@@ -285,7 +286,7 @@ fn pf1_circuit_coordinate_benchmark_reports_public_query_surfaces() {
     let row = BenchmarkRow {
         id: "pf1-circuit-coordinate-query".to_string(),
         milestone: Milestone::Pf1,
-        threshold_class: "non-primary-report-only".to_string(),
+        threshold_class: crate::manifest::ThresholdClass::NonPrimaryReportOnly,
         runner: Runner::ContractOnly,
         upstream_source: "src/stim/circuit/circuit.perf.cc".to_string(),
         stim_perf_filter: String::new(),
@@ -294,6 +295,7 @@ fn pf1_circuit_coordinate_benchmark_reports_public_query_surfaces() {
         phase: "analysis".to_string(),
         measurement: "circuit-coordinate-query".to_string(),
         description: "test row".to_string(),
+        comparability: crate::comparability::ComparabilityClass::Unspecified,
     };
 
     let measurements = run_stab_compare_row(&row)
@@ -328,7 +330,7 @@ fn pf1_dem_counts_benchmark_reports_public_query_surfaces() {
     let row = BenchmarkRow {
         id: "pf1-dem-counts-repeat".to_string(),
         milestone: Milestone::Pf1,
-        threshold_class: "non-primary-report-only".to_string(),
+        threshold_class: crate::manifest::ThresholdClass::NonPrimaryReportOnly,
         runner: Runner::ContractOnly,
         upstream_source: "src/stim/dem/detector_error_model.test.cc".to_string(),
         stim_perf_filter: String::new(),
@@ -337,6 +339,7 @@ fn pf1_dem_counts_benchmark_reports_public_query_surfaces() {
         phase: "analysis".to_string(),
         measurement: "dem-counts-repeat".to_string(),
         description: "test row".to_string(),
+        comparability: crate::comparability::ComparabilityClass::Unspecified,
     };
 
     let measurements = run_stab_compare_row(&row)
@@ -369,7 +372,7 @@ fn pf1_dem_without_tags_benchmark_reports_public_query_surface() {
     let row = BenchmarkRow {
         id: "pf1-dem-without-tags".to_string(),
         milestone: Milestone::Pf1,
-        threshold_class: "non-primary-report-only".to_string(),
+        threshold_class: crate::manifest::ThresholdClass::NonPrimaryReportOnly,
         runner: Runner::ContractOnly,
         upstream_source: "src/stim/dem/detector_error_model_pybind_test.py".to_string(),
         stim_perf_filter: String::new(),
@@ -378,6 +381,7 @@ fn pf1_dem_without_tags_benchmark_reports_public_query_surface() {
         phase: "analysis".to_string(),
         measurement: "dem-without-tags".to_string(),
         description: "test row".to_string(),
+        comparability: crate::comparability::ComparabilityClass::Unspecified,
     };
 
     let measurements = run_stab_compare_row(&row)
@@ -403,7 +407,7 @@ fn pf1_gate_metadata_benchmark_reports_public_metadata_surfaces() {
     let row = BenchmarkRow {
         id: "pf1-gate-metadata-lookup".to_string(),
         milestone: Milestone::Pf1,
-        threshold_class: "non-primary-report-only".to_string(),
+        threshold_class: crate::manifest::ThresholdClass::NonPrimaryReportOnly,
         runner: Runner::ContractOnly,
         upstream_source: "src/stim/gates/gates.perf.cc".to_string(),
         stim_perf_filter: String::new(),
@@ -412,6 +416,7 @@ fn pf1_gate_metadata_benchmark_reports_public_metadata_surfaces() {
         phase: "analysis".to_string(),
         measurement: "gate-metadata".to_string(),
         description: "test row".to_string(),
+        comparability: crate::comparability::ComparabilityClass::Unspecified,
     };
 
     let measurements = run_stab_compare_row(&row)
@@ -590,7 +595,7 @@ fn m6_benchmark_rows_have_stab_compare_runners() {
         let row = BenchmarkRow {
             id: id.to_string(),
             milestone: Milestone::M6,
-            threshold_class: "report-only".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::ReportOnly,
             runner: Runner::StimPerf,
             upstream_source: "src/stim/stabilizers/test.perf.cc".to_string(),
             stim_perf_filter: "test".to_string(),
@@ -599,6 +604,7 @@ fn m6_benchmark_rows_have_stab_compare_runners() {
             phase: "throughput".to_string(),
             measurement: "stabilizers".to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         };
 
         let measurements = run_stab_compare_row(&row)
@@ -708,7 +714,7 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
         let row = BenchmarkRow {
             id: id.to_string(),
             milestone: Milestone::M9,
-            threshold_class: "report-only".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::ReportOnly,
             runner,
             upstream_source: "src/stim/cmd/command_detect.test.cc".to_string(),
             stim_perf_filter: String::new(),
@@ -717,6 +723,7 @@ fn m9_benchmark_rows_have_stab_compare_runners() {
             phase: "throughput".to_string(),
             measurement: "detector-conversion".to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         };
 
         let measurements = run_stab_compare_row(&row)
@@ -776,7 +783,7 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
         let row = BenchmarkRow {
             id: id.to_string(),
             milestone: Milestone::Pf3,
-            threshold_class: "non-primary-report-only".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::NonPrimaryReportOnly,
             runner: Runner::ContractOnly,
             upstream_source: "src/stim/simulators/frame_simulator.perf.cc".to_string(),
             stim_perf_filter: String::new(),
@@ -785,6 +792,7 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
             phase: "throughput".to_string(),
             measurement: measurement.to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         };
 
         let measurements = run_stab_compare_row(&row)
@@ -841,7 +849,7 @@ fn pf7_cli_benchmark_rows_have_stab_compare_runners() {
         let row = BenchmarkRow {
             id: id.to_string(),
             milestone: Milestone::Pf7,
-            threshold_class: "non-primary-report-only".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::NonPrimaryReportOnly,
             runner: Runner::ContractOnly,
             upstream_source: "src/stim/cmd/command_m2d.test.cc".to_string(),
             stim_perf_filter: String::new(),
@@ -850,6 +858,7 @@ fn pf7_cli_benchmark_rows_have_stab_compare_runners() {
             phase: "throughput".to_string(),
             measurement: measurement.to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         };
 
         let measurements = run_stab_compare_row(&row)
@@ -907,7 +916,7 @@ fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
         let row = BenchmarkRow {
             id: id.to_string(),
             milestone: Milestone::Pf2,
-            threshold_class: "report-only".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::ReportOnly,
             runner: Runner::ContractOnly,
             upstream_source: "src/stim/circuit/circuit.test.cc".to_string(),
             stim_perf_filter: String::new(),
@@ -916,6 +925,7 @@ fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
             phase: "analysis".to_string(),
             measurement: "circuit-transform".to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         };
 
         let measurements = run_stab_compare_row(&row)
@@ -959,7 +969,7 @@ fn convert_benchmark_rows_have_stab_cli_runners() {
         let row = BenchmarkRow {
             id: id.to_string(),
             milestone: Milestone::M7,
-            threshold_class: "report-only".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::ReportOnly,
             runner: Runner::StimCli,
             upstream_source: "src/stim/cmd/command_convert.test.cc".to_string(),
             stim_perf_filter: String::new(),
@@ -968,6 +978,7 @@ fn convert_benchmark_rows_have_stab_cli_runners() {
             phase: "throughput".to_string(),
             measurement: "convert-cli".to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         };
 
         let measurements = run_stab_compare_row(&row)
@@ -1042,7 +1053,7 @@ fn m10_dem_benchmark_rows_have_stab_compare_runners() {
         let row = BenchmarkRow {
             id: id.to_string(),
             milestone: Milestone::M10,
-            threshold_class: "report-only".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::ReportOnly,
             runner,
             upstream_source: "src/stim/dem/detector_error_model.test.cc".to_string(),
             stim_perf_filter: String::new(),
@@ -1051,6 +1062,7 @@ fn m10_dem_benchmark_rows_have_stab_compare_runners() {
             phase: "analysis".to_string(),
             measurement: "dem-format".to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         };
 
         let measurements = run_stab_compare_row(&row)
@@ -1084,7 +1096,7 @@ fn benchmark_row(id: &str, runner: Runner) -> BenchmarkRow {
     BenchmarkRow {
         id: id.to_string(),
         milestone: Milestone::M4,
-        threshold_class: "report-only".to_string(),
+        threshold_class: crate::manifest::ThresholdClass::ReportOnly,
         runner,
         upstream_source: upstream_source.to_string(),
         stim_perf_filter: "test".to_string(),
@@ -1093,5 +1105,6 @@ fn benchmark_row(id: &str, runner: Runner) -> BenchmarkRow {
         phase: "analysis".to_string(),
         measurement: measurement.to_string(),
         description: "test row".to_string(),
+        comparability: crate::comparability::ComparabilityClass::Unspecified,
     }
 }

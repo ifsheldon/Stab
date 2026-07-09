@@ -6,7 +6,6 @@ use crate::baseline::{
     summarize_stab_measurements, validate_baseline_metadata,
 };
 use crate::beta_gate::{apply_beta_gate, read_beta_waivers};
-use crate::comparability::ComparabilityClass;
 use crate::compare_evidence::{aggregate_measurement_runs, paired_measurement_ratios};
 use crate::config::PREFIX;
 use crate::error::BenchError;
@@ -524,7 +523,13 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         }
         _ => None,
     };
-    let comparability = ComparabilityClass::from_note_and_runner(note.as_deref(), row.runner);
+    let comparability = if row.comparability
+        == crate::comparability::ComparabilityClass::Unspecified
+    {
+        crate::comparability::ComparabilityClass::from_note_and_runner(note.as_deref(), row.runner)
+    } else {
+        row.comparability
+    };
     let measurement_ratios =
         paired_measurement_ratios(&stim_measurements, &stab_measurements, comparability);
     let worst_paired_relative_ratio = measurement_ratios
@@ -547,7 +552,7 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
     CompareRowResult {
         id: row.id.clone(),
         milestone: row.milestone,
-        threshold_class: row.threshold_class.clone(),
+        threshold_class: row.threshold_class.as_str().to_string(),
         runner: row.runner,
         comparability,
         upstream_source: row.upstream_source.clone(),
@@ -870,7 +875,7 @@ mod tests {
         let row = BenchmarkRow {
             id: "allocation-row".to_string(),
             milestone: Milestone::M12,
-            threshold_class: "performance-gate".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::PerformanceGate,
             runner: Runner::StimPerf,
             upstream_source: "future/performance-primary-matrix".to_string(),
             stim_perf_filter: "test".to_string(),
@@ -879,6 +884,7 @@ mod tests {
             phase: "performance-hardening".to_string(),
             measurement: "primary-matrix".to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         };
 
         let result = build_compare_row_result(CompareRowBuild {
@@ -1073,7 +1079,7 @@ mod tests {
         BenchmarkRow {
             id: id.to_string(),
             milestone: Milestone::M12,
-            threshold_class: "performance-gate".to_string(),
+            threshold_class: crate::manifest::ThresholdClass::PerformanceGate,
             runner: Runner::StimPerf,
             upstream_source: "future/performance-primary-matrix".to_string(),
             stim_perf_filter: "test".to_string(),
@@ -1082,6 +1088,7 @@ mod tests {
             phase: "performance-hardening".to_string(),
             measurement: "primary-matrix".to_string(),
             description: "test row".to_string(),
+            comparability: crate::comparability::ComparabilityClass::Unspecified,
         }
     }
 
