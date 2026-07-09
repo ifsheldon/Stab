@@ -1,103 +1,189 @@
-# Goal: Finish Non-Deferred Partial Feature Milestones
+# Goal: Resolve The Remaining Non-Deferred Blockers
 
 ## Mission
 
-Finish the active milestones in `docs/plans/non-deferred-partial-feature-milestones.md`.
-The objective is to close every `Partial` row in `docs/stab-feature-checklist.md` whose remaining work is not intentionally deferred, while keeping deferred Python, JS/WASM, diagram, ecosystem, simulator-product, GPU, exact-randomness, C++ header, and deprecated `--detector_hypergraph` surfaces out of scope.
+Finish the blocker closure program in `docs/plans/non-deferred-partial-feature-milestones.md`.
+The objective is to resolve all eight open entries in `docs/plans/milestone-spec-gaps.md`, close every remaining active Rust or CLI feature gap, and stop treating intentionally deferred products or unbounded words such as `full`, `broader`, and `every` as implementation instructions.
 
-Use `docs/plans/lessons-learned.md` before planning or implementing each milestone.
-The recurring failure to avoid is claiming completion from broad checklist wording, broad upstream test files, stale reports, report-only benchmarks, or nearby tests that do not prove the exact subcase.
+The required outcome is not another collection of selected fixture-shaped handlers.
+The required outcome is a maintainable semantic foundation with exhaustive support contracts, shared traversal and flow engines, generic loop folding, exact source-owned tests, honest benchmark classifications, and synchronized status documentation.
+
+Read `docs/plans/lessons-learned.md` before starting each milestone.
+The central lesson is that ambiguity must be removed before coding and that nearby tests, broad upstream files, stale reports, and report-only benchmarks do not prove a feature claim.
 
 ## Active Sources Of Truth
 
-- Active execution plan: `docs/plans/non-deferred-partial-feature-milestones.md`.
+- Execution plan: `docs/plans/non-deferred-partial-feature-milestones.md`, especially PFM-B0 through PFM-B6.
+- Open blocker log: `docs/plans/milestone-spec-gaps.md`.
+- Current rollup evidence: `docs/plans/pfm8-rollup-evidence-report.md`.
 - Feature status: `docs/stab-feature-checklist.md`.
-- Stim feature inventory: `docs/stim-feature-list.md`.
-- Partial-row extraction map: `docs/plans/partial-feature-inventory.md`.
-- Historical RPF plan and reports: `docs/plans/remaining-partial-feature-milestones.md` and `docs/plans/rpf*-*.md`.
-- Current PFM8 rollup evidence report: `docs/plans/pfm8-rollup-evidence-report.md`.
-- Historical roadmap and benchmark policy: `docs/plans/rust-stim-drop-in-rewrite.md`.
+- Stim inventory: `docs/stim-feature-list.md`.
+- Partial-row map: `docs/plans/partial-feature-inventory.md`.
+- Lessons learned: `docs/plans/lessons-learned.md`.
+- Historical roadmap: `docs/plans/rust-stim-drop-in-rewrite.md`.
 - Test-porting map: `docs/plans/stim-test-porting-plan.md`.
-- Lessons and known spec gaps: `docs/plans/lessons-learned.md` and `docs/plans/milestone-spec-gaps.md`.
-- Upstream baseline: pinned Stim v1.16.0 in `vendor/stim`.
+- Frozen oracle: Stim v1.16.0 in `vendor/stim`.
 - Oracle metadata: `oracle/fixtures/manifest.csv`.
 - Benchmark metadata: `benchmarks/manifest.csv`, `benchmarks/m12-primary-thresholds.json`, `benchmarks/m12-primary-beta-waivers.json`, and `benchmarks/profiler-notes/`.
 
-If these files disagree, fix the stale source before implementing or claiming completion.
+If these sources disagree, fix the disagreement before implementation continues.
 
-## Work Loop For Each Milestone
+## Scope Decisions
 
-For every PFM milestone:
+The following decisions are fixed for this goal:
 
-1. Re-read the milestone section in `docs/plans/non-deferred-partial-feature-milestones.md`.
-2. Reconcile the milestone with the checklist, partial inventory, Stim feature inventory, pinned Stim source, lessons learned, and spec-gap log.
-3. Write or refresh a scope note before coding that names owned subcases, explicit rejections, explicit deferrals, comparator class, oracle rows, benchmark rows, resource behavior, and public API or CLI shape.
-4. Port or create meaningful tests before or alongside implementation.
-5. Implement the feature using existing Stab abstractions, typed boundaries, clear domain errors, and streaming or documented caps for public IO paths.
-6. Run targeted tests while iterating and fix failures.
-7. Add or update oracle rows, benchmark rows, measurement work units, compare notes, profiler notes, waivers, threshold entries, and fixture metadata when the milestone requires them.
-8. Update documentation in the same change set, including the checklist, active plan, milestone report, roadmap text, oracle metadata, benchmark metadata, and user-facing docs when behavior changes.
-9. Run milestone-audit and fix implementation, evidence, test, benchmark, or documentation findings.
-10. Run full-code-review for touched surfaces and fix findings; when using Codex, spawn GPT-5.5/xhigh subagents during the review.
-11. Log true under-specification in `docs/plans/milestone-spec-gaps.md` instead of hiding it in checklist wording.
+- Implement general reverse-flow and QEC transform semantics for the selected Rust APIs.
+- Evidence-close analyzer sweep behavior at the current pinned matrix instead of inventing additional sweep shapes.
+- Implement an exhaustive gate-by-surface semantic contract for legal execution behavior.
+- Implement one shared folded DEM traversal for bounded-result consumers.
+- Evidence-close detecting regions and missing detectors from their complete named pinned subcases plus existing promoted evidence.
+- Implement general GF(2) flow solving and shared stabilizer-flow transitions.
+- Implement generic analyzer loop-state cycle folding and finite graphlike, hypergraph, and SAT/WCNF closure corpora.
+- Keep full ErrorMatcher provenance and `explain_errors` deferred.
 
-A milestone is incomplete if any item in this loop is missing.
+The following surfaces remain excluded: Python bindings, JS/WASM, diagrams, `repl`, QASM, Quirk, Crumble, ecosystem packages, GPU, exact random-stream parity, public graph or vector simulator products, C++ header compatibility, and deprecated `--detector_hypergraph` behavior.
+
+An excluded surface must not keep an otherwise completed Rust or CLI child row marked as an active blocker.
+
+## Required Execution Order
+
+Execute the blocker milestones in this order:
+
+1. PFM-B0: freeze the subcase-level closure ledger.
+2. PFM-B2 contract groundwork: add the gate-by-surface classification before changing shared execution semantics.
+3. PFM-B3: add shared folded DEM traversal before migrating analyzer, search, SAT, or matcher consumers.
+4. PFM-B4 flow foundation: replace exhaustive flow solving and establish shared stabilizer transitions.
+5. PFM-B1: finish reverse-flow and QEC transforms using the shared flow foundation.
+6. PFM-B5: implement generic analyzer loop folding and finish search, SAT, sparse-tracker, and active matched-error closure.
+7. Finish the PFM-B2 generated semantic matrix after the shared engines stabilize.
+8. PFM-B6: resolve spec gaps, run audits and review, and roll up statuses.
+
+PFM-B4 detecting-region and missing-detector evidence closure may run in parallel with PFM-B3 because it must not add speculative behavior.
+Do not begin PFM-B6 while any owned blocker row lacks executable evidence.
+
+## Work Loop For Every Milestone
+
+For each PFM-B milestone:
+
+1. Re-read the exact milestone section and its owned blocker entries.
+2. Reconcile the closure ledger with pinned Stim source, the checklist, partial inventory, lessons learned, oracle manifest, and benchmark manifest.
+3. Write or refresh a scope or progress report naming every owned subcase, explicit rejection, deferral, comparator, public surface, resource contract, oracle row, benchmark row, and done criterion.
+4. Add or port meaningful tests before or alongside production changes.
+5. Implement the general abstraction named by the milestone and migrate the owned consumers.
+6. Run focused tests during iteration and fix semantic, error, and resource regressions.
+7. Update oracle rows and benchmark metadata in the same change set as behavior or performance-path changes.
+8. Update all affected documentation in the same change set.
+9. Run milestone-audit and fix every implementation, evidence, benchmark, test, and documentation finding.
+10. Log genuine newly discovered under-specification in `docs/plans/milestone-spec-gaps.md`; do not use a new gap entry to avoid a decision already made by this goal.
+11. Run full-code-review over the touched surfaces and fix findings.
+
+A milestone is incomplete if any step is missing.
+
+## Architecture Guardrails
+
+- Do not add production code that recognizes fixture text, exact instruction sequences, exact recurrence periods, exact detector counts, or one generated circuit signature.
+- Gate semantics must be expressed by gate-family and target-role transitions.
+- Flow generation, flow checking, flow solving, time reversal, detecting regions, missing detectors, and sparse reverse tracking should share stabilizer transition logic where their semantics overlap.
+- Flow solving must use GF(2) elimination or an equivalently general polynomial algorithm, not exhaustive subset enumeration.
+- Folded DEM traversal must carry checked detector and coordinate shifts through nested repeats and support early termination.
+- Analyzer loop folding must identify recurrence from canonical boundary state, not hard-coded periods such as 8 or 127.
+- A public materializing API may retain a documented cap when its result is inherently expanded.
+- A bounded-result internal consumer may not flatten repeated input merely for inspection.
+- Search may retain documented limits for genuinely exponential state spaces, but traversal limits and search-complexity limits must be distinct and tested.
+- Unsupported runtime shapes must return precise typed errors and must not silently skip work or substitute fallback semantics.
+
+If implementation cannot satisfy these guardrails, stop and revise the milestone contract before adding another special case.
 
 ## Test Rules
 
-Use the milestone-specific tests listed in `docs/plans/non-deferred-partial-feature-milestones.md`.
-Tests must protect behavior, compatibility, resource boundaries, typed errors, malformed inputs, CLI stdout and stderr behavior, exit status, and unsupported-shape handling where relevant.
-Do not count tests that only check constants, static labels, or broad smoke behavior as completion evidence.
+- Every blocker ledger row must select an executable Rust test or an explicit evidence-close check.
+- Multi-example upstream tests must be split into stable subcase ids before they count as complete.
+- Use exact comparators for canonical circuit text, deterministic DEM text, stable WCNF text, deterministic flow lists, and CLI output where order is contractual.
+- Use structural comparators for detecting-region maps, flow spans, and tie-sensitive logical-error target sets.
+- Use statistical comparators only for probabilistic behavior, with source-owned shot counts, seeds, tolerances, bucket definitions, and false-positive budgets.
+- Add positive, negative, malformed-input, overflow, unsupported-shape, visitor-error, and resource-boundary tests for each relevant public or internal surface.
+- Add small generated differential tests whenever a folded or optimized path has a straightforward materialized reference implementation.
+- Property tests must use deterministic seeds and print enough minimized context to reproduce failures.
 
-During iteration, use focused filters.
-Before claiming milestone completion, run the milestone’s full targeted test set plus any oracle, benchmark, and documentation checks named by the plan.
+Do not count tests that only restate metadata constants, static labels, or freshly constructed fields.
 
 ## Benchmark Rules
 
-Every performance-sensitive milestone must have benchmark metadata before completion.
+Every performance-sensitive milestone must update benchmark metadata before completion.
 
-For each benchmark row:
+For every changed or added row:
 
-- Classify it as `direct-match`, `cli-baseline`, `contract-representative`, `contract-proxy`, `contract-smoke`, `partial-match`, `report-only`, or `contract-only`.
-- Define measurement work units before collecting evidence.
+- Assign a comparability class before timing it.
+- Define work units that reflect the algorithm, such as matrix bits or pivots, DEM items visited, represented repeat iterations, analyzer states, search nodes, clauses, or circuit operations.
+- Record peak live allocation and sampled resident delta for traversal, loop-folding, and large matrix workloads.
 - Add compare notes explaining whether pinned Stim is a faithful baseline.
-- Add runner coverage or keep the row as an explicit placeholder.
-- Keep report-only, proxy, tiny, partial-match, and no-ratio rows out of the 1.25x primary threshold file unless a source-owned waiver and repeated evidence justify otherwise.
-- Use schema-version-2 submeasurement thresholds when one row bundles stable and unstable submeasurements.
-- Update profiler notes in the same change set as threshold changes.
+- Keep report-only, proxy, partial-match, tiny, and no-ratio rows out of the 1.25x threshold gate.
+- Use schema-version-2 submeasurement thresholds when one row contains different algorithms or size classes.
+- Update profiler notes and threshold entries in the same change set.
 
-Fresh primary benchmark evidence for newly gated rows must come from current committed `HEAD` or an explicitly recorded local-modification state:
+New primary-gate evidence must use a fresh baseline from current committed `HEAD`:
 
 ```sh
-just bench::baseline --primary --out target/benchmarks/non-deferred-partials-primary-baseline
-just bench::compare --primary --warmup --measurement-runs 3 --require-profiler-notes --baseline target/benchmarks/non-deferred-partials-primary-baseline/baseline.json --report target/benchmarks/non-deferred-partials-primary-compare
-just bench::primary-regression --baseline target/benchmarks/non-deferred-partials-primary-baseline/baseline.json --report target/benchmarks/non-deferred-partials-primary-regression
-just bench::primary-memory-regression --baseline target/benchmarks/non-deferred-partials-primary-baseline/baseline.json
+just bench::baseline --primary --out target/benchmarks/blocker-closure-primary-baseline
+just bench::compare --primary --warmup --measurement-runs 3 --require-profiler-notes --baseline target/benchmarks/blocker-closure-primary-baseline/baseline.json --report target/benchmarks/blocker-closure-primary-compare
+just bench::primary-regression --baseline target/benchmarks/blocker-closure-primary-baseline/baseline.json --report target/benchmarks/blocker-closure-primary-regression
+just bench::primary-memory-regression --baseline target/benchmarks/blocker-closure-primary-baseline/baseline.json
 ```
 
-Do not cite exploratory probes as release evidence.
+Exploratory probes are not completion evidence.
 
 ## Documentation Rules
 
-When behavior changes, update documentation in the same change set.
-At minimum, check whether the change affects:
+Every milestone must check and update, where applicable:
 
 - `docs/stab-feature-checklist.md`.
 - `docs/plans/non-deferred-partial-feature-milestones.md`.
+- `docs/plans/milestone-spec-gaps.md`.
 - `docs/plans/partial-feature-inventory.md`.
-- The matching milestone progress or completion report in `docs/plans/`.
+- The matching scope and progress report.
 - `docs/plans/rust-stim-drop-in-rewrite.md`.
 - `docs/plans/stim-test-porting-plan.md`.
-- `docs/plans/milestone-spec-gaps.md`.
-- `README.md` or CLI docs.
-- Oracle manifests, benchmark manifests, threshold files, waivers, profiler notes, and fixture metadata.
+- `docs/plans/pfm8-rollup-evidence-report.md`.
+- `README.md` and CLI or Rust API docs when public behavior changes.
+- Oracle and benchmark manifests, thresholds, waivers, profiler notes, and fixture metadata.
 
-Checklist rows may move from `Partial` to `Done` only after the owned subcases, tests, benchmarks, audits, and review findings prove the claim.
-Rollup rows may move only after every active child row is implemented or explicitly deferred with a named reason.
+Use `Done for selected Rust/CLI scope` when the active child surface is complete but literal full-Stim product parity still depends on deferred products.
+Do not leave such a row `Partial` and call it an active blocker.
+
+## Milestone Completion Criteria
+
+Each implementation milestone is complete only when:
+
+- Every owned subcase has implementation or evidence-close status and direct executable evidence.
+- Every promoted public behavior has a defined comparator, error contract, and resource contract.
+- Every unsupported shape fails closed with a precise error or is outside the selected public surface.
+- No production implementation depends on fixture signatures or hard-coded recurrence periods.
+- Tests cover correctness, compatibility, negative behavior, and resource boundaries.
+- Benchmark metadata and evidence match the milestone's performance claims.
+- Documentation agrees with current behavior.
+- Milestone-audit and full-code-review findings are fixed.
+
+## Goal Completion Criteria
+
+The whole goal is complete only when:
+
+- All eight open spec-gap entries are resolved.
+- PFM3 analyzer sweep, PFM5 detecting regions, and PFM5 missing detectors are evidence-closed without speculative scope growth.
+- The gate-by-surface contract covers every canonical gate and relevant implemented surface with no unknown classification.
+- Every legal target-role shape inside the selected Rust or CLI surface executes, lowers, or has defined no-op or annotation semantics; unsupported classifications are limited to invalid combinations or named exclusions and cannot satisfy a full-semantic status claim.
+- Reverse-flow transforms use general gate-family transitions and pass the owned pinned and generated corpus.
+- Flow solving has no exhaustive-subset size cliff.
+- Bounded-result DEM consumers use shared folded traversal or have a precise inherent-materialization rationale.
+- Analyzer loop folding has no fixture-specific or hard-coded-period production path.
+- Named graphlike, hypergraph, and SAT/WCNF corpora have exact or structural parity evidence.
+- Remaining caps protect inherent output or algorithmic complexity and have explicit tests.
+- Active checklist child rows are no longer generically partial.
+- Deferred product surfaces remain explicit and do not masquerade as active blockers.
+- Final PFM8 evidence comes from current `HEAD` and contains audit, review, tests, oracle, benchmark, and documentation closure.
 
 ## Final Verification
 
-Before claiming the full goal complete, run:
+Run before claiming the goal complete:
 
 ```sh
 cargo fmt --all --check
@@ -108,37 +194,21 @@ just bench::smoke
 just maintenance::pre-commit
 ```
 
-If the work changes benchmark gates, also run the primary benchmark commands in the benchmark rules section.
-If the work changes shared parser, sampler, analyzer, stabilizer, oracle, benchmark, or CLI infrastructure, expand verification beyond the targeted milestone filters.
-
-## Completion Criteria
-
-The goal is complete only when:
-
-- Every non-deferred partial row in `docs/stab-feature-checklist.md` has implemented evidence or remains partial with a named deferred subcase.
-- Every rollup row is backed by child-row evidence and does not imply broader parity than the implemented surfaces prove.
-- Every implemented feature has meaningful targeted tests, including positive, negative, compatibility, and resource-boundary cases where relevant.
-- Every public CLI behavior has CLI tests or oracle rows proving accepted flags, rejected flags, input and output formats, stdout behavior, stderr class, exit status, path handling, writer behavior, and resource behavior.
-- Every public Rust API added by the plan uses typed domain values and clear domain errors after external boundaries.
-- Every benchmarked feature has source-owned manifest metadata, runner coverage or explicit placeholder status, measurement work, compare notes, and a comparability class.
-- Every primary-gated benchmark row has repeated stable comparable evidence and matching profiler notes.
-- Report-only rows are labeled as report-only and are not used as release gates.
-- Checklist, active plan docs, roadmap docs, oracle metadata, benchmark metadata, threshold files, waivers, profiler notes, and milestone reports agree with current behavior.
-- Milestone-audit and full-code-review findings are fixed, or true under-specification findings are logged.
+Run the primary benchmark commands when any primary runner, threshold, or shared hot path changes.
 
 ## Stop Conditions
 
-Stop and write a spec-gap entry instead of coding when:
+Stop and amend the plan when:
 
-- A subcase requires an excluded surface.
-- A milestone still depends on a whole upstream file instead of exact owned subcases.
-- A public CLI behavior cannot define accepted flags, rejected flags, input formats, output formats, stdout behavior, stderr class, exit status, path handling, and resource behavior.
-- A benchmark row cannot be classified or cannot produce faithful comparable evidence.
-- A completion claim would require stale reports, informal waivers, or unrecorded local modifications.
-- A public parser, converter, sampler, analyzer, transformer, search, or writer path has neither streaming behavior nor a documented cap.
-- A checklist update would need to overstate implemented behavior to mark a row done.
+- An owned subcase still depends on a whole upstream file instead of stable subcase ids.
+- Expected behavior cannot be established from pinned Stim, a documented Stab hardening decision, or a precise invariant.
+- A proposed fix requires a fixture-shaped branch or hard-coded recurrence period.
+- A public parser, transformer, converter, sampler, analyzer, search, or writer path has neither streaming or folded behavior nor a documented cap.
+- A benchmark row cannot be classified or cannot define meaningful work units.
+- A performance claim depends on stale artifacts, unrecorded local modifications, missing profiler notes, or an informal waiver.
+- A checklist status would overstate Python, JS/WASM, diagram, ecosystem, simulator-product, or provenance parity.
 
 ## Commit Policy
 
 Do not commit solely because this goal exists.
-When the current thread explicitly authorizes commits, use focused commits following the repository commit-message convention and run the required targeted verification before committing.
+When a thread explicitly authorizes commits, group changes by blocker milestone, use the repository commit-message convention, and run the milestone's targeted verification before each focused commit.

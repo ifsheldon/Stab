@@ -5,7 +5,7 @@
 This plan covers every feature row that is marked `Partial` in `docs/stab-feature-checklist.md` and still has non-deferred Rust or CLI work.
 It excludes rows whose remaining work is only Python bindings, JavaScript/WASM, diagrams, ecosystem integrations, public simulator products, C++ header compatibility, exact random-stream parity, or deprecated `--detector_hypergraph` support.
 
-This is the active planning document for finishing the remaining partial feature surfaces.
+This is the active planning document for finishing the remaining partial feature surfaces and resolving the eight open under-specification entries recorded in `docs/plans/milestone-spec-gaps.md`.
 Use `docs/plans/remaining-partial-feature-milestones.md`, `docs/plans/partial-feature-inventory.md`, and existing RPF progress reports as historical context and source material, but execute this document when deciding the next implementation packet.
 
 The main planning rule is simple: a row may not move from `Partial` to `Done` because nearby functionality exists.
@@ -53,9 +53,9 @@ If a subcase in this plan turns out to require an excluded surface, stop and log
 | PFM7 | `stim m2d`, `stim analyze_errors`, legacy top-level command flags, CLI binary | Finish visible CLI parity for selected commands and accepted legacy aliases, with `--detector_hypergraph` remaining excluded. The selected CLI binary rollup is now closed; reopen only for newly selected command behavior. |
 | PFM8 | Rust core library equivalent, `.stim`/`.dem`/result-format compatibility, full semantic execution, highest-priority remaining feature gaps, and CLI binary regression checks | Audit, review, benchmark, documentation, and rollup-status closure after child milestones have evidence. |
 
-## Execution Order
+## Historical PFM Dependency Map
 
-Recommended order:
+The original PFM0 through PFM8 dependency relationships remain useful background:
 
 1. Run PFM0 before each new wave if the checklist, inventory, or roadmap has changed.
 2. Run PFM1 and PFM5 before measurement-rich flow-dependent PFM2 work, because measurement-rich `time_reversed_for_flows` and flow-aware decomposition checks need measurement-rich flow semantics.
@@ -64,6 +64,321 @@ Recommended order:
 5. Run PFM8 only after one or more implementation milestones have fresh source-owned evidence.
 
 Milestones may be implemented in smaller slices, but every slice must name the checklist rows, oracle rows, benchmark rows, deferred edges, and done criteria it owns.
+The active execution order is PFM-B0, PFM-B2 contract groundwork, PFM-B3, the PFM-B4 flow foundation, PFM-B1, PFM-B5, PFM-B2 final generated coverage, and PFM-B6.
+
+## Remaining Blocker Closure Program
+
+The current blockers are planning and architecture blockers, not permission to keep adding isolated fixture-shaped branches.
+This program replaces the previous instruction to choose an arbitrary next subcase from each broad checklist row.
+It gives every open entry in `docs/plans/milestone-spec-gaps.md` one finite disposition: implement a general capability, close the entry from existing source-owned evidence, or explicitly defer a product surface already excluded by this plan.
+
+### Blocker Decisions
+
+| Blocker | Decision | Closure path |
+| --- | --- | --- |
+| PFM2 broader QEC inverse and measurement-rich transforms | Implement | Finish the pinned non-binding transform corpus and replace packet-specific flow rewriting with one reverse-flow engine for the selected Rust API. |
+| PFM3 analyzer sweep shapes | Evidence close | The current matrix already exceeds the only pinned C++ analyzer sweep case. Do not invent additional shapes without a failing pinned oracle or a newly selected public API. |
+| PFM3 legal non-tableau execution | Implement | Build an exhaustive gate-by-surface support contract and generated semantic tests instead of promoting gates one example at a time. |
+| PFM4 DEM folded traversal and coordinates | Implement | Introduce a shared checked folded traversal abstraction, migrate bounded-result consumers, and retain explicit caps only where the requested result itself is materialized or potentially exponential. |
+| PFM5 detecting regions | Evidence close | Audit and lock the pinned `simple` and start-of-circuit anticommutation cases plus the already promoted generated, gauge, target, and resource evidence. Broader invented families are not active blockers. |
+| PFM5 missing detectors | Evidence close | Audit and lock the pinned `circuit`, `big_case_honeycomb_code`, and `toric_code_global_stabilizer_product` cases plus current row-reduction and repeat evidence. Broader invented families are not active blockers. |
+| PFM5 flow generators, solving, diagnostics, and transform integration | Implement | Replace bounded exhaustive solving and circuit-shape dispatch with GF(2) elimination over a shared stabilizer-flow engine, then close the named C++ and Python semantic corpus. |
+| PFM6 analyzer, search, sparse tracker, and active matched errors | Implement | Replace fixture-signature loop folding with generic state-cycle folding, close named search and SAT families, and integrate the shared sparse tracker into active consumers. Full ErrorMatcher provenance remains deferred. |
+
+An evidence-close milestone may change status and documentation but may not add speculative behavior merely to make a broad sentence look fuller.
+An implementation milestone may preserve a documented cap when output size or algorithmic complexity is inherently proportional to the expanded request, but it may not materialize repeated input merely for internal inspection.
+
+### PFM-B0: Freeze The Closure Ledger
+
+Objective: turn the blocker decisions into an executable, subcase-level evidence ledger before production code changes.
+
+Tasks:
+
+- Add a schema-versioned `docs/plans/blocker-closure-ledger.json` with one record per owned upstream subcase, not one record per upstream file, and render its human-readable summary in the PFM8 progress report.
+- Give each row a stable id, owning blocker, public or internal surface, Stim source and test name, expected comparator, implementation status, Rust test filter, oracle row, benchmark row or no-benchmark rationale, resource contract, and disposition.
+- Split multi-example upstream tests such as `circuit_flow_generators.various`, `missing_detectors.circuit`, and Python `test_inv_circuit` into stable named subcases before counting them.
+- Mark already implemented subcases as evidence verification work instead of scheduling duplicate implementation.
+- Mark Python binding shape, file-like Python behavior, diagrams, public simulator products, exact randomness, and full ErrorMatcher provenance as deferred without using those deferrals to hide Rust semantic gaps.
+- Reject any proposed row whose expected behavior cannot be obtained from pinned Stim v1.16.0, a stated Stab hardening decision, or a precise semantic invariant.
+
+Tests and operational checks:
+
+- `cargo test -p stab-oracle fixtures --quiet`
+- `just oracle::list`
+- `just oracle::matrix --check`
+- `just bench::list`
+- Add a `stab-oracle` validation test that rejects a blocker-ledger record without a comparator, executable test selector, resource contract, and benchmark disposition.
+
+Benchmarks:
+
+- No timings are required in PFM-B0.
+- Existing rows must be mapped to exact ledger entries and must keep their current comparability classes.
+
+Acceptance criteria:
+
+- All eight open spec-gap entries have an implementation or evidence-close owner in this program.
+- No owned row cites a whole upstream file as sufficient completion evidence.
+- No blocker remains open solely because the checklist says `broader`, `full`, or `every other consumer`.
+
+### PFM-B1: General Reverse-Flow And QEC Transform Closure
+
+Objective: close the PFM2 blocker with a general reverse-flow implementation for the selected Rust transform APIs, not more exact-circuit recognizers.
+
+Owned pinned subcases:
+
+- Audit or implement C++ `circuit_inverse_qec.anticommute`, `flow_reverse`, `flow_through_mzz`, and `flow_past_end_of_circuit` as separately selectable Rust tests.
+- Audit or implement Python `test_inv_circuit` examples, `test_inv_circuit_surface_code`, `test_more_flow_qubits_than_circuit_qubits`, `test_measurement_ordering`, `test_measurement_ordering_2`, `test_measurement_ordering_3`, `test_feedback`, and `test_obs_include_paulis` at the Rust semantic level without claiming Python binding parity.
+- Preserve the already promoted exact packets for reset, measurement, measure-reset, MPP, MZZ, MPAD, noisy measurement, noisy measure-reset, observable include, `flow_flip`, and the selected unitary suffix.
+- Add a bounded MPAD matrix covering constant values `0` and `1`, record-only flow terms, observable-only flow terms, mixed record and observable terms, duplicate observable-id parity, and one interleaved supported Clifford on either side. Obtain expected results from pinned Stim before implementation.
+
+Implementation requirements:
+
+- Represent reverse propagation as one typed flow state containing Pauli input, Pauli output, measurement parity, and observable parity.
+- Reuse the shared Clifford and sparse reverse-tracker operations for unitary propagation.
+- Handle measurement, reset, measure-reset, pair measurement, MPP, MPAD, detector, and observable annotations through gate-family handlers, not whole-circuit pattern matching.
+- Keep feedback fail-closed where pinned Stim rejects it.
+- Support repeat blocks through a generic unitary cycle summary or a documented bounded traversal; do not add a handler keyed to a fixture's exact period.
+- Validate every returned flow with the unsigned checker when unsigned semantics apply, and compare detecting regions for the generated rotated surface-code reversal.
+
+Tests:
+
+- Exact canonical-circuit and exact-flow tests for deterministic pinned examples.
+- Structural flow-set comparison for generated circuits where flow order is not contractual.
+- Property tests generating small supported circuits and satisfiable flows, reversing them twice where the operation family is involutive, and checking returned flows against the checker.
+- Negative tests for anticommutation, unsatisfied flows, feedback, duplicate targets under the locked hardening policy, out-of-range records, non-finite probabilities, and repeat-budget overflow.
+- Resource tests for large unitary repeats and bounded rejection of non-foldable measurement-rich repeats.
+
+Oracle rows:
+
+- Split `pf2-time-reverse-flow-measurement-rust` so the named C++ and Python subcases are independently selectable.
+- Add a structural generated-surface reversal row and a focused MPAD flow-matrix row.
+- Keep exact-output comparators for stable pinned text and structural comparators for detecting-region sets.
+
+Benchmarks:
+
+- Split or extend `pf2-time-reverse-flow` into `single-packet`, `generated-surface`, and `large-unitary-repeat` submeasurements with explicit circuit operations per second and peak live bytes.
+- Keep the row report-only unless a faithful in-process pinned Stim comparator is added.
+- Require the generated-surface and large-repeat submeasurements to show bounded memory growth relative to state and body size, not expanded repeat count.
+
+Acceptance criteria:
+
+- Every owned pinned subcase has direct executable evidence.
+- Production transform code contains gate-family logic and reusable state transitions, not fixture text, exact detector counts, or exact operation-sequence signatures.
+- The PFM2 spec-gap entry is resolved for the selected Rust transform API, and remaining Python or export surfaces are explicitly deferred instead of leaving the row generically partial.
+
+### PFM-B2: Gate-By-Surface Semantic Contract
+
+Objective: resolve both PFM3 entries by closing unsupported ambiguity across parser, sampler, detection conversion, detection sampling, analyzer, and flow surfaces.
+
+Tasks:
+
+- Add one source-owned gate-by-surface contract generated from canonical gate metadata.
+- Classify every canonical gate on each relevant surface as `execute`, `semantic_noop`, `annotation`, `lower_then_execute`, `unsupported_shape`, or `not_applicable`.
+- Permit `unsupported_shape` only for an invalid target-role combination or a shape that has a named exclusion outside the selected Rust or CLI surface; it cannot be used to claim semantic completion for a legal shape inside the selected surface.
+- Record accepted target-role patterns separately from gate names, including plain qubits, inverted measurement targets, Pauli-product combiners, measurement records, sweep bits, constants, detector ids, and observable ids.
+- Generate tests from the contract so parser acceptance cannot be mistaken for execution support.
+- Cover fixed-tableau gates, reset and measurement families, pair measurements, MPP, MPAD, SPP and SPP_DAG, Pauli noise, Pauli channels, depolarization, correlated-error blocks, heralded noise, annotations, controlled-Pauli feedback, and sweep-controlled groups.
+- Evidence-close analyzer sweep behavior at the current selected matrix because pinned Stim supplies no additional concrete analyzer case.
+- Require a new failing pinned oracle, a public API expansion, or an explicit compatibility decision before reopening analyzer sweep shapes.
+
+Tests:
+
+- Contract completeness test requiring every canonical gate and relevant surface to have exactly one classification.
+- Generated positive tests for each executable or no-op class and generated negative tests for each unsupported target role.
+- Exact deterministic comparisons for reference samples, detection conversion, and analyzer DEM output.
+- Statistical comparisons for stochastic MPP, MPAD, Pauli channels, depolarization, correlated errors, and heralded noise with source-owned shot counts, tolerances, and false-positive budgets.
+- Cross-surface tests proving the same target-role pattern is accepted or rejected consistently wherever the contract says the surfaces share semantics.
+- Sweep ordering tests for `CX`, `CY`, `CZ`, `XCZ`, and `YCZ`, including the current classical-only no-op matrix and omitted all-false sweep behavior.
+
+Oracle rows:
+
+- Replace broad `pf3-gate-semantic-execution` wording with generated contract shards grouped by gate family.
+- Keep `pf3-sweep-analyzer` as the complete selected analyzer sweep row and record that no unowned pinned subcase remains.
+- Use statistical rows only for genuinely probabilistic behavior.
+
+Benchmarks:
+
+- Add no per-gate microbenchmarks.
+- Keep representative sampler, converter, detector-frame, and analyzer rows for fixed-tableau, Pauli-product, and stochastic families.
+- Add one mixed-contract compile and execute row only if generated contract dispatch introduces measurable overhead; classify it as `direct-match` only with a faithful pinned Stim workload.
+
+Acceptance criteria:
+
+- The contract has no `unknown`, `selected_example_only`, or implicit fallback state.
+- Every parser-accepted canonical gate has explicit behavior on every relevant implemented surface.
+- Every legal target-role shape inside the selected Rust or CLI surface is `execute`, `semantic_noop`, `annotation`, or `lower_then_execute`; any `unsupported_shape` record points to an invalid combination or an explicit exclusion that remains visible in status documentation.
+- Analyzer sweep scope is closed from evidence, and legal non-tableau execution is closed from the exhaustive contract and generated tests.
+
+### PFM-B3: Shared Folded DEM Traversal
+
+Objective: resolve the PFM4 blocker with one checked traversal model shared by bounded-result DEM consumers.
+
+Implementation requirements:
+
+- Introduce an internal folded visitor or cursor that traverses nested DEM repeat blocks while carrying checked detector offset, coordinate shift, repeat depth, and logical-observable state.
+- Support early termination and selected-detector or selected-instruction filtering without flattening preceding repeats.
+- Expose repeat summaries to consumers that can combine repeated state, while allowing bounded expansion only when a consumer's requested output is itself expanded.
+- Migrate counts, selected coordinate lookup, all-coordinate lookup, rounded and tag-stripping transforms where applicable, DEM sampler compilation, graphlike and hypergraph collection, SAT/WCNF collection, and ErrorMatcher filtering to the shared traversal or document why a consumer must materialize.
+- Keep `DetectorErrorModel::flattened` capped because its public result is materialized.
+- Keep full coordinate-map output proportional to the number of returned detector declarations, but do not scan nonexistent sparse detector ids.
+- Use checked arithmetic for repeat counts, detector shifts, coordinate shifts, target rebasing, and output-size estimates.
+
+Tests:
+
+- Table-driven models covering flat, nested, empty-body, single-iteration, zero-shift, nonzero detector-shift, coordinate-shift, sparse detector-id, annotation-only, logical-only, separator-bearing error, and mixed active and zero-probability repeat bodies.
+- Differential property tests comparing folded traversal to materialized traversal for small generated DEMs.
+- Huge-repeat tests proving selected lookup, count, sampler compilation, and eligible search or SAT collection do not scale with repeat count.
+- Negative tests for arithmetic overflow, excessive result cardinality, ambiguous coordinate declarations, excessive nesting, and consumers whose inherent output or search space exceeds documented caps.
+- Visitor-error tests proving immediate stop and error preservation.
+
+Oracle rows:
+
+- Add one focused folded-traversal row per migrated consumer instead of a single broad DEM row.
+- Use exact comparators for canonical DEM text and coordinate maps, structural comparators for search sets, and seeded semantic comparators for sampler compilation.
+
+Benchmarks:
+
+- Add `flat-equivalent`, `nested-large-repeat`, and `sparse-selected-coordinate` submeasurements for the shared visitor.
+- Refresh consumer rows only when their traversal path changes.
+- Record instructions or declarations visited, logical expanded work represented, peak live bytes, and sampled resident delta.
+- Require huge-repeat eligible consumers to remain bounded in memory by model body plus consumer state.
+
+Acceptance criteria:
+
+- No bounded-result DEM consumer expands repeats merely to inspect them.
+- Every remaining materializing consumer names an inherent output or complexity reason and has a tested cap.
+- Folded and materialized traversal agree on the complete small-model differential corpus.
+
+### PFM-B4: Detector Utilities And General Flow Solving
+
+Objective: evidence-close the two already covered detector utilities and finish the real PFM5 flow-engine gap.
+
+Detecting-region evidence closure:
+
+- Lock C++ `circuit_to_detecting_regions.simple` and Python `test_detecting_regions_fails_on_anticommutations_at_start_of_circuit` as exact owned upstream subcases.
+- Retain current source-owned tests for filters, ticks, generated repetition and surface codes, gauge handling, Clifford propagation, feedback, sweep no-ops, MPP, MPAD, SPP, heralded records, repeats, and resource limits.
+- Do not invent broader generated-code or gauge families without a failing pinned case or a separately approved product requirement.
+
+Missing-detector evidence closure:
+
+- Lock C++ `missing_detectors.circuit`, `big_case_honeycomb_code`, and `toric_code_global_stabilizer_product` as independently selectable subcases.
+- Retain current source-owned tests for row reduction, observables, MPAD, MPP, Clifford and SPP propagation, bounded repeats, and folded final repeats.
+- Do not treat every possible generated code or stabilizer-rank pattern as an active blocker.
+
+Flow implementation requirements:
+
+- Drive `circuit_flow_generators`, unsigned checking, and `solve_for_flow_measurements` from shared stabilizer transitions instead of whole-circuit shape dispatch.
+- Replace the bounded exhaustive measurement-selection fallback with GF(2) elimination over generator measurement signatures.
+- Define deterministic pivot and tie-breaking rules from pinned Stim outputs so exact examples remain stable.
+- Preserve sparse qubit ids, measurement-record parity, observable parity, repeat budgets, and typed diagnostics.
+- Give `time_reversed_for_flows` the same transition implementation through PFM-B1 instead of duplicating measurement semantics.
+
+Owned flow subcases:
+
+- Split C++ `circuit_flow_generators.various` into stable per-example ids, then cover `all_operations`, `solve_for_flow_measurements.empty`, `simple`, and `rep_code`.
+- Cover Python `test_solve_flow_measurements`, `test_solve_flow_generators_measurements_multi_target`, `test_solve_flow_measurements_multi_target`, and `test_solve_flow_measurements_fewer_measurements_heuristic` at the Rust semantic level.
+- Keep the promoted signed and unsigned checker, diagnostics, repeat, sweep, feedback, heralded MPP, SPP, and MPAD cases.
+
+Tests:
+
+- Exact flow-list tests where pinned ordering is stable and structural span-equivalence tests where bases are non-unique.
+- Property tests requiring every generated flow to satisfy the unsigned checker and every solved flow to match the requested Pauli and observable terms.
+- Rank-deficient, inconsistent, underdetermined, sparse-high-qubit, duplicate-measurement, duplicate-observable, and more-than-20-measurement solver cases.
+- Repeat and resource tests proving elimination is polynomial in the generator matrix dimensions and does not enumerate measurement subsets.
+- Existing detecting-region and missing-detector exact-output, negative, and resource tests must remain green.
+
+Oracle rows:
+
+- Promote focused exact rows for the two detecting-region upstream tests and three missing-detector upstream tests.
+- Split flow rows by generator, solver, checker, and transform integration; do not use one row to imply all four.
+
+Benchmarks:
+
+- Keep existing detecting-region and missing-detector rows report-only unless a faithful pinned comparator exists.
+- Split flow solving into matrix dimensions such as `32x64`, `128x256`, and sparse `512x1024`, reporting pivots or matrix bits processed per second and peak live bytes.
+- Add a faithful direct comparator only if pinned Stim can execute the same generated circuit and requested-flow batch without Python binding overhead.
+
+Acceptance criteria:
+
+- Detecting regions and missing detectors close from exact evidence without speculative scope growth.
+- Flow solving no longer has an exhaustive-subset size cliff.
+- All named C++ and Python semantic subcases have executable evidence, and every produced flow passes the appropriate checker.
+
+### PFM-B5: Generic Analyzer Loop Folding And Search Closure
+
+Objective: resolve the PFM6 blocker by replacing fixture-shaped folding with a general finite-state loop summary and by closing a finite search corpus.
+
+Analyzer implementation requirements:
+
+- Define a loop-boundary analyzer state containing the sparse detector frame, measurement lookback dependencies, observable dependencies, coordinate shift, detector shift, and pending correlated-error state required for semantic recurrence.
+- Detect transient and periodic states by canonical state identity, then compose the repeated DEM delta with checked arithmetic.
+- Support prefix, nested repeat, and tail composition through the same summary API.
+- Preserve Stim-compatible compact output for owned deterministic cases and use bounded candidate validation against unrolled execution during implementation and tests.
+- Remove production branches that recognize exact period-8, period-127, or fixture-specific instruction signatures once the generic path covers them.
+- Keep bounded fallback only for states that cannot be summarized, and prove the fallback cannot mask errors from a selected folded path.
+
+Owned analyzer subcases:
+
+- Port or lock exact slices from `ErrorAnalyzer.loop_folding`, `loop_folding_nested_loop`, `loop_folding_rep_code_circuit`, `multi_round_gauge_detectors_dont_grow`, `coordinate_tracking`, and `dont_fold_when_observable_dependencies_cross_iterations`.
+- Retain the existing prefix/repeat/tail, huge odd observable, period-8, period-127, decomposition, remnant-edge, generated surface-coordinate fallback, and folded-observable guard evidence.
+
+Search and SAT closure:
+
+- Cover graphlike `no_error`, `distance_1`, `distance_2`, `distance_3`, `surface_code`, `repetition_code`, and `many_observables`.
+- Cover hypergraph `no_error`, `distance_1`, `distance_2`, `distance_3`, `hyper_error`, `surface_code`, `repetition_code`, and `many_observables`.
+- Cover shortest and likeliest WCNF cases for empty models, detector-only models, observable-only models, detector plus observable models, large probabilities, and half probability.
+- Use exact output for stable WCNF and deterministic DEM text, and canonical target-set or minimum-weight structural comparators for tie-sensitive search output.
+- Route folded DEM access through PFM-B3 and document caps for genuinely exponential search spaces.
+
+Sparse tracker and matched errors:
+
+- Use the generic loop summary in analyzer and unsigned-flow consumers instead of maintaining separate fixture-specific cycle logic.
+- Add generated equivalence tests against small unrolled Clifford, measurement, detector, and observable loops.
+- Keep active matched-error canonicalization and value validation covered, but leave stack-frame provenance, heralded provenance, repeat-contained provenance, and `explain_errors` deferred.
+
+Benchmarks:
+
+- Replace period-specific benchmark interpretation with `transient`, `short-period`, `long-period`, `nested`, and `generated-QEC` loop submeasurements.
+- Keep graphlike, hypergraph, and SAT rows split by direct DEM and generated-QEC workloads.
+- Record represented iterations, state size, emitted DEM items, search nodes or clauses, peak live bytes, and sampled resident delta.
+- Promote only faithful stable rows into the 1.25x gate; keep structural or no-faithful-baseline rows report-only.
+
+Acceptance criteria:
+
+- No production analyzer branch matches a test fixture's exact instruction sequence or hard-coded recurrence period.
+- Owned folded outputs match pinned Stim exactly where deterministic, and structural search comparators prove minimum-weight parity where ordering is non-contractual.
+- Eligible huge repeats use memory bounded by loop state, body, and emitted compact output rather than repeat count.
+- PFM6 closes for active analyzer, search, sparse-tracker, and matched-error value semantics while full provenance remains explicitly deferred.
+
+### PFM-B6: Resolve Spec Gaps And Roll Up Status
+
+Objective: turn completed blocker work into conservative, durable status without preserving stale `Partial` labels for already closed selected surfaces.
+
+Tasks:
+
+- Resolve all eight open entries in `docs/plans/milestone-spec-gaps.md` with links to implementation or evidence-close reports.
+- Update checklist child rows to `Done for selected Rust/CLI scope` when their active work is complete.
+- Keep broad product-level rollups partial only when a named deferred product surface still prevents a literal full-Stim claim; do not call that an active implementation blocker.
+- Update the partial inventory, roadmap, test-porting plan, oracle manifest, benchmark manifest, profiler notes, waivers, and user-facing docs.
+- Run milestone-audit for PFM-B1 through PFM-B5 and a final PFM8 rollup audit.
+- Run full-code-review over shared gate semantics, traversal, flow, analyzer, search, CLI, benchmark, and documentation changes.
+
+Verification:
+
+- All milestone-specific tests and oracle rows from PFM-B1 through PFM-B5.
+- `cargo fmt --all --check`
+- `cargo clippy -p stab-core -p stab-cli -p stab-oracle -p stab-bench --all-targets -- -D warnings`
+- `cargo test --workspace --quiet`
+- `just oracle::run --implemented-only`
+- `just bench::smoke`
+- `just maintenance::pre-commit`
+- Fresh primary timing and memory evidence from current committed `HEAD` if any primary runner, threshold, or shared hot path changed.
+
+Acceptance criteria:
+
+- Every blocker has a resolved spec-gap entry and completion evidence.
+- No active checklist row is partial merely because its wording once contained an unbounded adjective.
+- Deferred Python, JS/WASM, diagram, ecosystem, simulator-product, GPU, exact-randomness, C++ header, full ErrorMatcher provenance, and deprecated `--detector_hypergraph` surfaces remain clearly separated from active Rust and CLI completion.
 
 ## Required Packet For Every Implementation Slice
 
