@@ -229,7 +229,7 @@ Acceptance criteria:
 
 ### PFM-B3: Shared Folded DEM Traversal
 
-Implementation checkpoint, 2026-07-10: the shared traversal, seven consumer migrations, exact selectors, focused oracle rows, contract-only core benchmark, and materialization rationales are implemented. The milestone audit and GPT-5.6/max review found declaration-count overflow coupling, eager coordinate-state amplification, neutral-repeat cap regressions, sampler error-class drift, weak generated and exact evidence, and stale historical documentation; those findings are being closed before the clean committed-HEAD allocation rerun recorded in `docs/plans/pfm-b3-folded-dem-traversal-progress-report.md`.
+Completion checkpoint, 2026-07-10: PFM-B3 is complete for the selected Rust surface. The shared traversal, seven consumer migrations, exact selectors, focused oracle rows, contract-only core benchmark, and materialization rationales are implemented. All milestone-audit and GPT-5.6/max review findings are fixed, and the final allocation report records committed `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2` with `local_modifications=false`, peak live allocation of 65,536 bytes, and zero resident delta. The non-blocking ledger-proxy and statistical-schema follow-ups are recorded in `docs/plans/milestone-spec-gaps.md` and do not reopen this milestone.
 
 Objective: resolve the PFM4 blocker with one checked traversal model shared by bounded-result DEM consumers.
 

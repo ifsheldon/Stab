@@ -7,6 +7,7 @@ Status: In progress, not a final PFM8 completion report.
 ## Scope
 
 This report records the current PFM8 evidence state after the PFM0 broad active-wording reconciliation committed as `1f80348 docs(plans): lock broad partial-feature scope`, the clean PFM0 evidence refresh committed as `8f80612 docs(plans): refresh PFM0 evidence lock`, the selected PFM2 MPAD duplicate observable-id record parity slice committed as `3e30552 fix(core): merge duplicate MPAD observable records`, the selected PFM5 observable-neutral final-repeat missing-detector slice committed as `525d734 fix(core): fold observable-neutral missing-detector repeats`, and the selected PFM2 pinned feedback public-method evidence repair committed as `0cf2d3e test(core): pin feedback transform evidence`.
+It also incorporates the completed PFM-B3 shared folded DEM traversal implementation committed as `4a984c2 feat(core): add shared folded DEM traversal`.
 It covers the rollup layer only: `Rust core library equivalent for core Stim semantics`, `.stim`/`.dem`/result-format compatibility, `Full semantic execution of every legal circuit operation`, `Highest-priority remaining feature gaps`, and the selected CLI binary status.
 It does not add production behavior, promote a new active feature subcase, or claim full Stim parity.
 
@@ -25,6 +26,7 @@ Implemented oracle evidence is healthy for the current selected Rust and CLI sur
 Earlier PFM8 snapshots recorded local-modification evidence while the report, PF3 `MPAD`, noisy `MPAD(p)`, and deterministic `MPP` evidence rows were still being synchronized.
 After the selected PFM2 MPAD duplicate observable-id record parity slice was committed, `just oracle::run --implemented-only` passed on 2026-07-08 from clean committed `HEAD=3e305525bc9c` with `local_modifications=false`, including `pf2-inverse-qec-mpad-rust`.
 After the PFM0 evidence-lock cleanup, selected PFM5 observable-neutral final-repeat missing-detector slice, and selected PFM2 pinned feedback public-method evidence repair landed, the current refresh passed again on 2026-07-08 from clean committed `HEAD=0cf2d3eee423` with `local_modifications=false`, including `pf5-missing-detectors-observable-neutral-final-repeat-rust` and `pf2-feedback-inline-pinned-upstream-rust`.
+On 2026-07-10, `just oracle::run --implemented-only`, `just oracle::blockers --check-selectors`, and `just bench::smoke` passed from clean PFM-B3 implementation `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`.
 
 Metadata evidence is healthy for the current manifests.
 The current PFM8 verification pass reran oracle, matrix, and benchmark metadata checks after the latest committed PFM0, PFM2, and PFM5 evidence slices, and found no implemented oracle drift or manifest parsing failure.
@@ -87,7 +89,7 @@ Before PFM8 can become a completion report, the commands in `docs/plans/GOAL.md`
 
 This PFM8 pass confirms that the current rollup rows should stay conservative.
 PFM-B2 contract groundwork is complete and recorded in `docs/plans/pfm-b2-gate-surface-contract-groundwork-report.md`.
-PFM-B3 shared DEM traversal implementation evidence is in place. Its audit, review, and clean committed-HEAD allocation rerun close before the next implementation step, the PFM-B4 flow foundation; final PFM-B2 generated semantic coverage follows the shared foundations.
+PFM-B3 shared DEM traversal is complete: the audit and GPT-5.6/max review findings are fixed, and the clean allocation report records `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`, `local_modifications=false`, peak live allocation of 65,536 bytes, and zero resident delta. PFM-B4 is the next implementation step; final PFM-B2 generated semantic coverage follows the shared foundations.
 
 ## Verification
 

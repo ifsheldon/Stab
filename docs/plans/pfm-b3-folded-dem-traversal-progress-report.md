@@ -5,6 +5,7 @@
 PFM-B3 replaces consumer-specific compact DEM recursion with one checked folded traversal tree and visitor policy.
 The implementation owns exactly the seven `pfm4-traversal-*` cases in `docs/plans/blocker-closure-ledger.json`: counts, coordinates, compact transforms, sampler compilation, graphlike and hypergraph search collection, SAT and WCNF collection, and ErrorMatcher filter collection.
 All seven cases are implemented with independently selectable Rust tests and focused oracle rows.
+PFM-B3 is complete for the selected Rust surface as of 2026-07-10.
 
 The shared traversal is internal to `stab-core`.
 It does not add a new public DEM cursor API.
@@ -104,17 +105,17 @@ It has four submeasurements:
 - `sparse-selected-coordinate`: two compact declarations across 4,000,000 represented iterations for one selected detector.
 - `wide-coordinate-irrelevant`: 128 nested repeat blocks around one 4,096-dimensional coordinate shift, measured through coordinate-free detector counting.
 
-The preliminary allocation-enabled run on 2026-07-10 recorded:
+The final allocation-enabled run on 2026-07-10 recorded:
 
 | Submeasurement | Median | Peak live allocated bytes | Resident delta |
 | --- | ---: | ---: | ---: |
-| Flat equivalent | 41.870 microseconds | 65,536 | 0 |
-| Nested large repeat | 0.165 microseconds | 784 | 0 |
-| Sparse selected coordinate | 0.464 microseconds | 1,968 | 0 |
-| Wide coordinate irrelevant | 9.609 microseconds | 47,120 | 0 |
+| Flat equivalent | 41.993 microseconds | 65,536 | 0 |
+| Nested large repeat | 0.164 microseconds | 784 | 0 |
+| Sparse selected coordinate | 0.463 microseconds | 1,968 | 0 |
+| Wide coordinate irrelevant | 9.573 microseconds | 47,120 | 0 |
 
-The preliminary report is under `target/benchmarks/pfm-b3-dem-traversal-compare` and records `local_modifications=true`.
-A clean committed-HEAD rerun is required before this report becomes final milestone evidence.
+The final report is under `target/benchmarks/pfm-b3-dem-traversal-clean` and records Stab commit `4a984c26b39f6236fde5e3ff10cf0b42e8b155a2` with `local_modifications=false`, release profile, warmup enabled, three measurement runs, and Linux AArch64 machine metadata.
+The row remains `contract-only`, non-primary, and without a Stim ratio because pinned Stim exposes no faithful Rust internal traversal baseline.
 Existing consumer rows remain report-only and now describe the shared traversal path instead of claiming that true folded input traversal is pending.
 
 ## Verification
@@ -125,18 +126,26 @@ Completed during implementation:
 cargo test -p stab-core --test dem_folded_traversal --quiet
 cargo test -p stab-core --quiet
 cargo clippy -p stab-core --all-targets -- -D warnings
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace --quiet
 cargo test -p stab-oracle fixtures --quiet
 just oracle::list --milestone PF4
 just oracle::blockers
+just oracle::blockers --check-selectors
+just oracle::run --implemented-only
 cargo test -p stab-bench pf4_dem_transform_benchmark_rows_have_stab_compare_runners --quiet
 cargo clippy -p stab-bench --all-targets -- -D warnings
 just bench::smoke
 just bench::compare-allocations --only pfm-b3-dem-traversal-core --warmup --measurement-runs 3 --report target/benchmarks/pfm-b3-dem-traversal-compare
+just bench::compare-allocations --only pfm-b3-dem-traversal-core --warmup --measurement-runs 3 --report target/benchmarks/pfm-b3-dem-traversal-clean
+just maintenance::pre-commit
 ```
 
 ## Audit And Review
 
-Milestone-audit status: implementation and evidence findings resolved; final completion remains pending only on the clean committed-HEAD allocation rerun.
+Milestone-audit status: Complete With Spec Follow-ups.
+No blocking implementation, compatibility, test, oracle, benchmark, resource, or documentation finding remains.
 
 The audit and three GPT-5.6/max full-code-review sidecars found:
 
@@ -158,7 +167,7 @@ The three initial GPT-5.6/max reviews completed and supplied the findings above.
 A requested focused sidecar closure rerun could not start because the subagent account reached its usage limit; local closure verification reran the focused regressions, full core suite, Clippy, blocker validator, oracle metadata tests, benchmark harness tests, and dirty allocation probe instead.
 This unavailable optional second pass does not replace or weaken the completed initial full review, but it is recorded here rather than hidden.
 
-| Requirement | Status before clean rerun | Evidence |
+| Requirement | Status | Evidence |
 | --- | --- | --- |
 | Shared bounded-result traversal | Satisfied | `crates/stab-core/src/dem/traversal.rs`; seven focused selectors |
 | Sparse coordinate and overflow policy | Satisfied | `pfm_b3_folded_traversal_coordinates`; thresholded declaration count; 8,000,000 scalar-update cap |
@@ -166,5 +175,7 @@ This unavailable optional second pass does not replace or weaken the completed i
 | Sampler, search, SAT/WCNF, and matcher semantics | Satisfied | statistical combinations, neutral-repeat regressions, literal WCNF, shifted-active cap tests |
 | Generated differential corpus | Satisfied | 96 deterministic Proptest cases under `pfm_b3_folded_traversal_counts` |
 | Oracle and ledger evidence | Satisfied | seven independent rows; `just oracle::blockers --check-selectors` |
-| Benchmark contract and memory evidence | Preliminary | four-submeasurement dirty allocation report; clean committed-HEAD rerun pending |
+| Benchmark contract and memory evidence | Satisfied | four-submeasurement clean allocation report from `4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`; peak live allocation 65,536 bytes; resident delta 0 |
 | Documentation synchronization | Satisfied | plan, checklist, inventory, roadmap, test map, rollup, current report, and historical closure notes |
+
+The remaining spec follow-ups are non-blocking operational hardening: make Rust-test proxy comparators and exact statistical familywise-tail validation machine-readable in a future blocker-ledger schema revision.
