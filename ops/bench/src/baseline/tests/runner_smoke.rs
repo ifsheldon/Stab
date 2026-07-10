@@ -204,6 +204,7 @@ fn pf6_analyzer_benchmark_rows_have_stab_compare_runners() {
             "sparse-rev-frame",
             &[
                 "stab_pf6_sparse_rev_unitary_repeat_flow",
+                "stab_pf6_sparse_rev_unitary_repeat_high_idle_flow",
                 "stab_pf6_sparse_rev_shifted_measurement_flow",
             ][..],
         ),
@@ -247,4 +248,15 @@ fn assert_benchmark_measurements(id: &str, row: BenchmarkRow, expected_measureme
             "{id}/{name} should report normalized work"
         );
     }
+}
+
+#[test]
+fn sparse_reverse_high_idle_work_excludes_the_active_qubit() {
+    assert_eq!(
+        measurement_work(
+            "pf6-sparse-rev-frame-loop",
+            "stab_pf6_sparse_rev_unitary_repeat_high_idle_flow"
+        ),
+        Some((255.0, "idle-qubits/s"))
+    );
 }

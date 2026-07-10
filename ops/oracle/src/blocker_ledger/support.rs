@@ -32,6 +32,12 @@ const PFM5_MISSING_ORACLES: &[&str] = &[
     "pf5-missing-detectors-nested-final-repeat-rust",
     "pf5-missing-detectors-observable-neutral-final-repeat-rust",
 ];
+const PFM5_FLOW_ORACLES: &[&str] = &[
+    "pf5-has-flow-record-observable-rust",
+    "pf5-has-all-flows-rust",
+    "pf5-has-flow-diagnostics-rust",
+    "pf5-signed-sampled-flows-rust",
+];
 #[derive(Clone, Copy)]
 struct ExpectedBenchmarkSignature {
     id: &'static str,
@@ -57,6 +63,8 @@ const PFM5_DETECTING_BENCHMARKS: &[ExpectedBenchmarkSignature] = &[
 ];
 const PFM5_MISSING_BENCHMARKS: &[ExpectedBenchmarkSignature] =
     &[pf5_report_only_benchmark("pf5-missing-detectors-mpad")];
+const PFM5_FLOW_BENCHMARKS: &[ExpectedBenchmarkSignature] =
+    &[pf5_report_only_benchmark("pf5-has-all-flows-batch")];
 
 pub(super) fn validate_supporting_oracles(
     blocker: &BlockerRecord,
@@ -67,6 +75,7 @@ pub(super) fn validate_supporting_oracles(
         "pfm3-analyzer-sweep" => PFM3_ANALYZER_ORACLES,
         "pfm5-detecting-regions" => PFM5_DETECTING_ORACLES,
         "pfm5-missing-detectors" => PFM5_MISSING_ORACLES,
+        "pfm5-flow-engine" => PFM5_FLOW_ORACLES,
         _ => &[],
     };
     let expected = expected_values.iter().copied().collect::<BTreeSet<_>>();
@@ -136,6 +145,7 @@ pub(super) fn validate_supporting_benchmarks(
     let expected_values = match blocker.id.as_str() {
         "pfm5-detecting-regions" => PFM5_DETECTING_BENCHMARKS,
         "pfm5-missing-detectors" => PFM5_MISSING_BENCHMARKS,
+        "pfm5-flow-engine" => PFM5_FLOW_BENCHMARKS,
         _ => &[],
     };
     let expected = expected_values

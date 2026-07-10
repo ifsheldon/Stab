@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget,
-    FlexPauliString, GateCategory, Pauli, PauliBasis, PauliPhase, PauliSign, PauliString, QubitId,
+    FlexPauliString, Pauli, PauliBasis, PauliPhase, PauliSign, PauliString, QubitId,
     SingleQubitClifford, Tableau, Target,
 };
 
@@ -15,6 +15,16 @@ mod shifted_repeat;
 mod unitary_repeat;
 
 use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_terms_reversed};
+
+use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
+
+fn tracker_basis(basis: PauliBasis) -> CircuitResult<TrackerBasis> {
+    TrackerBasis::from_pauli_basis(basis).ok_or_else(|| {
+        CircuitError::invalid_detector_error_model(
+            "identity basis is not a reverse stabilizer transition",
+        )
+    })
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SparseReverseFrameTracker {
@@ -90,49 +100,64 @@ impl SparseReverseFrameTracker {
         &mut self,
         instruction: &CircuitInstruction,
     ) -> CircuitResult<()> {
-        match instruction.gate().canonical_name() {
-            "M" => self.undo_measurements(instruction, TrackerBasis::Z),
-            "MX" => self.undo_measurements(instruction, TrackerBasis::X),
-            "MY" => self.undo_measurements(instruction, TrackerBasis::Y),
-            "MXX" => self.undo_pair_measurements(instruction, TrackerBasis::X),
-            "MYY" => self.undo_pair_measurements(instruction, TrackerBasis::Y),
-            "MZZ" => self.undo_pair_measurements(instruction, TrackerBasis::Z),
-            "MPP" => self.undo_pauli_product_measurements(instruction),
-            "MR" => self.undo_measure_resets(instruction, TrackerBasis::Z),
-            "MRX" => self.undo_measure_resets(instruction, TrackerBasis::X),
-            "MRY" => self.undo_measure_resets(instruction, TrackerBasis::Y),
-            "MPAD" => self.undo_measurement_pads(instruction),
-            "R" => self.undo_resets(instruction, TrackerBasis::Z),
-            "RX" => self.undo_resets(instruction, TrackerBasis::X),
-            "RY" => self.undo_resets(instruction, TrackerBasis::Y),
-            "SPP" | "SPP_DAG" => self.undo_spp(instruction),
-            "CX" | "CY" | "CZ" => self.undo_controlled_pauli(instruction),
-            "XCZ" | "YCZ"
-                if instruction
-                    .targets()
-                    .iter()
-                    .any(Target::is_classical_bit_target) =>
-            {
-                self.undo_controlled_pauli(instruction)
+        match reverse_flow_transition(instruction) {
+            ReverseFlowTransition::Measurement(basis) => {
+                self.undo_measurements(instruction, tracker_basis(basis)?)
             }
-            "DETECTOR" => self.undo_detector(instruction),
-            "OBSERVABLE_INCLUDE" => self.undo_observable_include(instruction),
-            "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
+            ReverseFlowTransition::Reset(basis) => {
+                self.undo_resets(instruction, tracker_basis(basis)?)
+            }
+            ReverseFlowTransition::MeasureReset(basis) => {
+                self.undo_measure_resets(instruction, tracker_basis(basis)?)
+            }
+            ReverseFlowTransition::PairMeasurement(basis) => {
+                self.undo_pair_measurements(instruction, tracker_basis(basis)?)
+            }
+            ReverseFlowTransition::PauliProductMeasurement => {
+                self.undo_pauli_product_measurements(instruction)
+            }
+            ReverseFlowTransition::MeasurementPad => self.undo_measurement_pads(instruction),
+            ReverseFlowTransition::HeraldedMeasurement => {
                 self.undo_heralded_measurements(instruction)
             }
-            name if instruction.gate().is_two_qubit_gate() && instruction.gate().has_tableau() => {
-                self.undo_two_qubit_tableau(instruction, name)
+            ReverseFlowTransition::PauliProductUnitary => self.undo_spp(instruction),
+            ReverseFlowTransition::ControlledPauli(_) => {
+                if matches!(instruction.gate().canonical_name(), "CX" | "CY" | "CZ")
+                    || instruction
+                        .targets()
+                        .iter()
+                        .any(Target::is_classical_bit_target)
+                {
+                    self.undo_controlled_pauli(instruction)
+                } else {
+                    self.undo_two_qubit_tableau(instruction, instruction.gate().canonical_name())
+                }
             }
-            _ => match SingleQubitClifford::from_gate(instruction.gate()) {
-                Ok(clifford) => self.undo_single_qubit_clifford(instruction, clifford),
-                Err(_) => match instruction.gate().category() {
-                    GateCategory::Annotation | GateCategory::Noise => Ok(()),
-                    _ => Err(CircuitError::invalid_detector_error_model(format!(
-                        "sparse reverse frame tracker does not support gate {}",
-                        instruction.gate().canonical_name()
-                    ))),
-                },
-            },
+            ReverseFlowTransition::Detector => self.undo_detector(instruction),
+            ReverseFlowTransition::Observable => self.undo_observable_include(instruction),
+            ReverseFlowTransition::Tableau => {
+                if instruction.gate().is_two_qubit_gate() {
+                    self.undo_two_qubit_tableau(instruction, instruction.gate().canonical_name())
+                } else {
+                    let clifford =
+                        SingleQubitClifford::from_gate(instruction.gate()).map_err(|_| {
+                            CircuitError::invalid_detector_error_model(format!(
+                                "sparse reverse frame tracker does not support tableau gate {}",
+                                instruction.gate().canonical_name()
+                            ))
+                        })?;
+                    self.undo_single_qubit_clifford(instruction, clifford)
+                }
+            }
+            ReverseFlowTransition::SweepControlledPauliNoop | ReverseFlowTransition::Ignored => {
+                Ok(())
+            }
+            ReverseFlowTransition::Unsupported => {
+                Err(CircuitError::invalid_detector_error_model(format!(
+                    "sparse reverse frame tracker does not support gate {}",
+                    instruction.gate().canonical_name()
+                )))
+            }
         }
     }
 
@@ -383,18 +408,19 @@ impl SparseReverseFrameTracker {
                     "{gate_name} expected paired targets during sparse reverse tracking",
                 )));
             };
-            if control.is_measurement_record_target() {
+            if control.is_measurement_record_target() && target.qubit_id().is_some() {
                 validate_feedback_record_position(gate_name, true)?;
                 self.undo_classical_feedback(instruction, control, target)?;
-            } else if target.is_measurement_record_target() {
+            } else if target.is_measurement_record_target() && control.qubit_id().is_some() {
                 validate_feedback_record_position(gate_name, false)?;
                 self.undo_classical_feedback(instruction, target, control)?;
-            } else if control.is_sweep_bit_target() || target.is_sweep_bit_target() {
-                // Sweep-controlled Paulis are preserved by the feedback-inlining
-                // transform. The sparse tracker currently has no symbolic sweep
-                // branch, so they do not affect fixed detector sensitivities here.
-            } else {
-                self.undo_quantum_controlled_pauli(instruction, control, target)?;
+            } else if let (Some(left), Some(right)) = (control.qubit_id(), target.qubit_id()) {
+                if matches!(gate_name, "CX" | "CY" | "CZ") {
+                    self.undo_quantum_controlled_pauli(instruction, control, target)?;
+                } else {
+                    let inverse_tableau = two_qubit_inverse_tableau(instruction, gate_name)?;
+                    self.undo_two_qubit_tableau_group(gate_name, &inverse_tableau, left, right)?;
+                }
             }
         }
         Ok(())
@@ -485,21 +511,7 @@ impl SparseReverseFrameTracker {
         instruction: &CircuitInstruction,
         gate_name: &'static str,
     ) -> CircuitResult<()> {
-        let inverse = instruction.gate().inverse().ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(format!(
-                "{gate_name} does not have a unitary inverse for sparse reverse tracking"
-            ))
-        })?;
-        let inverse_tableau = inverse.tableau().map_err(|error| {
-            CircuitError::invalid_detector_error_model(format!(
-                "failed to load inverse tableau for {gate_name} during sparse reverse tracking: {error}"
-            ))
-        })?;
-        if inverse_tableau.len() != 2 {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "{gate_name} expected a two-qubit tableau during sparse reverse tracking"
-            )));
-        }
+        let inverse_tableau = two_qubit_inverse_tableau(instruction, gate_name)?;
         for group in instruction.target_groups().into_iter().rev() {
             let [left, right] = group else {
                 return Err(CircuitError::invalid_detector_error_model(format!(
@@ -942,6 +954,28 @@ fn qubit_index(qubit: QubitId) -> CircuitResult<usize> {
             qubit.get()
         ))
     })
+}
+
+fn two_qubit_inverse_tableau(
+    instruction: &CircuitInstruction,
+    gate_name: &'static str,
+) -> CircuitResult<Tableau> {
+    let inverse = instruction.gate().inverse().ok_or_else(|| {
+        CircuitError::invalid_detector_error_model(format!(
+            "{gate_name} does not have a unitary inverse for sparse reverse tracking"
+        ))
+    })?;
+    let inverse_tableau = inverse.tableau().map_err(|error| {
+        CircuitError::invalid_detector_error_model(format!(
+            "failed to load inverse tableau for {gate_name} during sparse reverse tracking: {error}"
+        ))
+    })?;
+    if inverse_tableau.len() != 2 {
+        return Err(CircuitError::invalid_detector_error_model(format!(
+            "{gate_name} expected a two-qubit tableau during sparse reverse tracking"
+        )));
+    }
+    Ok(inverse_tableau)
 }
 
 fn validate_feedback_record_position(gate_name: &str, record_is_first: bool) -> CircuitResult<()> {

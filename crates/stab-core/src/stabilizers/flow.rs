@@ -414,11 +414,9 @@ fn xor_sort<T: Copy + Ord>(values: &mut Vec<T>) {
 }
 
 fn compare_paulis(left: &PauliString, right: &PauliString) -> Ordering {
-    left.sign()
-        .is_negative()
-        .cmp(&right.sign().is_negative())
+    compare_pauli_bases(left, right)
         .then_with(|| left.len().cmp(&right.len()))
-        .then_with(|| compare_pauli_bases(left, right))
+        .then_with(|| left.sign().is_negative().cmp(&right.sign().is_negative()))
 }
 
 fn compare_pauli_bases(left: &PauliString, right: &PauliString) -> Ordering {

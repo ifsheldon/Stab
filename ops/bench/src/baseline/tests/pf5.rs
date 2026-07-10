@@ -2,7 +2,7 @@ use super::super::{
     compare_note, measurement_work,
     pf5::{
         expected_flow_generator_measurement_work_for_test,
-        expected_flow_solve_measurement_work_for_test,
+        expected_flow_solve_measurement_work_for_test, matrix_solver,
     },
     run_stab_compare_row,
 };
@@ -113,6 +113,12 @@ fn detector_utility_benchmark_rows_have_stab_compare_runners() {
                 "stab_pf5_flow_solve_measurement_python_queries",
             ][..],
         ),
+        (
+            "pfm-b4-flow-solve-matrix-sizes",
+            "src/stim/util_top/circuit_flow_generators.inl",
+            "flow-solve-matrix",
+            &matrix_solver::expected_measurement_names()[..],
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),
@@ -143,6 +149,59 @@ fn detector_utility_benchmark_rows_have_stab_compare_runners() {
             assert!(measurement_work(id, name).is_some());
         }
     }
+}
+
+#[test]
+fn flow_solver_matrix_work_matches_production_case_contracts() {
+    assert_eq!(
+        matrix_solver::production_case_contracts(),
+        [
+            (32, 64, 16, 7, 17),
+            (128, 256, 64, 24, 65),
+            (512, 1024, 32, 12, 33),
+        ]
+    );
+    assert_eq!(
+        matrix_solver::production_guard_contract(),
+        (3, 0.15, 0.08, 0.15, 0.85)
+    );
+    for (name, expected) in [
+        (
+            "stab_pfm_b4_flow_solve_dense_32x64_input_bits",
+            (3_136.0, "query-inclusive-input-bits/s"),
+        ),
+        (
+            "stab_pfm_b4_flow_solve_dense_32x64_queries",
+            (17.0, "queries/s"),
+        ),
+        (
+            "stab_pfm_b4_flow_solve_dense_128x256_input_bits",
+            (49_408.0, "query-inclusive-input-bits/s"),
+        ),
+        (
+            "stab_pfm_b4_flow_solve_dense_128x256_queries",
+            (65.0, "queries/s"),
+        ),
+        (
+            "stab_pfm_b4_flow_solve_sparse_512x1024_input_bits",
+            (558_080.0, "query-inclusive-input-bits/s"),
+        ),
+        (
+            "stab_pfm_b4_flow_solve_sparse_512x1024_queries",
+            (33.0, "queries/s"),
+        ),
+    ] {
+        assert_eq!(
+            measurement_work("pfm-b4-flow-solve-matrix-sizes", name),
+            Some(expected),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn flow_solver_matrix_production_cases_satisfy_contracts() {
+    matrix_solver::validate_production_cases().expect("validate production matrix workloads");
 }
 
 #[test]

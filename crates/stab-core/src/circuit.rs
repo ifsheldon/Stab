@@ -11,6 +11,7 @@ const MAX_CIRCUIT_PARSE_LINES: usize = 1_000_000;
 const MAX_CIRCUIT_REPEAT_NESTING: usize = 256;
 
 mod api;
+mod counts;
 mod iter;
 
 pub use iter::{CircuitFlattenedInstructionIter, CircuitFlattenedInstructionRevIter};
@@ -82,14 +83,6 @@ impl Circuit {
 
     pub fn iter_flattened_instructions_reverse(&self) -> CircuitFlattenedInstructionRevIter<'_> {
         CircuitFlattenedInstructionRevIter::new(self)
-    }
-
-    pub fn count_qubits(&self) -> usize {
-        self.items
-            .iter()
-            .map(CircuitItem::count_qubits)
-            .max()
-            .unwrap_or(0)
     }
 
     /// Converts the currently supported Clifford circuit subset into a tableau.
@@ -247,13 +240,6 @@ impl CircuitItem {
         }
     }
 
-    fn count_qubits(&self) -> usize {
-        match self {
-            Self::Instruction(instruction) => instruction.count_qubits(),
-            Self::RepeatBlock(repeat) => repeat.body().count_qubits(),
-        }
-    }
-
     fn without_tags(&self) -> Self {
         match self {
             Self::Instruction(instruction) => Self::Instruction(instruction.without_tag()),
@@ -369,15 +355,6 @@ impl CircuitInstruction {
 
     pub fn targets(&self) -> &[Target] {
         &self.targets
-    }
-
-    fn count_qubits(&self) -> usize {
-        self.targets
-            .iter()
-            .filter_map(Target::qubit_id)
-            .map(|qubit| qubit.get() as usize + 1)
-            .max()
-            .unwrap_or(0)
     }
 
     /// Returns the non-empty Stim tag attached to this instruction.

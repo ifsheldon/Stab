@@ -1,3 +1,5 @@
+use std::collections::{BTreeMap, BTreeSet};
+
 use crate::{
     CircuitError, CircuitInstruction, CircuitResult, Flow, Pauli, PauliBasis, PauliSign,
     PauliString, Target,
@@ -59,26 +61,6 @@ pub(super) fn instruction_qubit_count(instruction: &CircuitInstruction) -> usize
         .unwrap_or(0)
 }
 
-pub(super) fn sweep_controlled_pauli_is_sign_only_noop(instruction: &CircuitInstruction) -> bool {
-    if !matches!(
-        instruction.gate().canonical_name(),
-        "CX" | "CY" | "CZ" | "XCZ" | "YCZ"
-    ) {
-        return false;
-    }
-    let groups = instruction.target_groups();
-    !groups.is_empty()
-        && groups.iter().all(|group| {
-            let [left, right] = *group else {
-                return false;
-            };
-            let left_is_sweep = left.is_sweep_bit_target();
-            let right_is_sweep = right.is_sweep_bit_target();
-            (left_is_sweep ^ right_is_sweep)
-                && left.qubit_id().is_some() != right.qubit_id().is_some()
-        })
-}
-
 pub(super) fn plain_target_index(target: &Target) -> Option<usize> {
     if target.is_inverted_result_target() {
         return None;
@@ -90,26 +72,45 @@ pub(super) fn unique_plain_target_indices(instruction: &CircuitInstruction) -> O
     let mut qubits = Vec::with_capacity(instruction.targets().len());
     for target in instruction.targets() {
         let qubit = plain_target_index(target)?;
-        if qubits.contains(&qubit) {
-            return None;
+        if !qubits.contains(&qubit) {
+            qubits.push(qubit);
         }
-        qubits.push(qubit);
     }
     Some(qubits)
 }
 
-pub(super) fn unique_measure_reset_targets(
+pub(super) fn measure_reset_targets(
     instruction: &CircuitInstruction,
-) -> CircuitResult<Option<Vec<(usize, bool)>>> {
+) -> CircuitResult<Vec<(usize, bool)>> {
     let mut targets = Vec::with_capacity(instruction.targets().len());
     for target in instruction.targets() {
-        let parsed = pair_measurement_target_index(target)?;
-        if targets.iter().any(|&(qubit, _)| qubit == parsed.0) {
-            return Ok(None);
-        }
-        targets.push(parsed);
+        targets.push(pair_measurement_target_index(target)?);
     }
-    Ok(Some(targets))
+    Ok(targets)
+}
+
+pub(super) fn has_duplicate_measure_reset_targets(targets: &[(usize, bool)]) -> bool {
+    let mut seen = BTreeSet::new();
+    targets.iter().any(|&(qubit, _)| !seen.insert(qubit))
+}
+
+pub(super) fn unique_measure_reset_qubits(targets: &[(usize, bool)]) -> Vec<usize> {
+    let mut seen = BTreeSet::new();
+    targets
+        .iter()
+        .filter_map(|&(qubit, _)| seen.insert(qubit).then_some(qubit))
+        .collect()
+}
+
+pub(super) fn final_measure_reset_occurrences(
+    targets: &[(usize, bool)],
+) -> BTreeMap<usize, (usize, bool)> {
+    targets
+        .iter()
+        .copied()
+        .enumerate()
+        .map(|(index, (qubit, inverted))| (qubit, (index, inverted)))
+        .collect()
 }
 
 pub(super) fn measurement_indices_reversed(
@@ -153,6 +154,14 @@ pub(super) fn internal_flow_error(message: &'static str) -> CircuitError {
     CircuitError::invalid_tableau_conversion(message)
 }
 
+pub(super) fn rows_matching(flows: &[Flow], predicate: impl Fn(&Flow) -> bool) -> Vec<usize> {
+    flows
+        .iter()
+        .enumerate()
+        .filter_map(|(index, flow)| predicate(flow).then_some(index))
+        .collect()
+}
+
 pub(super) fn input_measurement_flow(
     qubit_count: usize,
     qubit: usize,
@@ -166,15 +175,6 @@ pub(super) fn input_measurement_flow(
         [record_index_i32(record_index)?],
         [],
     ))
-}
-
-pub(super) fn reset_flow(qubit_count: usize, qubit: usize, basis: PauliBasis) -> Flow {
-    Flow::new(
-        PauliString::identity(0),
-        single_pauli(qubit_count, qubit, basis),
-        [],
-        [],
-    )
 }
 
 pub(super) fn positive_record_flow(record_index: usize) -> CircuitResult<Flow> {

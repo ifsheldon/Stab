@@ -18,7 +18,7 @@ use gate_contract::{
 };
 use oracle::validate_oracle_reference;
 use provenance::validate_upstream_source;
-use selector::{CargoTestSelector, test_listing_has_match};
+use selector::CargoTestSelector;
 use support::{validate_supporting_benchmarks, validate_supporting_oracles};
 
 mod digest;
@@ -32,8 +32,8 @@ mod support;
 const SCHEMA_VERSION: u32 = 2;
 const STIM_VERSION: &str = "v1.16.0";
 const EXPECTED_LEDGER_DIGEST: [u8; 32] = [
-    0x52, 0x77, 0x8e, 0xfd, 0xbc, 0xd7, 0xe8, 0x61, 0xa2, 0x61, 0xe8, 0x4e, 0x01, 0xb6, 0xb7, 0x66,
-    0xaa, 0xee, 0x44, 0x77, 0x40, 0x10, 0xd1, 0xac, 0x4d, 0xa7, 0xf6, 0x28, 0x22, 0xb8, 0xd4, 0xff,
+    0x8e, 0x53, 0x34, 0x33, 0xa1, 0x06, 0x2e, 0xa0, 0xb8, 0x37, 0x17, 0x63, 0x43, 0x6f, 0x3b, 0x54,
+    0x98, 0x47, 0x4b, 0x31, 0x39, 0xd9, 0x99, 0x22, 0xce, 0xbd, 0xba, 0x60, 0x5f, 0xa5, 0xc6, 0x80,
 ];
 const MAX_LEDGER_BYTES: u64 = 1 << 20;
 const MAX_MANIFEST_BYTES: u64 = 16 << 20;
@@ -115,6 +115,15 @@ pub(crate) enum BlockerLedgerError {
 
     #[error("blocker test selector {selector} matched no tests for ledger cases {cases}")]
     SelectorMatchedNoTests { selector: String, cases: String },
+
+    #[error(
+        "exact blocker test selector {selector} matched {actual} tests instead of one for ledger cases {cases}"
+    )]
+    ExactSelectorMatchedUnexpectedCount {
+        selector: String,
+        cases: String,
+        actual: usize,
+    },
 
     #[error("blocker closure ledger validation failed:\n{0}")]
     Validation(Box<str>),
@@ -734,13 +743,17 @@ impl BlockerLedger {
             );
             if list {
                 for case in &blocker.cases {
-                    let selector_scope = if selector_counts
+                    let selector_is_shared = selector_counts
                         .get(&case.test.selector)
-                        .is_some_and(|count| *count > 1)
-                    {
+                        .is_some_and(|count| *count > 1);
+                    let selector_is_exact = CargoTestSelector::parse(&case.test.selector)
+                        .is_ok_and(CargoTestSelector::is_exact);
+                    let selector_scope = if selector_is_shared {
                         "shared-selector"
-                    } else {
+                    } else if selector_is_exact {
                         "exact-selector"
+                    } else {
+                        "unique-filter"
                     };
                     println!(
                         "  {} {} {} {}",
@@ -788,10 +801,18 @@ impl BlockerLedger {
                 });
             }
             let stdout = String::from_utf8_lossy(&output.stdout.bytes);
-            if !test_listing_has_match(&stdout) {
+            let match_count = selector::test_listing_match_count(&stdout);
+            if match_count == 0 {
                 return Err(BlockerLedgerError::SelectorMatchedNoTests {
                     selector: display,
                     cases: cases.join(", "),
+                });
+            }
+            if parsed.is_exact() && match_count != 1 {
+                return Err(BlockerLedgerError::ExactSelectorMatchedUnexpectedCount {
+                    selector: display,
+                    cases: cases.join(", "),
+                    actual: match_count,
                 });
             }
         }
@@ -857,7 +878,7 @@ fn validate_case(
     validate_resource_contract(case, violations);
     validate_statistical_plan(case, violations);
     validate_upstream_source(root, case, tracked_stim_paths, violations);
-    validate_test_reference(case, violations);
+    validate_test_reference(blocker, case, violations);
     validate_oracle_reference(case, oracle_rows, violations);
     validate_benchmark_reference(case, benchmark_rows, violations);
 
@@ -972,7 +993,11 @@ fn validate_statistical_plan(case: &BlockerCase, violations: &mut Vec<String>) {
     }
 }
 
-fn validate_test_reference(case: &BlockerCase, violations: &mut Vec<String>) {
+fn validate_test_reference(
+    blocker: &BlockerRecord,
+    case: &BlockerCase,
+    violations: &mut Vec<String>,
+) {
     let expected_state = if case.status == CaseStatus::Planned {
         EvidenceState::Planned
     } else {
@@ -986,8 +1011,19 @@ fn validate_test_reference(case: &BlockerCase, violations: &mut Vec<String>) {
             expected_state
         ));
     }
-    if let Err(reason) = CargoTestSelector::parse(&case.test.selector) {
-        violations.push(format!("case {:?} test selector {}", case.id, reason));
+    match CargoTestSelector::parse(&case.test.selector) {
+        Ok(selector)
+            if blocker.milestone == BlockerMilestone::B4
+                && case.test.state == EvidenceState::Existing
+                && !selector.is_exact() =>
+        {
+            violations.push(format!(
+                "PFM-B4 case {:?} must use an exact executable test selector",
+                case.id
+            ));
+        }
+        Ok(_) => {}
+        Err(reason) => violations.push(format!("case {:?} test selector {}", case.id, reason)),
     }
 }
 

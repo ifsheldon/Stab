@@ -111,6 +111,10 @@ impl Gate {
     pub(crate) fn arg_rule(self) -> ArgRule {
         self.info.arg_rule
     }
+
+    pub(crate) fn targets_are_measurement_pads(self) -> bool {
+        self.info.target_rule == TargetRule::MeasurementPads
+    }
 }
 
 #[cfg(feature = "ops-contracts")]

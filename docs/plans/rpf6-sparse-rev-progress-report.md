@@ -9,7 +9,7 @@ It implements supported-Clifford unitary-repeat folding and shifted-copy measure
 
 - `SparseReverseFrameTracker::undo_circuit` now recognizes repeat bodies containing the full single-qubit Clifford gate set with plain qubit targets plus fixed two-qubit tableau-backed Clifford gates with plain qubit-pair targets.
 - Quantum `CY` reverse propagation now uses the same sparse-tracker sensitivity engine as `CX` and `CZ`, so detecting-region extraction and supported-Clifford unitary-repeat folding can use it without a gate-specific fallback.
-- For those repeat bodies, the tracker builds a linear slot transform for X and Z sensitivity slots, exponentiates it by the repeat count, and applies the powered transform to the current detector and observable sensitivity sets.
+- For those repeat bodies, the tracker remaps only body-touched qubits into a dense local X/Z slot transform, exponentiates it by the repeat count, and writes the powered transform back to those active tracker slots. Untouched low or high qubits remain implicit identity, so transform construction scales with touched qubits instead of total tracker width.
 - Deterministic generated tests cover supported fixed-shape unitary repeat bodies across every fixed two-qubit tableau-backed gate, nested repeats, multi-target single-qubit instructions, and multi-pair two-qubit instructions by comparing the folded path to a test-only traversal that deliberately bypasses repeat folding.
 - Non-unitary repeat bodies now use a shifted-copy period detector before falling back to the existing traversal path, matching the upstream sparse tracker strategy for measurement and detector loops whose state repeats up to measurement-record and detector-id offsets.
 - Unsupported unitary gates and non-plain classical or sweep-controlled target shapes continue to use the shifted-copy traversal path or fail through existing gate-specific errors, so this slice does not broaden unsupported semantics.
@@ -28,6 +28,8 @@ Implemented Rust tests:
 - `unitary_repeat_folding_matches_naive_generated_supported_unitary_loops`
 - `unitary_repeat_folding_matches_naive_nested_supported_unitary_loops`
 - `unitary_repeat_folding_handles_huge_periodic_loop`
+- `unitary_repeat_folding_keeps_wide_idle_suffix_implicit`
+- `unitary_repeat_folding_remaps_sparse_high_active_qubit`
 - `unitary_repeat_folding_declines_non_unitary_and_unsupported_gates`
 - `sparse_rev_frame_tracker_shifted_copy_matches_record_and_detector_offsets`
 - `sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period`
@@ -62,9 +64,10 @@ The broad row `pf6-sparse-rev-tracker` remains manifest-only because full sparse
 Row with report-only runner coverage:
 
 - `pf6-sparse-rev-frame-loop`, measured as `stab_pf6_sparse_rev_unitary_repeat_flow`.
+- `pf6-sparse-rev-frame-loop`, measured as `stab_pf6_sparse_rev_unitary_repeat_high_idle_flow`.
 - `pf6-sparse-rev-frame-loop`, measured as `stab_pf6_sparse_rev_shifted_measurement_flow`.
 
-The row measures public unsigned-flow checking over a measurement-dependent fixed two-qubit `SWAP` repeat and over a shifted measurement/detector repeat, so the sparse reverse frame tracker must fold both unitary and shifted measurement loop shapes.
+The row measures public unsigned-flow checking over a measurement-dependent fixed two-qubit `SWAP` repeat, one active repeated `H` plus 65,535 idle qubits in a 65,536-wide flow, and a shifted measurement/detector repeat, so the sparse reverse frame tracker must fold unitary and shifted measurement loop shapes while keeping unitary transform setup proportional to touched qubits.
 It remains `non-primary-report-only` and `contract-only` because this internal Rust behavior has no faithful pinned Stim CLI timing ratio and should not enter the 1.25x primary threshold file.
 No separate benchmark row is added for unsigned `SPP`/`SPP_DAG` propagation because this slice is a correctness promotion inside the existing sparse-tracker and public unsigned-flow checker path, not a new production-scale throughput claim.
 No separate benchmark row is added for matched-error canonicalization because this is a value-object ordering contract and `ErrorMatcher` avoids implicit canonicalization on returned locations.

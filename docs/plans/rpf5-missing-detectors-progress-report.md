@@ -1,5 +1,7 @@
 # RPF5 Missing Detectors Progress Report
 
+Supersession note, 2026-07-10: PFM-B4 closes the selected missing-detector boundary from twelve independently selectable `missing_detectors.circuit` subcases plus separate honeycomb and toric suffix cases and the promoted row-reduction, observable, gate, repeat, and resource evidence. Behavior outside the finite ledger requires a new plan and is not an active continuation of this historical report.
+
 ## Summary
 
 This RPF5 slice promotes the Rust `missing_detectors` utility beyond the M9 basic reset and single-record subset.

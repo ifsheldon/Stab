@@ -122,6 +122,17 @@ impl WithoutFeedbackHelper {
                     instruction.gate().canonical_name()
                 )));
             };
+            if first.qubit_id().is_none() && second.qubit_id().is_none() {
+                let gate_name = instruction.gate().canonical_name();
+                if gate_name != "CZ"
+                    || first.is_measurement_record_target()
+                    || second.is_measurement_record_target()
+                {
+                    return Err(CircuitError::invalid_detector_error_model(format!(
+                        "{gate_name} feedback target {second} is not a qubit"
+                    )));
+                }
+            }
             let piece = instruction_with_targets(instruction, group.to_vec())?;
             match (
                 first.measurement_record_offset(),
@@ -798,7 +809,7 @@ DETECTOR rec[-3] rec[-2] rec[-1]
     }
 
     #[test]
-    fn circuit_with_inlined_feedback_keeps_cz_classical_only_groups_unsupported() {
+    fn circuit_with_inlined_feedback_keeps_cz_record_only_groups_unsupported() {
         for text in [
             "M 0\n\
              CZ rec[-1] sweep[0]\n",
@@ -809,6 +820,25 @@ DETECTOR rec[-3] rec[-2] rec[-1]
             let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
 
             assert!(error.to_string().contains("not a qubit"), "{error}");
+        }
+    }
+
+    #[test]
+    fn circuit_with_inlined_feedback_preserves_cz_sweep_only_groups() {
+        let circuit = Circuit::from_stim_str("CZ sweep[0] sweep[1]\n").unwrap();
+        assert_eq!(circuit_with_inlined_feedback(&circuit).unwrap(), circuit);
+    }
+
+    #[test]
+    fn circuit_with_inlined_feedback_rejects_non_cz_sweep_only_groups() {
+        for gate in ["CX", "CY", "XCZ", "YCZ"] {
+            let circuit = Circuit::from_stim_str(&format!("{gate} sweep[0] sweep[1]\n")).unwrap();
+            let error = circuit_with_inlined_feedback(&circuit).unwrap_err();
+            let message = error.to_string();
+            assert!(
+                message.contains("not a qubit") || message.contains("sweep-conditioned"),
+                "{gate}: {error}"
+            );
         }
     }
 

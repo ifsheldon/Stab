@@ -496,6 +496,46 @@ fn blocker_selector_places_filter_after_cargo_separator() {
 }
 
 #[test]
+fn blocker_selector_supports_exact_single_test_contracts() {
+    let selector = [
+        "cargo",
+        "test",
+        "-p",
+        "stab-core",
+        "--test",
+        "pfm_b4_flow_evidence",
+        "pfm_b4_flow_various_x",
+        "--quiet",
+        "--exact",
+    ]
+    .map(String::from);
+    let parsed = super::selector::CargoTestSelector::parse(&selector).expect("exact selector");
+
+    assert!(parsed.is_exact());
+    assert_eq!(
+        parsed.args(),
+        [
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "pfm_b4_flow_evidence",
+            "--quiet",
+            "--",
+            "pfm_b4_flow_various_x",
+            "--exact",
+            "--list"
+        ]
+    );
+    assert_eq!(
+        super::selector::test_listing_match_count(
+            "pfm_b4_flow_various_x: test\npfm_b4_flow_various_xcz_feedback: test\n"
+        ),
+        2
+    );
+}
+
+#[test]
 fn oracle_evidence_class_requires_typed_runner() {
     assert!(oracle_class_matches_runner(
         OracleEvidenceClass::Direct,

@@ -9,6 +9,8 @@ use crate::report::Measurement;
 
 use super::{measure_stab_iterations, stab_runner_error};
 
+pub(super) mod matrix_solver;
+
 #[cfg(not(test))]
 const UTILITY_BATCH: usize = 4096;
 #[cfg(test)]
@@ -34,11 +36,15 @@ pub(super) fn run_flow_compare_row(
         }
         "pf5-flow-solve-measurement-rich" => run_flow_solve_measurement_rich(row).map(Some),
         "pf5-flow-solve-measurement-python" => run_flow_solve_measurement_rich(row).map(Some),
+        "pfm-b4-flow-solve-matrix-sizes" => matrix_solver::run(row).map(Some),
         _ => Ok(None),
     }
 }
 
 pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {
+    if let Some(work) = matrix_solver::measurement_work(row_id, name) {
+        return Some(work);
+    }
     match (row_id, name) {
         ("pf5-flow-generators-measurement-rich", "stab_pf5_flow_generators_measurement_cases") => {
             Some((
@@ -91,6 +97,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
 }
 
 pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
+    if let Some(note) = matrix_solver::compare_note(row_id) {
+        return Some(note);
+    }
     match row_id {
         "pf5-flow-generators-measurement-rich" => Some(
             "report-only: Stab measures the Rust circuit_flow_generators scoped measurement/reset/inverted-measure-reset/pair-measurement/MPP/SPP/composed-measurement/unitary-mixed/annotation-noise-noop/bounded-repeat/feedback/sweep-controlled-Pauli/MPAD/single-and-multi-target-heralded-noise subset without a faithful pinned Stim CLI timing ratio",

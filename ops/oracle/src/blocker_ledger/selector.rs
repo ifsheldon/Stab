@@ -1,4 +1,4 @@
-const MAX_SELECTOR_PARTS: usize = 8;
+const MAX_SELECTOR_PARTS: usize = 9;
 const MAX_SELECTOR_PART_BYTES: usize = 128;
 
 #[derive(Clone, Copy, Debug)]
@@ -6,6 +6,7 @@ pub(super) struct CargoTestSelector<'a> {
     package: &'a str,
     target: Option<&'a str>,
     filter: &'a str,
+    exact: bool,
 }
 
 impl<'a> CargoTestSelector<'a> {
@@ -18,7 +19,31 @@ impl<'a> CargoTestSelector<'a> {
             return Err("has too many or oversized parts");
         }
 
-        let (package, target, filter) = match parts {
+        let (package, target, filter, exact) = match parts {
+            [
+                cargo,
+                test,
+                package_flag,
+                package,
+                target_flag,
+                target,
+                filter,
+                quiet,
+                exact,
+            ] if cargo == "cargo"
+                && test == "test"
+                && package_flag == "-p"
+                && target_flag == "--test"
+                && quiet == "--quiet"
+                && exact == "--exact" =>
+            {
+                (
+                    package.as_str(),
+                    Some(target.as_str()),
+                    filter.as_str(),
+                    true,
+                )
+            }
             [
                 cargo,
                 test,
@@ -34,7 +59,21 @@ impl<'a> CargoTestSelector<'a> {
                 && target_flag == "--test"
                 && quiet == "--quiet" =>
             {
-                (package.as_str(), Some(target.as_str()), filter.as_str())
+                (
+                    package.as_str(),
+                    Some(target.as_str()),
+                    filter.as_str(),
+                    false,
+                )
+            }
+            [cargo, test, package_flag, package, filter, quiet, exact]
+                if cargo == "cargo"
+                    && test == "test"
+                    && package_flag == "-p"
+                    && quiet == "--quiet"
+                    && exact == "--exact" =>
+            {
+                (package.as_str(), None, filter.as_str(), true)
             }
             [cargo, test, package_flag, package, filter, quiet]
                 if cargo == "cargo"
@@ -42,7 +81,7 @@ impl<'a> CargoTestSelector<'a> {
                     && package_flag == "-p"
                     && quiet == "--quiet" =>
             {
-                (package.as_str(), None, filter.as_str())
+                (package.as_str(), None, filter.as_str(), false)
             }
             _ => return Err("must use the allowlisted cargo test selector shape"),
         };
@@ -59,18 +98,24 @@ impl<'a> CargoTestSelector<'a> {
             package,
             target,
             filter,
+            exact,
         })
     }
 
+    pub(super) fn is_exact(self) -> bool {
+        self.exact
+    }
+
     pub(super) fn display(self) -> String {
+        let exact = if self.exact { " --exact" } else { "" };
         match self.target {
             Some(target) => format!(
-                "cargo test -p {} --test {} --quiet -- {} --list",
-                self.package, target, self.filter
+                "cargo test -p {} --test {} --quiet -- {}{} --list",
+                self.package, target, self.filter, exact
             ),
             None => format!(
-                "cargo test -p {} --quiet -- {} --list",
-                self.package, self.filter
+                "cargo test -p {} --quiet -- {}{} --list",
+                self.package, self.filter, exact
             ),
         }
     }
@@ -80,15 +125,20 @@ impl<'a> CargoTestSelector<'a> {
         if let Some(target) = self.target {
             args.extend(["--test", target]);
         }
-        args.extend(["--quiet", "--", self.filter, "--list"]);
+        args.extend(["--quiet", "--", self.filter]);
+        if self.exact {
+            args.push("--exact");
+        }
+        args.push("--list");
         args
     }
 }
 
-pub(super) fn test_listing_has_match(stdout: &str) -> bool {
+pub(super) fn test_listing_match_count(stdout: &str) -> usize {
     stdout
         .lines()
-        .any(|line| line.ends_with(": test") || line.ends_with(": benchmark"))
+        .filter(|line| line.ends_with(": test") || line.ends_with(": benchmark"))
+        .count()
 }
 
 fn is_test_name(value: &str) -> bool {

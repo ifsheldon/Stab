@@ -114,38 +114,31 @@ fn unsigned_stabilizer_flow_diagnostics_explain_sparse_tracker_failures() {
 
 #[test]
 fn unsigned_stabilizer_flow_diagnostics_keep_unsupported_circuits_fail_closed() {
-    for text in [
-        "SPP X0*Z0\n",
-        "M 0\nCZ rec[-1] sweep[0]\n",
-        "M 0 1\nCZ rec[-1] rec[-2]\n",
-    ] {
-        let circuit = circuit(text);
-        let query = flow("Z -> Z");
-        let checks = check_unsigned_stabilizer_flows_with_diagnostics(
-            &circuit,
-            std::slice::from_ref(&query),
-        );
-        let mut checks = checks.iter();
-        let check = checks.next().expect("diagnostic check");
-        assert!(checks.next().is_none());
+    let text = "SPP X0*Z0\n";
+    let circuit = circuit(text);
+    let query = flow("Z -> Z");
+    let checks =
+        check_unsigned_stabilizer_flows_with_diagnostics(&circuit, std::slice::from_ref(&query));
+    let mut checks = checks.iter();
+    let check = checks.next().expect("diagnostic check");
+    assert!(checks.next().is_none());
 
-        assert_eq!(
-            check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &[query]),
-            vec![false],
-            "{text}"
-        );
-        assert!(!check.has_flow(), "{text}");
-        let failure = check.failure().expect("unsupported diagnostic");
-        assert!(
-            matches!(
-                failure,
-                UnsignedStabilizerFlowFailure::UnsupportedCircuit { .. }
-            ),
-            "{text}: {failure:?}"
-        );
-        if let UnsignedStabilizerFlowFailure::UnsupportedCircuit { reason } = failure {
-            assert!(!reason.is_empty(), "{text}");
-        }
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &[query]),
+        vec![false],
+        "{text}"
+    );
+    assert!(!check.has_flow(), "{text}");
+    let failure = check.failure().expect("unsupported diagnostic");
+    assert!(
+        matches!(
+            failure,
+            UnsignedStabilizerFlowFailure::UnsupportedCircuit { .. }
+        ),
+        "{text}: {failure:?}"
+    );
+    if let UnsignedStabilizerFlowFailure::UnsupportedCircuit { reason } = failure {
+        assert!(!reason.is_empty(), "{text}");
     }
 }
 
@@ -871,23 +864,6 @@ fn solve_for_flow_measurements_cpp_repetition_code_example() {
             None,
             None,
         ]
-    );
-}
-
-#[test]
-fn solve_for_flow_measurements_has_documented_fallback_resource_limit() {
-    let circuit = circuit(
-        "
-        M 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
-        CX rec[-1] sweep[0]
-    ",
-    );
-    let error = solve_for_flow_measurements(&circuit, &[flow("Z0 -> Z0")])
-        .expect_err("fallback solver is bounded")
-        .to_string();
-    assert!(
-        error.contains("fallback supports at most 16 measurements"),
-        "{error}"
     );
 }
 

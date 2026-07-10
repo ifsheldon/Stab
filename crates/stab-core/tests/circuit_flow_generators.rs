@@ -3,8 +3,11 @@
     reason = "M6 circuit-flow-generator parity tests mirror compact upstream examples"
 )]
 
+use std::str::FromStr;
+
 use stab_core::{
-    Circuit, Flow, check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
+    Circuit, Flow, PauliBasis, check_if_circuit_has_unsigned_stabilizer_flows,
+    circuit_flow_generators,
 };
 
 #[test]
@@ -30,6 +33,18 @@ fn circuit_flow_generators_composed_unitary_matches_stim() {
         ",
         ),
         vec!["X -> Y", "Z -> X"]
+    );
+}
+
+#[test]
+fn circuit_flow_generators_reset_fast_paths_preserve_idle_qubits() {
+    assert_eq!(
+        generator_strings("R 1\n"),
+        vec!["1 -> _Z", "X_ -> X_", "Z_ -> Z_"]
+    );
+    assert_eq!(
+        generator_strings("MR 1\n"),
+        vec!["1 -> _Z", "_Z -> rec[0]", "X_ -> X_", "Z_ -> Z_"]
     );
 }
 
@@ -103,6 +118,23 @@ fn circuit_flow_generators_promotes_single_instruction_measurement_subset() {
     assert_eq!(
         generator_strings("MPAD 0 1 1 0\n"),
         vec!["1 -> rec[0]", "1 -> rec[3]", "1 -> -rec[1]", "1 -> -rec[2]"]
+    );
+    assert_eq!(
+        generator_strings("MPAD 1 0\n"),
+        vec!["1 -> rec[0]", "1 -> -rec[1]"]
+    );
+    assert_eq!(
+        generator_strings("MPAD 1 0\nTICK\n"),
+        vec!["1 -> rec[0]", "1 -> -rec[1]"]
+    );
+    assert_eq!(
+        generator_strings("M 0\nMPAD 1 0\n"),
+        vec![
+            "1 -> rec[1]",
+            "1 -> -rec[2]",
+            "1 -> Z xor rec[0]",
+            "Z -> rec[0]",
+        ]
     );
     assert_eq!(
         generator_strings("M 0\nCX rec[-1] 0\n"),
@@ -760,11 +792,62 @@ fn circuit_flow_generators_measurement_subset_promotes_generated_all_operations_
             result.err()
         );
     }
-    let circuit = circuit(&text);
-    let flows = circuit_flow_generators(&circuit).expect("all-operations generators");
+    let all_operations_circuit = circuit(&text);
+    let flows =
+        circuit_flow_generators(&all_operations_circuit).expect("all-operations generators");
     assert!(!flows.is_empty());
+    let expected = [
+        "1 -> rec[0]",
+        "1 -> rec[1]",
+        "1 -> rec[13] xor rec[23]",
+        "1 -> rec[16]",
+        "1 -> rec[17]",
+        "1 -> rec[19]",
+        "1 -> -rec[18]",
+        "1 -> _________Z________",
+        "1 -> _______ZY_________ xor rec[10] xor rec[14]",
+        "1 -> -______XXX_________ xor rec[10] xor rec[14] xor rec[24]",
+        "1 -> ______Z_Y_________ xor rec[10]",
+        "1 -> _____Y____________ xor rec[8] xor rec[23]",
+        "1 -> ____Y_____________ xor rec[8]",
+        "1 -> __XX______________ xor rec[12] xor rec[24]",
+        "1 -> -__ZZ______________ xor rec[22]",
+        "1 -> -_Y________________ xor rec[21]",
+        "1 -> X_________________",
+        "X17 -> Z16*X17",
+        "Z17 -> Z17",
+        "________________X_ -> ________________XZ",
+        "________________Z_ -> ________________Z_",
+        "_______________X__ -> ______________ZX__",
+        "_______________Z__ -> ______________ZZ__",
+        "______________X___ -> ______________XY__",
+        "______________Z___ -> ______________Z___",
+        "_____________X____ -> _____________X____",
+        "_____________Z____ -> ____________ZZ____",
+        "____________X_____ -> ____________XX____",
+        "____________Z_____ -> ____________Z_____",
+        "___________X______ -> -__________Y_______",
+        "___________Z______ -> __________ZZ______",
+        "__________X_______ -> -__________YY______",
+        "__________Z_______ -> ___________Z______",
+        "______YX__________ -> rec[10]",
+        "____XZ____________ -> rec[8]",
+        "____ZY____________ -> -rec[9]",
+        "___Y______________ -> rec[2] xor rec[4] xor rec[5] xor rec[7]",
+        "__X_______________ -> rec[2] xor rec[4] xor rec[5]",
+        "XX________________ -> rec[3]",
+        "ZY________________ -> rec[4] xor rec[5]",
+    ];
+    let mut expected = expected
+        .into_iter()
+        .map(|text| Flow::from_str(text).expect("parse pinned all-operations flow"))
+        .collect::<Vec<_>>();
+    expected.sort_unstable();
+    let mut signed_actual = flows.clone();
+    signed_actual.sort_unstable();
+    assert_eq!(signed_actual, expected);
     assert_eq!(
-        check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+        check_if_circuit_has_unsigned_stabilizer_flows(&all_operations_circuit, &flows),
         vec![true; flows.len()]
     );
 }
@@ -839,22 +922,151 @@ fn circuit_flow_generators_promotes_bounded_repeat_measurement_subset() {
 }
 
 #[test]
-fn circuit_flow_generators_rejects_unpromoted_measurement_rich_shapes() {
-    for text in [
-        "MR 0 0\n",
-        "M 0\nCX rec[-1] sweep[0]\n",
-        "M 0\nCX sweep[0] 0 1 2\n",
-        "M 0\nCX rec[-1] 0 1 2\n",
-        "M 0\nCX 1 2 rec[-1] 0\n",
-    ] {
-        let error = circuit_flow_generators(&circuit(text))
-            .expect_err("unpromoted measurement-rich flow generator shape")
-            .to_string();
-        assert!(
-            error.contains("circuit_flow_generators only supports"),
-            "{text}: {error}"
-        );
+fn circuit_flow_generators_measurement_subset_supports_duplicate_reset_targets() {
+    for suffix in ["", "TICK\n"] {
+        assert_eq!(generator_strings(&format!("R 0 0\n{suffix}")), ["1 -> Z"]);
+        for (instruction, expected) in [
+            (
+                "MR 0 0",
+                vec!["1 -> rec[0] xor rec[1]", "1 -> Z", "Z -> rec[1]"],
+            ),
+            (
+                "MR !0 0",
+                vec!["1 -> -rec[0] xor rec[1]", "1 -> Z", "Z -> rec[1]"],
+            ),
+            (
+                "MR 0 !0",
+                vec!["1 -> -rec[0] xor rec[1]", "1 -> Z", "Z -> -rec[1]"],
+            ),
+            (
+                "MR 0 0 0",
+                vec![
+                    "1 -> rec[0] xor rec[2]",
+                    "1 -> rec[1] xor rec[2]",
+                    "1 -> Z",
+                    "Z -> rec[2]",
+                ],
+            ),
+            (
+                "MR 0 1 0",
+                vec![
+                    "1 -> rec[0] xor rec[2]",
+                    "1 -> _Z",
+                    "1 -> Z_",
+                    "_Z -> rec[1]",
+                    "Z_ -> rec[2]",
+                ],
+            ),
+        ] {
+            assert_eq!(
+                generator_strings(&format!("{instruction}\n{suffix}")),
+                expected,
+                "{instruction} with suffix {suffix:?}"
+            );
+        }
     }
+}
+
+#[test]
+fn circuit_flow_generators_measurement_subset_supports_mixed_feedback_capable_groups() {
+    for (text, expected) in [
+        (
+            "M 0\nCX rec[-1] sweep[0]\n",
+            vec!["1 -> Z xor rec[0]", "Z -> rec[0]"],
+        ),
+        (
+            "M 0\nCX sweep[0] 0 1 2\n",
+            vec![
+                "1 -> Z__ xor rec[0]",
+                "__X -> __X",
+                "__Z -> _ZZ",
+                "_X_ -> _XX",
+                "_Z_ -> _Z_",
+                "Z__ -> rec[0]",
+            ],
+        ),
+        (
+            "M 0\nCX rec[-1] 0 1 2\n",
+            vec![
+                "1 -> Z__",
+                "__X -> __X",
+                "__Z -> _ZZ",
+                "_X_ -> _XX",
+                "_Z_ -> _Z_",
+                "Z__ -> rec[0]",
+            ],
+        ),
+        (
+            "M 0\nCX 1 2 rec[-1] 0\n",
+            vec![
+                "1 -> Z__",
+                "__X -> __X",
+                "__Z -> _ZZ",
+                "_X_ -> _XX",
+                "_Z_ -> _Z_",
+                "Z__ -> rec[0]",
+            ],
+        ),
+    ] {
+        assert_eq!(generator_strings(text), expected, "{text}");
+    }
+}
+
+#[test]
+fn circuit_flow_generators_measurement_subset_supports_measurement_free_mixed_sweep_groups() {
+    let circuit = circuit("CX sweep[0] 0 1 2\n");
+    let flows = circuit_flow_generators(&circuit).expect("mixed sweep generators");
+    assert_eq!(
+        flows.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        [
+            "__X -> __X",
+            "__Z -> _ZZ",
+            "_X_ -> _XX",
+            "_Z_ -> _Z_",
+            "X__ -> X__",
+            "Z__ -> Z__",
+        ]
+    );
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+        vec![true; flows.len()]
+    );
+}
+
+#[test]
+fn circuit_flow_generators_measurement_subset_ignores_noise_without_measurements() {
+    assert_eq!(generator_strings("X_ERROR(0.1) 0\n"), ["X -> X", "Z -> Z"]);
+}
+
+#[test]
+fn circuit_flow_generators_measurement_subset_folds_ignored_only_circuits_without_caps() {
+    let high = circuit_flow_generators(&circuit("QUBIT_COORDS(0) 2048\n"))
+        .expect("high-index ignored annotation generators");
+    assert_eq!(high.len(), 4098);
+    let first = high.first().expect("high-index first identity flow");
+    assert_eq!(first.input().get(2048), Some(PauliBasis::X));
+    assert_eq!(first.output().get(2048), Some(PauliBasis::X));
+    let last = high.last().expect("high-index last identity flow");
+    assert_eq!(last.input().get(0), Some(PauliBasis::Z));
+    assert_eq!(last.output().get(0), Some(PauliBasis::Z));
+
+    assert_eq!(
+        generator_strings("REPEAT 1000001 {\n    X_ERROR(0.1) 0\n}\n"),
+        ["X -> X", "Z -> Z"]
+    );
+    assert_eq!(
+        generator_strings("H 0\nX_ERROR(0.1) 0\n"),
+        ["X -> Z", "Z -> X"]
+    );
+}
+
+#[test]
+fn circuit_flow_generators_measurement_subset_excludes_mpad_values_from_simulated_qubits() {
+    assert_eq!(generator_strings("MPAD 0\nTICK\n"), ["1 -> rec[0]"]);
+    assert_eq!(
+        generator_strings("H 0\nMPAD 1\n"),
+        ["1 -> -rec[0]", "X -> Z", "Z -> X"]
+    );
 }
 
 #[test]

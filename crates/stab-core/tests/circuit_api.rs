@@ -124,6 +124,12 @@ fn pf1_circuit_stats_detection_width_helpers_match_owned_upstream_semantics() {
 }
 
 #[test]
+fn circuit_public_qubit_count_includes_mpad_numeric_targets_like_stim() {
+    let circuit = Circuit::from_stim_str("H 0\nMPAD 1\n").expect("parse MPAD circuit");
+    assert_eq!(circuit.count_qubits(), 2);
+}
+
+#[test]
 fn pf1_circuit_stats_measurement_counts_use_result_groups() {
     let circuit = Circuit::from_stim_str(
         "MPP X0*X1 Y2*Y3 Z4\n\

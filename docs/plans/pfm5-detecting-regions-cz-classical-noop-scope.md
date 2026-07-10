@@ -33,8 +33,8 @@ DETECTOR rec[-1]
 
 Pinned Stim also accepts the detecting-region probe where the classical-only `CZ` references `rec[-1]` before any prior measurement record in forward circuit order.
 Because this group has no qubit target and therefore cannot affect fixed unsigned detector sensitivity, Stab deliberately skips sparse-tracker record-offset validation for these `CZ` classical-only no-op groups inside detecting-region traversal.
-This does not broaden sampler, analyzer, detection-conversion, feedback-inlining, or CLI semantics.
-The shared sparse reverse tracker remains strict for these shapes; flow checking and feedback inlining keep them unsupported until a separate milestone promotes them.
+This detecting-region slice did not itself broaden sampler, analyzer, detection-conversion, feedback-inlining, or CLI semantics.
+PFM-B4 later promoted parser-accepted classical-only pairs as sign-only no-ops in flow generation and unsigned sparse tracking. Feedback inlining retains a narrower contract: record-only groups remain unsupported, sweep-only `CZ` groups are preserved unchanged like pinned Stim, and sweep-only `CX`, `CY`, `XCZ`, and `YCZ` groups are rejected.
 
 ## Owned Positive Scope
 
@@ -57,11 +57,12 @@ The shared sparse reverse tracker remains strict for these shapes; flow checking
 - `cargo test -p stab-core --test detecting_regions_cz_sweep_sweep --quiet`
 - `cargo test -p stab-core detecting_regions_target_shape --quiet`
 - `cargo test -p stab-core --test circuit_flows unsigned_stabilizer_flow_diagnostics_keep_unsupported_circuits_fail_closed --quiet`
-- `cargo test -p stab-core circuit_with_inlined_feedback_keeps_cz_classical_only_groups_unsupported --quiet`
+- `cargo test -p stab-core circuit_with_inlined_feedback_keeps_cz_record_only_groups_unsupported --quiet`
+- `cargo test -p stab-core circuit_with_inlined_feedback_rejects_non_cz_sweep_only_groups --quiet`
 
 The new executable evidence lives in `crates/stab-core/tests/detecting_regions_cz_classical_noop.rs`.
 The neighboring non-`CZ` record/sweep fail-closed evidence remains in `crates/stab-core/tests/detecting_regions_cz_sweep_sweep.rs`.
-The flow-checker and feedback-inlining regressions prove this detecting-region slice does not promote `CZ` classical-only groups for the shared sparse reverse tracker consumers.
+The flow-checker regressions now belong to the later PFM-B4 pairwise transition contract. The feedback-inlining regressions separately prove record-only rejection, `CZ` sweep-only preservation, and non-`CZ` sweep-only rejection at that transform boundary.
 
 ## Benchmarks
 

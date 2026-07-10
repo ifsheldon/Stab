@@ -151,6 +151,8 @@ fn stabilizers_flow_ordering_matches_stim_examples() {
     assert!(flow("1 -> 1") < flow("X -> 1"));
     assert!(flow("1 -> 1") < flow("1 -> X"));
     assert!(flow("1 -> 1") < flow("1 -> rec[-1]"));
+    assert!(flow("1 -> -rec[0] xor rec[1]") < flow("1 -> Z"));
+    assert!(flow("1 -> Z") < flow("1 -> -Z"));
 }
 
 #[test]

@@ -1,8 +1,7 @@
 mod checker;
 mod generators;
 mod solver;
-
-use generators::single_pauli;
+pub(crate) mod transitions;
 
 pub use checker::{
     UnsignedStabilizerFlowCheck, UnsignedStabilizerFlowFailure,

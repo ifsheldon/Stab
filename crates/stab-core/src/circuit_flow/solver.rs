@@ -1,17 +1,16 @@
 use crate::{Circuit, CircuitError, CircuitResult, Flow, PauliBasis, PauliString};
 
-use super::{
-    check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators, single_pauli,
-};
-
-const MAX_EXHAUSTIVE_FLOW_SOLVE_MEASUREMENTS: usize = 16;
+use super::circuit_flow_generators;
 
 /// Finds measurement indices that explain each queried unsigned stabilizer flow.
 ///
-/// The promoted Rust scope matches pinned Stim v1.16.0 examples for unitary, measured-idle,
-/// multi-target measurement, fewer-measurements heuristic, and small composed measurement-rich
-/// circuits. Broader composed measurement-rich circuits use a bounded checker fallback until the
-/// full generator-table solver is promoted.
+/// The solver reduces flow Pauli terms against the circuit's generator table over GF(2), then
+/// returns the corresponding measurement parity. Unsupported generator shapes fail closed through
+/// the same typed error path regardless of the circuit's measurement count. When a flow has more
+/// than one valid parity, the selected checker-valid solution is deterministic but is not promised
+/// to match Stim's internal pre-canonicalization tie break. Like Stim v1.16.0, this operation solves
+/// only each query's input and output Pauli projection; measurement and observable terms already
+/// present on a query are not constraints on the returned parity.
 pub fn solve_for_flow_measurements(
     circuit: &Circuit,
     flows: &[Flow],
@@ -21,10 +20,7 @@ pub fn solve_for_flow_measurements(
         return Ok(Vec::new());
     }
 
-    if let Some(results) = solve_with_generator_rows(circuit, flows)? {
-        return Ok(results);
-    }
-    solve_with_bounded_checker(circuit, flows)
+    solve_with_generator_rows(circuit, flows)
 }
 
 fn validate_non_empty_flow_queries(flows: &[Flow]) -> CircuitResult<()> {
@@ -41,10 +37,8 @@ fn validate_non_empty_flow_queries(flows: &[Flow]) -> CircuitResult<()> {
 fn solve_with_generator_rows(
     circuit: &Circuit,
     flows: &[Flow],
-) -> CircuitResult<Option<Vec<Option<Vec<i32>>>>> {
-    let Some(generators) = generator_rows_for(circuit, flows)? else {
-        return Ok(None);
-    };
+) -> CircuitResult<Vec<Option<Vec<i32>>>> {
+    let generators = circuit_flow_generators(circuit)?;
     let qubit_count = solved_qubit_count(circuit, flows, &generators);
     let vector_len = qubit_count.saturating_mul(4);
     let mut basis = vec![None; vector_len];
@@ -64,114 +58,18 @@ fn solve_with_generator_rows(
                 vector: flow_pauli_vector(flow, qubit_count),
                 measurements: Vec::new(),
             };
+            eliminate_implicit_idle_suffix(
+                &mut row.vector,
+                circuit.count_simulated_qubits(),
+                qubit_count,
+            );
             reduce_row(&mut row, &basis);
             row.is_zero().then(|| {
                 reduce_measurements_with_zero_rows(row.measurements, &zero_measurement_rows)
             })
         })
         .collect();
-    Ok(Some(results))
-}
-
-fn generator_rows_for(circuit: &Circuit, flows: &[Flow]) -> CircuitResult<Option<Vec<Flow>>> {
-    let mut generators = match circuit_flow_generators(circuit) {
-        Ok(generators) => generators,
-        Err(_) => return Ok(None),
-    };
-    let required_qubits = flows.iter().fold(circuit.count_qubits(), |count, flow| {
-        count.max(flow.input().len()).max(flow.output().len())
-    });
-    let existing_qubits = generators
-        .iter()
-        .fold(circuit.count_qubits(), |count, flow| {
-            count.max(flow.input().len()).max(flow.output().len())
-        });
-    for qubit in existing_qubits..required_qubits {
-        generators.push(Flow::new(
-            single_pauli(required_qubits, qubit, PauliBasis::X),
-            single_pauli(required_qubits, qubit, PauliBasis::X),
-            [],
-            [],
-        ));
-        generators.push(Flow::new(
-            single_pauli(required_qubits, qubit, PauliBasis::Z),
-            single_pauli(required_qubits, qubit, PauliBasis::Z),
-            [],
-            [],
-        ));
-    }
-    Ok(Some(generators))
-}
-
-fn solve_with_bounded_checker(
-    circuit: &Circuit,
-    flows: &[Flow],
-) -> CircuitResult<Vec<Option<Vec<i32>>>> {
-    let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
-        CircuitError::invalid_tableau_conversion(
-            "circuit measurement count does not fit usize during flow solving",
-        )
-    })?;
-    if measurement_count > MAX_EXHAUSTIVE_FLOW_SOLVE_MEASUREMENTS {
-        return Err(CircuitError::invalid_tableau_conversion(format!(
-            "solve_for_flow_measurements fallback supports at most {MAX_EXHAUSTIVE_FLOW_SOLVE_MEASUREMENTS} measurements, got {measurement_count}"
-        )));
-    }
-
-    flows
-        .iter()
-        .map(|flow| solve_one_with_bounded_checker(circuit, flow, measurement_count))
-        .collect()
-}
-
-fn solve_one_with_bounded_checker(
-    circuit: &Circuit,
-    flow: &Flow,
-    measurement_count: usize,
-) -> CircuitResult<Option<Vec<i32>>> {
-    let subset_count = 1usize
-        .checked_shl(u32::try_from(measurement_count).map_err(|_| {
-            CircuitError::invalid_tableau_conversion(
-                "measurement count does not fit u32 during flow solving",
-            )
-        })?)
-        .ok_or_else(|| {
-            CircuitError::invalid_tableau_conversion(
-                "measurement subset count overflowed during flow solving",
-            )
-        })?;
-    let mut masks = (0..subset_count).collect::<Vec<_>>();
-    masks.sort_unstable_by_key(|mask| (mask.count_ones(), *mask));
-    for mask in masks {
-        let measurements = measurements_from_mask(mask, measurement_count)?;
-        let candidate = Flow::new(
-            flow.input().clone(),
-            flow.output().clone(),
-            measurements.iter().copied(),
-            [],
-        );
-        if check_if_circuit_has_unsigned_stabilizer_flows(circuit, &[candidate])
-            .first()
-            .copied()
-            .unwrap_or(false)
-        {
-            return Ok(Some(measurements));
-        }
-    }
-    Ok(None)
-}
-
-fn measurements_from_mask(mask: usize, measurement_count: usize) -> CircuitResult<Vec<i32>> {
-    (0..measurement_count)
-        .filter(|index| (mask & (1usize << index)) != 0)
-        .map(|index| {
-            i32::try_from(index).map_err(|_| {
-                CircuitError::invalid_tableau_conversion(format!(
-                    "measurement index {index} does not fit i32 during flow solving"
-                ))
-            })
-        })
-        .collect()
+    Ok(results)
 }
 
 #[derive(Clone)]
@@ -246,9 +144,11 @@ fn reduce_measurements_with_zero_rows(
 }
 
 fn solved_qubit_count(circuit: &Circuit, flows: &[Flow], generators: &[Flow]) -> usize {
-    let count = flows.iter().fold(circuit.count_qubits(), |count, flow| {
-        count.max(flow.input().len()).max(flow.output().len())
-    });
+    let count = flows
+        .iter()
+        .fold(circuit.count_simulated_qubits(), |count, flow| {
+            count.max(flow.input().len()).max(flow.output().len())
+        });
     generators.iter().fold(count, |count, flow| {
         count.max(flow.input().len()).max(flow.output().len())
     })
@@ -259,6 +159,24 @@ fn flow_pauli_vector(flow: &Flow, qubit_count: usize) -> Vec<bool> {
     push_pauli_bits(flow.input(), qubit_count, &mut bits);
     push_pauli_bits(flow.output(), qubit_count, &mut bits);
     bits
+}
+
+fn eliminate_implicit_idle_suffix(vector: &mut [bool], circuit_qubits: usize, qubit_count: usize) {
+    let output_offset = qubit_count.saturating_mul(2);
+    for qubit in circuit_qubits..qubit_count {
+        for component in 0..2 {
+            let input = qubit.saturating_mul(2).saturating_add(component);
+            let output = output_offset.saturating_add(input);
+            let difference = vector.get(input).copied().unwrap_or(false)
+                ^ vector.get(output).copied().unwrap_or(false);
+            if let Some(bit) = vector.get_mut(input) {
+                *bit = difference;
+            }
+            if let Some(bit) = vector.get_mut(output) {
+                *bit = false;
+            }
+        }
+    }
 }
 
 fn push_pauli_bits(pauli: &PauliString, qubit_count: usize, bits: &mut Vec<bool>) {

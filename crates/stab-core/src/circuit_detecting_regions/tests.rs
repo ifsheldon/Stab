@@ -703,6 +703,28 @@ fn detecting_regions_anticommutation_rejects_false_mode() {
 
 #[test]
 fn detecting_regions_anticommutation_rejects_implicit_start_state() {
+    for text in [
+        "TICK\nR 0\nTICK\nMX 0\nDETECTOR rec[-1]\n",
+        "R 0\nTICK\nMX 0\nDETECTOR rec[-1]\n",
+        "MX 0\nDETECTOR rec[-1]\n",
+    ] {
+        let circuit = Circuit::from_stim_str(text).unwrap();
+        let error = circuit_detecting_regions_for_targets(
+            &circuit,
+            DetectingRegionTargetOptions {
+                targets: all_detecting_region_targets(&circuit).unwrap(),
+                ticks: all_detecting_region_ticks(&circuit).unwrap(),
+                ignore_anticommutation_errors: false,
+            },
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("anti-commuted"), "{text}");
+    }
+}
+
+#[test]
+fn detecting_regions_anticommutation_rejects_product_measurement_start_state() {
     let circuit = Circuit::from_stim_str("TICK\nMXX 0 1\nDETECTOR rec[-1]\n").unwrap();
     let error = circuit_detecting_regions(
         &circuit,

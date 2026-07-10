@@ -1,18 +1,22 @@
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, GateCategory,
-    PauliBasis, PauliSign, PauliString, Target,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, PauliBasis,
+    PauliSign, PauliString, Target,
 };
 
+mod canonicalize;
 mod helpers;
 
+use canonicalize::final_canonicalize_measurement_generators;
 use helpers::{
-    apply_local_tableau_to_global_pauli, input_measurement_flow, instruction_qubit_count,
-    internal_flow_error, measurement_indices_reversed, negative_record_flow,
+    apply_local_tableau_to_global_pauli, final_measure_reset_occurrences,
+    has_duplicate_measure_reset_targets, input_measurement_flow, instruction_qubit_count,
+    internal_flow_error, measure_reset_targets, measurement_indices_reversed, negative_record_flow,
     pair_measurement_target_index, pauli_basis, plain_tableau_targets, positive_record_flow,
-    record_index_i32, reset_flow, stabilizer_to_circuit_error,
-    sweep_controlled_pauli_is_sign_only_noop, unique_measure_reset_targets,
+    record_index_i32, rows_matching, stabilizer_to_circuit_error, unique_measure_reset_qubits,
     unique_plain_target_indices,
 };
+
+use super::transitions::{ReverseFlowTransition, reverse_flow_transition};
 
 const MAX_MEASUREMENT_RICH_FLOW_GENERATOR_ROWS: usize = 4096;
 
@@ -20,7 +24,12 @@ const MAX_MEASUREMENT_RICH_FLOW_GENERATOR_ROWS: usize = 4096;
 ///
 /// Repeat-contained measurement-rich circuits use bounded flattened operations plus a flow-row cap; broader semantics fail closed.
 pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
-    if circuit_needs_measurement_rich_generators(circuit) {
+    if circuit_is_ignored_only(circuit) {
+        return Ok(reverse_ordered_identity_flow_rows(
+            circuit.count_simulated_qubits(),
+        ));
+    }
+    if circuit_requires_reverse_flow_solver(circuit) {
         return simple_measurement_rich_flow_generators(circuit)?
             .ok_or_else(|| unsupported_flow_generator_error(circuit));
     }
@@ -55,9 +64,9 @@ fn unitary_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
 
 fn unitary_flow_tableau(circuit: &Circuit) -> CircuitResult<crate::Tableau> {
     if circuit_contains_spp(circuit) {
-        return circuit.decomposed()?.to_tableau(false, false, false);
+        return circuit.decomposed()?.to_tableau(true, false, false);
     }
-    circuit.to_tableau(false, false, false)
+    circuit.to_tableau(true, false, false)
 }
 
 fn circuit_contains_spp(circuit: &Circuit) -> bool {
@@ -69,44 +78,63 @@ fn circuit_contains_spp(circuit: &Circuit) -> bool {
     })
 }
 
-fn circuit_needs_measurement_rich_generators(circuit: &Circuit) -> bool {
+fn circuit_is_ignored_only(circuit: &Circuit) -> bool {
+    circuit.items().iter().all(|item| match item {
+        CircuitItem::Instruction(instruction) => {
+            matches!(
+                reverse_flow_transition(instruction),
+                ReverseFlowTransition::Ignored
+            )
+        }
+        CircuitItem::RepeatBlock(repeat) => circuit_is_ignored_only(repeat.body()),
+    })
+}
+
+fn circuit_requires_reverse_flow_solver(circuit: &Circuit) -> bool {
     circuit.items().iter().any(|item| match item {
         CircuitItem::Instruction(instruction) => {
-            instruction.gate().produces_measurements()
-                || matches!(
-                    instruction.gate().category(),
-                    GateCategory::Collapsing | GateCategory::PairMeasurement
-                )
-                || sweep_controlled_pauli_is_sign_only_noop(instruction)
+            instruction_requires_reverse_flow_solver(instruction)
         }
-        CircuitItem::RepeatBlock(repeat) => {
-            circuit_needs_measurement_rich_generators(repeat.body())
-        }
+        CircuitItem::RepeatBlock(repeat) => circuit_requires_reverse_flow_solver(repeat.body()),
     })
+}
+
+fn instruction_requires_reverse_flow_solver(instruction: &CircuitInstruction) -> bool {
+    let transition = reverse_flow_transition(instruction);
+    transition.is_measurement_rich()
+        || (matches!(transition, ReverseFlowTransition::ControlledPauli(_))
+            && instruction
+                .targets()
+                .iter()
+                .any(Target::is_classical_bit_target))
 }
 
 fn simple_measurement_rich_flow_generators(circuit: &Circuit) -> CircuitResult<Option<Vec<Flow>>> {
     if let [CircuitItem::Instruction(instruction)] = circuit.items() {
-        return Ok(match instruction.gate().canonical_name() {
-            "M" => simple_measurement_flows(instruction, PauliBasis::Z)?,
-            "MX" => simple_measurement_flows(instruction, PauliBasis::X)?,
-            "MY" => simple_measurement_flows(instruction, PauliBasis::Y)?,
-            "R" => simple_reset_flows(instruction, PauliBasis::Z)?,
-            "RX" => simple_reset_flows(instruction, PauliBasis::X)?,
-            "RY" => simple_reset_flows(instruction, PauliBasis::Y)?,
-            "MR" => simple_measure_reset_flows(instruction, PauliBasis::Z)?,
-            "MRX" => simple_measure_reset_flows(instruction, PauliBasis::X)?,
-            "MRY" => simple_measure_reset_flows(instruction, PauliBasis::Y)?,
-            "MXX" => simple_pair_measurement_flows(instruction, PauliBasis::X)?,
-            "MYY" => simple_pair_measurement_flows(instruction, PauliBasis::Y)?,
-            "MZZ" => simple_pair_measurement_flows(instruction, PauliBasis::Z)?,
-            "MPP" => simple_pauli_product_measurement_flows(instruction)?,
-            "MPAD" => Some(measurement_pad_flows(instruction)?),
-            _ if sweep_controlled_pauli_is_sign_only_noop(instruction) => {
+        let transition = reverse_flow_transition(instruction);
+        let simple = match transition {
+            ReverseFlowTransition::Measurement(basis) => {
+                simple_measurement_flows(instruction, basis)?
+            }
+            ReverseFlowTransition::Reset(basis) => simple_reset_flows(instruction, basis)?,
+            ReverseFlowTransition::MeasureReset(basis) => {
+                simple_measure_reset_flows(instruction, basis)?
+            }
+            ReverseFlowTransition::PairMeasurement(basis) => {
+                simple_pair_measurement_flows(instruction, basis)?
+            }
+            ReverseFlowTransition::PauliProductMeasurement => {
+                simple_pauli_product_measurement_flows(instruction)?
+            }
+            ReverseFlowTransition::MeasurementPad => Some(measurement_pad_flows(instruction)?),
+            ReverseFlowTransition::SweepControlledPauliNoop => {
                 Some(identity_flow_rows(instruction_qubit_count(instruction)))
             }
             _ => None,
-        });
+        };
+        if simple.is_some() {
+            return Ok(simple);
+        }
     }
     scoped_composed_measurement_flow_generators(circuit)
 }
@@ -158,12 +186,13 @@ fn simple_reset_flows(
         Some(qubits) => qubits,
         None => return Ok(None),
     };
-    Ok(Some(
-        qubits
-            .into_iter()
-            .map(|qubit| reset_flow(qubit_count, qubit, basis))
-            .collect(),
-    ))
+    let mut flows = identity_flow_rows(qubit_count);
+    for qubit in qubits {
+        remove_single_anticommutations(&mut flows, qubit, basis)?;
+        clear_input_term(&mut flows, qubit)?;
+    }
+    final_canonicalize_measurement_generators(&mut flows, qubit_count, 0)?;
+    Ok(Some(flows))
 }
 
 fn simple_measure_reset_flows(
@@ -171,16 +200,15 @@ fn simple_measure_reset_flows(
     basis: PauliBasis,
 ) -> CircuitResult<Option<Vec<Flow>>> {
     let qubit_count = instruction_qubit_count(instruction);
-    let targets = match unique_measure_reset_targets(instruction)? {
-        Some(targets) => targets,
-        None => return Ok(None),
-    };
-    validate_measurement_rich_flow_generator_rows(qubit_count, targets.len())?;
-    let mut flows = Vec::with_capacity(instruction.targets().len() * 2);
-    for &(qubit, _) in &targets {
-        flows.push(reset_flow(qubit_count, qubit, basis));
+    let targets = measure_reset_targets(instruction)?;
+    if has_duplicate_measure_reset_targets(&targets) {
+        return duplicate_measure_reset_flows(instruction, basis, &targets).map(Some);
     }
+    validate_measurement_rich_flow_generator_rows(qubit_count, targets.len())?;
+    let mut flows = identity_flow_rows(qubit_count);
     for (record_index, (qubit, inverted)) in targets.into_iter().enumerate() {
+        remove_single_anticommutations(&mut flows, qubit, basis)?;
+        clear_input_term(&mut flows, qubit)?;
         flows.push(input_measurement_flow(
             qubit_count,
             qubit,
@@ -199,6 +227,58 @@ fn simple_measure_reset_flows(
         instruction.targets().len(),
     )?;
     Ok(Some(flows))
+}
+
+fn duplicate_measure_reset_flows(
+    instruction: &CircuitInstruction,
+    basis: PauliBasis,
+    targets: &[(usize, bool)],
+) -> CircuitResult<Vec<Flow>> {
+    let qubit_count = instruction_qubit_count(instruction);
+    validate_measurement_rich_flow_generator_rows(qubit_count, targets.len())?;
+    let mut flows = identity_flow_rows(qubit_count);
+    for qubit in unique_measure_reset_qubits(targets) {
+        remove_single_anticommutations(&mut flows, qubit, basis)?;
+        clear_input_term(&mut flows, qubit)?;
+    }
+    let final_occurrences = final_measure_reset_occurrences(targets);
+    for (record_index, &(qubit, inverted)) in targets.iter().enumerate() {
+        let &(final_index, final_inverted) = final_occurrences
+            .get(&qubit)
+            .ok_or_else(|| internal_flow_error("missing final measure-reset target"))?;
+        if record_index == final_index {
+            flows.push(input_measurement_flow(
+                qubit_count,
+                qubit,
+                basis,
+                record_index,
+                if inverted {
+                    PauliSign::Minus
+                } else {
+                    PauliSign::Plus
+                },
+            )?);
+        } else {
+            flows.push(Flow::new(
+                PauliString::identity(qubit_count),
+                PauliString::from_bases(
+                    if inverted ^ final_inverted {
+                        PauliSign::Minus
+                    } else {
+                        PauliSign::Plus
+                    },
+                    vec![PauliBasis::I; qubit_count],
+                ),
+                [
+                    record_index_i32(record_index)?,
+                    record_index_i32(final_index)?,
+                ],
+                [],
+            ));
+        }
+    }
+    final_canonicalize_measurement_generators(&mut flows, qubit_count, targets.len())?;
+    Ok(flows)
 }
 
 fn simple_pair_measurement_flows(
@@ -270,7 +350,7 @@ fn measurement_pad_flows(instruction: &CircuitInstruction) -> CircuitResult<Vec<
     validate_measurement_rich_flow_generator_rows(0, instruction.targets().len())?;
     let mut positive_records = Vec::new();
     let mut negative_records = Vec::new();
-    for (record_index, target) in instruction.targets().iter().enumerate() {
+    for (record_index, target) in instruction.targets().iter().rev().enumerate() {
         match target.qubit_id().map(|id| id.get()) {
             Some(0) => positive_records.push(record_index),
             Some(1) => negative_records.push(record_index),
@@ -294,7 +374,7 @@ fn measurement_pad_flows(instruction: &CircuitInstruction) -> CircuitResult<Vec<
 fn scoped_composed_measurement_flow_generators(
     circuit: &Circuit,
 ) -> CircuitResult<Option<Vec<Flow>>> {
-    let qubit_count = circuit.count_qubits();
+    let qubit_count = circuit.count_simulated_qubits();
     let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
         CircuitError::invalid_tableau_conversion(
             "circuit measurement count does not fit usize during flow generation",
@@ -302,14 +382,10 @@ fn scoped_composed_measurement_flow_generators(
     })?;
     validate_measurement_rich_flow_generator_rows(qubit_count, measurement_count)?;
     let instructions = flattened_measurement_generator_instructions(circuit)?;
-    if !instructions.iter().any(|instruction| {
-        instruction.gate().produces_measurements()
-            || matches!(
-                instruction.gate().category(),
-                GateCategory::Collapsing | GateCategory::PairMeasurement
-            )
-            || sweep_controlled_pauli_is_sign_only_noop(instruction)
-    }) {
+    if !instructions
+        .iter()
+        .any(instruction_requires_reverse_flow_solver)
+    {
         return Ok(None);
     }
 
@@ -380,39 +456,34 @@ impl MeasurementFeedbackFlowSolver {
     }
 
     fn undo_instruction(&mut self, instruction: &CircuitInstruction) -> CircuitResult<bool> {
-        match instruction.gate().canonical_name() {
-            "M" => self.undo_measurement(instruction, PauliBasis::Z),
-            "MX" => self.undo_measurement(instruction, PauliBasis::X),
-            "MY" => self.undo_measurement(instruction, PauliBasis::Y),
-            "R" => self.undo_reset(instruction, PauliBasis::Z),
-            "RX" => self.undo_reset(instruction, PauliBasis::X),
-            "RY" => self.undo_reset(instruction, PauliBasis::Y),
-            "MR" => self.undo_measure_reset(instruction, PauliBasis::Z),
-            "MRX" => self.undo_measure_reset(instruction, PauliBasis::X),
-            "MRY" => self.undo_measure_reset(instruction, PauliBasis::Y),
-            "MXX" => self.undo_pair_measurement(instruction, PauliBasis::X),
-            "MYY" => self.undo_pair_measurement(instruction, PauliBasis::Y),
-            "MZZ" => self.undo_pair_measurement(instruction, PauliBasis::Z),
-            "MPP" => self.undo_pauli_product_measurement(instruction),
-            "MPAD" => self.undo_measurement_pad(instruction),
-            "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1" => {
+        match reverse_flow_transition(instruction) {
+            ReverseFlowTransition::Measurement(basis) => self.undo_measurement(instruction, basis),
+            ReverseFlowTransition::Reset(basis) => self.undo_reset(instruction, basis),
+            ReverseFlowTransition::MeasureReset(basis) => {
+                self.undo_measure_reset(instruction, basis)
+            }
+            ReverseFlowTransition::PairMeasurement(basis) => {
+                self.undo_pair_measurement(instruction, basis)
+            }
+            ReverseFlowTransition::PauliProductMeasurement => {
+                self.undo_pauli_product_measurement(instruction)
+            }
+            ReverseFlowTransition::MeasurementPad => self.undo_measurement_pad(instruction),
+            ReverseFlowTransition::HeraldedMeasurement => {
                 self.undo_heralded_flow_records(instruction)
             }
-            "SPP" | "SPP_DAG" => self.undo_decomposed_instruction(instruction),
-            "TICK" => Ok(true),
-            _ if sweep_controlled_pauli_is_sign_only_noop(instruction) => Ok(true),
-            _ if ignored_measurement_flow_generator_instruction(instruction) => Ok(true),
-            _ if feedback_measurement_basis(instruction).is_some() => {
-                if self.undo_measurement_feedback(instruction)? {
-                    Ok(true)
-                } else {
-                    self.undo_tableau_instruction(instruction)
-                }
+            ReverseFlowTransition::PauliProductUnitary => {
+                self.undo_decomposed_instruction(instruction)
             }
-            _ if crate::circuit_tableau::gate_has_tableau(instruction.gate().canonical_name()) => {
-                self.undo_tableau_instruction(instruction)
+            ReverseFlowTransition::SweepControlledPauliNoop
+            | ReverseFlowTransition::Detector
+            | ReverseFlowTransition::Observable
+            | ReverseFlowTransition::Ignored => Ok(true),
+            ReverseFlowTransition::ControlledPauli(basis) => {
+                self.undo_feedback_capable_instruction(instruction, basis)
             }
-            _ => Ok(false),
+            ReverseFlowTransition::Tableau => self.undo_tableau_instruction(instruction),
+            ReverseFlowTransition::Unsupported => Ok(false),
         }
     }
 
@@ -469,28 +540,56 @@ impl MeasurementFeedbackFlowSolver {
         instruction: &CircuitInstruction,
         basis: PauliBasis,
     ) -> CircuitResult<bool> {
-        let targets = match unique_measure_reset_targets(instruction)? {
-            Some(targets) => targets,
-            None => return Ok(false),
-        };
-        for (&(qubit, inverted), record_index) in targets.iter().rev().zip(
-            measurement_indices_reversed(&mut self.measurements_in_past, targets.len())?,
-        ) {
+        let targets = measure_reset_targets(instruction)?;
+        let mut record_indices =
+            measurement_indices_reversed(&mut self.measurements_in_past, targets.len())?;
+        record_indices.reverse();
+        for qubit in unique_measure_reset_qubits(&targets) {
             remove_single_anticommutations(&mut self.flows, qubit, basis)?;
             clear_input_term(&mut self.flows, qubit)?;
-            self.flows.push(Flow::new(
-                single_pauli(self.qubit_count, qubit, basis),
-                PauliString::from_bases(
-                    if inverted {
-                        PauliSign::Minus
-                    } else {
-                        PauliSign::Plus
-                    },
-                    vec![PauliBasis::I; self.qubit_count],
-                ),
-                [record_index],
-                [],
-            ));
+        }
+        let final_occurrences = final_measure_reset_occurrences(&targets);
+        for (local_index, &(qubit, inverted)) in targets.iter().enumerate() {
+            let &(final_index, final_inverted) = final_occurrences
+                .get(&qubit)
+                .ok_or_else(|| internal_flow_error("missing final measure-reset target"))?;
+            let record_index = record_indices
+                .get(local_index)
+                .copied()
+                .ok_or_else(|| internal_flow_error("missing measure-reset record index"))?;
+            let final_record = record_indices
+                .get(final_index)
+                .copied()
+                .ok_or_else(|| internal_flow_error("missing final measure-reset record index"))?;
+            if local_index == final_index {
+                self.flows.push(Flow::new(
+                    single_pauli(self.qubit_count, qubit, basis),
+                    PauliString::from_bases(
+                        if inverted {
+                            PauliSign::Minus
+                        } else {
+                            PauliSign::Plus
+                        },
+                        vec![PauliBasis::I; self.qubit_count],
+                    ),
+                    [record_index],
+                    [],
+                ));
+            } else {
+                self.flows.push(Flow::new(
+                    PauliString::identity(self.qubit_count),
+                    PauliString::from_bases(
+                        if inverted ^ final_inverted {
+                            PauliSign::Minus
+                        } else {
+                            PauliSign::Plus
+                        },
+                        vec![PauliBasis::I; self.qubit_count],
+                    ),
+                    [record_index, final_record],
+                    [],
+                ));
+            }
         }
         Ok(true)
     }
@@ -566,16 +665,12 @@ impl MeasurementFeedbackFlowSolver {
     }
 
     fn undo_measurement_pad(&mut self, instruction: &CircuitInstruction) -> CircuitResult<bool> {
-        for (target, record_index) in
-            instruction
-                .targets()
-                .iter()
-                .rev()
-                .zip(measurement_indices_reversed(
-                    &mut self.measurements_in_past,
-                    instruction.targets().len(),
-                )?)
-        {
+        let mut record_indices = measurement_indices_reversed(
+            &mut self.measurements_in_past,
+            instruction.targets().len(),
+        )?;
+        record_indices.reverse();
+        for (target, record_index) in instruction.targets().iter().rev().zip(record_indices) {
             match target.qubit_id().map(|id| id.get()) {
                 Some(0) => self.flows.push(Flow::new(
                     PauliString::identity(self.qubit_count),
@@ -625,12 +720,11 @@ impl MeasurementFeedbackFlowSolver {
         Ok(true)
     }
 
-    fn undo_measurement_feedback(
+    fn undo_feedback_capable_instruction(
         &mut self,
         instruction: &CircuitInstruction,
+        basis: PauliBasis,
     ) -> CircuitResult<bool> {
-        let basis = feedback_measurement_basis(instruction)
-            .ok_or_else(|| internal_flow_error("missing feedback basis"))?;
         for group in instruction.target_groups().into_iter().rev() {
             let [left, right] = group else {
                 return Ok(false);
@@ -644,10 +738,16 @@ impl MeasurementFeedbackFlowSolver {
                 _ => None,
             };
             let Some((record_offset, target)) = feedback else {
-                return Ok(false);
+                if left.qubit_id().is_some()
+                    && right.qubit_id().is_some()
+                    && !self.undo_tableau_target_group(instruction, group)?
+                {
+                    return Ok(false);
+                }
+                continue;
             };
             let Some(qubit) = target.qubit_id().map(|qubit| qubit.get() as usize) else {
-                return Ok(false);
+                continue;
             };
             let record_index = absolute_record_index(self.measurements_in_past, record_offset)?;
             for row in rows_matching(&self.flows, |flow| {
@@ -672,30 +772,41 @@ impl MeasurementFeedbackFlowSolver {
         instruction: &CircuitInstruction,
     ) -> CircuitResult<bool> {
         for group in instruction.target_groups().into_iter().rev() {
-            let Some(targets) = plain_tableau_targets(group) else {
-                return Ok(false);
-            };
-            let local_inverse =
-                crate::circuit_tableau::gate_tableau(instruction.gate().canonical_name())?
-                    .inverse()
-                    .map_err(stabilizer_to_circuit_error)?;
-            if local_inverse.len() != targets.len() {
+            if !self.undo_tableau_target_group(instruction, group)? {
                 return Ok(false);
             }
-            for row in &mut self.flows {
-                let input = apply_local_tableau_to_global_pauli(
-                    row.input(),
-                    &targets,
-                    &local_inverse,
-                    self.qubit_count,
-                )?;
-                *row = Flow::new(
-                    input,
-                    row.output().clone(),
-                    row.measurements(),
-                    row.observables(),
-                );
-            }
+        }
+        Ok(true)
+    }
+
+    fn undo_tableau_target_group(
+        &mut self,
+        instruction: &CircuitInstruction,
+        group: &[Target],
+    ) -> CircuitResult<bool> {
+        let Some(targets) = plain_tableau_targets(group) else {
+            return Ok(false);
+        };
+        let local_inverse =
+            crate::circuit_tableau::gate_tableau(instruction.gate().canonical_name())?
+                .inverse()
+                .map_err(stabilizer_to_circuit_error)?;
+        if local_inverse.len() != targets.len() {
+            return Ok(false);
+        }
+        for row in &mut self.flows {
+            let input = apply_local_tableau_to_global_pauli(
+                row.input(),
+                &targets,
+                &local_inverse,
+                self.qubit_count,
+            )?;
+            *row = Flow::new(
+                input,
+                row.output().clone(),
+                row.measurements(),
+                row.observables(),
+            );
         }
         Ok(true)
     }
@@ -768,6 +879,25 @@ fn measured_pauli_product(
 fn identity_flow_rows(qubit_count: usize) -> Vec<Flow> {
     let mut flows = Vec::with_capacity(qubit_count.saturating_mul(2));
     for qubit in 0..qubit_count {
+        flows.push(Flow::new(
+            single_pauli(qubit_count, qubit, PauliBasis::X),
+            single_pauli(qubit_count, qubit, PauliBasis::X),
+            [],
+            [],
+        ));
+        flows.push(Flow::new(
+            single_pauli(qubit_count, qubit, PauliBasis::Z),
+            single_pauli(qubit_count, qubit, PauliBasis::Z),
+            [],
+            [],
+        ));
+    }
+    flows
+}
+
+fn reverse_ordered_identity_flow_rows(qubit_count: usize) -> Vec<Flow> {
+    let mut flows = Vec::with_capacity(qubit_count.saturating_mul(2));
+    for qubit in (0..qubit_count).rev() {
         flows.push(Flow::new(
             single_pauli(qubit_count, qubit, PauliBasis::X),
             single_pauli(qubit_count, qubit, PauliBasis::X),
@@ -926,85 +1056,6 @@ fn clear_input_term(flows: &mut [Flow], qubit: usize) -> CircuitResult<()> {
     Ok(())
 }
 
-fn final_canonicalize_measurement_generators(
-    flows: &mut [Flow],
-    qubit_count: usize,
-    measurement_count: usize,
-) -> CircuitResult<()> {
-    let mut eliminated = 0;
-    for qubit in 0..qubit_count {
-        eliminate_rows_with(flows, &mut eliminated, |flow| {
-            flow.input().get(qubit).is_some_and(|basis| basis.x_bit())
-        })?;
-        eliminate_rows_with(flows, &mut eliminated, |flow| {
-            flow.input().get(qubit).is_some_and(|basis| basis.z_bit())
-        })?;
-    }
-    for qubit in 0..qubit_count {
-        eliminate_rows_with(flows, &mut eliminated, |flow| {
-            flow.output().get(qubit).is_some_and(|basis| basis.x_bit())
-        })?;
-        eliminate_rows_with(flows, &mut eliminated, |flow| {
-            flow.output().get(qubit).is_some_and(|basis| basis.z_bit())
-        })?;
-    }
-    for measurement in 0..measurement_count {
-        let measurement = record_index_i32(measurement)?;
-        eliminate_rows_with(flows, &mut eliminated, |flow| {
-            flow.measurements().any(|record| record == measurement)
-        })?;
-    }
-
-    for flow in flows.iter_mut() {
-        *flow = flow_with_final_sign_and_trimmed_identities(flow);
-    }
-    flows.sort();
-    Ok(())
-}
-
-fn eliminate_rows_with(
-    flows: &mut [Flow],
-    eliminated: &mut usize,
-    predicate: impl Fn(&Flow) -> bool,
-) -> CircuitResult<()> {
-    let matching_rows = rows_matching(flows, predicate);
-    let Some(pivot) = matching_rows
-        .iter()
-        .copied()
-        .find(|&row| row >= *eliminated && row < flows.len())
-    else {
-        return Ok(());
-    };
-    let pivot_flow = flows
-        .get(pivot)
-        .cloned()
-        .ok_or_else(|| internal_flow_error("canonical pivot row is out of bounds"))?;
-    for row in matching_rows {
-        if row == pivot {
-            continue;
-        }
-        let multiplied = flows
-            .get(row)
-            .ok_or_else(|| internal_flow_error("canonical target row is out of bounds"))?
-            .multiply(&pivot_flow)
-            .map_err(stabilizer_to_circuit_error)?;
-        if let Some(slot) = flows.get_mut(row) {
-            *slot = multiplied;
-        }
-    }
-    flows.swap(pivot, *eliminated);
-    *eliminated += 1;
-    Ok(())
-}
-
-fn rows_matching(flows: &[Flow], predicate: impl Fn(&Flow) -> bool) -> Vec<usize> {
-    flows
-        .iter()
-        .enumerate()
-        .filter_map(|(index, flow)| predicate(flow).then_some(index))
-        .collect()
-}
-
 fn anticommutes_with_pair_measurement(
     input: &PauliString,
     left: usize,
@@ -1068,23 +1119,6 @@ fn single_pauli_with_sign(
     )
 }
 
-fn feedback_measurement_basis(instruction: &CircuitInstruction) -> Option<PauliBasis> {
-    match instruction.gate().canonical_name() {
-        "CX" | "XCZ" => Some(PauliBasis::X),
-        "CY" | "YCZ" => Some(PauliBasis::Y),
-        "CZ" => Some(PauliBasis::Z),
-        _ => None,
-    }
-}
-
-fn ignored_measurement_flow_generator_instruction(instruction: &CircuitInstruction) -> bool {
-    !instruction.gate().produces_measurements()
-        && matches!(
-            instruction.gate().category(),
-            GateCategory::Annotation | GateCategory::Noise
-        )
-}
-
 fn absolute_record_index(measurements_in_past: usize, record_offset: i32) -> CircuitResult<i32> {
     let measurements_in_past = i64::try_from(measurements_in_past).map_err(|_| {
         CircuitError::invalid_tableau_conversion(
@@ -1117,32 +1151,6 @@ fn flow_with_toggled_measurement(flow: &Flow, record_index: i32) -> Flow {
         flow.measurements().chain([record_index]),
         flow.observables(),
     )
-}
-
-fn flow_with_final_sign_and_trimmed_identities(flow: &Flow) -> Flow {
-    let output_sign = xor_sign(flow.output().sign(), flow.input().sign());
-    Flow::new(
-        trimmed_pauli_with_sign(flow.input(), PauliSign::Plus),
-        trimmed_pauli_with_sign(flow.output(), output_sign),
-        flow.measurements(),
-        flow.observables(),
-    )
-}
-
-fn trimmed_pauli_with_sign(pauli: &PauliString, sign: PauliSign) -> PauliString {
-    if pauli.has_no_pauli_terms() {
-        PauliString::from_bases(sign, [])
-    } else {
-        pauli.with_sign(sign)
-    }
-}
-
-fn xor_sign(left: PauliSign, right: PauliSign) -> PauliSign {
-    if left.is_negative() ^ right.is_negative() {
-        PauliSign::Minus
-    } else {
-        PauliSign::Plus
-    }
 }
 
 fn unsupported_flow_generator_error(circuit: &Circuit) -> CircuitError {

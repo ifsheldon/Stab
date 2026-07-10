@@ -5,9 +5,10 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 use stab_core::{
-    Circuit, CodeDistance, DetectorErrorModel, ErrorAnalyzerOptions, Flow, Probability, RoundCount,
-    SurfaceCodeParams, SurfaceCodeTask, check_if_circuit_has_unsigned_stabilizer_flows,
-    circuit_flow_generators, circuit_to_detector_error_model, find_undetectable_logical_error,
+    Circuit, CodeDistance, DetectorErrorModel, ErrorAnalyzerOptions, Flow, PauliBasis, PauliString,
+    Probability, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
+    circuit_to_detector_error_model, find_undetectable_logical_error,
     generate_surface_code_circuit, independent_to_disjoint_xyz_errors, likeliest_error_sat_problem,
     shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
     try_disjoint_to_independent_xyz_errors,
@@ -70,6 +71,10 @@ const PERIOD127_OBSERVABLE_REPEAT_COUNT: u64 = 338;
 const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 1_000_001;
 #[cfg(test)]
 const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 17;
+#[cfg(not(test))]
+const SPARSE_REVERSE_HIGH_IDLE_QUBITS: usize = 65_536;
+#[cfg(test)]
+const SPARSE_REVERSE_HIGH_IDLE_QUBITS: usize = 256;
 #[cfg(not(test))]
 const SPARSE_REVERSE_SHIFTED_REPEAT_COUNT: u64 = 1025;
 #[cfg(test)]
@@ -162,6 +167,12 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             SPARSE_REVERSE_UNITARY_REPEAT_COUNT as f64,
             "folded-rounds/s",
         )),
+        ("pf6-sparse-rev-frame-loop", "stab_pf6_sparse_rev_unitary_repeat_high_idle_flow") => {
+            Some((
+                SPARSE_REVERSE_HIGH_IDLE_QUBITS.saturating_sub(1) as f64,
+                "idle-qubits/s",
+            ))
+        }
         ("pf6-sparse-rev-frame-loop", "stab_pf6_sparse_rev_shifted_measurement_flow") => Some((
             SPARSE_REVERSE_SHIFTED_REPEAT_COUNT as f64,
             "folded-rounds/s",
@@ -236,7 +247,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures shortest and weighted WCNF generation for a generated rotated-surface-code DEM after source-owned Rust analysis and decomposition; pinned Stim exposes SAT encoding as C++ API behavior, not a faithful public CLI baseline",
         ),
         "pf6-sparse-rev-frame-loop" => Some(
-            "report-only: Stab measures public unsigned-flow checking over a measurement-dependent fixed two-qubit Clifford unitary repeat and a shifted measurement/detector repeat so the sparse reverse frame tracker must use loop folding; broader sparse tracker parity and provenance remain outside this row",
+            "report-only: Stab measures public unsigned-flow checking over a measurement-dependent fixed two-qubit Clifford unitary repeat, the same folded-unitary path with one active qubit and a 65,535-qubit idle suffix in a 65,536-wide flow, and a shifted measurement/detector repeat so the sparse reverse frame tracker must use loop folding; the high-idle transform is required to scale with touched qubits instead of total tracker width, while broader sparse tracker parity and provenance remain outside this row",
         ),
         "pf3-analyze-errors-sweep" => Some(
             "report-only: Stab measures in-process analyzer handling for selected sweep-controlled Clifford gates and CZ sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, plus allocation-comparable low and maximum sweep-id resource submeasurements",
@@ -629,6 +640,13 @@ fn run_sparse_reverse_frame_loop_row(row: &BenchmarkRow) -> Result<Vec<Measureme
                 message: format!("failed to parse sparse reverse flow benchmark fixture: {error}"),
             })?,
         ];
+    let high_idle_circuit = Circuit::from_stim_str(&sparse_reverse_high_idle_frame_loop_fixture())
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let mut high_x = PauliString::identity(SPARSE_REVERSE_HIGH_IDLE_QUBITS);
+    high_x
+        .set(SPARSE_REVERSE_HIGH_IDLE_QUBITS - 1, PauliBasis::X)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let high_idle_flows = [Flow::new(high_x.clone(), high_x, [], [])];
     let shifted_circuit = Circuit::from_stim_str(&sparse_reverse_shifted_frame_loop_fixture())
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let shifted_flows = [generated_z_prefix_flow(&row.id, &shifted_circuit)?];
@@ -646,6 +664,26 @@ fn run_sparse_reverse_frame_loop_row(row: &BenchmarkRow) -> Result<Vec<Measureme
                         row_id: row.id.clone(),
                         message: format!(
                             "sparse reverse unitary flow benchmark expected [true], got {result:?}"
+                        ),
+                    });
+                }
+                black_box(result);
+                Ok(())
+            },
+        )?,
+        measure_stab_iterations(
+            "stab_pf6_sparse_rev_unitary_repeat_high_idle_flow",
+            ERROR_ANALYZER_COMPARE_ITERATIONS,
+            || {
+                let result = check_if_circuit_has_unsigned_stabilizer_flows(
+                    &high_idle_circuit,
+                    &high_idle_flows,
+                );
+                if result != [true] {
+                    return Err(BenchError::StabRunner {
+                        row_id: row.id.clone(),
+                        message: format!(
+                            "sparse reverse high-idle flow benchmark expected [true], got {result:?}"
                         ),
                     });
                 }
@@ -913,6 +951,10 @@ fn graphlike_search_model(row_id: &str) -> Result<DetectorErrorModel, BenchError
 
 fn sparse_reverse_unitary_frame_loop_fixture() -> String {
     format!("REPEAT {SPARSE_REVERSE_UNITARY_REPEAT_COUNT} {{\n    SWAP 0 1\n}}\nM 1\n")
+}
+
+fn sparse_reverse_high_idle_frame_loop_fixture() -> String {
+    format!("REPEAT {SPARSE_REVERSE_UNITARY_REPEAT_COUNT} {{\n    H 0\n}}\nM 0\n")
 }
 
 fn sparse_reverse_shifted_frame_loop_fixture() -> String {

@@ -2300,14 +2300,15 @@
               "test",
               "-p",
               "stab-core",
-              "detecting_regions_simple_h_cx_mxx",
-              "--quiet"
+              "circuit_detecting_regions::tests::detecting_regions_simple_h_cx_mxx",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-circuit-to-detecting-regions-simple",
+            "value": "pfm-b4-detecting-regions-simple-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
@@ -2340,18 +2341,19 @@
               "test",
               "-p",
               "stab-core",
-              "detecting_regions_anticommutation_rejects_implicit_start_state",
-              "--quiet"
+              "circuit_detecting_regions::tests::detecting_regions_anticommutation_rejects_implicit_start_state",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-detecting-regions-anticommutation-rust",
+            "value": "pfm-b4-detecting-regions-start-anticommutation-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|detecting_regions_anticommutation",
+              "argv": "cargo-test|-p|stab-core|detecting_regions_anticommutation_rejects_implicit_start_state",
               "upstream_source": "src/stim/util_top/circuit_to_detecting_regions_test.py"
             }
           },
@@ -2455,18 +2457,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_basic",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_empty",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-missing-detectors-basic",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|missing_detectors_basic",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2495,18 +2500,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_basic",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_covered",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-missing-detectors-basic",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|missing_detectors_basic",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2535,18 +2543,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_basic",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_duplicate_covered",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-missing-detectors-basic",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|missing_detectors_basic",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2575,18 +2586,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_basic",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_reset_measurement",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-missing-detectors-basic",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|missing_detectors_basic",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2615,18 +2629,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_basic",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_nondeterministic_known",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-missing-detectors-basic",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|missing_detectors_basic",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2655,18 +2672,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_basic",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_nondeterministic_ignored",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-missing-detectors-basic",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|missing_detectors_basic",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2695,18 +2715,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_reduces_multi_record_detector_rows",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_partial_multitarget",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-missing-detectors-row-reduction-rust",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|missing_detectors_reduces_multi_record_detector_rows",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2735,18 +2758,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_supports_mpp_observable_subset",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_mpp_independent_product",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-missing-detectors-mpp-observable-rust",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|missing_detectors|missing_detectors_supports_mpp_observable_subset",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2775,18 +2801,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_supports_mpp_observable_subset",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_mpp_dependent_row",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-missing-detectors-mpp-observable-rust",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|missing_detectors|missing_detectors_supports_mpp_observable_subset",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2815,18 +2844,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_supports_mpp_observable_subset",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_mpp_unknown_input",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-missing-detectors-mpp-observable-rust",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|missing_detectors|missing_detectors_supports_mpp_observable_subset",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2855,18 +2887,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_supports_mpp_observable_subset",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_record_observable",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-missing-detectors-mpp-observable-rust",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|missing_detectors|missing_detectors_supports_mpp_observable_subset",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2895,18 +2930,21 @@
               "test",
               "-p",
               "stab-core",
-              "missing_detectors_supports_mpp_observable_subset",
-              "--quiet"
+              "--test",
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_circuit_pauli_observable",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-missing-detectors-mpp-observable-rust",
+            "value": "pfm-b4-missing-detectors-circuit-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|missing_detectors|missing_detectors_supports_mpp_observable_subset",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_circuit_",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2936,19 +2974,20 @@
               "-p",
               "stab-core",
               "--test",
-              "missing_detectors",
-              "missing_detectors_supports_honeycomb_generated_code_suffix",
-              "--quiet"
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_honeycomb",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-missing-detectors-generated-honeycomb-rust",
+            "value": "pfm-b4-missing-detectors-honeycomb-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|missing_detectors|missing_detectors_supports_honeycomb_generated_code_suffix",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_honeycomb",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -2978,19 +3017,20 @@
               "-p",
               "stab-core",
               "--test",
-              "missing_detectors",
-              "missing_detectors_supports_toric_global_stabilizer_product",
-              "--quiet"
+              "pfm_b4_missing_detector_evidence",
+              "pfm_b4_missing_toric",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-missing-detectors-generated-toric-rust",
+            "value": "pfm-b4-missing-detectors-toric-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|missing_detectors|missing_detectors_supports_toric_global_stabilizer_product",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_toric",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -3008,8 +3048,54 @@
       "milestone": "PFM-B4",
       "disposition": "implement",
       "title": "General flow generation and GF(2) measurement solving",
-      "supporting_oracles": [],
-      "supporting_benchmarks": [],
+      "supporting_oracles": [
+        {
+          "classification": "rust-test-proxy",
+          "value": "pf5-has-flow-record-observable-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|--test|circuit_flows|check_if_circuit_has_unsigned_stabilizer_flows_supports",
+            "upstream_source": "src/stim/util_top/has_flow.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
+          "value": "pf5-has-all-flows-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|--test|circuit_flows|circuit_has_unsigned_stabilizer_flow_helpers",
+            "upstream_source": "src/stim/circuit/circuit2.pybind.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
+          "value": "pf5-has-flow-diagnostics-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|--test|circuit_flows|unsigned_stabilizer_flow_diagnostics",
+            "upstream_source": "src/stim/util_top/has_flow.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
+          "value": "pf5-signed-sampled-flows-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|--test|circuit_flows|sample_if_circuit_has_stabilizer_flows",
+            "upstream_source": "src/stim/util_top/has_flow.test.cc"
+          }
+        }
+      ],
+      "supporting_benchmarks": [
+        {
+          "classification": "report-only",
+          "value": "pf5-has-all-flows-batch"
+        }
+      ],
       "cases": [
         {
           "id": "pfm5-flow-various-empty",
@@ -3030,19 +3116,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_empty_and_single_qubit_unitaries_match_stim",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_empty",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-circuit-flow-generators",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3072,19 +3159,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_empty_and_single_qubit_unitaries_match_stim",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_x",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-circuit-flow-generators",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3114,19 +3202,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_empty_and_single_qubit_unitaries_match_stim",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_h",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-circuit-flow-generators",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3156,19 +3245,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_promotes_single_instruction_measurement_subset",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_measurement",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3198,19 +3288,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_promotes_single_instruction_measurement_subset",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_duplicate_measurement",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3240,19 +3331,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_promotes_single_instruction_measurement_subset",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_mxx",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3282,19 +3374,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_promotes_single_instruction_measurement_subset",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_myy",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3324,19 +3417,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_promotes_single_instruction_measurement_subset",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_mzz",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3366,19 +3460,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_two_qubit_unitary_order_matches_stim",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_iswap",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-circuit-flow-generators",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3408,19 +3503,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_empty_and_single_qubit_unitaries_match_stim",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_s",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-circuit-flow-generators",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3450,19 +3546,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_empty_and_single_qubit_unitaries_match_stim",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_s_dag",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-circuit-flow-generators",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3492,19 +3589,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_promotes_spp_measurement_row_unitary_examples",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_spp_z",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3534,19 +3632,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_composed_unitary_matches_stim",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_composed_unitary",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "coverage-util-top-circuit-flow-generators",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3576,19 +3675,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_promotes_spp_measurement_row_unitary_examples",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_spp_multigroup",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3618,19 +3718,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_promotes_spp_measurement_row_unitary_examples",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_spp_two_qubit",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3660,19 +3761,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "circuit_flow_generators_promotes_spp_measurement_row_unitary_examples",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_spp_dag",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3702,19 +3804,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "measurement",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_cx_feedback",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3744,19 +3847,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "measurement",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_reset",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3786,19 +3890,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "measurement",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_measure_reset",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3828,19 +3933,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "measurement",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_xcz_feedback",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3870,19 +3976,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "measurement",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_mpad",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3912,19 +4019,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "measurement",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_cy_feedback",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3954,19 +4062,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "measurement",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_heralded_mpp",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -3996,19 +4105,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flow_generators",
-              "measurement",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_various_mpp_yy",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-generators-measurement-rust",
+            "value": "pfm-b4-flow-generators-various-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|measurement",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_various_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -4040,7 +4150,8 @@
               "--test",
               "circuit_flow_generators",
               "circuit_flow_generators_measurement_subset_promotes_generated_all_operations_fixture",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -4080,19 +4191,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flows",
-              "solve_for_flow_measurements_cpp",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_solve_empty",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-solve-measurement-rust",
+            "value": "pfm-b4-flow-solver-cpp-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flows|solve_for_flow_measurements_cpp",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -4122,19 +4234,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flows",
-              "solve_for_flow_measurements_cpp",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_solve_simple",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-solve-measurement-rust",
+            "value": "pfm-b4-flow-solver-cpp-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flows|solve_for_flow_measurements_cpp",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -4164,19 +4277,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flows",
-              "solve_for_flow_measurements_cpp",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_solve_repetition_code",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-solve-measurement-rust",
+            "value": "pfm-b4-flow-solver-cpp-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flows|solve_for_flow_measurements_cpp",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_solve_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators.test.cc"
             }
           },
@@ -4206,19 +4320,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flows",
-              "solve_for_flow_measurements_python",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_python_measurement_solve",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-solve-measurement-python-rust",
+            "value": "pfm-b4-flow-solver-python-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flows|solve_for_flow_measurements_python",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators_test.py"
             }
           },
@@ -4250,7 +4365,8 @@
               "--test",
               "circuit_flow_generators",
               "circuit_flow_generators_promotes_python_multi_target_examples",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -4290,19 +4406,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flows",
-              "solve_for_flow_measurements_python",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_python_multitarget_solve",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-solve-measurement-python-rust",
+            "value": "pfm-b4-flow-solver-python-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flows|solve_for_flow_measurements_python",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators_test.py"
             }
           },
@@ -4332,19 +4449,20 @@
               "-p",
               "stab-core",
               "--test",
-              "circuit_flows",
-              "solve_for_flow_measurements_python",
-              "--quiet"
+              "pfm_b4_flow_evidence",
+              "pfm_b4_flow_python_fewer_measurements",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf5-flow-solve-measurement-python-rust",
+            "value": "pfm-b4-flow-solver-python-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flows|solve_for_flow_measurements_python",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_evidence|pfm_b4_flow_python_",
               "upstream_source": "src/stim/util_top/circuit_flow_generators_test.py"
             }
           },
@@ -4359,38 +4477,40 @@
           "id": "pfm5-flow-solve-over-sixteen",
           "surface": "solve_for_flow_measurements",
           "upstream": {
-            "path": "src/stim/util_top/circuit_flow_generators.test.cc",
-            "kind": "test-family",
-            "test": "solve_for_flow_measurements general generator-table semantics",
-            "subcase": "supported composed circuit with more than sixteen measurements",
-            "anchors": [
-              "circuit_flow_generators.all_operations",
-              "solve_for_flow_measurements.simple",
-              "solve_for_flow_measurements.rep_code"
-            ]
+            "path": "src/stim/util_top/circuit_flow_generators.inl",
+            "kind": "source-symbol",
+            "test": "solve_for_flow_measurements",
+            "subcase": "supported composed circuit with more than sixteen measurements"
           },
           "comparator": "semantic-invariant",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "circuit_flows",
+              "pfm_b4_flow_solver",
               "pfm_b4_flow_solve_over_sixteen",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b4-flow-solve-over-sixteen"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b4-flow-solver-matrix-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_flow_solver",
+              "upstream_source": "src/stim/util_top/circuit_flow_generators.inl"
+            }
           },
           "benchmark": {
-            "state": "planned",
+            "state": "existing",
             "value": "pfm-b4-flow-solve-matrix-sizes",
             "classification": "contract-only"
           },

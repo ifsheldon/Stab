@@ -54,12 +54,13 @@ PFM-B0 replaces broad under-specification with a schema-versioned, machine-check
 | PFM4 DEM traversal | PFM-B3 | Implement | 7 | 0 | 7 | 0 |
 | PFM5 detecting regions | PFM-B4 | Evidence close | 2 | 0 | 0 | 2 |
 | PFM5 missing detectors | PFM-B4 | Evidence close | 14 | 0 | 0 | 14 |
-| PFM5 flow engine | PFM-B4 | Implement | 33 | 1 | 32 | 0 |
+| PFM5 flow engine | PFM-B4 | Implement | 33 | 0 | 33 | 0 |
 | PFM6 analyzer and search | PFM-B5 | Implement | 36 | 14 | 22 | 0 |
 
-The three evidence-close blocker records also freeze 17 additional promoted supporting oracle rows: one analyzer CLI row, ten detecting-region rows, and six missing-detector rows.
-They freeze five supporting benchmark rows as well: four detecting-region rows and one missing-detector MPAD row, all retaining their source-owned `contract-only` runner, `non-primary-report-only` threshold class, and `report-only` comparability class.
-Fifty-six owned cases currently share a Rust selector with at least one other case, including eleven missing-detector evidence-close cases; the ledger makes that evidence-splitting debt visible, and the owning PFM-B milestone must replace shared filters with independently selectable tests before closure.
+The three evidence-close blocker records freeze 17 additional promoted supporting oracle rows: one analyzer CLI row, ten detecting-region rows, and six missing-detector rows.
+The PFM-B4 flow blocker separately freezes four retained checker oracle rows, so 21 supporting oracle signatures are machine-bound across the ledger.
+The ledger freezes six supporting benchmark rows: four detecting-region rows, one missing-detector MPAD row, and one flow-checker batch row, all retaining their source-owned `contract-only` runner, `non-primary-report-only` threshold class, and `report-only` comparability class.
+Seventeen owned cases outside PFM-B4 currently share a Rust selector with at least one other case. PFM-B4 has zero shared selectors after splitting eleven missing-detector and twenty-eight flow cases; the remaining debt belongs to PFM-B1 and PFM-B5.
 
 The validator rejects missing required blockers, any semantic change to the canonical SHA-256 ledger inventory, deleted owned-case floors, duplicate ids, unanchored or completed test-family aggregations, missing statistical plans, changed evidence-close supporting rows, supporting-oracle evidence-signature drift, unsafe, untracked, or symlinked upstream paths, non-pinned Stim sources, non-implemented oracle rows, stale benchmark rows, typed oracle runner drift, distinct benchmark runner, threshold-class, or comparability drift, dishonest planned versus existing test state, completion claims backed only by planned artifacts, and unstable, non-regular, or oversized ledger, manifest, and upstream evidence inputs.
 Schema version 2 additionally rejects missing or duplicate gate-surface and semantic-family coverage, checks those wire names against canonical core metadata, requires every PFM-B2 gate-family case to own parser, measurement-sampler, reference-sampler, detection-converter, detector-frame, detection-sampler, error-analyzer, and flow-generator evidence, and validates that the eighteen cases collectively own all nineteen canonical semantic families.
@@ -73,7 +74,7 @@ They are finite ledger-backed implementation and evidence-splitting programs:
 - PFM-B1 owns the seven planned QEC-transform cases and must split the four implemented cases that still share broad selectors.
 - PFM-B2 contract groundwork is complete and evidence-closes analyzer sweep behavior at the selected matrix; its final phase still implements eighteen planned cases covering all nineteen semantic families.
 - PFM-B3 implements the seven selected shared folded-DEM traversal contracts.
-- PFM-B4 evidence-closes the selected detecting-region and missing-detector cases, splits the eleven missing-detector and twenty-eight flow cases that still share selectors, and implements the one planned over-sixteen-measurement flow-solver case.
+- PFM-B4 implementation and focused evidence are in place for detecting regions, missing detectors, and all thirty-three flow cases. The initial audit and GPT-5.6/max review findings have an implemented correction pass covering idle-qubit flow span, sparse query memory, mixed feedback groups, exact source attribution, exact selectors, direct repeat evidence, and genuine dense benchmark workloads; focused re-review and clean committed-HEAD allocation evidence remain before the milestone closes.
 - PFM-B5 implements the fourteen planned analyzer and SAT/WCNF cases and splits the thirteen implemented analyzer/search cases that still share selectors.
 
 These exact ledger-owned items are the legitimate remaining work for the full GOAL and must be executed from `docs/plans/blocker-closure-ledger.json`, not reconstructed from checklist prose.
@@ -89,7 +90,7 @@ Before PFM8 can become a completion report, the commands in `docs/plans/GOAL.md`
 
 This PFM8 pass confirms that the current rollup rows should stay conservative.
 PFM-B2 contract groundwork is complete and recorded in `docs/plans/pfm-b2-gate-surface-contract-groundwork-report.md`.
-PFM-B3 shared DEM traversal is complete: the audit and GPT-5.6/max review findings are fixed, and the clean allocation report records `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`, `local_modifications=false`, peak live allocation of 65,536 bytes, and zero resident delta. PFM-B4 is the next implementation step; final PFM-B2 generated semantic coverage follows the shared foundations.
+PFM-B3 shared DEM traversal is complete: the audit and GPT-5.6/max review findings are fixed, and the clean allocation report records `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`, `local_modifications=false`, peak live allocation of 65,536 bytes, and zero resident delta. PFM-B4 implementation and focused evidence have completed their initial audit and review correction pass and await focused finding-closure review plus clean benchmark evidence before PFM-B1; final PFM-B2 generated semantic coverage follows the shared foundations.
 
 ## Verification
 
