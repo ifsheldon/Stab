@@ -70,7 +70,7 @@ Updated:
 
 Milestone-audit status: complete for this selected slice.
 No blocking implementation defects or milestone loopholes were found.
-The slice satisfies the scope note by folding selected flat and nested detectorless logical-observable-only zero-shift filter keys, preserving shifted filter DEM rejection, updating oracle metadata, adding report-only benchmark evidence, and keeping annotation-only or broader mixed-instruction filters, circuit-repeat provenance, full ErrorMatcher provenance, and `explain_errors` CLI behavior explicitly out of scope.
+The slice satisfies the scope note by folding selected flat and nested detectorless logical-observable-only zero-shift filter keys, preserving shifted active filter DEM rejection, updating oracle metadata, adding report-only benchmark evidence, and keeping broader active mixed-instruction filters, circuit-repeat provenance, full ErrorMatcher provenance, and `explain_errors` CLI behavior explicitly out of scope. PFM-B3 later proves annotation-only neutral filters skip.
 
 Full-code-review status: complete with two GPT-5.5/xhigh sidecars.
 The Rust and compatibility reviewer found no confirmed findings, confirmed the selector change is semantically sound against upstream Stim's filter-key xor behavior, and noted residual risk that no direct C++ oracle run exists for the exact oversized logical-only repeat filter.

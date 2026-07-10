@@ -124,6 +124,8 @@ src/stim/dem/detector_error_model.test.cc
 Small features:
 
 - `.dem` parsing, canonical printing, repeat blocks, detector shifts, coordinates, observables, separators, probability validation, flattening, approximate equality, and structural equivalence.
+- PFM-B3 adds seven independently selectable Rust tests under `crates/stab-core/tests/dem_folded_traversal.rs` for counts and shifts, coordinates, compact transforms, sampler behavior, graphlike or hypergraph search collection, SAT/WCNF collection, and ErrorMatcher filter keys. The count selector owns a 96-case deterministic Proptest corpus with seed `[0xB3; 32]` and a fixed generated domain covering nested repeats, shifts, tags, annotations, separators, and zero or deterministic active errors; it compares summaries, coordinates, transforms, deterministic sampling, search, and matcher filtering against explicitly unrolled models. Separate evidence asserts literal pinned WCNF text, ports `DemSampler.resample_combinations`, applies `1e-12` fractional-coordinate tolerance, and covers neutral repeats, declaration-count overflow, coordinate-work limits, visitor errors, and inherent-materialization caps.
+- The corresponding `pfm-b3-dem-traversal-*` oracle rows are implemented Rust-test proxies. They supplement, rather than replace, the exact `.dem` parse and print oracle rows.
 
 ### Diagrams And Rendering
 

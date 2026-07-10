@@ -21,7 +21,7 @@ For selected repeat bodies containing only those instructions, Stab should avoid
 - Repeats with nonzero detector shifts remain capped or rejected.
 - Repeats containing active error mechanisms remain governed by the existing selected graphlike, hypergraph, SAT/WCNF, and ErrorMatcher repeat-folding slices.
 - High sparse detector or logical-observable ids appearing on actual `error` targets remain governed by the existing search sparse-indexing behavior and SAT/WCNF dense target caps.
-- ErrorMatcher filter DEM annotation-only repeats remain capped as already locked by `pf4_error_matcher_filter_rejects_annotation_only_repeat`.
+- Historical decision at this slice: ErrorMatcher filter DEM annotation-only repeats remained capped. PFM-B3 later replaces that decision with pinned-Stim-compatible neutral skipping under `pf4_error_matcher_filter_skips_annotation_only_repeat`.
 - Analyzer traversal, DEM sampler sampled-error output, replay behavior, Python, diagrams, CLI behavior, public graph/vector simulator APIs, and full folded traversal across all consumers are unchanged.
 
 ## Comparator Class

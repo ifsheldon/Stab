@@ -10,7 +10,7 @@ It also hardens direct hypergraph search distance-1 behavior for multiple detect
 This slice did not change shifted, nested, non-flat, zero-probability, numeric-target, detectorless no-target, SAT/WCNF, analyzer, ErrorMatcher, sampled-error, replay, Python, diagram, or deferred simulator-product behavior at the time it landed.
 The later no-target follow-up promotes selected flat zero-shift no-target graphlike and hypergraph search repeats without widening this detectorless logical-only slice.
 Dense detector and observable caps remain in force.
-The broad `pf4-dem-folded-traversal` row remains manifest-only because other traversal consumers and repeat shapes still need folded behavior, precise caps, or explicit deferral.
+At the time of this slice, the broad `pf4-dem-folded-traversal` row remained manifest-only. PFM-B3 later promotes it to an implemented umbrella after migrating the selected consumers and documenting inherent caps.
 
 ## Comparator And Evidence
 

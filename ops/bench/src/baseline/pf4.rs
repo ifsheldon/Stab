@@ -17,6 +17,7 @@ mod matcher_filter;
 mod metadata;
 mod sampler;
 mod search_repeat;
+mod traversal;
 
 #[cfg(not(test))]
 const TRANSFORM_REPETITIONS: usize = 8;
@@ -110,6 +111,7 @@ pub(super) fn run_dem_transform_compare_row(
         | "pf4-error-matcher-filter-logical-repeat"
         | "pf4-error-matcher-filter-annotation-repeat" => matcher_filter::run_row(row),
         "pf4-dem-sampler-folded-repeat" => Ok(Some(sampler::run_dem_sampler_repeat_row(row)?)),
+        "pfm-b3-dem-traversal-core" => Ok(Some(traversal::run_row(row)?)),
         _ => Ok(None),
     }
 }
@@ -223,7 +225,8 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         )),
         _ => matcher_filter::measurement_work(row_id, name)
             .or_else(|| sampler::measurement_work(row_id, name))
-            .or_else(|| search_repeat::measurement_work(row_id, name)),
+            .or_else(|| search_repeat::measurement_work(row_id, name))
+            .or_else(|| traversal::measurement_work(row_id, name)),
     }
 }
 

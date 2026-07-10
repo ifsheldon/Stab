@@ -6,7 +6,7 @@ This report records the selected annotation-only DEM repeat resource slice descr
 The promoted behavior is intentionally narrow: graphlike search, hypergraph search, unweighted SAT, and weighted WCNF treat oversized flat or nested zero-detector-shift repeat bodies containing only `detector`, standalone `logical_observable`, and zero-detector-shift `shift_detectors` declarations as contributing no repeat-count-scaled search edges, no SAT/WCNF error variables, and no SAT/WCNF dense target cap pressure when high sparse ids appear only in annotations.
 
 This is not a full folded-traversal implementation.
-Repeats with nonzero detector shifts, repeats containing active errors, high sparse ids that appear on actual `error` targets, ErrorMatcher filter annotation-only repeats, analyzer traversal, DEM sampler sampled-error output, replay behavior, CLI behavior, Python bindings, diagrams, and broader public graph/vector simulator APIs remain governed by their existing plans and caps.
+Repeats with nonzero detector shifts, repeats containing active errors, high sparse ids that appear on actual `error` targets, analyzer traversal, DEM sampler sampled-error output, replay behavior, CLI behavior, Python bindings, diagrams, and broader public graph/vector simulator APIs remain governed by their existing plans and caps. PFM-B3 later corrects ErrorMatcher filter annotation-only repeats to skip as neutral input, matching pinned Stim.
 
 ## Implementation And Tests
 
@@ -28,7 +28,7 @@ The production change closes the high-id loophole where annotation-only declarat
 
 ## Documentation
 
-Updated the PFM4 scope and rollup docs to name selected annotation-only zero-shift repeat skipping for graphlike search, hypergraph search, unweighted SAT, and weighted WCNF, including high sparse annotation ids, while preserving ErrorMatcher filter annotation-only repeats as capped:
+Updated the PFM4 scope and rollup docs to name selected annotation-only zero-shift repeat skipping for graphlike search, hypergraph search, unweighted SAT, and weighted WCNF, including high sparse annotation ids. The historical ErrorMatcher cap recorded here was later corrected by PFM-B3 to neutral-repeat skipping:
 
 - [rpf4-dem-search-sat-progress-report.md](rpf4-dem-search-sat-progress-report.md)
 - [non-deferred-partial-feature-milestones.md](non-deferred-partial-feature-milestones.md)
@@ -57,7 +57,7 @@ just maintenance::pre-commit
 ## Audit And Review
 
 Local `milestone-audit` status is complete for this selected slice.
-The evidence satisfies the scope note by testing the promised graphlike, hypergraph, unweighted SAT, and weighted WCNF compact-model parity, including the high sparse annotation-id boundary; updating the owning PF4 oracle row; documenting the no-benchmark rationale; and preserving explicit non-goals for high ids on actual error targets, ErrorMatcher filter annotation-only repeats, and broader traversal consumers.
+The evidence satisfies the scope note by testing the promised graphlike, hypergraph, unweighted SAT, and weighted WCNF compact-model parity, including the high sparse annotation-id boundary; updating the owning PF4 oracle row; and documenting the no-benchmark rationale. PFM-B3 separately corrects ErrorMatcher neutral filter behavior and closes the shared traversal.
 
 `full-code-review` used two GPT-5.5/xhigh sidecars.
 The Rust/core sidecar found no blocking issues and confirmed that deriving SAT/WCNF dense target counts from flattened error targets is correct for this source-owned behavior, that actual error-target dense caps remain covered, and that the high-id test meaningfully proves the annotation-only boundary.

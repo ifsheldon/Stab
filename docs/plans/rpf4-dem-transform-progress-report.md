@@ -3,7 +3,12 @@
 ## Summary
 
 This RPF4 slice adds the current Rust public materialized `DetectorErrorModel::flattened` and `DetectorErrorModel::rounded` transform subset, plus source-owned evidence for recursive tag stripping and final count or shift introspection.
-It is not an RPF4 completion report because folded traversal across every DEM consumer, non-flat selected-coordinate traversal above the bounded flattened-declaration scan, diagram APIs, and Python binding shape remain outside this slice or still active.
+At the time of this slice, shared traversal, non-flat selected-coordinate handling, diagram APIs, and Python binding shape remained outside its scope.
+
+## 2026-07-10 PFM-B3 Closure Update
+
+PFM-B3 supersedes the active shared-traversal follow-up: `rounded` and `without_tags` retain direct compact recursion to avoid auxiliary-tree allocation, selected coordinate lookup uses the shared visitor plus bounded algebraic declaration scans, and the seven selected Rust surfaces have independent closure evidence in [pfm-b3-folded-dem-traversal-progress-report.md](pfm-b3-folded-dem-traversal-progress-report.md).
+The materialized `flattened` result retains its explicit output cap, while diagrams and Python binding shape remain deferred product surfaces.
 
 ## Implemented Surfaces
 
@@ -35,11 +40,13 @@ Implemented row:
 - `pf4-dem-introspection-query-rust`
 - `pf4-dem-validation-negative-rust`
 
-Still broad and manifest-only:
+Historical broad rows at the time of this slice:
 
 - `pf4-dem-introspection-transforms`
 - `pf4-dem-coordinate-api`
 - `pf4-dem-folded-traversal`
+
+PFM-B3 later promotes `pf4-dem-folded-traversal` to an implemented umbrella over seven focused child rows; `pf4-dem-introspection-transforms` and `pf4-dem-coordinate-api` remain historical aggregation rows.
 
 ## Benchmark Rows
 
@@ -72,9 +79,9 @@ just oracle::run --milestone PF4
 just bench::smoke
 ```
 
-## Remaining RPF4 Work
+## Post-PFM-B3 Disposition
 
-- Finish folded coordinate-map resource policy where current APIs still require caps or do not prove non-flat selected-coordinate lookup through very large repeats; the all-coordinate map cap, folded selected-query behavior, flat sparse-overlap fast path, bounded nested sparse-overlap fast path, valid flat sparse-hole behavior, and many-selected flat-overlap scan are tracked separately in `docs/plans/rpf4-dem-coordinate-progress-report.md`.
-- Finish folded or capped traversal evidence for graphlike search, hypergraph search, SAT or WCNF encoding beyond selected flat zero-shift repeat folding, matcher-adjacent operations, analyzer-adjacent operations, and shifted or otherwise non-selected repeated stochastic direct DEM sampling beyond the selected sampler folds.
-- Decide whether any Rust-specific copy, concat, repetition, or mutation helpers beyond existing `Clone`, `push_instruction`, `push_repeat_block`, and `append_from_dem_text` are still worth adding.
-- Add remaining resource-boundary cases only if later RPF4 work promotes high-detector or high-observable behavior beyond the current public validation and coordinate-resource subsets.
+- PFM-B3 closes the selected coordinate and folded-consumer resource policy through the shared traversal, focused tests, and allocation evidence.
+- The full coordinate map and `flattened` remain capped because their returned results are expanded; shifted active search state, sampled-error records, emitted SAT clauses, and full provenance retain separate tested caps or deferral.
+- No additional Rust-specific copy, concat, repetition, or mutation helper is selected beyond existing `Clone`, `push_instruction`, `push_repeat_block`, and `append_from_dem_text`.
+- Any future high-detector, high-observable, ambiguous-coordinate, or additional public transform family requires an explicit plan revision with its own resource contract.

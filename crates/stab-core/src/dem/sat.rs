@@ -1,6 +1,13 @@
+use std::ops::ControlFlow;
+
 use super::{
-    DemFlatteningBudget, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemTarget,
-    DetectorErrorModel, MAX_DEM_FLATTEN_REPEAT_UNROLL, MAX_DEM_REPEAT_NESTING,
+    DemInstruction, DemInstructionKind, DemObservableId, DemRepeatBlock, DemTarget,
+    DetectorErrorModel, MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS, MAX_DEM_FLATTEN_REPEAT_ITERATIONS,
+    MAX_DEM_FLATTEN_REPEAT_UNROLL,
+    traversal::{
+        DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemTraversal,
+        FoldedDemVisitor, shifted_targets,
+    },
 };
 use crate::{CircuitError, CircuitResult};
 
@@ -432,251 +439,119 @@ fn flattened_error_instructions(
     model: &DetectorErrorModel,
     mode: SatProblemMode,
 ) -> CircuitResult<Vec<FlattenedError>> {
+    let traversal = FoldedDemTraversal::new(model)?;
+    traversal.validate_repeat_depth("SAT problem generation")?;
     let mut errors = Vec::new();
-    let mut budget = DemFlatteningBudget::default();
-    collect_flattened_error_instructions(model, 0, mode, 0, &mut budget, &mut errors)?;
+    let mut visitor = SatErrorVisitor {
+        mode,
+        expanded_instructions: 0,
+        errors: &mut errors,
+    };
+    let _ = traversal.try_visit(&mut visitor)?;
     Ok(errors)
 }
 
-fn collect_flattened_error_instructions(
-    model: &DetectorErrorModel,
-    mut detector_offset: u64,
+struct SatErrorVisitor<'a> {
     mode: SatProblemMode,
-    depth: usize,
-    budget: &mut DemFlatteningBudget,
-    errors: &mut Vec<FlattenedError>,
-) -> CircuitResult<u64> {
-    if depth > MAX_DEM_REPEAT_NESTING {
-        return Err(CircuitError::invalid_detector_error_model(format!(
-            "DEM SAT problem generation repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
-        )));
-    }
-    for item in model.items() {
-        match item {
-            DemItem::Instruction(instruction) => match instruction.kind() {
-                DemInstructionKind::Error => {
-                    budget.add_expanded_instructions(1, "SAT problem generation")?;
-                    let probability = instruction.args().first().copied().ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
-                            "SAT error instruction is missing probability",
-                        )
-                    })?;
-                    if mode.includes_zero_probability_errors() || probability != 0.0 {
-                        errors.push(flatten_error(instruction, detector_offset)?);
-                    }
-                }
-                DemInstructionKind::ShiftDetectors => {
-                    budget.add_expanded_instructions(1, "SAT problem generation")?;
-                    detector_offset = detector_offset
-                        .checked_add(instruction.detector_shift()?)
-                        .ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(
-                                "SAT detector offset overflowed",
-                            )
-                        })?;
-                }
-                DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
-            },
-            DemItem::RepeatBlock(repeat) => {
-                let repeat_count = repeat.repeat_count().get();
-                if repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL
-                    && let Some(folded_errors) = folded_selected_sat_repeat_errors(
-                        repeat.body(),
-                        repeat_count,
-                        detector_offset,
-                        mode,
-                        depth + 1,
-                    )?
-                {
-                    budget.add_expanded_instructions(
-                        u64::try_from(folded_errors.len()).map_err(|_| {
-                            CircuitError::invalid_detector_error_model(
-                                "SAT folded repeat error count does not fit u64",
-                            )
-                        })?,
-                        "SAT problem generation",
-                    )?;
-                    errors.extend(folded_errors);
-                    let body_shift = repeat.body().total_detector_shift()?;
-                    detector_offset = body_shift
-                        .checked_mul(repeat_count)
-                        .and_then(|shift| detector_offset.checked_add(shift))
-                        .ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(
-                                "SAT repeat detector offset overflowed",
-                            )
-                        })?;
-                    continue;
-                }
-                if !mode.includes_zero_probability_errors()
-                    && !repeat
-                        .body()
-                        .has_nonzero_probability_error("SAT problem generation")?
-                {
-                    let body_shift = repeat.body().total_detector_shift()?;
-                    detector_offset = body_shift
-                        .checked_mul(repeat.repeat_count().get())
-                        .and_then(|shift| detector_offset.checked_add(shift))
-                        .ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(
-                                "SAT repeat detector offset overflowed",
-                            )
-                        })?;
-                    continue;
-                }
-                if repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL {
-                    return Err(CircuitError::invalid_detector_error_model(format!(
-                        "DEM SAT problem generation currently supports repeat counts up to {MAX_DEM_FLATTEN_REPEAT_UNROLL}, got {repeat_count}"
-                    )));
-                }
-                budget.add_repeat_iterations(repeat_count, "SAT problem generation")?;
-                for _ in 0..repeat_count {
-                    detector_offset = collect_flattened_error_instructions(
-                        repeat.body(),
-                        detector_offset,
-                        mode,
-                        depth + 1,
-                        budget,
-                        errors,
-                    )?;
-                }
-            }
+    expanded_instructions: u64,
+    errors: &'a mut Vec<FlattenedError>,
+}
+
+impl SatErrorVisitor<'_> {
+    fn add_expanded_instruction(&mut self) -> CircuitResult<()> {
+        self.expanded_instructions =
+            self.expanded_instructions.checked_add(1).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "DEM SAT problem generation expanded instruction count overflowed",
+                )
+            })?;
+        if self.expanded_instructions > MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "DEM SAT problem generation currently supports at most {MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
+                self.expanded_instructions
+            )));
         }
-    }
-    Ok(detector_offset)
-}
-
-fn folded_selected_sat_repeat_errors(
-    body: &DetectorErrorModel,
-    repeat_count: u64,
-    detector_offset: u64,
-    mode: SatProblemMode,
-    depth: usize,
-) -> CircuitResult<Option<Vec<FlattenedError>>> {
-    if body.total_detector_shift()? != 0 || body.items().is_empty() {
-        return Ok(None);
-    }
-    let mut folded_errors = Vec::with_capacity(body.items().len());
-    if collect_folded_selected_sat_repeat_errors(
-        body,
-        repeat_count,
-        detector_offset,
-        mode,
-        depth,
-        &mut folded_errors,
-    )? {
-        Ok(Some(folded_errors))
-    } else {
-        Ok(None)
+        Ok(())
     }
 }
 
-fn collect_folded_selected_sat_repeat_errors(
-    body: &DetectorErrorModel,
-    repeat_multiplier: u64,
-    detector_offset: u64,
-    mode: SatProblemMode,
-    depth: usize,
-    folded_errors: &mut Vec<FlattenedError>,
-) -> CircuitResult<bool> {
-    if depth > MAX_DEM_REPEAT_NESTING {
-        return Err(CircuitError::invalid_detector_error_model(format!(
-            "DEM SAT problem generation repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
-        )));
-    }
-    if body.total_detector_shift()? != 0 {
-        return Ok(false);
-    }
-    for item in body.items() {
-        match item {
-            DemItem::Instruction(instruction) => match instruction.kind() {
-                DemInstructionKind::Error => {
-                    let probability = instruction.args().first().copied().ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
-                            "SAT error instruction is missing probability",
+impl FoldedDemVisitor for SatErrorVisitor<'_> {
+    fn visit_instruction(
+        &mut self,
+        instruction: &DemInstruction,
+        state: &DemTraversalState,
+    ) -> CircuitResult<ControlFlow<()>> {
+        match instruction.kind() {
+            DemInstructionKind::Error => {
+                let probability = instruction.args().first().copied().ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "SAT error instruction is missing probability",
+                    )
+                })?;
+                if !self.mode.includes_zero_probability_errors() && probability == 0.0 {
+                    return Ok(ControlFlow::Continue(()));
+                }
+                let probability = match self.mode {
+                    SatProblemMode::Unweighted => probability,
+                    SatProblemMode::Weighted { .. } if state.folded_repeat_multiplicity() > 1 => {
+                        weighted_repeat_map_probability(
+                            probability,
+                            state.folded_repeat_multiplicity(),
                         )
-                    })?;
-                    match mode {
-                        SatProblemMode::Unweighted => {
-                            folded_errors.push(flatten_error(instruction, detector_offset)?);
-                        }
-                        SatProblemMode::Weighted { .. } => {
-                            if probability == 0.0 {
-                                continue;
-                            }
-                            let mut folded_error = flatten_error(instruction, detector_offset)?;
-                            folded_error.probability =
-                                weighted_repeat_map_probability(probability, repeat_multiplier);
-                            if folded_error.probability != 0.0 {
-                                folded_errors.push(folded_error);
-                            }
-                        }
                     }
-                }
-                DemInstructionKind::ShiftDetectors => {
-                    if instruction.detector_shift()? != 0 {
-                        return Ok(false);
-                    }
-                }
-                DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
-            },
-            DemItem::RepeatBlock(repeat) => {
-                if repeat.body().total_detector_shift()? != 0 {
-                    return Ok(false);
-                }
-                let nested_multiplier = repeat_multiplier
-                    .checked_mul(repeat.repeat_count().get())
-                    .ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
-                            "SAT folded repeat multiplier overflowed",
-                        )
-                    })?;
-                if !collect_folded_selected_sat_repeat_errors(
-                    repeat.body(),
-                    nested_multiplier,
-                    detector_offset,
-                    mode,
-                    depth + 1,
-                    folded_errors,
-                )? {
-                    return Ok(false);
+                    SatProblemMode::Weighted { .. } => probability,
+                };
+                if self.mode.includes_zero_probability_errors() || probability != 0.0 {
+                    self.add_expanded_instruction()?;
+                    self.errors.push(FlattenedError {
+                        probability,
+                        targets: shifted_targets(instruction.targets(), state.detector_offset())?,
+                    });
                 }
             }
+            DemInstructionKind::ShiftDetectors => {
+                if state.folded_repeat_multiplicity() == 1 {
+                    self.add_expanded_instruction()?;
+                }
+            }
+            DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
         }
+        Ok(ControlFlow::Continue(()))
     }
-    Ok(true)
-}
 
-fn flatten_error(
-    instruction: &DemInstruction,
-    detector_offset: u64,
-) -> CircuitResult<FlattenedError> {
-    let probability = instruction.args().first().copied().ok_or_else(|| {
-        CircuitError::invalid_detector_error_model("SAT error instruction is missing probability")
-    })?;
-    let targets = shifted_targets(instruction.targets(), detector_offset)?;
-    Ok(FlattenedError {
-        probability,
-        targets,
-    })
-}
-
-fn shifted_targets(targets: &[DemTarget], detector_offset: u64) -> CircuitResult<Vec<DemTarget>> {
-    targets
-        .iter()
-        .map(|target| match *target {
-            DemTarget::RelativeDetector(detector) => DemTarget::relative_detector(
-                detector_offset.checked_add(detector.get()).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model("SAT detector target overflowed")
-                })?,
-            ),
-            DemTarget::LogicalObservable(observable) => {
-                DemTarget::logical_observable(observable.get())
-            }
-            DemTarget::Separator => Ok(DemTarget::separator()),
-            DemTarget::Numeric(value) => Ok(DemTarget::numeric(value)),
+    fn enter_repeat(
+        &mut self,
+        repeat: &DemRepeatBlock,
+        body: &FoldedDemBlock<'_>,
+        state: &DemTraversalState,
+    ) -> CircuitResult<DemRepeatSelection> {
+        let repeat_count = repeat.repeat_count().get();
+        let body_shift = body.summary().detector_shift()?;
+        let in_folded_repeat = state.folded_repeat_multiplicity() > 1;
+        if body.summary().error_count()? == 0 {
+            return Ok(DemRepeatSelection::Skip);
+        }
+        if !self.mode.includes_zero_probability_errors()
+            && !body.summary().has_nonzero_probability_error()
+        {
+            return Ok(DemRepeatSelection::Skip);
+        }
+        if (in_folded_repeat || repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL)
+            && body_shift == 0
+            && (in_folded_repeat || !body.items().is_empty())
+        {
+            return Ok(DemRepeatSelection::FoldOnce);
+        }
+        if repeat_count > MAX_DEM_FLATTEN_REPEAT_UNROLL {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "DEM SAT problem generation currently supports repeat counts up to {MAX_DEM_FLATTEN_REPEAT_UNROLL}, got {repeat_count}"
+            )));
+        }
+        Ok(DemRepeatSelection::Expand {
+            max_total_iterations: MAX_DEM_FLATTEN_REPEAT_ITERATIONS,
+            context: "SAT problem generation",
         })
-        .collect()
+    }
 }
 
 fn flattened_error_target_counts(errors: &[FlattenedError]) -> CircuitResult<(u64, u64)> {

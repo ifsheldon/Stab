@@ -5,7 +5,7 @@
 This PFM4 slice owns one matcher-adjacent DEM traversal subcase: `explain_errors_from_circuit` filter DEMs whose oversized repeated body is selected by a recursive compact filter-key rule.
 
 The selected recursive rule accepts detector-touching `error` instructions, optional logical-observable and separator targets, nested repeat blocks with zero total detector shift, and `shift_detectors` instructions whose detector shift is exactly zero.
-For this slice, the selected recursive rule rejected or declined raw numeric targets, detectorless logical-only filter repeats, nonzero detector shifts, annotation-only or broader mixed-instruction bodies, circuit-repeat provenance, full ErrorMatcher provenance, and `explain_errors` CLI behavior.
+For this historical slice, the selected recursive rule rejected or declined raw numeric targets, detectorless logical-only filter repeats, nonzero detector shifts, annotation-only or broader mixed-instruction bodies, circuit-repeat provenance, full ErrorMatcher provenance, and `explain_errors` CLI behavior. PFM-B3 later promotes detectorless logical-only keys and corrects annotation-only neutral bodies to skip.
 The later PFM4 logical-only slice promotes selected detectorless logical-observable-only filter repeats.
 
 ## Comparator And Evidence

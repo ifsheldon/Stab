@@ -23,7 +23,7 @@ This records the new annotation-bearing row without growing `ops/bench/src/basel
 Added:
 
 - `pf4_error_matcher_filter_folds_annotation_repeat`.
-- `pf4_error_matcher_filter_rejects_annotation_only_repeat`.
+- `pf4_error_matcher_filter_skips_annotation_only_repeat`, corrected by PFM-B3 after direct pinned-Stim review showed annotation-only repeats are neutral.
 
 The positive regression constructs a circuit with detector and observable declarations, compares a compact filter against an oversized annotation-bearing filter with a nested zero-shift body, asserts that the compact filter selects errors, and verifies exact `ExplainedError` string parity.
 The negative regression proves an oversized body containing only annotations and zero-shift shifts remains capped instead of being silently accepted.
@@ -75,7 +75,7 @@ Updated:
 
 Milestone-audit status: complete for this selected slice.
 No blocking implementation defects or milestone loopholes were found.
-The slice satisfies the scope note by folding selected annotation-bearing zero-shift filter keys, preserving shifted and annotation-only filter DEM rejection, updating oracle metadata, adding report-only benchmark evidence, keeping the row out of the primary gate, and keeping broader mixed-instruction filters, circuit-repeat provenance, full ErrorMatcher provenance, and `explain_errors` CLI behavior explicitly out of scope.
+The slice satisfies its historical annotation-bearing scope by folding selected zero-shift filter keys, preserving shifted active filter rejection, updating oracle metadata, adding report-only benchmark evidence, keeping the row out of the primary gate, and keeping broader active mixed-instruction filters, circuit-repeat provenance, full ErrorMatcher provenance, and `explain_errors` CLI behavior explicitly out of scope. PFM-B3 later corrects neutral annotation-only bodies to skip instead of reject.
 
 Full-code-review status: complete with two GPT-5.5/xhigh sidecars.
 The Rust and compatibility reviewer found no confirmed findings, confirmed the selector stays scoped to effective filter-key `error` bodies plus ignored annotations, and checked the vendored Stim v1.16.0 filter-key path where detector and logical-observable annotations are ignored by filter collection.

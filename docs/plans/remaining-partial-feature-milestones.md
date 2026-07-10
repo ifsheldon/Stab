@@ -290,6 +290,8 @@ Acceptance criteria:
 
 ## Milestone RPF4: DEM API, Transforms, And Folded Traversal
 
+Supersession note, 2026-07-10: this RPF4 section is historical planning context. PFM-B3 in `docs/plans/non-deferred-partial-feature-milestones.md` closes the selected shared DEM traversal and promotes `pf4-dem-folded-traversal` to an implemented umbrella; statements below that full folded traversal remains active describe the pre-PFM-B3 state and must not reopen unselected scope.
+
 Objective: finish non-deferred DEM Rust API gaps and remove avoidable large-repeat expansion limits from DEM operations where practical.
 
 Owned checklist rows:

@@ -3,7 +3,12 @@
 ## Summary
 
 This RPF4 slice hardens Rust DEM coordinate-map resource behavior and adds report-only benchmark coverage for the current coordinate API subset.
-It is not an RPF4 completion report because folded traversal across every DEM consumer, remaining non-flat ambiguous-overlap coordinate ranges beyond bounded flattened-declaration scans, declared-bound pruning, or fallback caps, diagram APIs, and Python binding shape remain outside this slice or still active.
+At the time of this slice, shared traversal, remaining non-flat ambiguous-overlap ranges, declared-bound pruning, diagram APIs, and Python binding shape remained outside its scope or active.
+
+## 2026-07-10 PFM-B3 Closure Update
+
+PFM-B3 routes selected coordinate lookup through the shared folded visitor, preserving first-declaration semantics and bounded algebraic scans for ambiguous local declarations without flattening preceding repeats.
+Pinned Stim's unfiltered map returns every detector id below `count_detectors()`, including empty vectors, so that API remains inherently materialized and capped by returned entry count; diagrams and Python binding shape remain deferred.
 
 ## Implemented Surfaces
 
@@ -56,11 +61,13 @@ Related PFM6 generated-loop coordinate row:
 
 - `pf6-analyzer-generated-fold-loop-fallback-rust`
 
-Still broad and manifest-only:
+Historical broad rows at the time of this slice:
 
 - `pf4-dem-introspection-transforms`
 - `pf4-dem-coordinate-api`
 - `pf4-dem-folded-traversal`
+
+PFM-B3 later promotes `pf4-dem-folded-traversal` to an implemented umbrella over seven focused child rows; `pf4-dem-introspection-transforms` and `pf4-dem-coordinate-api` remain historical aggregation rows.
 
 ## Benchmark Rows
 
@@ -100,7 +107,7 @@ That audit checked that the slice named the supported nested sparse-overlap subc
 Milestone-audit status for the follow-up trivial-coordinate and generated-loop coordinate slice: complete with broader PFM6 generated-loop folding still active.
 The follow-up audit checked that pinned Stim trivial selected-coordinate behavior is direct PFM4 coordinate evidence, while the generated surface-code coordinate case is counted only for the selected bounded analyzer fallback and coordinate-equivalence subcase.
 
-Milestone-audit status for the declared-bound sparse-hole refresh: complete against the scoped declared-bound sparse-hole text, with broader within-bound sparse holes and ambiguous non-flat overlap traversal beyond the current caps still active.
+Milestone-audit status for the declared-bound sparse-hole refresh: complete against the scoped declared-bound sparse-hole text. PFM-B3 later closed the selected shared traversal; coordinate families beyond its bounded algebraic and selected-iteration contract require an explicit plan revision instead of remaining implicitly active.
 
 Full-code-review status for the follow-up slice: findings resolved.
 Two GPT-5.5/xhigh sidecars found that the generated-loop evidence was easy to miss because it was not covered by the documented PF4 coordinate filter; the generated coordinate case now has a dedicated PF6 oracle row, `pf6-analyzer-generated-fold-loop-fallback-rust`, and the verification commands name it explicitly.
@@ -109,10 +116,9 @@ The earlier Rust/resource review finding about eager coordinate-vector materiali
 Full-code-review status for the declared-bound sparse-hole refresh: findings resolved.
 The Rust/API GPT-5.5/xhigh sidecar reported no code findings; the docs/metadata sidecar found two evidence-wording overclaims, fixed by narrowing the docs to holes outside declared-detector bounds and by keeping the benchmark manifest focused on timed workloads only.
 
-## Remaining RPF4 Work
+## Post-PFM-B3 Disposition
 
-- Finish folded traversal or explicit caps for graphlike search, hypergraph search, SAT or WCNF encoding beyond selected flat zero-shift repeat folding, matcher-adjacent operations, analyzer-adjacent operations, and shifted or otherwise non-selected repeated stochastic direct DEM sampling beyond the selected sampler folds.
-- Broader true folded generated-loop analyzer output remains PFM6 work; the selected pinned `surface_code_coords_dont_infinite_loop` coordinate case is covered through bounded fallback evidence.
-- Finish or explicitly cap any later-promoted nested or non-flat ambiguous overlapping selected-coordinate ranges that need more than the current bounded flattened-declaration scan, declared-bound pruning, or fallback search.
-- Decide whether any Rust-specific copy, concat, repetition, or mutation helpers beyond existing `Clone`, `push_instruction`, `push_repeat_block`, and `append_from_dem_text` are still worth adding.
-- Add remaining malformed-input or resource-boundary cases only if later RPF4 work promotes behavior beyond the current validation, introspection, and coordinate-resource subsets.
+- PFM-B3 closes the selected shared traversal and explicit-cap contract for coordinates, sampler compilation, graphlike or hypergraph collection, SAT/WCNF collection, and ErrorMatcher filter keys.
+- Broader generated-loop analyzer and search semantics remain PFM-B5 work; the pinned `surface_code_coords_dont_infinite_loop` coordinate case remains covered through bounded fallback evidence.
+- Nested or non-flat ambiguous overlapping coordinate families beyond the current bounded declaration scans and selected-iteration policy require a separately approved plan instead of remaining implicit RPF4 work.
+- No additional Rust mutation ergonomics or malformed-input families are selected by this historical slice.

@@ -16,7 +16,7 @@ It also hardens the hypergraph direct-search distance-1 comparator for multiple 
 
 - Keep shifted, nested, non-flat, zero-probability, numeric-target, detectorless no-target, analyzer, ErrorMatcher, SAT/WCNF, sampled-error, replay, Python, and diagram behavior outside this slice unless already implemented by earlier slices.
 - Keep dense detector and observable caps in force.
-- Keep the broad `pf4-dem-folded-traversal` row manifest-only until every remaining traversal consumer is folded, capped with evidence, or explicitly deferred.
+- Historical gate for this slice: keep the broad `pf4-dem-folded-traversal` row manifest-only until every selected traversal consumer is folded, capped with evidence, or explicitly deferred. PFM-B3 later satisfies that gate and promotes the umbrella row.
 
 ## Comparator And Evidence
 

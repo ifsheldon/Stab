@@ -2,9 +2,9 @@ use rand::rngs::SmallRng;
 use rand::{Rng, RngExt as _, SeedableRng as _};
 
 use crate::{
-    CircuitError, CircuitResult, DemInstruction, DemInstructionKind, DemItem, DemTarget,
+    CircuitError, CircuitResult, DemInstruction, DemInstructionKind, DemTarget,
     DetectionConversionOutput, DetectionEventRecord, DetectorErrorModel,
-    dem::MAX_DEM_REPEAT_NESTING,
+    dem::{FoldedDemBlock, FoldedDemItem, FoldedDemTraversal, MAX_DEM_REPEAT_NESTING},
 };
 
 const MAX_DEM_SAMPLER_BUFFER_UNITS: usize = 64_000_000;
@@ -20,9 +20,22 @@ pub struct CompiledDemSampler {
 
 impl CompiledDemSampler {
     pub fn compile(model: &DetectorErrorModel) -> CircuitResult<Self> {
-        let operations = compile_items(model.items(), 0)?;
-        let detector_count = usize_from_u64(model.count_detectors()?, "detector count")?;
-        let observable_count = usize_from_u64(model.count_observables()?, "observable count")?;
+        let traversal = FoldedDemTraversal::new(model)?;
+        let repeat_depth = traversal.root().summary().max_repeat_depth();
+        if repeat_depth > MAX_DEM_REPEAT_NESTING {
+            return Err(CircuitError::invalid_sampler_compilation(format!(
+                "DEM repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}, got {repeat_depth}"
+            )));
+        }
+        let operations = compile_block(traversal.root())?;
+        let detector_count = usize_from_u64(
+            traversal.root().summary().detector_count()?,
+            "detector count",
+        )?;
+        let observable_count = usize_from_u64(
+            traversal.root().summary().observable_count(),
+            "observable count",
+        )?;
         Ok(Self {
             detector_count,
             observable_count,
@@ -401,17 +414,12 @@ impl DemSampleError {
     }
 }
 
-fn compile_items(items: &[DemItem], depth: usize) -> CircuitResult<DemSampleBlock> {
-    if depth > MAX_DEM_REPEAT_NESTING {
-        return Err(CircuitError::invalid_sampler_compilation(format!(
-            "DEM repeat nesting exceeds current limit {MAX_DEM_REPEAT_NESTING}"
-        )));
-    }
+fn compile_block(source: &FoldedDemBlock<'_>) -> CircuitResult<DemSampleBlock> {
     let mut block = DemSampleBlock::default();
     let mut current_shift = 0;
-    for item in items {
+    for item in source.items() {
         match item {
-            DemItem::Instruction(instruction) => {
+            FoldedDemItem::Instruction(instruction) => {
                 compile_instruction(instruction, current_shift, &mut block)?;
                 if instruction.kind() == DemInstructionKind::ShiftDetectors {
                     current_shift = current_shift
@@ -423,9 +431,9 @@ fn compile_items(items: &[DemItem], depth: usize) -> CircuitResult<DemSampleBloc
                         })?;
                 }
             }
-            DemItem::RepeatBlock(repeat) => {
+            FoldedDemItem::Repeat { repeat, body } => {
                 let repeat_count = repeat.repeat_count().get();
-                let body = compile_items(repeat.body().items(), depth + 1)?;
+                let body = compile_block(body)?;
                 let repeat_start_shift = current_shift;
                 let repeated_shift =
                     body.detector_shift

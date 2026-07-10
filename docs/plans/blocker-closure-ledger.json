@@ -1850,109 +1850,119 @@
           "surface": "DetectorErrorModel count APIs",
           "upstream": {
             "path": "src/stim/dem/detector_error_model.test.cc",
-            "kind": "test-family",
-            "test": "DetectorErrorModel repeat counts",
-            "subcase": "nested detector, observable, and error counts",
-            "anchors": [
-              "detector_error_model.total_detector_shift",
-              "detector_error_model.count_detectors",
-              "detector_error_model.count_observables"
-            ]
+            "kind": "gtest-case",
+            "test": "detector_error_model.count_detectors",
+            "subcase": "nested repeat detector counting with shifts"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
+              "--test",
+              "dem_folded_traversal",
               "pfm_b3_folded_traversal_counts",
               "--quiet"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b3-dem-traversal-counts"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b3-dem-traversal-counts",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_counts",
+              "upstream_source": "src/stim/dem/detector_error_model.test.cc"
+            }
           },
           "benchmark": {
-            "state": "planned",
+            "state": "existing",
             "value": "pfm-b3-dem-traversal-core",
             "classification": "contract-only"
           },
-          "resource_contract": "Run in memory proportional to nesting depth and model body, not repeat count."
+          "resource_contract": "Run with scalar summaries proportional to compact model structure and without coordinate-vector state unless a coordinate API requests it."
         },
         {
           "id": "pfm4-traversal-coordinates",
           "surface": "DetectorErrorModel coordinate APIs",
           "upstream": {
             "path": "src/stim/dem/detector_error_model.test.cc",
-            "kind": "test-family",
-            "test": "DetectorErrorModel detector coordinate queries",
-            "subcase": "selected and full maps across nested shifts and sparse ids",
-            "anchors": [
-              "detector_error_model.get_detector_coordinates_nested_loops",
-              "detector_error_model.get_detector_coordinates_trivial",
-              "detector_error_model.final_detector_and_coord_shift"
-            ]
+            "kind": "gtest-case",
+            "test": "detector_error_model.get_detector_coordinates_nested_loops",
+            "subcase": "selected coordinate lookup across nested detector and coordinate shifts"
           },
-          "comparator": "exact",
-          "status": "planned",
+          "comparator": "semantic-invariant",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
+              "--test",
+              "dem_folded_traversal",
               "pfm_b3_folded_traversal_coordinates",
               "--quiet"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b3-dem-traversal-coordinates"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b3-dem-traversal-coordinates",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_coordinates",
+              "upstream_source": "src/stim/dem/detector_error_model.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
             "value": "pf4-dem-coordinate-map",
             "classification": "contract-only"
           },
-          "resource_contract": "Selected lookup must scale with declarations visited, while full output scales with returned coordinates."
+          "resource_contract": "Selected lookup must scale with declarations and algebraic candidates visited, exact expanded declaration cardinality overflow must not block sparse lookup, aggregate coordinate scalar work is capped at 8000000 updates, and fractional coordinates use absolute tolerance 1e-12 against pinned Stim accumulation. Full output scales with returned detector ids."
         },
         {
           "id": "pfm4-traversal-transforms",
           "surface": "rounded and without_tags DEM transforms",
           "upstream": {
             "path": "src/stim/dem/detector_error_model.test.cc",
-            "kind": "test-family",
-            "test": "DetectorErrorModel structural transforms",
-            "subcase": "repeat-preserving probability rounding and recursive tag removal",
-            "anchors": [
-              "detector_error_model.rounded",
-              "detector_error_model.flattened"
-            ]
+            "kind": "gtest-case",
+            "test": "detector_error_model.rounded",
+            "subcase": "repeat-preserving probability rounding"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
+              "--test",
+              "dem_folded_traversal",
               "pfm_b3_folded_traversal_transforms",
               "--quiet"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b3-dem-traversal-transforms"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b3-dem-traversal-transforms",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_transforms",
+              "upstream_source": "src/stim/dem/detector_error_model.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -1966,13 +1976,9 @@
           "surface": "CompiledDemSampler",
           "upstream": {
             "path": "src/stim/simulators/dem_sampler.test.cc",
-            "kind": "test-family",
-            "test": "DEM sampler repeat handling",
-            "subcase": "nested stochastic and deterministic repeat compilation",
-            "anchors": [
-              "DemSampler.resample_basic_probabilities",
-              "DemSampler.resample_combinations"
-            ]
+            "kind": "gtest-case",
+            "test": "DemSampler.resample_combinations",
+            "subcase": "three pairwise detector error combinations plus repeated joint detector-observable parity"
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1982,26 +1988,38 @@
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 1e-06,
             "buckets": [
-              "all-zero-joint-record",
-              "each-source-owned-nonzero-joint-record"
+              "folded-all-zero-joint-record:p=0.5",
+              "folded-joint-nonzero-record:p=0.5",
+              "combination-detector-0:p=0.34",
+              "combination-detector-1:p=0.26",
+              "combination-detector-2:p=0.38",
+              "combination-even-parity:p=1"
             ]
           },
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
+              "--test",
+              "dem_folded_traversal",
               "pfm_b3_folded_traversal_sampler",
               "--quiet"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b3-dem-traversal-sampler"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b3-dem-traversal-sampler",
+            "signature": {
+              "parity_mode": "statistical",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_sampler",
+              "upstream_source": "src/stim/simulators/dem_sampler.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -2015,31 +2033,35 @@
           "surface": "graphlike and hypergraph DEM search",
           "upstream": {
             "path": "src/stim/search/graphlike/algo.test.cc",
-            "kind": "test-family",
-            "test": "logical-error search DEM traversal",
-            "subcase": "nested shifted, annotation, logical-only, and sparse repeat bodies",
-            "anchors": [
-              "shortest_graphlike_undetectable_logical_error.surface_code",
-              "shortest_graphlike_undetectable_logical_error.repetition_code"
-            ]
+            "kind": "gtest-case",
+            "test": "shortest_graphlike_undetectable_logical_error.surface_code",
+            "subcase": "surface-code detector error model logical-error search"
           },
           "comparator": "structural",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
+              "--test",
+              "dem_folded_traversal",
               "pfm_b3_folded_traversal_search",
               "--quiet"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b3-dem-traversal-search"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b3-dem-traversal-search",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_search",
+              "upstream_source": "src/stim/search/graphlike/algo.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -2053,31 +2075,35 @@
           "surface": "shortest and likeliest error WCNF encoders",
           "upstream": {
             "path": "src/stim/search/sat/wcnf.test.cc",
-            "kind": "test-family",
-            "test": "SAT and WCNF repeat traversal",
-            "subcase": "weighted and unweighted nested repeat error collection",
-            "anchors": [
-              "shortest_error_sat_problem.single_detector_single_observable",
-              "likeliest_error_sat_problem.single_detector_single_observable"
-            ]
+            "kind": "gtest-case",
+            "test": "shortest_error_sat_problem.single_detector_single_observable",
+            "subcase": "literal pinned single-detector single-observable unweighted and weighted WCNF encoding plus folded-repeat equivalence"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
+              "--test",
+              "dem_folded_traversal",
               "pfm_b3_folded_traversal_sat",
               "--quiet"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b3-dem-traversal-sat"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b3-dem-traversal-sat",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_sat",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -2091,31 +2117,35 @@
           "surface": "ErrorMatcher filter DEM traversal",
           "upstream": {
             "path": "src/stim/simulators/error_matcher.test.cc",
-            "kind": "test-family",
-            "test": "ErrorMatcher filter repeat handling",
-            "subcase": "nested shifted, annotation, logical-only, and detector-touching filter bodies",
-            "anchors": [
-              "ErrorMatcher.repetition_code_data_depolarization",
-              "ErrorMatcher.surface_code_filter"
-            ]
+            "kind": "gtest-case",
+            "test": "ErrorMatcher.surface_code_filter",
+            "subcase": "surface-code detector error model filter selection"
           },
           "comparator": "structural",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
+              "--test",
+              "dem_folded_traversal",
               "pfm_b3_folded_traversal_matcher_filter",
               "--quiet"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b3-dem-traversal-matcher-filter"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b3-dem-traversal-matcher-filter",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_matcher_filter",
+              "upstream_source": "src/stim/simulators/error_matcher.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",

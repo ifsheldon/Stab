@@ -34,7 +34,7 @@ The current PFM8 verification pass reran oracle, matrix, and benchmark metadata 
 | Checklist row | Current rollup state | PFM8 conclusion |
 | --- | --- | --- |
 | `Rust core library equivalent for core Stim semantics` | Rollup over active Rust APIs, transforms, DEMs, utilities, flows, analyzer, search, and sparse-tracker rows. | Keep `Partial`; selected child evidence is healthy, but the finite ledger-owned implementation and evidence-splitting work in PFM-B1 through PFM-B5 remains open. |
-| `.stim`, `.dem`, and result-format compatibility` | `.stim` and implemented result-format paths are strong; DEM behavior is scoped by active DEM API, folded traversal, analyzer, search, and sampler evidence. | Keep `Partial`; current implemented format paths are tested, but full DEM public API and folded traversal parity are not proven. |
+| `.stim`, `.dem`, and result-format compatibility` | `.stim` and implemented result-format paths are strong; the selected Rust DEM count, coordinate, transform, sampler, search, SAT/WCNF, and filter-key surfaces now have shared PFM-B3 traversal evidence. | Keep `Partial` only as a rollup over remaining PFM-B5 generated analyzer and search work; Python product shape, diagrams, and full ErrorMatcher provenance are deferred and do not keep the selected Rust DEM traversal child active. |
 | `Full semantic execution of every legal circuit operation` | Selected sampler, detector-conversion, detection, analyzer, `SPP`, `SPP_DAG`, fixed-tableau, deterministic `MPP`, stochastic `MPP(p)` sampler or detection-sampling, deterministic `MPAD`, stochastic `MPAD(p)` sampler or detection-sampling, and noisy `MPAD(p)` analyzer evidence is green. PFM-B2 contract groundwork now classifies all 81 canonical gates across eight surfaces and every declared target-role pattern. | Keep `Partial`; eighteen exact, error-class, state-equivalence, structural, semantic-invariant, or statistical gate-contract cases remain planned and must gain independently selectable semantic evidence before this rollup can close. |
 | `CLI binary` | Selected `stab` commands and selected legacy aliases are implemented with PF7 evidence. | Keep `Done for selected Stab CLI surface`; no stale PFM8 blocker found for the selected CLI surface. |
 | `Highest-priority remaining feature gaps` | The section correctly lists active partial rollups and deferred surfaces. | Keep active rows `Partial` until their ledger-backed PFM-B cases are implemented or evidence-closed; deferred products remain separate. |
@@ -49,7 +49,7 @@ PFM-B0 replaces broad under-specification with a schema-versioned, machine-check
 | PFM2 QEC transforms | PFM-B1 | Implement | 19 | 7 | 12 | 0 |
 | PFM3 analyzer sweep | PFM-B2 | Evidence close | 1 | 0 | 0 | 1 |
 | PFM3 gate execution | PFM-B2 | Implement | 18 | 18 | 0 | 0 |
-| PFM4 DEM traversal | PFM-B3 | Implement | 7 | 7 | 0 | 0 |
+| PFM4 DEM traversal | PFM-B3 | Implement | 7 | 0 | 7 | 0 |
 | PFM5 detecting regions | PFM-B4 | Evidence close | 2 | 0 | 0 | 2 |
 | PFM5 missing detectors | PFM-B4 | Evidence close | 14 | 0 | 0 | 14 |
 | PFM5 flow engine | PFM-B4 | Implement | 33 | 1 | 32 | 0 |
@@ -87,7 +87,7 @@ Before PFM8 can become a completion report, the commands in `docs/plans/GOAL.md`
 
 This PFM8 pass confirms that the current rollup rows should stay conservative.
 PFM-B2 contract groundwork is complete and recorded in `docs/plans/pfm-b2-gate-surface-contract-groundwork-report.md`.
-The next implementation step is PFM-B3 shared DEM traversal, using ledger state changes as completion evidence; final PFM-B2 generated semantic coverage follows the shared foundations.
+PFM-B3 shared DEM traversal implementation evidence is in place. Its audit, review, and clean committed-HEAD allocation rerun close before the next implementation step, the PFM-B4 flow foundation; final PFM-B2 generated semantic coverage follows the shared foundations.
 
 ## Verification
 

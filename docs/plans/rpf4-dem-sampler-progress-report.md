@@ -3,7 +3,12 @@
 ## Summary
 
 This RPF4 slice records source-owned evidence for folded DEM sampler compilation and direct detector sampling across repeat blocks.
-It is not an RPF4 completion report because sampled-error records still use Stim-compatible flat error occurrence order and therefore retain materialized width caps, and because graphlike, hypergraph, SAT, matcher-adjacent, and analyzer-adjacent traversal consumers still have active folded-traversal work beyond the implemented graphlike and hypergraph zero-probability repeat skip, weighted SAT/WCNF zero-probability variable elision and repeated-body skip, and selected SAT/WCNF flat and nested zero-shift repeat folding.
+At the time of this slice, sampled-error records retained Stim-compatible materialized width caps and other DEM consumers still had active shared-traversal work.
+
+## 2026-07-10 PFM-B3 Closure Update
+
+PFM-B3 now builds sampler compilation from the shared compact traversal tree while preserving the sampler-specific parity folds documented below.
+Sampled-error output and replay still retain materialized width and application-work caps because their public error-bit records are inherently expanded; the other six selected consumer families now share the same checked visitor and are closed in [pfm-b3-folded-dem-traversal-progress-report.md](pfm-b3-folded-dem-traversal-progress-report.md).
 
 ## Implemented Surfaces
 
@@ -42,9 +47,11 @@ Implemented row:
 
 - `pf4-dem-sampler-repeat-resource-rust`
 
-Still broad and manifest-only:
+Historical broad row at the time of this slice:
 
 - `pf4-dem-folded-traversal`
+
+PFM-B3 later promotes this umbrella row to implemented status and adds the focused `pfm-b3-dem-traversal-sampler` child.
 
 ## Benchmark Rows
 
@@ -71,8 +78,8 @@ just oracle::run --milestone PF4
 just bench::smoke
 ```
 
-## Remaining RPF4 Work
+## Post-PFM-B3 Disposition
 
-- Optimize folded DEM sampler execution for shifted or otherwise non-selected repeated stochastic nonzero-probability bodies where a safe dense-output resource boundary can be defined, then tighten or remove the current direct-sampling work cap for those selected shapes without changing the flat sampled-error record contract locked in `docs/plans/pfm4-dem-sampler-error-bit-cap-evidence-lock.md`.
-- Finish folded traversal or explicit caps for graphlike search, hypergraph search, SAT or WCNF encoding, matcher-adjacent operations, and analyzer-adjacent operations beyond the current graphlike and hypergraph zero-probability repeat skip, weighted SAT/WCNF zero-probability variable elision and repeated-body skip, and selected SAT/WCNF flat and nested zero-shift repeat folding.
-- Keep benchmark runners for `pf4-dem-folded-traversal` and `pf4-dem-folded-graphlike-traversal` synchronized when additional implementation or explicit cap behavior becomes source-owned enough to measure honestly.
+- Shifted or otherwise non-selected stochastic sampled-error and replay shapes retain the source-owned materialized record and application-work caps locked in `docs/plans/pfm4-dem-sampler-error-bit-cap-evidence-lock.md`; changing those contracts requires a new selected workload and plan.
+- PFM-B3 closes the shared traversal follow-up for the other selected consumer families while preserving their inherent output or search caps.
+- Historical PF4 consumer benchmark rows remain report-only, and `pfm-b3-dem-traversal-core` owns the shared visitor's compact, nested-large-repeat, sparse-selected-coordinate, and allocation evidence.

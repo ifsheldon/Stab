@@ -8,7 +8,7 @@ No-target errors are search no-ops because they affect neither detector parity n
 ## Explicit Non-Scope
 
 This slice does not change SAT/WCNF generation, analyzer traversal, ErrorMatcher traversal, DEM sampler sampled-error output, replay behavior, shifted repeats, nested repeats, non-flat repeats, mixed-instruction repeats, numeric raw error targets, Python, diagrams, CLI behavior, or simulator-product APIs.
-The broad `pf4-dem-folded-traversal` row remains manifest-only because other traversal consumers and repeat shapes still need folded behavior, precise caps, or explicit deferral.
+At the time of this slice, the broad `pf4-dem-folded-traversal` row remained manifest-only. PFM-B3 later promotes it to an implemented umbrella after migrating the selected consumers and documenting inherent caps.
 
 ## Comparator And Evidence
 

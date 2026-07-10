@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::ops::{Bound, Range, RangeBounds};
+use std::ops::{Bound, ControlFlow, Range, RangeBounds};
 
 use crate::{CircuitError, CircuitResult};
 
@@ -7,6 +7,10 @@ use super::coordinate_scan::{
     MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS, RepeatScanGeometry,
     find_selected_detector_coordinates_in_bounded_flattened_repeat_body,
     flattened_detector_declaration_count_up_to,
+};
+use super::traversal::{
+    DemDetectorBounds, DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem,
+    FoldedDemTraversal, FoldedDemVisitor, shifted_coordinates,
 };
 use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemRepeatBlock, DemTarget,
@@ -217,7 +221,8 @@ impl DetectorErrorModel {
     }
 
     pub fn detector_coordinates(&self) -> CircuitResult<BTreeMap<DemDetectorId, Vec<f64>>> {
-        let count = self.count_detectors()?;
+        let traversal = FoldedDemTraversal::new(self)?;
+        let count = traversal.root().summary().detector_count()?;
         if count > MAX_DEM_COORDINATE_MAP_DETECTORS {
             return Err(CircuitError::invalid_detector_error_model(format!(
                 "DEM detector_coordinates currently supports at most {MAX_DEM_COORDINATE_MAP_DETECTORS} detectors, got {count}; use detector_coordinates_for for selected detectors"
@@ -225,8 +230,8 @@ impl DetectorErrorModel {
         }
         let detectors = (0..count)
             .map(DemDetectorId::try_new)
-            .collect::<CircuitResult<Vec<_>>>()?;
-        self.detector_coordinates_for(detectors)
+            .collect::<CircuitResult<BTreeSet<_>>>()?;
+        detector_coordinates_for_traversal(&traversal, detectors, count)
     }
 
     pub fn detector_coordinates_for(
@@ -237,23 +242,9 @@ impl DetectorErrorModel {
         if detector_set.is_empty() {
             return Ok(BTreeMap::new());
         }
-        let detector_count = self.count_detectors()?;
-        for detector in &detector_set {
-            if detector.get() >= detector_count {
-                return Err(CircuitError::invalid_detector_error_model(format!(
-                    "detector index {} is too big; the detector error model has {detector_count} detectors",
-                    detector.get()
-                )));
-            }
-        }
-
-        let mut coordinates = BTreeMap::new();
-        find_selected_detector_coordinates(self, &detector_set, &mut coordinates, 0, &[])?;
-
-        for detector in detector_set {
-            coordinates.entry(detector).or_insert_with(Vec::new);
-        }
-        Ok(coordinates)
+        let traversal = FoldedDemTraversal::new(self)?;
+        let detector_count = traversal.root().summary().detector_count()?;
+        detector_coordinates_for_traversal(&traversal, detector_set, detector_count)
     }
 
     pub fn coordinates_of_detector(&self, detector: DemDetectorId) -> CircuitResult<Vec<f64>> {
@@ -273,6 +264,33 @@ impl DetectorErrorModel {
             .get(range)
             .ok_or_else(|| dem_item_range_error("computed range was outside item list"))
     }
+}
+
+fn detector_coordinates_for_traversal(
+    traversal: &FoldedDemTraversal<'_>,
+    detector_set: BTreeSet<DemDetectorId>,
+    detector_count: u64,
+) -> CircuitResult<BTreeMap<DemDetectorId, Vec<f64>>> {
+    for detector in &detector_set {
+        if detector.get() >= detector_count {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "detector index {} is too big; the detector error model has {detector_count} detectors",
+                detector.get()
+            )));
+        }
+    }
+
+    let mut coordinates = BTreeMap::new();
+    let mut visitor = SelectedCoordinateVisitor {
+        detector_set: &detector_set,
+        coordinates: &mut coordinates,
+        pending_truncated: Vec::new(),
+    };
+    let _ = traversal.try_visit_with_coordinates(&mut visitor)?;
+    for detector in detector_set {
+        coordinates.entry(detector).or_default();
+    }
+    Ok(coordinates)
 }
 
 impl DemItem {
@@ -314,6 +332,10 @@ impl DemItem {
     }
 }
 
+pub(super) fn coordinate_shift_of(model: &DetectorErrorModel) -> CircuitResult<Vec<f64>> {
+    FoldedDemTraversal::new(model)?.root().coordinate_shift()
+}
+
 impl DemInstruction {
     fn rounded(&self, digits: u8) -> CircuitResult<Self> {
         if self.kind() != DemInstructionKind::Error {
@@ -343,83 +365,141 @@ impl DemRepeatBlock {
     }
 }
 
-pub(super) fn coordinate_shift_of(model: &DetectorErrorModel) -> CircuitResult<Vec<f64>> {
-    let mut shift = Vec::new();
-    apply_coordinate_shift_of(model, &mut shift)?;
-    Ok(shift)
+struct SelectedCoordinateVisitor<'a> {
+    detector_set: &'a BTreeSet<DemDetectorId>,
+    coordinates: &'a mut BTreeMap<DemDetectorId, Vec<f64>>,
+    pending_truncated: Vec<BTreeSet<DemDetectorId>>,
 }
 
-fn apply_coordinate_shift_of(
-    model: &DetectorErrorModel,
-    shift: &mut Vec<f64>,
-) -> CircuitResult<()> {
-    for item in model.items() {
-        match item {
-            DemItem::Instruction(instruction) => {
-                if instruction.kind() == DemInstructionKind::ShiftDetectors {
-                    add_coordinate_shift_mul(shift, instruction.args(), 1.0)?;
-                }
-            }
-            DemItem::RepeatBlock(repeat) => {
-                let body_shift = coordinate_shift_of(repeat.body())?;
-                add_coordinate_shift_mul(shift, &body_shift, repeat.repeat_count().get() as f64)?;
-            }
+impl FoldedDemVisitor for SelectedCoordinateVisitor<'_> {
+    fn visit_instruction(
+        &mut self,
+        instruction: &DemInstruction,
+        state: &DemTraversalState,
+    ) -> CircuitResult<ControlFlow<()>> {
+        if instruction.kind() == DemInstructionKind::Detector {
+            record_selected_detector_coordinates(
+                instruction,
+                self.detector_set,
+                self.coordinates,
+                state.detector_offset(),
+                state.coordinate_shift()?,
+            )?;
         }
+        Ok(if self.coordinates.len() == self.detector_set.len() {
+            ControlFlow::Break(())
+        } else {
+            ControlFlow::Continue(())
+        })
     }
-    Ok(())
-}
 
-fn find_selected_detector_coordinates(
-    model: &DetectorErrorModel,
-    detector_set: &BTreeSet<DemDetectorId>,
-    coordinates: &mut BTreeMap<DemDetectorId, Vec<f64>>,
-    mut detector_offset: u64,
-    coordinate_shift: &[f64],
-) -> CircuitResult<()> {
-    let mut coordinate_shift = coordinate_shift.to_vec();
-    for item in model.items() {
-        if coordinates.len() == detector_set.len() {
-            return Ok(());
+    fn enter_repeat(
+        &mut self,
+        repeat: &DemRepeatBlock,
+        body: &FoldedDemBlock<'_>,
+        state: &DemTraversalState,
+    ) -> CircuitResult<DemRepeatSelection> {
+        self.pending_truncated.push(BTreeSet::new());
+        let Some(body_declared_bounds) = body.summary().detector_declaration_bounds()? else {
+            return Ok(DemRepeatSelection::Skip);
+        };
+        let body_detector_shift = body.summary().detector_shift()?;
+        if body_detector_shift == 0 {
+            return Ok(
+                if self.detector_set.iter().any(|detector| {
+                    !self.coordinates.contains_key(detector)
+                        && detector_in_repeat_body_bounds(
+                            *detector,
+                            state.detector_offset(),
+                            body_declared_bounds,
+                        )
+                }) {
+                    DemRepeatSelection::StructuralOnce
+                } else {
+                    DemRepeatSelection::Skip
+                },
+            );
         }
-        match item {
-            DemItem::Instruction(instruction) => match instruction.kind() {
-                DemInstructionKind::Detector => {
-                    record_selected_detector_coordinates(
-                        instruction,
-                        detector_set,
-                        coordinates,
-                        detector_offset,
-                        &coordinate_shift,
-                    )?;
-                }
-                DemInstructionKind::ShiftDetectors => {
-                    apply_detector_shift(&mut detector_offset, instruction)?;
-                    add_coordinate_shift_mul(&mut coordinate_shift, instruction.args(), 1.0)?;
-                }
-                DemInstructionKind::Error | DemInstructionKind::LogicalObservable => {}
-            },
-            DemItem::RepeatBlock(repeat) => {
-                find_selected_detector_coordinates_in_repeat(
-                    repeat,
-                    detector_set,
-                    coordinates,
-                    detector_offset,
-                    &coordinate_shift,
-                )?;
-                add_detector_shift_mul(
-                    &mut detector_offset,
-                    repeat.body().total_detector_shift_inner()?,
-                    repeat.repeat_count().get(),
-                )?;
-                add_coordinate_shift_mul(
-                    &mut coordinate_shift,
-                    &coordinate_shift_of(repeat.body())?,
-                    repeat.repeat_count().get() as f64,
-                )?;
-            }
+
+        if repeat_body_is_flat(body) {
+            let body_coordinate_shift = body.coordinate_shift()?;
+            find_selected_detector_coordinates_in_flat_repeat_body(
+                repeat,
+                body,
+                self.detector_set,
+                self.coordinates,
+                state.detector_offset(),
+                state.coordinate_shift()?,
+                RepeatScanGeometry {
+                    body_detector_shift,
+                    body_coordinate_shift: &body_coordinate_shift,
+                },
+            )?;
+            return Ok(DemRepeatSelection::Skip);
         }
+        if flattened_detector_declaration_count_up_to(
+            body,
+            MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS,
+        )?
+        .is_some()
+        {
+            let body_coordinate_shift = body.coordinate_shift()?;
+            find_selected_detector_coordinates_in_bounded_flattened_repeat_body(
+                repeat,
+                body,
+                self.detector_set,
+                self.coordinates,
+                state.detector_offset(),
+                state.coordinate_shift()?,
+                RepeatScanGeometry {
+                    body_detector_shift,
+                    body_coordinate_shift: &body_coordinate_shift,
+                },
+            )?;
+            return Ok(DemRepeatSelection::Skip);
+        }
+
+        let selected = selected_repeat_iterations(
+            self.detector_set,
+            self.coordinates,
+            state.detector_offset(),
+            body_detector_shift,
+            body_declared_bounds,
+            repeat.repeat_count().get(),
+        )?;
+        let pending = self.pending_truncated.last_mut().ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "selected coordinate traversal repeat stack is missing",
+            )
+        })?;
+        *pending = selected.truncated_detectors;
+        Ok(DemRepeatSelection::Selected(
+            selected.iterations.into_iter().collect(),
+        ))
     }
-    Ok(())
+
+    fn exit_repeat(
+        &mut self,
+        _repeat: &DemRepeatBlock,
+        _body: &FoldedDemBlock<'_>,
+        _state: &DemTraversalState,
+    ) -> CircuitResult<ControlFlow<()>> {
+        let truncated = self.pending_truncated.pop().ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "selected coordinate traversal repeat stack underflowed",
+            )
+        })?;
+        if let Some(detector) = truncated
+            .iter()
+            .find(|detector| !self.coordinates.contains_key(detector))
+        {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "DEM detector_coordinates_for currently supports at most {MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES} overlapping repeat candidates before finding detector {}",
+                detector.get()
+            )));
+        }
+        Ok(ControlFlow::Continue(()))
+    }
 }
 
 fn record_selected_detector_coordinates(
@@ -439,7 +519,7 @@ fn record_selected_detector_coordinates(
             if detector_set.contains(&detector) && !coordinates.contains_key(&detector) {
                 coordinates.insert(
                     detector,
-                    shifted_detector_coordinates(instruction.args(), coordinate_shift)?,
+                    shifted_coordinates(instruction.args(), coordinate_shift)?,
                 );
             }
         }
@@ -447,123 +527,20 @@ fn record_selected_detector_coordinates(
     Ok(())
 }
 
-fn find_selected_detector_coordinates_in_repeat(
-    repeat: &DemRepeatBlock,
-    detector_set: &BTreeSet<DemDetectorId>,
-    coordinates: &mut BTreeMap<DemDetectorId, Vec<f64>>,
-    detector_offset: u64,
-    coordinate_shift: &[f64],
-) -> CircuitResult<()> {
-    let Some(body_declared_bounds) = declared_detector_bounds_from(repeat.body(), 0)? else {
-        return Ok(());
-    };
-
-    let body_detector_shift = repeat.body().total_detector_shift_inner()?;
-    let body_coordinate_shift = coordinate_shift_of(repeat.body())?;
-    let repeat_count = repeat.repeat_count().get();
-
-    if body_detector_shift == 0 {
-        if detector_set.iter().any(|detector| {
-            detector_in_repeat_body_bounds(*detector, detector_offset, body_declared_bounds)
-        }) {
-            find_selected_detector_coordinates(
-                repeat.body(),
-                detector_set,
-                coordinates,
-                detector_offset,
-                coordinate_shift,
-            )?;
-        }
-        return Ok(());
-    }
-
-    if repeat_body_is_flat(repeat.body()) {
-        find_selected_detector_coordinates_in_flat_repeat_body(
-            repeat,
-            detector_set,
-            coordinates,
-            detector_offset,
-            coordinate_shift,
-            body_detector_shift,
-            &body_coordinate_shift,
-        )?;
-        return Ok(());
-    }
-
-    if flattened_detector_declaration_count_up_to(
-        repeat.body(),
-        MAX_DEM_SELECTED_COORDINATE_FLATTENED_DECLARATIONS,
-    )?
-    .is_some()
-    {
-        find_selected_detector_coordinates_in_bounded_flattened_repeat_body(
-            repeat,
-            detector_set,
-            coordinates,
-            detector_offset,
-            coordinate_shift,
-            RepeatScanGeometry {
-                body_detector_shift,
-                body_coordinate_shift: &body_coordinate_shift,
-            },
-        )?;
-        return Ok(());
-    }
-
-    let SelectedRepeatIterations {
-        iterations,
-        truncated_detectors,
-    } = selected_repeat_iterations(
-        detector_set,
-        coordinates,
-        detector_offset,
-        body_detector_shift,
-        body_declared_bounds,
-        repeat_count,
-    )?;
-    for iteration in iterations {
-        if coordinates.len() == detector_set.len() {
-            break;
-        }
-        let iteration_detector_offset =
-            detector_offset_with_repeat(detector_offset, body_detector_shift, iteration)?;
-        let iteration_coordinate_shift =
-            coordinate_shift_with_repeat(coordinate_shift, &body_coordinate_shift, iteration)?;
-        find_selected_detector_coordinates(
-            repeat.body(),
-            detector_set,
-            coordinates,
-            iteration_detector_offset,
-            &iteration_coordinate_shift,
-        )?;
-    }
-    if let Some(detector) = truncated_detectors
+fn repeat_body_is_flat(body: &FoldedDemBlock<'_>) -> bool {
+    body.items()
         .iter()
-        .find(|detector| !coordinates.contains_key(detector))
-    {
-        return Err(CircuitError::invalid_detector_error_model(format!(
-            "DEM detector_coordinates_for currently supports at most {MAX_DEM_SELECTED_COORDINATE_REPEAT_CANDIDATES} overlapping repeat candidates before finding detector {}",
-            detector.get()
-        )));
-    }
-    Ok(())
-}
-
-fn repeat_body_is_flat(model: &DetectorErrorModel) -> bool {
-    model
-        .items()
-        .iter()
-        .all(|item| matches!(item, DemItem::Instruction(_)))
+        .all(|item| matches!(item, FoldedDemItem::Instruction(_)))
 }
 
 fn find_selected_detector_coordinates_in_flat_repeat_body(
     repeat: &DemRepeatBlock,
+    body: &FoldedDemBlock<'_>,
     detector_set: &BTreeSet<DemDetectorId>,
     coordinates: &mut BTreeMap<DemDetectorId, Vec<f64>>,
     detector_offset: u64,
     coordinate_shift: &[f64],
-    body_detector_shift: u64,
-    body_coordinate_shift: &[f64],
+    geometry: RepeatScanGeometry<'_>,
 ) -> CircuitResult<()> {
     let mut local_detector_offset = 0_u64;
     let mut local_coordinate_shift = Vec::new();
@@ -573,12 +550,12 @@ fn find_selected_detector_coordinates_in_flat_repeat_body(
         best: BTreeMap::new(),
         outer_detector_offset: detector_offset,
         outer_coordinate_shift: coordinate_shift,
-        body_detector_shift,
-        body_coordinate_shift,
+        body_detector_shift: geometry.body_detector_shift,
+        body_coordinate_shift: geometry.body_coordinate_shift,
         repeat_count: repeat.repeat_count().get(),
     };
-    for (body_order, item) in repeat.body().items().iter().enumerate() {
-        let DemItem::Instruction(instruction) = item else {
+    for (body_order, item) in body.items().iter().enumerate() {
+        let FoldedDemItem::Instruction(instruction) = item else {
             continue;
         };
         match instruction.kind() {
@@ -706,7 +683,7 @@ impl FlatRepeatScan<'_> {
                 )?;
                 add_coordinate_shift_mul(&mut candidate_shift, local_coordinate_shift, 1.0)?;
                 let shifted_coordinates =
-                    shifted_detector_coordinates(detector_coordinates, &candidate_shift)?;
+                    shifted_coordinates(detector_coordinates, &candidate_shift)?;
                 self.best.insert(*detector, (order, shifted_coordinates));
             }
         }
@@ -729,7 +706,7 @@ impl FlatRepeatOrder {
 fn detector_in_repeat_body_bounds(
     detector: DemDetectorId,
     detector_offset: u64,
-    body_declared_bounds: DetectorDeclarationBounds,
+    body_declared_bounds: DemDetectorBounds,
 ) -> bool {
     detector
         .get()
@@ -744,7 +721,7 @@ fn selected_repeat_iterations(
     coordinates: &BTreeMap<DemDetectorId, Vec<f64>>,
     detector_offset: u64,
     body_detector_shift: u64,
-    body_declared_bounds: DetectorDeclarationBounds,
+    body_declared_bounds: DemDetectorBounds,
     repeat_count: u64,
 ) -> CircuitResult<SelectedRepeatIterations> {
     let mut iterations = BTreeSet::new();
@@ -806,115 +783,6 @@ struct SelectedRepeatIterations {
     truncated_detectors: BTreeSet<DemDetectorId>,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct DetectorDeclarationBounds {
-    min: u64,
-    max: u64,
-}
-
-impl DetectorDeclarationBounds {
-    fn include(&mut self, detector: u64) {
-        self.min = self.min.min(detector);
-        self.max = self.max.max(detector);
-    }
-}
-
-fn include_detector_bound(bounds: &mut Option<DetectorDeclarationBounds>, detector: u64) {
-    match bounds {
-        Some(bounds) => bounds.include(detector),
-        None => {
-            *bounds = Some(DetectorDeclarationBounds {
-                min: detector,
-                max: detector,
-            });
-        }
-    }
-}
-
-fn declared_detector_bounds_from(
-    model: &DetectorErrorModel,
-    mut detector_offset: u64,
-) -> CircuitResult<Option<DetectorDeclarationBounds>> {
-    let mut bounds = None;
-    for item in model.items() {
-        match item {
-            DemItem::Instruction(instruction) => match instruction.kind() {
-                DemInstructionKind::Detector => {
-                    for target in instruction.targets() {
-                        if let DemTarget::RelativeDetector(id) = target {
-                            let detector_id =
-                                detector_offset.checked_add(id.get()).ok_or_else(|| {
-                                    CircuitError::invalid_detector_error_model(
-                                        "detector id overflowed",
-                                    )
-                                })?;
-                            include_detector_bound(&mut bounds, detector_id);
-                        }
-                    }
-                }
-                DemInstructionKind::ShiftDetectors => {
-                    detector_offset = detector_offset
-                        .checked_add(instruction.detector_shift()?)
-                        .ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model("detector shift overflowed")
-                        })?;
-                }
-                DemInstructionKind::Error | DemInstructionKind::LogicalObservable => {}
-            },
-            DemItem::RepeatBlock(repeat) => {
-                let body_shift = repeat.body().total_detector_shift_inner()?;
-                let repeat_count = repeat.repeat_count().get();
-                if repeat_count > 0
-                    && let Some(body_bounds) = declared_detector_bounds_from(repeat.body(), 0)?
-                {
-                    let last_offset = body_shift
-                        .checked_mul(repeat_count.saturating_sub(1))
-                        .and_then(|shift| detector_offset.checked_add(shift))
-                        .ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(
-                                "repeat detector shift overflowed",
-                            )
-                        })?;
-                    let first_min =
-                        detector_offset
-                            .checked_add(body_bounds.min)
-                            .ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
-                                    "repeat detector id overflowed",
-                                )
-                            })?;
-                    let first_max =
-                        detector_offset
-                            .checked_add(body_bounds.max)
-                            .ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
-                                    "repeat detector id overflowed",
-                                )
-                            })?;
-                    let last_min = last_offset.checked_add(body_bounds.min).ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model("repeat detector id overflowed")
-                    })?;
-                    let last_max = last_offset.checked_add(body_bounds.max).ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model("repeat detector id overflowed")
-                    })?;
-                    for detector_id in [first_min, first_max, last_min, last_max] {
-                        include_detector_bound(&mut bounds, detector_id);
-                    }
-                }
-                detector_offset = body_shift
-                    .checked_mul(repeat_count)
-                    .and_then(|shift| detector_offset.checked_add(shift))
-                    .ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
-                            "repeat detector shift overflowed",
-                        )
-                    })?;
-            }
-        }
-    }
-    Ok(bounds)
-}
-
 pub(super) fn detector_offset_with_repeat(
     detector_offset: u64,
     body_detector_shift: u64,
@@ -964,30 +832,10 @@ fn rounded_probability_arg(value: f64, digits: u8) -> f64 {
 }
 
 fn count_errors_in(model: &DetectorErrorModel) -> CircuitResult<u64> {
-    let mut total = 0_u64;
-    for item in model.items() {
-        match item {
-            DemItem::Instruction(instruction) => {
-                if instruction.kind() == DemInstructionKind::Error {
-                    total = total.checked_add(1).ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model("error count overflowed")
-                    })?;
-                }
-            }
-            DemItem::RepeatBlock(repeat) => {
-                let body_errors = count_errors_in(repeat.body())?;
-                let repeated = body_errors
-                    .checked_mul(repeat.repeat_count().get())
-                    .ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model("repeat error count overflowed")
-                    })?;
-                total = total.checked_add(repeated).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model("error count overflowed")
-                })?;
-            }
-        }
-    }
-    Ok(total)
+    FoldedDemTraversal::new(model)?
+        .root()
+        .summary()
+        .error_count()
 }
 
 pub(super) fn apply_detector_shift(
@@ -1006,7 +854,7 @@ fn flatten_instruction(
     coordinate_shift: &[f64],
 ) -> CircuitResult<DemInstruction> {
     let args = if instruction.kind() == DemInstructionKind::Detector {
-        shifted_detector_coordinates(instruction.args(), coordinate_shift)?
+        shifted_coordinates(instruction.args(), coordinate_shift)?
     } else {
         instruction.args().to_vec()
     };
@@ -1037,44 +885,12 @@ fn shifted_target(target: DemTarget, detector_offset: u64) -> CircuitResult<DemT
     }
 }
 
-pub(super) fn shifted_detector_coordinates(
-    coordinates: &[f64],
-    shift: &[f64],
-) -> CircuitResult<Vec<f64>> {
-    let mut shifted = coordinates.to_vec();
-    for (index, coordinate) in shifted.iter_mut().enumerate() {
-        if let Some(delta) = shift.get(index) {
-            *coordinate += delta;
-            if !coordinate.is_finite() {
-                return Err(CircuitError::invalid_detector_error_model(
-                    "detector coordinate overflowed",
-                ));
-            }
-        }
-    }
-    Ok(shifted)
-}
-
 pub(super) fn add_coordinate_shift_mul(
     shift: &mut Vec<f64>,
     delta: &[f64],
     multiplier: f64,
 ) -> CircuitResult<()> {
-    if shift.len() < delta.len() {
-        shift.resize(delta.len(), 0.0);
-    }
-    for (index, value) in delta.iter().enumerate() {
-        let coordinate = shift.get_mut(index).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("coordinate shift dimension missing")
-        })?;
-        *coordinate += value * multiplier;
-        if !coordinate.is_finite() {
-            return Err(CircuitError::invalid_detector_error_model(
-                "coordinate shift overflowed",
-            ));
-        }
-    }
-    Ok(())
+    super::traversal::add_coordinate_shift_mul(shift, delta, multiplier)
 }
 
 fn checked_dem_item_range(

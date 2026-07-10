@@ -34,7 +34,7 @@ If these sources disagree, fix the disagreement before implementation continues.
 PFM-B0 is complete as of 2026-07-10.
 PFM-B2 contract groundwork is also complete: canonical metadata now classifies all 81 gates across eight surfaces and maps parser-accepted target groups, including anti-Hermitian Pauli products, to typed behavior or rejection decisions with no unknown state.
 Ledger schema version 2 requires all eight surfaces per gate-family case, validates its surface and family names against canonical core metadata, and gives every one of the nineteen semantic families an explicit owner. Deterministic MPP, anti-Hermitian MPP rejection, deterministic MPAD, stochastic MPP, and stochastic MPAD now have separate provenance and comparator records; eighteen cases remain planned until final PFM-B2 coverage after the shared foundations stabilize.
-Begin PFM-B3 shared folded DEM traversal next; do not reopen PFM-B0 or the PFM-B2 contract schema unless their frozen evidence or classification contracts change.
+PFM-B3 implementation and source-owned evidence are in place: all seven ledger cases are implemented through the shared folded traversal and have independent tests, oracle rows, and benchmark metadata. Finish its milestone audit, GPT-5.6/max full-code-review, finding closure, and clean committed-HEAD allocation benchmark evidence before advancing to the PFM-B4 flow foundation; do not reopen PFM-B0 or the PFM-B2 contract schema unless their frozen evidence or classification contracts change.
 
 ## Scope Decisions
 

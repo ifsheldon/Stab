@@ -11,6 +11,7 @@ mod generated_qec_tests;
 mod graphlike;
 mod hyper;
 mod sat;
+mod traversal;
 
 pub use analyze::{
     DisjointPauliProbabilities, ErrorAnalyzerOptions, IndependentPauliProbabilities,
@@ -19,9 +20,12 @@ pub use analyze::{
 };
 pub use api::DemFlattenedInstructionIter;
 pub use sat::{likeliest_error_sat_problem, shortest_error_sat_problem};
+pub(crate) use traversal::{
+    DemRepeatSelection, DemTraversalState, FoldedDemBlock, FoldedDemItem, FoldedDemTraversal,
+    FoldedDemVisitor,
+};
 
 use crate::{CircuitError, CircuitResult, Probability, RepeatCount};
-
 const MAX_DEM_DETECTOR_ID: u64 = (1_u64 << 62) - 1;
 const MAX_DEM_PARSE_LINES: usize = 1_000_000;
 pub(crate) const MAX_DEM_REPEAT_NESTING: usize = 256;
@@ -63,120 +67,24 @@ impl DetectorErrorModel {
     }
 
     pub fn total_detector_shift(&self) -> CircuitResult<u64> {
-        self.total_detector_shift_inner()
+        FoldedDemTraversal::new(self)?
+            .root()
+            .summary()
+            .detector_shift()
     }
 
     pub fn count_detectors(&self) -> CircuitResult<u64> {
-        self.count_detectors_from(0)
+        FoldedDemTraversal::new(self)?
+            .root()
+            .summary()
+            .detector_count()
     }
 
     pub fn count_observables(&self) -> CircuitResult<u64> {
-        let mut max_observable = None;
-        self.visit_observables(&mut max_observable)?;
-        Ok(max_observable.map_or(0, |id| id.saturating_add(1)))
-    }
-
-    fn total_detector_shift_inner(&self) -> CircuitResult<u64> {
-        let mut shift = 0_u64;
-        for item in &self.items {
-            match item {
-                DemItem::Instruction(instruction) => {
-                    if instruction.kind == DemInstructionKind::ShiftDetectors {
-                        shift = shift
-                            .checked_add(instruction.detector_shift()?)
-                            .ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
-                                    "detector shift overflowed",
-                                )
-                            })?;
-                    }
-                }
-                DemItem::RepeatBlock(repeat) => {
-                    let body_shift = repeat.body.total_detector_shift_inner()?;
-                    let repeated = body_shift
-                        .checked_mul(repeat.repeat_count.get())
-                        .ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model("repeat shift overflowed")
-                        })?;
-                    shift = shift.checked_add(repeated).ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model("detector shift overflowed")
-                    })?;
-                }
-            }
-        }
-        Ok(shift)
-    }
-
-    fn count_detectors_from(&self, mut detector_offset: u64) -> CircuitResult<u64> {
-        let mut count = detector_offset;
-        for item in &self.items {
-            match item {
-                DemItem::Instruction(instruction) => match instruction.kind {
-                    DemInstructionKind::Error | DemInstructionKind::Detector => {
-                        for target in instruction.targets() {
-                            if let DemTarget::RelativeDetector(id) = target {
-                                let detector_id =
-                                    detector_offset.checked_add(id.get()).ok_or_else(|| {
-                                        CircuitError::invalid_detector_error_model(
-                                            "detector id overflowed",
-                                        )
-                                    })?;
-                                let detector_count =
-                                    detector_id.checked_add(1).ok_or_else(|| {
-                                        CircuitError::invalid_detector_error_model(
-                                            "detector count overflowed",
-                                        )
-                                    })?;
-                                count = count.max(detector_count);
-                            }
-                        }
-                    }
-                    DemInstructionKind::ShiftDetectors => {
-                        detector_offset = detector_offset
-                            .checked_add(instruction.detector_shift()?)
-                            .ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
-                                    "detector shift overflowed",
-                                )
-                            })?;
-                    }
-                    DemInstructionKind::LogicalObservable => {}
-                },
-                DemItem::RepeatBlock(repeat) => {
-                    let body_shift = repeat.body.total_detector_shift_inner()?;
-                    let repeat_count = repeat.repeat_count.get();
-                    if repeat_count > 0 {
-                        let body_count = repeat.body.count_detectors_from(0)?;
-                        let last_offset = body_shift
-                            .checked_mul(repeat_count.saturating_sub(1))
-                            .and_then(|shift| detector_offset.checked_add(shift))
-                            .ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
-                                    "repeat detector shift overflowed",
-                                )
-                            })?;
-                        if body_count > 0 {
-                            count = count.max(last_offset.checked_add(body_count).ok_or_else(
-                                || {
-                                    CircuitError::invalid_detector_error_model(
-                                        "repeat detector count overflowed",
-                                    )
-                                },
-                            )?);
-                        }
-                    }
-                    detector_offset = body_shift
-                        .checked_mul(repeat_count)
-                        .and_then(|shift| detector_offset.checked_add(shift))
-                        .ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(
-                                "repeat detector shift overflowed",
-                            )
-                        })?;
-                }
-            }
-        }
-        Ok(count)
+        Ok(FoldedDemTraversal::new(self)?
+            .root()
+            .summary()
+            .observable_count())
     }
 
     pub(crate) fn validate_flattening_budget(&self, context: &'static str) -> CircuitResult<()> {
@@ -222,24 +130,6 @@ impl DetectorErrorModel {
                         budget,
                     )?;
                 }
-            }
-        }
-        Ok(())
-    }
-
-    fn visit_observables(&self, max_observable: &mut Option<u64>) -> CircuitResult<()> {
-        for item in &self.items {
-            match item {
-                DemItem::Instruction(instruction) => {
-                    for target in instruction.targets() {
-                        if let DemTarget::LogicalObservable(id) = target {
-                            *max_observable = Some(
-                                max_observable.map_or(id.get(), |current| current.max(id.get())),
-                            );
-                        }
-                    }
-                }
-                DemItem::RepeatBlock(repeat) => repeat.body.visit_observables(max_observable)?,
             }
         }
         Ok(())

@@ -115,6 +115,15 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
                 "stab_pf4_dem_sampler_sample_nested_stochastic_parity_repeat",
             ][..],
         ),
+        (
+            "pfm-b3-dem-traversal-core",
+            &[
+                "stab_pfm_b3_dem_traversal_flat_equivalent",
+                "stab_pfm_b3_dem_traversal_nested_large_repeat",
+                "stab_pfm_b3_dem_traversal_sparse_selected_coordinate",
+                "stab_pfm_b3_dem_traversal_wide_coordinate_irrelevant",
+            ][..],
+        ),
     ] {
         let row = BenchmarkRow {
             id: id.to_string(),

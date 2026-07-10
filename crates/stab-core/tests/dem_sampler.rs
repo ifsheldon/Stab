@@ -943,6 +943,10 @@ fn pf4_dem_sampler_rejects_programmatic_deep_repeat_nesting() {
 
     let error = CompiledDemSampler::compile(&model).expect_err("reject deep repeat nesting");
     assert!(
+        matches!(error, CircuitError::InvalidSamplerCompilation { .. }),
+        "sampler compilation must retain its public error class: {error}"
+    );
+    assert!(
         error.to_string().contains("repeat nesting exceeds"),
         "{error}"
     );

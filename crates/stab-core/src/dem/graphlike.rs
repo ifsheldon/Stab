@@ -11,9 +11,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 
+#[cfg(test)]
+use super::DemItem;
 use super::{
-    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemTarget,
-    DetectorErrorModel, error_traversal::SearchGraphTargetPolicy,
+    DemDetectorId, DemInstruction, DemObservableId, DemTarget, DetectorErrorModel,
+    error_traversal::{
+        SearchGraphTargetPolicy, search_graph_nonzero_error_targets, visit_search_graph_errors,
+    },
+    traversal::{FoldedDemTraversal, shifted_targets},
 };
 use crate::{CircuitError, CircuitResult, Probability};
 
@@ -363,10 +368,11 @@ impl Graph {
         model: &DetectorErrorModel,
         ignore_ungraphlike_errors: bool,
     ) -> CircuitResult<Self> {
-        model.validate_search_graph_error_traversal_budget("graphlike search")?;
-        let full_detector_count = model.count_detectors()?;
-        let full_observable_count = model.count_observables()?;
-        let effective_detectors = model.search_graph_nonzero_error_targets(
+        let traversal = FoldedDemTraversal::new(model)?;
+        let full_detector_count = traversal.root().summary().detector_count()?;
+        let full_observable_count = traversal.root().summary().observable_count();
+        let effective_detectors = search_graph_nonzero_error_targets(
+            &traversal,
             "graphlike search",
             SearchGraphTargetPolicy::Graphlike {
                 ignore_ungraphlike_errors,
@@ -397,78 +403,15 @@ impl Graph {
                 full_detector_count > 0,
             )?
         };
-        graph.add_flattened_dem(model, 0, ignore_ungraphlike_errors)?;
+        visit_search_graph_errors(
+            &traversal,
+            "graphlike search",
+            |instruction, detector_offset| {
+                let shifted = shifted_targets(instruction.targets(), detector_offset)?;
+                graph.add_edges_from_separable_targets(&shifted, ignore_ungraphlike_errors)
+            },
+        )?;
         Ok(graph)
-    }
-
-    fn add_flattened_dem(
-        &mut self,
-        model: &DetectorErrorModel,
-        mut detector_offset: u64,
-        ignore_ungraphlike_errors: bool,
-    ) -> CircuitResult<u64> {
-        for item in model.items() {
-            match item {
-                DemItem::Instruction(instruction) => match instruction.kind() {
-                    DemInstructionKind::Error => {
-                        if instruction.args().first().copied().unwrap_or(0.0) != 0.0 {
-                            let shifted = shifted_targets(instruction.targets(), detector_offset)?;
-                            self.add_edges_from_separable_targets(
-                                &shifted,
-                                ignore_ungraphlike_errors,
-                            )?;
-                        }
-                    }
-                    DemInstructionKind::ShiftDetectors => {
-                        detector_offset = detector_offset
-                            .checked_add(instruction.detector_shift()?)
-                            .ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
-                                    "graphlike detector offset overflowed",
-                                )
-                            })?;
-                    }
-                    DemInstructionKind::Detector | DemInstructionKind::LogicalObservable => {}
-                },
-                DemItem::RepeatBlock(repeat) => {
-                    if repeat
-                        .body()
-                        .selected_search_graph_compact_repeat_error_count()?
-                        .is_some()
-                    {
-                        self.add_flattened_dem(
-                            repeat.body(),
-                            detector_offset,
-                            ignore_ungraphlike_errors,
-                        )?;
-                        continue;
-                    }
-                    if !repeat
-                        .body()
-                        .has_nonzero_probability_error("graphlike search")?
-                    {
-                        let body_shift = repeat.body().total_detector_shift()?;
-                        detector_offset = body_shift
-                            .checked_mul(repeat.repeat_count().get())
-                            .and_then(|shift| detector_offset.checked_add(shift))
-                            .ok_or_else(|| {
-                                CircuitError::invalid_detector_error_model(
-                                    "graphlike repeat detector offset overflowed",
-                                )
-                            })?;
-                        continue;
-                    }
-                    for _ in 0..repeat.repeat_count().get() {
-                        detector_offset = self.add_flattened_dem(
-                            repeat.body(),
-                            detector_offset,
-                            ignore_ungraphlike_errors,
-                        )?;
-                    }
-                }
-            }
-        }
-        Ok(detector_offset)
     }
 }
 
@@ -620,26 +563,6 @@ fn format_detector(detector: DemDetectorId) -> String {
 
 fn format_observable(observable: DemObservableId) -> String {
     format!("L{}", observable.get())
-}
-
-fn shifted_targets(targets: &[DemTarget], detector_offset: u64) -> CircuitResult<Vec<DemTarget>> {
-    targets
-        .iter()
-        .map(|target| match *target {
-            DemTarget::RelativeDetector(detector) => DemTarget::relative_detector(
-                detector_offset.checked_add(detector.get()).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
-                        "graphlike detector target overflowed",
-                    )
-                })?,
-            ),
-            DemTarget::LogicalObservable(observable) => {
-                DemTarget::logical_observable(observable.get())
-            }
-            DemTarget::Separator => Ok(DemTarget::separator()),
-            DemTarget::Numeric(value) => Ok(DemTarget::numeric(value)),
-        })
-        .collect()
 }
 
 #[cfg(test)]

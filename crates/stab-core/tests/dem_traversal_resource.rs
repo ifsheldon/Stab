@@ -378,7 +378,7 @@ fn pf4_error_matcher_filter_folds_annotation_repeat() {
 }
 
 #[test]
-fn pf4_error_matcher_filter_rejects_annotation_only_repeat() {
+fn pf4_error_matcher_filter_skips_annotation_only_repeat() {
     let circuit = Circuit::from_stim_str(
         "
         M 0
@@ -397,11 +397,8 @@ fn pf4_error_matcher_filter_rejects_annotation_only_repeat() {
     )
     .unwrap();
 
-    let error = explain_errors_from_circuit(&circuit, Some(&annotation_only_filter), false)
-        .expect_err("reject annotation-only oversized filter DEM")
-        .to_string();
-    assert!(
-        error.contains("DEM ErrorMatcher filter currently supports repeat counts"),
-        "{error}"
+    assert_eq!(
+        explain_errors_from_circuit(&circuit, Some(&annotation_only_filter), false).unwrap(),
+        Vec::new()
     );
 }
