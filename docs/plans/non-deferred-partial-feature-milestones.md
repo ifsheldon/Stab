@@ -189,7 +189,7 @@ Tasks:
 - Give each `pfm3-contract-*` ledger case an exact machine-readable set of all eight contract surfaces; reject missing, duplicate, or unknown surface values.
 - Give every one of the nineteen canonical semantic families at least one machine-readable ledger owner, including exact no-op identity-noise and structural control-flow shards; reject missing or duplicate family declarations.
 - Validate the ledger's typed surface and semantic-family names against the canonical core contract so the two schemas cannot drift independently.
-- Treat `FlowGenerator` as the PFM-B2 flow surface; flow generation, checking evidence, and solving remain owned by PFM-B4, while reverse-flow and QEC transform integration remain owned by PFM-B1.
+- Treat `FlowGenerator` as the PFM-B2 flow surface; flow generation, checking evidence, and solving were owned and closed by PFM-B4, while reverse-flow and QEC transform integration remain owned by PFM-B1.
 - Evidence-close analyzer sweep behavior at the current selected matrix because pinned Stim supplies no additional concrete analyzer case.
 - Require a new failing pinned oracle, a public API expansion, or an explicit compatibility decision before reopening analyzer sweep shapes.
 
@@ -274,7 +274,7 @@ Acceptance criteria:
 
 ### PFM-B4: Detector Utilities And General Flow Solving
 
-Implementation checkpoint, 2026-07-11: all forty-nine PFM-B4 ledger cases have exact independently selectable evidence, the one planned over-sixteen solver case is implemented, exhaustive measurement-subset fallback is removed, and generator construction plus sparse unsigned checking share typed reverse-transition classification. Successive milestone-audit and GPT-5.6/max reviews exposed idle-qubit span, sparse-query allocation, mixed-feedback, source-attribution, selector, repeat-evidence, `MPAD` simulation-width and record-ordering, ignored-only repeat and row-cap behavior, quadratic idle-width repeat setup, gate-specific sweep-only feedback handling, duplicate reset semantics, flow ordering, solver-query projection, matrix-workload semantic, benchmark-density, work-normalization, and documentation defects. The correction pass includes pinned regressions, touched-qubit repeat transforms, an amended benchmark contract, nine focused oracle rows, four retained checker oracle signatures, and two resolved specification gaps. Core, benchmark, and compatibility finding-closure reviews are clean. The first implementation commit and both clean committed-HEAD allocation reports remain before completion; see `docs/plans/pfm-b4-detector-flow-progress-report.md`.
+Completion checkpoint, 2026-07-11: all forty-nine PFM-B4 ledger cases have exact independently selectable evidence, the over-sixteen solver case is implemented, exhaustive measurement-subset fallback is removed, and generator construction plus sparse unsigned checking share typed reverse-transition classification. Successive milestone-audit and GPT-5.6/max findings covering correctness, evidence, resource behavior, compatibility, benchmark semantics, and documentation are closed. Implementation commit `0f47eee04eacec96ed4e03dd36a18f58b76a0afc` and both required clean allocation reports identify `local_modifications=false` with zero resident delta. PFM-B4 is complete; see `docs/plans/pfm-b4-detector-flow-progress-report.md`.
 
 Objective: evidence-close the two already covered detector utilities and finish the real PFM5 flow-engine gap.
 

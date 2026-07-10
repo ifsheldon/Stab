@@ -2,8 +2,8 @@
 
 ## Status
 
-Implementation and source-owned evidence are in place as of 2026-07-11.
-The initial milestone audit and GPT-5.6/max review found correctness, selector, source-attribution, repeat-test, benchmark-density, and documentation issues. The first focused re-review then found `MPAD` simulation-width drift, unrelated-instruction engine selection, quadratic idle-width unitary-repeat setup, sweep-only feedback-transform rejection, and a benchmark contract that did not exercise measurement-signature elimination. A second core review found ignored-only repeat and row-cap drift, non-`CZ` sweep-only feedback acceptance, asymmetric `MPAD` record ordering, valid duplicate reset and measure-reset rejection, and an idle-qubit work-count error. The compatibility review then exposed a vacuous duplicate-observable solver test and stale generator-versus-transform scope wording. All core, benchmark, and compatibility finding-closure reviews are now clean; the first implementation commit and clean committed-HEAD allocation evidence remain.
+PFM-B4 is complete as of 2026-07-11 at implementation commit `0f47eee04eacec96ed4e03dd36a18f58b76a0afc`.
+The initial milestone audit and GPT-5.6/max review found correctness, selector, source-attribution, repeat-test, benchmark-density, and documentation issues. The first focused re-review then found `MPAD` simulation-width drift, unrelated-instruction engine selection, quadratic idle-width unitary-repeat setup, sweep-only feedback-transform rejection, and a benchmark contract that did not exercise measurement-signature elimination. A second core review found ignored-only repeat and row-cap drift, non-`CZ` sweep-only feedback acceptance, asymmetric `MPAD` record ordering, valid duplicate reset and measure-reset rejection, and an idle-qubit work-count error. The compatibility review then exposed a vacuous duplicate-observable solver test and stale generator-versus-transform scope wording. All core, benchmark, and compatibility finding-closure reviews are clean, and both required allocation reports record the implementation commit with `local_modifications=false`.
 
 PFM-B4 owns 49 cases in `docs/plans/blocker-closure-ledger.json`: two detecting-region evidence-close cases, fourteen missing-detector evidence-close cases, and thirty-three flow-engine cases.
 All forty-nine cases now have behavior or evidence-close status in `stab-core`, exact one-test Cargo selectors, and existing focused oracle evidence.
@@ -81,7 +81,16 @@ The corrected one-run exploratory allocation probes under `target/benchmarks/pfm
 | Measurement-rich sparse `512x1024`, 12 signatures, 33 queries | 211.402115 milliseconds | 2,640,000 input bits/s; 156.1 queries/s | 673,208 | 0 |
 | Folded unitary repeat with 65,535-qubit idle suffix in a 65,536-wide flow | 589.462743 milliseconds | 111,200 idle qubits/s | 3,293,377 | 0 |
 
-Clean committed-HEAD allocation reports for both changed report-only rows remain required. Paired matrix-bit and query measurements reuse the same timing sample, so their duration and memory evidence intentionally match.
+Clean committed-HEAD allocation reports for both changed report-only rows were recorded from `0f47eee04eacec96ed4e03dd36a18f58b76a0afc` with `local_modifications=false`, release profile, warmup enabled, three measurement runs, and zero sampled resident delta. Paired matrix-bit and query measurements reuse the same timing sample, so their duration and memory evidence intentionally match.
+
+| Clean committed workload | Median | Normalized rate | Peak live allocated bytes | Resident delta |
+| --- | ---: | ---: | ---: | ---: |
+| Measurement-rich dense `32x64`, 7 signatures, 17 queries | 4.539794 milliseconds | 690,800 input bits/s; 3,745 queries/s | 80,512 | 0 |
+| Measurement-rich dense `128x256`, 24 signatures, 65 queries | 80.954289 milliseconds | 610,300 input bits/s; 802.9 queries/s | 321,088 | 0 |
+| Measurement-rich sparse `512x1024`, 12 signatures, 33 queries | 213.161648 milliseconds | 2,618,000 input bits/s; 154.8 queries/s | 673,208 | 0 |
+| Folded unitary repeat with 65,535-qubit idle suffix in a 65,536-wide flow | 578.529221 milliseconds | 113,300 idle qubits/s | 3,293,377 | 0 |
+
+The authoritative reports are `target/benchmarks/pfm-b4-flow-solver-clean/report.md` and `target/benchmarks/pfm-b4-sparse-repeat-clean/report.md`.
 
 ## Verification To Date
 
@@ -105,7 +114,7 @@ just bench::compare-allocations --only pfm-b4-flow-solve-matrix-sizes --measurem
 just bench::compare-allocations --only pf6-sparse-rev-frame-loop --measurement-runs 1 --report target/benchmarks/pfm-b4-sparse-repeat-high-idle-probe
 ```
 
-After the implementation commit, completion evidence must be regenerated from clean committed `HEAD` with:
+Completion evidence was regenerated from clean committed `HEAD` with:
 
 ```text
 just bench::compare-allocations --only pfm-b4-flow-solve-matrix-sizes --warmup --measurement-runs 3 --report target/benchmarks/pfm-b4-flow-solver-clean
@@ -114,7 +123,7 @@ just bench::compare-allocations --only pf6-sparse-rev-frame-loop --warmup --meas
 
 ## Milestone Audit
 
-The post-correction milestone audit finds no remaining implementation, test, oracle, benchmark-contract, review, or documentation defect in the current PFM-B4 scope. The milestone remains operationally incomplete until both final allocation reports are regenerated from clean committed `HEAD`.
+The post-correction milestone audit finds no remaining implementation, test, oracle, benchmark-contract, review, documentation, or clean-evidence defect in the current PFM-B4 scope. PFM-B4 is complete.
 
 | Requirement | Status | Evidence | Notes |
 | --- | --- | --- | --- |
@@ -127,10 +136,10 @@ The post-correction milestone audit finds no remaining implementation, test, ora
 | Matrix and sparse-repeat benchmark contracts | Satisfied | `pfm-b4-flow-solve-matrix-sizes`; `pf6-sparse-rev-frame-loop`; 77 `stab-bench` tests; `just bench::smoke` | Workload construction, semantic guards, timing boundary, work units, and dirty allocation probes pass. |
 | Module-size and ownership guardrails | Satisfied | `circuit/counts.rs`; `circuit_flow/generators/canonicalize.rs`; large-file scan | Changed production Rust files remain below 1,200 lines after extracting qubit counting and canonical row reduction. |
 | GPT-5.6/max review closure | Satisfied | Core, benchmark, and compatibility finding-closure reviews report no remaining findings | Compatibility probes confirmed the signed 40-flow set, Pauli-projection solver boundary, MPAD ordering, controlled-Pauli handling, feedback gating, and duplicate generator-versus-transform scope. |
-| Clean committed-HEAD allocation evidence | Missing | Final commands above | This evidence cannot be generated honestly until the implementation commit exists. |
+| Clean committed-HEAD allocation evidence | Satisfied | `target/benchmarks/pfm-b4-flow-solver-clean/report.md`; `target/benchmarks/pfm-b4-sparse-repeat-clean/report.md` | Both reports identify `0f47eee04eacec96ed4e03dd36a18f58b76a0afc`, `local_modifications=false`, warmup, three measurement runs, allocation maxima, and zero resident delta. |
 
 The matrix-workload loophole revealed during review is resolved in `docs/plans/milestone-spec-gaps.md` with an exact mixed controlled-Pauli shape, signature sets, timing boundary, density guards, support guard, and production-construction test. The later solver-query loophole is also resolved there by defining Stim-compatible Pauli-projection semantics and moving duplicate measurement or observable parity evidence to value-object and checker tests that consume those terms. No additional PFM-B4 specification loophole remains open from this audit.
 
 ## Completion Gate
 
-PFM-B4 is complete only when all 49 selectors resolve independently, the ledger and focused oracle rows validate, no production exhaustive measurement-subset path remains, every generated solution passes the unsigned checker, both `target/benchmarks/pfm-b4-flow-solver-clean` and `target/benchmarks/pfm-b4-sparse-repeat-clean` record clean committed-HEAD allocation evidence, milestone-audit and GPT-5.6/max full-code-review findings are fixed, and the PFM5 detecting-region, missing-detector, and flow-engine spec-gap entries are resolved.
+PFM-B4 satisfies its completion gate: all 49 selectors resolve independently, the ledger and focused oracle rows validate, no production exhaustive measurement-subset path remains, every generated solution passes the unsigned checker, both clean allocation reports identify committed `HEAD`, milestone-audit and GPT-5.6/max full-code-review findings are fixed, and the PFM5 detecting-region, missing-detector, and flow-engine specification entries are resolved.

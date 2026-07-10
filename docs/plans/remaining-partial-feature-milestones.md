@@ -96,7 +96,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | DEM transforms | Active | RPF4 | Finish public `flattened`, `rounded`, and transform resource boundaries. |
 | DEM analysis and shortest graphlike error | Active | RPF4 and RPF6 | Finish folded traversal and generated-circuit evidence for graphlike, hypergraph, SAT, shifted or otherwise non-selected repeated stochastic direct DEM sampling, and analyzer-adjacent consumers while keeping flat sampled-error output and replay under their source-owned cap contract. |
 | Measurement-to-detection conversion | Active | RPF2, RPF3, RPF7 | Finish feedback transform semantics, broader sweep-conditioned conversion, and visible CLI parity. |
-| Detector-analysis utility APIs | Active | RPF5 | Finish promoted detecting-region, missing-detector, feedback, and flow utility subcases. |
+| Detector-analysis utility APIs | Done for selected Rust API scope | PFM-B4 | Detecting-region and missing-detector evidence closure plus the shared flow-engine foundation are complete; unselected utility families require a new exact plan. |
 | Single-shot interactive tableau simulator | Deferred-only | None | Public simulator product remains out of scope. |
 | Batched flip-frame simulator | Deferred-only | None | Public simulator product remains out of scope. |
 | Circuit-to-DEM analysis | Active | RPF6 and RPF7 | Finish analyzer subcases, generated-circuit evidence, loop folding, gauge behavior, and CLI proof. |
@@ -104,7 +104,7 @@ If any packet item cannot be completed, leave the checklist row `Partial` and do
 | Error explanation value objects | Implemented for current active Rust subset | RPF6 | The selected canonicalization slice is implemented; future analyzer/search slices may add value-object hardening only if their outputs require it, while full ErrorMatcher provenance and CLI remain deferred. |
 | Shortest graphlike and hypergraph logical-error search | Active | RPF6 | Finish generated-circuit search, ordering-insensitive structural comparators, and resource behavior. |
 | Sparse reverse detector-frame tracking | Active | RPF6 | Finish optimized loop folding and analyzer/search integration where needed; deterministic generated supported-unitary repeat coverage is implemented for the current promoted subset. |
-| Flows | Active | RPF1 and RPF5 | Finish measurement-rich flows, variable-target flow metadata decisions, and transform integration. |
+| Flows | Active transform follow-up | PFM-B1 | The selected Rust flow engine is complete under PFM-B4; finish only the nineteen selected reverse-flow and QEC transform cases without reopening the flow solver. |
 | `stim m2d` | Implemented for selected PF7 CLI surface | RPF7 | The selected CLI closure is implemented by `pf7-m2d-cli-parity`; only newly selected CLI cases should reopen this row. Broader detector-converter API semantics remain active under measurement-to-detection conversion rows. |
 | `stim analyze_errors` | Implemented for selected PF7 CLI surface | RPF7 | The selected CLI closure is implemented by `pf7-analyze-errors-cli-parity`; only newly selected CLI cases should reopen this row. Broader analyzer semantics remain active under core analyzer rows. |
 | Legacy top-level command flags | Implemented for selected PF7 CLI surface | RPF7 | The selected legacy-dispatch closure is implemented by `pf7-legacy-dispatch-parity`; only newly selected legacy spellings or failure modes should reopen this row. |

@@ -74,7 +74,7 @@ They are finite ledger-backed implementation and evidence-splitting programs:
 - PFM-B1 owns the seven planned QEC-transform cases and must split the four implemented cases that still share broad selectors.
 - PFM-B2 contract groundwork is complete and evidence-closes analyzer sweep behavior at the selected matrix; its final phase still implements eighteen planned cases covering all nineteen semantic families.
 - PFM-B3 implements the seven selected shared folded-DEM traversal contracts.
-- PFM-B4 implementation and focused evidence are in place for detecting regions, missing detectors, and all thirty-three flow cases. The initial audit and GPT-5.6/max review findings have an implemented correction pass covering idle-qubit flow span, sparse query memory, mixed feedback groups, exact source attribution, exact selectors, direct repeat evidence, and genuine dense benchmark workloads; focused re-review and clean committed-HEAD allocation evidence remain before the milestone closes.
+- PFM-B4 is complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc` for detecting regions, missing detectors, and all thirty-three flow cases. All milestone-audit and GPT-5.6/max findings are closed, and the matrix-solver plus sparse-repeat reports record clean committed-HEAD allocation evidence with zero resident delta.
 - PFM-B5 implements the fourteen planned analyzer and SAT/WCNF cases and splits the thirteen implemented analyzer/search cases that still share selectors.
 
 These exact ledger-owned items are the legitimate remaining work for the full GOAL and must be executed from `docs/plans/blocker-closure-ledger.json`, not reconstructed from checklist prose.
@@ -90,7 +90,7 @@ Before PFM8 can become a completion report, the commands in `docs/plans/GOAL.md`
 
 This PFM8 pass confirms that the current rollup rows should stay conservative.
 PFM-B2 contract groundwork is complete and recorded in `docs/plans/pfm-b2-gate-surface-contract-groundwork-report.md`.
-PFM-B3 shared DEM traversal is complete: the audit and GPT-5.6/max review findings are fixed, and the clean allocation report records `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`, `local_modifications=false`, peak live allocation of 65,536 bytes, and zero resident delta. PFM-B4 implementation and focused evidence have completed their initial audit and review correction pass and await focused finding-closure review plus clean benchmark evidence before PFM-B1; final PFM-B2 generated semantic coverage follows the shared foundations.
+PFM-B3 shared DEM traversal is complete: the audit and GPT-5.6/max review findings are fixed, and the clean allocation report records `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`, `local_modifications=false`, peak live allocation of 65,536 bytes, and zero resident delta. PFM-B4 is also complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc` with clean matrix-solver and sparse-repeat evidence. PFM-B1 is now active; final PFM-B2 generated semantic coverage follows the shared foundations.
 
 ## Verification
 
