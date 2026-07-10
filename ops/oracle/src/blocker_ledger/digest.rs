@@ -56,6 +56,16 @@ pub(super) fn computed_semantic_digest(ledger: &BlockerLedger) -> sha2::digest::
         for case in cases {
             digest_field(&mut hasher, "case.id", &case.id);
             digest_field(&mut hasher, "case.surface", &case.surface);
+            let mut gate_surfaces = case.gate_surfaces.clone();
+            gate_surfaces.sort();
+            for surface in gate_surfaces {
+                digest_field(&mut hasher, "case.gate_surface", surface.as_str());
+            }
+            let mut gate_families = case.gate_families.clone();
+            gate_families.sort();
+            for family in gate_families {
+                digest_field(&mut hasher, "case.gate_family", family.as_str());
+            }
             digest_field(
                 &mut hasher,
                 "case.upstream.path",

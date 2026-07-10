@@ -92,7 +92,7 @@ An implementation milestone may preserve a documented cap when output size or al
 
 Objective: turn the blocker decisions into an executable, subcase-level evidence ledger before production code changes.
 
-Status: Complete as of 2026-07-10. The 124-case source ledger, selector validation, exact oracle evidence signatures, typed benchmark runner, threshold, and comparability classifications, milestone audit, and full code review are recorded in `docs/plans/pfm-b0-blocker-ledger-progress-report.md`.
+Status: Complete as of 2026-07-10. The original 124-case source ledger, selector validation, exact oracle evidence signatures, typed benchmark runner, threshold, and comparability classifications, milestone audit, and full code review are recorded in `docs/plans/pfm-b0-blocker-ledger-progress-report.md`; PFM-B2 separated deterministic MPP, anti-Hermitian MPP rejection, deterministic MPAD, stochastic MPP, and stochastic MPAD provenance and added explicit identity-noise and control-flow owners, so the current ledger has 130 cases without changing the blocker set.
 
 Tasks:
 
@@ -174,31 +174,41 @@ Acceptance criteria:
 
 ### PFM-B2: Gate-By-Surface Semantic Contract
 
-Objective: resolve both PFM3 entries by closing unsupported ambiguity across parser, sampler, detection conversion, detection sampling, analyzer, and flow surfaces.
+Objective: resolve both PFM3 entries by closing unsupported ambiguity across parser, measurement sampler, reference sampler, detection converter, detector frame, detection sampler, error analyzer, and flow-generator surfaces.
+
+Status: Contract groundwork is complete as of 2026-07-10 and recorded in `docs/plans/pfm-b2-gate-surface-contract-groundwork-report.md`. Final generated semantic execution, statistical evidence, oracle shards, and any production dispatch fixes remain pending after the shared B3, B4, B1, and B5 foundations stabilize.
 
 Tasks:
 
 - Add one source-owned gate-by-surface contract generated from canonical gate metadata.
 - Classify every canonical gate on each relevant surface as `execute`, `semantic_noop`, `annotation`, `lower_then_execute`, `unsupported_shape`, or `not_applicable`.
 - Permit `unsupported_shape` only for an invalid target-role combination or a shape that has a named exclusion outside the selected Rust or CLI surface; it cannot be used to claim semantic completion for a legal shape inside the selected surface.
-- Record accepted target-role patterns separately from gate names, including plain qubits, inverted measurement targets, Pauli-product combiners, measurement records, sweep bits, constants, detector ids, and observable ids.
-- Generate tests from the contract so parser acceptance cannot be mistaken for execution support.
+- Record accepted target-role patterns separately from gate names, including plain qubits, inverted measurement targets, Hermitian and anti-Hermitian Pauli products, combiners, measurement records, sweep bits, constants, and detector or observable declarations whose IDs remain governed by their canonical argument rules.
+- Map parser-accepted targets back to machine-readable target patterns and generate tests from the contract so parser acceptance cannot be mistaken for execution support.
 - Cover fixed-tableau gates, reset and measurement families, pair measurements, MPP, MPAD, SPP and SPP_DAG, Pauli noise, Pauli channels, depolarization, correlated-error blocks, heralded noise, annotations, controlled-Pauli feedback, and sweep-controlled groups.
+- Give each `pfm3-contract-*` ledger case an exact machine-readable set of all eight contract surfaces; reject missing, duplicate, or unknown surface values.
+- Give every one of the nineteen canonical semantic families at least one machine-readable ledger owner, including exact no-op identity-noise and structural control-flow shards; reject missing or duplicate family declarations.
+- Validate the ledger's typed surface and semantic-family names against the canonical core contract so the two schemas cannot drift independently.
+- Treat `FlowGenerator` as the PFM-B2 flow surface; flow checking, solving, and transform integration remain owned by PFM-B4.
 - Evidence-close analyzer sweep behavior at the current selected matrix because pinned Stim supplies no additional concrete analyzer case.
 - Require a new failing pinned oracle, a public API expansion, or an explicit compatibility decision before reopening analyzer sweep shapes.
 
 Tests:
 
 - Contract completeness test requiring every canonical gate and relevant surface to have exactly one classification.
+- Accepted-target classification tests covering mixed classical-control groups plus Hermitian and anti-Hermitian Pauli-product groups.
 - Generated positive tests for each executable or no-op class and generated negative tests for each unsupported target role.
 - Exact deterministic comparisons for reference samples, detection conversion, and analyzer DEM output.
 - Statistical comparisons for stochastic MPP, MPAD, Pauli channels, depolarization, correlated errors, and heralded noise with source-owned shot counts, tolerances, and false-positive budgets.
 - Cross-surface tests proving the same target-role pattern is accepted or rejected consistently wherever the contract says the surfaces share semantics.
 - Sweep ordering tests for `CX`, `CY`, `CZ`, `XCZ`, and `YCZ`, including the current classical-only no-op matrix and omitted all-false sweep behavior.
+- Maximum legal sweep-ID analyzer regression proving resource use is not proportional to sweep-index magnitude.
+- Feature-gated allocation regression comparing `sweep[0]` with `sweep[16777215]`, allowing at most two additional allocation calls and 1,024 additional total or peak-live bytes for the maximum ID.
 
 Oracle rows:
 
 - Replace broad `pf3-gate-semantic-execution` wording with generated contract shards grouped by gate family.
+- Keep deterministic MPP, anti-Hermitian MPP rejection, deterministic MPAD, stochastic MPP, and stochastic MPAD evidence in separate ledger cases with exact, error-class, or statistical comparators as appropriate.
 - Keep `pf3-sweep-analyzer` as the complete selected analyzer sweep row and record that no unowned pinned subcase remains.
 - Use statistical rows only for genuinely probabilistic behavior.
 
@@ -206,12 +216,14 @@ Benchmarks:
 
 - Add no per-gate microbenchmarks.
 - Keep representative sampler, converter, detector-frame, and analyzer rows for fixed-tableau, Pauli-product, and stochastic families.
-- Add one mixed-contract compile and execute row only if generated contract dispatch introduces measurable overhead; classify it as `direct-match` only with a faithful pinned Stim workload.
+- Extend `pf3-analyze-errors-sweep` with separate low and maximum sweep-ID submeasurements so `just bench::compare-allocations --only pf3-analyze-errors-sweep` records the resource evidence.
+- Add one mixed-contract compile and execute row whenever final PFM-B2 changes a production compile or execution path to consult the contract; if production dispatch remains unchanged, retain the no-new-row disposition and cite the static-only diff. Classify a new row as `direct-match` only with a faithful pinned Stim workload.
 
 Acceptance criteria:
 
 - The contract has no `unknown`, `selected_example_only`, or implicit fallback state.
 - Every parser-accepted canonical gate has explicit behavior on every relevant implemented surface.
+- Every accepted target group maps to one or more declared target patterns, including a typed rejection for anti-Hermitian Pauli products on semantic surfaces.
 - Every legal target-role shape inside the selected Rust or CLI surface is `execute`, `semantic_noop`, `annotation`, or `lower_then_execute`; any `unsupported_shape` record points to an invalid combination or an explicit exclusion that remains visible in status documentation.
 - Analyzer sweep scope is closed from evidence, and legal non-tableau execution is closed from the exhaustive contract and generated tests.
 

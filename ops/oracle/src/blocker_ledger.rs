@@ -12,6 +12,10 @@ use digest::{computed_semantic_digest, digest_hex};
 use evidence::{
     open_regular_file, read_benchmark_manifest, read_oracle_manifest, read_tracked_stim_paths,
 };
+use gate_contract::{
+    GateContractFamily, GateContractSurface, validate_gate_contract_case,
+    validate_gate_family_coverage, validate_gate_schema,
+};
 use oracle::validate_oracle_reference;
 use provenance::validate_upstream_source;
 use selector::{CargoTestSelector, test_listing_has_match};
@@ -19,16 +23,17 @@ use support::{validate_supporting_benchmarks, validate_supporting_oracles};
 
 mod digest;
 mod evidence;
+mod gate_contract;
 mod oracle;
 mod provenance;
 mod selector;
 mod support;
 
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 const STIM_VERSION: &str = "v1.16.0";
 const EXPECTED_LEDGER_DIGEST: [u8; 32] = [
-    0x6b, 0x05, 0x06, 0x9d, 0xeb, 0xe6, 0x3c, 0x9d, 0xe7, 0xcd, 0x49, 0x11, 0x21, 0xaa, 0xc6, 0x7b,
-    0xe9, 0xcb, 0x6f, 0x33, 0xa1, 0x89, 0x96, 0x13, 0xdf, 0x41, 0x22, 0x34, 0x18, 0xa2, 0xd1, 0xee,
+    0x18, 0x40, 0x22, 0xc5, 0x8b, 0x9f, 0xd4, 0x1b, 0xe3, 0xe0, 0x68, 0x16, 0x1e, 0xc3, 0xb9, 0x74,
+    0x3b, 0x08, 0x20, 0x6f, 0x16, 0x8e, 0x82, 0x85, 0xac, 0xf9, 0x86, 0x2b, 0xd7, 0xd1, 0x55, 0x92,
 ];
 const MAX_LEDGER_BYTES: u64 = 1 << 20;
 const MAX_MANIFEST_BYTES: u64 = 16 << 20;
@@ -182,6 +187,10 @@ impl BlockerDisposition {
 struct BlockerCase {
     id: String,
     surface: String,
+    #[serde(default)]
+    gate_surfaces: Vec<GateContractSurface>,
+    #[serde(default)]
+    gate_families: Vec<GateContractFamily>,
     upstream: UpstreamSource,
     comparator: ComparatorKind,
     #[serde(default)]
@@ -505,7 +514,7 @@ const EXPECTED_BLOCKERS: [ExpectedBlocker; 8] = [
         id: "pfm3-gate-execution",
         milestone: BlockerMilestone::B2,
         disposition: BlockerDisposition::Implement,
-        minimum_cases: 12,
+        minimum_cases: 18,
     },
     ExpectedBlocker {
         id: "pfm4-dem-traversal",
@@ -628,6 +637,7 @@ impl BlockerLedger {
 
         let mut blocker_ids = BTreeSet::new();
         let mut case_ids = BTreeSet::new();
+        validate_gate_schema(&mut violations);
         for blocker in &self.blockers {
             if !blocker_ids.insert(blocker.id.as_str()) {
                 violations.push(format!("duplicate blocker id {:?}", blocker.id));
@@ -664,6 +674,7 @@ impl BlockerLedger {
                     &mut violations,
                 );
             }
+            validate_gate_family_coverage(blocker, &mut violations);
         }
 
         validate_expected_blockers(&self.blockers, &mut violations);
@@ -840,6 +851,7 @@ fn validate_case(
 ) {
     validate_identifier("case", &case.id, violations);
     validate_display_text("case surface", &case.surface, violations);
+    validate_gate_contract_case(blocker, case, violations);
     validate_display_text("upstream test", &case.upstream.test, violations);
     validate_display_text("upstream subcase", &case.upstream.subcase, violations);
     validate_resource_contract(case, violations);

@@ -92,6 +92,21 @@ fn dem_analyzer_ignores_sweep_controls_like_upstream() {
 }
 
 #[test]
+fn dem_analyzer_ignores_maximum_sweep_id_without_dense_state() {
+    assert_eq!(
+        analyze(
+            "
+            X_ERROR(0.25) 0
+            CNOT sweep[16777215] 0
+            M 0
+            DETECTOR rec[-1]
+            ",
+        ),
+        "error(0.25) D0\n"
+    );
+}
+
+#[test]
 fn dem_analyzer_rejects_invalid_sweep_target_positions() {
     for (circuit, expected) in [
         (

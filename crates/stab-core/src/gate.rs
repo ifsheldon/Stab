@@ -1,6 +1,7 @@
 mod decomposition;
 mod flows;
 mod metadata;
+mod semantic_contract;
 mod unitary;
 
 pub use decomposition::GateDecomposition;
@@ -8,6 +9,10 @@ pub use metadata::{GateArgumentRule, GateTargetGroupKind, GateTargetRule};
 pub use unitary::GateUnitaryMatrix;
 
 use crate::{CircuitError, CircuitResult, Probability, Target};
+use semantic_contract::{
+    GateSemanticFamily, gate, gate_with_inverse, not_fusable_gate, semantic_gate,
+    semantic_gate_with_inverse, semantic_not_fusable_gate,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GateCategory {
@@ -108,6 +113,18 @@ impl Gate {
     }
 }
 
+#[cfg(feature = "ops-contracts")]
+#[doc(hidden)]
+pub fn __gate_contract_family_names() -> &'static [&'static str] {
+    semantic_contract::gate_contract_family_names()
+}
+
+#[cfg(feature = "ops-contracts")]
+#[doc(hidden)]
+pub fn __gate_contract_surface_names() -> &'static [&'static str] {
+    semantic_contract::gate_contract_surface_names()
+}
+
 #[derive(Debug, Eq, PartialEq)]
 struct GateInfo {
     name: &'static str,
@@ -115,6 +132,7 @@ struct GateInfo {
     category: GateCategory,
     arg_rule: ArgRule,
     target_rule: TargetRule,
+    semantic_family: GateSemanticFamily,
     can_fuse: bool,
 }
 
@@ -263,7 +281,7 @@ impl TargetRule {
             Self::RecOrPauli => validate_targets(gate, targets, |target| {
                 target.is_measurement_record_target() || target.is_pauli_target()
             }),
-            Self::QubitCoords => validate_targets(gate, targets, Target::is_qubit_like),
+            Self::QubitCoords => validate_targets(gate, targets, is_plain_qubit_target),
             Self::PauliProducts => {
                 validate_targets(gate, targets, Target::is_pauli_product_part)?;
                 validate_combiners(gate, targets)
@@ -571,68 +589,78 @@ const GATES: &[GateInfo] = &[
         ArgRule::Exact(0),
         TargetRule::None,
     ),
-    gate(
+    semantic_gate(
         "MPAD",
         GateCategory::Annotation,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementPads,
+        GateSemanticFamily::MeasurementPad,
     ),
-    gate(
+    semantic_gate(
         "MX",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
+        GateSemanticFamily::Measurement,
     ),
-    gate(
+    semantic_gate(
         "MY",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
+        GateSemanticFamily::Measurement,
     ),
-    gate(
+    semantic_gate(
         "M",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
+        GateSemanticFamily::Measurement,
     ),
-    gate(
+    semantic_gate(
         "MRX",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
+        GateSemanticFamily::MeasureReset,
     ),
-    gate(
+    semantic_gate(
         "MRY",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
+        GateSemanticFamily::MeasureReset,
     ),
-    gate(
+    semantic_gate(
         "MR",
         GateCategory::Collapsing,
         ArgRule::ZeroOrOneProbability,
         TargetRule::MeasurementQubits,
+        GateSemanticFamily::MeasureReset,
     ),
-    gate_with_inverse(
+    semantic_gate_with_inverse(
         "RX",
         "MX",
         GateCategory::Collapsing,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
+        GateSemanticFamily::Reset,
     ),
-    gate_with_inverse(
+    semantic_gate_with_inverse(
         "RY",
         "MY",
         GateCategory::Collapsing,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
+        GateSemanticFamily::Reset,
     ),
-    gate_with_inverse(
+    semantic_gate_with_inverse(
         "R",
         "M",
         GateCategory::Collapsing,
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
+        GateSemanticFamily::Reset,
     ),
     gate(
         "XCX",
@@ -646,11 +674,12 @@ const GATES: &[GateInfo] = &[
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     ),
-    gate(
+    semantic_gate(
         "XCZ",
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::ClassicalControlPairs,
+        GateSemanticFamily::ReverseClassicalControl,
     ),
     gate(
         "YCX",
@@ -664,29 +693,33 @@ const GATES: &[GateInfo] = &[
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     ),
-    gate(
+    semantic_gate(
         "YCZ",
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::ClassicalControlPairs,
+        GateSemanticFamily::ReverseClassicalControl,
     ),
-    gate(
+    semantic_gate(
         "CX",
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::ClassicalControlPairs,
+        GateSemanticFamily::ForwardClassicalControl,
     ),
-    gate(
+    semantic_gate(
         "CY",
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::ClassicalControlPairs,
+        GateSemanticFamily::ForwardClassicalControl,
     ),
-    gate(
+    semantic_gate(
         "CZ",
         GateCategory::Controlled,
         ArgRule::Exact(0),
         TargetRule::ClassicalControlPairs,
+        GateSemanticFamily::SymmetricClassicalControl,
     ),
     gate(
         "H",
@@ -724,71 +757,82 @@ const GATES: &[GateInfo] = &[
         ArgRule::Exact(0),
         TargetRule::AnySingleQubit,
     ),
-    gate(
+    semantic_gate(
         "DEPOLARIZE1",
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::AnySingleQubit,
+        GateSemanticFamily::Depolarization,
     ),
-    gate(
+    semantic_gate(
         "DEPOLARIZE2",
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::PlainPairs,
+        GateSemanticFamily::Depolarization,
     ),
-    gate(
+    semantic_gate(
         "X_ERROR",
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::AnySingleQubit,
+        GateSemanticFamily::PauliNoise,
     ),
-    gate(
+    semantic_gate(
         "Y_ERROR",
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::AnySingleQubit,
+        GateSemanticFamily::PauliNoise,
     ),
-    gate(
+    semantic_gate(
         "Z_ERROR",
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::AnySingleQubit,
+        GateSemanticFamily::PauliNoise,
     ),
-    gate(
+    semantic_gate(
         "I_ERROR",
         GateCategory::Noise,
         ArgRule::AnyProbabilityList,
         TargetRule::AnySingleQubit,
+        GateSemanticFamily::IdentityNoise,
     ),
-    gate(
+    semantic_gate(
         "II_ERROR",
         GateCategory::Noise,
         ArgRule::AnyProbabilityList,
         TargetRule::PlainPairs,
+        GateSemanticFamily::IdentityNoise,
     ),
-    gate(
+    semantic_gate(
         "PAULI_CHANNEL_1",
         GateCategory::Noise,
         ArgRule::ProbabilityList(3),
         TargetRule::AnySingleQubit,
+        GateSemanticFamily::PauliChannel,
     ),
-    gate(
+    semantic_gate(
         "PAULI_CHANNEL_2",
         GateCategory::Noise,
         ArgRule::ProbabilityList(15),
         TargetRule::PlainPairs,
+        GateSemanticFamily::PauliChannel,
     ),
-    not_fusable_gate(
+    semantic_not_fusable_gate(
         "E",
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::PauliList,
+        GateSemanticFamily::CorrelatedError,
     ),
-    not_fusable_gate(
+    semantic_not_fusable_gate(
         "ELSE_CORRELATED_ERROR",
         GateCategory::Noise,
         ArgRule::ProbabilityList(1),
         TargetRule::PauliList,
+        GateSemanticFamily::CorrelatedError,
     ),
     gate(
         "HERALDED_ERASE",
@@ -972,25 +1016,28 @@ const GATES: &[GateInfo] = &[
         ArgRule::Exact(0),
         TargetRule::PlainPairs,
     ),
-    gate(
+    semantic_gate(
         "MPP",
         GateCategory::PauliProduct,
         ArgRule::ZeroOrOneProbability,
         TargetRule::PauliProducts,
+        GateSemanticFamily::PauliProductMeasurement,
     ),
-    gate_with_inverse(
+    semantic_gate_with_inverse(
         "SPP",
         "SPP_DAG",
         GateCategory::PauliProduct,
         ArgRule::Exact(0),
         TargetRule::PauliProducts,
+        GateSemanticFamily::PauliProductPhase,
     ),
-    gate_with_inverse(
+    semantic_gate_with_inverse(
         "SPP_DAG",
         "SPP",
         GateCategory::PauliProduct,
         ArgRule::Exact(0),
         TargetRule::PauliProducts,
+        GateSemanticFamily::PauliProductPhase,
     ),
     gate(
         "SWAP",
@@ -1051,45 +1098,3 @@ const GATES: &[GateInfo] = &[
         TargetRule::MeasurementPairs,
     ),
 ];
-
-const fn gate(
-    name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-) -> GateInfo {
-    gate_with_inverse(name, name, category, arg_rule, target_rule)
-}
-
-const fn gate_with_inverse(
-    name: &'static str,
-    inverse_name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-) -> GateInfo {
-    GateInfo {
-        name,
-        inverse_name,
-        category,
-        arg_rule,
-        target_rule,
-        can_fuse: true,
-    }
-}
-
-const fn not_fusable_gate(
-    name: &'static str,
-    category: GateCategory,
-    arg_rule: ArgRule,
-    target_rule: TargetRule,
-) -> GateInfo {
-    GateInfo {
-        name,
-        inverse_name: name,
-        category,
-        arg_rule,
-        target_rule,
-        can_fuse: false,
-    }
-}

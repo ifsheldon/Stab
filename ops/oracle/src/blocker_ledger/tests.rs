@@ -125,11 +125,84 @@ fn blocker_ledger_rejects_fifo_without_blocking() {
 #[test]
 fn blocker_ledger_rejects_unknown_schema_version() {
     let ledger = mutated_ledger(|value| {
-        *value.get_mut("schema_version").expect("schema version") = Value::from(2);
+        *value.get_mut("schema_version").expect("schema version") = Value::from(3);
     });
 
     let error = ledger.check(&repo_root()).expect_err("schema mismatch");
-    assert!(validation_text(error).contains("schema_version is 2"));
+    assert!(validation_text(error).contains("schema_version is 3"));
+}
+
+#[test]
+fn blocker_ledger_gate_schema_matches_canonical_core_metadata() {
+    let mut violations = Vec::new();
+    super::gate_contract::validate_gate_schema(&mut violations);
+    assert!(violations.is_empty(), "{violations:#?}");
+}
+
+#[test]
+fn blocker_ledger_requires_all_gate_contract_surfaces() {
+    let ledger = mutated_ledger(|value| {
+        case_mut(value, "pfm3-gate-execution", "pfm3-contract-fixed-tableau")
+            .get_mut("gate_surfaces")
+            .and_then(Value::as_array_mut)
+            .expect("gate surfaces")
+            .retain(|surface| surface.as_str() != Some("detector-frame"));
+    });
+
+    let error = ledger
+        .check(&repo_root())
+        .expect_err("missing gate surface");
+    let message = validation_text(error);
+    assert!(message.contains("must cover all eight gate surfaces"));
+    assert!(message.contains("detector-frame"));
+}
+
+#[test]
+fn blocker_ledger_rejects_duplicate_gate_contract_surfaces() {
+    let ledger = mutated_ledger(|value| {
+        case_mut(value, "pfm3-gate-execution", "pfm3-contract-fixed-tableau")
+            .get_mut("gate_surfaces")
+            .and_then(Value::as_array_mut)
+            .expect("gate surfaces")
+            .push(Value::from("parser"));
+    });
+
+    let error = ledger
+        .check(&repo_root())
+        .expect_err("duplicate gate surface");
+    assert!(validation_text(error).contains("duplicate gate_surfaces"));
+}
+
+#[test]
+fn blocker_ledger_requires_all_gate_contract_families() {
+    let ledger = mutated_ledger(|value| {
+        case_mut(value, "pfm3-gate-execution", "pfm3-contract-identity-noise")
+            .get_mut("gate_families")
+            .and_then(Value::as_array_mut)
+            .expect("gate families")
+            .clear();
+    });
+
+    let error = ledger.check(&repo_root()).expect_err("missing gate family");
+    let message = validation_text(error);
+    assert!(message.contains("all nineteen semantic families"));
+    assert!(message.contains("identity-noise"));
+}
+
+#[test]
+fn blocker_ledger_rejects_duplicate_gate_contract_families() {
+    let ledger = mutated_ledger(|value| {
+        case_mut(value, "pfm3-gate-execution", "pfm3-contract-fixed-tableau")
+            .get_mut("gate_families")
+            .and_then(Value::as_array_mut)
+            .expect("gate families")
+            .push(Value::from("fixed-tableau"));
+    });
+
+    let error = ledger
+        .check(&repo_root())
+        .expect_err("duplicate gate family");
+    assert!(validation_text(error).contains("duplicate gate_families"));
 }
 
 #[test]

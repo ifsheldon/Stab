@@ -32,8 +32,9 @@ If these sources disagree, fix the disagreement before implementation continues.
 ## Current Checkpoint
 
 PFM-B0 is complete as of 2026-07-10.
-The source-owned closure ledger now freezes 124 cases across all eight blocker families, and `just oracle::blockers --check-selectors` validates its evidence contracts and current executable selectors.
-Begin with PFM-B2 contract groundwork next; do not reopen PFM-B0 unless the ledger schema, frozen inventory, evidence signatures, or selector-validation contract changes.
+PFM-B2 contract groundwork is also complete: canonical metadata now classifies all 81 gates across eight surfaces and maps parser-accepted target groups, including anti-Hermitian Pauli products, to typed behavior or rejection decisions with no unknown state.
+Ledger schema version 2 requires all eight surfaces per gate-family case, validates its surface and family names against canonical core metadata, and gives every one of the nineteen semantic families an explicit owner. Deterministic MPP, anti-Hermitian MPP rejection, deterministic MPAD, stochastic MPP, and stochastic MPAD now have separate provenance and comparator records; eighteen cases remain planned until final PFM-B2 coverage after the shared foundations stabilize.
+Begin PFM-B3 shared folded DEM traversal next; do not reopen PFM-B0 or the PFM-B2 contract schema unless their frozen evidence or classification contracts change.
 
 ## Scope Decisions
 

@@ -771,7 +771,11 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
         ),
         (
             "pf3-analyze-errors-sweep",
-            &["stab_analyze_errors_sweep_control"][..],
+            &[
+                "stab_analyze_errors_sweep_control",
+                "stab_analyze_errors_sweep_id_low",
+                "stab_analyze_errors_sweep_id_max",
+            ][..],
             "analyze-errors-sweep",
         ),
         (
@@ -815,6 +819,50 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
             );
         }
     }
+}
+
+#[cfg(feature = "count-allocations")]
+#[test]
+fn pf3_analyzer_sweep_allocation_is_index_magnitude_independent() {
+    use std::hint::black_box;
+
+    use stab_core::{Circuit, ErrorAnalyzerOptions, circuit_to_detector_error_model};
+
+    fn analyze(circuit: &Circuit) {
+        let model = circuit_to_detector_error_model(circuit, ErrorAnalyzerOptions::default())
+            .expect("sweep resource fixture must analyze");
+        black_box(model);
+    }
+
+    let low = Circuit::from_stim_str(&super::m10::analyze_sweep_id_fixture(0))
+        .expect("low sweep-id fixture");
+    let high = Circuit::from_stim_str(&super::m10::analyze_sweep_id_fixture(16_777_215))
+        .expect("maximum sweep-id fixture");
+    analyze(&low);
+    analyze(&high);
+
+    let low_allocations = allocation_counter::measure(|| analyze(&low));
+    let high_allocations = allocation_counter::measure(|| analyze(&high));
+    const ALLOWED_COUNT_DELTA: u64 = 2;
+    const ALLOWED_BYTE_DELTA: u64 = 1_024;
+    assert!(
+        high_allocations.count_total
+            <= low_allocations
+                .count_total
+                .saturating_add(ALLOWED_COUNT_DELTA),
+        "maximum sweep id increased allocation count: low={low_allocations:?}, high={high_allocations:?}"
+    );
+    assert!(
+        high_allocations.bytes_total
+            <= low_allocations
+                .bytes_total
+                .saturating_add(ALLOWED_BYTE_DELTA),
+        "maximum sweep id increased total allocated bytes: low={low_allocations:?}, high={high_allocations:?}"
+    );
+    assert!(
+        high_allocations.bytes_max <= low_allocations.bytes_max.saturating_add(ALLOWED_BYTE_DELTA),
+        "maximum sweep id increased peak live bytes: low={low_allocations:?}, high={high_allocations:?}"
+    );
 }
 
 #[test]

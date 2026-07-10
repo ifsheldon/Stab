@@ -166,9 +166,12 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             SPARSE_REVERSE_SHIFTED_REPEAT_COUNT as f64,
             "folded-rounds/s",
         )),
-        ("pf3-analyze-errors-sweep", "stab_analyze_errors_sweep_control") => {
-            Some((1.0, "circuits/s"))
-        }
+        (
+            "pf3-analyze-errors-sweep",
+            "stab_analyze_errors_sweep_control"
+            | "stab_analyze_errors_sweep_id_low"
+            | "stab_analyze_errors_sweep_id_max",
+        ) => Some((1.0, "circuits/s")),
         ("m10-error-analyzer", "stab_error_analyzer_surface_code") => {
             Some((error_analyzer_detector_count(), "detectors/s"))
         }
@@ -236,7 +239,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures public unsigned-flow checking over a measurement-dependent fixed two-qubit Clifford unitary repeat and a shifted measurement/detector repeat so the sparse reverse frame tracker must use loop folding; broader sparse tracker parity and provenance remain outside this row",
         ),
         "pf3-analyze-errors-sweep" => Some(
-            "report-only: Stab measures in-process analyzer handling for selected sweep-controlled Clifford gates and CZ sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups that are semantically ignored by the error analyzer",
+            "report-only: Stab measures in-process analyzer handling for selected sweep-controlled Clifford gates and CZ sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, plus allocation-comparable low and maximum sweep-id resource submeasurements",
         ),
         "m10-error-analyzer" => Some(
             "contract-representative: Stab measures in-process generated rotated-memory-z surface-code analysis at d3/r3; the upstream Stim perf row uses d11/r100 and remains the eventual scale target",
@@ -588,16 +591,32 @@ fn run_generated_sat_wcnf_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
 fn run_analyze_sweep_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let circuit = Circuit::from_stim_str(ANALYZE_SWEEP_CONTROL_FIXTURE)
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    Ok(vec![measure_stab_iterations(
-        "stab_analyze_errors_sweep_control",
-        STAB_COMPARE_ITERATIONS,
-        || {
-            let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(dem.items().len());
-            Ok(())
-        },
-    )?])
+    let low_id_circuit = Circuit::from_stim_str(&analyze_sweep_id_fixture(0))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    let max_id_circuit = Circuit::from_stim_str(&analyze_sweep_id_fixture(16_777_215))
+        .map_err(|error| stab_runner_error(&row.id, error))?;
+    Ok(vec![
+        measure_analyze_sweep_circuit(row, "stab_analyze_errors_sweep_control", &circuit)?,
+        measure_analyze_sweep_circuit(row, "stab_analyze_errors_sweep_id_low", &low_id_circuit)?,
+        measure_analyze_sweep_circuit(row, "stab_analyze_errors_sweep_id_max", &max_id_circuit)?,
+    ])
+}
+
+fn measure_analyze_sweep_circuit(
+    row: &BenchmarkRow,
+    name: &str,
+    circuit: &Circuit,
+) -> Result<Measurement, BenchError> {
+    measure_stab_iterations(name, STAB_COMPARE_ITERATIONS, || {
+        let dem = circuit_to_detector_error_model(circuit, ErrorAnalyzerOptions::default())
+            .map_err(|error| stab_runner_error(&row.id, error))?;
+        black_box(dem.items().len());
+        Ok(())
+    })
+}
+
+pub(super) fn analyze_sweep_id_fixture(sweep_id: u32) -> String {
+    format!("X_ERROR(0.25) 0\nCX sweep[{sweep_id}] 0\nM 0\nDETECTOR rec[-1]\n")
 }
 
 fn run_sparse_reverse_frame_loop_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {

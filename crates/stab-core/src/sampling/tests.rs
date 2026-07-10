@@ -349,6 +349,11 @@ fn anti_hermitian_mpp_products_are_rejected() {
 #[test]
 fn correlated_error_branches_match_stim_else_semantics() {
     assert_eq!(
+        samples("E(1)\nELSE_CORRELATED_ERROR(1) X0\nM 0\n", 1),
+        vec![vec![false]],
+        "an empty successful correlated-error branch must suppress its ELSE branch"
+    );
+    assert_eq!(
         samples(
             "CORRELATED_ERROR(0) X0 X1\nELSE_CORRELATED_ERROR(0) X1 X2\nELSE_CORRELATED_ERROR(0) X2 X3\nM 0 1 2 3\n",
             1,

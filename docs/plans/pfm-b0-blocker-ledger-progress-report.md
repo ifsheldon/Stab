@@ -11,8 +11,8 @@ PFM-B0 adds no Stim behavior and changes no benchmark gate.
 
 ## Implementation
 
-- Added `docs/plans/blocker-closure-ledger.json` with schema version 1 and frozen Stim v1.16.0 provenance.
-- Recorded 124 owned cases across PFM-B1 through PFM-B5.
+- Added `docs/plans/blocker-closure-ledger.json` with frozen Stim v1.16.0 provenance; PFM-B2 subsequently upgraded it to schema version 2 so gate-family cases own typed eight-surface coverage.
+- Recorded 124 owned cases across PFM-B1 through PFM-B5; the later PFM-B2 schema-v2 upgrade separated deterministic MPP, anti-Hermitian MPP rejection, deterministic MPAD, stochastic MPP, and stochastic MPAD provenance and added identity-noise and control-flow owners, bringing the current total to 130.
 - Split the broad Python `test_inv_circuit`, C++ `missing_detectors.circuit`, and C++ `circuit_flow_generators.various` sources into stable case ids.
 - Recorded each case's public or internal surface, upstream source and subcase, comparator, current status, test selector, oracle disposition, benchmark disposition and comparability class, and resource contract.
 - Distinguished exact GTest cases, exact pytest cases, planned cross-cutting source test families, and implementation symbols. Exact tests and symbols are checked against tracked source text, and every planned test family names one or more exact validated upstream anchors; a test-family record cannot be used as implemented or evidence-close proof.
@@ -32,14 +32,14 @@ PFM-B0 adds no Stim behavior and changes no benchmark gate.
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | PFM2 QEC transforms | Implement | 19 | 7 | 12 | 0 | 4 | 0 | 0 |
 | PFM3 analyzer sweep | Evidence close | 1 | 0 | 0 | 1 | 0 | 1 | 0 |
-| PFM3 gate execution | Implement | 12 | 12 | 0 | 0 | 0 | 0 | 0 |
+| PFM3 gate execution | Implement | 18 | 18 | 0 | 0 | 0 | 0 | 0 |
 | PFM4 DEM traversal | Implement | 7 | 7 | 0 | 0 | 0 | 0 | 0 |
 | PFM5 detecting regions | Evidence close | 2 | 0 | 0 | 2 | 0 | 10 | 4 |
 | PFM5 missing detectors | Evidence close | 14 | 0 | 0 | 14 | 11 | 6 | 1 |
 | PFM5 flow engine | Implement | 33 | 1 | 32 | 0 | 28 | 0 | 0 |
 | PFM6 analyzer and search | Implement | 36 | 14 | 22 | 0 | 13 | 0 | 0 |
 
-The 41 planned cases are explicit future implementation work.
+The 47 planned cases are explicit future implementation work.
 The 66 implemented cases retain existing semantic evidence, and the 17 evidence-close-designated cases belong to the three families where the active pinned behavior is already implemented.
 The ledger also exposes 56 cases that currently share a broad Rust selector, including 11 missing-detector evidence-close cases; their stable case ids freeze the inventory, but PFM-B1, PFM-B4, and PFM-B5 must replace shared selectors with independently selectable tests before their respective acceptance criteria can close.
 Each statistical plan uses 100,000 shots, a frozen per-case seed, a six-sigma binomial standard-error term, a 0.01 absolute probability floor, named output buckets, and a familywise false-positive budget of 0.000001; the owner milestone must verify that budget with an exact binomial-tail calculation before promotion.
@@ -53,6 +53,7 @@ Each statistical plan uses 100,000 shots, a frozen per-case seed, a six-sigma bi
 - Missing required blockers.
 - Deleted owned cases below a blocker-specific floor.
 - Duplicate case ids.
+- Missing or duplicate PFM-B2 gate surfaces and semantic families, including incomplete union coverage across all nineteen canonical families.
 - Replacement of a frozen owned case with a different case id.
 - Planned rows that falsely claim existing test evidence.
 - Evidence-close rows that point only to planned oracle evidence.
@@ -85,7 +86,7 @@ Every ledger case nevertheless has an existing benchmark row, a planned benchmar
 | Requirement | Status | Evidence |
 | --- | --- | --- |
 | All eight open spec-gap entries have an owner | Satisfied | `EXPECTED_BLOCKERS` and `just oracle::blockers` |
-| One stable ledger record exists per owned subcase | Satisfied | 124 semantically frozen case records in `docs/plans/blocker-closure-ledger.json`, including separate loop-carried, period-8, and period-127 `ErrorAnalyzer.loop_folding` records |
+| One stable ledger record exists per owned subcase | Satisfied | 130 semantically frozen case records in `docs/plans/blocker-closure-ledger.json`, including separately sourced deterministic MPP, anti-Hermitian MPP rejection, deterministic MPAD, stochastic MPP, and stochastic MPAD records, identity-noise and control-flow owners, plus loop-carried, period-8, and period-127 `ErrorAnalyzer.loop_folding` records |
 | Multi-example broad tests have stable subcase inventory | Satisfied | Stable PFM2, PFM5 missing-detector, and PFM5 flow case ids; 56 shared selectors remain explicitly visible for owner-milestone evidence splitting |
 | Existing work is distinguished from planned work | Satisfied | `status` plus test, oracle, and benchmark evidence states |
 | Comparators and resource contracts are mandatory | Satisfied | `BlockerCase` schema and validator; statistical rows additionally require reproducible typed statistical plans |

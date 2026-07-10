@@ -933,6 +933,7 @@ fn parser_rejects_inverted_targets_except_result_gates_like_stim() {
     assert!(Circuit::from_stim_str("X !0\n").is_err());
     assert!(Circuit::from_stim_str("R !0\n").is_err());
     assert!(Circuit::from_stim_str("X_ERROR(0.125) !0\n").is_err());
+    assert!(Circuit::from_stim_str("QUBIT_COORDS(1, 2) !0\n").is_err());
 }
 
 #[test]

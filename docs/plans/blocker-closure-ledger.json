@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "stim_version": "v1.16.0",
   "blockers": [
     {
@@ -839,6 +839,19 @@
         {
           "id": "pfm3-contract-fixed-tableau",
           "surface": "sampler, detection converter, detection sampler, analyzer, and flows",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "fixed-tableau"
+          ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "test-family",
@@ -877,6 +890,21 @@
         {
           "id": "pfm3-contract-measure-reset",
           "surface": "sampler, detection converter, detection sampler, analyzer, and flows",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "measurement",
+            "measure-reset",
+            "reset"
+          ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "test-family",
@@ -917,6 +945,19 @@
         {
           "id": "pfm3-contract-pair-measurement",
           "surface": "sampler, detection converter, detection sampler, analyzer, and flows",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pair-measurement"
+          ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "test-family",
@@ -953,18 +994,166 @@
           "resource_contract": "Process pair groups in bounded scratch proportional to one group."
         },
         {
-          "id": "pfm3-contract-mpp-mpad",
-          "surface": "sampler, detection converter, detection sampler, analyzer, and flows",
+          "id": "pfm3-contract-mpp-deterministic",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pauli-product-measurement"
+          ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
-            "kind": "test-family",
-            "test": "FrameSimulator MPP and MPAD families",
-            "subcase": "deterministic and stochastic Pauli products and measurement pads",
-            "anchors": [
-              "FrameSimulator.measure_pauli_product_4body",
-              "FrameSimulator.non_deterministic_pauli_product_detectors",
-              "FrameSimulator.mpad"
+            "kind": "gtest-case",
+            "test": "FrameSimulator.measure_pauli_product_4body",
+            "subcase": "deterministic four-body Pauli-product measurement records"
+          },
+          "comparator": "exact",
+          "status": "planned",
+          "test": {
+            "state": "planned",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate_surface_contract_mpp_deterministic",
+              "--quiet"
             ]
+          },
+          "oracle": {
+            "state": "planned",
+            "classification": "planned",
+            "value": "pfm-b2-gate-contract-mpp-deterministic"
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Bound deterministic product reduction scratch by target count and process one target group at a time."
+        },
+        {
+          "id": "pfm3-contract-mpp-anti-hermitian-rejection",
+          "surface": "parser acceptance and semantic-surface rejection",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pauli-product-measurement"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/tableau_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "TableauSimulator.measure_pauli_product_bad",
+            "subcase": "anti-Hermitian same-qubit Pauli products reject during semantic execution"
+          },
+          "comparator": "error-class",
+          "status": "planned",
+          "test": {
+            "state": "planned",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate_surface_contract_mpp_anti_hermitian_rejection",
+              "--quiet"
+            ]
+          },
+          "oracle": {
+            "state": "planned",
+            "classification": "planned",
+            "value": "pfm-b2-gate-contract-mpp-anti-hermitian-rejection"
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "Negative Pauli-product shape rejection is admission behavior, not a throughput workload."
+          },
+          "resource_contract": "Reject the first anti-Hermitian product during bounded target-group validation without execution or target-count-proportional auxiliary state."
+        },
+        {
+          "id": "pfm3-contract-mpad-deterministic",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "measurement-pad"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.mpad",
+            "subcase": "deterministic zero and one measurement-pad records"
+          },
+          "comparator": "exact",
+          "status": "planned",
+          "test": {
+            "state": "planned",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate_surface_contract_mpad_deterministic",
+              "--quiet"
+            ]
+          },
+          "oracle": {
+            "state": "planned",
+            "classification": "planned",
+            "value": "pfm-b2-gate-contract-mpad-deterministic"
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Append deterministic pad records in one pass with reusable per-shot measurement storage."
+        },
+        {
+          "id": "pfm3-contract-mpp-stochastic",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pauli-product-measurement"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/tableau_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "TableauSimulator.measure_pauli_product_noisy",
+            "subcase": "MPP(p) flips deterministic Pauli-product measurement records at the declared probability"
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -975,7 +1164,63 @@
             "familywise_false_positive_budget": 1e-06,
             "buckets": [
               "mpp-zero",
-              "mpp-one",
+              "mpp-one"
+            ]
+          },
+          "status": "planned",
+          "test": {
+            "state": "planned",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate_surface_contract_mpp_stochastic",
+              "--quiet"
+            ]
+          },
+          "oracle": {
+            "state": "planned",
+            "classification": "planned",
+            "value": "pfm-b2-gate-contract-mpp-stochastic"
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Reuse stochastic sampling buffers and keep scratch proportional to one Pauli-product group rather than shot count."
+        },
+        {
+          "id": "pfm3-contract-mpad-stochastic",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "measurement-pad"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.inl",
+            "kind": "source-symbol",
+            "test": "FrameSimulator<W>::do_MPAD",
+            "subcase": "MPAD(p) reserves noisy measurement-record space and applies its declared flip probability; pinned Stim has no direct stochastic MPAD GTest"
+          },
+          "comparator": "statistical",
+          "statistical_plan": {
+            "shots": 100000,
+            "seed": 12648432,
+            "sigma_multiplier": 6.0,
+            "absolute_probability_floor": 0.01,
+            "familywise_false_positive_budget": 1e-06,
+            "buckets": [
               "mpad-zero",
               "mpad-one"
             ]
@@ -988,25 +1233,38 @@
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_mpp_mpad",
+              "gate_surface_contract_mpad_stochastic",
               "--quiet"
             ]
           },
           "oracle": {
             "state": "planned",
             "classification": "planned",
-            "value": "pfm-b2-gate-contract-mpp-mpad"
+            "value": "pfm-b2-gate-contract-mpad-stochastic"
           },
           "benchmark": {
             "state": "existing",
             "value": "pf3-gate-semantic-wide",
             "classification": "report-only"
           },
-          "resource_contract": "Bound product scratch by target count and reuse stochastic sampling buffers."
+          "resource_contract": "Reuse stochastic measurement-pad buffers and keep scratch proportional to one pad group rather than shot count."
         },
         {
           "id": "pfm3-contract-spp",
           "surface": "sampler, detection converter, detector frame, analyzer, and flows",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pauli-product-phase"
+          ],
           "upstream": {
             "path": "src/stim/circuit/gate_decomposition.test.cc",
             "kind": "test-family",
@@ -1046,6 +1304,19 @@
         {
           "id": "pfm3-contract-pauli-noise",
           "surface": "sampler, detection sampler, and analyzer",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pauli-noise"
+          ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "test-family",
@@ -1088,15 +1359,27 @@
             "value": "pfm-b2-gate-contract-pauli-noise"
           },
           "benchmark": {
-            "state": "planned",
-            "value": "pfm-b2-gate-noise-mixed",
-            "classification": "contract-representative"
+            "state": "not-applicable",
+            "value": "Retain representative report-only gate benchmarks; add a mixed-contract row whenever final PFM-B2 makes production compile or execution dispatch consult the contract."
           },
           "resource_contract": "Sample noise in place with constant scratch per target."
         },
         {
           "id": "pfm3-contract-pauli-channels",
           "surface": "sampler, detection sampler, and analyzer",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pauli-channel"
+          ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "test-family",
@@ -1155,15 +1438,73 @@
             "value": "pfm-b2-gate-contract-pauli-channels"
           },
           "benchmark": {
-            "state": "planned",
-            "value": "pfm-b2-gate-noise-mixed",
-            "classification": "contract-representative"
+            "state": "not-applicable",
+            "value": "Retain representative report-only gate benchmarks; add a mixed-contract row whenever final PFM-B2 makes production compile or execution dispatch consult the contract."
           },
           "resource_contract": "Sample channels without allocations proportional to shot count."
         },
         {
+          "id": "pfm3-contract-identity-noise",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "identity-noise"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.inl",
+            "kind": "source-symbol",
+            "test": "case GateType::I_ERROR:",
+            "subcase": "I_ERROR and II_ERROR execute as exact semantic no-ops"
+          },
+          "comparator": "semantic-invariant",
+          "status": "planned",
+          "test": {
+            "state": "planned",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate_surface_contract_identity_noise",
+              "--quiet"
+            ]
+          },
+          "oracle": {
+            "state": "planned",
+            "classification": "planned",
+            "value": "pfm-b2-gate-contract-identity-noise"
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "Identity-noise gates are exact no-ops covered inside representative execution rows; a standalone no-op microbenchmark would not represent user work."
+          },
+          "resource_contract": "Do not allocate or mutate simulator, converter, analyzer, or flow state for identity-noise targets."
+        },
+        {
           "id": "pfm3-contract-depolarization",
           "surface": "sampler, detection sampler, and analyzer",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "depolarization"
+          ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "test-family",
@@ -1208,15 +1549,27 @@
             "value": "pfm-b2-gate-contract-depolarization"
           },
           "benchmark": {
-            "state": "planned",
-            "value": "pfm-b2-gate-noise-mixed",
-            "classification": "contract-representative"
+            "state": "not-applicable",
+            "value": "Retain representative report-only gate benchmarks; add a mixed-contract row whenever final PFM-B2 makes production compile or execution dispatch consult the contract."
           },
           "resource_contract": "Use constant scratch for each one- or two-qubit group."
         },
         {
           "id": "pfm3-contract-correlated-errors",
           "surface": "sampler, detection sampler, and analyzer",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "correlated-error"
+          ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "test-family",
@@ -1259,15 +1612,27 @@
             "value": "pfm-b2-gate-contract-correlated-errors"
           },
           "benchmark": {
-            "state": "planned",
-            "value": "pfm-b2-gate-noise-mixed",
-            "classification": "contract-representative"
+            "state": "not-applicable",
+            "value": "Retain representative report-only gate benchmarks; add a mixed-contract row whenever final PFM-B2 makes production compile or execution dispatch consult the contract."
           },
           "resource_contract": "Track one active correlated-error branch per shot without growing history."
         },
         {
           "id": "pfm3-contract-heralded-noise",
           "surface": "sampler, detection converter, detection sampler, analyzer, and flows",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "heralded-noise"
+          ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "test-family",
@@ -1313,15 +1678,27 @@
             "value": "pfm-b2-gate-contract-heralded-noise"
           },
           "benchmark": {
-            "state": "planned",
-            "value": "pfm-b2-gate-noise-mixed",
-            "classification": "contract-representative"
+            "state": "not-applicable",
+            "value": "Retain representative report-only gate benchmarks; add a mixed-contract row whenever final PFM-B2 makes production compile or execution dispatch consult the contract."
           },
           "resource_contract": "Append herald records into reused shot buffers without full-output materialization."
         },
         {
           "id": "pfm3-contract-annotations",
           "surface": "sampler, detection converter, analyzer, and flows",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "annotation"
+          ],
           "upstream": {
             "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "test-family",
@@ -1360,6 +1737,21 @@
         {
           "id": "pfm3-contract-classical-controls",
           "surface": "reference sampler, detection converter, detection sampler, analyzer, and flows",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "forward-classical-control",
+            "symmetric-classical-control",
+            "reverse-classical-control"
+          ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "test-family",
@@ -1396,6 +1788,52 @@
             "classification": "report-only"
           },
           "resource_contract": "Resolve control bits from bounded record lookback or sparse sweep input without dense index allocation."
+        },
+        {
+          "id": "pfm3-contract-control-flow",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "control-flow"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.stream_huge_case",
+            "subcase": "REPEAT is parser-owned control flow and executes through circuit structure instead of regular instruction dispatch"
+          },
+          "comparator": "structural",
+          "status": "planned",
+          "test": {
+            "state": "planned",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate_surface_contract_control_flow",
+              "--quiet"
+            ]
+          },
+          "oracle": {
+            "state": "planned",
+            "classification": "planned",
+            "value": "pfm-b2-gate-contract-control-flow"
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "Repeat execution already has dedicated sampler and folded-consumer benchmarks; this shard proves dispatch ownership instead of adding a duplicate microbenchmark."
+          },
+          "resource_contract": "Keep repeat execution and folding at circuit-item level without materializing bounded-output-independent repeat counts."
         }
       ]
     },

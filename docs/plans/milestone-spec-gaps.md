@@ -73,15 +73,6 @@ Gap: the promoted PFM6 evidence is exact and source-owned, including the selecte
 Proposed amendment: keep the current PFM6 slices as the selected analyzer, search, sparse-tracker, and matched-error evidence. Do not add broader generated analyzer, logical-observable period, search, SAT/WCNF, sparse-tracker consumption, variable-target unitary, or value-object hardening rows until a future plan names exact subcases, positive and negative tests, comparator behavior, resource boundaries, oracle metadata, and benchmark or no-benchmark rationale.
 Resolution: Exact closure scope is selected by PFM-B5 in `docs/plans/non-deferred-partial-feature-milestones.md`. The entry remains open until generic analyzer state-cycle folding replaces fixture-specific periods, the named analyzer, graphlike, hypergraph, and WCNF corpora are complete, active sparse-tracker consumers share the loop summary, and tests, benchmarks, audit, review, and documentation close.
 
-## 2026-07-07 - PFM3: Analyzer Sweep-Shape Boundary
-
-Status: Open
-Revealed by: PFM0 evidence-lock refresh after comparing the implemented PF3 analyzer sweep-control matrix against pinned Stim v1.16.0 `ErrorAnalyzer, ignores_sweep_controls`.
-Current text: PFM3 says broader analyzer sweep-shape parity remains active after the selected analyzer sweep-control and `CZ` classical-only matrix landed.
-Gap: pinned Stim v1.16.0 `src/stim/simulators/error_analyzer.test.cc` names only the `CNOT sweep[0] 0` analyzer no-op case, while current Stab evidence already covers that case plus selected `CY`, `CZ`, `XCZ`, and `YCZ` no-ops, selected `CZ` sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, public `stab analyze_errors` behavior, and invalid controlled-Pauli target-position rejections. The remaining broad phrase does not name any additional legal gate-target shapes, accepted or rejected behavior, comparator class, CLI or Rust surface, oracle metadata, resource behavior, or benchmark policy. Treating it as implementation-ready would require inventing scope after the fact.
-Proposed amendment: keep the selected PF3 analyzer sweep-control and `CZ` classical-only matrix as the complete analyzer sweep evidence currently selected by PFM3. Do not add another analyzer sweep row until a future plan names exact gate-target shapes, expected no-op or rejection behavior, CLI and Rust surfaces, comparator class, positive and negative tests, oracle metadata, resource behavior, and benchmark or no-benchmark rationale.
-Resolution: PFM-B2 in `docs/plans/non-deferred-partial-feature-milestones.md` selects evidence closure at the current PF3 matrix because pinned Stim v1.16.0 supplies no additional concrete analyzer sweep subcase. The entry remains open only until the gate-by-surface contract records the boundary, existing rows are independently executable, and audit, review, checklist, and inventory updates confirm that future shapes require a new failing oracle or public-surface decision.
-
 ## 2026-07-07 - PFM3: Remaining Legal Non-Tableau Execution Boundary
 
 Status: Open
@@ -92,6 +83,42 @@ Proposed amendment: keep the fixed-tableau plus supported Hermitian `SPP` or `SP
 Resolution: Exact closure scope is selected by PFM-B2 in `docs/plans/non-deferred-partial-feature-milestones.md`. The entry remains open until every canonical gate and relevant implemented surface has one machine-checked execution classification, generated exact or statistical semantic evidence, target-role rejection coverage, benchmark disposition, audit, review, and synchronized documentation.
 
 ## Resolved Entries
+
+## 2026-07-07 - PFM3: Analyzer Sweep-Shape Boundary
+
+Status: Resolved
+Revealed by: PFM0 evidence-lock refresh after comparing the implemented PF3 analyzer sweep-control matrix against pinned Stim v1.16.0 `ErrorAnalyzer, ignores_sweep_controls`.
+Current text: PFM3 said broader analyzer sweep-shape parity remained active after the selected analyzer sweep-control and `CZ` classical-only matrix landed.
+Gap: pinned Stim v1.16.0 `src/stim/simulators/error_analyzer.test.cc` names only the `CNOT sweep[0] 0` analyzer no-op case, while current Stab evidence already covers that case plus selected `CY`, `CZ`, `XCZ`, and `YCZ` no-ops, selected `CZ` sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, public `stab analyze_errors` behavior, and invalid controlled-Pauli target-position rejections. The remaining broad phrase did not name any additional legal gate-target shapes, accepted or rejected behavior, comparator class, CLI or Rust surface, oracle metadata, resource behavior, or benchmark policy.
+Proposed amendment: keep the selected PF3 analyzer sweep-control and `CZ` classical-only matrix as the complete analyzer sweep evidence currently selected by PFM3. Do not add another analyzer sweep row until a future plan names exact gate-target shapes, expected no-op or rejection behavior, CLI and Rust surfaces, comparator class, positive and negative tests, oracle metadata, resource behavior, and benchmark or no-benchmark rationale.
+Resolution: PFM-B2 records this boundary across all eight gate-contract surfaces, retains independently executable core and CLI evidence, and adds maximum legal sweep-ID semantic and allocation regressions plus low-ID and maximum-ID benchmark submeasurements. The ledger, checklist, inventory, milestone audit, and GPT-5.6/max full code review agree that future analyzer sweep shapes require a new failing pinned oracle, a newly selected public API, or an explicit compatibility-plan revision.
+
+## 2026-07-10 - PFM-B2: Gate-Family Evidence Ownership
+
+Status: Resolved
+Revealed by: full-code-review of the PFM-B2 gate-surface contract groundwork.
+Current text: PFM-B2 required each planned gate case to list all eight surfaces but did not require the case set to own every canonical semantic family.
+Gap: all existing selectors could have been promoted while `I_ERROR`, `II_ERROR`, or circuit-level `REPEAT` behavior remained outside every evidence shard.
+Proposed amendment: add typed semantic-family ownership to ledger schema version 2, require at least one family per gate-contract case, and reject an incomplete union across canonical families.
+Resolution: `GateContractFamily` validation now requires all nineteen families, checks its wire names against canonical core metadata, and uses dedicated identity-noise and control-flow owners. Independent MPP, anti-Hermitian rejection, and MPAD evidence records bring the gate-contract inventory to eighteen cases.
+
+## 2026-07-10 - PFM-B2: Analyzer Sweep Resource Evidence
+
+Status: Resolved
+Revealed by: milestone-audit and full-code-review of the PFM-B2 analyzer sweep evidence-close claim.
+Current text: the selected analyzer sweep resource contract prohibited state proportional to sweep-index magnitude but required only a maximum-ID semantic regression.
+Gap: a dense allocation indexed by `sweep[16777215]` could still produce the expected DEM and pass the semantic test.
+Proposed amendment: compare low and maximum sweep IDs under allocation tracking with explicit count, total-byte, and peak-live-byte deltas, and retain both workloads as benchmark submeasurements.
+Resolution: the feature-gated allocation test permits at most two extra allocation calls and 1,024 extra total or peak-live bytes, while the release-profile probe records identical low and maximum measurements of 25 allocation calls, 3,783 total bytes, 11 peak-live allocations, and 1,976 peak-live bytes.
+
+## 2026-07-10 - PFM-B2: Mixed-Contract Benchmark Trigger
+
+Status: Resolved
+Revealed by: milestone-audit of the PFM-B2 benchmark disposition.
+Current text: a mixed-contract benchmark was required only if generated dispatch introduced "measurable overhead," without defining a probe, baseline, repetition policy, or threshold.
+Gap: final implementation could avoid benchmark ownership by declaring an unmeasured change insignificant.
+Proposed amendment: require the mixed-contract row whenever production compile or execution dispatch begins consulting the contract, independent of a preliminary timing judgment.
+Resolution: PFM-B2 now retains no new row only while the contract is static metadata; any production dispatch integration unconditionally triggers the mixed-contract benchmark requirement.
 
 ## 2026-07-07 - PFM2: Broader Repeat-Contained Feedback Boundary
 
