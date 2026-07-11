@@ -252,17 +252,13 @@ pub(super) fn execute_operations(
                 qubit,
                 probabilities,
             } => {
-                if mode.includes_noise() {
-                    noise::apply_heralded_pauli_channel(
-                        buffers.frame,
-                        *qubit,
-                        probabilities,
-                        buffers.record,
-                        rng,
-                    );
+                let herald = if mode.includes_noise() {
+                    noise::apply_heralded_pauli_channel(buffers.frame, *qubit, probabilities, rng)
                 } else {
-                    buffers.record.push(false);
-                }
+                    false
+                };
+                buffers.record.push(herald);
+                buffers.output.push(herald);
             }
             SampleOperation::FeedbackPauli {
                 offset,

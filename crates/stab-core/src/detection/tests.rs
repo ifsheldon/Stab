@@ -7,6 +7,9 @@
 
 use super::*;
 
+#[cfg(feature = "ops-contracts")]
+use std::hint::black_box;
+
 fn convert(
     circuit_text: &str,
     measurements: &[&[bool]],
@@ -51,6 +54,83 @@ fn convert_with_sweep(
         },
     )
     .expect("convert measurements with sweep")
+}
+
+#[cfg(feature = "ops-contracts")]
+#[test]
+fn streamed_sweep_conversion_adds_no_per_shot_scratch_allocations() {
+    let circuit = Circuit::from_stim_str(
+        "H 0\nCX sweep[0] 0\nM 0\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+    )
+    .expect("parse sweep conversion circuit");
+    let converter = CompiledDetectionConverter::compile(
+        &circuit,
+        DetectionConversionOptions {
+            skip_reference_sample: false,
+        },
+    )
+    .expect("compile sweep conversion circuit");
+    let measurement = [false];
+    let sweep = [true];
+
+    let reference_sampler =
+        CompiledSampler::compile_allowing_sweep(&circuit).expect("compile sweep reference sampler");
+    let mut reference_scratch = reference_sampler.reusable_reference_sample_scratch();
+    let mut reference_record = Vec::with_capacity(converter.measurement_count());
+    let mut sample_reference = |shots| {
+        for _ in 0..shots {
+            reference_sampler
+                .reference_measurement_record_with_sweep_and_scratch_into(
+                    &sweep,
+                    &mut reference_scratch,
+                    &mut reference_record,
+                )
+                .expect("sample sweep reference");
+            black_box(reference_record.as_slice());
+        }
+    };
+    sample_reference(1);
+    sample_reference(256);
+    let reference_one = allocation_counter::measure(|| sample_reference(1));
+    let reference_many = allocation_counter::measure(|| sample_reference(256));
+
+    let convert = |shots| {
+        converter
+            .try_for_each_detection_event_with_sweep(
+                std::iter::repeat_n(measurement.as_slice(), shots),
+                std::iter::repeat_n(sweep.as_slice(), shots),
+                |record| {
+                    black_box(record.detectors.first());
+                    black_box(record.observables.first());
+                    Ok::<(), CircuitError>(())
+                },
+            )
+            .expect("stream sweep conversion");
+    };
+    convert(1);
+    convert(256);
+
+    let one = allocation_counter::measure(|| convert(1));
+    let many = allocation_counter::measure(|| convert(256));
+
+    assert_eq!(
+        many.count_total.saturating_sub(one.count_total),
+        reference_many
+            .count_total
+            .saturating_sub(reference_one.count_total),
+        "conversion added per-shot allocations beyond reference sampling: reference_one={reference_one:?}, reference_many={reference_many:?}, one={one:?}, many={many:?}"
+    );
+    assert_eq!(
+        many.bytes_total.saturating_sub(one.bytes_total),
+        reference_many
+            .bytes_total
+            .saturating_sub(reference_one.bytes_total),
+        "conversion added per-shot allocation bytes beyond reference sampling: reference_one={reference_one:?}, reference_many={reference_many:?}, one={one:?}, many={many:?}"
+    );
+    assert!(
+        many.bytes_max <= one.bytes_max,
+        "conversion peak allocation grew with shot count: one={one:?}, many={many:?}"
+    );
 }
 
 #[test]

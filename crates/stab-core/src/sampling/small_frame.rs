@@ -188,7 +188,9 @@ fn execute_operations<R>(
                 qubit,
                 probabilities,
             } => {
-                apply_heralded_pauli_channel(frame, *qubit, probabilities, record, rng);
+                let herald = apply_heralded_pauli_channel(frame, *qubit, probabilities, rng);
+                record.push(herald);
+                output.push(herald);
             }
             SampleOperation::FeedbackPauli {
                 offset,
@@ -721,16 +723,15 @@ fn apply_heralded_pauli_channel<R>(
     frame: &mut SmallStabilizerFrame,
     qubit: usize,
     probabilities: &[f64; 4],
-    measurements: &mut Vec<bool>,
     rng: &mut R,
-) where
+) -> bool
+where
     R: Rng,
 {
     let [i_probability, x_probability, y_probability, z_probability] = *probabilities;
     let mut sampled_probability = rng.random::<f64>();
     if sampled_probability < i_probability {
-        measurements.push(true);
-        return;
+        return true;
     }
     sampled_probability -= i_probability;
     for (basis, probability) in [
@@ -739,13 +740,12 @@ fn apply_heralded_pauli_channel<R>(
         (PauliBasis::Z, z_probability),
     ] {
         if sampled_probability < probability {
-            measurements.push(true);
             frame.apply_pauli(qubit, basis);
-            return;
+            return true;
         }
         sampled_probability -= probability;
     }
-    measurements.push(false);
+    false
 }
 
 fn apply_single_qubit_pauli_channel<R>(

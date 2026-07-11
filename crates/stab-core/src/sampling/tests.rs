@@ -5,6 +5,9 @@
 
 use super::*;
 
+#[cfg(feature = "ops-contracts")]
+use std::fmt::Write as _;
+
 fn samples(input: &str, shots: usize) -> Vec<Vec<bool>> {
     let circuit = Circuit::from_stim_str(input).expect("parse circuit");
     CompiledSampler::compile(&circuit)
@@ -15,6 +18,73 @@ fn samples(input: &str, shots: usize) -> Vec<Vec<bool>> {
 fn count_determined(input: &str, unknown_input: bool) -> u64 {
     let circuit = Circuit::from_stim_str(input).expect("parse circuit");
     count_determined_measurements(&circuit, unknown_input).expect("count determined measurements")
+}
+
+#[cfg(feature = "ops-contracts")]
+#[test]
+fn warmed_fixed_tableau_gate_execution_does_not_allocate_per_dispatch() {
+    let mut circuit_text = String::new();
+    for gate in crate::Gate::all().filter(|gate| gate.has_tableau()) {
+        let inverse = gate.inverse().expect("tableau gate inverse");
+        let arity = gate.tableau().expect("gate tableau").len();
+        let targets = [(1, "0"), (2, "0 1")]
+            .into_iter()
+            .find_map(|(candidate, targets)| (candidate == arity).then_some(targets))
+            .expect("fixed-tableau gate must have supported arity");
+        writeln!(circuit_text, "{} {targets}", gate.canonical_name()).expect("write gate circuit");
+        writeln!(circuit_text, "{} {targets}", inverse.canonical_name())
+            .expect("write inverse circuit");
+    }
+    let circuit = Circuit::from_stim_str(&circuit_text).expect("parse gate corpus");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile gate corpus");
+    let mut rng = SmallRng::seed_from_u64(29);
+    let mut frame = StabilizerFrame::new(sampler.qubit_count);
+    let mut record = Vec::with_capacity(sampler.measurement_count);
+    let mut output = Vec::with_capacity(sampler.measurement_count);
+    sampler.sample_shot_in_mode_into(
+        &mut rng,
+        ExecutionMode::Sample,
+        &[],
+        &mut frame,
+        &mut record,
+        &mut output,
+    );
+
+    let one = allocation_counter::measure(|| {
+        sampler.sample_shot_in_mode_into(
+            &mut rng,
+            ExecutionMode::Sample,
+            &[],
+            &mut frame,
+            &mut record,
+            &mut output,
+        );
+    });
+    let many = allocation_counter::measure(|| {
+        for _ in 0..256 {
+            sampler.sample_shot_in_mode_into(
+                &mut rng,
+                ExecutionMode::Sample,
+                &[],
+                &mut frame,
+                &mut record,
+                &mut output,
+            );
+        }
+    });
+
+    assert_eq!(
+        many.count_total, one.count_total,
+        "gate dispatch allocation count scaled with repetitions: one={one:?}, many={many:?}"
+    );
+    assert_eq!(
+        many.bytes_total, one.bytes_total,
+        "gate dispatch allocation bytes scaled with repetitions: one={one:?}, many={many:?}"
+    );
+    assert_eq!(
+        many.bytes_max, one.bytes_max,
+        "gate dispatch peak allocation scaled with repetitions: one={one:?}, many={many:?}"
+    );
 }
 
 #[test]
@@ -232,38 +302,71 @@ fn mpp_measures_pauli_products_with_inversions() {
 fn heralded_pauli_channel_records_and_applies_local_paulis() {
     assert_eq!(
         samples("HERALDED_PAULI_CHANNEL_1(0, 0, 0, 0) 0\n", 1),
-        vec![vec![]]
-    );
-    assert_eq!(
-        samples("HERALDED_PAULI_CHANNEL_1(1, 0, 0, 0) 0\nM 0\n", 1),
         vec![vec![false]]
     );
     assert_eq!(
+        samples("HERALDED_PAULI_CHANNEL_1(1, 0, 0, 0) 0\nM 0\n", 1),
+        vec![vec![true, false]]
+    );
+    assert_eq!(
         samples("HERALDED_PAULI_CHANNEL_1(0, 1, 0, 0) 0\nM 0\n", 1),
-        vec![vec![true]]
+        vec![vec![true, true]]
     );
     assert_eq!(
         samples("HERALDED_PAULI_CHANNEL_1(0, 0, 1, 0) 0\nM 0\n", 1),
-        vec![vec![true]]
+        vec![vec![true, true]]
     );
     assert_eq!(
         samples("H 0\nHERALDED_PAULI_CHANNEL_1(0, 0, 0, 1) 0\nMX 0\n", 1),
-        vec![vec![true]]
+        vec![vec![true, true]]
     );
     assert_eq!(
         samples(
             "HERALDED_PAULI_CHANNEL_1(0, 1, 0, 0) 0\nCX rec[-1] 1\nM 0 1\n",
             1
         ),
-        vec![vec![true, true]]
+        vec![vec![true, true, true]]
     );
+}
+
+#[test]
+fn public_sampler_outputs_include_heralded_measurement_records() {
+    let circuit = Circuit::from_stim_str(
+        "HERALDED_PAULI_CHANNEL_1(1, 0, 0, 0) 0\nM 0\nHERALDED_ERASE(0) 1\n",
+    )
+    .expect("parse circuit");
+    let sampler = CompiledSampler::compile(&circuit).expect("compile sampler");
+    let expected = vec![true, false, false];
+
+    assert_eq!(sampler.reference_sample(), vec![false, false, false]);
+    assert_eq!(
+        sampler.sample_zero_one_with_seed(1, Some(5)),
+        vec![expected.clone()]
+    );
+    assert_eq!(
+        sampler.sample_bytes_with_seed(1, SampleFormat::ZeroOne, Some(5)),
+        b"100\n"
+    );
+    assert_eq!(
+        sampler.sample_bytes_with_seed(1, SampleFormat::B8, Some(5)),
+        vec![1]
+    );
+
+    let mut visited = Vec::new();
+    sampler
+        .for_each_sample_with_seed_and_reference_mode(1, Some(5), false, |record| {
+            visited.push(record.to_vec());
+            Ok::<(), std::convert::Infallible>(())
+        })
+        .expect("infallible visitor");
+    assert_eq!(visited, vec![expected]);
 }
 
 #[test]
 fn heralded_erase_records_heralds_and_randomizes_state() {
     assert_eq!(
         samples("HERALDED_ERASE(0) 0 1\nM 0 1\n", 1),
-        vec![vec![false, false]]
+        vec![vec![false, false, false, false]]
     );
 
     let circuit = Circuit::from_stim_str("HERALDED_ERASE(1) 0\nM 0\n").expect("parse circuit");
@@ -272,7 +375,7 @@ fn heralded_erase_records_heralds_and_randomizes_state() {
 
     let hits = shots
         .iter()
-        .filter(|shot| shot.first() == Some(&true))
+        .filter(|shot| shot.get(1) == Some(&true))
         .count();
     assert!(
         (400..=600).contains(&hits),
@@ -291,11 +394,11 @@ fn heralded_pauli_channel_samples_disjoint_probabilities() {
 
     let heralds = shots
         .iter()
-        .filter(|shot| shot.get(1) == Some(&true))
+        .filter(|shot| shot.first() == Some(&true))
         .count();
     let hits = shots
         .iter()
-        .filter(|shot| shot.first() == Some(&true))
+        .filter(|shot| shot.get(1) == Some(&true))
         .count();
     assert!(
         (465..=635).contains(&heralds),

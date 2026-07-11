@@ -16,9 +16,12 @@ mod measurement_flip;
 mod noise;
 mod operation;
 pub(crate) mod pauli_product;
+mod reference;
 mod small_frame;
 mod stabilizer_frame;
 mod stream;
+
+pub(crate) use reference::ReferenceSampleScratch;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompiledSampler {
@@ -250,32 +253,6 @@ impl CompiledSampler {
             &mut frame,
             &mut record,
             output,
-        );
-        Ok(())
-    }
-
-    pub(crate) fn reference_measurement_record_with_sweep_into(
-        &self,
-        sweep_record: &[bool],
-        record: &mut Vec<bool>,
-    ) -> CircuitResult<()> {
-        if sweep_record.len() != self.sweep_bit_count {
-            return Err(CircuitError::invalid_result_format(format!(
-                "sweep record expected {} bits, got {}",
-                self.sweep_bit_count,
-                sweep_record.len()
-            )));
-        }
-        let mut rng = SmallRng::seed_from_u64(0);
-        let mut frame = StabilizerFrame::new(self.qubit_count);
-        let mut external_output = Vec::with_capacity(self.measurement_count);
-        self.sample_shot_in_mode_into(
-            &mut rng,
-            ExecutionMode::ReferenceSample,
-            sweep_record,
-            &mut frame,
-            record,
-            &mut external_output,
         );
         Ok(())
     }

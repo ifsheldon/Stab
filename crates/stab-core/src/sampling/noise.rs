@@ -9,14 +9,12 @@ pub(super) fn apply_heralded_pauli_channel(
     frame: &mut StabilizerFrame,
     qubit: usize,
     probabilities: &[f64; 4],
-    measurements: &mut Vec<bool>,
     rng: &mut impl Rng,
-) {
+) -> bool {
     let [i_probability, x_probability, y_probability, z_probability] = *probabilities;
     let mut sampled_probability = rng.random::<f64>();
     if sampled_probability < i_probability {
-        measurements.push(true);
-        return;
+        return true;
     }
     sampled_probability -= i_probability;
     for (basis, probability) in [
@@ -25,13 +23,12 @@ pub(super) fn apply_heralded_pauli_channel(
         (PauliBasis::Z, z_probability),
     ] {
         if sampled_probability < probability {
-            measurements.push(true);
             frame.apply_pauli(qubit, basis);
-            return;
+            return true;
         }
         sampled_probability -= probability;
     }
-    measurements.push(false);
+    false
 }
 
 pub(super) fn apply_single_qubit_pauli_channel(

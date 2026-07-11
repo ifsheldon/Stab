@@ -5,7 +5,7 @@
     reason = "PFM-B2 generated semantic tests use direct assertions for compact diagnostics"
 )]
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 use super::super::{
     GateSemanticFamily, GateSurface, GateSurfaceBehavior, GateTargetPattern,
@@ -18,6 +18,97 @@ use crate::{
 };
 
 mod statistical;
+
+const MAX_STATISTICAL_BUCKETS: usize = 20;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct StatisticalCounts {
+    names: [Option<&'static str>; MAX_STATISTICAL_BUCKETS],
+    values: [usize; MAX_STATISTICAL_BUCKETS],
+    len: usize,
+}
+
+impl StatisticalCounts {
+    fn new(names: &[&'static str]) -> Self {
+        assert!(
+            names.len() <= MAX_STATISTICAL_BUCKETS,
+            "statistical bucket count exceeds fixed counter capacity"
+        );
+        let mut result = Self {
+            names: [None; MAX_STATISTICAL_BUCKETS],
+            values: [0; MAX_STATISTICAL_BUCKETS],
+            len: names.len(),
+        };
+        for (slot, name) in result.names.iter_mut().zip(names) {
+            *slot = Some(*name);
+        }
+        result
+    }
+
+    fn increment(&mut self, name: &'static str) {
+        let value = self
+            .names
+            .iter()
+            .zip(self.values.iter_mut())
+            .take(self.len)
+            .find_map(|(candidate, value)| (*candidate == Some(name)).then_some(value))
+            .unwrap_or_else(|| panic!("missing statistical bucket {name}"));
+        *value += 1;
+    }
+
+    fn push(&mut self, name: &'static str, value: usize) {
+        assert!(
+            self.get(name).is_none(),
+            "duplicate statistical bucket {name}"
+        );
+        let Some((name_slot, value_slot)) = self
+            .names
+            .iter_mut()
+            .zip(self.values.iter_mut())
+            .nth(self.len)
+        else {
+            panic!("statistical bucket count exceeds fixed counter capacity");
+        };
+        *name_slot = Some(name);
+        *value_slot = value;
+        self.len += 1;
+    }
+
+    fn extend(&mut self, other: Self) {
+        for (name, value) in other.iter() {
+            self.push(name, value);
+        }
+    }
+
+    fn remap(self, mapping: &[(&'static str, &'static str)]) -> Self {
+        let mut result = Self::new(&[]);
+        for (name, value) in self.iter() {
+            let target = mapping
+                .iter()
+                .find_map(|(source, target)| (*source == name).then_some(*target))
+                .unwrap_or_else(|| panic!("missing statistical remap for {name}"));
+            result.push(target, value);
+        }
+        result
+    }
+
+    fn iter(&self) -> impl Iterator<Item = (&'static str, usize)> + '_ {
+        self.names
+            .iter()
+            .zip(self.values)
+            .take(self.len)
+            .filter_map(|(name, value)| name.map(|name| (name, value)))
+    }
+
+    fn get(&self, name: &str) -> Option<usize> {
+        self.iter()
+            .find_map(|(candidate, value)| (candidate == name).then_some(value))
+    }
+
+    fn len(&self) -> usize {
+        self.len
+    }
+}
 
 #[test]
 fn gate_surface_contract_fixed_tableau() {
@@ -37,8 +128,10 @@ fn gate_surface_contract_fixed_tableau() {
             inverse.canonical_name()
         );
         assert_all_semantic_surfaces_execute(&circuit_text);
-        let circuit = circuit(&circuit_text);
-        let sampler = CompiledSampler::compile(&circuit).expect("compile inverse pair");
+        let actual_circuit = circuit(&circuit_text);
+        let identity = circuit(&format!("M {measured_qubits}\n"));
+        assert_circuit_semantics_equal(&actual_circuit, &identity, gate.canonical_name());
+        let sampler = CompiledSampler::compile(&actual_circuit).expect("compile inverse pair");
         assert!(
             sampler
                 .sample_zero_one_with_seed(8, Some(11))
@@ -152,11 +245,137 @@ fn gate_surface_contract_pair_measurement_inversion() {
         assert_exact_reference_and_samples(&probability_flipped, &[false]);
         assert_all_semantic_surfaces_execute(&probability_flipped);
     }
+
+    let grouped = "MXX 0 1 0 !1 !0 1 !0 !1\nMYY 0 1 0 !1 !0 1 !0 !1\nMZZ 0 1 0 !1 !0 1 !0 !1\nDETECTOR rec[-12] rec[-11]\nDETECTOR rec[-12] rec[-10]\nDETECTOR rec[-12] rec[-9]\nDETECTOR rec[-8] rec[-7]\nDETECTOR rec[-8] rec[-6]\nDETECTOR rec[-8] rec[-5]\nDETECTOR rec[-4] rec[-12] rec[-8]\nDETECTOR rec[-4] rec[-3]\nDETECTOR rec[-4] rec[-2]\nDETECTOR rec[-4] rec[-1]\n";
+    let grouped_circuit = circuit(grouped);
+    let sampler = CompiledSampler::compile(&grouped_circuit)
+        .expect("compile grouped inverted pair measurements");
+    let samples = sampler.sample_zero_one_with_seed(128, Some(41));
+    for record in &samples {
+        let [
+            xx,
+            xx_right,
+            xx_left,
+            xx_both,
+            yy,
+            yy_right,
+            yy_left,
+            yy_both,
+            zz,
+            zz_right,
+            zz_left,
+            zz_both,
+        ] = record.as_slice()
+        else {
+            panic!("expected twelve grouped pair-measurement records: {record:?}");
+        };
+        assert_eq!(*xx_right, !*xx);
+        assert_eq!(*xx_left, !*xx);
+        assert_eq!(*xx_both, *xx);
+        assert_eq!(*yy_right, !*yy);
+        assert_eq!(*yy_left, !*yy);
+        assert_eq!(*yy_both, *yy);
+        assert_eq!(*zz, !(*xx ^ *yy));
+        assert_eq!(*zz_right, !*zz);
+        assert_eq!(*zz_left, !*zz);
+        assert_eq!(*zz_both, *zz);
+    }
+    let converter = CompiledDetectionConverter::compile(
+        &grouped_circuit,
+        DetectionConversionOptions {
+            skip_reference_sample: false,
+        },
+    )
+    .expect("compile grouped pair converter");
+    for record in &samples {
+        assert!(
+            converter
+                .convert_record(record)
+                .expect("convert grouped pair record")
+                .detectors
+                .iter()
+                .all(|bit| !bit),
+            "pair inversion identities must produce no detection events"
+        );
+    }
+    assert!(
+        sample_detection_events(&grouped_circuit, 128, Some(43))
+            .expect("sample grouped pair detections")
+            .records
+            .iter()
+            .all(|record| record.detectors.iter().all(|bit| !bit)),
+        "direct pair inversion identities must produce no detection events"
+    );
+    assert!(
+        !circuit_flow_generators(&grouped_circuit)
+            .expect("generate grouped pair flows")
+            .is_empty(),
+        "grouped pair circuit must expose flow constraints"
+    );
+    assert!(
+        !circuit_to_detector_error_model(&grouped_circuit, ErrorAnalyzerOptions::default())
+            .expect("analyze grouped pair circuit")
+            .to_string()
+            .contains("error("),
+        "deterministic pair identities must not create error mechanisms"
+    );
+    assert_all_semantic_surfaces_execute(grouped);
 }
 
 #[test]
 fn gate_surface_contract_mpp_deterministic() {
     assert_family_names(&[GateSemanticFamily::PauliProductMeasurement], &["MPP"]);
+
+    let four_body = "X_ERROR(0.5) 0 1 2 3\nZ_ERROR(0.5) 0 1 2 3\nMPP X0*X1*X2*X3\nMX 0 1 2 3 4 5\nMPP X2*X3*X4*X5\nMPP Z0*Z1*Z4*Z5 !Y0*Y1*Y4*Y5\nDETECTOR rec[-10] rec[-9] rec[-8] rec[-7] rec[-6]\nDETECTOR rec[-3] rec[-7] rec[-6] rec[-5] rec[-4]\nDETECTOR rec[-1] rec[-2] rec[-10] rec[-3]\n";
+    let four_body_circuit = circuit(four_body);
+    let four_body_sampler =
+        CompiledSampler::compile(&four_body_circuit).expect("compile four-body MPP circuit");
+    let four_body_samples =
+        four_body_sampler.sample_zero_one_with_seed_and_reference_mode(128, Some(43), true);
+    for record in &four_body_samples {
+        let [x0123, x0, x1, x2, x3, x4, x5, x2345, z0145, y0145] = record.as_slice() else {
+            panic!("expected ten four-body MPP records: {record:?}");
+        };
+        assert_eq!(*x0123, *x0 ^ *x1 ^ *x2 ^ *x3);
+        assert_eq!(*x2345, *x2 ^ *x3 ^ *x4 ^ *x5);
+        assert_eq!(*y0145 ^ *z0145, *x0123 ^ *x2345);
+    }
+    let converter = CompiledDetectionConverter::compile(
+        &four_body_circuit,
+        DetectionConversionOptions {
+            skip_reference_sample: false,
+        },
+    )
+    .expect("compile four-body MPP converter");
+    for record in four_body_sampler.sample_zero_one_with_seed(128, Some(43)) {
+        assert!(
+            converter
+                .convert_record(&record)
+                .expect("convert four-body MPP record")
+                .detectors
+                .iter()
+                .all(|bit| !bit),
+            "four-body parity detectors must stay silent"
+        );
+    }
+    let detections = sample_detection_events(&four_body_circuit, 128, Some(47))
+        .expect("sample four-body MPP detections");
+    assert!(
+        detections
+            .records
+            .iter()
+            .all(|record| record.detectors.iter().all(|bit| !bit)),
+        "direct four-body parity detectors must stay silent"
+    );
+    let dem = circuit_to_detector_error_model(&four_body_circuit, ErrorAnalyzerOptions::default())
+        .expect("analyze four-body MPP parity circuit")
+        .to_string();
+    assert!(
+        !dem.contains("error("),
+        "parity identities cancel noise: {dem}"
+    );
+    assert_all_semantic_surfaces_execute(four_body);
+
     let bell = "H 0\nCX 0 1\nMPP X0*X1 !Z0*Z1 X0*X0\n";
     assert_exact_reference_and_samples(bell, &[false, true, false]);
     assert_all_semantic_surfaces_execute(bell);
@@ -383,6 +602,17 @@ fn gate_surface_contract_classical_controls() {
             }
         }
     }
+
+    for (text, false_reference, true_reference) in [
+        ("CX sweep[0] 0\nM 0\n", vec![false], vec![true]),
+        ("CY sweep[0] 0\nM 0\n", vec![false], vec![true]),
+        ("RX 0\nCZ sweep[0] 0\nMX 0\n", vec![false], vec![true]),
+        ("RX 0\nCZ 0 sweep[0]\nMX 0\n", vec![false], vec![true]),
+        ("XCZ 0 sweep[0]\nM 0\n", vec![false], vec![true]),
+        ("YCZ 0 sweep[0]\nM 0\n", vec![false], vec![true]),
+    ] {
+        assert_sweep_reference(text, &false_reference, &true_reference);
+    }
 }
 
 #[test]
@@ -401,14 +631,22 @@ fn gate_surface_contract_classical_control_rejection() {
 
 #[test]
 fn gate_surface_contract_classical_control_feedback() {
-    for text in [
-        "MPAD 1\nCX rec[-1] 0\nM 0\n",
-        "MPAD 1\nCY rec[-1] 0\nM 0\n",
-        "MPAD 1\nXCZ 0 rec[-1]\nM 0\n",
-        "MPAD 1\nYCZ 0 rec[-1]\nM 0\n",
+    for (text, expected) in [
+        ("MPAD 1\nCX rec[-1] 0\nM 0\n", "MPAD 1\nX 0\nM 0\n"),
+        ("MPAD 1\nCY rec[-1] 0\nM 0\n", "MPAD 1\nY 0\nM 0\n"),
+        (
+            "MPAD 1\nRX 0\nCZ rec[-1] 0\nMX 0\n",
+            "MPAD 1\nRX 0\nZ 0\nMX 0\n",
+        ),
+        (
+            "MPAD 1\nRX 0\nCZ 0 rec[-1]\nMX 0\n",
+            "MPAD 1\nRX 0\nZ 0\nMX 0\n",
+        ),
+        ("MPAD 1\nXCZ 0 rec[-1]\nM 0\n", "MPAD 1\nX 0\nM 0\n"),
+        ("MPAD 1\nYCZ 0 rec[-1]\nM 0\n", "MPAD 1\nY 0\nM 0\n"),
     ] {
         assert_exact_reference_and_samples(text, &[true, true]);
-        assert_all_semantic_surfaces_execute(text);
+        assert_circuit_semantics_equal(&circuit(text), &circuit(expected), text);
     }
 }
 
@@ -547,7 +785,7 @@ fn assert_noisy_measure_reset_basis(case_id: &str, prepare: &str, gate: &str, ve
     let samples = CompiledSampler::compile(&circuit(&text))
         .expect("compile noisy measurement-reset circuit")
         .sample_zero_one_with_seed(statistical_shot_count(plan), Some(plan.seed));
-    let mut counts = BTreeMap::from([("measurement-zero", 0), ("measurement-one", 0)]);
+    let mut counts = StatisticalCounts::new(&["measurement-zero", "measurement-one"]);
     for record in samples {
         let [measurement, reset_verification] = record.as_slice() else {
             panic!("expected noisy measurement and reset verification: {record:?}");
@@ -556,13 +794,11 @@ fn assert_noisy_measure_reset_basis(case_id: &str, prepare: &str, gate: &str, ve
             !reset_verification,
             "measurement-reset must reset its basis"
         );
-        *counts
-            .get_mut(if *measurement {
-                "measurement-one"
-            } else {
-                "measurement-zero"
-            })
-            .expect("measurement-reset bucket") += 1;
+        counts.increment(if *measurement {
+            "measurement-one"
+        } else {
+            "measurement-zero"
+        });
     }
     assert_statistical_counts(case_id, &counts);
     assert_all_semantic_surfaces_execute(&text);
@@ -588,6 +824,13 @@ fn assert_circuit_semantics_equal(actual: &Circuit, expected: &Circuit, label: &
         actual.reference_sample().expect("actual reference"),
         expected.reference_sample().expect("expected reference"),
         "reference sampler: {label}"
+    );
+    assert_eq!(
+        run_surface(&actual.to_stim_string(), GateSurface::DetectionConverter)
+            .expect("actual detection conversion"),
+        run_surface(&expected.to_stim_string(), GateSurface::DetectionConverter)
+            .expect("expected detection conversion"),
+        "detection converter: {label}"
     );
     assert_eq!(
         sample_detection_events(actual, 16, Some(31)).expect("actual detection samples"),
@@ -699,13 +942,12 @@ fn statistical_shot_count(plan: &super::super::GateContractStatisticalPlan) -> u
     usize::try_from(plan.shots).expect("statistical shot count fits usize")
 }
 
-fn assert_statistical_counts(case_id: &str, counts: &BTreeMap<&str, usize>) {
+fn assert_statistical_counts(case_id: &str, counts: &StatisticalCounts) {
     let plan = statistical_plan(case_id);
     assert_eq!(counts.len(), plan.buckets.len(), "{case_id} bucket count");
     for bucket in plan.buckets {
         let count = counts
             .get(bucket.name)
-            .copied()
             .unwrap_or_else(|| panic!("{case_id} missing bucket {}", bucket.name));
         let observed = count as f64 / plan.shots as f64;
         let standard_deviation =

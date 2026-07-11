@@ -30,9 +30,9 @@ use help::{HelpArgs, run_help};
 pub(crate) use input::read_limited_input;
 use sample_dem::{SampleDemArgs, run_sample_dem};
 use stab_core::{
-    Circuit, CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask, CompiledSampler,
-    GeneratedCircuit, Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount,
-    SampleFormat, SurfaceCodeParams, SurfaceCodeTask, generate_color_code_circuit,
+    Circuit, CircuitItem, CircuitResult, CodeDistance, ColorCodeParams, ColorCodeTask,
+    CompiledSampler, GeneratedCircuit, Probability, RepetitionCodeParams, RepetitionCodeTask,
+    RoundCount, SampleFormat, SurfaceCodeParams, SurfaceCodeTask, generate_color_code_circuit,
     generate_repetition_code_circuit, generate_surface_code_circuit,
     result_formats::{MeasureRecordWriter, validate_ptb64_shot_count},
 };
@@ -745,6 +745,11 @@ where
     let circuit = Circuit::from_stim_str(circuit_text)?;
     let sampler = CompiledSampler::compile(&circuit)?;
     let skip_reference_sample = args.skip_reference_sample || args.frame0;
+    let visible_measurements = if args.shots == 1 && !skip_reference_sample {
+        legacy_tableau_visible_measurements(&circuit)?
+    } else {
+        None
+    };
     if args.out_format == SampleOutFormatArg::Ptb64 {
         validate_ptb64_shot_count(args.shots)?;
     }
@@ -760,6 +765,7 @@ where
             args.out_format,
             args.seed,
             skip_reference_sample,
+            visible_measurements.as_deref(),
             &mut output,
         )
         .map_err(|source| CliError::WritePath {
@@ -773,6 +779,7 @@ where
         args.out_format,
         args.seed,
         skip_reference_sample,
+        visible_measurements.as_deref(),
         stdout,
     )
     .map_err(CliError::WriteOutput)
@@ -789,6 +796,7 @@ fn write_sample_output<W>(
     format: SampleOutFormatArg,
     seed: Option<u64>,
     skip_reference_sample: bool,
+    visible_measurements: Option<&[usize]>,
     output: &mut W,
 ) -> std::io::Result<()>
 where
@@ -804,6 +812,7 @@ where
             format.sample_format().map_err(std::io::Error::other)?,
             seed,
             skip_reference_sample,
+            visible_measurements,
             output,
         ),
     }
@@ -815,22 +824,77 @@ fn write_record_sample_output<W>(
     format: SampleFormat,
     seed: Option<u64>,
     skip_reference_sample: bool,
+    visible_measurements: Option<&[usize]>,
     output: &mut W,
 ) -> std::io::Result<()>
 where
     W: Write,
 {
+    let mut filtered_record = visible_measurements.map(|indices| Vec::with_capacity(indices.len()));
     sampler.for_each_sample_with_seed_and_reference_mode(
         shots,
         seed,
         skip_reference_sample,
         |record| {
+            let record = if let (Some(indices), Some(filtered_record)) =
+                (visible_measurements, filtered_record.as_mut())
+            {
+                filtered_record.clear();
+                for index in indices {
+                    filtered_record.push(*record.get(*index).ok_or_else(|| {
+                        std::io::Error::other(format!(
+                            "internal sample layout index {index} exceeded record width {}",
+                            record.len()
+                        ))
+                    })?);
+                }
+                filtered_record.as_slice()
+            } else {
+                record
+            };
             let mut writer = MeasureRecordWriter::new(format);
             writer.write_bits(record);
             writer.write_end();
             output.write_all(&writer.into_bytes())
         },
     )
+}
+
+fn legacy_tableau_visible_measurements(circuit: &Circuit) -> Result<Option<Vec<usize>>, CliError> {
+    // Stim v1.16's one-shot tableau CLI path records heralds for feedback but does not write them.
+    if !circuit_contains_heralded_records(circuit) {
+        return Ok(None);
+    }
+
+    let mut visible = Vec::new();
+    let mut measurement_index = 0usize;
+    for instruction in circuit.iter_flattened_instructions() {
+        if !instruction.gate().produces_measurements() {
+            continue;
+        }
+        let produced = instruction.target_groups().len();
+        let next_index = measurement_index
+            .checked_add(produced)
+            .ok_or(CliError::MeasurementCountOverflow)?;
+        if !matches!(
+            instruction.gate().canonical_name(),
+            "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
+        ) {
+            visible.extend(measurement_index..next_index);
+        }
+        measurement_index = next_index;
+    }
+    Ok(Some(visible))
+}
+
+fn circuit_contains_heralded_records(circuit: &Circuit) -> bool {
+    circuit.items().iter().any(|item| match item {
+        CircuitItem::Instruction(instruction) => matches!(
+            instruction.gate().canonical_name(),
+            "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
+        ),
+        CircuitItem::RepeatBlock(repeat) => circuit_contains_heralded_records(repeat.body()),
+    })
 }
 
 fn write_ptb64_sample_output<W>(

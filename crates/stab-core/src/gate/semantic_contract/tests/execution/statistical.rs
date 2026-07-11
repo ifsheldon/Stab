@@ -8,7 +8,7 @@ fn gate_surface_contract_mpp_stochastic() {
     let samples = sampler.sample_zero_one_with_seed(statistical_shot_count(plan), Some(plan.seed));
     assert_statistical_counts(
         plan.case_id,
-        &count_binary_records(&samples, "mpp-zero", "mpp-one"),
+        &count_binary_records(samples.iter().map(Vec::as_slice), "mpp-zero", "mpp-one"),
     );
 
     let detection_circuit = circuit("MPP(0.25) Z0\nDETECTOR rec[-1]\n");
@@ -18,14 +18,16 @@ fn gate_surface_contract_mpp_stochastic() {
         Some(plan.seed),
     )
     .expect("sample stochastic MPP detections");
-    let detection_bits = detections
-        .records
-        .iter()
-        .map(|record| record.detectors.clone())
-        .collect::<Vec<_>>();
     assert_statistical_counts(
         plan.case_id,
-        &count_binary_records(&detection_bits, "mpp-zero", "mpp-one"),
+        &count_binary_records(
+            detections
+                .records
+                .iter()
+                .map(|record| record.detectors.as_slice()),
+            "mpp-zero",
+            "mpp-one",
+        ),
     );
 
     let frame_circuit =
@@ -36,19 +38,18 @@ fn gate_surface_contract_mpp_stochastic() {
         Some(plan.seed),
     )
     .expect("sample stochastic MPP frames");
-    let frame_bits = frames
-        .records
-        .iter()
-        .map(|record| {
-            let [observable, ..] = record.observables.as_slice() else {
-                panic!("expected an MPP frame observable: {record:?}");
-            };
-            vec![*observable]
-        })
-        .collect::<Vec<_>>();
     assert_statistical_counts(
         plan.case_id,
-        &count_binary_records(&frame_bits, "mpp-zero", "mpp-one"),
+        &count_binary_records(
+            frames.records.iter().map(|record| {
+                let [observable, ..] = record.observables.as_slice() else {
+                    panic!("expected an MPP frame observable: {record:?}");
+                };
+                [*observable]
+            }),
+            "mpp-zero",
+            "mpp-one",
+        ),
     );
     assert_eq!(
         circuit_to_detector_error_model(&detection_circuit, ErrorAnalyzerOptions::default())
@@ -66,7 +67,7 @@ fn gate_surface_contract_mpad_stochastic() {
     let samples = sampler.sample_zero_one_with_seed(statistical_shot_count(plan), Some(plan.seed));
     assert_statistical_counts(
         plan.case_id,
-        &count_binary_records(&samples, "mpad-zero", "mpad-one"),
+        &count_binary_records(samples.iter().map(Vec::as_slice), "mpad-zero", "mpad-one"),
     );
 
     let detection_circuit = circuit("MPAD(0.25) 0\nDETECTOR rec[-1]\n");
@@ -76,14 +77,16 @@ fn gate_surface_contract_mpad_stochastic() {
         Some(plan.seed),
     )
     .expect("sample stochastic MPAD detections");
-    let detection_bits = detections
-        .records
-        .iter()
-        .map(|record| record.detectors.clone())
-        .collect::<Vec<_>>();
     assert_statistical_counts(
         plan.case_id,
-        &count_binary_records(&detection_bits, "mpad-zero", "mpad-one"),
+        &count_binary_records(
+            detections
+                .records
+                .iter()
+                .map(|record| record.detectors.as_slice()),
+            "mpad-zero",
+            "mpad-one",
+        ),
     );
 
     let frame_circuit =
@@ -94,19 +97,18 @@ fn gate_surface_contract_mpad_stochastic() {
         Some(plan.seed),
     )
     .expect("sample stochastic MPAD frames");
-    let frame_bits = frames
-        .records
-        .iter()
-        .map(|record| {
-            let [observable, ..] = record.observables.as_slice() else {
-                panic!("expected an MPAD frame observable: {record:?}");
-            };
-            vec![*observable]
-        })
-        .collect::<Vec<_>>();
     assert_statistical_counts(
         plan.case_id,
-        &count_binary_records(&frame_bits, "mpad-zero", "mpad-one"),
+        &count_binary_records(
+            frames.records.iter().map(|record| {
+                let [observable, ..] = record.observables.as_slice() else {
+                    panic!("expected an MPAD frame observable: {record:?}");
+                };
+                [*observable]
+            }),
+            "mpad-zero",
+            "mpad-one",
+        ),
     );
     assert_eq!(
         circuit_to_detector_error_model(&detection_circuit, ErrorAnalyzerOptions::default())
@@ -134,9 +136,12 @@ fn gate_surface_contract_pauli_noise() {
 
 #[test]
 fn gate_surface_contract_pauli_noise_general_circuit() {
-    let text = "X_ERROR(1) 0\nY_ERROR(1) 0\nZ_ERROR(1) 0\nM 0\n";
-    assert_exact_reference_and_samples(text, &[false]);
-    assert_all_semantic_surfaces_execute(text);
+    let text = "RX 2\nX_ERROR(1) 0\nY_ERROR(1) 1\nZ_ERROR(1) 2\nM 0 1\nMX 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n";
+    assert_deterministic_noise_effect(
+        text,
+        &[true, true, true],
+        "error(1) D0\nerror(1) D1\nerror(1) D2\n",
+    );
 }
 
 #[test]
@@ -190,10 +195,12 @@ fn gate_surface_contract_pauli_channels() {
 
 #[test]
 fn gate_surface_contract_pauli_channels_general_circuit() {
-    let text =
-        "PAULI_CHANNEL_1(0,0,0) 0\nPAULI_CHANNEL_2(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 0 1\nM 0 1\n";
-    assert_exact_reference_and_samples(text, &[false, false]);
-    assert_all_semantic_surfaces_execute(text);
+    let text = "PAULI_CHANNEL_1(1,0,0) 0\nPAULI_CHANNEL_2(1,0,0,0,0,0,0,0,0,0,0,0,0,0,0) 1 2\nM 0 1 2\nDETECTOR rec[-3]\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n";
+    assert_deterministic_noise_effect(
+        text,
+        &[true, false, true],
+        "error(1) D0\nerror(1) D2\ndetector D1\n",
+    );
 }
 
 #[test]
@@ -247,9 +254,16 @@ fn gate_surface_contract_depolarization() {
 
 #[test]
 fn gate_surface_contract_depolarization_general_circuit() {
-    let text = "DEPOLARIZE1(0) 0\nDEPOLARIZE2(0) 0 1\nM 0 1\n";
-    assert_exact_reference_and_samples(text, &[false, false]);
-    assert_all_semantic_surfaces_execute(text);
+    assert_depolarizing_gate_effect(
+        "DEPOLARIZE1(0.75) 0\nM 0\nDETECTOR rec[-1]\n",
+        &[0.45..=0.55],
+        &["D0"],
+    );
+    assert_depolarizing_gate_effect(
+        "DEPOLARIZE2(0.75) 0 1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n",
+        &[0.35..=0.45, 0.35..=0.45],
+        &["D0", "D1"],
+    );
 }
 
 #[test]
@@ -290,9 +304,8 @@ fn gate_surface_contract_correlated_errors() {
 
 #[test]
 fn gate_surface_contract_correlated_errors_general_circuit() {
-    let text = "E(0) X0\nELSE_CORRELATED_ERROR(0) Y0\nELSE_CORRELATED_ERROR(0) Z0\nM 0\n";
-    assert_exact_reference_and_samples(text, &[false]);
-    assert_all_semantic_surfaces_execute(text);
+    let text = "E(1) X0\nELSE_CORRELATED_ERROR(1) Y0\nE(0) X1\nELSE_CORRELATED_ERROR(1) X1\nM 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\n";
+    assert_deterministic_noise_effect(text, &[true, true], "error(1) D0\nerror(1) D1\n");
 }
 
 #[test]
@@ -361,24 +374,75 @@ fn assert_heralded_plan_across_surfaces(
     assert_statistical_counts(plan.case_id, &frame_counts);
 }
 
+fn assert_deterministic_noise_effect(text: &str, expected_sample: &[bool], expected_dem: &str) {
+    let circuit = circuit(text);
+    assert_eq!(
+        circuit.reference_sample().expect("noise-free reference"),
+        vec![false; expected_sample.len()]
+    );
+    assert_eq!(
+        CompiledSampler::compile(&circuit)
+            .expect("compile deterministic noise circuit")
+            .sample_zero_one_with_seed(8, Some(47)),
+        vec![expected_sample.to_vec(); 8]
+    );
+    assert_eq!(noise_dem(&circuit, text).to_string(), expected_dem);
+    assert_all_semantic_surfaces_execute(text);
+}
+
+fn assert_depolarizing_gate_effect(
+    text: &str,
+    expected_rates: &[std::ops::RangeInclusive<f64>],
+    expected_dem_targets: &[&str],
+) {
+    const SHOTS: usize = 4_096;
+    let circuit = circuit(text);
+    let samples = CompiledSampler::compile(&circuit)
+        .expect("compile depolarizing general circuit")
+        .sample_zero_one_with_seed(SHOTS, Some(43));
+    assert_eq!(
+        samples.first().map(Vec::len),
+        Some(expected_rates.len()),
+        "depolarizing sample width"
+    );
+    for (index, expected_rate) in expected_rates.iter().enumerate() {
+        let hits = samples
+            .iter()
+            .filter(|record| record.get(index) == Some(&true))
+            .count();
+        let rate = hits as f64 / SHOTS as f64;
+        assert!(
+            expected_rate.contains(&rate),
+            "depolarizing output {index} rate {rate} is outside {expected_rate:?}"
+        );
+    }
+    let dem = noise_dem(&circuit, text).to_string();
+    for target in expected_dem_targets {
+        assert!(dem.contains(target), "DEM must contain {target}: {dem}");
+    }
+    assert_all_semantic_surfaces_execute(text);
+}
+
+fn noise_dem(circuit: &Circuit, label: &str) -> crate::DetectorErrorModel {
+    circuit_to_detector_error_model(
+        circuit,
+        ErrorAnalyzerOptions {
+            approximate_disjoint_errors_threshold: Some(
+                Probability::try_new(1.0).expect("unit probability"),
+            ),
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .unwrap_or_else(|error| panic!("analyze {label}: {error}"))
+}
+
 fn assert_single_pauli_plan_across_surfaces(
     plan: &super::super::super::GateContractStatisticalPlan,
     noise: &str,
     prefix: &str,
-    names: &[(&str, &str)],
+    names: &[(&'static str, &'static str)],
 ) {
-    let remap = |counts: BTreeMap<&'static str, usize>| {
-        counts
-            .into_iter()
-            .map(|(name, count)| {
-                let target = names
-                    .iter()
-                    .find_map(|(source, target)| (*source == name).then_some(*target))
-                    .unwrap_or_else(|| panic!("missing remap for {name}"));
-                (target, count)
-            })
-            .collect::<BTreeMap<_, _>>()
-    };
+    let remap = |counts: StatisticalCounts| counts.remap(names);
     let samples = sample_records(&bell_measurement_circuit(noise), plan);
     assert_statistical_counts(
         plan.case_id,
@@ -450,7 +514,7 @@ fn two_pauli_frame_circuit(noise: &str) -> String {
 }
 
 fn heralded_bell_measurement_circuit(noise: &str) -> String {
-    format!("H 0\nCX 0 1\n{noise}CX rec[-1] 2\nM 2\nMPP X0*X1 Z0*Z1\n")
+    format!("H 0\nCX 0 1\n{noise}MPP X0*X1 Z0*Z1\n")
 }
 
 fn heralded_bell_detection_circuit(noise: &str) -> String {
@@ -469,34 +533,34 @@ fn heralded_frame_circuit(noise: &str) -> String {
     )
 }
 
-fn count_binary_records(
-    records: &[Vec<bool>],
+fn count_binary_records<I, R>(
+    records: I,
     zero: &'static str,
     one: &'static str,
-) -> BTreeMap<&'static str, usize> {
-    let mut counts = BTreeMap::from([(zero, 0), (one, 0)]);
+) -> StatisticalCounts
+where
+    I: IntoIterator<Item = R>,
+    R: AsRef<[bool]>,
+{
+    let mut counts = StatisticalCounts::new(&[zero, one]);
     for record in records {
-        let [bit] = record.as_slice() else {
+        let record = record.as_ref();
+        let [bit] = record else {
             panic!("expected one statistical bit, got {record:?}");
         };
-        *counts
-            .get_mut(if *bit { one } else { zero })
-            .expect("bucket") += 1;
+        counts.increment(if *bit { one } else { zero });
     }
     counts
 }
 
-fn count_single_pauli_samples(
-    records: &[Vec<bool>],
-    prefix: &str,
-) -> BTreeMap<&'static str, usize> {
+fn count_single_pauli_samples(records: &[Vec<bool>], prefix: &str) -> StatisticalCounts {
     count_single_paulis(records.iter().map(Vec::as_slice), prefix)
 }
 
 fn count_single_pauli_detection(
     output: &crate::DetectionConversionOutput,
     prefix: &str,
-) -> BTreeMap<&'static str, usize> {
+) -> StatisticalCounts {
     count_single_paulis(
         output
             .records
@@ -509,7 +573,7 @@ fn count_single_pauli_detection(
 fn count_single_pauli_frame(
     output: &crate::DetectionConversionOutput,
     prefix: &str,
-) -> BTreeMap<&'static str, usize> {
+) -> StatisticalCounts {
     count_single_paulis(
         output
             .records
@@ -522,19 +586,17 @@ fn count_single_pauli_frame(
 fn count_single_paulis<'a>(
     records: impl Iterator<Item = &'a [bool]>,
     prefix: &str,
-) -> BTreeMap<&'static str, usize> {
+) -> StatisticalCounts {
     let names = single_pauli_names(prefix);
-    let mut counts = names
-        .iter()
-        .map(|(_, name)| (*name, 0))
-        .collect::<BTreeMap<_, _>>();
+    let bucket_names = names.map(|(_, name)| name);
+    let mut counts = StatisticalCounts::new(&bucket_names);
     for record in records {
         let source = single_pauli_label(record);
         let name = names
             .iter()
             .find_map(|(candidate, name)| (*candidate == source).then_some(*name))
             .expect("single-Pauli bucket name");
-        *counts.get_mut(name).expect("single-Pauli bucket") += 1;
+        counts.increment(name);
     }
     counts
 }
@@ -568,14 +630,14 @@ fn single_pauli_label(bits: &[bool]) -> &'static str {
     }
 }
 
-fn count_two_pauli_samples(records: &[Vec<bool>], prefix: &str) -> BTreeMap<&'static str, usize> {
+fn count_two_pauli_samples(records: &[Vec<bool>], prefix: &str) -> StatisticalCounts {
     count_two_paulis(records.iter().map(Vec::as_slice), prefix)
 }
 
 fn count_two_pauli_detection(
     output: &crate::DetectionConversionOutput,
     prefix: &str,
-) -> BTreeMap<&'static str, usize> {
+) -> StatisticalCounts {
     count_two_paulis(
         output
             .records
@@ -588,7 +650,7 @@ fn count_two_pauli_detection(
 fn count_two_pauli_frame(
     output: &crate::DetectionConversionOutput,
     prefix: &str,
-) -> BTreeMap<&'static str, usize> {
+) -> StatisticalCounts {
     count_two_paulis(
         output
             .records
@@ -601,16 +663,13 @@ fn count_two_pauli_frame(
 fn count_two_paulis<'a>(
     records: impl Iterator<Item = &'a [bool]>,
     prefix: &str,
-) -> BTreeMap<&'static str, usize> {
+) -> StatisticalCounts {
     assert_eq!(prefix, "pc2-");
     let names = [
         "pc2-ii", "pc2-ix", "pc2-iy", "pc2-iz", "pc2-xi", "pc2-xx", "pc2-xy", "pc2-xz", "pc2-yi",
         "pc2-yx", "pc2-yy", "pc2-yz", "pc2-zi", "pc2-zx", "pc2-zy", "pc2-zz",
     ];
-    let mut counts = names
-        .into_iter()
-        .map(|name| (name, 0))
-        .collect::<BTreeMap<_, _>>();
+    let mut counts = StatisticalCounts::new(&names);
     for record in records {
         let [a, b, c, d] = record else {
             panic!("expected four two-Pauli classification bits, got {record:?}");
@@ -621,7 +680,7 @@ fn count_two_paulis<'a>(
             .get(first * 4 + second)
             .copied()
             .expect("two-Pauli classification index");
-        *counts.get_mut(name).expect("two-Pauli bucket") += 1;
+        counts.increment(name);
     }
     counts
 }
@@ -639,7 +698,7 @@ fn count_identity_vs_nonidentity_samples(
     records: &[Vec<bool>],
     identity: &'static str,
     nonidentity: &'static str,
-) -> BTreeMap<&'static str, usize> {
+) -> StatisticalCounts {
     count_identity_vs_nonidentity(records.iter().map(Vec::as_slice), identity, nonidentity)
 }
 
@@ -647,7 +706,7 @@ fn count_identity_vs_nonidentity_detection(
     output: &crate::DetectionConversionOutput,
     identity: &'static str,
     nonidentity: &'static str,
-) -> BTreeMap<&'static str, usize> {
+) -> StatisticalCounts {
     count_identity_vs_nonidentity(
         output
             .records
@@ -662,7 +721,7 @@ fn count_identity_vs_nonidentity_frame(
     output: &crate::DetectionConversionOutput,
     identity: &'static str,
     nonidentity: &'static str,
-) -> BTreeMap<&'static str, usize> {
+) -> StatisticalCounts {
     count_identity_vs_nonidentity(
         output
             .records
@@ -677,27 +736,27 @@ fn count_identity_vs_nonidentity<'a>(
     records: impl Iterator<Item = &'a [bool]>,
     identity: &'static str,
     nonidentity: &'static str,
-) -> BTreeMap<&'static str, usize> {
-    let mut counts = BTreeMap::from([(identity, 0), (nonidentity, 0)]);
+) -> StatisticalCounts {
+    let mut counts = StatisticalCounts::new(&[identity, nonidentity]);
     for record in records {
         let name = if record.iter().all(|bit| !bit) {
             identity
         } else {
             nonidentity
         };
-        *counts.get_mut(name).expect("identity bucket") += 1;
+        counts.increment(name);
     }
     counts
 }
 
-fn count_heralded_samples(records: &[Vec<bool>], erase: bool) -> BTreeMap<&'static str, usize> {
+fn count_heralded_samples(records: &[Vec<bool>], erase: bool) -> StatisticalCounts {
     count_heralded(records.iter().map(Vec::as_slice), erase)
 }
 
 fn count_heralded_detection(
     output: &crate::DetectionConversionOutput,
     erase: bool,
-) -> BTreeMap<&'static str, usize> {
+) -> StatisticalCounts {
     count_heralded(
         output.records.iter().map(|record| {
             let [herald] = record.detectors.as_slice() else {
@@ -715,7 +774,7 @@ fn count_heralded_detection(
 fn count_heralded_frame(
     output: &crate::DetectionConversionOutput,
     erase: bool,
-) -> BTreeMap<&'static str, usize> {
+) -> StatisticalCounts {
     count_heralded(
         output.records.iter().map(|record| {
             let [first, second, herald] = record.observables.as_slice() else {
@@ -727,13 +786,13 @@ fn count_heralded_frame(
     )
 }
 
-fn count_heralded<'a, I, R>(records: I, erase: bool) -> BTreeMap<&'static str, usize>
+fn count_heralded<I, R>(records: I, erase: bool) -> StatisticalCounts
 where
     I: Iterator<Item = R>,
-    R: AsRef<[bool]> + 'a,
+    R: AsRef<[bool]>,
 {
     let names = if erase {
-        vec![
+        [
             "erase-no-herald",
             "erase-i",
             "erase-x",
@@ -741,7 +800,7 @@ where
             "erase-z",
         ]
     } else {
-        vec![
+        [
             "no-herald",
             "herald-no-data-error",
             "herald-x",
@@ -749,10 +808,7 @@ where
             "herald-z",
         ]
     };
-    let mut counts = names
-        .iter()
-        .map(|name| (*name, 0))
-        .collect::<BTreeMap<_, _>>();
+    let mut counts = StatisticalCounts::new(&names);
     for record in records {
         let record = record.as_ref();
         let [herald, first, second] = record else {
@@ -782,7 +838,7 @@ where
                 _ => unreachable!(),
             }
         };
-        *counts.get_mut(name).expect("heralded bucket") += 1;
+        counts.increment(name);
     }
     counts
 }

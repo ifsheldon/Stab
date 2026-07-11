@@ -638,6 +638,47 @@ fn sample_basic_matches_m8_oracle_golden() {
 }
 
 #[test]
+fn sample_matches_stim_heralded_record_output_paths() {
+    let input = include_bytes!("../../../oracle/fixtures/inputs/sample_heralded.stim");
+
+    let mut one_shot = Vec::new();
+    let mut one_shot_stderr = Vec::new();
+    let one_shot_status = run_from(
+        ["stab", "sample", "--shots=1"],
+        input.as_slice(),
+        &mut one_shot,
+        &mut one_shot_stderr,
+    );
+    assert_eq!(one_shot_status, 0);
+    assert_eq!(one_shot, b"0010\n");
+    assert!(one_shot_stderr.is_empty());
+
+    let mut frame = Vec::new();
+    let mut frame_stderr = Vec::new();
+    let frame_status = run_from(
+        ["stab", "sample", "--shots=2"],
+        input.as_slice(),
+        &mut frame,
+        &mut frame_stderr,
+    );
+    assert_eq!(frame_status, 0);
+    assert_eq!(frame, b"011001001\n011001001\n");
+    assert!(frame_stderr.is_empty());
+
+    let mut skipped_reference = Vec::new();
+    let mut skipped_reference_stderr = Vec::new();
+    let skipped_reference_status = run_from(
+        ["stab", "sample", "--shots=1", "--skip_reference_sample"],
+        input.as_slice(),
+        &mut skipped_reference,
+        &mut skipped_reference_stderr,
+    );
+    assert_eq!(skipped_reference_status, 0);
+    assert_eq!(skipped_reference, b"011001001\n");
+    assert!(skipped_reference_stderr.is_empty());
+}
+
+#[test]
 fn legacy_sample_flag_matches_m8_oracle_golden() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();

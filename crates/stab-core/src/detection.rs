@@ -5,6 +5,7 @@ use frame::{
     try_for_each_detection_event_with_frame, validate_frame_detection_circuit,
 };
 
+use crate::sampling::ReferenceSampleScratch;
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, CompiledSampler,
     RepeatBlock, SampleFormat,
@@ -120,14 +121,16 @@ impl CompiledDetectionConverter {
     {
         let mut record = self.reusable_detection_record();
         let mut reference_sample = self.reusable_reference_sample();
+        let mut reference_scratch = self.reference_sample.reusable_scratch();
         let sweep_record = vec![false; self.sweep_bit_count()];
         for (shot_index, measurement_record) in measurements.into_iter().enumerate() {
             self.validate_measurement_record_width(measurement_record, Some(shot_index))?;
-            self.convert_record_with_sweep_into(
+            self.convert_record_with_sweep_and_scratch_into(
                 measurement_record,
                 &sweep_record,
                 &mut reference_sample,
                 &mut record,
+                reference_scratch.as_mut(),
             )?;
             visit(&record)?;
         }
@@ -150,17 +153,19 @@ impl CompiledDetectionConverter {
         let mut sweep_iter = sweeps.into_iter();
         let mut record = self.reusable_detection_record();
         let mut reference_sample = self.reusable_reference_sample();
+        let mut reference_scratch = self.reference_sample.reusable_scratch();
         let mut shot_index = 0usize;
         loop {
             match (measurement_iter.next(), sweep_iter.next()) {
                 (Some(measurement_record), Some(sweep_record)) => {
                     self.validate_measurement_record_width(measurement_record, Some(shot_index))?;
                     self.validate_sweep_record_width(sweep_record, Some(shot_index))?;
-                    self.convert_record_with_sweep_into(
+                    self.convert_record_with_sweep_and_scratch_into(
                         measurement_record,
                         sweep_record,
                         &mut reference_sample,
                         &mut record,
+                        reference_scratch.as_mut(),
                     )?;
                     visit(&record)?;
                     shot_index += 1;
@@ -200,10 +205,32 @@ impl CompiledDetectionConverter {
         reference_sample: &mut Vec<bool>,
         record: &mut DetectionEventRecord,
     ) -> CircuitResult<()> {
+        let mut reference_scratch = self.reference_sample.reusable_scratch();
+        self.convert_record_with_sweep_and_scratch_into(
+            measurement_record,
+            sweep_record,
+            reference_sample,
+            record,
+            reference_scratch.as_mut(),
+        )
+    }
+
+    fn convert_record_with_sweep_and_scratch_into(
+        &self,
+        measurement_record: &[bool],
+        sweep_record: &[bool],
+        reference_sample: &mut Vec<bool>,
+        record: &mut DetectionEventRecord,
+        reference_scratch: Option<&mut ReferenceSampleScratch>,
+    ) -> CircuitResult<()> {
         self.validate_measurement_record_width(measurement_record, None)?;
         self.validate_sweep_record_width(sweep_record, None)?;
-        self.reference_sample
-            .fill(sweep_record, self.measurement_count(), reference_sample)?;
+        self.reference_sample.fill(
+            sweep_record,
+            self.measurement_count(),
+            reference_sample,
+            reference_scratch,
+        )?;
         self.plan
             .convert_record_into(measurement_record, reference_sample, record)
     }
@@ -267,18 +294,35 @@ impl CompiledDetectionConverter {
 }
 
 impl ReferenceSampleSource {
+    fn reusable_scratch(&self) -> Option<ReferenceSampleScratch> {
+        match self {
+            Self::Sweep(sampler) => Some(sampler.reusable_reference_sample_scratch()),
+            Self::Zero | Self::Static(_) => None,
+        }
+    }
+
     fn fill(
         &self,
         sweep_record: &[bool],
         measurement_count: usize,
         output: &mut Vec<bool>,
+        reference_scratch: Option<&mut ReferenceSampleScratch>,
     ) -> CircuitResult<()> {
         output.clear();
         match self {
             Self::Zero => output.resize(measurement_count, false),
             Self::Static(reference_sample) => output.extend_from_slice(reference_sample),
             Self::Sweep(sampler) => {
-                sampler.reference_measurement_record_with_sweep_into(sweep_record, output)?
+                let scratch = reference_scratch.ok_or_else(|| {
+                    CircuitError::invalid_result_format(
+                        "internal sweep reference conversion scratch is unavailable",
+                    )
+                })?;
+                sampler.reference_measurement_record_with_sweep_and_scratch_into(
+                    sweep_record,
+                    scratch,
+                    output,
+                )?
             }
         }
         validate_reference_sample_len(output, measurement_count)
