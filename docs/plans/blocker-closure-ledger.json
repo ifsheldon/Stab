@@ -4686,6 +4686,26 @@
         },
         {
           "classification": "rust-test-proxy",
+          "value": "pfm-b5-analyzer-nested-probe-budget-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|dem::analyze::reverse_fold::tests::pfm_b5_nested_analyzer_probe_work_is_bounded|--|--exact",
+            "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
+          "value": "pfm-b5-analyzer-local-decomposition-17-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_pfm_b5|pfm_b5_local_decomposition_rejects_seventeen_like_stim|--|--exact",
+            "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
           "value": "pfm-b5-analyzer-repetition-code-loop-rust",
           "signature": {
             "parity_mode": "structural",
@@ -4706,12 +4726,32 @@
         },
         {
           "classification": "rust-test-proxy",
+          "value": "pfm-b5-graphlike-state-payload-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|dem::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads|--|--exact",
+            "upstream_source": "src/stim/search/graphlike/search_state.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
           "value": "pfm-b5-hypergraph-finite-corpus-rust",
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
             "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
             "upstream_source": "src/stim/search/hyper/algo.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
+          "value": "pfm-b5-hypergraph-state-payload-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|dem::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads|--|--exact",
+            "upstream_source": "src/stim/search/hyper/search_state.test.cc"
           }
         },
         {
@@ -5149,7 +5189,7 @@
             "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.too_many_symptoms",
-            "subcase": "accept sixteen detector symptoms and reject seventeen"
+            "subcase": "accept sixteen detector symptoms"
           },
           "comparator": "exact",
           "status": "implemented",
@@ -5162,7 +5202,7 @@
               "stab-core",
               "--test",
               "dem_analyzer_pfm_b5",
-              "pfm_b5_local_decomposition_boundary_matches_stim",
+              "pfm_b5_local_decomposition_accepts_sixteen_like_stim",
               "--quiet",
               "--exact"
             ]
@@ -5186,7 +5226,135 @@
             "state": "not-applicable",
             "value": "The sixteen-versus-seventeen symptom boundary is too small to be a useful benchmark."
           },
-          "resource_contract": "Local decomposition uses a fixed sixteen-bit detector-symptom contract and rejects the seventeenth before combinatorial work."
+          "resource_contract": "Local decomposition accepts the inclusive fixed sixteen-bit detector-symptom boundary."
+        },
+        {
+          "id": "pfm6-analyzer-local-decomposition-rejection",
+          "surface": "circuit_to_detector_error_model local composite decomposition",
+          "upstream": {
+            "path": "src/stim/simulators/error_analyzer.test.cc",
+            "kind": "gtest-case",
+            "test": "ErrorAnalyzer.too_many_symptoms",
+            "subcase": "reject seventeen detector symptoms"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "--test",
+              "dem_analyzer_pfm_b5",
+              "pfm_b5_local_decomposition_rejects_seventeen_like_stim",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-analyzer-local-decomposition-17-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_pfm_b5|pfm_b5_local_decomposition_rejects_seventeen_like_stim|--|--exact",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "The seventeen-symptom rejection is a fixed error boundary rather than a throughput workload."
+          },
+          "resource_contract": "Reject the seventeenth detector symptom before allocating exponential local-decomposition combinations."
+        },
+        {
+          "id": "pfm6-analyzer-folded-noisy-mpad",
+          "surface": "circuit_to_detector_error_model fold_loops and stab analyze_errors",
+          "upstream": {
+            "path": "src/stim/simulators/error_analyzer.test.cc",
+            "kind": "gtest-case",
+            "test": "ErrorAnalyzer.mpad",
+            "subcase": "noisy MPAD detector effect with an inert repeat"
+          },
+          "comparator": "exact",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "--test",
+              "dem_analyzer_pfm_b5",
+              "pfm_b5_folded_noisy_mpad_matches_stim",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "direct",
+            "value": "pfm-b5-analyzer-folded-mpad",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "analyze_errors|--fold_loops",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
+              "stdin_path": "inputs/pfm_b5_analyzer_folded_mpad.stim",
+              "expected_stdout_path": "expected/pfm_b5_analyzer_folded_mpad.stdout",
+              "stdin_sha256": "44f03a87b9bf7b47a44810c37abf36ed6be98dcc84df0858e4bbab96c65a090b",
+              "expected_stdout_sha256": "9d7a075fc6bdc5edd26212c2c10cdd0b9ee7a4d530c07e21f4884fd4302d6b42"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "The folded MPAD fix adds one existing per-record error lookup and is covered by analyzer workloads."
+          },
+          "resource_contract": "Record each noisy MPAD measurement error before reverse tracking consumes its measurement record."
+        },
+        {
+          "id": "pfm6-analyzer-nested-probe-budget",
+          "surface": "circuit_to_detector_error_model folded recurrence probing",
+          "upstream": {
+            "path": "src/stim/simulators/error_analyzer.test.cc",
+            "kind": "gtest-case",
+            "test": "ErrorAnalyzer.loop_folding_nested_loop",
+            "subcase": "nested no-recurrence probe work bound"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "dem::analyze::reverse_fold::tests::pfm_b5_nested_analyzer_probe_work_is_bounded",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-analyzer-nested-probe-budget-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|dem::analyze::reverse_fold::tests::pfm_b5_nested_analyzer_probe_work_is_bounded|--|--exact",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "The nested no-recurrence case is a hostile-input admission boundary and must terminate with a domain error instead of becoming a timing workload."
+          },
+          "resource_contract": "Charge one cumulative one-million-unit recurrence budget across nested probe circuits and instructions."
         },
         {
           "id": "pfm6-analyzer-coordinate-loop",
@@ -5318,6 +5486,88 @@
             "value": "The empty-result rejection is covered inside direct search benchmarks."
           },
           "resource_contract": "Return no-error status without growing a search frontier."
+        },
+        {
+          "id": "pfm6-graphlike-zero-probability-diagnostics",
+          "surface": "shortest_graphlike_error failure diagnostics",
+          "upstream": {
+            "path": "src/stim/search/graphlike/algo.test.cc",
+            "kind": "gtest-case",
+            "test": "shortest_graphlike_undetectable_logical_error.no_error",
+            "subcase": "zero-probability source error reports no graphlike errors instead of no errors"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "--test",
+              "dem_search_pfm_b5",
+              "pfm_b5_graphlike_zero_probability_diagnostics_match_stim",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-graphlike-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
+              "upstream_source": "src/stim/search/graphlike/algo.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "Failure-message classification is not a throughput workload."
+          },
+          "resource_contract": "Count source error instructions for diagnostics while excluding zero-probability mechanisms from graph construction."
+        },
+        {
+          "id": "pfm6-graphlike-state-payload-budget",
+          "surface": "shortest_graphlike_error search frontier",
+          "upstream": {
+            "path": "src/stim/search/graphlike/search_state.test.cc",
+            "kind": "gtest-case",
+            "test": "search_graphlike.DemAdjGraphSearchState_construct",
+            "subcase": "variable observable-mask payload admission"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "dem::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-graphlike-state-payload-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|dem::graphlike::algo::tests::graphlike_search_bounds_variable_state_payloads|--|--exact",
+              "upstream_source": "src/stim/search/graphlike/search_state.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "The payload admission boundary protects hostile models and is not a successful search workload."
+          },
+          "resource_contract": "Preflight at most 65,536 terms per state before cloning and at most 5,000,000 stored terms across map keys predecessors and queued copies."
         },
         {
           "id": "pfm6-graphlike-distance-one",
@@ -5618,6 +5868,88 @@
             "value": "The empty-result rejection is covered inside direct search benchmarks."
           },
           "resource_contract": "Return no-error status without growing a search frontier."
+        },
+        {
+          "id": "pfm6-hypergraph-zero-probability-diagnostics",
+          "surface": "search_hypergraph_logical_error failure diagnostics",
+          "upstream": {
+            "path": "src/stim/search/hyper/algo.test.cc",
+            "kind": "gtest-case",
+            "test": "find_undetectable_logical_error.no_error",
+            "subcase": "zero-probability source error does not report no errors"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "--test",
+              "dem_search_pfm_b5",
+              "pfm_b5_hypergraph_zero_probability_diagnostics_match_stim",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-hypergraph-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "upstream_source": "src/stim/search/hyper/algo.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "Failure-message classification is not a throughput workload."
+          },
+          "resource_contract": "Count source error instructions for diagnostics while excluding zero-probability mechanisms from graph construction."
+        },
+        {
+          "id": "pfm6-hypergraph-state-payload-budget",
+          "surface": "search_hypergraph_logical_error search frontier",
+          "upstream": {
+            "path": "src/stim/search/hyper/search_state.test.cc",
+            "kind": "gtest-case",
+            "test": "search_hyper_search_state.equality",
+            "subcase": "variable detector and observable set payload admission"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "dem::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-hypergraph-state-payload-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|dem::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads|--|--exact",
+              "upstream_source": "src/stim/search/hyper/search_state.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "The payload admission boundary protects hostile models and is not a successful search workload."
+          },
+          "resource_contract": "Preflight symmetric-difference cardinality before cloning with at most 65,536 terms per state and 5,000,000 stored terms overall; cap each source error at 65,536 targets before normalization."
         },
         {
           "id": "pfm6-hypergraph-distance-one",
@@ -6050,6 +6382,48 @@
           "resource_contract": "Encode sparse detector parity without scanning undeclared ids."
         },
         {
+          "id": "pfm6-wcnf-shortest-large-detector-only",
+          "surface": "shortest_error_sat_problem",
+          "upstream": {
+            "path": "src/stim/search/sat/wcnf.test.cc",
+            "kind": "gtest-case",
+            "test": "shortest_error_sat_problem.single_dets_no_obs",
+            "subcase": "large shifted detector-only repeat is trivially unsatisfiable"
+          },
+          "comparator": "exact",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "--test",
+              "dem_search_pfm_b5",
+              "pfm_b5_wcnf_shortest_large_detector_only_is_unsat",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "The count-summary UNSAT fast path is constant-time metadata work rather than a materialized encoding workload."
+          },
+          "resource_contract": "Return the fixed UNSAT encoding from compact error and observable counts before traversing or flattening shifted repeats."
+        },
+        {
           "id": "pfm6-wcnf-shortest-no-targets",
           "surface": "shortest_error_sat_problem",
           "upstream": {
@@ -6348,6 +6722,48 @@
             "classification": "report-only"
           },
           "resource_contract": "Elide neutral weights without changing parity constraints."
+        },
+        {
+          "id": "pfm6-wcnf-likeliest-low-quantization-header",
+          "surface": "likeliest_error_sat_problem",
+          "upstream": {
+            "path": "src/stim/search/sat/wcnf.test.cc",
+            "kind": "gtest-case",
+            "test": "likeliest_error_sat_problem.single_detector_single_observable",
+            "subcase": "stored zero-weight clause remains counted in the WDIMACS header"
+          },
+          "comparator": "exact",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "--test",
+              "dem_search_pfm_b5",
+              "pfm_b5_wcnf_likeliest_low_quantization_header_matches_stim",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "Quantization-header compatibility changes encoding text but not encoder complexity."
+          },
+          "resource_contract": "Preflight and store the clause shape once while preserving Stim's stored-clause header count when zero quantization omits the printed line."
         },
         {
           "id": "pfm6-sparse-tracker-loop-summary",
