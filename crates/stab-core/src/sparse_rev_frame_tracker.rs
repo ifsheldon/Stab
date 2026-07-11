@@ -13,10 +13,12 @@ use crate::{
 
 mod error_analysis;
 mod pauli_product;
+mod shifted_recurrence;
 mod shifted_repeat;
 mod unitary_repeat;
 
 use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_terms_reversed};
+pub(crate) use shifted_recurrence::{ShiftedRecurrenceSearch, search_shifted_recurrence};
 
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
 
@@ -155,7 +157,9 @@ impl SparseReverseFrameTracker {
                     }
                 }
                 CircuitItem::RepeatBlock(repeat) => {
-                    if unitary_repeat::try_undo_supported_unitary_repeat(self, repeat)? {
+                    if gauge_output == GaugeOutputPolicy::Preserve
+                        && unitary_repeat::try_undo_supported_unitary_repeat(self, repeat)?
+                    {
                         continue;
                     }
                     shifted_repeat::undo_loop_with_gauge_output(

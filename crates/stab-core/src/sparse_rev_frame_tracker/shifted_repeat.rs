@@ -2,7 +2,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{Circuit, CircuitError, CircuitResult, DemTarget};
 
-use super::{AnalyzerProbeBudget, GaugeOutputPolicy, SparseReverseFrameTracker};
+use super::{
+    AnalyzerProbeBudget, GaugeOutputPolicy, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
+    search_shifted_recurrence,
+};
 
 pub(super) fn undo_loop(
     tracker: &mut SparseReverseFrameTracker,
@@ -35,73 +38,56 @@ pub(super) fn undo_loop_with_gauge_output(
         );
     }
 
-    let mut tortoise = tracker.clone();
-    let mut hare_steps = 0_u64;
-    let mut tortoise_steps = 0_u64;
-    loop {
+    let probe_limit = repetitions / 2 + 1;
+    let search = search_shifted_recurrence(tracker, probe_limit, |probe| {
         undo_probe_iteration(
-            tracker,
+            probe,
             body,
             gauge_output,
             analyzer_probe_budget.as_deref_mut(),
-        )?;
-        hare_steps = hare_steps.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
-                "sparse reverse repeat step count overflowed",
-            )
-        })?;
-        if is_shifted_copy(tracker, &tortoise) {
-            break;
-        }
-
-        if hare_steps > repetitions.saturating_sub(hare_steps) {
+        )
+    })?;
+    let recurrence = match search {
+        ShiftedRecurrenceSearch::Found { recurrence, .. } => recurrence,
+        ShiftedRecurrenceSearch::Exhausted {
+            state, iterations, ..
+        } => {
+            *tracker = state;
             return undo_loop_by_unrolling_with_gauge_output(
                 tracker,
                 body,
-                repetitions - hare_steps,
+                repetitions.checked_sub(iterations).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "sparse reverse repeat remainder underflowed",
+                    )
+                })?,
                 gauge_output,
                 analyzer_probe_budget,
             );
         }
+    };
 
-        if hare_steps & 1 == 0 {
-            undo_probe_iteration(
-                &mut tortoise,
-                body,
-                gauge_output,
-                analyzer_probe_budget.as_deref_mut(),
-            )?;
-            tortoise_steps = tortoise_steps.checked_add(1).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
-                    "sparse reverse repeat step count overflowed",
-                )
-            })?;
-            if is_shifted_copy(tracker, &tortoise) {
-                break;
-            }
-        }
-    }
-
-    let period = hare_steps.checked_sub(tortoise_steps).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model("sparse reverse repeat period underflowed")
-    })?;
-    if period == 0 {
-        return Err(CircuitError::invalid_detector_error_model(
-            "sparse reverse repeat period was zero",
-        ));
-    }
-    let skipped_iterations = (repetitions - hare_steps) / period;
-    let measurements_per_period = tortoise
+    let remaining_after_cycle = repetitions
+        .checked_sub(recurrence.cycle_end_iterations)
+        .ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "sparse reverse repeat cycle end exceeded its repeat count",
+            )
+        })?;
+    let skipped_iterations = remaining_after_cycle / recurrence.period;
+    let measurements_per_period = recurrence
+        .cycle_start_state
         .measurement_count
-        .checked_sub(tracker.measurement_count)
+        .checked_sub(recurrence.cycle_end_state.measurement_count)
         .ok_or_else(|| {
             CircuitError::invalid_detector_error_model(
                 "sparse reverse repeat measurement period underflowed",
             )
         })?;
-    let detectors_per_period = tortoise
+    let detectors_per_period = recurrence
+        .cycle_start_state
         .detector_count
-        .checked_sub(tracker.detector_count)
+        .checked_sub(recurrence.cycle_end_state.detector_count)
         .ok_or_else(|| {
             CircuitError::invalid_detector_error_model(
                 "sparse reverse repeat detector period underflowed",
@@ -112,13 +98,19 @@ pub(super) fn undo_loop_with_gauge_output(
         signed_product_usize(measurements_per_period, skipped_iterations, "measurement")?;
     let skipped_detectors =
         signed_product_u64(detectors_per_period, skipped_iterations, "detector")?;
+    *tracker = recurrence.cycle_end_state;
     shift(tracker, -skipped_measurements, -skipped_detectors)?;
-    hare_steps = hare_steps
-        .checked_add(skipped_iterations.checked_mul(period).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model(
-                "sparse reverse repeat skipped step count overflowed",
-            )
-        })?)
+    let completed_iterations = recurrence
+        .cycle_end_iterations
+        .checked_add(
+            skipped_iterations
+                .checked_mul(recurrence.period)
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "sparse reverse repeat skipped step count overflowed",
+                    )
+                })?,
+        )
         .ok_or_else(|| {
             CircuitError::invalid_detector_error_model(
                 "sparse reverse repeat step count overflowed",
@@ -128,7 +120,13 @@ pub(super) fn undo_loop_with_gauge_output(
     undo_loop_by_unrolling_with_gauge_output(
         tracker,
         body,
-        repetitions - hare_steps,
+        repetitions
+            .checked_sub(completed_iterations)
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "sparse reverse repeat remainder underflowed",
+                )
+            })?,
         gauge_output,
         analyzer_probe_budget,
     )

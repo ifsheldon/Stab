@@ -11,7 +11,7 @@ use super::{
     error_traversal::{
         SearchGraphTargetPolicy, search_graph_nonzero_error_targets, visit_search_graph_errors,
     },
-    search_budget::SearchBudget,
+    search_budget::{GraphConstructionBudget, SearchBudget},
     traversal::{FoldedDemTraversal, shifted_targets},
 };
 use crate::{CircuitError, CircuitResult, Probability};
@@ -96,6 +96,15 @@ impl Edge {
             observables,
         }
     }
+
+    fn term_count(&self) -> CircuitResult<usize> {
+        self.detectors
+            .len()
+            .checked_add(self.observables.len())
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("hypergraph edge term count overflowed")
+            })
+    }
 }
 
 impl Display for Edge {
@@ -125,23 +134,26 @@ impl Display for Edge {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct Node {
     edge_ids: Vec<usize>,
+    edge_id_index: BTreeSet<usize>,
 }
 
 impl Node {
-    fn add_edge_id(&mut self, edge_id: usize) -> CircuitResult<()> {
-        if !self.edge_ids.contains(&edge_id) {
-            self.edge_ids.try_reserve(1).map_err(|_| {
-                CircuitError::invalid_detector_error_model(
-                    "hypergraph search cannot allocate another edge incidence",
-                )
-            })?;
-            self.edge_ids.push(edge_id);
+    fn add_edge_id(&mut self, edge_id: usize) -> CircuitResult<bool> {
+        if self.edge_id_index.contains(&edge_id) {
+            return Ok(false);
         }
-        Ok(())
+        self.edge_ids.try_reserve(1).map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "hypergraph search cannot allocate another edge incidence",
+            )
+        })?;
+        self.edge_id_index.insert(edge_id);
+        self.edge_ids.push(edge_id);
+        Ok(true)
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 struct Graph {
     nodes: Vec<Node>,
     edges: Vec<Edge>,
@@ -151,7 +163,23 @@ struct Graph {
     has_declared_detectors: bool,
     num_observables: usize,
     distance_1_error_mask: ObservableMask,
+    construction_budget: GraphConstructionBudget,
 }
+
+impl PartialEq for Graph {
+    fn eq(&self, other: &Self) -> bool {
+        self.nodes == other.nodes
+            && self.edges == other.edges
+            && self.edge_index == other.edge_index
+            && self.edge_incidences == other.edge_incidences
+            && self.detector_index == other.detector_index
+            && self.has_declared_detectors == other.has_declared_detectors
+            && self.num_observables == other.num_observables
+            && self.distance_1_error_mask == other.distance_1_error_mask
+    }
+}
+
+impl Eq for Graph {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum DetectorIndex {
@@ -173,6 +201,7 @@ impl Graph {
             has_declared_detectors: node_count > 0,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
+            construction_budget: GraphConstructionBudget::new("hypergraph search"),
         }
     }
 
@@ -193,6 +222,7 @@ impl Graph {
             has_declared_detectors: node_count > 0,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
+            construction_budget: GraphConstructionBudget::new("hypergraph search"),
         })
     }
 
@@ -229,6 +259,7 @@ impl Graph {
             has_declared_detectors,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
+            construction_budget: GraphConstructionBudget::new("hypergraph search"),
         })
     }
 
@@ -241,14 +272,18 @@ impl Graph {
         graph.distance_1_error_mask = distance_1_error_mask;
         for (node_index, edges) in node_edges.into_iter().enumerate() {
             for edge in edges {
-                let edge_id = graph.intern_edge(edge)?;
+                let (edge_id, inserted) = graph.intern_edge(edge, 2)?;
+                if !inserted {
+                    graph.construction_budget.admit_adjacency(2)?;
+                }
                 let node = graph.nodes.get_mut(node_index).ok_or_else(|| {
                     CircuitError::invalid_detector_error_model(
                         "hypergraph test node index is outside the graph",
                     )
                 })?;
-                node.add_edge_id(edge_id)?;
-                graph.edge_incidences = graph.edge_incidences.saturating_add(1);
+                if node.add_edge_id(edge_id)? {
+                    graph.edge_incidences = graph.edge_incidences.saturating_add(1);
+                }
             }
         }
         Ok(graph)
@@ -262,9 +297,13 @@ impl Graph {
         })
     }
 
-    fn intern_edge(&mut self, edge: Edge) -> CircuitResult<usize> {
+    fn intern_edge(
+        &mut self,
+        edge: Edge,
+        adjacency_stored_terms: usize,
+    ) -> CircuitResult<(usize, bool)> {
         if let Some(edge_id) = self.edge_index.get(&edge).copied() {
-            return Ok(edge_id);
+            return Ok((edge_id, false));
         }
         let edge_id = self.edges.len();
         self.edges.try_reserve(1).map_err(|_| {
@@ -272,9 +311,14 @@ impl Graph {
                 "hypergraph search cannot allocate another edge",
             )
         })?;
+        self.construction_budget.admit_unique_edge(
+            edge.term_count()?,
+            2,
+            adjacency_stored_terms,
+        )?;
         self.edges.push(edge.clone());
         self.edge_index.insert(edge, edge_id);
-        Ok(edge_id)
+        Ok((edge_id, true))
     }
 
     fn detector_for_node_index(&self, index: usize) -> CircuitResult<DemDetectorId> {
@@ -356,7 +400,15 @@ impl Graph {
             )));
         }
 
-        let edge_id = self.intern_edge(edge)?;
+        let adjacency_stored_terms = detectors.len().checked_mul(2).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "hypergraph stored edge incidence count overflowed",
+            )
+        })?;
+        let (edge_id, inserted) = self.intern_edge(edge, adjacency_stored_terms)?;
+        if !inserted {
+            return Ok(());
+        }
         for detector in detectors {
             let index = self.node_index_for_detector(detector)?;
             let Some(node) = self.nodes.get_mut(index) else {
@@ -365,7 +417,12 @@ impl Graph {
                     detector.get()
                 )));
             };
-            node.add_edge_id(edge_id)?;
+            let inserted = node.add_edge_id(edge_id)?;
+            if !inserted {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "hypergraph search inserted a new edge into the same detector twice",
+                ));
+            }
         }
         self.edge_incidences = projected_incidences;
         Ok(())
@@ -749,416 +806,4 @@ fn format_observable(observable: DemObservableId) -> String {
 mod resource_tests;
 
 #[cfg(test)]
-mod tests {
-    #![allow(
-        clippy::expect_used,
-        clippy::indexing_slicing,
-        clippy::unwrap_used,
-        reason = "unit tests use direct assertions for compact diagnostics"
-    )]
-
-    use super::*;
-
-    fn detector(value: u64) -> DemDetectorId {
-        DemDetectorId::try_new(value).unwrap()
-    }
-
-    fn detector_set(values: &[u64]) -> BTreeSet<DemDetectorId> {
-        values.iter().copied().map(detector).collect()
-    }
-
-    fn obs_mask(bits: u64) -> ObservableMask {
-        let mut observables = BTreeSet::new();
-        for index in 0..64 {
-            if bits & (1 << index) != 0 {
-                observables.insert(DemObservableId::try_new(index).unwrap());
-            }
-        }
-        ObservableMask { observables }
-    }
-
-    fn edge(detectors: &[u64], observables: u64) -> Edge {
-        Edge::new(detector_set(detectors), obs_mask(observables))
-    }
-
-    fn sparse_graph(
-        detectors: &[u64],
-        node_edges: Vec<Vec<Edge>>,
-        num_observables: usize,
-    ) -> Graph {
-        let mut graph =
-            Graph::try_new_sparse(detector_set(detectors), num_observables, true).unwrap();
-        assert_eq!(graph.nodes.len(), node_edges.len());
-        for (node_index, edges) in node_edges.into_iter().enumerate() {
-            for edge in edges {
-                let edge_id = graph.intern_edge(edge).unwrap();
-                graph.nodes[node_index].add_edge_id(edge_id).unwrap();
-                graph.edge_incidences += 1;
-            }
-        }
-        graph
-    }
-
-    fn state(detectors: &[u64], observables: u64) -> SearchState {
-        SearchState::new(detector_set(detectors), obs_mask(observables))
-    }
-
-    fn first_targets(dem: &str) -> Vec<DemTarget> {
-        let model = DetectorErrorModel::from_dem_str(dem).unwrap();
-        let instruction = model
-            .items()
-            .first()
-            .and_then(|item| match item {
-                DemItem::Instruction(instruction) => Some(instruction),
-                DemItem::RepeatBlock(_) => None,
-            })
-            .unwrap();
-        instruction.targets().to_vec()
-    }
-
-    fn find(
-        dem: &str,
-        dont_explore_detection_event_sets_with_size_above: usize,
-        dont_explore_edges_with_degree_above: usize,
-        dont_explore_edges_increasing_symptom_degree: bool,
-    ) -> CircuitResult<String> {
-        let model = DetectorErrorModel::from_dem_str(dem)?;
-        find_undetectable_logical_error(
-            &model,
-            dont_explore_detection_event_sets_with_size_above,
-            dont_explore_edges_with_degree_above,
-            dont_explore_edges_increasing_symptom_degree,
-        )
-        .map(|error| error.to_dem_string())
-    }
-
-    #[test]
-    fn hyper_edge_matches_upstream() {
-        let e1 = edge(&[], 0);
-        let e2 = edge(&[1], 0);
-        let e3 = edge(&[], 1);
-        let e4 = edge(&[1, 2], 5);
-
-        assert_eq!(e1.to_string(), "[silent]");
-        assert_eq!(e2.to_string(), "[boundary] D1");
-        assert_eq!(e3.to_string(), "[silent] L0");
-        assert_eq!(e4.to_string(), "D1 D2 L0 L2");
-        assert_eq!(e1, e1);
-        assert_ne!(e1, e2);
-        assert_eq!(e1, edge(&[], 0));
-        assert_eq!(e2, e2);
-        assert_eq!(e3, e3);
-        assert_ne!(e1, e3);
-    }
-
-    #[test]
-    fn hyper_node_adjacency_reuses_edge_arena() {
-        let shared = edge(&[1, 3], 5);
-        let graph = Graph::from_parts(
-            vec![
-                vec![],
-                vec![shared.clone()],
-                vec![],
-                vec![shared, edge(&[3], 8)],
-            ],
-            64,
-            obs_mask(0),
-        )
-        .unwrap();
-
-        assert_eq!(graph.edges.len(), 2);
-        assert_eq!(graph.nodes[1].edge_ids, vec![0]);
-        assert_eq!(graph.nodes[3].edge_ids, vec![0, 1]);
-    }
-
-    #[test]
-    fn hyper_search_state_appends_transition_as_error_instruction_matches_upstream() {
-        let mut out = DetectorErrorModel::new();
-
-        state(&[1, 2], 9)
-            .append_transition_as_error_instruction_to(&state(&[1, 2], 16), &mut out)
-            .unwrap();
-        assert_eq!(out.to_dem_string(), "error(1) L0 L3 L4\n");
-
-        state(&[], 9)
-            .append_transition_as_error_instruction_to(&state(&[1, 2, 4], 16), &mut out)
-            .unwrap();
-        assert_eq!(
-            out.to_dem_string(),
-            "error(1) L0 L3 L4\nerror(1) D1 D2 D4 L0 L3 L4\n"
-        );
-
-        state(&[1, 2], 9)
-            .append_transition_as_error_instruction_to(&state(&[2, 3], 9), &mut out)
-            .unwrap();
-        assert_eq!(
-            out.to_dem_string(),
-            "error(1) L0 L3 L4\nerror(1) D1 D2 D4 L0 L3 L4\nerror(1) D1 D3\n"
-        );
-    }
-
-    #[test]
-    fn hyper_search_state_equality_ordering_and_display_match_upstream() {
-        assert_eq!(state(&[1, 2], 3), state(&[1, 2], 3));
-        assert_ne!(state(&[1, 2], 3), state(&[1, 4], 3));
-        assert_ne!(state(&[1, 2], 3), state(&[1], 3));
-        assert_ne!(state(&[1, 2], 3), state(&[1, 2], 4));
-
-        assert!(state(&[1], 999) < state(&[1, 2], 999));
-        assert!(state(&[1, 999], 999) < state(&[101, 102], 103));
-        assert!(state(&[1, 101], 999) < state(&[101, 102], 103));
-        assert!(state(&[1, 102], 999) < state(&[101, 102], 103));
-        assert!(state(&[101, 102], 3) < state(&[101, 102], 103));
-        assert!(state(&[101, 102], 103) >= state(&[101, 102], 103));
-        assert!(state(&[101, 104], 103) >= state(&[101, 102], 103));
-        assert!(state(&[101, 102], 104) >= state(&[101, 102], 103));
-
-        assert_eq!(state(&[1, 2], 3).to_string(), "D1 D2 L0 L1 ");
-    }
-
-    #[test]
-    fn hyper_graph_equality_matches_upstream() {
-        assert_eq!(Graph::new(1, 64), Graph::new(1, 64));
-        assert_ne!(Graph::new(1, 64), Graph::new(2, 64));
-        assert_ne!(Graph::new(1, 64), Graph::new(1, 32));
-
-        let a = Graph::new(1, 64);
-        let mut b = Graph::new(1, 64);
-        assert_eq!(a, b);
-        b.distance_1_error_mask = obs_mask(1);
-        assert_ne!(a, b);
-    }
-
-    #[test]
-    fn hyper_graph_add_edge_from_dem_targets_matches_upstream() {
-        let mut graph = Graph::new(3, 64);
-        graph
-            .add_edge_from_dem_targets(&first_targets("error(0.01) D0 D1 L3 ^ D0\n"), usize::MAX)
-            .unwrap();
-        assert_eq!(
-            graph.to_string(),
-            Graph::from_parts(vec![vec![], vec![edge(&[1], 8)], vec![]], 64, obs_mask(0),)
-                .unwrap()
-                .to_string()
-        );
-
-        graph
-            .add_edge_from_dem_targets(&first_targets("error(0.01) D0 D1 D2 L0\n"), usize::MAX)
-            .unwrap();
-        assert_eq!(
-            graph.to_string(),
-            Graph::from_parts(
-                vec![
-                    vec![edge(&[0, 1, 2], 1)],
-                    vec![edge(&[1], 8), edge(&[0, 1, 2], 1)],
-                    vec![edge(&[0, 1, 2], 1)],
-                ],
-                64,
-                obs_mask(0),
-            )
-            .unwrap()
-            .to_string()
-        );
-        assert_eq!(graph.edges.len(), 2);
-        assert_eq!(graph.edge_incidences, 4);
-    }
-
-    #[test]
-    fn hyper_graph_display_matches_upstream() {
-        let graph = Graph::from_parts(
-            vec![
-                vec![],
-                vec![edge(&[1], 0), edge(&[1, 3], 32)],
-                vec![],
-                vec![edge(&[1, 3], 32)],
-            ],
-            64,
-            obs_mask(0),
-        )
-        .unwrap();
-
-        assert_eq!(
-            graph.to_string(),
-            "0:\n1:\n    [boundary] D1\n    D1 D3 L5\n2:\n3:\n    D1 D3 L5\n"
-        );
-    }
-
-    #[test]
-    fn hyper_graph_from_dem_matches_upstream() {
-        let dem = DetectorErrorModel::from_dem_str(
-            "error(0.1) D0\nrepeat 3 {\n    error(0.1) D0 D1\n    shift_detectors 1\n}\nerror(0.1) D0 L7\nerror(0.1) D2 ^ D3 D4 L2\ndetector D5\n",
-        )
-        .unwrap();
-
-        assert_eq!(
-            Graph::from_dem(&dem, usize::MAX).unwrap(),
-            sparse_graph(
-                &[0, 1, 2, 3, 5, 6, 7],
-                vec![
-                    vec![edge(&[0], 0), edge(&[0, 1], 0)],
-                    vec![edge(&[0, 1], 0), edge(&[1, 2], 0)],
-                    vec![edge(&[1, 2], 0), edge(&[2, 3], 0)],
-                    vec![edge(&[2, 3], 0), edge(&[3], 128)],
-                    vec![edge(&[5, 6, 7], 4)],
-                    vec![edge(&[5, 6, 7], 4)],
-                    vec![edge(&[5, 6, 7], 4)],
-                ],
-                8,
-            )
-        );
-
-        assert_eq!(
-            Graph::from_dem(&dem, 2).unwrap(),
-            sparse_graph(
-                &[0, 1, 2, 3],
-                vec![
-                    vec![edge(&[0], 0), edge(&[0, 1], 0)],
-                    vec![edge(&[0, 1], 0), edge(&[1, 2], 0)],
-                    vec![edge(&[1, 2], 0), edge(&[2, 3], 0)],
-                    vec![edge(&[2, 3], 0), edge(&[3], 128)],
-                ],
-                8,
-            )
-        );
-
-        assert_eq!(
-            Graph::from_dem(&dem, 1).unwrap(),
-            sparse_graph(&[0, 3], vec![vec![edge(&[0], 0)], vec![edge(&[3], 128)]], 8,)
-        );
-    }
-
-    #[test]
-    fn hyper_algo_no_error_matches_upstream() {
-        assert!(find("", usize::MAX, usize::MAX, false).is_err());
-        assert!(find("error(0.1) D0 L0\n", usize::MAX, usize::MAX, false).is_err());
-        assert!(
-            find(
-                "error(0.1) D0\nerror(0.1) D0 D1\nerror(0.1) D1\n",
-                usize::MAX,
-                usize::MAX,
-                false
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn hyper_algo_rejects_excessive_search_states() {
-        let mut text = String::new();
-        for observable in 0..=64 {
-            text.push_str(&format!("error(0.1) D0 L{observable}\n"));
-        }
-        let error = find(&text, 3, 3, false).expect_err("search state cap");
-        assert!(error.to_string().contains("at most 64 search states"));
-    }
-
-    #[test]
-    fn hyper_algo_distance_1_matches_upstream() {
-        assert_eq!(
-            find("error(0.1) L0\n", usize::MAX, usize::MAX, false).unwrap(),
-            "error(1) L0\n"
-        );
-    }
-
-    #[test]
-    fn hyper_algo_distance_2_matches_upstream() {
-        assert_eq!(
-            find(
-                "error(0.1) D0\nerror(0.1) D0 L0\n",
-                usize::MAX,
-                usize::MAX,
-                false
-            )
-            .unwrap(),
-            "error(1) D0\nerror(1) D0 L0\n"
-        );
-
-        assert_eq!(
-            find(
-                "error(0.1) D0 L0\nerror(0.1) D0 L1\n",
-                usize::MAX,
-                usize::MAX,
-                false
-            )
-            .unwrap(),
-            "error(1) D0 L0\nerror(1) D0 L1\n"
-        );
-
-        assert_eq!(
-            find(
-                "error(0.1) D0 D1 L0\nerror(0.1) D0 D1 L1\n",
-                usize::MAX,
-                usize::MAX,
-                false
-            )
-            .unwrap(),
-            "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n"
-        );
-
-        assert_eq!(
-            find(
-                "error(0.1) D0 D1 L1\nerror(0.1) D0 D1 L0\n",
-                usize::MAX,
-                usize::MAX,
-                false
-            )
-            .unwrap(),
-            "error(1) D0 D1 L0\nerror(1) D0 D1 L1\n"
-        );
-    }
-
-    #[test]
-    fn hyper_algo_distance_3_matches_upstream() {
-        assert_eq!(
-            find(
-                "error(0.1) D0\nerror(0.1) D0 D1 L0\nerror(0.1) D1\n",
-                usize::MAX,
-                usize::MAX,
-                false
-            )
-            .unwrap(),
-            "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n"
-        );
-
-        assert_eq!(
-            find(
-                "error(0.1) D1\nerror(0.1) D1 D0 L0\nerror(0.1) D0\n",
-                usize::MAX,
-                usize::MAX,
-                false
-            )
-            .unwrap(),
-            "error(1) D0\nerror(1) D0 D1 L0\nerror(1) D1\n"
-        );
-    }
-
-    #[test]
-    fn hyper_algo_hyper_error_matches_upstream() {
-        assert_eq!(
-            find(
-                "\
-error(0.1) D0 D1
-error(0.1) D0 D1 D2 D3
-error(0.1) D2 D3 D4 D5 L0
-error(0.1) D4 D5 D6 D7
-error(0.1) D6 D7 D8 D9
-error(0.1) D8
-error(0.1) D9
-",
-                4,
-                4,
-                true
-            )
-            .unwrap(),
-            "\
-error(1) D0 D1
-error(1) D0 D1 D2 D3
-error(1) D2 D3 D4 D5 L0
-error(1) D4 D5 D6 D7
-error(1) D6 D7 D8 D9
-error(1) D8
-error(1) D9
-"
-        );
-    }
-}
+mod tests;

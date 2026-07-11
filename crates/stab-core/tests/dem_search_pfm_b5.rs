@@ -65,21 +65,24 @@ fn assert_no_logical_error(
 }
 
 fn assert_search_signature(
-    model: &DetectorErrorModel,
+    source: &DetectorErrorModel,
+    result: &DetectorErrorModel,
+    source_shape: SourceMechanismShape,
     expected_error_count: usize,
     max_detectors_per_error: usize,
     expected_observable: u64,
 ) {
+    let source_signatures = source_error_signatures(source, source_shape);
     let mut detector_parity = BTreeSet::new();
     let mut observable_parity = BTreeSet::new();
     let mut target_sets = BTreeSet::new();
     let mut error_count = 0;
 
-    for item in model.items() {
+    for item in result.items() {
         let DemItem::Instruction(instruction) = item else {
             panic!(
                 "search output should not contain repeat blocks: {}",
-                model.to_dem_string()
+                result.to_dem_string()
             );
         };
         assert_eq!(instruction.kind(), DemInstructionKind::Error);
@@ -99,11 +102,18 @@ fn assert_search_signature(
                 }
                 DemTarget::Separator | DemTarget::Numeric(_) => panic!(
                     "search output contains a non-canonical target: {}",
-                    model.to_dem_string()
+                    result.to_dem_string()
                 ),
             }
         }
         assert!(detectors.len() <= max_detectors_per_error);
+        assert!(
+            source_signatures.contains(&(detectors.clone(), observables.clone())),
+            "search result mechanism was not present in the source DEM: {:?}\nsource:\n{}\nresult:\n{}",
+            (&detectors, &observables),
+            source.to_dem_string(),
+            result.to_dem_string()
+        );
         assert!(target_sets.insert((detectors, observables)));
         error_count += 1;
     }
@@ -112,6 +122,57 @@ fn assert_search_signature(
     assert!(detector_parity.is_empty());
     assert_eq!(observable_parity, BTreeSet::from([expected_observable]));
     assert_eq!(target_sets.len(), expected_error_count);
+}
+
+#[derive(Clone, Copy)]
+enum SourceMechanismShape {
+    GraphlikeComponents,
+    Hypergraph,
+}
+
+fn source_error_signatures(
+    source: &DetectorErrorModel,
+    shape: SourceMechanismShape,
+) -> BTreeSet<(BTreeSet<u64>, BTreeSet<u64>)> {
+    let mut signatures = BTreeSet::new();
+    for instruction in source.iter_flattened_instructions() {
+        let instruction = instruction.expect("generated source DEM flattens");
+        if instruction.kind() != DemInstructionKind::Error || instruction.args() == [0.0] {
+            continue;
+        }
+        match shape {
+            SourceMechanismShape::GraphlikeComponents => {
+                for component in instruction
+                    .targets()
+                    .split(|target| matches!(target, DemTarget::Separator))
+                {
+                    signatures.insert(error_signature(component));
+                }
+            }
+            SourceMechanismShape::Hypergraph => {
+                signatures.insert(error_signature(instruction.targets()));
+            }
+        }
+    }
+    signatures
+}
+
+fn error_signature(targets: &[DemTarget]) -> (BTreeSet<u64>, BTreeSet<u64>) {
+    let mut detectors = BTreeSet::new();
+    let mut observables = BTreeSet::new();
+    for target in targets {
+        match *target {
+            DemTarget::RelativeDetector(detector) => {
+                toggle_parity(&mut detectors, detector.get());
+            }
+            DemTarget::LogicalObservable(observable) => {
+                toggle_parity(&mut observables, observable.get());
+            }
+            DemTarget::Separator => {}
+            DemTarget::Numeric(_) => panic!("error mechanism contains a numeric target"),
+        }
+    }
+    (detectors, observables)
 }
 
 fn toggle_parity(values: &mut BTreeSet<u64>, value: u64) {
@@ -177,16 +238,36 @@ fn pfm_b5_graphlike_distance_three() {
 #[test]
 fn pfm_b5_graphlike_surface_code() {
     let (graphlike, ungraphlike) = generated_surface_models();
-    for result in [
-        shortest_graphlike_undetectable_logical_error(&graphlike, false)
-            .expect("graphlike surface-code error"),
-        shortest_graphlike_undetectable_logical_error(&graphlike, true)
-            .expect("graphlike surface-code error with ignored decomposition"),
-        shortest_graphlike_undetectable_logical_error(&ungraphlike, true)
-            .expect("ungraphlike surface-code error with ignored decomposition"),
-    ] {
-        assert_search_signature(&result, 5, 2, 0);
-    }
+    let strict = shortest_graphlike_undetectable_logical_error(&graphlike, false)
+        .expect("graphlike surface-code error");
+    assert_search_signature(
+        &graphlike,
+        &strict,
+        SourceMechanismShape::GraphlikeComponents,
+        5,
+        2,
+        0,
+    );
+    let ignored = shortest_graphlike_undetectable_logical_error(&graphlike, true)
+        .expect("graphlike surface-code error with ignored decomposition");
+    assert_search_signature(
+        &graphlike,
+        &ignored,
+        SourceMechanismShape::GraphlikeComponents,
+        5,
+        2,
+        0,
+    );
+    let ungraphlike_ignored = shortest_graphlike_undetectable_logical_error(&ungraphlike, true)
+        .expect("ungraphlike surface-code error with ignored decomposition");
+    assert_search_signature(
+        &ungraphlike,
+        &ungraphlike_ignored,
+        SourceMechanismShape::GraphlikeComponents,
+        5,
+        2,
+        0,
+    );
     let error = shortest_graphlike_undetectable_logical_error(&ungraphlike, false)
         .expect_err("undecomposed surface model should be rejected");
     assert!(matches!(
@@ -197,17 +278,32 @@ fn pfm_b5_graphlike_surface_code() {
 
 #[test]
 fn pfm_b5_graphlike_repetition_code() {
-    let result =
-        shortest_graphlike_undetectable_logical_error(&generated_repetition_model(), false)
-            .expect("repetition-code logical error");
-    assert_search_signature(&result, 7, 2, 0);
+    let source = generated_repetition_model();
+    let result = shortest_graphlike_undetectable_logical_error(&source, false)
+        .expect("repetition-code logical error");
+    assert_search_signature(
+        &source,
+        &result,
+        SourceMechanismShape::GraphlikeComponents,
+        7,
+        2,
+        0,
+    );
 }
 
 #[test]
 fn pfm_b5_graphlike_many_observables() {
-    let result = shortest_graphlike_undetectable_logical_error(&many_observables_model(), false)
+    let source = many_observables_model();
+    let result = shortest_graphlike_undetectable_logical_error(&source, false)
         .expect("many-observable graphlike error");
-    assert_search_signature(&result, 5, 2, 1200);
+    assert_search_signature(
+        &source,
+        &result,
+        SourceMechanismShape::GraphlikeComponents,
+        5,
+        2,
+        1200,
+    );
 }
 
 #[test]
@@ -287,28 +383,49 @@ error(0.1) D9
 #[test]
 fn pfm_b5_hypergraph_surface_code() {
     let (graphlike, ungraphlike) = generated_surface_models();
-    for result in [
-        find_undetectable_logical_error(&graphlike, 4, 4, true)
-            .expect("surface-code hypergraph error"),
-        find_undetectable_logical_error(&ungraphlike, 4, 4, true)
-            .expect("ungraphlike surface-code hypergraph error"),
-    ] {
-        assert_search_signature(&result, 5, 4, 0);
-    }
+    let graphlike_result = find_undetectable_logical_error(&graphlike, 4, 4, true)
+        .expect("surface-code hypergraph error");
+    assert_search_signature(
+        &graphlike,
+        &graphlike_result,
+        SourceMechanismShape::Hypergraph,
+        5,
+        4,
+        0,
+    );
+    let ungraphlike_result = find_undetectable_logical_error(&ungraphlike, 4, 4, true)
+        .expect("ungraphlike surface-code hypergraph error");
+    assert_search_signature(
+        &ungraphlike,
+        &ungraphlike_result,
+        SourceMechanismShape::Hypergraph,
+        5,
+        4,
+        0,
+    );
 }
 
 #[test]
 fn pfm_b5_hypergraph_repetition_code() {
-    let result = find_undetectable_logical_error(&generated_repetition_model(), 4, 4, false)
+    let source = generated_repetition_model();
+    let result = find_undetectable_logical_error(&source, 4, 4, false)
         .expect("repetition-code hypergraph error");
-    assert_search_signature(&result, 7, 4, 0);
+    assert_search_signature(&source, &result, SourceMechanismShape::Hypergraph, 7, 4, 0);
 }
 
 #[test]
 fn pfm_b5_hypergraph_many_observables() {
-    let result = find_undetectable_logical_error(&many_observables_model(), 4, 4, false)
+    let source = many_observables_model();
+    let result = find_undetectable_logical_error(&source, 4, 4, false)
         .expect("many-observable hypergraph error");
-    assert_search_signature(&result, 5, 4, 1200);
+    assert_search_signature(
+        &source,
+        &result,
+        SourceMechanismShape::Hypergraph,
+        5,
+        4,
+        1200,
+    );
 }
 
 #[test]
@@ -317,8 +434,10 @@ fn pfm_b5_graphlike_zero_probability_diagnostics_match_stim() {
     let graphlike = shortest_graphlike_undetectable_logical_error(&model, false)
         .expect_err("zero-probability graphlike model has no logical error")
         .to_string();
-    assert!(graphlike.contains("WARNING: NO GRAPHLIKE ERRORS"));
-    assert!(!graphlike.contains("WARNING: NO ERRORS"));
+    assert_eq!(
+        graphlike,
+        "invalid detector error model: Failed to find any graphlike logical errors.\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors.\n    WARNING: NO GRAPHLIKE ERRORS. Although the circuit or detector error model does define some errors, none of them are graphlike (i.e. have at most two detection events), making it vacuously impossible to find a graphlike logical error."
+    );
 }
 
 #[test]
@@ -327,7 +446,10 @@ fn pfm_b5_hypergraph_zero_probability_diagnostics_match_stim() {
     let hypergraph = find_undetectable_logical_error(&model, usize::MAX, usize::MAX, false)
         .expect_err("zero-probability hypergraph model has no logical error")
         .to_string();
-    assert!(!hypergraph.contains("WARNING: NO ERRORS"));
+    assert_eq!(
+        hypergraph,
+        "invalid detector error model: Failed to find any logical errors.\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors."
+    );
 }
 
 #[test]

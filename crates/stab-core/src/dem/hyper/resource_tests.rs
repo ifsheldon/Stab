@@ -10,6 +10,36 @@ use super::{
 };
 
 #[test]
+fn hyper_graph_bounds_unique_edges_and_persistent_payload() {
+    let mut edge_limited = Graph::new(1, 65);
+    for observable in 0..64 {
+        edge_limited
+            .add_edge_from_dem_targets(&edge_targets(observable..=observable), usize::MAX)
+            .expect("edge within test limit");
+    }
+    let error = edge_limited
+        .add_edge_from_dem_targets(&edge_targets(64..=64), usize::MAX)
+        .expect_err("unique edge cap");
+    assert!(error.to_string().contains("at most 64 unique graph edges"));
+    assert_eq!(edge_limited.edges.len(), 64);
+
+    let mut payload_limited = Graph::new(1, 1_022);
+    payload_limited
+        .add_edge_from_dem_targets(&edge_targets(0..512), usize::MAX)
+        .expect("first payload within test limit");
+    let error = payload_limited
+        .add_edge_from_dem_targets(&edge_targets(512..1_022), usize::MAX)
+        .expect_err("persistent graph payload cap");
+    assert!(
+        error
+            .to_string()
+            .contains("at most 2048 stored detector and observable graph terms")
+    );
+    assert_eq!(payload_limited.edges.len(), 1);
+    assert_eq!(payload_limited.edge_incidences, 1);
+}
+
+#[test]
 fn hyper_graph_rejects_excessive_edge_degree_before_adjacency_allocation() {
     let mut graph = Graph::new(MAX_HYPERGRAPH_EDGE_DEGREE + 1, 0);
     let targets = (0..=MAX_HYPERGRAPH_EDGE_DEGREE)
@@ -84,4 +114,14 @@ fn variable_payload_model(observables: usize, hops: usize) -> DetectorErrorModel
     }
     text.push_str(&format!("error(0.1) D{}\nerror(0.1) D1\n", hops + 1));
     DetectorErrorModel::from_dem_str(&text).expect("valid variable-payload model")
+}
+
+fn edge_targets(observables: impl IntoIterator<Item = usize>) -> Vec<DemTarget> {
+    let mut targets = vec![DemTarget::relative_detector(0).expect("D0")];
+    targets.extend(
+        observables
+            .into_iter()
+            .map(|observable| DemTarget::logical_observable(observable as u64).expect("L")),
+    );
+    targets
 }

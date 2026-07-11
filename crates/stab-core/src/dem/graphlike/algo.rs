@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque, btree_map::Entry};
 
 use super::{Graph, ObservableMask, SearchState};
 use crate::dem::search_budget::SearchBudget;
@@ -39,14 +39,10 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
                     })?;
                 budget.preflight_state_terms(start_terms)?;
                 let start = SearchState::new(Some(source), edge.detector, edge.observables.clone());
-                if !back_map.contains_key(&start) {
+                if let Entry::Vacant(entry) = back_map.entry(start) {
                     budget.admit_state(start_terms, 0, true)?;
-                    if back_map.insert(start.clone(), empty.clone()).is_some() {
-                        return Err(CircuitError::invalid_detector_error_model(
-                            "graphlike initial search state was inserted twice",
-                        ));
-                    }
-                    queue.push_back(start);
+                    queue.push_back(entry.key().clone());
+                    entry.insert(empty.clone());
                 }
             }
         }
@@ -78,28 +74,24 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
                     )
                 })?;
             budget.preflight_state_terms(next_terms)?;
-            let mut next = SearchState::new(
+            let next = SearchState::new(
                 edge.detector,
                 current.detector_held,
                 edge.observables.symmetric_difference(&current.observables),
             );
-            if back_map.contains_key(&next) {
-                continue;
-            }
             let undetected = next.is_undetected();
-            budget.admit_state(next_terms, current_terms, !undetected)?;
-            if back_map.insert(next.clone(), current.clone()).is_some() {
-                return Err(CircuitError::invalid_detector_error_model(
-                    "graphlike search state was inserted twice",
-                ));
+            if let Entry::Vacant(entry) = back_map.entry(next) {
+                budget.admit_state(next_terms, current_terms, !undetected)?;
+                let mut inserted = entry.key().clone();
+                entry.insert(current.clone());
+                if undetected {
+                    return backtrack_path(&back_map, &inserted);
+                }
+                if inserted.detector_active.is_none() {
+                    std::mem::swap(&mut inserted.detector_active, &mut inserted.detector_held);
+                }
+                queue.push_back(inserted);
             }
-            if undetected {
-                return backtrack_path(&back_map, &next);
-            }
-            if next.detector_active.is_none() {
-                std::mem::swap(&mut next.detector_active, &mut next.detector_held);
-            }
-            queue.push_back(next);
         }
     }
 
@@ -192,7 +184,7 @@ mod tests {
     #[test]
     fn graphlike_search_rejects_excessive_search_states() {
         let mut text = String::new();
-        for observable in 0..=64 {
+        for observable in 0..64 {
             text.push_str(&format!("error(0.1) D0 L{observable}\n"));
         }
         let model = DetectorErrorModel::from_dem_str(&text).expect("valid search model");

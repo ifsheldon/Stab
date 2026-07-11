@@ -20,6 +20,11 @@ const MAX_DEM_SEARCH_ERROR_TARGET_OCCURRENCES: usize = 65_536;
 #[cfg(test)]
 const MAX_DEM_SEARCH_ERROR_TARGET_OCCURRENCES: usize = 128;
 
+#[cfg(not(test))]
+const MAX_DEM_SEARCH_TOTAL_ERROR_TARGET_OCCURRENCES: usize = 20_000_000;
+#[cfg(test)]
+const MAX_DEM_SEARCH_TOTAL_ERROR_TARGET_OCCURRENCES: usize = 10_000;
+
 pub(in crate::dem) fn search_graph_nonzero_error_targets(
     traversal: &FoldedDemTraversal<'_>,
     context: &'static str,
@@ -45,6 +50,7 @@ where
     let mut visitor = SearchErrorVisitor {
         context,
         visited_error_mechanisms: 0,
+        visited_target_occurrences: 0,
         visit_error,
     };
     let _ = traversal.try_visit(&mut visitor)?;
@@ -54,6 +60,7 @@ where
 struct SearchErrorVisitor<F> {
     context: &'static str,
     visited_error_mechanisms: u64,
+    visited_target_occurrences: usize,
     visit_error: F,
 }
 
@@ -86,6 +93,19 @@ where
                     self.context
                 )));
             }
+            let visited_target_occurrences = self
+                .visited_target_occurrences
+                .checked_add(target_occurrences)
+                .ok_or_else(|| {
+                    traversal_error(self.context, "total target occurrence count overflowed")
+                })?;
+            if visited_target_occurrences > MAX_DEM_SEARCH_TOTAL_ERROR_TARGET_OCCURRENCES {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "DEM {} currently supports at most {MAX_DEM_SEARCH_TOTAL_ERROR_TARGET_OCCURRENCES} total target occurrences across expanded nonzero error mechanisms, got at least {visited_target_occurrences}",
+                    self.context
+                )));
+            }
+            self.visited_target_occurrences = visited_target_occurrences;
             (self.visit_error)(instruction, state.detector_offset())?;
         }
         Ok(ControlFlow::Continue(()))
@@ -363,7 +383,7 @@ mod tests {
         .expect_err("three touched detectors should exceed the two-node test cap")
         .to_string();
         assert!(error.contains("at most 2 effective detector nodes, got 3"));
-        assert!(!error.contains("expanded nonzero error mechanisms"));
+        assert!(!error.contains("at most 10000 expanded nonzero error mechanisms"));
     }
 
     #[test]
@@ -379,5 +399,19 @@ mod tests {
             .expect_err("target occurrence cap")
             .to_string();
         assert!(error.contains("at most 128 target occurrences per nonzero error mechanism"));
+    }
+
+    #[test]
+    fn search_traversal_bounds_aggregate_error_target_work() {
+        let model = DetectorErrorModel::from_dem_str(
+            "repeat 5001 {\n    error(0.1) D0 L0\n    shift_detectors 1\n}\n",
+        )
+        .unwrap();
+        let traversal = FoldedDemTraversal::new(&model).unwrap();
+        let error = visit_search_graph_errors(&traversal, "test search", |_, _| Ok(()))
+            .expect_err("aggregate target occurrence cap")
+            .to_string();
+        assert!(error.contains("at most 10000 total target occurrences"));
+        assert!(!error.contains("at most 10000 expanded nonzero error mechanisms"));
     }
 }

@@ -4,6 +4,8 @@
 )]
 
 mod algo;
+#[cfg(test)]
+mod resource_tests;
 
 pub(super) use algo::shortest_graphlike_undetectable_logical_error;
 
@@ -18,6 +20,7 @@ use super::{
     error_traversal::{
         SearchGraphTargetPolicy, search_graph_nonzero_error_targets, visit_search_graph_errors,
     },
+    search_budget::GraphConstructionBudget,
     traversal::{FoldedDemTraversal, shifted_targets},
 };
 use crate::{CircuitError, CircuitResult, Probability};
@@ -105,7 +108,7 @@ impl PartialOrd for ObservableMask {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(super) struct Edge {
     detector: Option<DemDetectorId>,
     observables: ObservableMask,
@@ -117,6 +120,15 @@ impl Edge {
             detector,
             observables,
         }
+    }
+
+    fn term_count(&self) -> CircuitResult<usize> {
+        self.observables
+            .len()
+            .checked_add(usize::from(self.detector.is_some()))
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("graphlike edge term count overflowed")
+            })
     }
 }
 
@@ -134,17 +146,28 @@ impl Display for Edge {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(super) struct Node {
     edges: Vec<Edge>,
+    edge_index: BTreeSet<Edge>,
 }
 
 impl Node {
     pub(super) fn new(edges: Vec<Edge>) -> Self {
-        Self { edges }
+        let edge_index = edges.iter().cloned().collect();
+        Self { edges, edge_index }
     }
 
-    fn add_edge(&mut self, edge: Edge) {
-        if !self.edges.contains(&edge) {
-            self.edges.push(edge);
+    fn add_edge(&mut self, edge: Edge, budget: &mut GraphConstructionBudget) -> CircuitResult<()> {
+        if self.edge_index.contains(&edge) {
+            return Ok(());
         }
+        self.edges.try_reserve(1).map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "graphlike search cannot allocate another outward edge",
+            )
+        })?;
+        budget.admit_unique_edge(edge.term_count()?, 2, 0)?;
+        self.edge_index.insert(edge.clone());
+        self.edges.push(edge);
+        Ok(())
     }
 }
 
@@ -157,14 +180,27 @@ impl Display for Node {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub(super) struct Graph {
     nodes: Vec<Node>,
     detector_index: DetectorIndex,
     has_declared_detectors: bool,
     num_observables: usize,
     distance_1_error_mask: ObservableMask,
+    construction_budget: GraphConstructionBudget,
 }
+
+impl PartialEq for Graph {
+    fn eq(&self, other: &Self) -> bool {
+        self.nodes == other.nodes
+            && self.detector_index == other.detector_index
+            && self.has_declared_detectors == other.has_declared_detectors
+            && self.num_observables == other.num_observables
+            && self.distance_1_error_mask == other.distance_1_error_mask
+    }
+}
+
+impl Eq for Graph {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum DetectorIndex {
@@ -183,6 +219,7 @@ impl Graph {
             has_declared_detectors: node_count > 0,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
+            construction_budget: GraphConstructionBudget::new("graphlike search"),
         }
     }
 
@@ -200,6 +237,7 @@ impl Graph {
             has_declared_detectors: node_count > 0,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
+            construction_budget: GraphConstructionBudget::new("graphlike search"),
         })
     }
 
@@ -233,6 +271,7 @@ impl Graph {
             has_declared_detectors,
             num_observables,
             distance_1_error_mask: ObservableMask::new(),
+            construction_budget: GraphConstructionBudget::new("graphlike search"),
         })
     }
 
@@ -247,6 +286,7 @@ impl Graph {
             detector_index: DetectorIndex::Identity,
             num_observables,
             distance_1_error_mask,
+            construction_budget: GraphConstructionBudget::new("graphlike search"),
         }
     }
 
@@ -302,7 +342,10 @@ impl Graph {
                 source.get()
             )));
         };
-        node.add_edge(Edge::new(destination, observables));
+        node.add_edge(
+            Edge::new(destination, observables),
+            &mut self.construction_budget,
+        )?;
         Ok(())
     }
 
@@ -446,8 +489,7 @@ impl SearchState {
     }
 
     pub(super) fn is_undetected(&self) -> bool {
-        let canonical = self.canonical();
-        canonical.detector_active.is_none() && canonical.detector_held.is_none()
+        self.canonical_detectors() == (None, None)
     }
 
     pub(super) fn term_count(&self) -> CircuitResult<usize> {
@@ -463,16 +505,8 @@ impl SearchState {
     }
 
     pub(super) fn canonical(&self) -> Self {
-        match (self.detector_active, self.detector_held) {
-            (Some(left), Some(right)) if left == right => {
-                Self::new(None, None, self.observables.clone())
-            }
-            (Some(left), Some(right)) if right < left => {
-                Self::new(Some(right), Some(left), self.observables.clone())
-            }
-            (None, Some(detector)) => Self::new(Some(detector), None, self.observables.clone()),
-            _ => self.clone(),
-        }
+        let (detector_active, detector_held) = self.canonical_detectors();
+        Self::new(detector_active, detector_held, self.observables.clone())
     }
 
     pub(super) fn append_transition_as_error_instruction_to(
@@ -480,20 +514,19 @@ impl SearchState {
         next: &Self,
         out: &mut DetectorErrorModel,
     ) -> CircuitResult<()> {
-        let current = self.canonical();
-        let next = next.canonical();
+        let (current_active, current_held) = self.canonical_detectors();
+        let (next_active, next_held) = next.canonical_detectors();
         let mut detector_targets = BTreeSet::new();
-        toggle_detector(&mut detector_targets, current.detector_active);
-        toggle_detector(&mut detector_targets, current.detector_held);
-        toggle_detector(&mut detector_targets, next.detector_active);
-        toggle_detector(&mut detector_targets, next.detector_held);
+        toggle_detector(&mut detector_targets, current_active);
+        toggle_detector(&mut detector_targets, current_held);
+        toggle_detector(&mut detector_targets, next_active);
+        toggle_detector(&mut detector_targets, next_held);
 
         let mut targets = Vec::new();
         for detector in detector_targets {
             targets.push(DemTarget::relative_detector(detector.get())?);
         }
-        current
-            .observables
+        self.observables
             .symmetric_difference(&next.observables)
             .push_targets(&mut targets)?;
         out.push_instruction(DemInstruction::error(
@@ -507,17 +540,17 @@ impl SearchState {
 
 impl Display for SearchState {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let canonical = self.canonical();
+        let (detector_active, detector_held) = self.canonical_detectors();
         let mut text = String::new();
-        if let Some(detector) = canonical.detector_active {
+        if let Some(detector) = detector_active {
             text.push_str(&format_detector(detector));
             text.push(' ');
         }
-        if let Some(detector) = canonical.detector_held {
+        if let Some(detector) = detector_held {
             text.push_str(&format_detector(detector));
             text.push(' ');
         }
-        for observable in &canonical.observables.observables {
+        for observable in &self.observables.observables {
             text.push_str(&format_observable(*observable));
             text.push(' ');
         }
@@ -527,13 +560,16 @@ impl Display for SearchState {
 
 impl Hash for SearchState {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.canonical_fields().hash(state);
+        self.canonical_detectors().hash(state);
+        self.observables.hash(state);
     }
 }
 
 impl Ord for SearchState {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.canonical_fields().cmp(&other.canonical_fields())
+        self.canonical_detectors()
+            .cmp(&other.canonical_detectors())
+            .then_with(|| self.observables.cmp(&other.observables))
     }
 }
 
@@ -545,18 +581,19 @@ impl PartialOrd for SearchState {
 
 impl PartialEq for SearchState {
     fn eq(&self, other: &Self) -> bool {
-        self.canonical_fields() == other.canonical_fields()
+        self.canonical_detectors() == other.canonical_detectors()
+            && self.observables == other.observables
     }
 }
 
 impl SearchState {
-    fn canonical_fields(&self) -> (Option<DemDetectorId>, Option<DemDetectorId>, ObservableMask) {
-        let canonical = self.canonical();
-        (
-            canonical.detector_active,
-            canonical.detector_held,
-            canonical.observables,
-        )
+    fn canonical_detectors(&self) -> (Option<DemDetectorId>, Option<DemDetectorId>) {
+        match (self.detector_active, self.detector_held) {
+            (Some(left), Some(right)) if left == right => (None, None),
+            (Some(left), Some(right)) if right < left => (Some(right), Some(left)),
+            (None, Some(detector)) => (Some(detector), None),
+            pair => pair,
+        }
     }
 }
 

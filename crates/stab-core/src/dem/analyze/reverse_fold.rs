@@ -3,7 +3,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemInstruction,
     DemRepeatBlock, DemTarget, DetectorErrorModel, Pauli, Probability, RepeatCount, Target,
-    sparse_rev_frame_tracker::{AnalyzerProbeBudget, SparseReverseFrameTracker},
+    sparse_rev_frame_tracker::{
+        AnalyzerProbeBudget, ShiftedRecurrenceSearch, SparseReverseFrameTracker,
+        search_shifted_recurrence,
+    },
 };
 
 use super::{
@@ -655,38 +658,35 @@ impl ReverseFoldAnalyzer {
             return self.undo_loop_by_unrolling(body, iterations);
         }
 
-        let mut tortoise = self.tracker.clone();
-        let mut hare = self.tracker.clone();
-        let mut hare_iterations = 0_u64;
-        let mut tortoise_iterations = 0_u64;
-        let mut found_cycle = false;
-        while hare_iterations < iterations && hare_iterations < MAX_LOOP_CYCLE_STEPS {
-            hare.undo_circuit_for_analyzer_probe(body, &mut self.probe_budget)?;
-            self.record_recurrence_probe(&hare);
-            hare_iterations = checked_add(hare_iterations, 1, "hare iteration")?;
-            if hare.is_shifted_copy(&tortoise) {
-                found_cycle = true;
-                break;
+        let search = search_shifted_recurrence(
+            &self.tracker,
+            iterations.min(MAX_LOOP_CYCLE_STEPS),
+            |probe| probe.undo_circuit_for_analyzer_probe(body, &mut self.probe_budget),
+        )?;
+        self.diagnostics.recurrence_search_steps = self.probe_budget.consumed_steps();
+        let recurrence = match search {
+            ShiftedRecurrenceSearch::Found {
+                recurrence,
+                max_boundary_entries,
+            } => {
+                self.observe_boundary_entries(max_boundary_entries);
+                recurrence
             }
-            if hare_iterations.is_multiple_of(2) {
-                tortoise.undo_circuit_for_analyzer_probe(body, &mut self.probe_budget)?;
-                self.record_recurrence_probe(&tortoise);
-                tortoise_iterations = checked_add(tortoise_iterations, 1, "tortoise iteration")?;
-                if hare.is_shifted_copy(&tortoise) {
-                    found_cycle = true;
-                    break;
+            ShiftedRecurrenceSearch::Exhausted {
+                max_boundary_entries,
+                ..
+            } => {
+                self.observe_boundary_entries(max_boundary_entries);
+                if iterations > MAX_BOUNDED_REPEAT_UNROLL {
+                    return Err(CircuitError::invalid_detector_error_model(format!(
+                        "analyze_errors found no loop-state recurrence within {MAX_LOOP_CYCLE_STEPS} iterations for repeat count {iterations}"
+                    )));
                 }
+                return self.undo_loop_by_unrolling(body, iterations);
             }
-        }
-
-        if !found_cycle {
-            if iterations > MAX_BOUNDED_REPEAT_UNROLL {
-                return Err(CircuitError::invalid_detector_error_model(format!(
-                    "analyze_errors found no loop-state recurrence within {MAX_LOOP_CYCLE_STEPS} iterations for repeat count {iterations}"
-                )));
-            }
-            return self.undo_loop_by_unrolling(body, iterations);
-        }
+        };
+        let hare_iterations = recurrence.cycle_end_iterations;
+        let mut tortoise_iterations = recurrence.transient_iterations;
 
         for _ in 0..tortoise_iterations {
             self.undo_circuit(body)?;
@@ -718,9 +718,9 @@ impl ReverseFoldAnalyzer {
             if period_repetitions > 1 {
                 self.capture_repeated_period(
                     body,
-                    period,
+                    recurrence.period,
                     period_repetitions,
-                    &hare,
+                    &recurrence.cycle_end_state,
                     &mut tortoise_iterations,
                     tag,
                 )?;
@@ -733,11 +733,6 @@ impl ReverseFoldAnalyzer {
             )
         })?;
         self.undo_loop_by_unrolling(body, remaining)
-    }
-
-    fn record_recurrence_probe(&mut self, tracker: &SparseReverseFrameTracker) {
-        self.diagnostics.recurrence_search_steps = self.probe_budget.consumed_steps();
-        self.observe_boundary_entries(tracker.boundary_entry_count())
     }
 
     fn observe_boundary_entries(&mut self, entries: usize) {
