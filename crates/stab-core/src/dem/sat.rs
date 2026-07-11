@@ -12,258 +12,15 @@ use super::{
 };
 use crate::{CircuitError, CircuitResult};
 
+mod instance;
+
+use instance::{
+    BoolRef, Clause, MAX_SAT_ERROR_MECHANISMS, MAX_SAT_TARGET_OCCURRENCES, MaxSatInstance,
+    SatProblemMode, SatShape,
+};
+
 const UNSAT_WDIMACS: &str = "p wcnf 1 2 3\n3 -1 0\n3 1 0\n";
 const MAX_SAT_EFFECTIVE_TARGET_COUNT: usize = 1_000_000;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum SatProblemMode {
-    Unweighted,
-    Weighted { quantization: u32 },
-}
-
-impl SatProblemMode {
-    fn includes_zero_probability_errors(self) -> bool {
-        matches!(self, Self::Unweighted)
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum BoolAtom {
-    Constant(bool),
-    Variable(usize),
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct BoolRef {
-    atom: BoolAtom,
-    negated: bool,
-}
-
-impl BoolRef {
-    fn false_ref() -> Self {
-        Self {
-            atom: BoolAtom::Constant(false),
-            negated: false,
-        }
-    }
-
-    fn variable(index: usize) -> Self {
-        Self {
-            atom: BoolAtom::Variable(index),
-            negated: false,
-        }
-    }
-
-    fn not(self) -> Self {
-        Self {
-            atom: self.atom,
-            negated: !self.negated,
-        }
-    }
-
-    fn constant_value(self) -> Option<bool> {
-        match self.atom {
-            BoolAtom::Constant(value) => Some(value ^ self.negated),
-            BoolAtom::Variable(_) => None,
-        }
-    }
-
-    fn variable_index(self) -> Option<usize> {
-        match self.atom {
-            BoolAtom::Variable(index) => Some(index),
-            BoolAtom::Constant(_) => None,
-        }
-    }
-
-    fn to_wdimacs_literal(self) -> CircuitResult<Option<String>> {
-        let Some(index) = self.variable_index() else {
-            return Ok(None);
-        };
-        let one_based = index.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("SAT variable index overflowed")
-        })?;
-        if self.negated {
-            Ok(Some(format!("-{one_based}")))
-        } else {
-            Ok(Some(one_based.to_string()))
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-enum ClauseWeight {
-    Hard,
-    Soft(f64),
-}
-
-#[derive(Clone, Debug, PartialEq)]
-struct Clause {
-    vars: Vec<BoolRef>,
-    weight: ClauseWeight,
-}
-
-impl Clause {
-    fn hard(vars: Vec<BoolRef>) -> Self {
-        Self {
-            vars,
-            weight: ClauseWeight::Hard,
-        }
-    }
-
-    fn soft(var: BoolRef, weight: f64) -> Self {
-        Self {
-            vars: vec![var],
-            weight: ClauseWeight::Soft(weight),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-struct MaxSatInstance {
-    num_variables: usize,
-    max_weight: f64,
-    clauses: Vec<Clause>,
-}
-
-impl MaxSatInstance {
-    fn new_bool(&mut self) -> CircuitResult<BoolRef> {
-        let variable = self.num_variables;
-        self.num_variables = self.num_variables.checked_add(1).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("SAT variable count overflowed")
-        })?;
-        Ok(BoolRef::variable(variable))
-    }
-
-    fn add_clause(&mut self, clause: Clause) -> CircuitResult<()> {
-        if let ClauseWeight::Soft(weight) = clause.weight {
-            if !weight.is_finite() || weight <= 0.0 {
-                return Err(CircuitError::invalid_detector_error_model(
-                    "SAT soft clause weight must be finite and positive",
-                ));
-            }
-            self.max_weight = self.max_weight.max(weight);
-        }
-        self.clauses.push(clause);
-        Ok(())
-    }
-
-    fn xor(&mut self, left: BoolRef, right: BoolRef) -> CircuitResult<BoolRef> {
-        match (left.constant_value(), right.constant_value()) {
-            (Some(false), _) => return Ok(right),
-            (Some(true), _) => return Ok(right.not()),
-            (_, Some(false)) => return Ok(left),
-            (_, Some(true)) => return Ok(left.not()),
-            (None, None) => {}
-        }
-
-        let output = self.new_bool()?;
-        self.add_clause(Clause::hard(vec![left, right, output.not()]))?;
-        self.add_clause(Clause::hard(vec![left, right.not(), output]))?;
-        self.add_clause(Clause::hard(vec![left.not(), right, output]))?;
-        self.add_clause(Clause::hard(vec![left.not(), right.not(), output.not()]))?;
-        Ok(output)
-    }
-
-    fn to_wdimacs(&self, mode: SatProblemMode) -> CircuitResult<String> {
-        let emitted_clause_count = self.emitted_clause_count(mode)?;
-        let top = self.top_weight(mode, emitted_clause_count)?;
-        let mut out = String::new();
-        out.push_str("p wcnf ");
-        out.push_str(&self.num_variables.to_string());
-        out.push(' ');
-        out.push_str(&emitted_clause_count.to_string());
-        out.push(' ');
-        out.push_str(&top.to_string());
-        out.push('\n');
-
-        for clause in &self.clauses {
-            let weight = self.quantized_weight(mode, top, &clause.weight)?;
-            if weight == 0 {
-                continue;
-            }
-            out.push_str(&weight.to_string());
-            for var in &clause.vars {
-                if let Some(literal) = var.to_wdimacs_literal()? {
-                    out.push(' ');
-                    out.push_str(&literal);
-                }
-            }
-            out.push_str(" 0\n");
-        }
-        Ok(out)
-    }
-
-    fn emitted_clause_count(&self, mode: SatProblemMode) -> CircuitResult<usize> {
-        let mut count = 0usize;
-        for clause in &self.clauses {
-            if self.clause_is_emitted(mode, clause)? {
-                count = count.checked_add(1).ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model("SAT clause count overflowed")
-                })?;
-            }
-        }
-        Ok(count)
-    }
-
-    fn clause_is_emitted(&self, mode: SatProblemMode, clause: &Clause) -> CircuitResult<bool> {
-        match clause.weight {
-            ClauseWeight::Hard => Ok(true),
-            ClauseWeight::Soft(_) => Ok(self.quantized_weight(mode, 0, &clause.weight)? != 0),
-        }
-    }
-
-    fn top_weight(
-        &self,
-        mode: SatProblemMode,
-        emitted_clause_count: usize,
-    ) -> CircuitResult<usize> {
-        match mode {
-            SatProblemMode::Unweighted => emitted_clause_count.checked_add(1).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model("unweighted SAT top weight overflowed")
-            }),
-            SatProblemMode::Weighted { quantization } => {
-                let quantization = usize::try_from(quantization).map_err(|_| {
-                    CircuitError::invalid_detector_error_model(
-                        "weighted SAT quantization does not fit usize",
-                    )
-                })?;
-                quantization
-                    .checked_mul(emitted_clause_count)
-                    .and_then(|value| value.checked_add(1))
-                    .ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
-                            "weighted SAT top weight overflowed",
-                        )
-                    })
-            }
-        }
-    }
-
-    fn quantized_weight(
-        &self,
-        mode: SatProblemMode,
-        top: usize,
-        weight: &ClauseWeight,
-    ) -> CircuitResult<usize> {
-        match weight {
-            ClauseWeight::Hard => Ok(top),
-            ClauseWeight::Soft(_) if matches!(mode, SatProblemMode::Unweighted) => Ok(1),
-            ClauseWeight::Soft(weight) => {
-                let SatProblemMode::Weighted { quantization } = mode else {
-                    return Err(CircuitError::invalid_detector_error_model(
-                        "unweighted SAT problem received weighted clause",
-                    ));
-                };
-                if self.max_weight <= 0.0 {
-                    return Err(CircuitError::invalid_detector_error_model(
-                        "weighted SAT problem has no positive soft-clause weight",
-                    ));
-                }
-                rounded_nonnegative_usize(*weight / self.max_weight * f64::from(quantization))
-            }
-        }
-    }
-}
 
 #[derive(Clone, Debug, PartialEq)]
 struct FlattenedError {
@@ -334,6 +91,86 @@ impl SatTargetIndex {
     }
 }
 
+fn preflight_sat_shape(
+    errors: &[FlattenedError],
+    target_index: &SatTargetIndex,
+    mode: SatProblemMode,
+) -> CircuitResult<SatShape> {
+    let mut seen_detectors = vec![false; target_index.detector_to_slot.len()];
+    let mut seen_observables = vec![false; target_index.observable_to_slot.len()];
+    let mut target_occurrences = 0usize;
+    let mut xor_count = 0usize;
+    let mut soft_clause_count = 0usize;
+
+    for error in errors {
+        if soft_clause_is_stored(mode, error.probability) {
+            soft_clause_count = checked_sat_add(soft_clause_count, 1, "soft clause count")?;
+        }
+        for target in &error.targets {
+            let seen = match *target {
+                DemTarget::RelativeDetector(detector) => {
+                    let slot = target_index.detector_slot(detector)?;
+                    seen_detectors.get_mut(slot).ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "SAT detector preflight slot is outside its state vector",
+                        )
+                    })?
+                }
+                DemTarget::LogicalObservable(observable) => {
+                    let slot = target_index.observable_slot(observable)?;
+                    seen_observables.get_mut(slot).ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "SAT observable preflight slot is outside its state vector",
+                        )
+                    })?
+                }
+                DemTarget::Separator | DemTarget::Numeric(_) => continue,
+            };
+            target_occurrences = checked_sat_add(target_occurrences, 1, "target occurrence count")?;
+            if *seen {
+                xor_count = checked_sat_add(xor_count, 1, "XOR count")?;
+            } else {
+                *seen = true;
+            }
+        }
+    }
+
+    let variables = checked_sat_add(errors.len(), xor_count, "variable count")?;
+    let xor_clauses = checked_sat_product(xor_count, 4, "XOR clause count")?;
+    let clauses = checked_sat_add(
+        checked_sat_add(xor_clauses, soft_clause_count, "soft and XOR clause count")?,
+        checked_sat_add(
+            target_index.detector_to_slot.len(),
+            1,
+            "hard detector and observable clause count",
+        )?,
+        "total clause count",
+    )?;
+    let clause_literals = checked_sat_add(
+        checked_sat_add(
+            checked_sat_product(xor_count, 12, "XOR clause literal count")?,
+            soft_clause_count,
+            "soft and XOR clause literal count",
+        )?,
+        checked_sat_add(
+            target_index.detector_to_slot.len(),
+            target_index.observable_to_slot.len(),
+            "hard target clause literal count",
+        )?,
+        "total clause literal count",
+    )?;
+
+    SatShape {
+        error_mechanisms: errors.len(),
+        target_occurrences,
+        variables,
+        clauses,
+        clause_literals,
+        output_bytes: 0,
+    }
+    .with_output_bound(mode)
+}
+
 pub fn shortest_error_sat_problem(model: &DetectorErrorModel) -> CircuitResult<String> {
     sat_problem_as_wcnf_string(model, SatProblemMode::Unweighted)
 }
@@ -362,8 +199,17 @@ fn sat_problem_as_wcnf_string(
     if target_index.observable_to_slot.is_empty() {
         return Ok(UNSAT_WDIMACS.to_string());
     }
-    let mut instance = MaxSatInstance::default();
-    let mut errors_activated = Vec::with_capacity(errors.len());
+    let shape = preflight_sat_shape(&errors, &target_index, mode)?;
+    let mut instance = MaxSatInstance::with_shape(shape)?;
+    let mut errors_activated = Vec::new();
+    errors_activated
+        .try_reserve_exact(errors.len())
+        .map_err(|_| {
+            CircuitError::invalid_detector_error_model(format!(
+                "SAT problem generation cannot reserve {} error variables",
+                errors.len()
+            ))
+        })?;
     for _ in &errors {
         errors_activated.push(instance.new_bool()?);
     }
@@ -397,6 +243,7 @@ fn sat_problem_as_wcnf_string(
         .filter(|observable| observable.variable_index().is_some())
         .collect();
     instance.add_clause(Clause::hard(observable_clause_vars))?;
+    instance.validate_shape(shape)?;
     instance.to_wdimacs(mode)
 }
 
@@ -493,6 +340,13 @@ fn add_error_soft_clause(
     }
 }
 
+fn soft_clause_is_stored(mode: SatProblemMode, probability: f64) -> bool {
+    match mode {
+        SatProblemMode::Unweighted => true,
+        SatProblemMode::Weighted { .. } => probability > 0.0 && probability != 0.5,
+    }
+}
+
 fn flattened_error_instructions(
     model: &DetectorErrorModel,
     mode: SatProblemMode,
@@ -503,6 +357,7 @@ fn flattened_error_instructions(
     let mut visitor = SatErrorVisitor {
         mode,
         expanded_instructions: 0,
+        target_occurrences: 0,
         errors: &mut errors,
     };
     let _ = traversal.try_visit(&mut visitor)?;
@@ -512,6 +367,7 @@ fn flattened_error_instructions(
 struct SatErrorVisitor<'a> {
     mode: SatProblemMode,
     expanded_instructions: u64,
+    target_occurrences: usize,
     errors: &'a mut Vec<FlattenedError>,
 }
 
@@ -529,6 +385,53 @@ impl SatErrorVisitor<'_> {
                 self.expanded_instructions
             )));
         }
+        Ok(())
+    }
+
+    fn push_error(
+        &mut self,
+        probability: f64,
+        targets: &[DemTarget],
+        detector_offset: u64,
+    ) -> CircuitResult<()> {
+        let next_error_count = self.errors.len().checked_add(1).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model("SAT error mechanism count overflowed")
+        })?;
+        if next_error_count > MAX_SAT_ERROR_MECHANISMS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "SAT problem generation currently supports at most {MAX_SAT_ERROR_MECHANISMS} error mechanisms, got at least {next_error_count}"
+            )));
+        }
+        let added_occurrences = targets
+            .iter()
+            .filter(|target| {
+                matches!(
+                    target,
+                    DemTarget::RelativeDetector(_) | DemTarget::LogicalObservable(_)
+                )
+            })
+            .count();
+        let next_target_occurrences = self
+            .target_occurrences
+            .checked_add(added_occurrences)
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model("SAT target occurrence count overflowed")
+            })?;
+        if next_target_occurrences > MAX_SAT_TARGET_OCCURRENCES {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "SAT problem generation currently supports at most {MAX_SAT_TARGET_OCCURRENCES} target occurrences, got at least {next_target_occurrences}"
+            )));
+        }
+        self.errors.try_reserve(1).map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "SAT problem generation cannot allocate another error mechanism",
+            )
+        })?;
+        self.errors.push(FlattenedError {
+            probability,
+            targets: shifted_targets(targets, detector_offset)?,
+        });
+        self.target_occurrences = next_target_occurrences;
         Ok(())
     }
 }
@@ -561,10 +464,7 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
                 };
                 if self.mode.includes_zero_probability_errors() || probability != 0.0 {
                     self.add_expanded_instruction()?;
-                    self.errors.push(FlattenedError {
-                        probability,
-                        targets: shifted_targets(instruction.targets(), state.detector_offset())?,
-                    });
+                    self.push_error(probability, instruction.targets(), state.detector_offset())?;
                 }
             }
             DemInstructionKind::ShiftDetectors => {
@@ -612,17 +512,6 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
     }
 }
 
-fn rounded_nonnegative_usize(value: f64) -> CircuitResult<usize> {
-    if !value.is_finite() || value < 0.0 {
-        return Err(CircuitError::invalid_detector_error_model(
-            "SAT quantized weight is not a finite nonnegative value",
-        ));
-    }
-    format!("{:.0}", value.round())
-        .parse::<usize>()
-        .map_err(|_| CircuitError::invalid_detector_error_model("SAT quantized weight overflowed"))
-}
-
 fn weighted_repeat_map_probability(probability: f64, repeat_count: u64) -> f64 {
     if repeat_count == 0 || probability <= 0.0 {
         return 0.0;
@@ -647,18 +536,32 @@ fn weighted_repeat_map_probability(probability: f64, repeat_count: u64) -> f64 {
     }
 }
 
+fn checked_sat_add(left: usize, right: usize, context: &str) -> CircuitResult<usize> {
+    left.checked_add(right).ok_or_else(|| {
+        CircuitError::invalid_detector_error_model(format!("SAT {context} overflowed"))
+    })
+}
+
+fn checked_sat_product(left: usize, right: usize, context: &str) -> CircuitResult<usize> {
+    left.checked_mul(right).ok_or_else(|| {
+        CircuitError::invalid_detector_error_model(format!("SAT {context} overflowed"))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(
+        clippy::expect_used,
         clippy::panic_in_result_fn,
         reason = "unit tests use direct assertions for compact diagnostics"
     )]
 
     use super::{
-        MAX_SAT_EFFECTIVE_TARGET_COUNT, likeliest_error_sat_problem, shortest_error_sat_problem,
+        MAX_SAT_EFFECTIVE_TARGET_COUNT, MAX_SAT_TARGET_OCCURRENCES, SatErrorVisitor,
+        SatProblemMode, likeliest_error_sat_problem, shortest_error_sat_problem,
         validate_sat_effective_target_counts,
     };
-    use crate::{CircuitError, CircuitResult, DetectorErrorModel};
+    use crate::{CircuitError, CircuitResult, DemTarget, DetectorErrorModel};
 
     const UNSAT_WDIMACS: &str = "p wcnf 1 2 3\n3 -1 0\n3 1 0\n";
     const TWO_ERROR_UNWEIGHTED_WDIMACS: &str = "\
@@ -896,10 +799,37 @@ p wcnf 3 7 71
     }
 
     #[test]
-    fn sat_problem_likeliest_header_counts_emitted_clauses() -> CircuitResult<()> {
+    fn sat_problem_likeliest_header_counts_stored_clauses_like_stim() -> CircuitResult<()> {
         let wcnf = likeliest_error_sat_problem(&dem("error(0.1) D0 L0\nerror(0.49) D0\n")?, 1)?;
         let clause_count = wcnf_clause_count(&wcnf)?;
-        assert_eq!(wcnf.lines().skip(1).count(), clause_count, "{wcnf}");
+        assert_eq!(clause_count, 8, "{wcnf}");
+        assert_eq!(wcnf.lines().skip(1).count(), 7, "{wcnf}");
+        assert_eq!(
+            wcnf,
+            "p wcnf 3 8 9\n1 -1 0\n9 1 2 -3 0\n9 1 -2 3 0\n9 -1 2 3 0\n9 -1 -2 -3 0\n9 -3 0\n9 1 0\n"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sat_error_visitor_rejects_target_occurrences_before_materialization() -> CircuitResult<()> {
+        let mut errors = Vec::new();
+        let mut visitor = SatErrorVisitor {
+            mode: SatProblemMode::Unweighted,
+            expanded_instructions: 0,
+            target_occurrences: MAX_SAT_TARGET_OCCURRENCES,
+            errors: &mut errors,
+        };
+        let targets = [DemTarget::relative_detector(0)?];
+        let error = visitor
+            .push_error(0.1, &targets, 0)
+            .expect_err("target occurrence beyond the cap");
+        assert!(
+            error
+                .to_string()
+                .contains("at most 500000 target occurrences")
+        );
+        assert!(visitor.errors.is_empty());
         Ok(())
     }
 
