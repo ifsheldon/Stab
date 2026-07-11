@@ -4,6 +4,7 @@ use std::str::Lines;
 
 mod analyze;
 mod api;
+mod arena_index;
 mod coordinate_scan;
 mod error_traversal;
 #[cfg(test)]

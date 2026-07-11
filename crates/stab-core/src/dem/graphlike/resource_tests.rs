@@ -22,17 +22,17 @@ fn graphlike_construction_bounds_unique_edges_and_persistent_payload() {
     assert!(error.to_string().contains("at most 64 unique graph edges"));
     assert_eq!(edge_limited.nodes.first().expect("D0 node").edges.len(), 64);
 
-    let mut payload_limited = Graph::new(1, 1_025);
+    let mut payload_limited = Graph::new(1, 2_048);
     payload_limited
-        .add_outward_edge(detector, None, observable_mask(0..1_024))
+        .add_outward_edge(detector, None, observable_mask(0..2_047))
         .expect("payload boundary is inclusive");
     let error = payload_limited
-        .add_outward_edge(detector, None, observable_mask([1_024]))
+        .add_outward_edge(detector, None, observable_mask([2_047]))
         .expect_err("persistent graph payload cap");
     assert!(
         error
             .to_string()
-            .contains("at most 2048 stored detector and observable graph terms")
+            .contains("at most 2048 stored graph payload terms")
     );
     assert_eq!(
         payload_limited.nodes.first().expect("D0 node").edges.len(),

@@ -5727,7 +5727,7 @@
             "state": "not-applicable",
             "value": "Unique-edge and persistent-mask admission protects hostile graph construction and is not a successful search workload."
           },
-          "resource_contract": "Use indexed edge deduplication and admit at most 5,000,000 unique outward edges and 20,000,000 persistent detector or observable graph terms before cloning into both graph indexes."
+          "resource_contract": "Use a collision-checked randomized arena index for edge deduplication and admit at most 5,000,000 unique outward edges and 20,000,000 persistent edge-payload or compact-index terms before installation."
         },
         {
           "id": "pfm6-graphlike-distance-one",
@@ -6149,7 +6149,7 @@
             "state": "not-applicable",
             "value": "Unique-edge and persistent-mask admission protects hostile graph construction and is not a successful search workload."
           },
-          "resource_contract": "Use indexed edge and incidence deduplication and transactionally admit at most 5,000,000 unique edges and 20,000,000 persistent edge or adjacency terms before installation."
+          "resource_contract": "Use collision-checked randomized arena indexing plus indexed incidence deduplication and transactionally admit at most 5,000,000 unique edges and 20,000,000 persistent edge-payload, compact-index, or adjacency terms before installation."
         },
         {
           "id": "pfm6-hypergraph-distance-one",

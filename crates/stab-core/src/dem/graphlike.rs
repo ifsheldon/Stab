@@ -17,6 +17,7 @@ use std::hash::{Hash, Hasher};
 use super::DemItem;
 use super::{
     DemDetectorId, DemInstruction, DemObservableId, DemTarget, DetectorErrorModel,
+    arena_index::ArenaIndex,
     error_traversal::{
         SearchGraphTargetPolicy, search_graph_nonzero_error_targets, visit_search_graph_errors,
     },
@@ -108,7 +109,7 @@ impl PartialOrd for ObservableMask {
     }
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(super) struct Edge {
     detector: Option<DemDetectorId>,
     observables: ObservableMask,
@@ -143,30 +144,43 @@ impl Display for Edge {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub(super) struct Node {
     edges: Vec<Edge>,
-    edge_index: BTreeSet<Edge>,
+    edge_index: ArenaIndex,
 }
+
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        self.edges == other.edges
+    }
+}
+
+impl Eq for Node {}
 
 impl Node {
     pub(super) fn new(edges: Vec<Edge>) -> Self {
-        let edge_index = edges.iter().cloned().collect();
+        let edge_index = ArenaIndex::from_arena(&edges);
         Self { edges, edge_index }
     }
 
     fn add_edge(&mut self, edge: Edge, budget: &mut GraphConstructionBudget) -> CircuitResult<()> {
-        if self.edge_index.contains(&edge) {
+        if self.edge_index.find(&edge, &self.edges).is_some() {
             return Ok(());
         }
+        let edge_hash = self.edge_index.hash(&edge);
         self.edges.try_reserve(1).map_err(|_| {
             CircuitError::invalid_detector_error_model(
                 "graphlike search cannot allocate another outward edge",
             )
         })?;
-        budget.admit_unique_edge(edge.term_count()?, 2, 0)?;
-        self.edge_index.insert(edge.clone());
+        self.edge_index
+            .try_reserve(&self.edges, "graphlike search")?;
+        budget.admit_unique_edge(edge.term_count()?, 1, 1)?;
+        let edge_index = self.edges.len();
         self.edges.push(edge);
+        self.edge_index
+            .insert_reserved(edge_hash, edge_index, &self.edges);
         Ok(())
     }
 }

@@ -23,6 +23,7 @@ allocation-counter = "0.8.1"
 clap = { version = "4.6.1", features = ["derive"] }
 csv = "1.4.0"
 gix = "0.85.0"
+hashbrown = "0.17.1"
 ignore = "0.4.26"
 memory-stats = "1.2.0"
 num-complex = "0.4.6"

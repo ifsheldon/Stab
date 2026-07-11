@@ -8,6 +8,7 @@ use std::fmt::{Display, Formatter};
 
 use super::{
     DemDetectorId, DemInstruction, DemItem, DemObservableId, DemTarget, DetectorErrorModel,
+    arena_index::ArenaIndex,
     error_traversal::{
         SearchGraphTargetPolicy, search_graph_nonzero_error_targets, visit_search_graph_errors,
     },
@@ -26,7 +27,7 @@ const MAX_HYPERGRAPH_EDGE_INCIDENCES: usize = 5_000_000;
 #[cfg(test)]
 const MAX_HYPERGRAPH_EDGE_INCIDENCES: usize = 256;
 
-#[derive(Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct ObservableMask {
     observables: BTreeSet<DemObservableId>,
 }
@@ -83,7 +84,7 @@ impl ObservableMask {
     }
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 struct Edge {
     detectors: BTreeSet<DemDetectorId>,
     observables: ObservableMask,
@@ -157,7 +158,7 @@ impl Node {
 struct Graph {
     nodes: Vec<Node>,
     edges: Vec<Edge>,
-    edge_index: BTreeMap<Edge, usize>,
+    edge_index: ArenaIndex,
     edge_incidences: usize,
     detector_index: DetectorIndex,
     has_declared_detectors: bool,
@@ -170,7 +171,6 @@ impl PartialEq for Graph {
     fn eq(&self, other: &Self) -> bool {
         self.nodes == other.nodes
             && self.edges == other.edges
-            && self.edge_index == other.edge_index
             && self.edge_incidences == other.edge_incidences
             && self.detector_index == other.detector_index
             && self.has_declared_detectors == other.has_declared_detectors
@@ -195,7 +195,7 @@ impl Graph {
         Self {
             nodes: vec![Node::default(); node_count],
             edges: Vec::new(),
-            edge_index: BTreeMap::new(),
+            edge_index: ArenaIndex::new(),
             edge_incidences: 0,
             detector_index: DetectorIndex::Identity,
             has_declared_detectors: node_count > 0,
@@ -216,7 +216,7 @@ impl Graph {
         Ok(Self {
             nodes,
             edges: Vec::new(),
-            edge_index: BTreeMap::new(),
+            edge_index: ArenaIndex::new(),
             edge_incidences: 0,
             detector_index: DetectorIndex::Identity,
             has_declared_detectors: node_count > 0,
@@ -250,7 +250,7 @@ impl Graph {
         Ok(Self {
             nodes,
             edges: Vec::new(),
-            edge_index: BTreeMap::new(),
+            edge_index: ArenaIndex::new(),
             edge_incidences: 0,
             detector_index: DetectorIndex::Sparse {
                 node_to_detector,
@@ -302,22 +302,32 @@ impl Graph {
         edge: Edge,
         adjacency_stored_terms: usize,
     ) -> CircuitResult<(usize, bool)> {
-        if let Some(edge_id) = self.edge_index.get(&edge).copied() {
+        if let Some(edge_id) = self.edge_index.find(&edge, &self.edges) {
             return Ok((edge_id, false));
         }
+        let edge_hash = self.edge_index.hash(&edge);
         let edge_id = self.edges.len();
         self.edges.try_reserve(1).map_err(|_| {
             CircuitError::invalid_detector_error_model(
                 "hypergraph search cannot allocate another edge",
             )
         })?;
+        self.edge_index
+            .try_reserve(&self.edges, "hypergraph search")?;
+        let stored_index_and_adjacency_terms =
+            adjacency_stored_terms.checked_add(1).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "hypergraph stored graph index count overflowed",
+                )
+            })?;
         self.construction_budget.admit_unique_edge(
             edge.term_count()?,
-            2,
-            adjacency_stored_terms,
+            1,
+            stored_index_and_adjacency_terms,
         )?;
-        self.edges.push(edge.clone());
-        self.edge_index.insert(edge, edge_id);
+        self.edges.push(edge);
+        self.edge_index
+            .insert_reserved(edge_hash, edge_id, &self.edges);
         Ok((edge_id, true))
     }
 
@@ -383,7 +393,7 @@ impl Graph {
         }
 
         let edge = Edge::new(detectors.clone(), observables);
-        if self.edge_index.contains_key(&edge) {
+        if self.edge_index.find(&edge, &self.edges).is_some() {
             return Ok(());
         }
         let projected_incidences = self

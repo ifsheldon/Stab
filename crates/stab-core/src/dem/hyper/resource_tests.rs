@@ -23,17 +23,17 @@ fn hyper_graph_bounds_unique_edges_and_persistent_payload() {
     assert!(error.to_string().contains("at most 64 unique graph edges"));
     assert_eq!(edge_limited.edges.len(), 64);
 
-    let mut payload_limited = Graph::new(1, 1_022);
+    let mut payload_limited = Graph::new(1, 2_042);
     payload_limited
-        .add_edge_from_dem_targets(&edge_targets(0..512), usize::MAX)
+        .add_edge_from_dem_targets(&edge_targets(0..1_022), usize::MAX)
         .expect("first payload within test limit");
     let error = payload_limited
-        .add_edge_from_dem_targets(&edge_targets(512..1_022), usize::MAX)
+        .add_edge_from_dem_targets(&edge_targets(1_022..2_042), usize::MAX)
         .expect_err("persistent graph payload cap");
     assert!(
         error
             .to_string()
-            .contains("at most 2048 stored detector and observable graph terms")
+            .contains("at most 2048 stored graph payload terms")
     );
     assert_eq!(payload_limited.edges.len(), 1);
     assert_eq!(payload_limited.edge_incidences, 1);

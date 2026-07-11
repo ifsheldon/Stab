@@ -93,7 +93,7 @@ impl GraphConstructionBudget {
         })?;
         if stored_terms > MAX_DEM_SEARCH_STORED_GRAPH_TERMS {
             return Err(CircuitError::invalid_detector_error_model(format!(
-                "{} currently supports at most {MAX_DEM_SEARCH_STORED_GRAPH_TERMS} stored detector and observable graph terms, got at least {stored_terms}",
+                "{} currently supports at most {MAX_DEM_SEARCH_STORED_GRAPH_TERMS} stored graph payload terms, got at least {stored_terms}",
                 self.context
             )));
         }
@@ -293,7 +293,7 @@ mod tests {
                 .admit_adjacency(1)
                 .expect_err("payload beyond limit")
                 .to_string()
-                .contains("at most 2048 stored detector and observable graph terms")
+                .contains("at most 2048 stored graph payload terms")
         );
     }
 }

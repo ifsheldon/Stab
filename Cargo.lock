@@ -2121,6 +2121,7 @@ dependencies = [
 name = "stab-core"
 version = "0.1.0"
 dependencies = [
+ "hashbrown 0.17.1",
  "num-complex",
  "proptest",
  "rand 0.10.1",
