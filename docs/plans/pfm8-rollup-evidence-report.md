@@ -35,7 +35,7 @@ The current PFM8 verification pass reran oracle, matrix, and benchmark metadata 
 
 | Checklist row | Current rollup state | PFM8 conclusion |
 | --- | --- | --- |
-| `Rust core library equivalent for core Stim semantics` | Rollup over active Rust APIs, transforms, DEMs, utilities, flows, analyzer, search, and sparse-tracker rows. | Keep `Partial`; PFM-B3 and PFM-B4 are complete, PFM-B1 is in final review and clean-evidence closure, and PFM-B2 plus PFM-B5 retain finite ledger-owned implementation work before PFM-B6 rollup. |
+| `Rust core library equivalent for core Stim semantics` | Rollup over active Rust APIs, transforms, DEMs, utilities, flows, analyzer, search, and sparse-tracker rows. | Keep `Partial`; PFM-B1, PFM-B3, and PFM-B4 are complete, while PFM-B2 plus PFM-B5 retain finite ledger-owned implementation work before PFM-B6 rollup. |
 | `.stim`, `.dem`, and result-format compatibility` | `.stim` and implemented result-format paths are strong; the selected Rust DEM count, coordinate, transform, sampler, search, SAT/WCNF, and filter-key surfaces now have shared PFM-B3 traversal evidence. | Keep `Partial` only as a rollup over remaining PFM-B5 generated analyzer and search work; Python product shape, diagrams, and full ErrorMatcher provenance are deferred and do not keep the selected Rust DEM traversal child active. |
 | `Full semantic execution of every legal circuit operation` | Selected sampler, detector-conversion, detection, analyzer, `SPP`, `SPP_DAG`, fixed-tableau, deterministic `MPP`, stochastic `MPP(p)` sampler or detection-sampling, deterministic `MPAD`, stochastic `MPAD(p)` sampler or detection-sampling, and noisy `MPAD(p)` analyzer evidence is green. PFM-B2 contract groundwork now classifies all 81 canonical gates across eight surfaces and every declared target-role pattern. | Keep `Partial`; eighteen exact, error-class, state-equivalence, structural, semantic-invariant, or statistical gate-contract cases remain planned and must gain independently selectable semantic evidence before this rollup can close. |
 | `CLI binary` | Selected `stab` commands and selected legacy aliases are implemented with PF7 evidence. | Keep `Done for selected Stab CLI surface`; no stale PFM8 blocker found for the selected CLI surface. |
@@ -71,7 +71,7 @@ Schema version 2 additionally rejects missing or duplicate gate-surface and sema
 The current blockers are no longer hidden broad upstream files or pending exact-subcase plans.
 They are finite ledger-backed implementation and evidence-splitting programs:
 
-- PFM-B1 has implemented all nineteen QEC-transform cases, split every shared selector, and closed GPT-5.6/max review; the implementation commit, clean evidence, final evidence audit, and documentation closure remain.
+- PFM-B1 is complete for the selected Rust transform scope: all nineteen QEC-transform cases have distinct selectors, exact or structural evidence, clean committed-HEAD allocation reports, final audit, and GPT-5.6/max review closure.
 - PFM-B2 contract groundwork is complete and evidence-closes analyzer sweep behavior at the selected matrix; its final phase still implements eighteen planned cases covering all nineteen semantic families.
 - PFM-B3 implements the seven selected shared folded-DEM traversal contracts.
 - PFM-B4 is complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc` for detecting regions, missing detectors, and all thirty-three flow cases. All milestone-audit and GPT-5.6/max findings are closed, and the matrix-solver plus sparse-repeat reports record clean committed-HEAD allocation evidence with zero resident delta.
@@ -90,7 +90,7 @@ Before PFM8 can become a completion report, the commands in `docs/plans/GOAL.md`
 
 This PFM8 pass confirms that the current rollup rows should stay conservative.
 PFM-B2 contract groundwork is complete and recorded in `docs/plans/pfm-b2-gate-surface-contract-groundwork-report.md`.
-PFM-B3 shared DEM traversal is complete: the audit and GPT-5.6/max review findings are fixed, and the clean allocation report records `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`, `local_modifications=false`, peak live allocation of 65,536 bytes, and zero resident delta. PFM-B4 is also complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc` with clean matrix-solver and sparse-repeat evidence. PFM-B1 implementation, source-owned evidence, and review closure are in place with `19/19 implemented` and zero shared selectors; the implementation commit, clean allocation evidence, and final evidence audit remain before PFM-B5.
+PFM-B1 is complete with `19/19 implemented`, zero shared selectors, and four clean reports from `HEAD=4f193f19cebf132f7baf0a3aa1cc799a153a71ed` with `local_modifications=false`; its maximum peak live allocation is 84,280 bytes and maximum sampled resident delta is 8,192 bytes. PFM-B3 shared DEM traversal is complete at `4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`, and PFM-B4 is complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc`. PFM-B2 and PFM-B5 remain before PFM-B6 rollup.
 
 ## Verification
 

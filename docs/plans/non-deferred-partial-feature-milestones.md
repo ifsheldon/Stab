@@ -128,7 +128,7 @@ Acceptance criteria:
 
 ### PFM-B1: General Reverse-Flow And QEC Transform Closure
 
-Implementation checkpoint, 2026-07-11: all nineteen ledger cases are implemented with distinct exact Cargo selectors and the packet-specific measurement-rich dispatch is replaced by one `ReverseFlowTransition` and sparse reverse-tracker engine. Review findings are fixed and rechecked with no remaining P0 through P2 blocker: high-index unitary validation has a tableau budget and sparse fallback, empty nested repeats and checker batches skip unnecessary work, returned flows validate in one batch, width-mismatched idle flow qubits use sparse validation, reversal-only record aliases reject like pinned Stim while ordinary unsigned checking retains XOR cancellation, observable effects combine before collapse checks, exact goldens re-record through a pinned C++ helper with path and SHA-256 bindings, truncated or link-routed evidence fails closed, source-owned and child-produced inputs are bounded, live side-output limits terminate process groups, scratch directories clean up through RAII, ignored tests cannot satisfy evidence, generated-surface workloads are repeat-free compact-source points, MPAD and repeat allocation properties have executable incremental-slope bounds, and sparse-index allocation has an additive-delta bound. The implementation commit and clean committed-HEAD allocation reports remain before completion; see `docs/plans/pfm-b1-reverse-flow-progress-report.md`.
+Status: Complete as of 2026-07-11. All nineteen ledger cases have distinct exact selectors, the packet-specific measurement-rich dispatch is replaced by one `ReverseFlowTransition` and sparse reverse-tracker engine, all milestone-audit and GPT-5.6/max findings are closed, and four clean allocation reports identify committed `HEAD=4f193f19cebf132f7baf0a3aa1cc799a153a71ed` with `local_modifications=false`. Exact golden recording is bound to pinned C++ Stim, resource contracts are executable, and source-owned or child-produced evidence paths fail closed under the documented limits. See `docs/plans/pfm-b1-reverse-flow-progress-report.md`.
 
 Objective: close the PFM2 blocker with a general reverse-flow implementation for the selected Rust transform APIs, not more exact-circuit recognizers.
 
@@ -864,7 +864,7 @@ Acceptance criteria:
 
 Current evidence:
 
-- `docs/plans/pfm8-rollup-evidence-report.md` records the current PFM8 rollup evidence snapshot. It is intentionally not a final PFM8 completion report because PFM-B1 still needs final review and clean evidence, PFM-B2 and PFM-B5 retain implementation work, and PFM-B6 must audit and roll up the completed children; PFM-B3 and PFM-B4 are already complete.
+- `docs/plans/pfm8-rollup-evidence-report.md` records the current PFM8 rollup evidence snapshot. It is intentionally not a final PFM8 completion report because PFM-B2 and PFM-B5 retain implementation work and PFM-B6 must audit and roll up the completed children; PFM-B1, PFM-B3, and PFM-B4 are complete.
 
 ## Final Verification
 

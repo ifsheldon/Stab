@@ -4,7 +4,7 @@
 
 The PFM-B1 implementation and source-owned evidence are in place as of 2026-07-11.
 All nineteen cases in the `pfm2-qec-transforms` blocker ledger are marked implemented, every case has a distinct exact Cargo selector, and the ledger reports zero planned cases and zero shared selectors.
-All findings from the first GPT-5.6/max review, its focused re-review lanes, and the adversarial confirmation passes are fixed locally, and the final focused recheck reports no remaining P0 through P2 blocker. The implementation commit and clean committed-HEAD allocation reports remain required before PFM-B1 is complete.
+All findings from the first GPT-5.6/max review, its focused re-review lanes, and the adversarial confirmation passes are fixed, and the final focused recheck reports no remaining P0 through P2 blocker. Four clean allocation reports from committed `HEAD=4f193f19cebf132f7baf0a3aa1cc799a153a71ed` complete the remaining evidence gate.
 
 ## Implemented Architecture
 
@@ -81,8 +81,20 @@ The report-only benchmark family is split by semantic workload:
 | `pfm-b1-time-reverse-sparse-high-qubit` | Otherwise identical unitary operations at qubit 0 and qubit 1,000,000 with the same nonempty low-width validation flow | transforms/s | Detects maximum-index allocation amplification in both reversal and validation. |
 
 The pre-review dirty-worktree probes used obsolete one-point measurement contracts and are superseded by the matrices above.
-After the implementation commit, run all four PFM-B1 allocation rows with warmup and three measurement runs.
-Feature-gated allocation tests enforce low-versus-million index deltas, logarithmic repeat-count work with bounded peak live bytes, three-point compact-body/state-size slopes at widths 1, 4, and 16, and three-point MPAD slopes at 8, 64, and 1,024 flows. A synthetic profile proves that the shared acceptance function rejects a retained dense quadratic matrix. The clean reports remain required as reviewable evidence in addition to these executable gates.
+Feature-gated allocation tests enforce low-versus-million index deltas, logarithmic repeat-count work with bounded peak live bytes, three-point compact-body/state-size slopes at widths 1, 4, and 16, and three-point MPAD slopes at 8, 64, and 1,024 flows. A synthetic profile proves that the shared acceptance function rejects a retained dense quadratic matrix.
+
+## Clean Committed Evidence
+
+All four required reports were recorded from committed `HEAD=4f193f19cebf132f7baf0a3aa1cc799a153a71ed` with `local_modifications=false`, warmup enabled, and three measurement runs. The JSON reports retain per-measurement variance, allocation counts and bytes, sampled resident bytes, and resident deltas; the table below summarizes the medians and maximum resource observations.
+
+| Report | Median measurements | Maximum peak live allocation | Maximum sampled resident delta |
+| --- | --- | ---: | ---: |
+| `target/benchmarks/pfm-b1-generated-surface-clean/compare.json` | d3/r2 30.750 us; d5/r2 84.638 us; d7/r2 171.600 us | 84,280 bytes | 0 bytes |
+| `target/benchmarks/pfm-b1-mpad-matrix-clean/compare.json` | matrix 4.874 us; scale 1 0.750 us; scale 8 3.532 us; scale 64 29.238 us | 44,672 bytes | 8,192 bytes |
+| `target/benchmarks/pfm-b1-large-repeat-clean/compare.json` | count 1 5.716 us; count 1,024 7.586 us; count 1 billion 12.870 us; wide body 215.680 us | 19,496 bytes | 0 bytes |
+| `target/benchmarks/pfm-b1-sparse-high-qubit-clean/compare.json` | qubit 0 1.414 us; qubit 1,000,000 0.972 us | 2,120 bytes | 0 bytes |
+
+These rows remain `contract-only`, `non-primary-report-only` evidence because the harness has no faithful in-process pinned-Stim comparator for these Rust transform workloads. No timing ratio or primary threshold is claimed.
 
 ## Verification To Date
 
@@ -101,7 +113,7 @@ just oracle::run --milestone PF2 --exact
 just bench::smoke
 ```
 
-After the implementation commit, the required clean report commands are:
+The clean reports were recorded with:
 
 ```text
 just bench::compare-allocations --only pfm-b1-time-reverse-generated-surface --warmup --measurement-runs 3 --report target/benchmarks/pfm-b1-generated-surface-clean
@@ -112,7 +124,7 @@ just bench::compare-allocations --only pfm-b1-time-reverse-sparse-high-qubit --w
 
 ## Milestone Audit
 
-The local milestone audit completed its first pass on 2026-07-11.
+The milestone audit completed its final pass on 2026-07-11.
 
 Finding closure:
 
@@ -133,8 +145,8 @@ Finding closure:
 - Post-fix evidence confirmation found that recording could truncate an outside inode through a hard-linked golden, child side-output reads retained a check/use race and unbounded reopen, and compatibility-matrix reads remained unbounded. Golden writes now use an exclusive same-directory temporary file and descriptor-relative atomic rename, side outputs are opened once without following links and read through a one-mebibyte limit, compatibility-matrix readers share the same bound, and focused hard-link, symlink, and oversized-file tests lock the contracts.
 - Post-fix benchmark confirmation found that saturating slope arithmetic could fail open on synthetic overflow and that one planning summary mislabeled the sparse-index additive-delta check. Acceptance arithmetic now uses checked products and rejects overflow, while the planning text distinguishes MPAD and repeat incremental slopes from the sparse-index delta gate.
 - Final resource confirmation found that auxiliary-output limits were enforced only after child exit and that per-run scratch directories accumulated. Fixture processes now monitor side-output descriptors every process poll, terminate the full process group as soon as a file exceeds one mebibyte or becomes unsafe, and own each run directory through an RAII guard that removes it on success and every error path.
-- No implementation defect remains from the local audit.
-- No PFM-B1 specification loophole was revealed. The one-million-instruction measurement-rich repeat cap, heralded-record rejection, duplicate-target hardening, observable-parity behavior, benchmark timing boundaries, normalized work, and clean-evidence commands are now explicit in this report and the public API documentation.
+- No implementation, evidence, benchmark, documentation, or operational defect remains from the final audit.
+- No PFM-B1 specification loophole was revealed. The one-million-instruction measurement-rich repeat cap, heralded-record rejection, duplicate-target hardening, observable-parity behavior, benchmark timing boundaries, normalized work, live side-output limit, scratch cleanup, and clean-evidence commands are explicit in this report and the public API documentation.
 
 Completion matrix:
 
@@ -150,14 +162,11 @@ Completion matrix:
 | Generated-surface structural parity | Satisfied | `pfm_b1_surface_code_reversal` compares all detector and observable detecting-region signatures under reversed tick indexing. |
 | Oracle evidence | Satisfied | `just oracle::record --check-clean` regenerates pinned rows from Stim and `just oracle::run --milestone PF2` passes all implemented rows. |
 | Benchmark contracts | Satisfied | Five report-only semantic rows include repeat-free generated-size, MPAD scale, repeat-count, repeat-body/state, and nonempty-flow sparse-index matrices with literal setup validation, exact work units, and feature-gated allocation bounds. |
-| Clean committed allocation evidence | Missing | Must be recorded after the implementation commit with warmup and three runs. |
+| Clean committed allocation evidence | Satisfied | Four reports identify `HEAD=4f193f19cebf132f7baf0a3aa1cc799a153a71ed`, `local_modifications=false`, warmup, three runs, peak live allocation, and sampled resident delta. |
 | GPT-5.6/max full-code-review closure | Satisfied | Successive core, evidence, benchmark, and resource confirmation passes report no remaining P0 through P2 blocker after all findings were fixed and rechecked. |
 
-Milestone status: **Incomplete** until the implementation is committed and clean committed-HEAD allocation reports are recorded and audited.
+Milestone status: **Complete for the selected Rust transform scope**. All nineteen cases, review findings, clean evidence requirements, and audit criteria are closed. Python bindings, export products, broader feedback, heralded-record reversal, duplicate-target compatibility decisions, and behavior outside the finite ledger remain deferred or require a new exact plan.
 
-## Remaining Closure Work
+## Next Work
 
-1. Run the staged pre-commit check and commit the implementation in focused commits.
-2. Record four clean committed-HEAD allocation reports with warmup and three measurement runs.
-3. Run the final milestone-audit against the clean evidence, resolving implementation findings and logging only genuine newly revealed under-specification.
-4. Synchronize the roadmap, feature checklist, rollup report, PFM2 spec-gap resolution, and this report before marking PFM-B1 complete.
+Proceed to PFM-B5. Do not reopen PFM-B1 unless its frozen finite contract changes or a new exact-subcase plan deliberately expands the selected Rust transform scope.
