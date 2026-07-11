@@ -5,7 +5,7 @@ use crate::{
     RepeatBlock, SingleQubitClifford, Target,
 };
 
-use super::{SparseReverseFrameTracker, toggle_targets};
+use super::{SparseReverseFrameTracker, qubit_index, replace_qubit_set, toggle_targets};
 
 pub(super) fn try_undo_supported_unitary_repeat(
     tracker: &mut SparseReverseFrameTracker,
@@ -15,7 +15,7 @@ pub(super) fn try_undo_supported_unitary_repeat(
         return Ok(false);
     }
 
-    let transform = SlotTransform::for_body(repeat.body(), tracker.xs.len())?;
+    let transform = SlotTransform::for_body(repeat.body(), tracker.qubit_count)?;
     transform
         .pow(repeat.repeat_count().get())?
         .apply_to(tracker)?;
@@ -58,7 +58,7 @@ impl SlotTransform {
             let mut basis_tracker = SparseReverseFrameTracker::new(dense_qubit_count, 0, 0, true);
             seed_slot(&mut basis_tracker, dense_qubit_count, slot, target)?;
             basis_tracker.undo_circuit(&dense_body)?;
-            destinations.push(collect_target_slots(&basis_tracker, target));
+            destinations.push(collect_target_slots(&basis_tracker, target)?);
         }
         Ok(Self {
             qubits,
@@ -114,22 +114,10 @@ impl SlotTransform {
         let slot_count = self.destinations.len();
         let mut old_slots = Vec::with_capacity(slot_count);
         for &qubit in &self.qubits {
-            old_slots.push(
-                tracker
-                    .xs
-                    .get(qubit)
-                    .cloned()
-                    .ok_or_else(|| active_slot_error("X", qubit))?,
-            );
+            old_slots.push(tracker.xs_for(qubit_id_from_index(qubit)?)?.clone());
         }
         for &qubit in &self.qubits {
-            old_slots.push(
-                tracker
-                    .zs
-                    .get(qubit)
-                    .cloned()
-                    .ok_or_else(|| active_slot_error("Z", qubit))?,
-            );
+            old_slots.push(tracker.zs_for(qubit_id_from_index(qubit)?)?.clone());
         }
 
         let mut new_slots = vec![BTreeSet::new(); slot_count];
@@ -158,20 +146,14 @@ impl SlotTransform {
                 .get(local)
                 .cloned()
                 .ok_or_else(|| active_slot_error("X transform", qubit))?;
-            *tracker
-                .xs
-                .get_mut(qubit)
-                .ok_or_else(|| active_slot_error("X", qubit))? = value;
+            replace_qubit_set(&mut tracker.xs, qubit_id_from_index(qubit)?, value);
         }
         for (local, &qubit) in self.qubits.iter().enumerate() {
             let value = new_slots
                 .get(active_qubit_count + local)
                 .cloned()
                 .ok_or_else(|| active_slot_error("Z transform", qubit))?;
-            *tracker
-                .zs
-                .get_mut(qubit)
-                .ok_or_else(|| active_slot_error("Z", qubit))? = value;
+            replace_qubit_set(&mut tracker.zs, qubit_id_from_index(qubit)?, value);
         }
         Ok(())
     }
@@ -330,20 +312,38 @@ fn seed_slot(
     }
 }
 
-fn collect_target_slots(tracker: &SparseReverseFrameTracker, target: DemTarget) -> BTreeSet<usize> {
+fn collect_target_slots(
+    tracker: &SparseReverseFrameTracker,
+    target: DemTarget,
+) -> CircuitResult<BTreeSet<usize>> {
     let mut slots = BTreeSet::new();
-    let qubit_count = tracker.xs.len();
-    for (index, targets) in tracker.xs.iter().enumerate() {
+    let qubit_count = tracker.qubit_count;
+    for (qubit, targets) in &tracker.xs {
         if targets.contains(&target) {
-            slots.insert(index);
+            slots.insert(qubit_index(*qubit)?);
         }
     }
-    for (index, targets) in tracker.zs.iter().enumerate() {
+    for (qubit, targets) in &tracker.zs {
         if targets.contains(&target) {
-            slots.insert(index + qubit_count);
+            let slot = qubit_index(*qubit)?
+                .checked_add(qubit_count)
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "unitary repeat target slot overflowed",
+                    )
+                })?;
+            slots.insert(slot);
         }
     }
-    slots
+    Ok(slots)
+}
+
+fn qubit_id_from_index(index: usize) -> CircuitResult<QubitId> {
+    QubitId::new(u32::try_from(index).map_err(|_| {
+        CircuitError::invalid_detector_error_model(format!(
+            "unitary repeat qubit index {index} does not fit u32"
+        ))
+    })?)
 }
 
 fn slot_target(slot: usize) -> CircuitResult<DemTarget> {
@@ -623,8 +623,18 @@ mod tests {
             .unwrap();
 
         assert!(try_undo_supported_unitary_repeat(&mut tracker, &repeat).unwrap());
-        assert!(tracker.xs[HIGH_QUBIT as usize].contains(&target));
-        assert!(!tracker.zs[HIGH_QUBIT as usize].contains(&target));
+        assert!(
+            tracker
+                .xs_for(QubitId::new(HIGH_QUBIT).unwrap())
+                .unwrap()
+                .contains(&target)
+        );
+        assert!(
+            !tracker
+                .zs_for(QubitId::new(HIGH_QUBIT).unwrap())
+                .unwrap()
+                .contains(&target)
+        );
     }
 
     #[test]
@@ -638,8 +648,18 @@ mod tests {
             .unwrap();
 
         assert!(try_undo_supported_unitary_repeat(&mut tracker, &repeat).unwrap());
-        assert!(!tracker.xs[HIGH_QUBIT as usize].contains(&target));
-        assert!(tracker.zs[HIGH_QUBIT as usize].contains(&target));
+        assert!(
+            !tracker
+                .xs_for(QubitId::new(HIGH_QUBIT).unwrap())
+                .unwrap()
+                .contains(&target)
+        );
+        assert!(
+            tracker
+                .zs_for(QubitId::new(HIGH_QUBIT).unwrap())
+                .unwrap()
+                .contains(&target)
+        );
     }
 
     #[test]

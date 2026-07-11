@@ -65,6 +65,10 @@ fn q(id: u32) -> Target {
     Target::qubit(QubitId::new(id).unwrap(), false)
 }
 
+fn qid(id: u32) -> QubitId {
+    QubitId::new(id).unwrap()
+}
+
 fn rec(offset: i32) -> Target {
     Target::measurement_record(MeasureRecordOffset::try_new(offset).unwrap())
 }
@@ -75,6 +79,27 @@ fn single_pauli_set(id: u64) -> BTreeSet<DemTarget> {
 
 fn detector_set(id: u64) -> BTreeSet<DemTarget> {
     BTreeSet::from([DemTarget::relative_detector(id).unwrap()])
+}
+
+#[test]
+fn sparse_rev_frame_tracker_allocates_only_active_qubit_entries() {
+    const HIGH_QUBIT: u32 = 1_000_000;
+    let target = DemTarget::logical_observable(0).unwrap();
+    let mut tracker = SparseReverseFrameTracker::new(HIGH_QUBIT as usize + 1, 0, 0, true);
+
+    assert!(tracker.xs.is_empty());
+    assert!(tracker.zs.is_empty());
+    tracker
+        .toggle_xs(qid(HIGH_QUBIT), &BTreeSet::from([target]))
+        .unwrap();
+    assert_eq!(tracker.xs.len(), 1);
+    assert!(tracker.xs_for(qid(HIGH_QUBIT)).unwrap().contains(&target));
+    assert!(tracker.xs_for(qid(0)).unwrap().is_empty());
+
+    tracker
+        .toggle_xs(qid(HIGH_QUBIT), &BTreeSet::from([target]))
+        .unwrap();
+    assert!(tracker.xs.is_empty());
 }
 
 #[test]
@@ -408,11 +433,11 @@ fn sparse_rev_frame_tracker_mpp_measurements_subset() {
         .unwrap();
 
     let mut expected = tracker_from_pauli_text("XYZIIZ");
-    expected.xs[0] = single_pauli_set(0);
-    expected.xs[1] = single_pauli_set(0);
-    expected.zs[1] = single_pauli_set(0);
-    expected.zs[2] = single_pauli_set(0);
-    expected.zs[5] = single_pauli_set(1);
+    expected.xs.insert(qid(0), single_pauli_set(0));
+    expected.xs.insert(qid(1), single_pauli_set(0));
+    expected.zs.insert(qid(1), single_pauli_set(0));
+    expected.zs.insert(qid(2), single_pauli_set(0));
+    expected.zs.insert(qid(5), single_pauli_set(1));
     expected.measurement_count = 0;
     assert_eq!(actual, expected);
 }
@@ -446,7 +471,11 @@ fn sparse_rev_frame_tracker_undo_circuit_feedback_subset() {
     actual.undo_circuit(&circuit).unwrap();
 
     let mut expected = SparseReverseFrameTracker::new(1, 0, 0, true);
-    expected.zs[0].insert(DemTarget::relative_detector(0).unwrap());
+    expected
+        .zs
+        .entry(qid(0))
+        .or_default()
+        .insert(DemTarget::relative_detector(0).unwrap());
     assert_eq!(actual, expected);
 }
 
@@ -504,14 +533,14 @@ fn sparse_rev_frame_tracker_observable_include_paulis_subset() {
         .undo_circuit(&circuit("OBSERVABLE_INCLUDE(5) X1 Y2 Z3 rec[-1]\n"))
         .unwrap();
 
-    assert!(tracker.xs[0].is_empty());
-    assert!(tracker.zs[0].is_empty());
-    assert_eq!(tracker.xs[1], single_pauli_set(5));
-    assert!(tracker.zs[1].is_empty());
-    assert_eq!(tracker.xs[2], single_pauli_set(5));
-    assert_eq!(tracker.zs[2], single_pauli_set(5));
-    assert!(tracker.xs[3].is_empty());
-    assert_eq!(tracker.zs[3], single_pauli_set(5));
+    assert!(tracker.xs_for(qid(0)).unwrap().is_empty());
+    assert!(tracker.zs_for(qid(0)).unwrap().is_empty());
+    assert_eq!(tracker.xs_for(qid(1)).unwrap(), &single_pauli_set(5));
+    assert!(tracker.zs_for(qid(1)).unwrap().is_empty());
+    assert_eq!(tracker.xs_for(qid(2)).unwrap(), &single_pauli_set(5));
+    assert_eq!(tracker.zs_for(qid(2)).unwrap(), &single_pauli_set(5));
+    assert!(tracker.xs_for(qid(3)).unwrap().is_empty());
+    assert_eq!(tracker.zs_for(qid(3)).unwrap(), &single_pauli_set(5));
     assert_eq!(tracker.rec_bits.get(&3), Some(&single_pauli_set(5)));
 }
 
@@ -550,24 +579,40 @@ fn sparse_rev_frame_tracker_shifted_copy_matches_record_and_detector_offsets() {
         .insert(DemTarget::relative_detector(2993).unwrap());
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
-    actual.xs[5] = single_pauli_set(3);
+    actual.xs.insert(qid(5), single_pauli_set(3));
     assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
-    expected.xs[5] = single_pauli_set(3);
+    expected.xs.insert(qid(5), single_pauli_set(3));
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
-    actual.zs[6] = single_pauli_set(3);
+    actual.zs.insert(qid(6), single_pauli_set(3));
     assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
-    expected.zs[6] = single_pauli_set(3);
+    expected.zs.insert(qid(6), single_pauli_set(3));
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
-    actual.xs[5].insert(DemTarget::relative_detector(287).unwrap());
+    actual
+        .xs
+        .get_mut(&qid(5))
+        .unwrap()
+        .insert(DemTarget::relative_detector(287).unwrap());
     assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
-    expected.xs[5].insert(DemTarget::relative_detector(2987).unwrap());
+    expected
+        .xs
+        .get_mut(&qid(5))
+        .unwrap()
+        .insert(DemTarget::relative_detector(2987).unwrap());
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
-    actual.zs[6].insert(DemTarget::relative_detector(287).unwrap());
+    actual
+        .zs
+        .get_mut(&qid(6))
+        .unwrap()
+        .insert(DemTarget::relative_detector(287).unwrap());
     assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
-    expected.zs[6].insert(DemTarget::relative_detector(2987).unwrap());
+    expected
+        .zs
+        .get_mut(&qid(6))
+        .unwrap()
+        .insert(DemTarget::relative_detector(2987).unwrap());
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
     shifted_repeat::shift(&mut actual, 1800, 2700).unwrap();
@@ -592,7 +637,7 @@ fn sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period() {
     assert_eq!(folded, unrolled);
 
     shifted_repeat::undo_loop(&mut folded, &body, 1_000_000_000_001).unwrap();
-    assert_eq!(folded.zs[0], single_pauli_set(3));
+    assert_eq!(folded.zs_for(qid(0)).unwrap(), &single_pauli_set(3));
     assert_eq!(folded.measurement_count, 1_999_999_998_497);
     assert_eq!(folded.detector_count, 2_999_999_999_499);
 }
@@ -616,8 +661,12 @@ fn sparse_rev_frame_tracker_repeat_blocks_track_measurements_and_detectors() {
     tracker.undo_circuit(&circuit).unwrap();
 
     let mut expected = SparseReverseFrameTracker::new(1, 0, 0, true);
-    expected.zs[0] = detector_set(0);
-    expected.zs[0].insert(DemTarget::relative_detector(1).unwrap());
+    expected.zs.insert(qid(0), detector_set(0));
+    expected
+        .zs
+        .get_mut(&qid(0))
+        .unwrap()
+        .insert(DemTarget::relative_detector(1).unwrap());
     assert_eq!(tracker, expected);
 }
 

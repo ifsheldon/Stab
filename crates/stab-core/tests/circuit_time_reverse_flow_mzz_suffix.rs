@@ -90,15 +90,11 @@ fn mzz_unitary_suffix_rejects_unsatisfied_flows() -> Result<(), String> {
         Err(error) => error.to_string(),
     };
 
-    require_contains(
-        &error,
-        "requires selected measurement-rich circuit to satisfy flow 0",
-        "unsatisfied flow error",
-    )
+    require_contains(&error, "anti-commuted", "unsatisfied flow error")
 }
 
 #[test]
-fn mzz_unitary_suffix_rejects_observable_terms() -> Result<(), String> {
+fn mzz_unitary_suffix_ignores_input_observable_terms_like_stim() -> Result<(), String> {
     let input = circuit(
         "
         MZZ 0 1
@@ -108,44 +104,41 @@ fn mzz_unitary_suffix_rejects_observable_terms() -> Result<(), String> {
     ",
     )?;
     let observable_flow = flow("X0*X1 -> X0*Z1 xor rec[-1] xor obs[0]")?;
-    let error = match circuit_time_reversed_for_flows(&input, &[observable_flow]) {
-        Ok(_) => return Err("observable flow unexpectedly reversed".to_owned()),
-        Err(error) => error.to_string(),
-    };
+    let (inverse, flows) = circuit_time_reversed_for_flows(&input, &[observable_flow])
+        .map_err(|error| error.to_string())?;
 
-    require_contains(
-        &error,
-        "does not support observable terms in selected flow 0",
-        "observable flow error",
+    require_eq(
+        &inverse,
+        &circuit("S_DAG 1\nCX 0 1\nH 0\nMZZ 0 1\n")?,
+        "observable-bearing reversed circuit",
+    )?;
+    require_eq(
+        &flows,
+        &vec![flow("X0*Z1 -> X0*X1 xor rec[-1]")?],
+        "observable-bearing reversed flow",
     )
 }
 
 #[test]
-fn mzz_unitary_suffix_rejects_unscoped_shapes() -> Result<(), String> {
-    for circuit_text in [
-        "MZZ(0.125) 0 1\nH 0\n",
-        "MZZ 0 1 2 3\nH 0\n",
-        "MZZ 0 1\nCX rec[-1] 0\n",
-        "MZZ 0 1\nDETECTOR rec[-1]\n",
-        "MZZ 0 1\nX_ERROR(0.125) 0\n",
-        "MZZ 0 1\nREPEAT 2 {\n    H 0\n}\n",
+fn mzz_unitary_suffix_rejects_feedback_and_duplicate_targets() -> Result<(), String> {
+    for (circuit_text, flow_text, expected) in [
+        (
+            "MZZ 0 1\nCX rec[-1] 0\n",
+            "Z0 -> Z0 xor rec[-1]",
+            "feedback",
+        ),
+        (
+            "MZZ 0 1 1 2\nH 0\n",
+            "1 -> Z0*Z1 xor rec[-2]",
+            "duplicate target qubit",
+        ),
     ] {
-        let input = circuit(circuit_text)?;
-        let flow = flow("Z0 -> Z0 xor rec[-1]")?;
-        let error = match circuit_time_reversed_for_flows(&input, &[flow]) {
-            Ok(_) => {
-                return Err(format!(
-                    "unscoped MZZ suffix shape succeeded: {circuit_text}"
-                ));
-            }
-            Err(error) => error.to_string(),
-        };
-
-        require_contains(
-            &error,
-            "one noiseless plain MZZ group followed by plain-qubit unitary",
-            circuit_text,
-        )?;
+        let error =
+            match circuit_time_reversed_for_flows(&circuit(circuit_text)?, &[flow(flow_text)?]) {
+                Ok(_) => return Err(format!("unsupported MZZ shape succeeded: {circuit_text}")),
+                Err(error) => error.to_string(),
+            };
+        require_contains(&error, expected, circuit_text)?;
     }
     Ok(())
 }

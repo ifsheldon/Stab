@@ -116,8 +116,9 @@ pub(super) fn is_shifted_copy(
         &other.rec_bits,
         measurement_offset,
         detector_offset,
-    ) && vecs_match_shifted(&tracker.xs, &other.xs, detector_offset)
-        && vecs_match_shifted(&tracker.zs, &other.zs, detector_offset)
+    ) && tracker.qubit_count == other.qubit_count
+        && maps_match_shifted(&tracker.xs, &other.xs, detector_offset)
+        && maps_match_shifted(&tracker.zs, &other.zs, detector_offset)
 }
 
 pub(super) fn shift(
@@ -172,18 +173,17 @@ fn rec_bits_match_shifted(
     })
 }
 
-fn vecs_match_shifted(
-    unshifted: &[BTreeSet<DemTarget>],
-    expected: &[BTreeSet<DemTarget>],
+fn maps_match_shifted(
+    unshifted: &BTreeMap<crate::QubitId, BTreeSet<DemTarget>>,
+    expected: &BTreeMap<crate::QubitId, BTreeSet<DemTarget>>,
     detector_offset: i128,
 ) -> bool {
     unshifted.len() == expected.len()
-        && unshifted
-            .iter()
-            .zip(expected)
-            .all(|(targets, expected_targets)| {
+        && unshifted.iter().all(|(qubit, targets)| {
+            expected.get(qubit).is_some_and(|expected_targets| {
                 target_set_matches_shifted(targets, expected_targets, detector_offset)
             })
+        })
 }
 
 fn target_set_matches_shifted(
@@ -200,8 +200,11 @@ fn target_set_matches_shifted(
     })
 }
 
-fn shift_target_sets(sets: &mut [BTreeSet<DemTarget>], detector_offset: i128) -> CircuitResult<()> {
-    for targets in sets {
+fn shift_target_sets(
+    sets: &mut BTreeMap<crate::QubitId, BTreeSet<DemTarget>>,
+    detector_offset: i128,
+) -> CircuitResult<()> {
+    for targets in sets.values_mut() {
         *targets = shift_target_set(targets, detector_offset)?;
     }
     Ok(())

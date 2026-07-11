@@ -3,6 +3,7 @@
     reason = "M10 lands sparse reverse tracker parity before the error matcher consumes this internal primitive"
 )]
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::LazyLock;
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget,
@@ -18,6 +19,8 @@ use pauli_product::{pauli_product_measurement_terms_reversed, pauli_product_term
 
 use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_transition};
 
+static EMPTY_TARGETS: LazyLock<BTreeSet<DemTarget>> = LazyLock::new(BTreeSet::new);
+
 fn tracker_basis(basis: PauliBasis) -> CircuitResult<TrackerBasis> {
     TrackerBasis::from_pauli_basis(basis).ok_or_else(|| {
         CircuitError::invalid_detector_error_model(
@@ -28,11 +31,13 @@ fn tracker_basis(basis: PauliBasis) -> CircuitResult<TrackerBasis> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SparseReverseFrameTracker {
-    xs: Vec<BTreeSet<DemTarget>>,
-    zs: Vec<BTreeSet<DemTarget>>,
+    xs: BTreeMap<QubitId, BTreeSet<DemTarget>>,
+    zs: BTreeMap<QubitId, BTreeSet<DemTarget>>,
+    qubit_count: usize,
     rec_bits: BTreeMap<usize, BTreeSet<DemTarget>>,
     measurement_count: usize,
     detector_count: u64,
+    observable_effects: BTreeMap<u64, BTreeSet<DemTarget>>,
     fail_on_anticommute: bool,
     anticommutations: BTreeSet<Anticommutation>,
 }
@@ -45,11 +50,13 @@ impl SparseReverseFrameTracker {
         fail_on_anticommute: bool,
     ) -> Self {
         Self {
-            xs: vec![BTreeSet::new(); qubit_count],
-            zs: vec![BTreeSet::new(); qubit_count],
+            xs: BTreeMap::new(),
+            zs: BTreeMap::new(),
+            qubit_count,
             rec_bits: BTreeMap::new(),
             measurement_count,
             detector_count,
+            observable_effects: BTreeMap::new(),
             fail_on_anticommute,
             anticommutations: BTreeSet::new(),
         }
@@ -94,6 +101,48 @@ impl SparseReverseFrameTracker {
         }
         self.toggle_record_target(index, target);
         Ok(())
+    }
+
+    pub(crate) fn toggle_observable_effect(&mut self, observable: u32, target: DemTarget) {
+        let effects = self
+            .observable_effects
+            .entry(u64::from(observable))
+            .or_default();
+        toggle_target(effects, target);
+    }
+
+    pub(crate) fn pauli_targets_at(&self, qubit: QubitId) -> CircuitResult<BTreeSet<DemTarget>> {
+        Ok(self
+            .xs_for(qubit)?
+            .union(self.zs_for(qubit)?)
+            .copied()
+            .collect())
+    }
+
+    pub(crate) fn record_targets_at(&self, index: usize) -> CircuitResult<BTreeSet<DemTarget>> {
+        if index >= self.measurement_count {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "measurement record index {index} is outside the sparse reverse tracker history"
+            )));
+        }
+        Ok(self.rec_bits.get(&index).cloned().unwrap_or_default())
+    }
+
+    pub(crate) fn active_targets(&self) -> BTreeSet<DemTarget> {
+        let mut result = BTreeSet::new();
+        for targets in self.xs.values().chain(self.zs.values()) {
+            result.extend(targets);
+        }
+        for targets in self.rec_bits.values() {
+            result.extend(targets);
+        }
+        result
+    }
+
+    pub(crate) fn target_anticommuted(&self, target: DemTarget) -> bool {
+        self.anticommutations
+            .iter()
+            .any(|anticommutation| anticommutation.target == target)
     }
 
     pub(crate) fn undo_instruction(
@@ -174,14 +223,64 @@ impl SparseReverseFrameTracker {
     }
 
     pub(crate) fn region_for_target(&self, target: DemTarget) -> CircuitResult<FlexPauliString> {
-        let bases = self.xs.iter().zip(&self.zs).map(|(xs, zs)| {
-            match (xs.contains(&target), zs.contains(&target)) {
-                (false, false) => PauliBasis::I,
-                (true, false) => PauliBasis::X,
-                (false, true) => PauliBasis::Z,
-                (true, true) => PauliBasis::Y,
+        self.region_for_target_with_len(target, self.qubit_count)
+    }
+
+    pub(crate) fn compact_region_for_target(
+        &self,
+        target: DemTarget,
+    ) -> CircuitResult<FlexPauliString> {
+        let len = self
+            .xs
+            .iter()
+            .chain(&self.zs)
+            .filter_map(|(qubit, targets)| targets.contains(&target).then_some(qubit.get()))
+            .max()
+            .map(|max_qubit| qubit_index(QubitId::new(max_qubit)?).map(|index| index + 1))
+            .transpose()?
+            .unwrap_or(0);
+        self.region_for_target_with_len(target, len)
+    }
+
+    fn region_for_target_with_len(
+        &self,
+        target: DemTarget,
+        len: usize,
+    ) -> CircuitResult<FlexPauliString> {
+        let mut bases = vec![PauliBasis::I; len];
+        for (qubit, xs) in &self.xs {
+            if xs.contains(&target) {
+                let index = qubit_index(*qubit)?;
+                let basis = bases.get_mut(index).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(format!(
+                        "X-basis sensitivity qubit {} is outside its sparse region",
+                        qubit.get()
+                    ))
+                })?;
+                *basis = PauliBasis::X;
             }
-        });
+        }
+        for (qubit, zs) in &self.zs {
+            if zs.contains(&target) {
+                let index = qubit_index(*qubit)?;
+                let basis = bases.get_mut(index).ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(format!(
+                        "Z-basis sensitivity qubit {} is outside its sparse region",
+                        qubit.get()
+                    ))
+                })?;
+                *basis = match *basis {
+                    PauliBasis::I => PauliBasis::Z,
+                    PauliBasis::X => PauliBasis::Y,
+                    actual => {
+                        return Err(CircuitError::invalid_detector_error_model(format!(
+                            "unexpected {actual:?} basis while building sparse region for qubit {}",
+                            qubit.get()
+                        )));
+                    }
+                };
+            }
+        }
         FlexPauliString::from_phase_and_bases(PauliPhase::Plus, bases).map_err(|error| {
             CircuitError::invalid_detector_error_model(format!(
                 "failed to build detecting region for {target}: {error}"
@@ -190,12 +289,13 @@ impl SparseReverseFrameTracker {
     }
 
     pub(crate) fn undo_implicit_rz_at_start_of_circuit(&mut self) -> CircuitResult<()> {
-        for index in 0..self.xs.len() {
-            let qubit = QubitId::new(u32::try_from(index).map_err(|_| {
-                CircuitError::invalid_detector_error_model(format!(
-                    "qubit index {index} does not fit u32 during implicit start-state check"
-                ))
-            })?)?;
+        let active_qubits = self
+            .xs
+            .keys()
+            .chain(self.zs.keys())
+            .copied()
+            .collect::<BTreeSet<_>>();
+        for qubit in active_qubits {
             self.check_reset_gauge(qubit, TrackerBasis::Z)?;
         }
         Ok(())
@@ -355,7 +455,6 @@ impl SparseReverseFrameTracker {
             ))
         })?;
         for qubit in qubits_reversed(instruction)? {
-            let index = self.checked_qubit_index(qubit)?;
             let old_xs = self.xs_for(qubit)?.clone();
             let old_zs = self.zs_for(qubit)?.clone();
             let mut new_xs = BTreeSet::new();
@@ -380,22 +479,8 @@ impl SparseReverseFrameTracker {
                     new_zs.insert(*target);
                 }
             }
-            let Some(xs) = self.xs.get_mut(index) else {
-                return Err(CircuitError::invalid_detector_error_model(format!(
-                    "{} target qubit {} is outside the sparse reverse tracker",
-                    instruction.gate().canonical_name(),
-                    qubit.get()
-                )));
-            };
-            *xs = new_xs;
-            let Some(zs) = self.zs.get_mut(index) else {
-                return Err(CircuitError::invalid_detector_error_model(format!(
-                    "{} target qubit {} is outside the sparse reverse tracker",
-                    instruction.gate().canonical_name(),
-                    qubit.get()
-                )));
-            };
-            *zs = new_zs;
+            replace_qubit_set(&mut self.xs, qubit, new_xs);
+            replace_qubit_set(&mut self.zs, qubit, new_zs);
         }
         Ok(())
     }
@@ -540,12 +625,12 @@ impl SparseReverseFrameTracker {
         left: QubitId,
         right: QubitId,
     ) -> CircuitResult<()> {
-        let left_index = self.checked_qubit_index(left)?;
-        let right_index = self.checked_qubit_index(right)?;
-        let old_left_xs = clone_qubit_set(&self.xs, left_index, left, "X")?;
-        let old_left_zs = clone_qubit_set(&self.zs, left_index, left, "Z")?;
-        let old_right_xs = clone_qubit_set(&self.xs, right_index, right, "X")?;
-        let old_right_zs = clone_qubit_set(&self.zs, right_index, right, "Z")?;
+        self.validate_qubit(left)?;
+        self.validate_qubit(right)?;
+        let old_left_xs = self.xs_for(left)?.clone();
+        let old_left_zs = self.zs_for(left)?.clone();
+        let old_right_xs = self.xs_for(right)?.clone();
+        let old_right_zs = self.zs_for(right)?.clone();
         let mut tracked_targets = BTreeSet::new();
         tracked_targets.extend(old_left_xs.iter().copied());
         tracked_targets.extend(old_left_zs.iter().copied());
@@ -582,10 +667,10 @@ impl SparseReverseFrameTracker {
             insert_basis_target(&mut new_left_xs, &mut new_left_zs, target, left_basis);
             insert_basis_target(&mut new_right_xs, &mut new_right_zs, target, right_basis);
         }
-        replace_qubit_set(&mut self.xs, left_index, left, "X", new_left_xs)?;
-        replace_qubit_set(&mut self.zs, left_index, left, "Z", new_left_zs)?;
-        replace_qubit_set(&mut self.xs, right_index, right, "X", new_right_xs)?;
-        replace_qubit_set(&mut self.zs, right_index, right, "Z", new_right_zs)?;
+        replace_qubit_set(&mut self.xs, left, new_left_xs);
+        replace_qubit_set(&mut self.zs, left, new_left_zs);
+        replace_qubit_set(&mut self.xs, right, new_right_xs);
+        replace_qubit_set(&mut self.zs, right, new_right_zs);
         Ok(())
     }
 
@@ -614,8 +699,13 @@ impl SparseReverseFrameTracker {
                 "OBSERVABLE_INCLUDE is missing an observable id",
             )
         })?;
-        let target = DemTarget::logical_observable(observable.get())?;
-        let sensitivity = BTreeSet::from([target]);
+        let sensitivity = self
+            .observable_effects
+            .get(&observable.get())
+            .cloned()
+            .unwrap_or(BTreeSet::from([DemTarget::logical_observable(
+                observable.get(),
+            )?]));
         for target in instruction.targets() {
             match target {
                 Target::MeasurementRecord { offset } => {
@@ -750,67 +840,45 @@ impl SparseReverseFrameTracker {
     }
 
     fn clear_qubit(&mut self, qubit: QubitId) -> CircuitResult<()> {
-        let index = self.checked_qubit_index(qubit)?;
-        let Some(xs) = self.xs.get_mut(index) else {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "reset target qubit {} is outside the sparse reverse tracker",
-                qubit.get()
-            )));
-        };
-        xs.clear();
-        let Some(zs) = self.zs.get_mut(index) else {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "reset target qubit {} is outside the sparse reverse tracker",
-                qubit.get()
-            )));
-        };
-        zs.clear();
+        self.validate_qubit(qubit)?;
+        self.xs.remove(&qubit);
+        self.zs.remove(&qubit);
         Ok(())
     }
 
     fn xs_for(&self, qubit: QubitId) -> CircuitResult<&BTreeSet<DemTarget>> {
-        self.xs
-            .get(self.checked_qubit_index(qubit)?)
-            .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
-                    "qubit {} is outside the sparse reverse tracker",
-                    qubit.get()
-                ))
-            })
+        self.validate_qubit(qubit)?;
+        Ok(self.xs.get(&qubit).unwrap_or(&EMPTY_TARGETS))
     }
 
     fn zs_for(&self, qubit: QubitId) -> CircuitResult<&BTreeSet<DemTarget>> {
-        self.zs
-            .get(self.checked_qubit_index(qubit)?)
-            .ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(format!(
-                    "qubit {} is outside the sparse reverse tracker",
-                    qubit.get()
-                ))
-            })
+        self.validate_qubit(qubit)?;
+        Ok(self.zs.get(&qubit).unwrap_or(&EMPTY_TARGETS))
     }
 
     fn toggle_xs(&mut self, qubit: QubitId, targets: &BTreeSet<DemTarget>) -> CircuitResult<()> {
-        let index = self.checked_qubit_index(qubit)?;
-        let Some(xs) = self.xs.get_mut(index) else {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "qubit {} is outside the sparse reverse tracker",
-                qubit.get()
-            )));
+        self.validate_qubit(qubit)?;
+        let is_empty = {
+            let xs = self.xs.entry(qubit).or_default();
+            toggle_targets(xs, targets.iter().copied());
+            xs.is_empty()
         };
-        toggle_targets(xs, targets.iter().copied());
+        if is_empty {
+            self.xs.remove(&qubit);
+        }
         Ok(())
     }
 
     fn toggle_zs(&mut self, qubit: QubitId, targets: &BTreeSet<DemTarget>) -> CircuitResult<()> {
-        let index = self.checked_qubit_index(qubit)?;
-        let Some(zs) = self.zs.get_mut(index) else {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "qubit {} is outside the sparse reverse tracker",
-                qubit.get()
-            )));
+        self.validate_qubit(qubit)?;
+        let is_empty = {
+            let zs = self.zs.entry(qubit).or_default();
+            toggle_targets(zs, targets.iter().copied());
+            zs.is_empty()
         };
-        toggle_targets(zs, targets.iter().copied());
+        if is_empty {
+            self.zs.remove(&qubit);
+        }
         Ok(())
     }
 
@@ -824,15 +892,15 @@ impl SparseReverseFrameTracker {
         Ok(())
     }
 
-    fn checked_qubit_index(&self, qubit: QubitId) -> CircuitResult<usize> {
+    fn validate_qubit(&self, qubit: QubitId) -> CircuitResult<()> {
         let index = qubit_index(qubit)?;
-        if index >= self.xs.len() {
+        if index >= self.qubit_count {
             return Err(CircuitError::invalid_detector_error_model(format!(
                 "qubit {} is outside the sparse reverse tracker",
                 qubit.get()
             )));
         }
-        Ok(index)
+        Ok(())
     }
 
     fn record_index_from_offset(&self, offset: i32) -> CircuitResult<usize> {
@@ -1022,35 +1090,16 @@ fn insert_basis_target(
     }
 }
 
-fn clone_qubit_set(
-    sets: &[BTreeSet<DemTarget>],
-    index: usize,
-    qubit: QubitId,
-    basis: &'static str,
-) -> CircuitResult<BTreeSet<DemTarget>> {
-    sets.get(index).cloned().ok_or_else(|| {
-        CircuitError::invalid_detector_error_model(format!(
-            "missing {basis}-basis sensitivity set for qubit {} during sparse reverse tracking",
-            qubit.get()
-        ))
-    })
-}
-
 fn replace_qubit_set(
-    sets: &mut [BTreeSet<DemTarget>],
-    index: usize,
+    sets: &mut BTreeMap<QubitId, BTreeSet<DemTarget>>,
     qubit: QubitId,
-    basis: &'static str,
     value: BTreeSet<DemTarget>,
-) -> CircuitResult<()> {
-    let Some(slot) = sets.get_mut(index) else {
-        return Err(CircuitError::invalid_detector_error_model(format!(
-            "missing {basis}-basis sensitivity set for qubit {} during sparse reverse tracking",
-            qubit.get()
-        )));
-    };
-    *slot = value;
-    Ok(())
+) {
+    if value.is_empty() {
+        sets.remove(&qubit);
+    } else {
+        sets.insert(qubit, value);
+    }
 }
 
 fn toggle_targets(target: &mut BTreeSet<DemTarget>, values: impl Iterator<Item = DemTarget>) {

@@ -305,28 +305,24 @@ fn time_reversed_for_flows_rejects_selected_mpad_unpromoted_flow_terms() {
         (
             "MPAD 0\n",
             "Z0 -> obs[0]",
-            "requires selected circuit to satisfy flow",
+            "didn't satisfy one of the given flows",
         ),
         (
             "MPAD 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
             "X0 -> Z0 xor obs[0]",
-            "requires selected circuit to satisfy flow",
+            "didn't satisfy one of the given flows",
         ),
         (
             "MPAD 0\n",
             "X0 -> Z0",
-            "unitary subset requires input circuit to satisfy flow",
+            "didn't satisfy one of the given flows",
         ),
         (
             "MPAD 0\n",
             "X0 -> Z0 xor rec[-1]",
-            "requires selected circuit to satisfy flow",
+            "didn't satisfy one of the given flows",
         ),
-        (
-            "MPAD 0 1\n",
-            "1 -> rec[-3]",
-            "measurement record rec[-3] outside available measurement count 2",
-        ),
+        ("MPAD 0 1\n", "1 -> rec[-3]", "out of range measurement"),
     ] {
         let error = circuit_time_reversed_for_flows(&circuit(circuit_text), &[flow(flow_text)])
             .expect_err("selected MPAD unpromoted flow terms are rejected")
@@ -340,47 +336,29 @@ fn time_reversed_for_flows_rejects_selected_mpad_unpromoted_flow_terms() {
 }
 
 #[test]
-fn time_reversed_for_flows_rejects_unpromoted_mpad_shapes_with_pauli_flows() {
-    let error = circuit_time_reversed_for_flows(&circuit("MPAD 0\nH 0\n"), &[flow("X0 -> Z0")])
-        .expect_err("interleaved MPAD time reversal remains outside the selected packet")
-        .to_string();
+fn time_reversed_for_flows_supports_interleaved_mpad_flows() {
+    for (input_text, input_flow, expected_text, expected_flow) in [
+        ("MPAD 0\nH 0\n", "X0 -> Z0", "H 0\nMPAD 0\n", "Z0 -> X0"),
+        (
+            "MPAD 0\nH 0\n",
+            "1 -> rec[-1]",
+            "H 0\nMPAD 0\n",
+            "1 -> rec[-1]",
+        ),
+        (
+            "MPAD 0\nH 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+            "1 -> obs[0]",
+            "H 0\nMPAD 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+            "1 -> 1",
+        ),
+    ] {
+        let (inverse, flows) =
+            circuit_time_reversed_for_flows(&circuit(input_text), &[flow(input_flow)])
+                .expect("reverse interleaved MPAD flow");
 
-    assert!(
-        error.contains("inverse_qec selected MPAD record-tail subset")
-            || error.contains("operation MPAD is not unitary"),
-        "{error}"
-    );
-}
-
-#[test]
-fn time_reversed_for_flows_rejects_unpromoted_mpad_shapes_with_record_flows() {
-    let error = circuit_time_reversed_for_flows(&circuit("MPAD 0\nH 0\n"), &[flow("1 -> rec[-1]")])
-        .expect_err(
-            "interleaved MPAD record-flow time reversal remains outside the selected packet",
-        )
-        .to_string();
-
-    assert!(
-        error.contains("inverse_qec selected MPAD record-tail subset"),
-        "{error}"
-    );
-}
-
-#[test]
-fn time_reversed_for_flows_rejects_unpromoted_mpad_shapes_with_observable_flows() {
-    let error = circuit_time_reversed_for_flows(
-        &circuit("MPAD 0\nH 0\nOBSERVABLE_INCLUDE(0) rec[-1]\n"),
-        &[flow("1 -> obs[0]")],
-    )
-    .expect_err(
-        "interleaved MPAD observable-flow time reversal remains outside the selected packet",
-    )
-    .to_string();
-
-    assert!(
-        error.contains("inverse_qec selected MPAD record-tail subset"),
-        "{error}"
-    );
+        assert_eq!(inverse, circuit(expected_text), "{input_text}");
+        assert_eq!(flows, vec![flow(expected_flow)], "{input_text}");
+    }
 }
 
 #[test]

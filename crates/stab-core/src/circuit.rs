@@ -131,9 +131,12 @@ impl Circuit {
         crate::circuit_inverse_qec_with_options(self, options)
     }
 
-    /// Returns the currently supported time-reversal subset for flows.
+    /// Returns the supported tracker-driven time reversal for unsigned flows.
     ///
-    /// Supports unsigned unitary flows, selected measurement-rich flows, and selected MPAD record-tail Pauli-only, measurement-record, or selected observable flows; broader detector, feedback, repeat, noise, and non-selected MPAD observable rewrites remain follow-up work.
+    /// Supports the selected Clifford, measurement, reset, measure-reset,
+    /// detector, observable, MPAD, coordinate, and ordinary-noise families.
+    /// Pure unitary repeats stay folded, measurement-rich expansion is bounded,
+    /// and feedback, heralded records, and duplicate collapse targets fail closed.
     pub fn time_reversed_for_flows(
         &self,
         flows: &[crate::Flow],

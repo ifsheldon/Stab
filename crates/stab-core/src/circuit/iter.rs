@@ -35,7 +35,7 @@ impl<'a> Iterator for CircuitFlattenedInstructionIter<'a> {
             match item {
                 CircuitItem::Instruction(instruction) => return Some(instruction),
                 CircuitItem::RepeatBlock(repeat) => {
-                    if !repeat.body().items().is_empty() {
+                    if items_contain_instruction(repeat.body().items()) {
                         self.stack.push(ForwardInstructionFrame::new_repeated(
                             repeat.body().items(),
                             repeat.repeat_count().get(),
@@ -110,7 +110,7 @@ impl<'a> Iterator for CircuitFlattenedInstructionRevIter<'a> {
             match item {
                 CircuitItem::Instruction(instruction) => return Some(instruction),
                 CircuitItem::RepeatBlock(repeat) => {
-                    if !repeat.body().items().is_empty() {
+                    if items_contain_instruction(repeat.body().items()) {
                         self.stack.push(ReverseInstructionFrame::new_repeated(
                             repeat.body().items(),
                             repeat.repeat_count().get(),
@@ -121,6 +121,13 @@ impl<'a> Iterator for CircuitFlattenedInstructionRevIter<'a> {
         }
         None
     }
+}
+
+fn items_contain_instruction(items: &[CircuitItem]) -> bool {
+    items.iter().any(|item| match item {
+        CircuitItem::Instruction(_) => true,
+        CircuitItem::RepeatBlock(repeat) => items_contain_instruction(repeat.body().items()),
+    })
 }
 
 #[derive(Clone, Debug)]

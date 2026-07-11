@@ -177,6 +177,75 @@ fn unsigned_stabilizer_flow_diagnostics_match_bool_checker() {
 }
 
 #[test]
+fn unsigned_checker_combines_observable_effects_before_collapse_checks() {
+    let circuit = circuit(
+        "
+        M 0
+        OBSERVABLE_INCLUDE(0) X0
+        ",
+    );
+    let flows = [flow("1 -> X xor obs[0]"), flow("1 -> X")];
+
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &flows),
+        vec![true, false]
+    );
+    assert_eq!(
+        check_unsigned_stabilizer_flows_with_diagnostics(&circuit, &flows)
+            .iter()
+            .map(|check| check.has_flow())
+            .collect::<Vec<_>>(),
+        vec![true, false]
+    );
+}
+
+#[test]
+fn unsigned_checker_xor_cancels_absolute_relative_record_aliases() {
+    let circuit = circuit("M 0\n");
+    let aliased = flow("1 -> rec[-1] xor rec[0]");
+
+    assert_eq!(
+        check_if_circuit_has_unsigned_stabilizer_flows(&circuit, std::slice::from_ref(&aliased)),
+        vec![true]
+    );
+    assert!(
+        check_unsigned_stabilizer_flows_with_diagnostics(&circuit, &[aliased])
+            .first()
+            .is_some_and(stab_core::UnsignedStabilizerFlowCheck::has_flow)
+    );
+}
+
+#[test]
+fn unsigned_checker_empty_batch_skips_dense_validation() {
+    let circuit = circuit("H 8191\n");
+
+    assert!(check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &[]).is_empty());
+    assert!(check_unsigned_stabilizer_flows_with_diagnostics(&circuit, &[]).is_empty());
+}
+
+#[test]
+fn unsigned_checker_preserves_flow_qubits_idle_outside_circuit_width() {
+    let circuit = circuit("H 1\n");
+    let shorter = [flow("Z0 -> Z0"), flow("X0 -> Z0")];
+    let empty = Circuit::new();
+    let longer = [flow("X1000000 -> X1000000"), flow("X1000000 -> Z1000000")];
+
+    for (circuit, queries) in [(&circuit, &shorter), (&empty, &longer)] {
+        assert_eq!(
+            check_if_circuit_has_unsigned_stabilizer_flows(circuit, queries),
+            vec![true, false]
+        );
+        assert_eq!(
+            check_unsigned_stabilizer_flows_with_diagnostics(circuit, queries)
+                .iter()
+                .map(stab_core::UnsignedStabilizerFlowCheck::has_flow)
+                .collect::<Vec<_>>(),
+            vec![true, false]
+        );
+    }
+}
+
+#[test]
 fn circuit_has_unsigned_stabilizer_flow_helpers_match_supported_batch_semantics() {
     let h_circuit = circuit("H 0\n");
     let h_flows = [
