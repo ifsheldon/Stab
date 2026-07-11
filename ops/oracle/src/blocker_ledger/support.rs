@@ -38,6 +38,15 @@ const PFM5_FLOW_ORACLES: &[&str] = &[
     "pf5-has-flow-diagnostics-rust",
     "pf5-signed-sampled-flows-rust",
 ];
+const PFM6_ANALYZER_SEARCH_ORACLES: &[&str] = &[
+    "pfm-b5-analyzer-nested-loop",
+    "pfm-b5-analyzer-coordinate-loop",
+    "pfm-b5-analyzer-gauge-loop",
+    "pfm-b5-analyzer-repetition-code-loop-rust",
+    "pfm-b5-graphlike-finite-corpus-rust",
+    "pfm-b5-hypergraph-finite-corpus-rust",
+    "pfm-b5-wcnf-finite-corpus-rust",
+];
 #[derive(Clone, Copy)]
 struct ExpectedBenchmarkSignature {
     id: &'static str,
@@ -64,6 +73,24 @@ const fn pfm2_contract_benchmark(id: &'static str) -> ExpectedBenchmarkSignature
     }
 }
 
+const fn pfm6_report_only_benchmark(id: &'static str) -> ExpectedBenchmarkSignature {
+    ExpectedBenchmarkSignature {
+        id,
+        runner: BenchmarkRunner::ContractOnly,
+        threshold_class: BenchmarkThresholdClass::NonPrimaryReportOnly,
+        comparability: BenchmarkClass::ReportOnly,
+    }
+}
+
+const fn pfm6_direct_match_benchmark(id: &'static str) -> ExpectedBenchmarkSignature {
+    ExpectedBenchmarkSignature {
+        id,
+        runner: BenchmarkRunner::StimPerf,
+        threshold_class: BenchmarkThresholdClass::NonPrimaryReportOnly,
+        comparability: BenchmarkClass::DirectMatch,
+    }
+}
+
 const PFM2_QEC_BENCHMARKS: &[ExpectedBenchmarkSignature] = &[
     pfm2_contract_benchmark("pfm-b1-time-reverse-generated-surface"),
     pfm2_contract_benchmark("pfm-b1-time-reverse-mpad-matrix"),
@@ -81,6 +108,19 @@ const PFM5_MISSING_BENCHMARKS: &[ExpectedBenchmarkSignature] =
     &[pf5_report_only_benchmark("pf5-missing-detectors-mpad")];
 const PFM5_FLOW_BENCHMARKS: &[ExpectedBenchmarkSignature] =
     &[pf5_report_only_benchmark("pf5-has-all-flows-batch")];
+const PFM6_ANALYZER_SEARCH_BENCHMARKS: &[ExpectedBenchmarkSignature] = &[
+    pfm6_report_only_benchmark("pfm-b5-analyzer-cycle-folding"),
+    pfm6_report_only_benchmark("pfm-b5-analyzer-generated-qec"),
+    pfm6_report_only_benchmark("pfm-b5-graphlike-search-direct-dem"),
+    pfm6_direct_match_benchmark("pfm-b5-graphlike-generated-d25"),
+    pfm6_direct_match_benchmark("pfm-b5-graphlike-generated-d11-r1000"),
+    pfm6_report_only_benchmark("pfm-b5-hypergraph-search-direct-dem"),
+    pfm6_report_only_benchmark("pfm-b5-hypergraph-search-generated-qec"),
+    pfm6_report_only_benchmark("pfm-b5-wcnf-direct-dem"),
+    pfm6_report_only_benchmark("pfm-b5-wcnf-generated-qec"),
+    pfm6_report_only_benchmark("pf6-error-decomp-loop-folded"),
+    pfm6_report_only_benchmark("pf6-sparse-rev-frame-loop"),
+];
 
 pub(super) fn validate_supporting_oracles(
     blocker: &BlockerRecord,
@@ -92,6 +132,7 @@ pub(super) fn validate_supporting_oracles(
         "pfm5-detecting-regions" => PFM5_DETECTING_ORACLES,
         "pfm5-missing-detectors" => PFM5_MISSING_ORACLES,
         "pfm5-flow-engine" => PFM5_FLOW_ORACLES,
+        "pfm6-analyzer-search" => PFM6_ANALYZER_SEARCH_ORACLES,
         _ => &[],
     };
     let expected = expected_values.iter().copied().collect::<BTreeSet<_>>();
@@ -163,6 +204,7 @@ pub(super) fn validate_supporting_benchmarks(
         "pfm5-detecting-regions" => PFM5_DETECTING_BENCHMARKS,
         "pfm5-missing-detectors" => PFM5_MISSING_BENCHMARKS,
         "pfm5-flow-engine" => PFM5_FLOW_BENCHMARKS,
+        "pfm6-analyzer-search" => PFM6_ANALYZER_SEARCH_BENCHMARKS,
         _ => &[],
     };
     let expected = expected_values

@@ -4653,8 +4653,124 @@
       "milestone": "PFM-B5",
       "disposition": "implement",
       "title": "Generic analyzer loop folding and finite search closure",
-      "supporting_oracles": [],
-      "supporting_benchmarks": [],
+      "supporting_oracles": [
+        {
+          "classification": "direct",
+          "value": "pfm-b5-analyzer-nested-loop",
+          "signature": {
+            "parity_mode": "exact-output",
+            "comparator": "exact-output",
+            "argv": "analyze_errors|--fold_loops",
+            "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+          }
+        },
+        {
+          "classification": "direct",
+          "value": "pfm-b5-analyzer-coordinate-loop",
+          "signature": {
+            "parity_mode": "exact-output",
+            "comparator": "exact-output",
+            "argv": "analyze_errors|--fold_loops",
+            "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+          }
+        },
+        {
+          "classification": "direct",
+          "value": "pfm-b5-analyzer-gauge-loop",
+          "signature": {
+            "parity_mode": "exact-output",
+            "comparator": "exact-output",
+            "argv": "analyze_errors|--fold_loops|--allow_gauge_detectors",
+            "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
+          "value": "pfm-b5-analyzer-repetition-code-loop-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_pfm_b5|pfm_b5_repetition_code_loop",
+            "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
+          "value": "pfm-b5-graphlike-finite-corpus-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
+            "upstream_source": "src/stim/search/graphlike/algo.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
+          "value": "pfm-b5-hypergraph-finite-corpus-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+            "upstream_source": "src/stim/search/hyper/algo.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
+          "value": "pfm-b5-wcnf-finite-corpus-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+            "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+          }
+        }
+      ],
+      "supporting_benchmarks": [
+        {
+          "classification": "report-only",
+          "value": "pfm-b5-analyzer-cycle-folding"
+        },
+        {
+          "classification": "report-only",
+          "value": "pfm-b5-analyzer-generated-qec"
+        },
+        {
+          "classification": "report-only",
+          "value": "pfm-b5-graphlike-search-direct-dem"
+        },
+        {
+          "classification": "direct-match",
+          "value": "pfm-b5-graphlike-generated-d25"
+        },
+        {
+          "classification": "direct-match",
+          "value": "pfm-b5-graphlike-generated-d11-r1000"
+        },
+        {
+          "classification": "report-only",
+          "value": "pfm-b5-hypergraph-search-direct-dem"
+        },
+        {
+          "classification": "report-only",
+          "value": "pfm-b5-hypergraph-search-generated-qec"
+        },
+        {
+          "classification": "report-only",
+          "value": "pfm-b5-wcnf-direct-dem"
+        },
+        {
+          "classification": "report-only",
+          "value": "pfm-b5-wcnf-generated-qec"
+        },
+        {
+          "classification": "report-only",
+          "value": "pf6-error-decomp-loop-folded"
+        },
+        {
+          "classification": "report-only",
+          "value": "pf6-sparse-rev-frame-loop"
+        }
+      ],
       "cases": [
         {
           "id": "pfm6-analyzer-loop-carried-observable",
@@ -4693,7 +4809,7 @@
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-analyzer-loop-observable-folded",
+            "value": "pfm-b5-analyzer-cycle-folding",
             "classification": "report-only"
           },
           "resource_contract": "Detect the loop-carried recurrence with state bounded by the canonical analyzer boundary and compact DEM."
@@ -4735,7 +4851,7 @@
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-analyzer-period8-observable-folded",
+            "value": "pfm-b5-analyzer-cycle-folding",
             "classification": "report-only"
           },
           "resource_contract": "Discover the period-8 recurrence from canonical state without expanding the giant repeat count."
@@ -4777,7 +4893,7 @@
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-analyzer-period127-observable-folded",
+            "value": "pfm-b5-analyzer-cycle-folding",
             "classification": "report-only"
           },
           "resource_contract": "Discover the period-127 recurrence from canonical state without expanding the giant repeat count."
@@ -4792,29 +4908,36 @@
             "subcase": "nested repeat folding and detector shifts"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_analyzer_loop_folding",
+              "dem_analyzer_pfm_b5",
               "pfm_b5_nested_loop_folding",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-analyzer-nested-loop"
+            "state": "existing",
+            "classification": "direct",
+            "value": "pfm-b5-analyzer-nested-loop",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "analyze_errors|--fold_loops",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+            }
           },
           "benchmark": {
-            "state": "planned",
+            "state": "existing",
             "value": "pfm-b5-analyzer-cycle-folding",
-            "classification": "contract-only"
+            "classification": "report-only"
           },
           "resource_contract": "Compose nested summaries without multiplying repeat counts into traversal work."
         },
@@ -4827,29 +4950,36 @@
             "test": "ErrorAnalyzer.loop_folding_rep_code_circuit",
             "subcase": "generated repetition-code compact folded DEM"
           },
-          "comparator": "exact",
-          "status": "planned",
+          "comparator": "semantic-invariant",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_analyzer_loop_folding",
+              "dem_analyzer_pfm_b5",
               "pfm_b5_repetition_code_loop",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-analyzer-repetition-code-loop"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-analyzer-repetition-code-loop-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_pfm_b5|pfm_b5_repetition_code_loop",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-analyze-errors-generated-surface",
+            "value": "pfm-b5-analyzer-generated-qec",
             "classification": "report-only"
           },
           "resource_contract": "Fold generated rounds with state bounded by one round and recurrence state."
@@ -4863,30 +4993,37 @@
             "test": "ErrorAnalyzer.multi_round_gauge_detectors_dont_grow",
             "subcase": "gauge detector state remains bounded across rounds"
           },
-          "comparator": "semantic-invariant",
-          "status": "planned",
+          "comparator": "exact",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_analyzer_loop_folding",
+              "dem_analyzer_pfm_b5",
               "pfm_b5_gauge_loop_bounded",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-analyzer-gauge-loop"
+            "state": "existing",
+            "classification": "direct",
+            "value": "pfm-b5-analyzer-gauge-loop",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "analyze_errors|--fold_loops|--allow_gauge_detectors",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+            }
           },
           "benchmark": {
-            "state": "planned",
+            "state": "existing",
             "value": "pfm-b5-analyzer-cycle-folding",
-            "classification": "contract-only"
+            "classification": "report-only"
           },
           "resource_contract": "Canonical gauge state must stop growing after reaching its recurrence."
         },
@@ -4900,29 +5037,36 @@
             "subcase": "detector and coordinate shifts across folded loops"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_analyzer_loop_folding",
+              "dem_analyzer_pfm_b5",
               "pfm_b5_coordinate_loop",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-analyzer-coordinate-loop"
+            "state": "existing",
+            "classification": "direct",
+            "value": "pfm-b5-analyzer-coordinate-loop",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "analyze_errors|--fold_loops",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+            }
           },
           "benchmark": {
-            "state": "planned",
+            "state": "existing",
             "value": "pfm-b5-analyzer-cycle-folding",
-            "classification": "contract-only"
+            "classification": "report-only"
           },
           "resource_contract": "Compose coordinate shifts with checked arithmetic and constant state per coordinate dimension."
         },
@@ -4986,19 +5130,20 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_direct_dem_graphlike",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_graphlike_no_error",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-direct-dem-graphlike-rust",
+            "value": "pfm-b5-graphlike-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_direct_dem_graphlike",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
@@ -5017,7 +5162,7 @@
             "test": "shortest_graphlike_undetectable_logical_error.distance_1",
             "subcase": "distance-one exact logical error"
           },
-          "comparator": "structural",
+          "comparator": "exact",
           "status": "implemented",
           "test": {
             "state": "existing",
@@ -5027,28 +5172,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_direct_dem_graphlike",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_graphlike_distance_one",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-direct-dem-graphlike-rust",
+            "value": "pfm-b5-graphlike-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_direct_dem_graphlike",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-graphlike-search-generated",
+            "value": "pfm-b5-graphlike-search-direct-dem",
             "classification": "report-only"
           },
-          "resource_contract": "Use sparse graph nodes proportional to mechanisms and touched detectors."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap."
         },
         {
           "id": "pfm6-graphlike-distance-two",
@@ -5059,7 +5205,7 @@
             "test": "shortest_graphlike_undetectable_logical_error.distance_2",
             "subcase": "distance-two canonical target set"
           },
-          "comparator": "structural",
+          "comparator": "exact",
           "status": "implemented",
           "test": {
             "state": "existing",
@@ -5069,28 +5215,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_direct_dem_graphlike",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_graphlike_distance_two",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-direct-dem-graphlike-rust",
+            "value": "pfm-b5-graphlike-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_direct_dem_graphlike",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-graphlike-search-generated",
+            "value": "pfm-b5-graphlike-search-direct-dem",
             "classification": "report-only"
           },
-          "resource_contract": "Use sparse graph nodes proportional to mechanisms and touched detectors."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap."
         },
         {
           "id": "pfm6-graphlike-distance-three",
@@ -5101,7 +5248,7 @@
             "test": "shortest_graphlike_undetectable_logical_error.distance_3",
             "subcase": "distance-three canonical target set"
           },
-          "comparator": "structural",
+          "comparator": "exact",
           "status": "implemented",
           "test": {
             "state": "existing",
@@ -5111,28 +5258,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_direct_dem_graphlike",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_graphlike_distance_three",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-direct-dem-graphlike-rust",
+            "value": "pfm-b5-graphlike-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_direct_dem_graphlike",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-graphlike-search-generated",
+            "value": "pfm-b5-graphlike-search-direct-dem",
             "classification": "report-only"
           },
-          "resource_contract": "Keep search state explicitly capped by graph size and frontier policy."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap."
         },
         {
           "id": "pfm6-graphlike-surface-code",
@@ -5153,28 +5301,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_generated_qec_",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_graphlike_surface_code",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-generated-qec-rust",
+            "value": "pfm-b5-graphlike-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_generated_qec_",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-graphlike-search-generated",
-            "classification": "report-only"
+            "value": "pfm-b5-graphlike-generated-d25",
+            "classification": "direct-match"
           },
-          "resource_contract": "Use sparse graph state and documented search caps for generated code distance."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap."
         },
         {
           "id": "pfm6-graphlike-repetition-code",
@@ -5195,28 +5344,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_generated_qec_",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_graphlike_repetition_code",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-generated-qec-rust",
+            "value": "pfm-b5-graphlike-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_generated_qec_",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-graphlike-search-generated",
-            "classification": "report-only"
+            "value": "pfm-b5-graphlike-generated-d11-r1000",
+            "classification": "direct-match"
           },
-          "resource_contract": "Use sparse graph state and documented search caps for generated code distance."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap."
         },
         {
           "id": "pfm6-graphlike-many-observables",
@@ -5237,28 +5387,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_graphlike_search_many_observables",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_graphlike_many_observables",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-many-observables-graphlike-rust",
+            "value": "pfm-b5-graphlike-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_graphlike_search_many_observables",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_graphlike_",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-graphlike-search-generated",
+            "value": "pfm-b5-graphlike-search-direct-dem",
             "classification": "report-only"
           },
-          "resource_contract": "Represent sparse observable ids without allocation through the maximum id."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap."
         },
         {
           "id": "pfm6-hypergraph-no-error",
@@ -5279,19 +5430,20 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_direct_dem_hypergraph",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_hypergraph_no_error",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-direct-dem-hypergraph-rust",
+            "value": "pfm-b5-hypergraph-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_direct_dem_hypergraph",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
@@ -5310,7 +5462,7 @@
             "test": "find_undetectable_logical_error.distance_1",
             "subcase": "distance-one exact logical error"
           },
-          "comparator": "structural",
+          "comparator": "exact",
           "status": "implemented",
           "test": {
             "state": "existing",
@@ -5320,28 +5472,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_direct_dem_hypergraph",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_hypergraph_distance_one",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-direct-dem-hypergraph-rust",
+            "value": "pfm-b5-hypergraph-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_direct_dem_hypergraph",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-hypergraph-search-generated",
+            "value": "pfm-b5-hypergraph-search-direct-dem",
             "classification": "report-only"
           },
-          "resource_contract": "Use sparse hyperedges proportional to mechanisms and touched detectors."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap."
         },
         {
           "id": "pfm6-hypergraph-distance-two",
@@ -5352,7 +5505,7 @@
             "test": "find_undetectable_logical_error.distance_2",
             "subcase": "distance-two canonical target set"
           },
-          "comparator": "structural",
+          "comparator": "exact",
           "status": "implemented",
           "test": {
             "state": "existing",
@@ -5362,28 +5515,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_direct_dem_hypergraph",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_hypergraph_distance_two",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-direct-dem-hypergraph-rust",
+            "value": "pfm-b5-hypergraph-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_direct_dem_hypergraph",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-hypergraph-search-generated",
+            "value": "pfm-b5-hypergraph-search-direct-dem",
             "classification": "report-only"
           },
-          "resource_contract": "Use sparse hyperedges proportional to mechanisms and touched detectors."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap."
         },
         {
           "id": "pfm6-hypergraph-distance-three",
@@ -5394,7 +5548,7 @@
             "test": "find_undetectable_logical_error.distance_3",
             "subcase": "distance-three canonical target set"
           },
-          "comparator": "structural",
+          "comparator": "exact",
           "status": "implemented",
           "test": {
             "state": "existing",
@@ -5404,28 +5558,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_direct_dem_hypergraph",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_hypergraph_distance_three",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-direct-dem-hypergraph-rust",
+            "value": "pfm-b5-hypergraph-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_direct_dem_hypergraph",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-hypergraph-search-generated",
+            "value": "pfm-b5-hypergraph-search-direct-dem",
             "classification": "report-only"
           },
-          "resource_contract": "Keep search state explicitly capped by hypergraph size and frontier policy."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap."
         },
         {
           "id": "pfm6-hypergraph-hyper-error",
@@ -5436,7 +5591,7 @@
             "test": "find_undetectable_logical_error.hyper_error",
             "subcase": "bounded non-graphlike hyperedge result"
           },
-          "comparator": "structural",
+          "comparator": "exact",
           "status": "implemented",
           "test": {
             "state": "existing",
@@ -5446,28 +5601,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_direct_dem_hypergraph",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_hypergraph_hyper_error",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-direct-dem-hypergraph-rust",
+            "value": "pfm-b5-hypergraph-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_direct_dem_hypergraph",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-hypergraph-search-generated",
+            "value": "pfm-b5-hypergraph-search-direct-dem",
             "classification": "report-only"
           },
-          "resource_contract": "Bound hyperedge combinations by the documented search size limit."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap plus the public search frontier limits."
         },
         {
           "id": "pfm6-hypergraph-surface-code",
@@ -5488,28 +5644,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_generated_qec_",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_hypergraph_surface_code",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-generated-qec-rust",
+            "value": "pfm-b5-hypergraph-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_generated_qec_",
-              "upstream_source": "src/stim/search/graphlike/algo.test.cc"
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-hypergraph-search-generated",
+            "value": "pfm-b5-hypergraph-search-generated-qec",
             "classification": "report-only"
           },
-          "resource_contract": "Use sparse hypergraph state and documented generated-code search caps."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap plus the public search frontier limits."
         },
         {
           "id": "pfm6-hypergraph-repetition-code",
@@ -5530,28 +5687,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_generated_qec_",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_hypergraph_repetition_code",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-generated-qec-rust",
+            "value": "pfm-b5-hypergraph-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_generated_qec_",
-              "upstream_source": "src/stim/search/graphlike/algo.test.cc"
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
+              "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-hypergraph-search-generated",
+            "value": "pfm-b5-hypergraph-search-generated-qec",
             "classification": "report-only"
           },
-          "resource_contract": "Use sparse hypergraph state and documented generated-code search caps."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap plus the public search frontier limits."
         },
         {
           "id": "pfm6-hypergraph-many-observables",
@@ -5572,28 +5730,29 @@
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
-              "pf6_hypergraph_search_many_observables",
-              "--quiet"
+              "dem_search_pfm_b5",
+              "pfm_b5_hypergraph_many_observables",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf6-search-many-observables-hypergraph-rust",
+            "value": "pfm-b5-hypergraph-finite-corpus-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_search|pf6_hypergraph_search_many_observables",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_hypergraph_",
               "upstream_source": "src/stim/search/hyper/algo.test.cc"
             }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-hypergraph-search-generated",
+            "value": "pfm-b5-hypergraph-search-direct-dem",
             "classification": "report-only"
           },
-          "resource_contract": "Represent sparse observable ids without allocation through the maximum id."
+          "resource_contract": "Allocate only touched detector nodes and compressed observable slots; enforce the independent 5,000,000 expanded nonzero-error-mechanism budget and 1,000,000 effective-detector-node cap plus the public search frontier limits."
         },
         {
           "id": "pfm6-wcnf-shortest-no-error",
@@ -5605,28 +5764,35 @@
             "subcase": "logical-error-free model"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
+              "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_no_error",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-wcnf-shortest-no-error"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-generated-sat-wcnf",
+            "value": "pfm-b5-wcnf-direct-dem",
             "classification": "report-only"
           },
           "resource_contract": "Encode clauses proportional to concrete mechanisms and parity constraints."
@@ -5641,28 +5807,35 @@
             "subcase": "single observable with no detectors"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
+              "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_observable_only",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-wcnf-shortest-observable-only"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-generated-sat-wcnf",
+            "value": "pfm-b5-wcnf-direct-dem",
             "classification": "report-only"
           },
           "resource_contract": "Encode sparse observable ids without dense allocation."
@@ -5677,28 +5850,35 @@
             "subcase": "single detector with no observables"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
+              "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_detector_only",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-wcnf-shortest-detector-only"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-generated-sat-wcnf",
+            "value": "pfm-b5-wcnf-direct-dem",
             "classification": "report-only"
           },
           "resource_contract": "Encode sparse detector parity without scanning undeclared ids."
@@ -5713,28 +5893,35 @@
             "subcase": "errors with no detector or observable targets"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
+              "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_no_targets",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-wcnf-shortest-no-targets"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-generated-sat-wcnf",
+            "value": "pfm-b5-wcnf-direct-dem",
             "classification": "report-only"
           },
           "resource_contract": "Skip vacuous mechanisms before allocating SAT variables."
@@ -5749,24 +5936,31 @@
             "subcase": "empty detector error model"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
+              "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_empty_model",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-wcnf-shortest-empty-model"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
@@ -5784,28 +5978,35 @@
             "subcase": "single detector and observable weighted structure"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
+              "dem_search_pfm_b5",
               "pfm_b5_wcnf_shortest_detector_observable",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-wcnf-shortest-detector-observable"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-generated-sat-wcnf",
+            "value": "pfm-b5-wcnf-direct-dem",
             "classification": "report-only"
           },
           "resource_contract": "Encode variables and clauses linearly in error mechanisms and parity terms."
@@ -5820,28 +6021,35 @@
             "subcase": "logical-error-free weighted model"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
+              "dem_search_pfm_b5",
               "pfm_b5_wcnf_likeliest_no_error",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-wcnf-likeliest-no-error"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-generated-sat-wcnf",
+            "value": "pfm-b5-wcnf-direct-dem",
             "classification": "report-only"
           },
           "resource_contract": "Compute weights once per mechanism without repeat materialization."
@@ -5856,28 +6064,35 @@
             "subcase": "ordinary probability weighted clauses"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
+              "dem_search_pfm_b5",
               "pfm_b5_wcnf_likeliest_detector_observable",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-wcnf-likeliest-detector-observable"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-generated-sat-wcnf",
+            "value": "pfm-b5-wcnf-direct-dem",
             "classification": "report-only"
           },
           "resource_contract": "Encode weighted clauses linearly in mechanisms and parity terms."
@@ -5892,28 +6107,35 @@
             "subcase": "probability above one half weight orientation"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
+              "dem_search_pfm_b5",
               "pfm_b5_wcnf_likeliest_large_probability",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-wcnf-likeliest-large-probability"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-generated-sat-wcnf",
+            "value": "pfm-b5-wcnf-direct-dem",
             "classification": "report-only"
           },
           "resource_contract": "Normalize weights in constant space per mechanism."
@@ -5928,28 +6150,35 @@
             "subcase": "half-probability neutral weight"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "dem_search",
+              "dem_search_pfm_b5",
               "pfm_b5_wcnf_likeliest_half_probability",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b5-wcnf-likeliest-half-probability"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-wcnf-finite-corpus-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|dem_search_pfm_b5|pfm_b5_wcnf_",
+              "upstream_source": "src/stim/search/sat/wcnf.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
-            "value": "pf6-generated-sat-wcnf",
+            "value": "pfm-b5-wcnf-direct-dem",
             "classification": "report-only"
           },
           "resource_contract": "Elide neutral weights without changing parity constraints."
