@@ -342,6 +342,9 @@ impl Analyzer {
                 "PAULI_CHANNEL_1 expected three probabilities",
             ));
         };
+        if instruction.targets().is_empty() {
+            return Ok(());
+        }
         if let Some(independent) =
             try_disjoint_to_independent_xyz_errors(*x_probability, *y_probability, *z_probability)?
         {
@@ -420,6 +423,9 @@ impl Analyzer {
     }
 
     fn record_pauli_channel2(&mut self, instruction: &CircuitInstruction) -> CircuitResult<()> {
+        if instruction.targets().is_empty() {
+            return Ok(());
+        }
         let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
             return Err(CircuitError::invalid_detector_error_model(
                 "PAULI_CHANNEL_2 requires approximate_disjoint_errors during error analysis",
@@ -619,6 +625,9 @@ impl Analyzer {
                 "HERALDED_PAULI_CHANNEL_1 expected four probabilities",
             ));
         };
+        if instruction.targets().is_empty() {
+            return Ok(());
+        }
         let non_zero_count = probabilities
             .iter()
             .filter(|probability| probability.get() > 0.0)
@@ -659,6 +668,9 @@ impl Analyzer {
         let Some(probability) = instruction.probability_argument()? else {
             return Ok(());
         };
+        if instruction.targets().is_empty() {
+            return Ok(());
+        }
         let use_disjoint_group = if probability.get() > 0.0 {
             let Some(threshold) = self.options.approximate_disjoint_errors_threshold else {
                 return Err(CircuitError::invalid_detector_error_model(

@@ -6,6 +6,9 @@ mod unitary;
 
 pub use decomposition::GateDecomposition;
 pub use metadata::{GateArgumentRule, GateTargetGroupKind, GateTargetRule};
+#[cfg(feature = "ops-contracts")]
+#[doc(hidden)]
+pub use semantic_contract::{GateContractStatisticalBucket, GateContractStatisticalPlan};
 pub use unitary::GateUnitaryMatrix;
 
 use crate::{CircuitError, CircuitResult, Probability, Target};
@@ -127,6 +130,12 @@ pub fn __gate_contract_family_names() -> &'static [&'static str] {
 #[doc(hidden)]
 pub fn __gate_contract_surface_names() -> &'static [&'static str] {
     semantic_contract::gate_contract_surface_names()
+}
+
+#[cfg(feature = "ops-contracts")]
+#[doc(hidden)]
+pub fn __gate_contract_statistical_plans() -> &'static [GateContractStatisticalPlan] {
+    semantic_contract::gate_contract_statistical_plans()
 }
 
 #[derive(Debug, Eq, PartialEq)]

@@ -1,9 +1,8 @@
 mod frame;
 
 use frame::{
-    circuit_has_pauli_observable_targets, frame_execution_circuit,
-    sample_detection_events_with_frame, try_for_each_detection_event_with_frame,
-    validate_frame_detection_circuit,
+    circuit_requires_detector_frame, frame_execution_circuit, sample_detection_events_with_frame,
+    try_for_each_detection_event_with_frame, validate_frame_detection_circuit,
 };
 
 use crate::{
@@ -279,7 +278,7 @@ impl ReferenceSampleSource {
             Self::Zero => output.resize(measurement_count, false),
             Self::Static(reference_sample) => output.extend_from_slice(reference_sample),
             Self::Sweep(sampler) => {
-                sampler.reference_sample_with_sweep_into(sweep_record, output)?
+                sampler.reference_measurement_record_with_sweep_into(sweep_record, output)?
             }
         }
         validate_reference_sample_len(output, measurement_count)
@@ -344,7 +343,7 @@ pub fn sample_detection_events(
     shots: usize,
     seed: Option<u64>,
 ) -> CircuitResult<DetectionConversionOutput> {
-    if circuit_has_pauli_observable_targets(circuit) {
+    if circuit_requires_detector_frame(circuit) {
         return sample_detection_events_with_frame(circuit, shots, seed);
     }
     validate_detection_sampling_circuit(circuit)?;
@@ -379,7 +378,7 @@ where
     E: From<CircuitError>,
     F: FnMut(&DetectionEventRecord) -> Result<(), E>,
 {
-    if circuit_has_pauli_observable_targets(circuit) {
+    if circuit_requires_detector_frame(circuit) {
         return try_for_each_detection_event_with_frame(circuit, shots, seed, visit);
     }
     validate_detection_sampling_circuit(circuit)?;
@@ -414,7 +413,7 @@ pub fn detection_record_width(circuit: &Circuit) -> CircuitResult<usize> {
 }
 
 pub fn validate_detection_sampling_circuit(circuit: &Circuit) -> CircuitResult<()> {
-    if circuit_has_pauli_observable_targets(circuit) {
+    if circuit_requires_detector_frame(circuit) {
         validate_frame_detection_circuit(circuit)
     } else {
         ConversionPlan::from_circuit(circuit)?;
@@ -424,7 +423,7 @@ pub fn validate_detection_sampling_circuit(circuit: &Circuit) -> CircuitResult<(
 }
 
 fn detection_conversion_plan(circuit: &Circuit) -> CircuitResult<ConversionPlan> {
-    if circuit_has_pauli_observable_targets(circuit) {
+    if circuit_requires_detector_frame(circuit) {
         let executable = frame_execution_circuit(circuit)?;
         validate_frame_detection_circuit(&executable)?;
         return ConversionPlan::from_circuit(&executable);
@@ -608,7 +607,7 @@ impl ConversionPlan {
             return Ok(());
         };
         match instruction.gate().canonical_name() {
-            "CX" | "CY" | "CZ" => Ok(()),
+            "CX" | "CY" | "CZ" | "XCZ" | "YCZ" => Ok(()),
             name => Err(CircuitError::invalid_result_format(format!(
                 "{UNSUPPORTED_SWEEP_DETECTION_MESSAGE}; found {target} in {name}"
             ))),
@@ -755,7 +754,9 @@ impl ConversionPlan {
 }
 
 fn reference_sample(circuit: &Circuit, measurement_count: usize) -> CircuitResult<Vec<bool>> {
-    let reference_sample = CompiledSampler::compile(circuit)?.reference_sample();
+    let sampler = CompiledSampler::compile(circuit)?;
+    let mut reference_sample = Vec::with_capacity(measurement_count);
+    sampler.reference_measurement_record_with_sweep_into(&[], &mut reference_sample)?;
     validate_reference_sample_len(&reference_sample, measurement_count)?;
     Ok(reference_sample)
 }

@@ -227,6 +227,7 @@ impl CompiledSampler {
         self.sweep_bit_count
     }
 
+    #[cfg(test)]
     pub(crate) fn reference_sample_with_sweep_into(
         &self,
         sweep_record: &[bool],
@@ -249,6 +250,32 @@ impl CompiledSampler {
             &mut frame,
             &mut record,
             output,
+        );
+        Ok(())
+    }
+
+    pub(crate) fn reference_measurement_record_with_sweep_into(
+        &self,
+        sweep_record: &[bool],
+        record: &mut Vec<bool>,
+    ) -> CircuitResult<()> {
+        if sweep_record.len() != self.sweep_bit_count {
+            return Err(CircuitError::invalid_result_format(format!(
+                "sweep record expected {} bits, got {}",
+                self.sweep_bit_count,
+                sweep_record.len()
+            )));
+        }
+        let mut rng = SmallRng::seed_from_u64(0);
+        let mut frame = StabilizerFrame::new(self.qubit_count);
+        let mut external_output = Vec::with_capacity(self.measurement_count);
+        self.sample_shot_in_mode_into(
+            &mut rng,
+            ExecutionMode::ReferenceSample,
+            sweep_record,
+            &mut frame,
+            record,
+            &mut external_output,
         );
         Ok(())
     }
@@ -517,8 +544,12 @@ fn compile_instruction(
         "MPP" => compile_pauli_product_measurement(instruction, operations, state),
         "MPAD" => compile_measurement_pads(instruction, operations, state),
         "SPP" | "SPP_DAG" => compile_decomposed_instruction(instruction, operations, state),
-        "CX" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::X),
-        "CY" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Y),
+        "CX" | "XCZ" => {
+            compile_controlled_or_feedback(instruction, operations, state, PauliBasis::X)
+        }
+        "CY" | "YCZ" => {
+            compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Y)
+        }
         "CZ" => compile_controlled_or_feedback(instruction, operations, state, PauliBasis::Z),
         _ if SingleQubitClifford::from_gate(gate).is_ok() => {
             compile_single_qubit_clifford(instruction, operations)
@@ -796,9 +827,8 @@ fn compile_controlled_or_feedback(
                 target_group,
             )?;
         } else if target_group
-            .first()
-            .and_then(|target| target.measurement_record_offset())
-            .is_some()
+            .iter()
+            .any(|target| target.is_measurement_record_target())
         {
             compile_feedback_pauli_group(
                 instruction,
@@ -835,6 +865,8 @@ fn compile_sweep_pauli_group(
         .sweep_bit_id()
         .map(|sweep_id| state.add_sweep_bit(sweep_id))
         .transpose()?;
+    validate_record_target_if_present(instruction, state, first)?;
+    validate_record_target_if_present(instruction, state, second)?;
 
     match (
         instruction.gate().canonical_name(),
@@ -865,6 +897,15 @@ fn compile_sweep_pauli_group(
             });
             Ok(())
         }
+        ("XCZ" | "YCZ", None, Some(sweep_id)) if first.qubit_id().is_some() => {
+            operations.push(SampleOperation::SweepPauli {
+                sweep_id,
+                qubit: qubit_index(instruction, first)?,
+                basis,
+            });
+            Ok(())
+        }
+        ("CZ", _, _) if is_classical_bit_target(first) && is_classical_bit_target(second) => Ok(()),
         (_, Some(_), Some(_)) | (_, Some(_), None) | (_, None, Some(_)) => {
             Err(unsupported_sampler_instruction(instruction))
         }
@@ -879,19 +920,64 @@ fn compile_feedback_pauli_group(
     basis: PauliBasis,
     target_group: &[crate::Target],
 ) -> CircuitResult<()> {
-    let [record, target] = target_group else {
+    let [first, second] = target_group else {
         return Err(unsupported_sampler_instruction(instruction));
     };
+    validate_record_target_if_present(instruction, state, first)?;
+    validate_record_target_if_present(instruction, state, second)?;
+    match instruction.gate().canonical_name() {
+        "CX" | "CY"
+            if first.measurement_record_offset().is_some() && second.qubit_id().is_some() =>
+        {
+            push_feedback_pauli(instruction, operations, first, second, basis)
+        }
+        "CZ" if first.measurement_record_offset().is_some() && second.qubit_id().is_some() => {
+            push_feedback_pauli(instruction, operations, first, second, PauliBasis::Z)
+        }
+        "CZ" if first.qubit_id().is_some() && second.measurement_record_offset().is_some() => {
+            push_feedback_pauli(instruction, operations, second, first, PauliBasis::Z)
+        }
+        "CZ" if is_classical_bit_target(first) && is_classical_bit_target(second) => Ok(()),
+        "XCZ" | "YCZ"
+            if first.qubit_id().is_some() && second.measurement_record_offset().is_some() =>
+        {
+            push_feedback_pauli(instruction, operations, second, first, basis)
+        }
+        _ => Err(unsupported_sampler_instruction(instruction)),
+    }
+}
+
+fn push_feedback_pauli(
+    instruction: &CircuitInstruction,
+    operations: &mut Vec<SampleOperation>,
+    record: &crate::Target,
+    target: &crate::Target,
+    basis: PauliBasis,
+) -> CircuitResult<()> {
     let Some(offset) = record.measurement_record_offset() else {
         return Err(unsupported_sampler_instruction(instruction));
     };
-    state.validate_record_offset(instruction, offset)?;
     operations.push(SampleOperation::FeedbackPauli {
         offset,
         qubit: qubit_index(instruction, target)?,
         basis,
     });
     Ok(())
+}
+
+fn validate_record_target_if_present(
+    instruction: &CircuitInstruction,
+    state: &CompileState,
+    target: &crate::Target,
+) -> CircuitResult<()> {
+    if let Some(offset) = target.measurement_record_offset() {
+        state.validate_record_offset(instruction, offset)?;
+    }
+    Ok(())
+}
+
+fn is_classical_bit_target(target: &crate::Target) -> bool {
+    target.is_measurement_record_target() || target.is_sweep_bit_target()
 }
 
 fn compile_single_qubit_clifford(

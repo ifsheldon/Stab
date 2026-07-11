@@ -96,6 +96,346 @@ pub(crate) enum GateSurfaceBehavior {
     NotApplicable,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(
+    not(feature = "ops-contracts"),
+    allow(
+        unreachable_pub,
+        reason = "the type is exported only by the ops-contracts feature"
+    )
+)]
+pub struct GateContractStatisticalBucket {
+    pub name: &'static str,
+    pub expected_probability: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(
+    not(feature = "ops-contracts"),
+    allow(
+        unreachable_pub,
+        reason = "the type is exported only by the ops-contracts feature"
+    )
+)]
+pub struct GateContractStatisticalPlan {
+    pub case_id: &'static str,
+    pub shots: u64,
+    pub seed: u64,
+    pub sigma_multiplier: f64,
+    pub absolute_probability_floor: f64,
+    pub familywise_false_positive_budget: f64,
+    pub buckets: &'static [GateContractStatisticalBucket],
+}
+
+const STATISTICAL_SHOTS: u64 = 100_000;
+const STATISTICAL_SIGMA: f64 = 6.0;
+const STATISTICAL_ABSOLUTE_FLOOR: f64 = 0.01;
+const STATISTICAL_FAMILYWISE_BUDGET: f64 = 0.000_001;
+
+const MPP_BUCKETS: &[GateContractStatisticalBucket] = &[
+    GateContractStatisticalBucket {
+        name: "mpp-zero",
+        expected_probability: 0.75,
+    },
+    GateContractStatisticalBucket {
+        name: "mpp-one",
+        expected_probability: 0.25,
+    },
+];
+const MPAD_BUCKETS: &[GateContractStatisticalBucket] = &[
+    GateContractStatisticalBucket {
+        name: "mpad-zero",
+        expected_probability: 0.75,
+    },
+    GateContractStatisticalBucket {
+        name: "mpad-one",
+        expected_probability: 0.25,
+    },
+];
+const PAULI_NOISE_BUCKETS: &[GateContractStatisticalBucket] = &[
+    GateContractStatisticalBucket {
+        name: "identity",
+        expected_probability: 0.25,
+    },
+    GateContractStatisticalBucket {
+        name: "x",
+        expected_probability: 0.25,
+    },
+    GateContractStatisticalBucket {
+        name: "y",
+        expected_probability: 0.25,
+    },
+    GateContractStatisticalBucket {
+        name: "z",
+        expected_probability: 0.25,
+    },
+];
+const PAULI_CHANNEL_BUCKETS: &[GateContractStatisticalBucket] = &[
+    GateContractStatisticalBucket {
+        name: "pc1-i",
+        expected_probability: 0.4,
+    },
+    GateContractStatisticalBucket {
+        name: "pc1-x",
+        expected_probability: 0.1,
+    },
+    GateContractStatisticalBucket {
+        name: "pc1-y",
+        expected_probability: 0.2,
+    },
+    GateContractStatisticalBucket {
+        name: "pc1-z",
+        expected_probability: 0.3,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-ii",
+        expected_probability: 0.4,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-ix",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-iy",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-iz",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-xi",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-xx",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-xy",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-xz",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-yi",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-yx",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-yy",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-yz",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-zi",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-zx",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-zy",
+        expected_probability: 0.04,
+    },
+    GateContractStatisticalBucket {
+        name: "pc2-zz",
+        expected_probability: 0.04,
+    },
+];
+const DEPOLARIZATION_BUCKETS: &[GateContractStatisticalBucket] = &[
+    GateContractStatisticalBucket {
+        name: "depol1-i",
+        expected_probability: 0.4,
+    },
+    GateContractStatisticalBucket {
+        name: "depol1-x",
+        expected_probability: 0.2,
+    },
+    GateContractStatisticalBucket {
+        name: "depol1-y",
+        expected_probability: 0.2,
+    },
+    GateContractStatisticalBucket {
+        name: "depol1-z",
+        expected_probability: 0.2,
+    },
+    GateContractStatisticalBucket {
+        name: "depol2-ii",
+        expected_probability: 0.25,
+    },
+    GateContractStatisticalBucket {
+        name: "depol2-nonidentity",
+        expected_probability: 0.75,
+    },
+];
+const CORRELATED_ERROR_BUCKETS: &[GateContractStatisticalBucket] = &[
+    GateContractStatisticalBucket {
+        name: "no-error",
+        expected_probability: 0.3,
+    },
+    GateContractStatisticalBucket {
+        name: "first-branch",
+        expected_probability: 0.2,
+    },
+    GateContractStatisticalBucket {
+        name: "else-branch-one",
+        expected_probability: 0.2,
+    },
+    GateContractStatisticalBucket {
+        name: "else-branch-two",
+        expected_probability: 0.3,
+    },
+];
+const MEASURE_RESET_BUCKETS: &[GateContractStatisticalBucket] = &[
+    GateContractStatisticalBucket {
+        name: "measurement-zero",
+        expected_probability: 0.95,
+    },
+    GateContractStatisticalBucket {
+        name: "measurement-one",
+        expected_probability: 0.05,
+    },
+];
+const HERALDED_ERASE_BUCKETS: &[GateContractStatisticalBucket] = &[
+    GateContractStatisticalBucket {
+        name: "erase-no-herald",
+        expected_probability: 0.9,
+    },
+    GateContractStatisticalBucket {
+        name: "erase-i",
+        expected_probability: 0.025,
+    },
+    GateContractStatisticalBucket {
+        name: "erase-x",
+        expected_probability: 0.025,
+    },
+    GateContractStatisticalBucket {
+        name: "erase-y",
+        expected_probability: 0.025,
+    },
+    GateContractStatisticalBucket {
+        name: "erase-z",
+        expected_probability: 0.025,
+    },
+];
+const HERALDED_CHANNEL_BUCKETS: &[GateContractStatisticalBucket] = &[
+    GateContractStatisticalBucket {
+        name: "no-herald",
+        expected_probability: 0.45,
+    },
+    GateContractStatisticalBucket {
+        name: "herald-no-data-error",
+        expected_probability: 0.05,
+    },
+    GateContractStatisticalBucket {
+        name: "herald-x",
+        expected_probability: 0.1,
+    },
+    GateContractStatisticalBucket {
+        name: "herald-y",
+        expected_probability: 0.15,
+    },
+    GateContractStatisticalBucket {
+        name: "herald-z",
+        expected_probability: 0.25,
+    },
+];
+
+const GATE_CONTRACT_STATISTICAL_PLANS: &[GateContractStatisticalPlan] = &[
+    statistical_plan("pfm3-contract-mpp-stochastic", 12_648_431, MPP_BUCKETS),
+    statistical_plan("pfm3-contract-mpad-stochastic", 12_648_432, MPAD_BUCKETS),
+    statistical_plan("pfm3-contract-pauli-noise", 12_648_432, PAULI_NOISE_BUCKETS),
+    statistical_plan(
+        "pfm3-contract-pauli-channels",
+        12_648_433,
+        PAULI_CHANNEL_BUCKETS,
+    ),
+    statistical_plan(
+        "pfm3-contract-depolarization",
+        12_648_434,
+        DEPOLARIZATION_BUCKETS,
+    ),
+    statistical_plan(
+        "pfm3-contract-correlated-errors",
+        12_648_435,
+        CORRELATED_ERROR_BUCKETS,
+    ),
+    statistical_plan(
+        "pfm3-contract-heralded-noise",
+        12_648_436,
+        HERALDED_ERASE_BUCKETS,
+    ),
+    statistical_plan(
+        "pfm3-contract-heralded-channel",
+        12_648_437,
+        HERALDED_CHANNEL_BUCKETS,
+    ),
+    statistical_plan(
+        "pfm3-contract-heralded-erase-offset",
+        12_648_438,
+        HERALDED_ERASE_BUCKETS,
+    ),
+    statistical_plan(
+        "pfm3-contract-heralded-channel-offset",
+        12_648_439,
+        HERALDED_CHANNEL_BUCKETS,
+    ),
+    statistical_plan(
+        "pfm3-contract-measure-reset-x",
+        12_648_440,
+        MEASURE_RESET_BUCKETS,
+    ),
+    statistical_plan(
+        "pfm3-contract-measure-reset-y",
+        12_648_441,
+        MEASURE_RESET_BUCKETS,
+    ),
+    statistical_plan(
+        "pfm3-contract-measure-reset-z",
+        12_648_442,
+        MEASURE_RESET_BUCKETS,
+    ),
+];
+
+const fn statistical_plan(
+    case_id: &'static str,
+    seed: u64,
+    buckets: &'static [GateContractStatisticalBucket],
+) -> GateContractStatisticalPlan {
+    GateContractStatisticalPlan {
+        case_id,
+        shots: STATISTICAL_SHOTS,
+        seed,
+        sigma_multiplier: STATISTICAL_SIGMA,
+        absolute_probability_floor: STATISTICAL_ABSOLUTE_FLOOR,
+        familywise_false_positive_budget: STATISTICAL_FAMILYWISE_BUDGET,
+        buckets,
+    }
+}
+
+pub(crate) fn gate_contract_statistical_plan(
+    case_id: &str,
+) -> Option<&'static GateContractStatisticalPlan> {
+    GATE_CONTRACT_STATISTICAL_PLANS
+        .iter()
+        .find(|plan| plan.case_id == case_id)
+}
+
+#[cfg(feature = "ops-contracts")]
+pub(super) fn gate_contract_statistical_plans() -> &'static [GateContractStatisticalPlan] {
+    GATE_CONTRACT_STATISTICAL_PLANS
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) enum GateTargetPattern {
     NoTargets,

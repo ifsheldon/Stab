@@ -27,7 +27,7 @@ impl Analyzer {
         instruction: &CircuitInstruction,
     ) -> CircuitResult<()> {
         for group in instruction.target_groups() {
-            let terms = pauli_product_terms(instruction.gate().canonical_name(), group)?;
+            let terms = reduced_pauli_product_terms(instruction.gate().canonical_name(), group)?;
             let qubits = terms
                 .iter()
                 .map(|(qubit, _basis)| *qubit)

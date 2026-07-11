@@ -431,7 +431,7 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
     );
 
     let unsupported = Circuit::from_stim_str("R 0\nXCZ sweep[0] 0\nM 0\nDETECTOR rec[-1]\n")
-        .expect("parse unsupported sweep circuit");
+        .expect("parse unsupported sweep target role");
     let unsupported_error = convert_measurements_to_detection_events_with_sweep(
         &unsupported,
         &[vec![false]],
@@ -440,11 +440,11 @@ fn detection_conversion_rejects_bad_sweep_records_and_unsupported_sampling_surfa
             skip_reference_sample: false,
         },
     )
-    .expect_err("reject unsupported sweep gate");
+    .expect_err("reject unsupported sweep target role");
     assert!(
         unsupported_error
             .to_string()
-            .contains(UNSUPPORTED_SWEEP_DETECTION_MESSAGE),
+            .contains("does not support XCZ"),
         "{unsupported_error}"
     );
     let unsupported_shape = Circuit::from_stim_str("CX sweep[0] sweep[1]\nM 0\nDETECTOR rec[-1]\n")

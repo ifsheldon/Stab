@@ -9,9 +9,17 @@ use crate::{
     PauliBasis, PauliSign, PauliString, RepeatBlock, Target,
 };
 
-pub(super) fn circuit_has_pauli_observable_targets(circuit: &Circuit) -> bool {
+pub(super) fn circuit_requires_detector_frame(circuit: &Circuit) -> bool {
     for item in circuit.items() {
         match item {
+            CircuitItem::Instruction(instruction)
+                if matches!(
+                    instruction.gate().canonical_name(),
+                    "HERALDED_ERASE" | "HERALDED_PAULI_CHANNEL_1"
+                ) =>
+            {
+                return true;
+            }
             CircuitItem::Instruction(instruction)
                 if instruction.gate().canonical_name() == "OBSERVABLE_INCLUDE"
                     && instruction
@@ -22,9 +30,7 @@ pub(super) fn circuit_has_pauli_observable_targets(circuit: &Circuit) -> bool {
                 return true;
             }
             CircuitItem::Instruction(_) => {}
-            CircuitItem::RepeatBlock(repeat)
-                if circuit_has_pauli_observable_targets(repeat.body()) =>
-            {
+            CircuitItem::RepeatBlock(repeat) if circuit_requires_detector_frame(repeat.body()) => {
                 return true;
             }
             CircuitItem::RepeatBlock(_) => {}

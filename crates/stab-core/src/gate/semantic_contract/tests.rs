@@ -11,6 +11,8 @@ use super::{
 };
 use crate::{Circuit, CompiledSampler, Gate, MeasureRecordOffset, Pauli, QubitId, Target};
 
+mod execution;
+
 #[test]
 fn gate_surface_contract_covers_every_canonical_gate_surface_and_target_pattern() {
     let mut behavior_counts = BTreeMap::new();

@@ -368,6 +368,9 @@ impl ReverseFoldAnalyzer {
                 "PAULI_CHANNEL_1 expected three probabilities",
             ));
         };
+        if instruction.targets().is_empty() {
+            return Ok(());
+        }
         let independent = try_disjoint_to_independent_xyz_errors(*x, *y, *z)?;
         if independent.is_none() {
             self.validate_disjoint_threshold("PAULI_CHANNEL_1", &probabilities)?;
@@ -410,6 +413,9 @@ impl ReverseFoldAnalyzer {
         let Some(probabilities) = instruction.probability_arguments()? else {
             return Ok(());
         };
+        if instruction.targets().is_empty() {
+            return Ok(());
+        }
         self.validate_disjoint_threshold("PAULI_CHANNEL_2", &probabilities)?;
         let probabilities: [Probability; 15] =
             probabilities.try_into().map_err(|values: Vec<_>| {
