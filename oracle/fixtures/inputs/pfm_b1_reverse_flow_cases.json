@@ -1,0 +1,74 @@
+{
+  "cases": {
+    "pfm2-flow-reverse-measurement": {
+      "circuit": "M 0\n",
+      "flows": ["1 -> Z0 xor rec[-1]"]
+    },
+    "pfm2-flow-through-mzz": {
+      "circuit": "MZZ 0 1\n",
+      "flows": [
+        "X0*X1 -> Y0*Y1 xor rec[-1]",
+        "X0*X1 -> X0*X1",
+        "Z0 -> Z1 xor rec[-1]",
+        "Z0 -> Z0"
+      ]
+    },
+    "pfm2-flow-past-idle-qubits": {
+      "circuit": "H 0\n",
+      "flows": ["X300*Z0 -> X300*X0"]
+    },
+    "pfm2-python-inverse-empty": {
+      "circuit": "",
+      "flows": []
+    },
+    "pfm2-python-reset-h-mx-detector": {
+      "circuit": "R 0\nH 0\nMX 0\nDETECTOR rec[-1]\n",
+      "flows": []
+    },
+    "pfm2-python-measurement-to-reset": {
+      "circuit": "M 0\n",
+      "flows": ["Z0 -> rec[-1]"]
+    },
+    "pfm2-python-reset-to-measurement": {
+      "circuit": "R 0\n",
+      "flows": ["1 -> Z0"]
+    },
+    "pfm2-python-measurement-kept-by-flow": {
+      "circuit": "M 0\n",
+      "flows": ["1 -> Z0 xor rec[-1]"]
+    },
+    "pfm2-python-dont-turn-measurement": {
+      "circuit": "M 0\n",
+      "flows": ["Z0 -> rec[-1]"],
+      "dont_turn_measurements_into_resets": true
+    },
+    "pfm2-python-noisy-measure-reset": {
+      "circuit": "MR(0.125) 0\n",
+      "flows": []
+    },
+    "pfm2-python-more-flow-qubits": {
+      "circuit": "H 2\n",
+      "flows": ["X300 -> X300", "X2*Z301 -> Z2*Z301"]
+    },
+    "pfm2-python-observable-paulis": {
+      "circuit": "RX 0\nOBSERVABLE_INCLUDE[test1](2) X0\nOBSERVABLE_INCLUDE[test2](3) Y1\nMY 1\nOBSERVABLE_INCLUDE(3) rec[-1]\n",
+      "flows": []
+    },
+    "pfm2-mpad-flow-matrix": {
+      "circuit": "H 0\nMPAD 0 1\nS 0\nOBSERVABLE_INCLUDE(0) rec[-2]\nOBSERVABLE_INCLUDE(0) rec[-1]\n",
+      "flows": [
+        "1 -> rec[1]",
+        "1 -> -rec[0]",
+        "X -> Z",
+        "Z -> Y",
+        "1 -> obs[0]",
+        "1 -> rec[-2] xor obs[0]",
+        "1 -> rec[-1] xor obs[0]"
+      ]
+    },
+    "pfm2-record-alias-rejection": {
+      "circuit": "M 0\n",
+      "flows": ["1 -> rec[-1] xor rec[0]"]
+    }
+  }
+}

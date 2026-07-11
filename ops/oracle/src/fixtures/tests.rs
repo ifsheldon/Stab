@@ -1,6 +1,6 @@
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureManifest, FixturePathRequirement, Milestone,
-    RunFilter, RunMode, cargo_test_executed_test_count, check_direct_rust_fixture_executed_tests,
+    RunFilter, RunMode, cargo_test_passed_test_count, check_direct_rust_fixture_executed_tests,
     compare_fixture, is_recordable,
     outputs::{self, FixtureArgToken},
     run_core_fixture, run_direct_rust_fixture, statistical, validate_fixture_path,
@@ -40,6 +40,46 @@ fn repository_fixture_manifest_passes_validation() {
     let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
 
     manifest.check(&root).expect("manifest validation");
+}
+
+#[cfg(unix)]
+#[test]
+fn fixture_manifest_rejects_symlinked_fixture_root() {
+    use std::os::unix::fs::symlink;
+
+    let temp = tempfile::tempdir().expect("temporary repository");
+    let outside = tempfile::tempdir().expect("outside fixture directory");
+    std::fs::create_dir(temp.path().join("oracle")).expect("oracle directory");
+    symlink(outside.path(), temp.path().join("oracle/fixtures")).expect("symlink fixture root");
+    let root = crate::RepoRoot::resolve(temp.path()).expect("resolve repository");
+    let manifest = FixtureManifest::from_csv(HEADER).expect("empty manifest");
+
+    let error = manifest
+        .check(&root)
+        .expect_err("symlinked fixture root must fail closed");
+
+    assert!(error.to_string().contains("source-owned directory tree"));
+}
+
+#[test]
+fn fixture_input_read_enforces_aggregate_byte_limit() {
+    let temp = tempfile::tempdir().expect("temporary repository");
+    let fixture_root = temp.path().join("oracle/fixtures");
+    std::fs::create_dir_all(fixture_root.join("inputs")).expect("fixture inputs");
+    std::fs::write(
+        fixture_root.join("inputs/oversized.json"),
+        vec![b'x'; crate::process::OUTPUT_LIMIT_BYTES + 1],
+    )
+    .expect("oversized fixture input");
+    let root = crate::RepoRoot::resolve(temp.path()).expect("resolve repository");
+
+    let error = super::paths::read_fixture_file(&root, "inputs/oversized.json")
+        .expect_err("oversized fixture input must fail closed");
+
+    assert!(matches!(
+        error,
+        super::FixtureError::FixtureFileTooLarge { .. }
+    ));
 }
 
 #[test]
@@ -194,11 +234,11 @@ fn m4_direct_rust_rows_run_cargo_tests() {
 fn direct_rust_fixture_counts_cargo_test_output_across_streams() {
     let output = process_output(
         Some(0),
-        b"running 0 tests\n\nrunning 2 tests\n",
-        b"running 1 test\n",
+        b"test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n",
+        b"test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n",
     );
 
-    assert_eq!(cargo_test_executed_test_count(&output), 3);
+    assert_eq!(cargo_test_passed_test_count(&output), 3);
 }
 
 #[test]
@@ -219,13 +259,57 @@ fn direct_rust_fixture_rejects_zero_test_cargo_output() {
     assert!(
         error
             .to_string()
-            .contains("direct Rust fixture matched zero cargo tests"),
+            .contains("direct Rust fixture passed zero cargo tests"),
         "{error}"
     );
 }
 
 #[test]
-fn core_exact_output_rows_are_not_recorded_from_stim_cli() {
+fn direct_rust_fixture_rejects_ignored_exact_test() {
+    let csv = format!(
+        "{HEADER}bad,M4,src/stim/circuit/gate_target.test.cc,structural,structural,cargo test,cargo-test|-p|stab-core|ignored_test|--|--exact,,,0,any,implemented,Run one exact direct Rust test,hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let row = manifest.rows.first().expect("manifest row");
+    let output = process_output(
+        Some(0),
+        b"running 1 test\ntest ignored_test ... ignored\n\ntest result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out\n",
+        b"",
+    );
+
+    let error =
+        check_direct_rust_fixture_executed_tests(row, &output).expect_err("reject ignored test");
+    assert!(
+        error.to_string().contains("passed zero cargo tests"),
+        "{error}"
+    );
+}
+
+#[test]
+fn direct_rust_fixture_rejects_multiple_passed_exact_tests() {
+    let csv = format!(
+        "{HEADER}bad,M4,src/stim/circuit/gate_target.test.cc,structural,structural,cargo test,cargo-test|-p|stab-core|broad_filter|--|--exact,,,0,any,implemented,Run one exact direct Rust test,hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let row = manifest.rows.first().expect("manifest row");
+    let output = process_output(
+        Some(0),
+        b"test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n",
+        b"",
+    );
+
+    let error = check_direct_rust_fixture_executed_tests(row, &output)
+        .expect_err("reject broad exact selector");
+    assert!(
+        error
+            .to_string()
+            .contains("passed 2 cargo tests instead of exactly one"),
+        "{error}"
+    );
+}
+
+#[test]
+fn only_upstream_executable_core_exact_rows_are_recordable() {
     let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
     let core_exact_row = manifest
         .rows
@@ -237,9 +321,15 @@ fn core_exact_output_rows_are_not_recorded_from_stim_cli() {
         .iter()
         .find(|row| row.id == "smoke-tiny-circuit")
         .expect("M0 CLI exact row");
+    let reverse_flow_exact_row = manifest
+        .rows
+        .iter()
+        .find(|row| row.id == "pfm-b1-exact-flow-reverse-measurement")
+        .expect("PFM-B1 pinned reverse-flow row");
 
     assert!(!is_recordable(core_exact_row));
     assert!(is_recordable(cli_exact_row));
+    assert!(is_recordable(reverse_flow_exact_row));
 }
 
 #[test]
@@ -348,6 +438,14 @@ fn fixture_output_placeholders_are_replaced_with_target_paths() {
             .iter()
             .any(|token| token.to_string_lossy().contains("fixture-outputs"))
     );
+    let run_dir = output
+        .actual_path
+        .parent()
+        .expect("fixture run directory")
+        .to_path_buf();
+    assert!(run_dir.is_dir());
+    drop(command);
+    assert!(!run_dir.exists(), "scratch run directory must be removed");
 }
 
 #[test]
@@ -822,6 +920,53 @@ fn fixture_output_scratch_rejects_symlinked_parent() {
         .expect_err("symlinked scratch parent should fail");
 
     assert!(error.to_string().contains("scratch path contains symlink"));
+}
+
+#[test]
+fn child_fixture_output_read_enforces_descriptor_byte_limit() {
+    let temp = tempfile::tempdir().expect("fixture output directory");
+    let actual = temp.path().join("actual.bin");
+    std::fs::write(&actual, vec![0_u8; 1024 * 1024 + 1]).expect("oversized output");
+    let csv = format!(
+        "{HEADER}output,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,fixture output,sample_dem,inputs/sample.dem,expected/sample.stdout,0,empty,red,,hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse fixture row");
+    let row = manifest.rows.first().expect("fixture row");
+    let output = outputs::FixtureOutput {
+        expected_relative: "expected/side.bin".to_string(),
+        actual_path: actual,
+    };
+
+    let error = outputs::read_actual_fixture_output(row, &output)
+        .expect_err("oversized child output must fail closed");
+
+    assert!(matches!(
+        error,
+        super::FixtureError::AuxiliaryOutputTooLarge { .. }
+    ));
+}
+
+#[cfg(unix)]
+#[test]
+fn child_fixture_output_read_rejects_symlink() {
+    use std::os::unix::fs::symlink;
+
+    let temp = tempfile::tempdir().expect("fixture output directory");
+    let outside = temp.path().join("outside.bin");
+    let actual = temp.path().join("actual.bin");
+    std::fs::write(&outside, b"outside").expect("outside output");
+    symlink(&outside, &actual).expect("symlink output");
+    let csv = format!(
+        "{HEADER}output,M11,src/stim/cmd/command_sample_dem.test.cc,exact-output,exact-output,fixture output,sample_dem,inputs/sample.dem,expected/sample.stdout,0,empty,red,,hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse fixture row");
+    let row = manifest.rows.first().expect("fixture row");
+    let output = outputs::FixtureOutput {
+        expected_relative: "expected/side.bin".to_string(),
+        actual_path: actual,
+    };
+
+    assert!(outputs::read_actual_fixture_output(row, &output).is_err());
 }
 
 #[test]

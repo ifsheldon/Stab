@@ -9,13 +9,19 @@ use thiserror::Error;
 
 use crate::{OracleError, RepoRoot, StderrClass, compare_exact, compare_help_health};
 
+mod direct_rust;
 mod milestone;
 mod outputs;
 mod paths;
+mod reverse_flow;
 mod statistical;
 
+#[cfg(test)]
+use direct_rust::{cargo_test_passed_test_count, check_direct_rust_fixture_executed_tests};
+use direct_rust::{is_direct_rust_fixture, run_direct_rust_fixture};
 pub(crate) use milestone::Milestone;
-use paths::{fixture_file, prepare_fixture_output_file, validate_fixture_path};
+use paths::{fixture_file, validate_fixture_path};
+use reverse_flow::core_time_reverse_flows_output;
 
 const FIXTURE_ROOT: &str = "oracle/fixtures";
 
@@ -368,6 +374,9 @@ pub(crate) enum FixtureError {
         source: std::io::Error,
     },
 
+    #[error("fixture file {path} exceeds the {limit}-byte limit")]
+    FixtureFileTooLarge { path: PathBuf, limit: usize },
+
     #[error("failed to inspect fixture output {path}: {source}")]
     InspectOutput {
         path: PathBuf,
@@ -428,13 +437,13 @@ pub(crate) enum FixtureError {
 }
 
 impl FixtureManifest {
-    fn read_from_path(path: impl AsRef<Path>) -> Result<Self, FixtureError> {
-        let path = path.as_ref();
-        let content =
-            std::fs::read_to_string(path).map_err(|source| FixtureError::ReadManifest {
-                path: path.to_path_buf(),
-                source,
-            })?;
+    fn read(root: &RepoRoot) -> Result<Self, FixtureError> {
+        let path = root.fixture_manifest();
+        let bytes = paths::read_fixture_file(root, "manifest.csv")?;
+        let content = String::from_utf8(bytes).map_err(|source| FixtureError::ReadManifest {
+            path,
+            source: std::io::Error::new(std::io::ErrorKind::InvalidData, source),
+        })?;
         Self::from_csv(&content)
     }
 
@@ -458,6 +467,9 @@ impl FixtureManifest {
         let mut violations = Vec::new();
         let mut ids = BTreeSet::new();
         let fixture_root = root.path.join(FIXTURE_ROOT);
+        if let Err(violation) = paths::validate_fixture_root(root) {
+            return Err(FixtureError::Validation(violation.into_boxed_str()));
+        }
         for row in &self.rows {
             if row.id.is_empty() {
                 violations.push("row with empty id".to_string());
@@ -560,10 +572,21 @@ impl FixtureManifest {
             .iter()
             .map(|row| (row.upstream_source.as_str(), row.milestone, row.parity_mode))
             .collect::<BTreeSet<_>>();
-        let content = match std::fs::read_to_string(root.compatibility_matrix()) {
-            Ok(content) => content,
+        let matrix_path = root.compatibility_matrix();
+        let bytes = match crate::safe_file::read_regular_file_bounded(
+            &matrix_path,
+            crate::matrix::MAX_COMPATIBILITY_MATRIX_BYTES,
+        ) {
+            Ok(bytes) => bytes,
             Err(error) => {
                 violations.push(format!("failed to read compatibility matrix: {error}"));
+                return;
+            }
+        };
+        let content = match String::from_utf8(bytes) {
+            Ok(content) => content,
+            Err(error) => {
+                violations.push(format!("compatibility matrix is not UTF-8: {error}"));
                 return;
             }
         };
@@ -664,8 +687,7 @@ impl FixtureRow {
         if self.stdin_path.is_empty() {
             return Ok(Vec::new());
         }
-        let path = fixture_file(root, &self.stdin_path)?;
-        std::fs::read(&path).map_err(|source| FixtureError::ReadFile { path, source })
+        paths::read_fixture_file(root, &self.stdin_path)
     }
 
     fn expected_stdout_file(&self, root: &RepoRoot) -> Result<PathBuf, FixtureError> {
@@ -694,18 +716,24 @@ pub(crate) fn record_fixtures(
         },
     )?;
     let stim_binary = crate::ensure_stim_binary(root, rebuild_stim)?;
+    let mut reverse_flow_helper = None;
     for row in manifest.rows.iter().filter(|row| is_recordable(row)) {
         let stdin = row.stdin(root)?;
         let command = outputs::prepare_command(root, row, "stim-record")?;
-        let output = crate::run_process(&stim_binary, &command.argv, &stdin, Some(&root.path))?;
+        let output = if reverse_flow::is_reverse_flow_fixture(row) {
+            let helper = match &reverse_flow_helper {
+                Some(path) => path,
+                None => reverse_flow_helper
+                    .insert(crate::ensure_stim_reverse_flow_helper(root, rebuild_stim)?),
+            };
+            reverse_flow::run_pinned_stim_reverse_flow(root, row, &stdin, helper)?
+        } else {
+            run_prepared_fixture_process(root, &stim_binary, &command, &stdin)?
+        };
         check_expected_process_shape(row, &output)?;
         let expected_path = row.expected_stdout_file(root)?;
         if check_clean {
-            let expected =
-                std::fs::read(&expected_path).map_err(|source| FixtureError::ReadFile {
-                    path: expected_path.clone(),
-                    source,
-                })?;
+            let expected = paths::read_fixture_file(root, &row.expected_stdout_path)?;
             if expected != output.stdout.bytes {
                 return Err(FixtureError::ExpectedStdoutMismatch {
                     id: row.id.clone(),
@@ -716,13 +744,7 @@ pub(crate) fn record_fixtures(
             outputs::compare_expected_outputs(row, root, &command.outputs)?;
             println!("[stab-oracle] CLEAN {}", row.id);
         } else {
-            prepare_fixture_output_file(root, &row.expected_stdout_path)?;
-            std::fs::write(&expected_path, &output.stdout.bytes).map_err(|source| {
-                FixtureError::WriteOutput {
-                    path: expected_path.clone(),
-                    source,
-                }
-            })?;
+            paths::write_fixture_file(root, &row.expected_stdout_path, &output.stdout.bytes)?;
             outputs::record_outputs(row, root, &command.outputs)?;
             println!("[stab-oracle] RECORDED {}", row.id);
         }
@@ -733,7 +755,7 @@ pub(crate) fn record_fixtures(
 fn is_recordable(row: &FixtureRow) -> bool {
     row.comparator == FixtureComparator::ExactOutput
         && row.status != FixtureStatus::ManifestOnly
-        && !is_core_fixture(row)
+        && (!is_core_fixture(row) || reverse_flow::is_reverse_flow_fixture(row))
         && !row.expected_stdout_path.is_empty()
 }
 
@@ -768,17 +790,17 @@ pub(crate) fn run_fixtures(
                     let stab_binary_path = cached_stab_binary(root, &mut stab_binary)?;
                     let stim_command = outputs::prepare_command(root, row, "stim")?;
                     let stab_command = outputs::prepare_command(root, row, "stab")?;
-                    let stim = crate::run_process(
+                    let stim = run_prepared_fixture_process(
+                        root,
                         &stim_binary_path,
-                        &stim_command.argv,
+                        &stim_command,
                         &stdin,
-                        Some(&root.path),
                     )?;
-                    let stab = crate::run_process(
+                    let stab = run_prepared_fixture_process(
+                        root,
                         &stab_binary_path,
-                        &stab_command.argv,
+                        &stab_command,
                         &stdin,
-                        Some(&root.path),
                     )?;
                     compare_fixture(row, &stim, &stab)?;
                     outputs::compare_outputs(row, &stim_command.outputs, &stab_command.outputs)?;
@@ -821,6 +843,27 @@ pub(crate) fn run_fixtures(
     Ok(())
 }
 
+fn run_prepared_fixture_process(
+    root: &RepoRoot,
+    program: &Path,
+    command: &outputs::PreparedFixtureCommand,
+    stdin: &[u8],
+) -> Result<crate::ProcessOutput, OracleError> {
+    let monitored_paths = command
+        .outputs
+        .iter()
+        .map(|output| output.actual_path.as_path())
+        .collect::<Vec<_>>();
+    crate::process::run_process_monitoring_files(
+        program,
+        &command.argv,
+        stdin,
+        Some(&root.path),
+        &monitored_paths,
+        outputs::AUXILIARY_OUTPUT_LIMIT_BYTES,
+    )
+}
+
 fn matches_milestone_filter(row: &FixtureRow, milestone_filter: Option<Milestone>) -> bool {
     milestone_filter
         .map(|milestone| row.milestone == milestone)
@@ -853,75 +896,15 @@ fn cached_stab_binary(
 }
 
 fn is_core_fixture(row: &FixtureRow) -> bool {
-    matches!(
-        row.argv.as_str(),
-        "core-parse-print" | "core-circuit-parse-print" | "core-dem-parse-print"
-    )
-}
-
-fn is_direct_rust_fixture(row: &FixtureRow) -> bool {
-    row.argv_tokens()
-        .first()
-        .is_some_and(|token| token == "cargo-test")
-}
-
-fn run_direct_rust_fixture(
-    root: &RepoRoot,
-    row: &FixtureRow,
-) -> Result<crate::ProcessOutput, FixtureError> {
-    let tokens = row.argv_tokens();
-    let args = std::iter::once("test").chain(tokens.iter().skip(1).map(String::as_str));
-    let output =
-        crate::run_process(Path::new("cargo"), args, &[], Some(&root.path)).map_err(|source| {
-            FixtureError::CoreFixtureFailed {
-                id: row.id.clone(),
-                reason: source.to_string(),
-            }
-        })?;
-    check_expected_process_shape(row, &output)?;
-    check_direct_rust_fixture_executed_tests(row, &output)?;
-    match row.comparator {
-        FixtureComparator::Property
-        | FixtureComparator::Statistical
-        | FixtureComparator::Structural => Ok(output),
-        FixtureComparator::ExactOutput | FixtureComparator::HelpHealth => {
-            Err(FixtureError::ComparatorMismatch {
-                id: row.id.clone(),
-                comparator: row.comparator.as_str(),
-                reason: "direct Rust fixtures only support test-like comparators".to_string(),
-            })
-        }
-    }
-}
-
-fn check_direct_rust_fixture_executed_tests(
-    row: &FixtureRow,
-    output: &crate::ProcessOutput,
-) -> Result<(), FixtureError> {
-    if output.status == Some(0) && cargo_test_executed_test_count(output) == 0 {
-        return Err(FixtureError::CoreFixtureFailed {
-            id: row.id.clone(),
-            reason: "direct Rust fixture matched zero cargo tests; check the cargo-test filter"
-                .to_string(),
-        });
-    }
-    Ok(())
-}
-
-fn cargo_test_executed_test_count(output: &crate::ProcessOutput) -> usize {
-    count_cargo_test_lines(&output.stdout.bytes) + count_cargo_test_lines(&output.stderr.bytes)
-}
-
-fn count_cargo_test_lines(bytes: &[u8]) -> usize {
-    String::from_utf8_lossy(bytes)
-        .lines()
-        .filter_map(|line| {
-            line.trim()
-                .strip_prefix("running ")
-                .and_then(|rest| rest.split_whitespace().next())
-                .and_then(|count| count.parse::<usize>().ok())
-        })
-        .sum()
+    row.argv_tokens().first().is_some_and(|token| {
+        matches!(
+            token.as_str(),
+            "core-parse-print"
+                | "core-circuit-parse-print"
+                | "core-dem-parse-print"
+                | "core-time-reverse-flows"
+        )
+    })
 }
 
 fn run_core_fixture(
@@ -960,8 +943,18 @@ fn core_parse_print_output(
             reason: format!("unsupported core fixture argv {}", row.argv),
         });
     }
+    let tokens = row.argv_tokens();
+    let Some(kind) = tokens.first().map(String::as_str) else {
+        return Err(FixtureError::CoreFixtureFailed {
+            id: row.id.clone(),
+            reason: "core fixture has no command token".to_string(),
+        });
+    };
     let input = fixture_utf8(row, "stdin", stdin)?;
-    if row.argv == "core-dem-parse-print" {
+    if kind == "core-time-reverse-flows" {
+        return core_time_reverse_flows_output(row, input, &tokens);
+    }
+    if kind == "core-dem-parse-print" {
         let dem = parse_core_dem(row, "stdin", input)?;
         return Ok(crate::ProcessOutput {
             status: Some(0),
@@ -995,10 +988,7 @@ fn compare_expected_stdout(
     output: &crate::ProcessOutput,
 ) -> Result<(), FixtureError> {
     let expected_path = row.expected_stdout_file(root)?;
-    let expected = std::fs::read(&expected_path).map_err(|source| FixtureError::ReadFile {
-        path: expected_path.clone(),
-        source,
-    })?;
+    let expected = paths::read_fixture_file(root, &row.expected_stdout_path)?;
     if expected != output.stdout.bytes {
         return Err(FixtureError::ExpectedStdoutMismatch {
             id: row.id.clone(),
@@ -1067,7 +1057,7 @@ fn fixture_utf8<'a>(
 }
 
 fn load_manifest(root: &RepoRoot) -> Result<FixtureManifest, OracleError> {
-    let manifest = FixtureManifest::read_from_path(root.fixture_manifest())?;
+    let manifest = FixtureManifest::read(root)?;
     manifest.check(root)?;
     Ok(manifest)
 }
@@ -1076,7 +1066,7 @@ fn load_manifest_with_expected_stdout_policy(
     root: &RepoRoot,
     expected_stdout_policy: ExpectedStdoutPolicy,
 ) -> Result<FixtureManifest, OracleError> {
-    let manifest = FixtureManifest::read_from_path(root.fixture_manifest())?;
+    let manifest = FixtureManifest::read(root)?;
     manifest.check_with_expected_stdout_policy(root, expected_stdout_policy)?;
     Ok(manifest)
 }

@@ -17,6 +17,7 @@ const IMPLEMENTATION_MILESTONES: &[Milestone] = &[
     Milestone::M11,
     Milestone::M12,
 ];
+pub(crate) const MAX_COMPATIBILITY_MATRIX_BYTES: usize = crate::process::OUTPUT_LIMIT_BYTES;
 
 const FUTURE_BUCKETS: &[&str] = &[
     "diagrams",
@@ -426,6 +427,9 @@ pub(crate) enum MatrixError {
         source: std::io::Error,
     },
 
+    #[error("compatibility matrix {path} exceeds the {limit}-byte limit")]
+    TooLarge { path: PathBuf, limit: usize },
+
     #[error("failed to parse compatibility matrix: {0}")]
     Parse(#[from] csv::Error),
 
@@ -439,9 +443,26 @@ pub(crate) enum MatrixError {
 impl CompatibilityMatrix {
     pub(crate) fn read_from_path(path: impl AsRef<Path>) -> Result<Self, MatrixError> {
         let path = path.as_ref();
-        let content = std::fs::read_to_string(path).map_err(|source| MatrixError::Read {
+        let bytes =
+            match crate::safe_file::read_regular_file_bounded(path, MAX_COMPATIBILITY_MATRIX_BYTES)
+            {
+                Ok(bytes) => bytes,
+                Err(crate::safe_file::SafeFileError::TooLarge { limit }) => {
+                    return Err(MatrixError::TooLarge {
+                        path: path.to_path_buf(),
+                        limit,
+                    });
+                }
+                Err(source) => {
+                    return Err(MatrixError::Read {
+                        path: path.to_path_buf(),
+                        source: std::io::Error::other(source),
+                    });
+                }
+            };
+        let content = String::from_utf8(bytes).map_err(|source| MatrixError::Read {
             path: path.to_path_buf(),
-            source,
+            source: std::io::Error::new(std::io::ErrorKind::InvalidData, source),
         })?;
         Self::from_csv(&content)
     }
@@ -817,7 +838,9 @@ fn collect_vendor_paths_recursive(
 
 #[cfg(test)]
 mod tests {
-    use super::{CompatibilityMatrix, IMPLEMENTATION_MILESTONES};
+    use super::{
+        CompatibilityMatrix, IMPLEMENTATION_MILESTONES, MAX_COMPATIBILITY_MATRIX_BYTES, MatrixError,
+    };
 
     const MATRIX_CSV: &str = include_str!("../../../oracle/compatibility-matrix.csv");
     const HEADER: &str = "id,upstream_path,source_kind,surface,owner_crate,milestone,priority,parity_mode,comparator_type,status,future_bucket,defer_reason,acceptance_check\n";
@@ -840,6 +863,19 @@ mod tests {
         for milestone in IMPLEMENTATION_MILESTONES {
             assert!(!matrix.rows_for_milestone(milestone.as_str()).is_empty());
         }
+    }
+
+    #[test]
+    fn compatibility_matrix_read_enforces_byte_limit() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let path = directory.path().join("matrix.csv");
+        std::fs::write(&path, vec![b'x'; MAX_COMPATIBILITY_MATRIX_BYTES + 1])
+            .expect("oversized matrix");
+
+        let error = CompatibilityMatrix::read_from_path(&path)
+            .expect_err("oversized matrix must fail closed");
+
+        assert!(matches!(error, MatrixError::TooLarge { .. }));
     }
 
     #[test]

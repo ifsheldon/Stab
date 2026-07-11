@@ -1,0 +1,4 @@
+circuit:
+R 0
+flows:
+1 -> Z

@@ -47,12 +47,59 @@ where
     run_process_with_timeout(program, args, stdin, working_dir, COMMAND_TIMEOUT)
 }
 
+pub(super) fn run_process_monitoring_files<I, S>(
+    program: &Path,
+    args: I,
+    stdin: &[u8],
+    working_dir: Option<&Path>,
+    monitored_paths: &[&Path],
+    file_limit: u64,
+) -> Result<ProcessOutput, OracleError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    run_process_with_timeout_and_monitored_files(
+        program,
+        args,
+        stdin,
+        working_dir,
+        COMMAND_TIMEOUT,
+        monitored_paths,
+        file_limit,
+    )
+}
+
 fn run_process_with_timeout<I, S>(
     program: &Path,
     args: I,
     stdin: &[u8],
     working_dir: Option<&Path>,
     timeout: Duration,
+) -> Result<ProcessOutput, OracleError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    run_process_with_timeout_and_monitored_files(
+        program,
+        args,
+        stdin,
+        working_dir,
+        timeout,
+        &[],
+        u64::MAX,
+    )
+}
+
+fn run_process_with_timeout_and_monitored_files<I, S>(
+    program: &Path,
+    args: I,
+    stdin: &[u8],
+    working_dir: Option<&Path>,
+    timeout: Duration,
+    monitored_paths: &[&Path],
+    file_limit: u64,
 ) -> Result<ProcessOutput, OracleError>
 where
     I: IntoIterator<Item = S>,
@@ -113,6 +160,15 @@ where
                 source,
             })?;
         }
+        if let Some(violation) = monitored_output_violation(monitored_paths, file_limit) {
+            terminate_process_tree(&mut child, &program_name)?;
+            if let Some(stdin) = stdin {
+                drop(stdin.join());
+            }
+            drop(join_output_reader(&program_name, stdout)?);
+            drop(join_output_reader(&program_name, stderr)?);
+            return Err(violation.into_oracle_error(program_name, file_limit));
+        }
         let stdin_finished = stdin.as_ref().is_none_or(JoinHandle::is_finished);
         if status.is_some() && stdin_finished && stdout.is_finished() && stderr.is_finished() {
             break;
@@ -139,11 +195,94 @@ where
     join_stdin_writer(&program_name, stdin)?;
     let stdout = join_output_reader(&program_name, stdout)?;
     let stderr = join_output_reader(&program_name, stderr)?;
+    reject_truncated_output(&program_name, "stdout", &stdout)?;
+    reject_truncated_output(&program_name, "stderr", &stderr)?;
     Ok(ProcessOutput {
         status: status.and_then(|status| status.code()),
         stdout,
         stderr,
     })
+}
+
+enum MonitoredOutputViolation {
+    TooLarge {
+        path: std::path::PathBuf,
+    },
+    Unsafe {
+        path: std::path::PathBuf,
+        reason: String,
+    },
+}
+
+impl MonitoredOutputViolation {
+    fn into_oracle_error(self, program: String, limit: u64) -> OracleError {
+        match self {
+            Self::TooLarge { path } => OracleError::AuxiliaryOutputLimitExceeded {
+                program,
+                path,
+                limit,
+            },
+            Self::Unsafe { path, reason } => OracleError::UnsafeAuxiliaryOutput {
+                program,
+                path,
+                reason,
+            },
+        }
+    }
+}
+
+fn monitored_output_violation(paths: &[&Path], limit: u64) -> Option<MonitoredOutputViolation> {
+    for path in paths {
+        match std::fs::symlink_metadata(path) {
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Some(MonitoredOutputViolation::Unsafe {
+                    path: path.to_path_buf(),
+                    reason: error.to_string(),
+                });
+            }
+        }
+        let file = match crate::safe_file::open_regular_file(path) {
+            Ok(file) => file,
+            Err(error) => {
+                return Some(MonitoredOutputViolation::Unsafe {
+                    path: path.to_path_buf(),
+                    reason: error.to_string(),
+                });
+            }
+        };
+        match file.metadata() {
+            Ok(metadata) if metadata.len() > limit => {
+                return Some(MonitoredOutputViolation::TooLarge {
+                    path: path.to_path_buf(),
+                });
+            }
+            Ok(_) => {}
+            Err(error) => {
+                return Some(MonitoredOutputViolation::Unsafe {
+                    path: path.to_path_buf(),
+                    reason: error.to_string(),
+                });
+            }
+        }
+    }
+    None
+}
+
+fn reject_truncated_output(
+    program: &str,
+    stream: &'static str,
+    output: &CapturedOutput,
+) -> Result<(), OracleError> {
+    if output.truncated {
+        return Err(OracleError::OutputLimitExceeded {
+            program: program.to_string(),
+            stream,
+            limit: OUTPUT_LIMIT_BYTES,
+        });
+    }
+    Ok(())
 }
 
 fn spawn_stdin_writer(
@@ -293,9 +432,30 @@ mod tests {
     use std::time::{Duration, Instant};
 
     #[cfg(unix)]
-    use super::run_process_with_timeout;
+    use super::{
+        OUTPUT_LIMIT_BYTES, reject_truncated_output, run_process_with_timeout,
+        run_process_with_timeout_and_monitored_files,
+    };
+    use crate::CapturedOutput;
     #[cfg(unix)]
     use crate::OracleError;
+
+    #[test]
+    fn truncated_process_output_fails_closed_before_comparison() {
+        let output = CapturedOutput {
+            bytes: vec![b'x'; OUTPUT_LIMIT_BYTES],
+            truncated: true,
+        };
+
+        assert!(matches!(
+            reject_truncated_output("fixture", "stdout", &output),
+            Err(crate::OracleError::OutputLimitExceeded {
+                program,
+                stream: "stdout",
+                limit: OUTPUT_LIMIT_BYTES,
+            }) if program == "fixture"
+        ));
+    }
 
     #[cfg(unix)]
     #[test]
@@ -311,6 +471,31 @@ mod tests {
         .expect_err("process tree should time out");
 
         assert!(matches!(error, OracleError::TimedOut { .. }));
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn auxiliary_output_limit_terminates_process_group_promptly() {
+        let directory = tempfile::tempdir().expect("temporary output directory");
+        let output = directory.path().join("side-output");
+        std::fs::write(&output, b"too large").expect("oversized side output");
+        let started = Instant::now();
+        let error = run_process_with_timeout_and_monitored_files(
+            Path::new("/bin/sh"),
+            ["-c", "sleep 30 & wait"],
+            &[],
+            None,
+            Duration::from_secs(5),
+            &[output.as_path()],
+            1,
+        )
+        .expect_err("oversized auxiliary output must terminate the child");
+
+        assert!(matches!(
+            error,
+            OracleError::AuxiliaryOutputLimitExceeded { .. }
+        ));
         assert!(started.elapsed() < Duration::from_secs(2));
     }
 

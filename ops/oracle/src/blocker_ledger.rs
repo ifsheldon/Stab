@@ -32,8 +32,8 @@ mod support;
 const SCHEMA_VERSION: u32 = 2;
 const STIM_VERSION: &str = "v1.16.0";
 const EXPECTED_LEDGER_DIGEST: [u8; 32] = [
-    0x8e, 0x53, 0x34, 0x33, 0xa1, 0x06, 0x2e, 0xa0, 0xb8, 0x37, 0x17, 0x63, 0x43, 0x6f, 0x3b, 0x54,
-    0x98, 0x47, 0x4b, 0x31, 0x39, 0xd9, 0x99, 0x22, 0xce, 0xbd, 0xba, 0x60, 0x5f, 0xa5, 0xc6, 0x80,
+    0x4c, 0xab, 0x5b, 0xca, 0xfd, 0x55, 0xea, 0x20, 0x83, 0xc6, 0x48, 0xa2, 0x94, 0xf4, 0x6f, 0x00,
+    0x63, 0x0c, 0xd3, 0x4f, 0x6d, 0x36, 0xa9, 0xd7, 0xec, 0x26, 0xc2, 0xf9, 0xcf, 0x11, 0x81, 0x31,
 ];
 const MAX_LEDGER_BYTES: u64 = 1 << 20;
 const MAX_MANIFEST_BYTES: u64 = 16 << 20;
@@ -315,7 +315,21 @@ struct OracleEvidenceSignature {
     comparator: OracleManifestComparator,
     argv: String,
     upstream_source: StimSourcePath,
+    #[serde(default)]
+    stdin_path: Option<FixtureRelativeEvidencePath>,
+    #[serde(default)]
+    expected_stdout_path: Option<FixtureRelativeEvidencePath>,
+    #[serde(default)]
+    stdin_sha256: Option<Sha256Hex>,
+    #[serde(default)]
+    expected_stdout_sha256: Option<Sha256Hex>,
 }
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+struct FixtureRelativeEvidencePath(PathBuf);
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+struct Sha256Hex(String);
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -328,6 +342,7 @@ struct SupportingBenchmarkReference {
 #[serde(rename_all = "kebab-case")]
 enum OracleEvidenceClass {
     Direct,
+    PinnedGolden,
     RustTestProxy,
     Planned,
 }
@@ -414,9 +429,10 @@ impl OracleRunner {
         let first = argv.split('|').next()?;
         match first {
             "cargo-test" => Some(Self::CargoTest),
-            "core-parse-print" | "core-circuit-parse-print" | "core-dem-parse-print" => {
-                Some(Self::CoreFixture)
-            }
+            "core-parse-print"
+            | "core-circuit-parse-print"
+            | "core-dem-parse-print"
+            | "core-time-reverse-flows" => Some(Self::CoreFixture),
             "manifest-only" => Some(Self::ManifestOnly),
             "--help" | "analyze_errors" | "convert" | "detect" | "gen" | "m2d" | "sample"
             | "sample_dem" => Some(Self::StimCli),
@@ -452,6 +468,10 @@ struct OracleManifestRow {
     comparator: OracleManifestComparator,
     #[serde(rename = "argv", deserialize_with = "deserialize_oracle_command")]
     command: OracleCommand,
+    #[serde(default)]
+    stdin_path: Option<FixtureRelativeEvidencePath>,
+    #[serde(default)]
+    expected_stdout_path: Option<FixtureRelativeEvidencePath>,
     status: OracleManifestStatus,
 }
 
@@ -879,7 +899,7 @@ fn validate_case(
     validate_statistical_plan(case, violations);
     validate_upstream_source(root, case, tracked_stim_paths, violations);
     validate_test_reference(blocker, case, violations);
-    validate_oracle_reference(case, oracle_rows, violations);
+    validate_oracle_reference(root, case, oracle_rows, violations);
     validate_benchmark_reference(case, benchmark_rows, violations);
 
     if blocker.disposition == BlockerDisposition::Implement
@@ -1013,12 +1033,15 @@ fn validate_test_reference(
     }
     match CargoTestSelector::parse(&case.test.selector) {
         Ok(selector)
-            if blocker.milestone == BlockerMilestone::B4
-                && case.test.state == EvidenceState::Existing
+            if matches!(
+                blocker.milestone,
+                BlockerMilestone::B1 | BlockerMilestone::B4
+            ) && case.test.state == EvidenceState::Existing
                 && !selector.is_exact() =>
         {
             violations.push(format!(
-                "PFM-B4 case {:?} must use an exact executable test selector",
+                "{} case {:?} must use an exact executable test selector",
+                blocker.milestone.as_str(),
                 case.id
             ));
         }

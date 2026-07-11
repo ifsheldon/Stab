@@ -1,8 +1,10 @@
 use serde_json::Value;
 
-use super::oracle::oracle_class_matches_runner;
+use super::evidence::read_oracle_manifest;
+use super::oracle::{oracle_class_matches_runner, oracle_comparator_matches};
 use super::{
-    BlockerLedger, BlockerLedgerError, MAX_LEDGER_BYTES, OracleEvidenceClass, OracleRunner,
+    BlockerLedger, BlockerLedgerError, ComparatorKind, FixtureId, MAX_LEDGER_BYTES,
+    OracleEvidenceClass, OracleRunner,
 };
 
 const LEDGER_JSON: &str = include_str!("../../../../docs/plans/blocker-closure-ledger.json");
@@ -53,6 +55,22 @@ fn case_mut<'a>(value: &'a mut Value, blocker_id: &str, case_id: &str) -> &'a mu
         .iter_mut()
         .find(|case| case.get("id").and_then(Value::as_str) == Some(case_id))
         .expect("named case")
+}
+
+fn planned_case_mut(value: &mut Value) -> &mut Value {
+    value
+        .get_mut("blockers")
+        .and_then(Value::as_array_mut)
+        .expect("blocker array")
+        .iter_mut()
+        .find_map(|blocker| {
+            blocker
+                .get_mut("cases")
+                .and_then(Value::as_array_mut)?
+                .iter_mut()
+                .find(|case| case.get("status").and_then(Value::as_str) == Some("planned"))
+        })
+        .expect("source ledger has a planned case for planned-selector validation")
 }
 
 fn validation_text(error: BlockerLedgerError) -> String {
@@ -286,7 +304,7 @@ fn blocker_ledger_rejects_owned_case_semantic_substitution() {
 #[test]
 fn blocker_ledger_requires_planned_selectors_for_planned_cases() {
     let ledger = mutated_ledger(|value| {
-        let case = case_mut(value, "pfm2-qec-transforms", "pfm2-python-inverse-empty");
+        let case = planned_case_mut(value);
         let test = case.get_mut("test").expect("test reference");
         *test.get_mut("state").expect("test state") = Value::from("existing");
     });
@@ -545,6 +563,10 @@ fn oracle_evidence_class_requires_typed_runner() {
         OracleEvidenceClass::RustTestProxy,
         OracleRunner::CargoTest
     ));
+    assert!(oracle_class_matches_runner(
+        OracleEvidenceClass::PinnedGolden,
+        OracleRunner::CoreFixture
+    ));
     assert!(!oracle_class_matches_runner(
         OracleEvidenceClass::Direct,
         OracleRunner::CargoTest
@@ -553,7 +575,45 @@ fn oracle_evidence_class_requires_typed_runner() {
         OracleEvidenceClass::RustTestProxy,
         OracleRunner::StimCli
     ));
+    assert_eq!(
+        OracleRunner::from_argv("core-time-reverse-flows|case"),
+        Some(OracleRunner::CoreFixture)
+    );
     assert!(OracleRunner::from_argv("--workspace").is_none());
+}
+
+#[test]
+fn exact_claim_rejects_structural_pinned_golden_row() {
+    let root = repo_root();
+    let rows = read_oracle_manifest(&root.fixture_manifest()).expect("oracle manifest");
+    let row = rows
+        .get(&FixtureId("m4-parser-basic".to_string()))
+        .expect("structural core row");
+
+    assert!(!oracle_comparator_matches(ComparatorKind::Exact, row));
+}
+
+#[test]
+fn blocker_ledger_rejects_tampered_pinned_golden_digest() {
+    let ledger = mutated_ledger(|value| {
+        *case_mut(
+            value,
+            "pfm2-qec-transforms",
+            "pfm2-flow-reverse-measurement",
+        )
+        .get_mut("oracle")
+        .and_then(|oracle| oracle.get_mut("signature"))
+        .and_then(|signature| signature.get_mut("expected_stdout_sha256"))
+        .expect("pinned-golden digest") = Value::from("0".repeat(64));
+    });
+
+    let error = ledger
+        .check(&repo_root())
+        .expect_err("tampered pinned golden");
+    assert!(
+        validation_text(error).contains("evidence signature is incompatible"),
+        "tampered digest must invalidate the frozen evidence binding"
+    );
 }
 
 #[test]

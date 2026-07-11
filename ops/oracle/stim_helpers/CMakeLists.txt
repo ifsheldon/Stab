@@ -1,0 +1,25 @@
+cmake_minimum_required(VERSION 3.13)
+project(stab_stim_oracle_helpers LANGUAGES CXX)
+
+if(NOT DEFINED STIM_SOURCE_DIR)
+    message(FATAL_ERROR "STIM_SOURCE_DIR is required")
+endif()
+if(NOT DEFINED STIM_LIBRARY)
+    message(FATAL_ERROR "STIM_LIBRARY is required")
+endif()
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/out")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/out")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/out")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/out")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${CMAKE_BINARY_DIR}/out")
+
+add_executable(stab_stim_reverse_flow reverse_flow.cc)
+target_include_directories(stab_stim_reverse_flow PRIVATE "${STIM_SOURCE_DIR}/src")
+target_link_libraries(stab_stim_reverse_flow PRIVATE "${STIM_LIBRARY}")
+
+if(NOT MSVC)
+    target_compile_options(stab_stim_reverse_flow PRIVATE -O3 -Wall -Wpedantic -fno-strict-aliasing)
+endif()

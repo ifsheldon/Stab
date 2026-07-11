@@ -1,0 +1,13 @@
+circuit:
+S_DAG 0
+MPAD 1 0
+OBSERVABLE_INCLUDE(0) rec[-2] rec[-1]
+H 0
+flows:
+1 -> rec[-2]
+1 -> rec[-1]
+Z -> X
+Y -> Z
+1 -> 1
+1 -> rec[-1]
+1 -> rec[-2]

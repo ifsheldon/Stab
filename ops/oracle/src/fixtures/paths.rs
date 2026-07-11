@@ -1,6 +1,15 @@
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
 use super::{FIXTURE_ROOT, FixtureError, FixturePathRequirement, RepoRoot};
+
+const FIXTURE_FILE_LIMIT_BYTES: usize = crate::process::OUTPUT_LIMIT_BYTES;
+
+pub(super) fn validate_fixture_root(root: &RepoRoot) -> Result<(), String> {
+    crate::safe_file::open_directory(&root.path.join(FIXTURE_ROOT))
+        .map(|_| ())
+        .map_err(|source| format!("fixture root is not a source-owned directory tree: {source}"))
+}
 
 pub(super) fn validate_fixture_path(
     fixture_root: &Path,
@@ -115,6 +124,8 @@ pub(super) fn prepare_fixture_output_file(
     root: &RepoRoot,
     relative: &str,
 ) -> Result<(), FixtureError> {
+    validate_fixture_root(root)
+        .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))?;
     let fixture_root = root.path.join(FIXTURE_ROOT);
     validate_fixture_path(
         &fixture_root,
@@ -124,24 +135,12 @@ pub(super) fn prepare_fixture_output_file(
         FixturePathRequirement::ExistingFileIfPresent,
     )
     .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))?;
-    let path = fixture_root.join(relative);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|source| FixtureError::CreateOutputDir {
-            path: parent.to_path_buf(),
-            source,
-        })?;
-    }
-    validate_fixture_path(
-        &fixture_root,
-        "fixture",
-        "path",
-        relative,
-        FixturePathRequirement::ExistingFileIfPresent,
-    )
-    .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))
+    Ok(())
 }
 
 pub(super) fn fixture_file(root: &RepoRoot, relative: &str) -> Result<PathBuf, FixtureError> {
+    validate_fixture_root(root)
+        .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))?;
     let fixture_root = root.path.join(FIXTURE_ROOT);
     validate_fixture_path(
         &fixture_root,
@@ -152,6 +151,51 @@ pub(super) fn fixture_file(root: &RepoRoot, relative: &str) -> Result<PathBuf, F
     )
     .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))?;
     Ok(fixture_root.join(relative))
+}
+
+pub(super) fn read_fixture_file(root: &RepoRoot, relative: &str) -> Result<Vec<u8>, FixtureError> {
+    let path = fixture_file(root, relative)?;
+    let mut file =
+        crate::safe_file::open_regular_file(&path).map_err(|source| FixtureError::ReadFile {
+            path: path.clone(),
+            source: std::io::Error::other(source),
+        })?;
+    let mut bytes = Vec::new();
+    Read::by_ref(&mut file)
+        .take(u64::try_from(FIXTURE_FILE_LIMIT_BYTES).unwrap_or(u64::MAX) + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|source| FixtureError::ReadFile {
+            path: path.clone(),
+            source,
+        })?;
+    if bytes.len() > FIXTURE_FILE_LIMIT_BYTES {
+        return Err(FixtureError::FixtureFileTooLarge {
+            path,
+            limit: FIXTURE_FILE_LIMIT_BYTES,
+        });
+    }
+    Ok(bytes)
+}
+
+pub(super) fn write_fixture_file(
+    root: &RepoRoot,
+    relative: &str,
+    bytes: &[u8],
+) -> Result<(), FixtureError> {
+    if bytes.len() > FIXTURE_FILE_LIMIT_BYTES {
+        return Err(FixtureError::FixtureFileTooLarge {
+            path: root.path.join(FIXTURE_ROOT).join(relative),
+            limit: FIXTURE_FILE_LIMIT_BYTES,
+        });
+    }
+    prepare_fixture_output_file(root, relative)?;
+    let path = root.path.join(FIXTURE_ROOT).join(relative);
+    crate::safe_file::atomic_write_regular_file(&path, bytes).map_err(|source| {
+        FixtureError::WriteOutput {
+            path: path.clone(),
+            source: std::io::Error::other(source),
+        }
+    })
 }
 
 pub(super) fn unsafe_component(component: Component<'_>) -> bool {

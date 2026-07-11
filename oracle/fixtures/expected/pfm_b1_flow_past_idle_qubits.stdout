@@ -1,0 +1,4 @@
+circuit:
+H 0
+flows:
+X0*X300 -> Z0*X300

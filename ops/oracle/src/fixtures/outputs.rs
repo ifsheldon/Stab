@@ -1,9 +1,10 @@
 use std::collections::BTreeSet;
 use std::ffi::OsString;
+use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::paths::{fixture_file, prepare_fixture_output_file, validate_fixture_path};
+use super::paths::{fixture_file, validate_fixture_path};
 use super::statistical::{self, StatisticalSource};
 use super::{
     ExpectedStdoutPolicy, FixtureComparator, FixtureError, FixturePathRequirement, FixtureRow,
@@ -14,14 +15,28 @@ const FIXTURE_INPUT_TOKEN_PREFIX: &str = "{fixture_input:";
 const FIXTURE_OUTPUT_TOKEN_PREFIX: &str = "{fixture_output:";
 const FIXTURE_TOKEN_SUFFIX: &str = "}";
 const FIXTURE_OUTPUT_ROOT: &str = "target/oracle/fixture-outputs";
-const AUXILIARY_OUTPUT_LIMIT_BYTES: u64 = 1024 * 1024;
+pub(super) const AUXILIARY_OUTPUT_LIMIT_BYTES: u64 = 1024 * 1024;
 
 static RUN_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub(super) struct PreparedFixtureCommand {
     pub(super) argv: Vec<OsString>,
     pub(super) outputs: Vec<FixtureOutput>,
+    _scratch: ScratchRunDirectory,
+}
+
+#[derive(Debug)]
+struct ScratchRunDirectory {
+    path: Option<PathBuf>,
+}
+
+impl Drop for ScratchRunDirectory {
+    fn drop(&mut self) {
+        if let Some(path) = self.path.take() {
+            drop(std::fs::remove_dir_all(path));
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -196,7 +211,11 @@ pub(super) fn prepare_command(
             None => argv.push(OsString::from(token)),
         }
     }
-    Ok(PreparedFixtureCommand { argv, outputs })
+    Ok(PreparedFixtureCommand {
+        argv,
+        outputs,
+        _scratch: ScratchRunDirectory { path: scratch_dir },
+    })
 }
 
 fn create_scratch_run_dir(
@@ -314,12 +333,7 @@ pub(super) fn record_outputs(
 ) -> Result<(), FixtureError> {
     for output in outputs {
         let actual = read_actual_fixture_output(row, output)?;
-        prepare_fixture_output_file(root, &output.expected_relative)?;
-        let expected_path = fixture_file(root, &output.expected_relative)?;
-        std::fs::write(&expected_path, actual).map_err(|source| FixtureError::WriteOutput {
-            path: expected_path,
-            source,
-        })?;
+        super::paths::write_fixture_file(root, &output.expected_relative, &actual)?;
     }
     Ok(())
 }
@@ -332,10 +346,7 @@ pub(super) fn compare_expected_outputs(
     for output in outputs {
         let actual = read_actual_fixture_output(row, output)?;
         let expected_path = fixture_file(root, &output.expected_relative)?;
-        let expected = std::fs::read(&expected_path).map_err(|source| FixtureError::ReadFile {
-            path: expected_path.clone(),
-            source,
-        })?;
+        let expected = super::paths::read_fixture_file(root, &output.expected_relative)?;
         if expected != actual {
             return Err(FixtureError::ExpectedFixtureOutputMismatch {
                 id: row.id.clone(),
@@ -446,34 +457,30 @@ fn compare_statistical_fixture_output(
     Ok(())
 }
 
-fn read_actual_fixture_output(
+pub(super) fn read_actual_fixture_output(
     row: &FixtureRow,
     output: &FixtureOutput,
 ) -> Result<Vec<u8>, FixtureError> {
-    let metadata = std::fs::symlink_metadata(&output.actual_path).map_err(|source| {
+    let mut file = crate::safe_file::open_regular_file(&output.actual_path).map_err(|source| {
         FixtureError::ReadFile {
             path: output.actual_path.clone(),
-            source,
+            source: std::io::Error::other(source),
         }
     })?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() {
-        return Err(FixtureError::CoreFixtureFailed {
-            id: row.id.clone(),
-            reason: format!(
-                "fixture output {} is not a regular file",
-                output.actual_path.display()
-            ),
-        });
-    }
-    if metadata.len() > AUXILIARY_OUTPUT_LIMIT_BYTES {
+    let mut bytes = Vec::new();
+    Read::by_ref(&mut file)
+        .take(AUXILIARY_OUTPUT_LIMIT_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|source| FixtureError::ReadFile {
+            path: output.actual_path.clone(),
+            source,
+        })?;
+    if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > AUXILIARY_OUTPUT_LIMIT_BYTES {
         return Err(FixtureError::AuxiliaryOutputTooLarge {
             id: row.id.clone(),
             path: output.actual_path.clone(),
             limit: AUXILIARY_OUTPUT_LIMIT_BYTES,
         });
     }
-    std::fs::read(&output.actual_path).map_err(|source| FixtureError::ReadFile {
-        path: output.actual_path.clone(),
-        source,
-    })
+    Ok(bytes)
 }

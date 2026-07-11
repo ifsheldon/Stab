@@ -55,6 +55,22 @@ const fn pf5_report_only_benchmark(id: &'static str) -> ExpectedBenchmarkSignatu
     }
 }
 
+const fn pfm2_contract_benchmark(id: &'static str) -> ExpectedBenchmarkSignature {
+    ExpectedBenchmarkSignature {
+        id,
+        runner: BenchmarkRunner::ContractOnly,
+        threshold_class: BenchmarkThresholdClass::NonPrimaryReportOnly,
+        comparability: BenchmarkClass::ContractOnly,
+    }
+}
+
+const PFM2_QEC_BENCHMARKS: &[ExpectedBenchmarkSignature] = &[
+    pfm2_contract_benchmark("pfm-b1-time-reverse-generated-surface"),
+    pfm2_contract_benchmark("pfm-b1-time-reverse-mpad-matrix"),
+    pfm2_contract_benchmark("pfm-b1-time-reverse-large-unitary-repeat"),
+    pfm2_contract_benchmark("pfm-b1-time-reverse-sparse-high-qubit"),
+];
+
 const PFM5_DETECTING_BENCHMARKS: &[ExpectedBenchmarkSignature] = &[
     pf5_report_only_benchmark("pf5-detecting-regions-repeat"),
     pf5_report_only_benchmark("pf5-detecting-regions-clifford"),
@@ -143,6 +159,7 @@ pub(super) fn validate_supporting_benchmarks(
     violations: &mut Vec<String>,
 ) {
     let expected_values = match blocker.id.as_str() {
+        "pfm2-qec-transforms" => PFM2_QEC_BENCHMARKS,
         "pfm5-detecting-regions" => PFM5_DETECTING_BENCHMARKS,
         "pfm5-missing-detectors" => PFM5_MISSING_BENCHMARKS,
         "pfm5-flow-engine" => PFM5_FLOW_BENCHMARKS,

@@ -8,7 +8,24 @@
       "disposition": "implement",
       "title": "General reverse-flow and QEC transform closure",
       "supporting_oracles": [],
-      "supporting_benchmarks": [],
+      "supporting_benchmarks": [
+        {
+          "classification": "contract-only",
+          "value": "pfm-b1-time-reverse-generated-surface"
+        },
+        {
+          "classification": "contract-only",
+          "value": "pfm-b1-time-reverse-mpad-matrix"
+        },
+        {
+          "classification": "contract-only",
+          "value": "pfm-b1-time-reverse-large-unitary-repeat"
+        },
+        {
+          "classification": "contract-only",
+          "value": "pfm-b1-time-reverse-sparse-high-qubit"
+        }
+      ],
       "cases": [
         {
           "id": "pfm2-anticommuting-measure-reset",
@@ -31,7 +48,8 @@
               "--test",
               "circuit_inverse_qec",
               "circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -72,18 +90,23 @@
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_measurement_rich_subset_reverses_single_measurement",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pf2-time-reverse-flow-measurement-rust",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-flow-reverse-measurement",
             "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|measurement_rich_subset",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-flow-reverse-measurement",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_flow_reverse_measurement.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "5c89183d6dc8fd746e6c7c6276dca9f10b575434f435e9cca78cc24e39e2f0c7"
             }
           },
           "benchmark": {
@@ -114,18 +137,23 @@
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_measurement_rich_subset_reverses_pair_measurement",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pf2-time-reverse-flow-measurement-rust",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-flow-through-mzz",
             "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|measurement_rich_subset",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-flow-through-mzz",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_flow_through_mzz.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "92b01ae76b350429e120185faa051c8f540b6069a0cc0d23325caf13a71493d1"
             }
           },
           "benchmark": {
@@ -156,18 +184,23 @@
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_unitary_subset_supports_flow_past_end",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pf2-time-reverse-flow-unitary-rust",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-flow-past-idle-qubits",
             "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|unitary_subset",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-flow-past-idle-qubits",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_flow_past_idle_qubits.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "075b695a3293c80c579bcd70f09cc063168e3febe9141a70754f6efed209ef13"
             }
           },
           "benchmark": {
@@ -187,24 +220,35 @@
             "subcase": "empty circuit and empty flows"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "circuit_inverse_qec",
+              "circuit_inverse_qec_pfm_b1",
               "pfm_b1_python_inverse_empty",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b1-python-inverse-empty"
+            "state": "existing",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-python-inverse-empty",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-python-inverse-empty",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_python_inverse_empty.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "e442a604849d62e587f2d53cfcbe439f8f64ad060b03c2bb259c83b96c4ee0f4"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
@@ -222,24 +266,35 @@
             "subcase": "R, H, MX, and DETECTOR canonical reversal"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "circuit_inverse_qec",
+              "circuit_inverse_qec_pfm_b1",
               "pfm_b1_python_reset_h_mx_detector",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b1-python-reset-h-mx-detector"
+            "state": "existing",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-python-reset-h-mx-detector",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-python-reset-h-mx-detector",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_python_reset_h_mx_detector.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "2ac1f50662cc55ff094e00e2dd06158f4140aa865080c2dfbe67d49f2f8def92"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -269,18 +324,23 @@
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_measurement_rich_subset_turns_measurements_into_resets",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pf2-time-reverse-flow-measurement-rust",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-python-measurement-to-reset",
             "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|measurement_rich_subset",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-python-measurement-to-reset",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_python_measurement_to_reset.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "bcd7757ce96790511b3dd13044da3deb91de989810e43ef2613b141ccca39b9e"
             }
           },
           "benchmark": {
@@ -311,18 +371,23 @@
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_measurement_rich_subset_reverses_resets",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pf2-time-reverse-flow-measurement-rust",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-python-reset-to-measurement",
             "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|measurement_rich_subset",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-python-reset-to-measurement",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_python_reset_to_measurement.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "5c89183d6dc8fd746e6c7c6276dca9f10b575434f435e9cca78cc24e39e2f0c7"
             }
           },
           "benchmark": {
@@ -352,19 +417,24 @@
               "stab-core",
               "--test",
               "circuit_inverse_qec",
-              "time_reversed_for_flows_measurement_rich_subset_reverses_single_measurement",
-              "--quiet"
+              "pfm_b1_python_measurement_kept_by_flow",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pf2-time-reverse-flow-measurement-rust",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-python-measurement-kept-by-flow",
             "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|measurement_rich_subset",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-python-measurement-kept-by-flow",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_python_measurement_kept_by_flow.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "5c89183d6dc8fd746e6c7c6276dca9f10b575434f435e9cca78cc24e39e2f0c7"
             }
           },
           "benchmark": {
@@ -395,18 +465,23 @@
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_measurement_rich_subset_can_keep_measurements",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pf2-time-reverse-flow-measurement-rust",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-python-dont-turn-measurement",
             "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|measurement_rich_subset",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-python-dont-turn-measurement",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_python_dont_turn_measurement.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "07de4caae1a95774594c70f0cdf47430a1107a5cfbc2e34f4ee3708d2c31dc51"
             }
           },
           "benchmark": {
@@ -426,24 +501,35 @@
             "subcase": "MR probability becomes trailing X_ERROR"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "circuit_inverse_qec",
+              "circuit_inverse_qec_pfm_b1",
               "pfm_b1_python_noisy_measure_reset",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b1-python-noisy-measure-reset"
+            "state": "existing",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-python-noisy-measure-reset",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-python-noisy-measure-reset",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_python_noisy_measure_reset.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "1c651f0a410e9a6f16e2d47b86b920ba0544f40040f20858cea4820499a7ef5d"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -462,27 +548,34 @@
             "subcase": "distance-3 rounds-2 rotated memory-X detecting-region reversal"
           },
           "comparator": "structural",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "circuit_inverse_qec",
+              "circuit_inverse_qec_pfm_b1",
               "pfm_b1_surface_code_reversal",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b1-surface-code-reversal"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b1-surface-code-reversal-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec_pfm_b1|pfm_b1_surface_code_reversal",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
+            }
           },
           "benchmark": {
-            "state": "planned",
+            "state": "existing",
             "value": "pfm-b1-time-reverse-generated-surface",
             "classification": "contract-only"
           },
@@ -509,18 +602,23 @@
               "--test",
               "circuit_inverse_qec",
               "time_reversed_for_flows_unitary_subset_supports_extra_idle_qubits",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
-            "classification": "rust-test-proxy",
-            "value": "pf2-time-reverse-flow-unitary-rust",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-python-more-flow-qubits",
             "signature": {
-              "parity_mode": "structural",
-              "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|unitary_subset",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-python-more-flow-qubits",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_python_more_flow_qubits.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "f642e12d8720ff14662d7ee5d3a80f28961af9385fe74063629fe94fabb9d858"
             }
           },
           "benchmark": {
@@ -550,19 +648,20 @@
               "stab-core",
               "--test",
               "circuit_inverse_qec",
-              "time_reversed_for_flows_measurement_rich_subset_preserves_measurement_ordering",
-              "--quiet"
+              "pfm_b1_python_measurement_ordering_m",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf2-time-reverse-flow-measurement-rust",
+            "value": "pfm-b1-measurement-ordering-m-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|measurement_rich_subset",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
+              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|pfm_b1_python_measurement_ordering_m|--|--exact",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
             }
           },
           "benchmark": {
@@ -592,19 +691,20 @@
               "stab-core",
               "--test",
               "circuit_inverse_qec",
-              "time_reversed_for_flows_measurement_rich_subset_preserves_measurement_ordering",
-              "--quiet"
+              "pfm_b1_python_measurement_ordering_mzz",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf2-time-reverse-flow-measurement-rust",
+            "value": "pfm-b1-measurement-ordering-mzz-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|measurement_rich_subset",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
+              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|pfm_b1_python_measurement_ordering_mzz|--|--exact",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
             }
           },
           "benchmark": {
@@ -634,19 +734,20 @@
               "stab-core",
               "--test",
               "circuit_inverse_qec",
-              "time_reversed_for_flows_measurement_rich_subset_reverses_multi_target_measure_resets",
-              "--quiet"
+              "pfm_b1_python_measurement_ordering_mr",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
             "state": "existing",
             "classification": "rust-test-proxy",
-            "value": "pf2-time-reverse-flow-measurement-rust",
+            "value": "pfm-b1-measurement-ordering-mr-rust",
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|measurement_rich_subset",
-              "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
+              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|pfm_b1_python_measurement_ordering_mr|--|--exact",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
             }
           },
           "benchmark": {
@@ -666,24 +767,31 @@
             "subcase": "measurement-record CX feedback remains rejected"
           },
           "comparator": "error-class",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "circuit_inverse_qec",
+              "circuit_inverse_qec_pfm_b1",
               "pfm_b1_feedback_rejection",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b1-feedback-rejection"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b1-time-reverse-general-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec_pfm_b1",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
@@ -701,24 +809,35 @@
             "subcase": "tagged X and Y observable includes with record conversion"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "circuit_inverse_qec",
+              "circuit_inverse_qec_pfm_b1",
               "pfm_b1_observable_paulis",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b1-observable-paulis"
+            "state": "existing",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-python-observable-paulis",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-python-observable-paulis",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_python_observable_paulis.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "d6de5f028e6f7a77df04ae437111fff20ac6425cb9eb49a3a32f4f94860b61c7"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -737,27 +856,38 @@
             "subcase": "MPAD constants, records, observables, duplicate ids, and adjacent Clifford matrix"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
               "--test",
-              "circuit_inverse_qec",
+              "circuit_inverse_qec_pfm_b1",
               "pfm_b1_mpad_flow_matrix",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b1-mpad-flow-matrix"
+            "state": "existing",
+            "classification": "pinned-golden",
+            "value": "pfm-b1-exact-mpad-flow-matrix",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "core-time-reverse-flows|pfm2-mpad-flow-matrix",
+              "upstream_source": "src/stim/util_top/circuit_inverse_qec.cc",
+              "stdin_path": "inputs/pfm_b1_reverse_flow_cases.json",
+              "expected_stdout_path": "expected/pfm_b1_mpad_flow_matrix.stdout",
+              "stdin_sha256": "49b54358fb2cb35dc981fdee5c4777101a0c09dd2926650d402abde2ace3257a",
+              "expected_stdout_sha256": "95b64d3063e6b8cd039c238c49c8b33a07d941120c0714174ec9d64ab7750687"
+            }
           },
           "benchmark": {
-            "state": "planned",
+            "state": "existing",
             "value": "pfm-b1-time-reverse-mpad-matrix",
             "classification": "contract-only"
           },
@@ -1161,7 +1291,7 @@
             "seed": 12648431,
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
-            "familywise_false_positive_budget": 1e-06,
+            "familywise_false_positive_budget": 0.000001,
             "buckets": [
               "mpp-zero",
               "mpp-one"
@@ -1219,7 +1349,7 @@
             "seed": 12648432,
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
-            "familywise_false_positive_budget": 1e-06,
+            "familywise_false_positive_budget": 0.000001,
             "buckets": [
               "mpad-zero",
               "mpad-one"
@@ -1333,7 +1463,7 @@
             "seed": 12648432,
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
-            "familywise_false_positive_budget": 1e-06,
+            "familywise_false_positive_budget": 0.000001,
             "buckets": [
               "identity",
               "x",
@@ -1396,7 +1526,7 @@
             "seed": 12648433,
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
-            "familywise_false_positive_budget": 1e-06,
+            "familywise_false_positive_budget": 0.000001,
             "buckets": [
               "pc1-i",
               "pc1-x",
@@ -1521,7 +1651,7 @@
             "seed": 12648434,
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
-            "familywise_false_positive_budget": 1e-06,
+            "familywise_false_positive_budget": 0.000001,
             "buckets": [
               "depol1-i",
               "depol1-x",
@@ -1586,7 +1716,7 @@
             "seed": 12648435,
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
-            "familywise_false_positive_budget": 1e-06,
+            "familywise_false_positive_budget": 0.000001,
             "buckets": [
               "no-error",
               "first-branch",
@@ -1651,7 +1781,7 @@
             "seed": 12648436,
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
-            "familywise_false_positive_budget": 1e-06,
+            "familywise_false_positive_budget": 0.000001,
             "buckets": [
               "no-herald",
               "herald-no-data-error",
@@ -1986,7 +2116,7 @@
             "seed": 12648437,
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
-            "familywise_false_positive_budget": 1e-06,
+            "familywise_false_positive_budget": 0.000001,
             "buckets": [
               "folded-all-zero-joint-record:p=0.5",
               "folded-joint-nonzero-record:p=0.5",

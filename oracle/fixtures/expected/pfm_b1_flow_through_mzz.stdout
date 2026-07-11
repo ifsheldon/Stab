@@ -1,0 +1,7 @@
+circuit:
+MZZ 0 1
+flows:
+YY -> XX xor rec[-1]
+XX -> XX
+_Z -> Z xor rec[-1]
+Z -> Z

@@ -13,6 +13,7 @@ mod blocker_ledger;
 mod fixtures;
 mod matrix;
 mod process;
+mod safe_file;
 
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
@@ -29,6 +30,8 @@ const STIM_COMMIT: &str = "e2fc1eca7fd21684d433aa5f10f4504ea4860d07";
 const VENDOR_STIM_PATH: &str = "vendor/stim";
 const BUILD_DIR: &str = "target/oracle/stim-v1.16.0";
 const BUILD_STAMP_FILE: &str = "stab-oracle-build-stamp.txt";
+const STIM_HELPER_SOURCE_DIR: &str = "ops/oracle/stim_helpers";
+const STIM_REVERSE_FLOW_HELPER_BUILD_DIR: &str = "target/oracle/stim-v1.16.0/reverse-flow-helper";
 
 #[derive(Debug, Parser)]
 #[command(
@@ -186,6 +189,9 @@ enum OracleError {
     #[error("CMake build finished without producing {0}")]
     MissingStimBinary(PathBuf),
 
+    #[error("pinned Stim helper build requires missing artifact {0}")]
+    MissingStimArtifact(PathBuf),
+
     #[error("failed to start {program}: {source}")]
     Spawn {
         program: String,
@@ -208,6 +214,27 @@ enum OracleError {
     CaptureOutput {
         program: String,
         source: std::io::Error,
+    },
+
+    #[error("{program} {stream} exceeded the {limit}-byte capture limit")]
+    OutputLimitExceeded {
+        program: String,
+        stream: &'static str,
+        limit: usize,
+    },
+
+    #[error("{program} auxiliary output {path} exceeded the {limit}-byte limit")]
+    AuxiliaryOutputLimitExceeded {
+        program: String,
+        path: PathBuf,
+        limit: u64,
+    },
+
+    #[error("{program} auxiliary output {path} is unsafe: {reason}")]
+    UnsafeAuxiliaryOutput {
+        program: String,
+        path: PathBuf,
+        reason: String,
     },
 
     #[error("{program} timed out after {milliseconds}ms\nstdout:\n{stdout}\nstderr:\n{stderr}")]
@@ -271,6 +298,32 @@ impl RepoRoot {
         self.build_dir()
             .join("out")
             .join(format!("stim{}", std::env::consts::EXE_SUFFIX))
+    }
+
+    fn stim_library(&self) -> PathBuf {
+        let file_name = if cfg!(windows) {
+            "libstim.lib"
+        } else {
+            "libstim.a"
+        };
+        self.build_dir().join("out").join(file_name)
+    }
+
+    fn stim_helper_source_dir(&self) -> PathBuf {
+        self.path.join(STIM_HELPER_SOURCE_DIR)
+    }
+
+    fn stim_reverse_flow_helper_build_dir(&self) -> PathBuf {
+        self.path.join(STIM_REVERSE_FLOW_HELPER_BUILD_DIR)
+    }
+
+    fn stim_reverse_flow_helper_binary(&self) -> PathBuf {
+        self.stim_reverse_flow_helper_build_dir()
+            .join("out")
+            .join(format!(
+                "stab_stim_reverse_flow{}",
+                std::env::consts::EXE_SUFFIX
+            ))
     }
 
     fn build_stamp(&self) -> PathBuf {
@@ -635,6 +688,78 @@ fn ensure_stim_binary(root: &RepoRoot, rebuild: bool) -> Result<PathBuf, OracleE
         }
     })?;
     Ok(binary)
+}
+
+fn ensure_stim_reverse_flow_helper(
+    root: &RepoRoot,
+    rebuild_stim: bool,
+) -> Result<PathBuf, OracleError> {
+    ensure_stim_binary(root, rebuild_stim)?;
+    let library = root.stim_library();
+    if rebuild_stim || !library.is_file() {
+        run_checked(
+            "cmake",
+            [
+                OsString::from("--build"),
+                root.build_dir().into_os_string(),
+                OsString::from("--target"),
+                OsString::from("libstim"),
+                OsString::from("--parallel"),
+            ],
+            b"",
+            Some(&root.path),
+        )?;
+    }
+    if !library.is_file() {
+        return Err(OracleError::MissingStimArtifact(library));
+    }
+
+    let source_dir = root.stim_helper_source_dir();
+    if !source_dir.is_dir() {
+        return Err(OracleError::MissingStimArtifact(source_dir));
+    }
+    let helper_build_dir = root.stim_reverse_flow_helper_build_dir();
+    std::fs::create_dir_all(&helper_build_dir).map_err(|source| OracleError::CreateBuildDir {
+        path: helper_build_dir.clone(),
+        source,
+    })?;
+    run_checked(
+        "cmake",
+        [
+            OsString::from("-S"),
+            source_dir.into_os_string(),
+            OsString::from("-B"),
+            helper_build_dir.clone().into_os_string(),
+            OsString::from("-DCMAKE_BUILD_TYPE=Release"),
+            cmake_path_definition("STIM_SOURCE_DIR", &root.stim_source()),
+            cmake_path_definition("STIM_LIBRARY", &library),
+        ],
+        b"",
+        Some(&root.path),
+    )?;
+    run_checked(
+        "cmake",
+        [
+            OsString::from("--build"),
+            helper_build_dir.into_os_string(),
+            OsString::from("--target"),
+            OsString::from("stab_stim_reverse_flow"),
+            OsString::from("--parallel"),
+        ],
+        b"",
+        Some(&root.path),
+    )?;
+    let binary = root.stim_reverse_flow_helper_binary();
+    if !binary.is_file() {
+        return Err(OracleError::MissingStimBinary(binary));
+    }
+    Ok(binary)
+}
+
+fn cmake_path_definition(name: &str, path: &Path) -> OsString {
+    let mut value = OsString::from(format!("-D{name}="));
+    value.push(path.as_os_str());
+    value
 }
 
 fn build_stamp_matches(root: &RepoRoot, version: &StimSourceVersion) -> bool {

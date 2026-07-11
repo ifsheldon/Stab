@@ -1,0 +1,4 @@
+circuit:
+M 0
+flows:
+Z -> rec[-1]

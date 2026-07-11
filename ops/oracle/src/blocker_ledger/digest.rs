@@ -183,6 +183,41 @@ fn digest_oracle_signature(hasher: &mut Sha256, label: &str, signature: &OracleE
         &format!("{label}.upstream_source"),
         &signature.upstream_source.0.to_string_lossy(),
     );
+    digest_optional_path(
+        hasher,
+        &format!("{label}.stdin_path"),
+        signature.stdin_path.as_ref(),
+    );
+    digest_optional_path(
+        hasher,
+        &format!("{label}.expected_stdout_path"),
+        signature.expected_stdout_path.as_ref(),
+    );
+    digest_field(
+        hasher,
+        &format!("{label}.stdin_sha256"),
+        signature
+            .stdin_sha256
+            .as_ref()
+            .map_or("none", |digest| digest.0.as_str()),
+    );
+    digest_field(
+        hasher,
+        &format!("{label}.expected_stdout_sha256"),
+        signature
+            .expected_stdout_sha256
+            .as_ref()
+            .map_or("none", |digest| digest.0.as_str()),
+    );
+}
+
+fn digest_optional_path(
+    hasher: &mut Sha256,
+    label: &str,
+    path: Option<&super::FixtureRelativeEvidencePath>,
+) {
+    let value = path.map_or_else(|| "none".into(), |path| path.0.to_string_lossy());
+    digest_field(hasher, label, &value);
 }
 
 pub(super) fn digest_hex(digest: &[u8]) -> String {

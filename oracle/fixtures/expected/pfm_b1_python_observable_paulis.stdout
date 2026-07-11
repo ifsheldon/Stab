@@ -1,0 +1,7 @@
+circuit:
+RY 1
+OBSERVABLE_INCLUDE[test2](3) Y1
+OBSERVABLE_INCLUDE[test1](2) X0
+MX 0
+OBSERVABLE_INCLUDE(2) rec[-1]
+flows:

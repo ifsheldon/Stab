@@ -44,8 +44,6 @@ fn open_regular_file_unix_with_pre_open_hook(
 ) -> Result<std::fs::File, BlockerLedgerError> {
     use std::os::unix::fs::MetadataExt;
 
-    use rustix::fs::{Mode, OFlags};
-
     let expected =
         std::fs::symlink_metadata(path).map_err(|source| BlockerLedgerError::Inspect {
             path: path.to_path_buf(),
@@ -57,16 +55,11 @@ fn open_regular_file_unix_with_pre_open_hook(
         });
     }
     hook();
-    let descriptor = rustix::fs::open(
-        path,
-        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
-        Mode::empty(),
-    )
-    .map_err(|source| BlockerLedgerError::Inspect {
-        path: path.to_path_buf(),
-        source: source.into(),
+    let file = crate::safe_file::open_regular_file(path).map_err(|_| {
+        BlockerLedgerError::EvidenceNotRegular {
+            path: path.to_path_buf(),
+        }
     })?;
-    let file = std::fs::File::from(descriptor);
     let opened = file
         .metadata()
         .map_err(|source| BlockerLedgerError::Inspect {

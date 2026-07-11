@@ -1,0 +1,5 @@
+circuit:
+H 2
+flows:
+X300 -> X300
+Z2*Z301 -> X2*Z301
