@@ -39,7 +39,8 @@ PFM-B1 is complete as of 2026-07-11: all nineteen transform cases have direct ex
 PFM-B4 is complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc`.
 The required second PFM-B5 full-code review found additional analyzer correctness, nested-probe accounting, search-state memory, trivial-SAT preflight, diagnostic-parity, and evidence-specificity defects after `15b55cc`.
 Remediation is committed in `d1d6554`, `433252c`, and `d3ffc5f`; all 48 cases now have independent exact selectors, the ledger reports eleven supporting oracle rows and eleven benchmarks, and ten direct PF6 exact rows pass.
-Regenerate clean PF6 benchmark evidence from the current committed implementation, synchronize the final evidence values, run milestone-audit, and run full-code-review again before declaring PFM-B5 complete.
+Clean PF6 baseline and allocation-tracked compare evidence identifies `HEAD=37cf5860c72456347d1365340735fc7ef126d4de` with `local_modifications=false`; the faithful graphlike rows remain report-only at 5.960x and 5.490x Stim.
+Run milestone-audit and full-code-review again against the synchronized implementation and evidence before declaring PFM-B5 complete.
 Then implement the eighteen remaining PFM-B2 gate-surface cases and proceed to PFM-B6.
 Do not reopen PFM-B0, PFM-B1, PFM-B2 contract groundwork, PFM-B3, PFM-B4, or the fixed PFM-B5 semantic scope unless their frozen contracts change.
 

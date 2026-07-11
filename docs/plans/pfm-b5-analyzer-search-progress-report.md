@@ -5,7 +5,7 @@
 PFM-B5 implementation, executable evidence, original milestone-audit remediation, and first full-code-review remediation were complete through `15b55cc`.
 The required second full-code review then found additional correctness, resource-accounting, and evidence-specificity defects; remediation is committed in `d1d6554`, `433252c`, and `d3ffc5f`.
 The milestone now owns 48 independently selected ledger cases: fourteen analyzer cases, nine graphlike cases, ten hypergraph cases, twelve shortest or weighted WCNF cases, two sparse reverse-tracker cases, and one matched-error value-object case.
-Fresh committed-HEAD benchmark evidence, a new milestone-audit pass, and a final full-code-review pass remain required before this report may be treated as the PFM-B5 completion record.
+Fresh committed-HEAD benchmark evidence is now recorded at `37cf586`; a new milestone-audit pass and a final full-code-review pass remain required before this report may be treated as the PFM-B5 completion record.
 
 ## Scope Result
 
@@ -85,29 +85,26 @@ A parameterized touched-detector test crosses the effective-node boundary withou
 
 ## Benchmark Evidence
 
-The last clean first-review source-owned artifacts are:
+The current clean second-review source-owned artifacts are:
 
-- Baseline: `target/benchmarks/pfm-b5-review-baseline/baseline.json`.
-- Compare: `target/benchmarks/pfm-b5-review-compare/compare.json`.
-- Stab commit: `15b55cc8bf2c1aa0dabab401389fa88ad14b3fb1`.
+- Baseline: `target/benchmarks/pfm-b5-second-review-baseline/baseline.json`.
+- Compare: `target/benchmarks/pfm-b5-second-review-compare/compare.json`.
+- Stab commit: `37cf5860c72456347d1365340735fc7ef126d4de`.
 - Frozen Stim commit: `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, tag `v1.16.0`.
 - Worktree state: `local_modifications=false`.
 - Method: release profile, warmup, three measurement runs, allocation tracking, and required profiler notes.
 
-These artifacts predate the second-review remediation and therefore remain historical comparison evidence, not current completion evidence.
-They must be replaced by fresh committed-HEAD PF6 baseline and compare artifacts before closure.
-
 | Row | Representative Stab time | Stim time | Ratio | Peak live allocation | Disposition |
 | --- | ---: | ---: | ---: | ---: | --- |
-| `pfm-b5-analyzer-cycle-folding` | 6.688 us to 489.216 us | No faithful aggregate filter | None | 94,336 B | Report-only |
-| `pfm-b5-analyzer-generated-qec` | 45.744 us and 13.794 ms | No faithful aggregate filter | None | 6,430,472 B | Report-only |
-| `pfm-b5-graphlike-search-direct-dem` | 745.600 us | No faithful direct-model filter | None | 615,896 B | Report-only |
-| `pfm-b5-graphlike-generated-d25` | 179.058 ms | 30 ms | 5.969x | 12,437,520 B | Direct match, report-only |
-| `pfm-b5-graphlike-generated-d11-r1000` | 1.375 s | 250 ms | 5.500x | 92,643,408 B | Direct match, report-only |
-| `pfm-b5-hypergraph-search-direct-dem` | 57.744 us | No faithful direct-model filter | None | 57,768 B | Report-only |
-| `pfm-b5-hypergraph-search-generated-qec` | 53.965 ms | No faithful filter | None | 12,661,296 B | Report-only |
-| `pfm-b5-wcnf-direct-dem` | 374.320 us and 423.616 us | No faithful filter | None | 453,518 B | Report-only |
-| `pfm-b5-wcnf-generated-qec` | 3.284 ms and 3.500 ms | No faithful filter | None | 3,844,106 B | Report-only |
+| `pfm-b5-analyzer-cycle-folding` | 6.704 us to 489.423 us | No faithful aggregate filter | None | 94,336 B | Report-only |
+| `pfm-b5-analyzer-generated-qec` | 46.800 us and 13.830 ms | No faithful aggregate filter | None | 6,430,472 B | Report-only |
+| `pfm-b5-graphlike-search-direct-dem` | 824.463 us | No faithful direct-model filter | None | 615,896 B | Report-only |
+| `pfm-b5-graphlike-generated-d25` | 184.769 ms | 31 ms | 5.960x | 12,437,520 B | Direct match, report-only |
+| `pfm-b5-graphlike-generated-d11-r1000` | 1.427 s | 260 ms | 5.490x | 92,643,408 B | Direct match, report-only |
+| `pfm-b5-hypergraph-search-direct-dem` | 57.600 us | No faithful direct-model filter | None | 57,768 B | Report-only |
+| `pfm-b5-hypergraph-search-generated-qec` | 47.464 ms | No faithful filter | None | 12,661,296 B | Report-only |
+| `pfm-b5-wcnf-direct-dem` | 383.296 us and 434.143 us | No faithful filter | None | 453,518 B | Report-only |
+| `pfm-b5-wcnf-generated-qec` | 3.338 ms and 3.550 ms | No faithful filter | None | 3,844,106 B | Report-only |
 
 The analyzer diagnostics prove that the transient, period-8, period-127, nested, gauge, and coordinate workloads all use the generic reverse-fold path with no bounded fallback.
 The gauge case represents `10^15` repeat iterations and arithmetically skips `999,999,999,999,996` entered-loop iterations.
@@ -146,7 +143,14 @@ just oracle::blockers --check-selectors
 just oracle::run --milestone PF6 --exact
 ```
 
-Fresh benchmark commands and final workspace verification remain pending.
+The second-review benchmark refresh additionally passed:
+
+```sh
+just bench::baseline --only PF6 --out target/benchmarks/pfm-b5-second-review-baseline
+cargo run -q -p stab-bench --profile release --features count-allocations -- compare --only PF6 --baseline target/benchmarks/pfm-b5-second-review-baseline/baseline.json --report target/benchmarks/pfm-b5-second-review-compare --track-allocations --warmup --measurement-runs 3 --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/pfm-b5
+```
+
+Final workspace verification remains pending.
 
 ## Audit And Review Status
 
@@ -158,7 +162,7 @@ The later GPT-5.6/max full-code review found production defects and evidence gap
 Commits `642ff63`, `83ed962`, `8908e7f`, `f0c6a83`, `07bb198`, and `15b55cc` fix those findings without adding a new under-specification entry; the remaining documented fallback and sparse WCNF deviations were already explicit scope or resource decisions.
 The next required full-code-review pass found that folded noisy `MPAD` errors were dropped, nested no-recurrence probes could evade the outer step budget, count-only search budgets did not bound variable-sized state payloads, trivial detector-only SAT models flattened large repeats before returning UNSAT, zero-probability error diagnostics diverged from Stim, and several exact or resource claims were broader than their selected evidence.
 Commits `d1d6554`, `433252c`, and `d3ffc5f` fix those findings, split overclaimed ledger rows, add direct folded-`MPAD` and structural resource evidence, and expand PFM-B5 from 39 to 48 independently selected cases.
-The fresh benchmark run, milestone audit, and final full-code review have not yet been completed against those commits, so PFM-B5 remains open.
+The fresh benchmark run is complete at clean `HEAD=37cf5860c72456347d1365340735fc7ef126d4de`; milestone audit and final full-code review have not yet been completed against the synchronized evidence, so PFM-B5 remains open.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
@@ -168,14 +172,14 @@ The fresh benchmark run, milestone audit, and final full-code review have not ye
 | Exact shortest and weighted WCNF corpus | Satisfied | Twelve independently selected `pfm_b5_wcnf_*` cases |
 | Sparse IDs and distinct traversal or search limits | Satisfied | Sparse resource tests, traversal mechanism and target-list tests, state, transition, state-payload, edge-arena, and SAT preflight tests |
 | Source-owned oracle evidence | Satisfied | Content-bound direct rows, exact selectors, eleven supporting oracle rows, and ten direct exact PF6 rows |
-| Fresh source-owned benchmark evidence | Pending | Regenerate PF6 baseline and allocation-tracked compare from the current committed implementation |
-| Honest 1.25x gate disposition | Pending refresh | Prior direct-match ratios 5.969x and 5.500x remain report-only; rerun before closure |
+| Fresh source-owned benchmark evidence | Satisfied | Clean allocation-tracked PF6 artifacts from `37cf5860c72456347d1365340735fc7ef126d4de` |
+| Honest 1.25x gate disposition | Satisfied | Direct-match ratios 5.960x and 5.490x remain report-only with updated profiler notes |
 | Final milestone audit and full-code review | Pending | Re-run both after evidence and documentation synchronization |
 | Deferred provenance remains excluded | Satisfied | Checklist, ledger, and this report name full ErrorMatcher provenance as deferred |
 
 ## Remaining Work Outside PFM-B5
 
-The selected PFM-B5 semantic scope has no intentionally unimplemented child case, but fresh benchmark evidence, milestone-audit closure, and final review sign-off are still pending.
+The selected PFM-B5 semantic scope has no intentionally unimplemented child case, but milestone-audit closure and final review sign-off are still pending.
 Full ErrorMatcher stack-frame, heralded, and repeat-contained provenance plus `stim explain_errors` remain intentionally deferred.
 The graphlike direct-match slowdown is an optimization backlog item and an explicit reason the rows remain outside the primary gate; it does not invalidate semantic closure.
 PFM-B2 still owns the generated exhaustive gate-by-surface semantic matrix, and PFM-B6 still owns final audit and status rollup.
