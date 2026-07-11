@@ -11,6 +11,7 @@ use crate::{
     SingleQubitClifford, Tableau, Target,
 };
 
+mod error_analysis;
 mod pauli_product;
 mod shifted_repeat;
 mod unitary_repeat;
@@ -39,6 +40,9 @@ pub(crate) struct SparseReverseFrameTracker {
     detector_count: u64,
     observable_effects: BTreeMap<u64, BTreeSet<DemTarget>>,
     fail_on_anticommute: bool,
+    error_analysis_mode: bool,
+    eliminate_detector_gauges: bool,
+    gauge_errors: Vec<BTreeSet<DemTarget>>,
     anticommutations: BTreeSet<Anticommutation>,
 }
 
@@ -58,8 +62,31 @@ impl SparseReverseFrameTracker {
             detector_count,
             observable_effects: BTreeMap::new(),
             fail_on_anticommute,
+            error_analysis_mode: false,
+            eliminate_detector_gauges: false,
+            gauge_errors: Vec::new(),
             anticommutations: BTreeSet::new(),
         }
+    }
+
+    pub(crate) fn measurement_count(&self) -> usize {
+        self.measurement_count
+    }
+
+    pub(crate) fn detector_count(&self) -> u64 {
+        self.detector_count
+    }
+
+    pub(crate) fn is_shifted_copy(&self, other: &Self) -> bool {
+        shifted_repeat::is_shifted_copy(self, other)
+    }
+
+    pub(crate) fn shift_counts(
+        &mut self,
+        measurement_offset: i128,
+        detector_offset: i128,
+    ) -> CircuitResult<()> {
+        shifted_repeat::shift(self, measurement_offset, detector_offset)
     }
 
     pub(crate) fn undo_circuit(&mut self, circuit: &Circuit) -> CircuitResult<()> {
@@ -723,73 +750,6 @@ impl SparseReverseFrameTracker {
                         "OBSERVABLE_INCLUDE target {target} is not a measurement record or Pauli target"
                     )));
                 }
-            }
-        }
-        Ok(())
-    }
-
-    fn check_measurement_gauge(
-        &mut self,
-        qubit: QubitId,
-        basis: TrackerBasis,
-    ) -> CircuitResult<()> {
-        self.check_gauge(qubit, basis, self.anticommuting_sensitivity(qubit, basis)?)
-    }
-
-    fn check_product_measurement_gauge(
-        &mut self,
-        terms: &[(QubitId, TrackerBasis)],
-    ) -> CircuitResult<()> {
-        let mut gauge = BTreeSet::new();
-        for (qubit, basis) in terms {
-            toggle_targets(
-                &mut gauge,
-                self.anticommuting_sensitivity(*qubit, *basis)?
-                    .iter()
-                    .copied(),
-            );
-        }
-        self.check_product_gauge(terms, gauge)
-    }
-
-    fn check_reset_gauge(&mut self, qubit: QubitId, basis: TrackerBasis) -> CircuitResult<()> {
-        self.check_gauge(qubit, basis, self.anticommuting_sensitivity(qubit, basis)?)
-    }
-
-    fn check_gauge(
-        &mut self,
-        qubit: QubitId,
-        basis: TrackerBasis,
-        gauge: BTreeSet<DemTarget>,
-    ) -> CircuitResult<()> {
-        self.check_product_gauge(&[(qubit, basis)], gauge)
-    }
-
-    fn check_product_gauge(
-        &mut self,
-        terms: &[(QubitId, TrackerBasis)],
-        gauge: BTreeSet<DemTarget>,
-    ) -> CircuitResult<()> {
-        if gauge.is_empty() {
-            return Ok(());
-        }
-        if self.fail_on_anticommute {
-            let mut message = String::from("collapse anti-commuted with tracked targets:");
-            for target in &gauge {
-                message.push_str("\n    ");
-                message.push_str(&target.to_string());
-            }
-            return Err(CircuitError::invalid_detector_error_model(message));
-        }
-        for (qubit, basis) in terms {
-            for target in &gauge {
-                self.anticommutations.insert(Anticommutation {
-                    target: *target,
-                    location: TrackerLocation {
-                        qubit: *qubit,
-                        basis: *basis,
-                    },
-                });
             }
         }
         Ok(())

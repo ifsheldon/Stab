@@ -345,12 +345,9 @@ fn pf6_dem_analyzer_period127_observable_keeps_single_middle_repeat_unfolded() {
 }
 
 #[test]
-fn pf6_dem_analyzer_period127_observable_keeps_adjacent_residue_unfolded() {
+fn pf6_dem_analyzer_period127_observable_folds_adjacent_residue() {
     let circuit =
         Circuit::from_stim_str(&period127_observable_circuit(466)).expect("period-127 circuit");
-    let expected = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
-        .expect("non-folded analysis")
-        .to_dem_string();
     let actual = circuit_to_detector_error_model(
         &circuit,
         ErrorAnalyzerOptions {
@@ -358,32 +355,33 @@ fn pf6_dem_analyzer_period127_observable_keeps_adjacent_residue_unfolded() {
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect("fold-loop bounded fallback")
+    .expect("generic period-127 fold")
     .to_dem_string();
 
-    assert_eq!(actual, expected);
-    assert!(
-        actual.starts_with("error(1) D466\ndetector D0\n"),
-        "{actual}"
-    );
-    assert!(!actual.contains("repeat 466"), "{actual}");
+    assert!(actual.starts_with("detector D0\n"), "{actual}");
+    assert!(actual.contains("repeat 2 {"), "{actual}");
+    assert!(actual.contains("error(1) D212"), "{actual}");
+    assert!(actual.ends_with("logical_observable L9\n"), "{actual}");
 }
 
 #[test]
-fn pf6_dem_analyzer_period127_observable_rejects_huge_adjacent_residue() {
+fn pf6_dem_analyzer_period127_observable_folds_huge_adjacent_residue() {
     let circuit = Circuit::from_stim_str(&period127_observable_circuit(1_000_083))
         .expect("period-127 circuit");
 
-    let error = circuit_to_detector_error_model(
+    let actual = circuit_to_detector_error_model(
         &circuit,
         ErrorAnalyzerOptions {
             fold_loops: true,
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect_err("unsupported huge residue should not use generic compact folding");
+    .expect("generic huge period-127 fold")
+    .to_dem_string();
 
-    assert!(error.to_string().contains("repeat counts up to 100000"));
+    assert!(actual.contains("repeat 7873 {"), "{actual}");
+    assert!(actual.contains("error(1) D212"), "{actual}");
+    assert!(actual.lines().count() < 400, "{actual}");
 }
 
 #[test]
@@ -464,7 +462,7 @@ fn pf6_dem_analyzer_fallback_preserves_delayed_rec_dependency() {
 }
 
 #[test]
-fn pf6_dem_analyzer_fallback_does_not_mask_prefixed_repeat_errors() {
+fn pf6_dem_analyzer_generic_prefixed_repeat_matches_unfolded() {
     let circuit = Circuit::from_stim_str(
         "
         X_ERROR(0.125) 0
@@ -481,21 +479,17 @@ fn pf6_dem_analyzer_fallback_does_not_mask_prefixed_repeat_errors() {
         .to_dem_string();
     assert_eq!(non_folded, "error(0.125) D0 D1\n");
 
-    let error = circuit_to_detector_error_model(
+    let folded = circuit_to_detector_error_model(
         &circuit,
         ErrorAnalyzerOptions {
             fold_loops: true,
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect_err("preserve unsupported prefixed-repeat folded error");
+    .expect("generic prefixed-repeat analysis")
+    .to_dem_string();
 
-    assert!(
-        error
-            .to_string()
-            .contains("supports prefixed repeats only when the first iteration ends"),
-        "{error}"
-    );
+    assert_eq!(folded, non_folded);
 }
 
 #[test]
@@ -520,7 +514,7 @@ fn pf6_dem_analyzer_rejects_folded_observables_crossing_iterations() {
 }
 
 #[test]
-fn pf6_dem_analyzer_fallback_preserves_repeat_count_cap() {
+fn pf6_dem_analyzer_no_recurrence_preserves_repeat_count_cap() {
     let circuit = Circuit::from_stim_str(
         "
         R 0
@@ -544,18 +538,18 @@ fn pf6_dem_analyzer_fallback_preserves_repeat_count_cap() {
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect_err("reject unsupported mixed top-level expansion beyond cap");
+    .expect_err("reject unsummarizable repeat beyond cap");
 
     assert!(
         error
             .to_string()
-            .contains("analyze_errors currently supports repeat counts up to 100000"),
+            .contains("found no loop-state recurrence within 1000000 iterations"),
         "{error}"
     );
 }
 
 #[test]
-fn pf6_dem_analyzer_fallback_preserves_repeat_count_cap_for_delayed_rec_dependency() {
+fn pf6_dem_analyzer_no_recurrence_rejects_delayed_dependency_beyond_cap() {
     let circuit = Circuit::from_stim_str(
         "
         M 0
@@ -585,18 +579,18 @@ fn pf6_dem_analyzer_fallback_preserves_repeat_count_cap_for_delayed_rec_dependen
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect_err("reject unsupported delayed dependency beyond repeat cap");
+    .expect_err("reject unsummarizable delayed dependency beyond repeat cap");
 
     assert!(
         error
             .to_string()
-            .contains("analyze_errors currently supports repeat counts up to 100000"),
+            .contains("found no loop-state recurrence within 1000000 iterations"),
         "{error}"
     );
 }
 
 #[test]
-fn pf6_dem_analyzer_fallback_preserves_repeat_iteration_cap() {
+fn pf6_dem_analyzer_folds_nested_measurement_only_repeats() {
     let circuit = Circuit::from_stim_str(
         "
         M 0
@@ -610,23 +604,21 @@ fn pf6_dem_analyzer_fallback_preserves_repeat_iteration_cap() {
     )
     .expect("circuit");
 
-    let error = circuit_to_detector_error_model(
+    let actual = circuit_to_detector_error_model(
         &circuit,
         ErrorAnalyzerOptions {
             fold_loops: true,
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect_err("reject aggregate repeat iterations beyond cap");
+    .expect("fold nested measurement-only repeats")
+    .to_dem_string();
 
-    assert!(
-        error.to_string().contains("expanded repeat iterations"),
-        "{error}"
-    );
+    assert_eq!(actual, "repeat 10000 {\n    repeat 101 {\n    }\n}\n");
 }
 
 #[test]
-fn pf6_dem_analyzer_fallback_preserves_expanded_instruction_cap() {
+fn pf6_dem_analyzer_folds_measurement_only_instruction_volume() {
     let circuit = Circuit::from_stim_str(
         "
         M 0
@@ -648,17 +640,15 @@ fn pf6_dem_analyzer_fallback_preserves_expanded_instruction_cap() {
     )
     .expect("circuit");
 
-    let error = circuit_to_detector_error_model(
+    let actual = circuit_to_detector_error_model(
         &circuit,
         ErrorAnalyzerOptions {
             fold_loops: true,
             ..ErrorAnalyzerOptions::default()
         },
     )
-    .expect_err("reject aggregate expanded instructions beyond cap");
+    .expect("fold measurement-only instruction volume")
+    .to_dem_string();
 
-    assert!(
-        error.to_string().contains("expanded instructions"),
-        "{error}"
-    );
+    assert_eq!(actual, "repeat 100000 {\n}\n");
 }

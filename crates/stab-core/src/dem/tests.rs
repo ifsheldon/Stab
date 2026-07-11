@@ -1166,10 +1166,7 @@ fn dem_analyzer_fold_loops_preserves_repeat_detector_shift() {
     .unwrap()
     .to_dem_string();
 
-    assert_eq!(
-        dem,
-        "repeat 2 {\n    detector D0\n    shift_detectors 1\n}\n"
-    );
+    assert_eq!(dem, "detector D0\ndetector D1\n");
 }
 
 #[test]

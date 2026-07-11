@@ -13,13 +13,14 @@ mod instructions;
 mod measurements;
 mod mpp;
 mod probabilities;
+mod reverse_fold;
 
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Probability, QubitId,
     RepeatBlock, SingleQubitClifford,
 };
 
-use super::{DemInstruction, DemRepeatBlock, DemTarget, DetectorErrorModel};
+use super::{DemInstruction, DemTarget, DetectorErrorModel};
 use budget::validate_analyzer_expansion_budget;
 use declarations::Declaration;
 use decompose::decompose_tagged_error_probabilities;
@@ -67,11 +68,6 @@ pub fn circuit_to_detector_error_model(
     Analyzer::new(options).analyze(circuit)
 }
 
-struct AnalyzerResult {
-    dem: DetectorErrorModel,
-    detector_count: u64,
-}
-
 struct Analyzer {
     options: ErrorAnalyzerOptions,
     measurement_count: usize,
@@ -107,11 +103,7 @@ impl Analyzer {
         }
     }
 
-    fn analyze(self, circuit: &Circuit) -> CircuitResult<DetectorErrorModel> {
-        self.analyze_with_stats(circuit).map(|result| result.dem)
-    }
-
-    fn analyze_with_stats(mut self, circuit: &Circuit) -> CircuitResult<AnalyzerResult> {
+    fn analyze(mut self, circuit: &Circuit) -> CircuitResult<DetectorErrorModel> {
         validate_analyzer_expansion_budget(circuit)?;
         self.visit_circuit(circuit)?;
         self.gauge_errors = find_gauge_errors(
@@ -122,12 +114,7 @@ impl Analyzer {
             circuit.count_qubits(),
             self.options.allow_gauge_detectors,
         )?;
-        let detector_count = self.detector_count;
-        let dem = self.into_dem()?;
-        Ok(AnalyzerResult {
-            dem,
-            detector_count,
-        })
+        self.into_dem()
     }
 
     fn visit_circuit(&mut self, circuit: &Circuit) -> CircuitResult<()> {

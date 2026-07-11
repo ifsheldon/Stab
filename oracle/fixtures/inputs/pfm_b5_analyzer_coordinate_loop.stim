@@ -1,0 +1,13 @@
+MR 1
+REPEAT 1000 {
+    REPEAT 1000 {
+        X_ERROR(0.25) 0
+        CNOT 0 1
+        MR 1
+        DETECTOR(1, 2, 3) rec[-2] rec[-1]
+        SHIFT_COORDS(4, 5)
+    }
+    SHIFT_COORDS(6, 7)
+}
+M 0
+OBSERVABLE_INCLUDE(9) rec[-1]

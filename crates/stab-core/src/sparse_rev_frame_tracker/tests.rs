@@ -615,6 +615,38 @@ fn sparse_rev_frame_tracker_shifted_copy_matches_record_and_detector_offsets() {
         .insert(DemTarget::relative_detector(2987).unwrap());
     assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
 
+    actual.observable_effects.insert(9, detector_set(286));
+    assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
+    expected.observable_effects.insert(9, detector_set(2986));
+    assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
+
+    actual.gauge_errors.push(detector_set(285));
+    assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
+    expected.gauge_errors.push(detector_set(2985));
+    assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
+
+    actual.anticommutations.insert(Anticommutation {
+        target: DemTarget::relative_detector(284).unwrap(),
+        location: TrackerLocation {
+            qubit: qid(7),
+            basis: TrackerBasis::Y,
+        },
+    });
+    assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
+    expected.anticommutations.insert(Anticommutation {
+        target: DemTarget::relative_detector(2984).unwrap(),
+        location: TrackerLocation {
+            qubit: qid(7),
+            basis: TrackerBasis::Y,
+        },
+    });
+    assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
+
+    actual.error_analysis_mode = true;
+    assert!(!shifted_repeat::is_shifted_copy(&actual, &expected));
+    expected.error_analysis_mode = true;
+    assert!(shifted_repeat::is_shifted_copy(&actual, &expected));
+
     shifted_repeat::shift(&mut actual, 1800, 2700).unwrap();
     assert_eq!(actual, expected);
 }

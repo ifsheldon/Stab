@@ -1,0 +1,13 @@
+repeat 999 {
+    repeat 1000 {
+        error(0.25) D0 L9
+        shift_detectors 1
+    }
+}
+repeat 499 {
+    error(0.25) D0 L9
+    error(0.25) D1 L9
+    shift_detectors 2
+}
+error(0.25) D0 L9
+error(0.25) D1 L9

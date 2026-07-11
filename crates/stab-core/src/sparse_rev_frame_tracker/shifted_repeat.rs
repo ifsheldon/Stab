@@ -119,6 +119,20 @@ pub(super) fn is_shifted_copy(
     ) && tracker.qubit_count == other.qubit_count
         && maps_match_shifted(&tracker.xs, &other.xs, detector_offset)
         && maps_match_shifted(&tracker.zs, &other.zs, detector_offset)
+        && maps_match_shifted(
+            &tracker.observable_effects,
+            &other.observable_effects,
+            detector_offset,
+        )
+        && target_sets_match_shifted(&tracker.gauge_errors, &other.gauge_errors, detector_offset)
+        && anticommutations_match_shifted(
+            &tracker.anticommutations,
+            &other.anticommutations,
+            detector_offset,
+        )
+        && tracker.fail_on_anticommute == other.fail_on_anticommute
+        && tracker.error_analysis_mode == other.error_analysis_mode
+        && tracker.eliminate_detector_gauges == other.eliminate_detector_gauges
 }
 
 pub(super) fn shift(
@@ -149,7 +163,22 @@ pub(super) fn shift(
     }
     tracker.rec_bits = shifted_records;
     shift_target_sets(&mut tracker.xs, detector_offset)?;
-    shift_target_sets(&mut tracker.zs, detector_offset)
+    shift_target_sets(&mut tracker.zs, detector_offset)?;
+    shift_target_sets(&mut tracker.observable_effects, detector_offset)?;
+    for gauge in &mut tracker.gauge_errors {
+        *gauge = shift_target_set(gauge, detector_offset)?;
+    }
+    tracker.anticommutations = tracker
+        .anticommutations
+        .iter()
+        .map(|anticommutation| {
+            Ok(super::Anticommutation {
+                target: shifted_detector_target(anticommutation.target, detector_offset)?,
+                location: anticommutation.location,
+            })
+        })
+        .collect::<CircuitResult<_>>()?;
+    Ok(())
 }
 
 fn rec_bits_match_shifted(
@@ -173,15 +202,45 @@ fn rec_bits_match_shifted(
     })
 }
 
-fn maps_match_shifted(
-    unshifted: &BTreeMap<crate::QubitId, BTreeSet<DemTarget>>,
-    expected: &BTreeMap<crate::QubitId, BTreeSet<DemTarget>>,
+fn maps_match_shifted<K: Ord>(
+    unshifted: &BTreeMap<K, BTreeSet<DemTarget>>,
+    expected: &BTreeMap<K, BTreeSet<DemTarget>>,
     detector_offset: i128,
 ) -> bool {
     unshifted.len() == expected.len()
         && unshifted.iter().all(|(qubit, targets)| {
             expected.get(qubit).is_some_and(|expected_targets| {
                 target_set_matches_shifted(targets, expected_targets, detector_offset)
+            })
+        })
+}
+
+fn target_sets_match_shifted(
+    unshifted: &[BTreeSet<DemTarget>],
+    expected: &[BTreeSet<DemTarget>],
+    detector_offset: i128,
+) -> bool {
+    unshifted.len() == expected.len()
+        && unshifted
+            .iter()
+            .zip(expected)
+            .all(|(targets, expected_targets)| {
+                target_set_matches_shifted(targets, expected_targets, detector_offset)
+            })
+}
+
+fn anticommutations_match_shifted(
+    unshifted: &BTreeSet<super::Anticommutation>,
+    expected: &BTreeSet<super::Anticommutation>,
+    detector_offset: i128,
+) -> bool {
+    unshifted.len() == expected.len()
+        && unshifted.iter().all(|anticommutation| {
+            shifted_detector_target(anticommutation.target, detector_offset).is_ok_and(|target| {
+                expected.contains(&super::Anticommutation {
+                    target,
+                    location: anticommutation.location,
+                })
             })
         })
 }
@@ -200,8 +259,8 @@ fn target_set_matches_shifted(
     })
 }
 
-fn shift_target_sets(
-    sets: &mut BTreeMap<crate::QubitId, BTreeSet<DemTarget>>,
+fn shift_target_sets<K>(
+    sets: &mut BTreeMap<K, BTreeSet<DemTarget>>,
     detector_offset: i128,
 ) -> CircuitResult<()> {
     for targets in sets.values_mut() {
