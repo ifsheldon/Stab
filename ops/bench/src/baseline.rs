@@ -275,6 +275,18 @@ pub(crate) fn run_stab_compare_row(
         "pf2-time-reverse-flow-measurement" => {
             Ok(Some(pf2::run_time_reverse_flow_measurement_row(row)?))
         }
+        "pfm-b1-time-reverse-generated-surface" => {
+            Ok(Some(pf2::run_time_reverse_flow_generated_surface_row(row)?))
+        }
+        "pfm-b1-time-reverse-mpad-matrix" => {
+            Ok(Some(pf2::run_time_reverse_flow_mpad_matrix_row(row)?))
+        }
+        "pfm-b1-time-reverse-large-unitary-repeat" => {
+            Ok(Some(pf2::run_time_reverse_flow_large_repeat_row(row)?))
+        }
+        "pfm-b1-time-reverse-sparse-high-qubit" => {
+            Ok(Some(pf2::run_time_reverse_flow_sparse_high_qubit_row(row)?))
+        }
         "m5-simd-bit-table" => {
             let matrix = m5_bit_matrix(&row.id)?;
             Ok(Some(vec![

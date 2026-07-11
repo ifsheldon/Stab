@@ -10,6 +10,7 @@ use crate::manifest::{BenchmarkManifest, BenchmarkRow, Milestone, Runner};
 use crate::report::{BaselineReport, Measurement};
 
 mod pf5;
+mod pfm_b1;
 mod runner_smoke;
 
 #[test]
@@ -959,6 +960,39 @@ fn pf2_transform_benchmark_rows_have_stab_compare_runners() {
         (
             "pf2-time-reverse-flow-measurement",
             &["stab_circuit_time_reversed_for_flows_measurement"][..],
+        ),
+        (
+            "pfm-b1-time-reverse-generated-surface",
+            &[
+                "stab_circuit_time_reversed_for_flows_generated_surface_d3_r2",
+                "stab_circuit_time_reversed_for_flows_generated_surface_d5_r2",
+                "stab_circuit_time_reversed_for_flows_generated_surface_d7_r2",
+            ][..],
+        ),
+        (
+            "pfm-b1-time-reverse-mpad-matrix",
+            &[
+                "stab_circuit_time_reversed_for_flows_mpad_matrix",
+                "stab_circuit_time_reversed_for_flows_mpad_scale_1",
+                "stab_circuit_time_reversed_for_flows_mpad_scale_8",
+                "stab_circuit_time_reversed_for_flows_mpad_scale_64",
+            ][..],
+        ),
+        (
+            "pfm-b1-time-reverse-large-unitary-repeat",
+            &[
+                "stab_circuit_time_reversed_for_flows_unitary_repeat_count_1",
+                "stab_circuit_time_reversed_for_flows_unitary_repeat_count_1024",
+                "stab_circuit_time_reversed_for_flows_unitary_repeat_count_1b",
+                "stab_circuit_time_reversed_for_flows_unitary_repeat_wide_body_1b",
+            ][..],
+        ),
+        (
+            "pfm-b1-time-reverse-sparse-high-qubit",
+            &[
+                "stab_circuit_time_reversed_for_flows_sparse_qubit_0",
+                "stab_circuit_time_reversed_for_flows_sparse_qubit_1000000",
+            ][..],
         ),
     ] {
         let row = BenchmarkRow {
