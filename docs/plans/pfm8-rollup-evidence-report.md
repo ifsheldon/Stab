@@ -35,7 +35,7 @@ The current PFM8 verification pass reran oracle, matrix, and benchmark metadata 
 
 | Checklist row | Current rollup state | PFM8 conclusion |
 | --- | --- | --- |
-| `Rust core library equivalent for core Stim semantics` | Rollup over active Rust APIs, transforms, DEMs, utilities, flows, analyzer, search, and sparse-tracker rows. | Keep `Partial`; selected child evidence is healthy, but the finite ledger-owned implementation and evidence-splitting work in PFM-B1 through PFM-B5 remains open. |
+| `Rust core library equivalent for core Stim semantics` | Rollup over active Rust APIs, transforms, DEMs, utilities, flows, analyzer, search, and sparse-tracker rows. | Keep `Partial`; PFM-B3 and PFM-B4 are complete, PFM-B1 is in final review and clean-evidence closure, and PFM-B2 plus PFM-B5 retain finite ledger-owned implementation work before PFM-B6 rollup. |
 | `.stim`, `.dem`, and result-format compatibility` | `.stim` and implemented result-format paths are strong; the selected Rust DEM count, coordinate, transform, sampler, search, SAT/WCNF, and filter-key surfaces now have shared PFM-B3 traversal evidence. | Keep `Partial` only as a rollup over remaining PFM-B5 generated analyzer and search work; Python product shape, diagrams, and full ErrorMatcher provenance are deferred and do not keep the selected Rust DEM traversal child active. |
 | `Full semantic execution of every legal circuit operation` | Selected sampler, detector-conversion, detection, analyzer, `SPP`, `SPP_DAG`, fixed-tableau, deterministic `MPP`, stochastic `MPP(p)` sampler or detection-sampling, deterministic `MPAD`, stochastic `MPAD(p)` sampler or detection-sampling, and noisy `MPAD(p)` analyzer evidence is green. PFM-B2 contract groundwork now classifies all 81 canonical gates across eight surfaces and every declared target-role pattern. | Keep `Partial`; eighteen exact, error-class, state-equivalence, structural, semantic-invariant, or statistical gate-contract cases remain planned and must gain independently selectable semantic evidence before this rollup can close. |
 | `CLI binary` | Selected `stab` commands and selected legacy aliases are implemented with PF7 evidence. | Keep `Done for selected Stab CLI surface`; no stale PFM8 blocker found for the selected CLI surface. |
@@ -48,7 +48,7 @@ PFM-B0 replaces broad under-specification with a schema-versioned, machine-check
 
 | Blocker | Milestone | Decision | Cases | Planned | Implemented | Evidence close |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
-| PFM2 QEC transforms | PFM-B1 | Implement | 19 | 7 | 12 | 0 |
+| PFM2 QEC transforms | PFM-B1 | Implement | 19 | 0 | 19 | 0 |
 | PFM3 analyzer sweep | PFM-B2 | Evidence close | 1 | 0 | 0 | 1 |
 | PFM3 gate execution | PFM-B2 | Implement | 18 | 18 | 0 | 0 |
 | PFM4 DEM traversal | PFM-B3 | Implement | 7 | 0 | 7 | 0 |
@@ -59,19 +59,19 @@ PFM-B0 replaces broad under-specification with a schema-versioned, machine-check
 
 The three evidence-close blocker records freeze 17 additional promoted supporting oracle rows: one analyzer CLI row, ten detecting-region rows, and six missing-detector rows.
 The PFM-B4 flow blocker separately freezes four retained checker oracle rows, so 21 supporting oracle signatures are machine-bound across the ledger.
-The ledger freezes six supporting benchmark rows: four detecting-region rows, one missing-detector MPAD row, and one flow-checker batch row, all retaining their source-owned `contract-only` runner, `non-primary-report-only` threshold class, and `report-only` comparability class.
-Seventeen owned cases outside PFM-B4 currently share a Rust selector with at least one other case. PFM-B4 has zero shared selectors after splitting eleven missing-detector and twenty-eight flow cases; the remaining debt belongs to PFM-B1 and PFM-B5.
+The ledger freezes ten supporting benchmark rows. The four PFM-B1 reverse-flow rows retain `contract-only` runner and comparability metadata with the `non-primary-report-only` threshold class; the six PFM-B4 rows cover four detecting-region rows, one missing-detector MPAD row, and one flow-checker batch row with `contract-only` runners, `non-primary-report-only` thresholds, and `report-only` comparability.
+Thirteen owned cases outside PFM-B4 currently share a Rust selector with at least one other case. PFM-B1 and PFM-B4 have zero shared selectors; the remaining debt belongs to PFM-B5.
 
-The validator rejects missing required blockers, any semantic change to the canonical SHA-256 ledger inventory, deleted owned-case floors, duplicate ids, unanchored or completed test-family aggregations, missing statistical plans, changed evidence-close supporting rows, supporting-oracle evidence-signature drift, unsafe, untracked, or symlinked upstream paths, non-pinned Stim sources, non-implemented oracle rows, stale benchmark rows, typed oracle runner drift, distinct benchmark runner, threshold-class, or comparability drift, dishonest planned versus existing test state, completion claims backed only by planned artifacts, and unstable, non-regular, or oversized ledger, manifest, and upstream evidence inputs.
+The validator rejects missing required blockers, any semantic change to the canonical SHA-256 ledger inventory, deleted owned-case floors, duplicate ids, unanchored or completed test-family aggregations, missing statistical plans, changed evidence-close supporting rows, supporting-oracle evidence-signature drift, pinned-golden path or SHA-256 drift, unsafe, untracked, or symlinked upstream paths, non-pinned Stim sources, non-implemented oracle rows, stale benchmark rows, typed oracle runner drift, distinct benchmark runner, threshold-class, or comparability drift, dishonest planned versus existing test state, completion claims backed only by planned artifacts, and unstable, non-regular, or oversized ledger, manifest, and upstream evidence inputs.
 Schema version 2 additionally rejects missing or duplicate gate-surface and semantic-family coverage, checks those wire names against canonical core metadata, requires every PFM-B2 gate-family case to own parser, measurement-sampler, reference-sampler, detection-converter, detector-frame, detection-sampler, error-analyzer, and flow-generator evidence, and validates that the eighteen cases collectively own all nineteen canonical semantic families.
-`just oracle::blockers --check-selectors` additionally proves every claimed existing selector resolves to at least one Rust test without executing arbitrary ledger commands; it rejects option-shaped filters and runs Cargo through the oracle harness's timeout and bounded-output controls.
+`just oracle::blockers --check-selectors` additionally proves every claimed existing selector resolves to at least one Rust test without executing arbitrary ledger commands; it rejects option-shaped filters and runs Cargo through the oracle harness's timeout and bounded-output controls. Direct Rust fixture execution separately requires at least one passed test, requires exactly one passed test for `--exact` rows, and rejects ignored-only evidence.
 
 ## Remaining Non-Deferred Blockers
 
 The current blockers are no longer hidden broad upstream files or pending exact-subcase plans.
 They are finite ledger-backed implementation and evidence-splitting programs:
 
-- PFM-B1 owns the seven planned QEC-transform cases and must split the four implemented cases that still share broad selectors.
+- PFM-B1 has implemented all nineteen QEC-transform cases, split every shared selector, and closed GPT-5.6/max review; the implementation commit, clean evidence, final evidence audit, and documentation closure remain.
 - PFM-B2 contract groundwork is complete and evidence-closes analyzer sweep behavior at the selected matrix; its final phase still implements eighteen planned cases covering all nineteen semantic families.
 - PFM-B3 implements the seven selected shared folded-DEM traversal contracts.
 - PFM-B4 is complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc` for detecting regions, missing detectors, and all thirty-three flow cases. All milestone-audit and GPT-5.6/max findings are closed, and the matrix-solver plus sparse-repeat reports record clean committed-HEAD allocation evidence with zero resident delta.
@@ -90,7 +90,7 @@ Before PFM8 can become a completion report, the commands in `docs/plans/GOAL.md`
 
 This PFM8 pass confirms that the current rollup rows should stay conservative.
 PFM-B2 contract groundwork is complete and recorded in `docs/plans/pfm-b2-gate-surface-contract-groundwork-report.md`.
-PFM-B3 shared DEM traversal is complete: the audit and GPT-5.6/max review findings are fixed, and the clean allocation report records `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`, `local_modifications=false`, peak live allocation of 65,536 bytes, and zero resident delta. PFM-B4 is also complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc` with clean matrix-solver and sparse-repeat evidence. PFM-B1 is now active; final PFM-B2 generated semantic coverage follows the shared foundations.
+PFM-B3 shared DEM traversal is complete: the audit and GPT-5.6/max review findings are fixed, and the clean allocation report records `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`, `local_modifications=false`, peak live allocation of 65,536 bytes, and zero resident delta. PFM-B4 is also complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc` with clean matrix-solver and sparse-repeat evidence. PFM-B1 implementation, source-owned evidence, and review closure are in place with `19/19 implemented` and zero shared selectors; the implementation commit, clean allocation evidence, and final evidence audit remain before PFM-B5.
 
 ## Verification
 
