@@ -29,6 +29,7 @@ fn parses_stim_perf_measurement_line() {
             allocation: None,
             resident_bytes: None,
             resident_delta_bytes: None,
+            observations: Vec::new(),
             iterations: None,
         }
     );
@@ -497,6 +498,7 @@ fn compare_row_result_records_ratio_and_beta_gate_status() {
             allocation: None,
             resident_bytes: None,
             resident_delta_bytes: None,
+            observations: Vec::new(),
             iterations: None,
         }],
         stab_measurements: vec![Measurement {
@@ -506,6 +508,7 @@ fn compare_row_result_records_ratio_and_beta_gate_status() {
             allocation: None,
             resident_bytes: None,
             resident_delta_bytes: None,
+            observations: Vec::new(),
             iterations: Some(1),
         }],
         baseline_status: BaselineCompareStatus::Comparable,
@@ -535,6 +538,7 @@ fn compare_row_result_distinguishes_missing_baseline_from_uncomparable_contracts
             allocation: None,
             resident_bytes: None,
             resident_delta_bytes: None,
+            observations: Vec::new(),
             iterations: Some(1),
         }],
         baseline_status: BaselineCompareStatus::Missing,

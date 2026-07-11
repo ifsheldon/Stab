@@ -8,9 +8,8 @@ use stab_core::{
     Circuit, CodeDistance, DetectorErrorModel, ErrorAnalyzerOptions, Flow, PauliBasis, PauliString,
     Probability, RoundCount, SurfaceCodeParams, SurfaceCodeTask,
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
-    circuit_to_detector_error_model, find_undetectable_logical_error,
-    generate_surface_code_circuit, independent_to_disjoint_xyz_errors, likeliest_error_sat_problem,
-    shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
+    circuit_to_detector_error_model, generate_surface_code_circuit,
+    independent_to_disjoint_xyz_errors, shortest_graphlike_undetectable_logical_error,
     try_disjoint_to_independent_xyz_errors,
 };
 
@@ -56,18 +55,6 @@ const ERROR_DECOMP_LOOP_REPEAT_COUNT: u64 = 4096;
 #[cfg(test)]
 const ERROR_DECOMP_LOOP_REPEAT_COUNT: u64 = 5;
 #[cfg(not(test))]
-const LOOP_CARRIED_OBSERVABLE_REPEAT_COUNT: u64 = 1_000_001;
-#[cfg(test)]
-const LOOP_CARRIED_OBSERVABLE_REPEAT_COUNT: u64 = 5;
-#[cfg(not(test))]
-const PERIOD8_OBSERVABLE_REPEAT_COUNT: u64 = 1_000_001;
-#[cfg(test)]
-const PERIOD8_OBSERVABLE_REPEAT_COUNT: u64 = 9;
-#[cfg(not(test))]
-const PERIOD127_OBSERVABLE_REPEAT_COUNT: u64 = 1_000_082;
-#[cfg(test)]
-const PERIOD127_OBSERVABLE_REPEAT_COUNT: u64 = 338;
-#[cfg(not(test))]
 const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 1_000_001;
 #[cfg(test)]
 const SPARSE_REVERSE_UNITARY_REPEAT_COUNT: u64 = 17;
@@ -93,20 +80,7 @@ pub(super) fn run_dem_compare_row(
         "m10-analyze-errors-fold-cli" => run_analyze_fold_row(row).map(Some),
         "m10-analyze-errors-high-repeat-contract" => run_analyze_fold_row(row).map(Some),
         "pf3-analyze-errors-sweep" => run_analyze_sweep_row(row).map(Some),
-        "pf6-analyze-errors-generated-surface" => run_analyze_generated_core_row(row).map(Some),
         "pf6-error-decomp-loop-folded" => run_error_decomp_loop_folded_row(row).map(Some),
-        "pf6-analyzer-loop-observable-folded" => {
-            run_loop_carried_observable_folded_row(row).map(Some)
-        }
-        "pf6-analyzer-period8-observable-folded" => {
-            run_period8_observable_folded_row(row).map(Some)
-        }
-        "pf6-analyzer-period127-observable-folded" => {
-            run_period127_observable_folded_row(row).map(Some)
-        }
-        "pf6-graphlike-search-generated" => run_generated_graphlike_search_row(row).map(Some),
-        "pf6-hypergraph-search-generated" => run_generated_hypergraph_search_row(row).map(Some),
-        "pf6-generated-sat-wcnf" => run_generated_sat_wcnf_row(row).map(Some),
         "pf6-sparse-rev-frame-loop" => run_sparse_reverse_frame_loop_row(row).map(Some),
         "pf7-cli-analyze-errors-generated" => run_analyze_generated_cli_row(row).map(Some),
         "pf7-cli-analyze-errors-decompose" => run_analyze_decompose_cli_row(row).map(Some),
@@ -135,33 +109,8 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf7-cli-analyze-errors-generated", "stab_pf7_cli_analyze_errors_generated") => {
             Some((error_analyzer_detector_count(), "detectors/s"))
         }
-        ("pf6-analyze-errors-generated-surface", "stab_pf6_analyze_errors_generated_surface") => {
-            Some((error_analyzer_detector_count(), "detectors/s"))
-        }
         ("pf6-error-decomp-loop-folded", "stab_pf6_error_decomp_loop_folded") => {
             Some((ERROR_DECOMP_LOOP_REPEAT_COUNT as f64, "folded-rounds/s"))
-        }
-        ("pf6-analyzer-loop-observable-folded", "stab_pf6_analyzer_loop_observable_folded") => {
-            Some((
-                LOOP_CARRIED_OBSERVABLE_REPEAT_COUNT as f64,
-                "folded-rounds/s",
-            ))
-        }
-        (
-            "pf6-analyzer-period8-observable-folded",
-            "stab_pf6_analyzer_period8_observable_folded",
-        ) => Some((PERIOD8_OBSERVABLE_REPEAT_COUNT as f64, "folded-rounds/s")),
-        (
-            "pf6-analyzer-period127-observable-folded",
-            "stab_pf6_analyzer_period127_observable_folded",
-        ) => Some((PERIOD127_OBSERVABLE_REPEAT_COUNT as f64, "folded-rounds/s")),
-        ("pf6-graphlike-search-generated", "stab_pf6_graphlike_search_generated_surface")
-        | ("pf6-hypergraph-search-generated", "stab_pf6_hypergraph_search_generated_surface") => {
-            Some((error_analyzer_detector_count(), "detectors/s"))
-        }
-        ("pf6-generated-sat-wcnf", "stab_pf6_shortest_sat_generated_surface")
-        | ("pf6-generated-sat-wcnf", "stab_pf6_likeliest_sat_generated_surface") => {
-            Some((error_analyzer_detector_count(), "detectors/s"))
         }
         ("pf6-sparse-rev-frame-loop", "stab_pf6_sparse_rev_unitary_repeat_flow") => Some((
             SPARSE_REVERSE_UNITARY_REPEAT_COUNT as f64,
@@ -222,29 +171,8 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
         "pf7-cli-analyze-errors-generated" => Some(
             "report-only: Stab measures the public CLI analyze_errors path on the source-owned generated d3/r3 rotated-memory-z surface-code analyzer workload",
         ),
-        "pf6-analyze-errors-generated-surface" => Some(
-            "report-only: Stab measures the Rust generated d3/r3 rotated-memory-z surface-code analyzer workload without a faithful pinned Stim CLI timing ratio",
-        ),
         "pf6-error-decomp-loop-folded" => Some(
             "report-only: Stab measures Rust analyze_errors with fold_loops plus decompose_errors over a repeated composite-error fixture; pinned Stim exposes equivalent analyzer behavior but not a faithful Rust direct baseline in this harness",
-        ),
-        "pf6-analyzer-loop-observable-folded" => Some(
-            "report-only: Stab measures Rust analyze_errors fold_loops over the selected loop-carried observable giant-repeat shape from pinned ErrorAnalyzer.loop_folding; pinned Stim exposes equivalent analyzer behavior but not a faithful Rust direct baseline in this harness",
-        ),
-        "pf6-analyzer-period8-observable-folded" => Some(
-            "report-only: Stab measures Rust analyze_errors fold_loops over the selected period-8 observable giant-repeat shape from pinned ErrorAnalyzer.loop_folding; pinned Stim exposes equivalent analyzer behavior but not a faithful Rust direct baseline in this harness",
-        ),
-        "pf6-analyzer-period127-observable-folded" => Some(
-            "report-only: Stab measures Rust analyze_errors fold_loops over the selected period-127 observable giant-repeat shape from pinned ErrorAnalyzer.loop_folding; pinned Stim exposes equivalent analyzer behavior but not a faithful Rust direct baseline in this harness",
-        ),
-        "pf6-graphlike-search-generated" => Some(
-            "report-only: Stab measures generated rotated-surface-code DEM graphlike search after source-owned Rust analysis and decomposition; pinned Stim exposes this as C++ API/perf behavior, not a faithful public CLI baseline",
-        ),
-        "pf6-hypergraph-search-generated" => Some(
-            "report-only: Stab measures generated rotated-surface-code DEM hypergraph search after source-owned Rust analysis and decomposition; pinned Stim exposes this as C++ API behavior, not a faithful public CLI baseline",
-        ),
-        "pf6-generated-sat-wcnf" => Some(
-            "report-only: Stab measures shortest and weighted WCNF generation for a generated rotated-surface-code DEM after source-owned Rust analysis and decomposition; pinned Stim exposes SAT encoding as C++ API behavior, not a faithful public CLI baseline",
         ),
         "pf6-sparse-rev-frame-loop" => Some(
             "report-only: Stab measures public unsigned-flow checking over a measurement-dependent fixed two-qubit Clifford unitary repeat, the same folded-unitary path with one active qubit and a 65,535-qubit idle suffix in a 65,536-wide flow, and a shifted measurement/detector repeat so the sparse reverse frame tracker must use loop folding; the high-idle transform is required to scale with touched qubits instead of total tracker width, while broader sparse tracker parity and provenance remain outside this row",
@@ -398,20 +326,6 @@ fn run_analyze_generated_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>,
     )?])
 }
 
-fn run_analyze_generated_core_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let circuit = error_analyzer_surface_code(&row.id)?;
-    Ok(vec![measure_stab_iterations(
-        "stab_pf6_analyze_errors_generated_surface",
-        ERROR_ANALYZER_COMPARE_ITERATIONS,
-        || {
-            let dem = circuit_to_detector_error_model(&circuit, ErrorAnalyzerOptions::default())
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(dem.items().len());
-            Ok(())
-        },
-    )?])
-}
-
 fn run_error_decomp_loop_folded_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
     let circuit = Circuit::from_stim_str(&error_decomp_loop_folded_fixture())
         .map_err(|error| stab_runner_error(&row.id, error))?;
@@ -433,170 +347,6 @@ fn run_error_decomp_loop_folded_row(row: &BenchmarkRow) -> Result<Vec<Measuremen
             Ok(())
         },
     )?])
-}
-
-fn run_loop_carried_observable_folded_row(
-    row: &BenchmarkRow,
-) -> Result<Vec<Measurement>, BenchError> {
-    let fixture = loop_carried_observable_circuit_text(LOOP_CARRIED_OBSERVABLE_REPEAT_COUNT);
-    let circuit =
-        Circuit::from_stim_str(&fixture).map_err(|error| stab_runner_error(&row.id, error))?;
-    Ok(vec![measure_stab_iterations(
-        "stab_pf6_analyzer_loop_observable_folded",
-        ERROR_ANALYZER_COMPARE_ITERATIONS,
-        || {
-            let dem = circuit_to_detector_error_model(
-                &circuit,
-                ErrorAnalyzerOptions {
-                    fold_loops: true,
-                    ..ErrorAnalyzerOptions::default()
-                },
-            )
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(dem.items().len());
-            Ok(())
-        },
-    )?])
-}
-
-fn loop_carried_observable_circuit_text(repeat_count: u64) -> String {
-    format!(
-        "MR 1\n\
-         REPEAT {repeat_count} {{\n\
-             X_ERROR(0.25) 0\n\
-             CX 0 1\n\
-             MR 1\n\
-             DETECTOR rec[-2] rec[-1]\n\
-         }}\n\
-         M 0\n\
-         OBSERVABLE_INCLUDE(9) rec[-1]\n"
-    )
-}
-
-fn run_period8_observable_folded_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let fixture = period8_observable_circuit_text(PERIOD8_OBSERVABLE_REPEAT_COUNT);
-    let circuit =
-        Circuit::from_stim_str(&fixture).map_err(|error| stab_runner_error(&row.id, error))?;
-    Ok(vec![measure_stab_iterations(
-        "stab_pf6_analyzer_period8_observable_folded",
-        ERROR_ANALYZER_COMPARE_ITERATIONS,
-        || {
-            let dem = circuit_to_detector_error_model(
-                &circuit,
-                ErrorAnalyzerOptions {
-                    fold_loops: true,
-                    ..ErrorAnalyzerOptions::default()
-                },
-            )
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(dem.items().len());
-            Ok(())
-        },
-    )?])
-}
-
-fn period8_observable_circuit_text(repeat_count: u64) -> String {
-    format!(
-        "R 0 1 2 3 4\n\
-         REPEAT {repeat_count} {{\n\
-             CNOT 0 1 1 2 2 3 3 4\n\
-             DETECTOR\n\
-         }}\n\
-         M 4\n\
-         OBSERVABLE_INCLUDE(9) rec[-1]\n"
-    )
-}
-
-fn run_period127_observable_folded_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let fixture = period127_observable_circuit_text(PERIOD127_OBSERVABLE_REPEAT_COUNT);
-    let circuit =
-        Circuit::from_stim_str(&fixture).map_err(|error| stab_runner_error(&row.id, error))?;
-    Ok(vec![measure_stab_iterations(
-        "stab_pf6_analyzer_period127_observable_folded",
-        ERROR_ANALYZER_COMPARE_ITERATIONS,
-        || {
-            let dem = circuit_to_detector_error_model(
-                &circuit,
-                ErrorAnalyzerOptions {
-                    fold_loops: true,
-                    ..ErrorAnalyzerOptions::default()
-                },
-            )
-            .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(dem.items().len());
-            Ok(())
-        },
-    )?])
-}
-
-fn period127_observable_circuit_text(repeat_count: u64) -> String {
-    format!(
-        "R 0 1 2 3 4 5 6\n\
-         REPEAT {repeat_count} {{\n\
-             CNOT 0 1 1 2 2 3 3 4 4 5 5 6 6 0\n\
-             DETECTOR\n\
-         }}\n\
-         M 6\n\
-         OBSERVABLE_INCLUDE(9) rec[-1]\n\
-         R 7\n\
-         X_ERROR(1) 7\n\
-         M 7\n\
-         DETECTOR rec[-1]\n"
-    )
-}
-
-fn run_generated_graphlike_search_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let model = generated_search_surface_code_dem(&row.id)?;
-    Ok(vec![measure_stab_iterations(
-        "stab_pf6_graphlike_search_generated_surface",
-        ERROR_ANALYZER_COMPARE_ITERATIONS,
-        || {
-            let shortest = shortest_graphlike_undetectable_logical_error(&model, false)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(shortest.items().len());
-            Ok(())
-        },
-    )?])
-}
-
-fn run_generated_hypergraph_search_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let model = generated_search_surface_code_dem(&row.id)?;
-    Ok(vec![measure_stab_iterations(
-        "stab_pf6_hypergraph_search_generated_surface",
-        ERROR_ANALYZER_COMPARE_ITERATIONS,
-        || {
-            let shortest = find_undetectable_logical_error(&model, 4, 4, true)
-                .map_err(|error| stab_runner_error(&row.id, error))?;
-            black_box(shortest.items().len());
-            Ok(())
-        },
-    )?])
-}
-
-fn run_generated_sat_wcnf_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
-    let model = generated_search_surface_code_dem(&row.id)?;
-    Ok(vec![
-        measure_stab_iterations(
-            "stab_pf6_shortest_sat_generated_surface",
-            ERROR_ANALYZER_COMPARE_ITERATIONS,
-            || {
-                let wcnf = shortest_error_sat_problem(&model)
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-                black_box(wcnf.len());
-                Ok(())
-            },
-        )?,
-        measure_stab_iterations(
-            "stab_pf6_likeliest_sat_generated_surface",
-            ERROR_ANALYZER_COMPARE_ITERATIONS,
-            || {
-                let wcnf = likeliest_error_sat_problem(&model, 100)
-                    .map_err(|error| stab_runner_error(&row.id, error))?;
-                black_box(wcnf.len());
-                Ok(())
-            },
-        )?,
-    ])
 }
 
 fn run_analyze_sweep_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
@@ -880,6 +630,7 @@ fn measure_error_decomp_cases(
         allocation: tracked_memory.allocation,
         resident_bytes: tracked_memory.resident_bytes_max,
         resident_delta_bytes: tracked_memory.resident_delta_bytes_max,
+        observations: Vec::new(),
         iterations: Some(STAB_COMPARE_ITERATIONS),
     })
 }
@@ -913,18 +664,6 @@ fn error_analyzer_surface_code(row_id: &str) -> Result<Circuit, BenchError> {
     let generated =
         generate_surface_code_circuit(&params).map_err(|error| stab_runner_error(row_id, error))?;
     Ok(generated.circuit().clone())
-}
-
-fn generated_search_surface_code_dem(row_id: &str) -> Result<DetectorErrorModel, BenchError> {
-    let circuit = error_analyzer_surface_code(row_id)?;
-    circuit_to_detector_error_model(
-        &circuit,
-        ErrorAnalyzerOptions {
-            decompose_errors: true,
-            ..ErrorAnalyzerOptions::default()
-        },
-    )
-    .map_err(|error| stab_runner_error(row_id, error))
 }
 
 fn error_analyzer_detector_count() -> f64 {

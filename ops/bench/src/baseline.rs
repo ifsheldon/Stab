@@ -31,6 +31,7 @@ mod pf1;
 mod pf2;
 mod pf4;
 mod pf5;
+mod pf6;
 #[cfg(test)]
 mod tests;
 
@@ -501,6 +502,8 @@ pub(crate) fn run_stab_compare_row(
                 Ok(Some(measurements))
             } else if let Some(measurements) = m9::run_detection_compare_row(row)? {
                 Ok(Some(measurements))
+            } else if let Some(measurements) = pf6::run_compare_row(row)? {
+                Ok(Some(measurements))
             } else if let Some(measurements) = m10::run_dem_compare_row(row)? {
                 Ok(Some(measurements))
             } else if let Some(measurements) = m11::run_dem_sampling_compare_row(row)? {
@@ -613,6 +616,7 @@ fn measure_sparse_xor_items(
         allocation: tracked_memory.allocation,
         resident_bytes: tracked_memory.resident_bytes_max,
         resident_delta_bytes: tracked_memory.resident_delta_bytes_max,
+        observations: Vec::new(),
         iterations: Some(STAB_COMPARE_ITERATIONS),
     })
 }
@@ -753,6 +757,7 @@ fn measure_stab_iterations(
         allocation: tracked_memory.allocation,
         resident_bytes: tracked_memory.resident_bytes_max,
         resident_delta_bytes: tracked_memory.resident_delta_bytes_max,
+        observations: Vec::new(),
         iterations: Some(iterations),
     })
 }
@@ -798,6 +803,7 @@ fn measure_stab_batched_iterations(
         allocation: tracked_memory.allocation,
         resident_bytes: tracked_memory.resident_bytes_max,
         resident_delta_bytes: tracked_memory.resident_delta_bytes_max,
+        observations: Vec::new(),
         iterations: Some(iterations),
     })
 }
@@ -866,6 +872,9 @@ pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         return Some(work);
     }
     if let Some(work) = pf5::measurement_work(row_id, name) {
+        return Some(work);
+    }
+    if let Some(work) = pf6::measurement_work(row_id, name) {
         return Some(work);
     }
     if let Some(work) = m7::measurement_work(row_id, name) {
@@ -954,6 +963,9 @@ pub(crate) fn compare_note(row_id: &str) -> Option<&'static str> {
         return Some(note);
     }
     if let Some(note) = pf5::compare_note(row_id) {
+        return Some(note);
+    }
+    if let Some(note) = pf6::compare_note(row_id) {
         return Some(note);
     }
     if let Some(note) = m7::compare_note(row_id) {
@@ -1122,6 +1134,7 @@ fn run_stim_cli_row(
             allocation: None,
             resident_bytes: None,
             resident_delta_bytes: None,
+            observations: Vec::new(),
             iterations: Some(iterations),
         }],
     })
@@ -1148,6 +1161,7 @@ fn parse_stim_perf_line(line: &str) -> Option<Measurement> {
         allocation: None,
         resident_bytes: None,
         resident_delta_bytes: None,
+        observations: Vec::new(),
         iterations: None,
     })
 }

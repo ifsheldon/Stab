@@ -18,8 +18,12 @@ use super::{
     try_disjoint_to_independent_xyz_errors,
 };
 
+mod local_decomposition;
 mod output;
 
+use local_decomposition::{
+    locally_decompose_combinations, merge_indistinguishable_disjoint_probabilities,
+};
 use output::unreverse_model;
 
 const MAX_LOOP_CYCLE_STEPS: u64 = 1_000_000;
@@ -27,10 +31,50 @@ const MAX_BOUNDED_REPEAT_UNROLL: u64 = 100_000;
 
 type ErrorKey = (Vec<DemTarget>, Option<String>);
 
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(super) struct ReverseFoldDiagnostics {
+    pub(super) recurrence_search_steps: u64,
+    pub(super) recurrences_found: u64,
+    pub(super) max_recurrence_period: u64,
+    pub(super) represented_repeat_iterations: u64,
+    pub(super) folded_repeat_iterations: u64,
+    pub(super) max_boundary_entries: u64,
+    pub(super) emitted_compact_dem_items: u64,
+}
+
+#[cfg(feature = "ops-contracts")]
+impl From<ReverseFoldDiagnostics> for super::ErrorAnalyzerDiagnostics {
+    fn from(diagnostics: ReverseFoldDiagnostics) -> Self {
+        Self {
+            used_reverse_fold: true,
+            used_bounded_fallback: false,
+            recurrence_search_steps: diagnostics.recurrence_search_steps,
+            recurrences_found: diagnostics.recurrences_found,
+            max_recurrence_period: diagnostics.max_recurrence_period,
+            represented_repeat_iterations: diagnostics.represented_repeat_iterations,
+            folded_repeat_iterations: diagnostics.folded_repeat_iterations,
+            max_boundary_entries: diagnostics.max_boundary_entries,
+            emitted_compact_dem_items: diagnostics.emitted_compact_dem_items,
+        }
+    }
+}
+
 pub(super) fn try_analyze(
     circuit: &Circuit,
     options: ErrorAnalyzerOptions,
 ) -> CircuitResult<Option<DetectorErrorModel>> {
+    if contains_unsupported_reverse_fold_instruction(circuit) {
+        return Ok(None);
+    }
+    let (model, _) = ReverseFoldAnalyzer::new(circuit, options)?.analyze(circuit)?;
+    Ok(Some(model))
+}
+
+#[cfg(feature = "ops-contracts")]
+pub(super) fn try_analyze_with_diagnostics(
+    circuit: &Circuit,
+    options: ErrorAnalyzerOptions,
+) -> CircuitResult<Option<(DetectorErrorModel, ReverseFoldDiagnostics)>> {
     if contains_unsupported_reverse_fold_instruction(circuit) {
         return Ok(None);
     }
@@ -45,6 +89,7 @@ struct ReverseFoldAnalyzer {
     ticks_left: u64,
     reversed_model: DetectorErrorModel,
     error_probabilities: BTreeMap<ErrorKey, Probability>,
+    diagnostics: ReverseFoldDiagnostics,
 }
 
 impl ReverseFoldAnalyzer {
@@ -66,17 +111,26 @@ impl ReverseFoldAnalyzer {
             ticks_left: circuit.count_ticks()?,
             reversed_model: DetectorErrorModel::new(),
             error_probabilities: BTreeMap::new(),
+            diagnostics: ReverseFoldDiagnostics {
+                represented_repeat_iterations: represented_repeat_iterations(circuit, 1)?,
+                ..ReverseFoldDiagnostics::default()
+            },
         })
     }
 
-    fn analyze(mut self, circuit: &Circuit) -> CircuitResult<DetectorErrorModel> {
+    fn analyze(
+        mut self,
+        circuit: &Circuit,
+    ) -> CircuitResult<(DetectorErrorModel, ReverseFoldDiagnostics)> {
         self.undo_circuit(circuit)?;
         self.tracker.undo_implicit_rz_at_start_of_circuit()?;
         self.collect_gauge_errors()?;
         self.flush()?;
         let mut base_detector_id = 0_u64;
         let mut seen = BTreeSet::new();
-        unreverse_model(&self.reversed_model, &mut base_detector_id, &mut seen)
+        let model = unreverse_model(&self.reversed_model, &mut base_detector_id, &mut seen)?;
+        self.diagnostics.emitted_compact_dem_items = compact_dem_item_count(&model)?;
+        Ok((model, self.diagnostics))
     }
 
     fn undo_circuit(&mut self, circuit: &Circuit) -> CircuitResult<()> {
@@ -585,6 +639,7 @@ impl ReverseFoldAnalyzer {
         if iterations == 0 {
             return Ok(());
         }
+        self.observe_boundary_entries(self.tracker.boundary_entry_count())?;
         if !self.options.fold_loops {
             return self.undo_loop_by_unrolling(body, iterations);
         }
@@ -597,6 +652,7 @@ impl ReverseFoldAnalyzer {
         while hare_iterations < iterations && hare_iterations < MAX_LOOP_CYCLE_STEPS {
             hare.undo_circuit(body)?;
             hare.take_gauge_errors();
+            self.record_recurrence_probe(&hare)?;
             hare_iterations = checked_add(hare_iterations, 1, "hare iteration")?;
             if hare.is_shifted_copy(&tortoise) {
                 found_cycle = true;
@@ -605,6 +661,7 @@ impl ReverseFoldAnalyzer {
             if hare_iterations.is_multiple_of(2) {
                 tortoise.undo_circuit(body)?;
                 tortoise.take_gauge_errors();
+                self.record_recurrence_probe(&tortoise)?;
                 tortoise_iterations = checked_add(tortoise_iterations, 1, "tortoise iteration")?;
                 if hare.is_shifted_copy(&tortoise) {
                     found_cycle = true;
@@ -639,6 +696,10 @@ impl ReverseFoldAnalyzer {
                     "folded analyzer recurrence period was zero",
                 ));
             }
+            self.diagnostics.recurrences_found =
+                checked_add(self.diagnostics.recurrences_found, 1, "recurrence count")?;
+            self.diagnostics.max_recurrence_period =
+                self.diagnostics.max_recurrence_period.max(period);
             let remaining = iterations.checked_sub(tortoise_iterations).ok_or_else(|| {
                 CircuitError::invalid_detector_error_model(
                     "folded analyzer repeat remainder underflowed",
@@ -663,6 +724,28 @@ impl ReverseFoldAnalyzer {
             )
         })?;
         self.undo_loop_by_unrolling(body, remaining)
+    }
+
+    fn record_recurrence_probe(
+        &mut self,
+        tracker: &SparseReverseFrameTracker,
+    ) -> CircuitResult<()> {
+        self.diagnostics.recurrence_search_steps = checked_add(
+            self.diagnostics.recurrence_search_steps,
+            1,
+            "recurrence search step",
+        )?;
+        self.observe_boundary_entries(tracker.boundary_entry_count())
+    }
+
+    fn observe_boundary_entries(&mut self, entries: usize) -> CircuitResult<()> {
+        let entries = u64::try_from(entries).map_err(|_| {
+            CircuitError::invalid_detector_error_model(
+                "folded analyzer boundary entry count does not fit u64",
+            )
+        })?;
+        self.diagnostics.max_boundary_entries = self.diagnostics.max_boundary_entries.max(entries);
+        Ok(())
     }
 
     fn capture_repeated_period(
@@ -700,6 +783,13 @@ impl ReverseFoldAnalyzer {
                 "folded analyzer skipped period count underflowed",
             )
         })?;
+        let folded_iterations =
+            checked_product_u64(period, skipped_periods, "folded repeat iteration")?;
+        self.diagnostics.folded_repeat_iterations = checked_add(
+            self.diagnostics.folded_repeat_iterations,
+            folded_iterations,
+            "folded repeat iteration total",
+        )?;
         let skipped_measurements =
             checked_product_usize(measurements_per_period, skipped_periods, "measurement skip")?;
         let skipped_detectors =
@@ -714,7 +804,7 @@ impl ReverseFoldAnalyzer {
         )?;
         *tortoise_iterations = checked_add(
             *tortoise_iterations,
-            checked_product_u64(period, skipped_periods, "period skip")?,
+            folded_iterations,
             "tortoise skipped iteration",
         )?;
 
@@ -766,6 +856,27 @@ fn contains_unsupported_reverse_fold_instruction(circuit: &Circuit) -> bool {
     })
 }
 
+fn represented_repeat_iterations(circuit: &Circuit, multiplier: u64) -> CircuitResult<u64> {
+    let mut total = 0_u64;
+    for item in circuit.items() {
+        let CircuitItem::RepeatBlock(repeat) = item else {
+            continue;
+        };
+        let repeated = checked_product_u64(
+            multiplier,
+            repeat.repeat_count().get(),
+            "represented repeat multiplicity",
+        )?;
+        total = checked_add(total, repeated, "represented repeat iteration")?;
+        total = checked_add(
+            total,
+            represented_repeat_iterations(repeat.body(), repeated)?,
+            "nested represented repeat iteration",
+        )?;
+    }
+    Ok(total)
+}
+
 fn analyzer_pauli(pauli: AnalyzerPauli) -> Pauli {
     match pauli {
         AnalyzerPauli::X => Pauli::X,
@@ -780,237 +891,6 @@ fn toggle_targets(target: &mut BTreeSet<DemTarget>, values: BTreeSet<DemTarget>)
             target.remove(&value);
         }
     }
-}
-
-fn locally_decompose_combinations(
-    basis_errors: &[BTreeSet<DemTarget>],
-    combinations: &mut [Vec<DemTarget>],
-) -> CircuitResult<()> {
-    let mut involved_detectors = BTreeMap::new();
-    for basis in basis_errors {
-        for target in basis {
-            if let DemTarget::RelativeDetector(detector) = target {
-                let next = involved_detectors.len();
-                if !involved_detectors.contains_key(detector) {
-                    if next >= 15 {
-                        return Err(CircuitError::invalid_detector_error_model(
-                            "an error case in a composite error exceeded 15 detector symptoms",
-                        ));
-                    }
-                    involved_detectors.insert(*detector, next);
-                }
-            }
-        }
-    }
-
-    let mut detector_masks = vec![0_u64; combinations.len()];
-    for (slot, targets) in detector_masks.iter_mut().zip(combinations.iter()).skip(1) {
-        let mut mask = 0_u64;
-        for target in targets {
-            if let DemTarget::RelativeDetector(detector) = target {
-                let bit = involved_detectors.get(detector).copied().ok_or_else(|| {
-                    CircuitError::invalid_detector_error_model(
-                        "composite error detector has no local mask",
-                    )
-                })?;
-                mask ^= 1_u64 << bit;
-            }
-        }
-        *slot = mask;
-    }
-
-    let detector_counts = detector_masks
-        .iter()
-        .map(|mask| mask.count_ones())
-        .collect::<Vec<_>>();
-    let mut solved = vec![false; combinations.len()];
-    let mut single_detector_union = 0_u64;
-    for ((detector_count, detector_mask), solved_slot) in detector_counts
-        .iter()
-        .zip(&detector_masks)
-        .zip(&mut solved)
-        .skip(1)
-    {
-        if *detector_count == 1 {
-            single_detector_union |= *detector_mask;
-            *solved_slot = true;
-        }
-    }
-    let mut irreducible_pairs = Vec::new();
-    for (index, ((detector_count, detector_mask), solved_slot)) in detector_counts
-        .iter()
-        .zip(&detector_masks)
-        .zip(&mut solved)
-        .enumerate()
-        .skip(1)
-    {
-        if *detector_count == 2 && *detector_mask & !single_detector_union != 0 {
-            irreducible_pairs.push(index);
-            *solved_slot = true;
-        }
-    }
-
-    for goal_index in 1..combinations.len() {
-        let detector_count = *indexed(
-            &detector_counts,
-            goal_index,
-            "composite error detector count",
-        )?;
-        let is_solved = *indexed(&solved, goal_index, "composite error solved state")?;
-        if detector_count == 0 || is_solved {
-            continue;
-        }
-        let goal = *indexed(&detector_masks, goal_index, "composite error detector mask")?;
-        let mut components = Vec::new();
-        let mut remnants = if goal & !single_detector_union == 0 {
-            goal
-        } else {
-            let mut contained_pair = None;
-            for &pair in &irreducible_pairs {
-                let pair_mask = *indexed(
-                    &detector_masks,
-                    pair,
-                    "irreducible composite error pair mask",
-                )?;
-                if goal & pair_mask == pair_mask && goal & !(single_detector_union | pair_mask) == 0
-                {
-                    contained_pair = Some((pair, pair_mask));
-                    break;
-                }
-            }
-            if let Some((pair, pair_mask)) = contained_pair {
-                components.push(
-                    indexed(combinations, pair, "irreducible composite error component")?.clone(),
-                );
-                goal & !pair_mask
-            } else if let Some((left, right)) = find_two_disjoint_pairs(
-                goal,
-                single_detector_union,
-                &irreducible_pairs,
-                &detector_masks,
-            )? {
-                let left_component =
-                    indexed(combinations, left, "left composite error pair")?.clone();
-                let right_component =
-                    indexed(combinations, right, "right composite error pair")?.clone();
-                if left_component <= right_component {
-                    components.push(left_component);
-                    components.push(right_component);
-                } else {
-                    components.push(right_component);
-                    components.push(left_component);
-                }
-                let left_mask = *indexed(&detector_masks, left, "left composite error pair mask")?;
-                let right_mask =
-                    *indexed(&detector_masks, right, "right composite error pair mask")?;
-                goal & !(left_mask | right_mask)
-            } else {
-                continue;
-            }
-        };
-
-        while remnants != 0 {
-            let mut single_match = None;
-            for index in 1..combinations.len() {
-                let detector_count = *indexed(
-                    &detector_counts,
-                    index,
-                    "single composite error detector count",
-                )?;
-                let detector_mask = *indexed(
-                    &detector_masks,
-                    index,
-                    "single composite error detector mask",
-                )?;
-                if detector_count == 1 && detector_mask & !remnants == 0 {
-                    single_match = Some((index, detector_mask));
-                    break;
-                }
-            }
-            let Some((single, detector_mask)) = single_match else {
-                return Err(CircuitError::invalid_detector_error_model(
-                    "composite error local decomposition left an unsolved detector",
-                ));
-            };
-            remnants &= !detector_mask;
-            components
-                .push(indexed(combinations, single, "single composite error component")?.clone());
-        }
-        *indexed_mut(
-            combinations,
-            goal_index,
-            "decomposed composite error component",
-        )? = join_error_components(&components);
-    }
-    Ok(())
-}
-
-fn find_two_disjoint_pairs(
-    goal: u64,
-    single_detector_union: u64,
-    pairs: &[usize],
-    masks: &[u64],
-) -> CircuitResult<Option<(usize, usize)>> {
-    for (position, &left) in pairs.iter().enumerate() {
-        for &right in pairs.iter().skip(position + 1) {
-            let left_mask = *indexed(masks, left, "left irreducible detector mask")?;
-            let right_mask = *indexed(masks, right, "right irreducible detector mask")?;
-            if left_mask & right_mask == 0
-                && goal & !(single_detector_union | left_mask | right_mask) == 0
-            {
-                return Ok(Some((left, right)));
-            }
-        }
-    }
-    Ok(None)
-}
-
-fn join_error_components(components: &[Vec<DemTarget>]) -> Vec<DemTarget> {
-    let mut joined = Vec::new();
-    for (index, component) in components.iter().enumerate() {
-        if index > 0 {
-            joined.push(DemTarget::separator());
-        }
-        joined.extend(component.iter().copied());
-    }
-    joined
-}
-
-fn merge_indistinguishable_disjoint_probabilities(
-    targets: &[Vec<DemTarget>],
-    probabilities: &mut [Probability],
-) -> CircuitResult<()> {
-    if targets.len() != probabilities.len() {
-        return Err(CircuitError::invalid_detector_error_model(
-            "disjoint probability and target table lengths differ",
-        ));
-    }
-    for mask in 1..targets.len() {
-        if !indexed(targets, mask, "disjoint target mask")?.is_empty() {
-            continue;
-        }
-        for destination in 0..targets.len() {
-            let source = destination ^ mask;
-            if source > destination {
-                let destination_probability = *indexed(
-                    probabilities,
-                    destination,
-                    "disjoint destination probability",
-                )?;
-                let source_probability =
-                    *indexed(probabilities, source, "disjoint source probability")?;
-                *indexed_mut(
-                    probabilities,
-                    destination,
-                    "disjoint destination probability",
-                )? =
-                    Probability::try_new(destination_probability.get() + source_probability.get())?;
-                *indexed_mut(probabilities, source, "disjoint source probability")? =
-                    Probability::try_new(0.0)?;
-            }
-        }
-    }
-    Ok(())
 }
 
 fn prepend_detector_shift(
@@ -1070,24 +950,19 @@ fn push_items(target: &mut DetectorErrorModel, items: &[crate::DemItem]) {
     }
 }
 
-fn indexed<'a, T>(values: &'a [T], index: usize, context: &str) -> CircuitResult<&'a T> {
-    values.get(index).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model(format!(
-            "folded analyzer {context} index {index} is out of range"
-        ))
-    })
-}
-
-fn indexed_mut<'a, T>(
-    values: &'a mut [T],
-    index: usize,
-    context: &str,
-) -> CircuitResult<&'a mut T> {
-    values.get_mut(index).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model(format!(
-            "folded analyzer {context} index {index} is out of range"
-        ))
-    })
+pub(super) fn compact_dem_item_count(model: &DetectorErrorModel) -> CircuitResult<u64> {
+    let mut count = 0_u64;
+    for item in model.items() {
+        count = checked_add(count, 1, "compact DEM item count")?;
+        if let crate::DemItem::RepeatBlock(repeat) = item {
+            count = checked_add(
+                count,
+                compact_dem_item_count(repeat.body())?,
+                "compact DEM nested item count",
+            )?;
+        }
+    }
+    Ok(count)
 }
 
 fn checked_add(left: u64, right: u64, context: &str) -> CircuitResult<u64> {

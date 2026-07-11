@@ -908,6 +908,7 @@ mod tests {
                 }),
                 resident_bytes: Some(8192),
                 resident_delta_bytes: None,
+                observations: Vec::new(),
                 iterations: Some(1),
             }],
             baseline_status: BaselineCompareStatus::Comparable,
@@ -1049,6 +1050,7 @@ mod tests {
                 allocation: None,
                 resident_bytes: None,
                 resident_delta_bytes: None,
+                observations: Vec::new(),
                 iterations: None,
             }]
         });
@@ -1060,6 +1062,7 @@ mod tests {
                 allocation: None,
                 resident_bytes: None,
                 resident_delta_bytes: None,
+                observations: Vec::new(),
                 iterations: Some(1),
             }]
         });
@@ -1108,6 +1111,7 @@ mod tests {
             allocation: None,
             resident_bytes: None,
             resident_delta_bytes: None,
+            observations: Vec::new(),
             iterations,
         }
     }

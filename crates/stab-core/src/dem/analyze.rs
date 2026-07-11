@@ -4,6 +4,8 @@ mod budget;
 mod clifford;
 mod declarations;
 mod decompose;
+#[cfg(feature = "ops-contracts")]
+mod diagnostics;
 mod effects;
 mod error_decomp;
 mod feedback;
@@ -24,6 +26,10 @@ use super::{DemInstruction, DemTarget, DetectorErrorModel};
 use budget::validate_analyzer_expansion_budget;
 use declarations::Declaration;
 use decompose::decompose_tagged_error_probabilities;
+#[cfg(feature = "ops-contracts")]
+pub use diagnostics::{
+    __circuit_to_detector_error_model_with_diagnostics, ErrorAnalyzerDiagnostics,
+};
 use effects::{
     AnalyzerBasis, AnalyzerPauli, NoiseEffect, ObservableSensitivity, PendingError,
     PendingSingleQubitPauliChannel, analyzer_pauli_from_mask, pauli_mask,

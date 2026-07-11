@@ -604,6 +604,7 @@ mod tests {
             allocation: None,
             resident_bytes: None,
             resident_delta_bytes: None,
+            observations: Vec::new(),
             iterations: None,
         }
     }

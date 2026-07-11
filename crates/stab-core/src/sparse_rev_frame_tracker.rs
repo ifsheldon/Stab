@@ -166,6 +166,18 @@ impl SparseReverseFrameTracker {
         result
     }
 
+    pub(crate) fn boundary_entry_count(&self) -> usize {
+        self.xs
+            .values()
+            .chain(self.zs.values())
+            .chain(self.rec_bits.values())
+            .chain(self.observable_effects.values())
+            .chain(self.gauge_errors.iter())
+            .fold(self.anticommutations.len(), |count, targets| {
+                count.saturating_add(targets.len())
+            })
+    }
+
     pub(crate) fn target_anticommuted(&self, target: DemTarget) -> bool {
         self.anticommutations
             .iter()

@@ -39,6 +39,13 @@ pub(crate) fn aggregate_measurement_runs(
             .collect::<Result<Vec<_>, _>>()?;
         let variance_seconds = variance_seconds(&seconds);
         seconds.sort_by(f64::total_cmp);
+        if runs.iter().any(|run| {
+            run.get(index).is_none_or(|measurement| {
+                measurement.observations != first_measurement.observations
+            })
+        }) {
+            return Err(inconsistent_measurement_runs(row_id));
+        }
         measurements.push(Measurement {
             name: name.clone(),
             seconds: seconds
@@ -49,6 +56,7 @@ pub(crate) fn aggregate_measurement_runs(
             allocation: aggregate_allocations(&runs, index),
             resident_bytes: aggregate_resident_bytes(&runs, index),
             resident_delta_bytes: aggregate_resident_delta_bytes(&runs, index),
+            observations: first_measurement.observations.clone(),
             iterations: aggregate_iterations(&runs, index),
         });
     }
@@ -195,7 +203,7 @@ fn normalized_measurement_name(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::aggregate_measurement_runs;
-    use crate::report::Measurement;
+    use crate::report::{Measurement, MeasurementObservation};
 
     #[test]
     fn repeated_measurement_runs_use_median_seconds_and_validate_shape() {
@@ -211,6 +219,14 @@ mod tests {
         assert_eq!(aggregate_measurement.seconds, 2.0);
         assert_eq!(aggregate_measurement.iterations, Some(6));
         assert!(aggregate_measurement.variance_seconds.is_some());
+        assert_eq!(
+            aggregate_measurement
+                .observations
+                .first()
+                .expect("state-count observation")
+                .value,
+            17
+        );
 
         let error = aggregate_measurement_runs(
             "row",
@@ -225,6 +241,21 @@ mod tests {
                 .to_string()
                 .contains("inconsistent measurement shapes")
         );
+
+        let mut changed_observation = measurement("stab_case", 2.0);
+        changed_observation
+            .observations
+            .first_mut()
+            .expect("state-count observation")
+            .value = 18;
+        aggregate_measurement_runs(
+            "row",
+            vec![
+                vec![measurement("stab_case", 1.0)],
+                vec![changed_observation],
+            ],
+        )
+        .expect_err("reject mismatched algorithm observations");
     }
 
     fn measurement(name: &str, seconds: f64) -> Measurement {
@@ -243,6 +274,10 @@ mod tests {
             allocation: None,
             resident_bytes: None,
             resident_delta_bytes: None,
+            observations: vec![MeasurementObservation {
+                name: "state_count".to_string(),
+                value: 17,
+            }],
             iterations,
         }
     }

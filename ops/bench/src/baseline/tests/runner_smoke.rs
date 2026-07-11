@@ -148,55 +148,80 @@ fn pf4_dem_transform_benchmark_rows_have_stab_compare_runners() {
 fn pf6_analyzer_benchmark_rows_have_stab_compare_runners() {
     for (id, upstream_source, measurement, expected_measurements) in [
         (
-            "pf6-analyze-errors-generated-surface",
+            "pfm-b5-analyzer-cycle-folding",
+            "src/stim/simulators/error_analyzer.test.cc",
+            "analyzer-cycle-folding",
+            &[
+                "stab_pfm_b5_analyzer_transient",
+                "stab_pfm_b5_analyzer_short_period",
+                "stab_pfm_b5_analyzer_long_period",
+                "stab_pfm_b5_analyzer_nested",
+                "stab_pfm_b5_analyzer_gauge",
+                "stab_pfm_b5_analyzer_coordinate",
+            ][..],
+        ),
+        (
+            "pfm-b5-analyzer-generated-qec",
             "src/stim/simulators/error_analyzer.perf.cc",
-            "analyze-errors-generated",
-            &["stab_pf6_analyze_errors_generated_surface"][..],
+            "analyzer-generated-qec",
+            &[
+                "stab_pfm_b5_analyzer_repetition_qec",
+                "stab_pfm_b5_analyzer_surface_qec",
+            ][..],
+        ),
+        (
+            "pfm-b5-graphlike-search-direct-dem",
+            "src/stim/search/graphlike/algo.test.cc",
+            "graphlike-direct-dem",
+            &["stab_pfm_b5_graphlike_direct_dem"][..],
+        ),
+        (
+            "pfm-b5-graphlike-generated-d25",
+            "src/stim/search/graphlike/algo.perf.cc",
+            "graphlike-generated-d25",
+            &["stab_pfm_b5_graphlike_generated_d25"][..],
+        ),
+        (
+            "pfm-b5-graphlike-generated-d11-r1000",
+            "src/stim/search/graphlike/algo.perf.cc",
+            "graphlike-generated-d11-r1000",
+            &["stab_pfm_b5_graphlike_generated_d11_r1000"][..],
+        ),
+        (
+            "pfm-b5-hypergraph-search-direct-dem",
+            "src/stim/search/hyper/algo.test.cc",
+            "hypergraph-direct-dem",
+            &["stab_pfm_b5_hypergraph_direct_dem"][..],
+        ),
+        (
+            "pfm-b5-hypergraph-search-generated-qec",
+            "src/stim/search/hyper/algo.test.cc",
+            "hypergraph-generated-qec",
+            &["stab_pfm_b5_hypergraph_generated_qec"][..],
+        ),
+        (
+            "pfm-b5-wcnf-direct-dem",
+            "src/stim/search/sat/wcnf.test.cc",
+            "wcnf-direct-dem",
+            &[
+                "stab_pfm_b5_wcnf_shortest_direct",
+                "stab_pfm_b5_wcnf_likeliest_direct",
+            ][..],
+        ),
+        (
+            "pfm-b5-wcnf-generated-qec",
+            "src/stim/search/sat/wcnf.test.cc",
+            "wcnf-generated-qec",
+            &[
+                "stab_pfm_b5_wcnf_shortest_generated",
+                "stab_pfm_b5_wcnf_likeliest_generated",
+            ][..],
         ),
         (
             "pf6-error-decomp-loop-folded",
             "src/stim/simulators/error_analyzer.test.cc",
             "error-decomp-loop-folded",
             &["stab_pf6_error_decomp_loop_folded"][..],
-        ),
-        (
-            "pf6-analyzer-loop-observable-folded",
-            "src/stim/simulators/error_analyzer.test.cc",
-            "analyze-errors-loop-observable",
-            &["stab_pf6_analyzer_loop_observable_folded"][..],
-        ),
-        (
-            "pf6-analyzer-period8-observable-folded",
-            "src/stim/simulators/error_analyzer.test.cc",
-            "analyze-errors-period8-observable",
-            &["stab_pf6_analyzer_period8_observable_folded"][..],
-        ),
-        (
-            "pf6-analyzer-period127-observable-folded",
-            "src/stim/simulators/error_analyzer.test.cc",
-            "analyze-errors-period127-observable",
-            &["stab_pf6_analyzer_period127_observable_folded"][..],
-        ),
-        (
-            "pf6-graphlike-search-generated",
-            "src/stim/search/graphlike/algo.perf.cc",
-            "graphlike-search-generated",
-            &["stab_pf6_graphlike_search_generated_surface"][..],
-        ),
-        (
-            "pf6-hypergraph-search-generated",
-            "src/stim/search/hyper/algo.test.cc",
-            "hypergraph-search-generated",
-            &["stab_pf6_hypergraph_search_generated_surface"][..],
-        ),
-        (
-            "pf6-generated-sat-wcnf",
-            "src/stim/search/sat/wcnf.test.cc",
-            "sat-wcnf-generated",
-            &[
-                "stab_pf6_shortest_sat_generated_surface",
-                "stab_pf6_likeliest_sat_generated_surface",
-            ][..],
         ),
         (
             "pf6-sparse-rev-frame-loop",
@@ -242,12 +267,44 @@ fn assert_benchmark_measurements(id: &str, row: BenchmarkRow, expected_measureme
         compare_note(id).is_some(),
         "{id} should explain benchmark comparability"
     );
+    if id.starts_with("pfm-b5-") {
+        for measurement in &measurements {
+            assert!(
+                !measurement.observations.is_empty(),
+                "{id}/{} should record algorithm observations",
+                measurement.name
+            );
+        }
+    }
+    if id == "pfm-b5-analyzer-cycle-folding" {
+        let short_period = measurements
+            .iter()
+            .find(|measurement| measurement.name == "stab_pfm_b5_analyzer_short_period")
+            .expect("short-period analyzer measurement");
+        let long_period = measurements
+            .iter()
+            .find(|measurement| measurement.name == "stab_pfm_b5_analyzer_long_period")
+            .expect("long-period analyzer measurement");
+        assert_eq!(observation_value(short_period, "max_recurrence_period"), 8);
+        assert_eq!(observation_value(long_period, "max_recurrence_period"), 127);
+        assert!(observation_value(short_period, "folded_repeat_iterations") > 0);
+        assert!(observation_value(long_period, "folded_repeat_iterations") > 0);
+    }
     for name in names {
         assert!(
             measurement_work(id, name).is_some(),
             "{id}/{name} should report normalized work"
         );
     }
+}
+
+fn observation_value(measurement: &crate::report::Measurement, name: &str) -> u64 {
+    measurement
+        .observations
+        .iter()
+        .find(|observation| observation.name == name)
+        .map(|observation| observation.value)
+        .expect("named benchmark observation")
 }
 
 #[test]

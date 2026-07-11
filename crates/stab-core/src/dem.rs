@@ -13,6 +13,9 @@ mod hyper;
 mod sat;
 mod traversal;
 
+#[cfg(feature = "ops-contracts")]
+#[doc(hidden)]
+pub use analyze::{__circuit_to_detector_error_model_with_diagnostics, ErrorAnalyzerDiagnostics};
 pub use analyze::{
     DisjointPauliProbabilities, ErrorAnalyzerOptions, IndependentPauliProbabilities,
     circuit_to_detector_error_model, independent_to_disjoint_xyz_errors,

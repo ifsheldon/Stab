@@ -90,7 +90,15 @@ pub(crate) struct Measurement {
     pub(crate) resident_bytes: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) resident_delta_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) observations: Vec<MeasurementObservation>,
     pub(crate) iterations: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) struct MeasurementObservation {
+    pub(crate) name: String,
+    pub(crate) value: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -325,7 +333,22 @@ pub(crate) fn render_markdown_report(report: &BaselineReport) -> String {
         } else {
             row.measurements
                 .iter()
-                .map(|measurement| format!("{}={:.6}s", measurement.name, measurement.seconds))
+                .map(|measurement| {
+                    let observations = measurement
+                        .observations
+                        .iter()
+                        .map(|observation| format!("{}={}", observation.name, observation.value))
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    if observations.is_empty() {
+                        format!("{}={:.6}s", measurement.name, measurement.seconds)
+                    } else {
+                        format!(
+                            "{}={:.6}s [{}]",
+                            measurement.name, measurement.seconds, observations
+                        )
+                    }
+                })
                 .collect::<Vec<_>>()
                 .join("<br>")
         };

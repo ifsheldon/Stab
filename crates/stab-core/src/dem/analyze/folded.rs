@@ -20,4 +20,29 @@ impl FoldedAnalyzer {
         fallback_options.fold_loops = false;
         Analyzer::new(fallback_options).analyze(circuit)
     }
+
+    #[cfg(feature = "ops-contracts")]
+    pub(super) fn analyze_with_diagnostics(
+        &self,
+        circuit: &Circuit,
+    ) -> CircuitResult<(DetectorErrorModel, super::ErrorAnalyzerDiagnostics)> {
+        if let Some((model, diagnostics)) =
+            reverse_fold::try_analyze_with_diagnostics(circuit, self.options)?
+        {
+            return Ok((model, diagnostics.into()));
+        }
+
+        let mut fallback_options = self.options;
+        fallback_options.fold_loops = false;
+        let model = Analyzer::new(fallback_options).analyze(circuit)?;
+        let emitted_compact_dem_items = reverse_fold::compact_dem_item_count(&model)?;
+        Ok((
+            model,
+            super::ErrorAnalyzerDiagnostics {
+                used_bounded_fallback: true,
+                emitted_compact_dem_items,
+                ..super::ErrorAnalyzerDiagnostics::default()
+            },
+        ))
+    }
 }

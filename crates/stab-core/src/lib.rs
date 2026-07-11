@@ -62,6 +62,9 @@ pub use circuit_inverse::{
 pub use circuit_missing_detectors::{MissingDetectorOptions, missing_detectors};
 pub use circuit_simplify::{decomposed_circuit, simplified_circuit};
 pub use circuit_tableau::circuit_to_tableau;
+#[cfg(feature = "ops-contracts")]
+#[doc(hidden)]
+pub use dem::{__circuit_to_detector_error_model_with_diagnostics, ErrorAnalyzerDiagnostics};
 pub use dem::{
     DemDetectorId, DemFlattenedInstructionIter, DemInstruction, DemInstructionKind, DemItem,
     DemObservableId, DemRepeatBlock, DemTarget, DetectorErrorModel, DisjointPauliProbabilities,
