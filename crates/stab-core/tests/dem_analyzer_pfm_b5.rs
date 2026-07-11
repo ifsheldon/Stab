@@ -10,6 +10,9 @@ use stab_core::{
     ErrorAnalyzerOptions, circuit_to_detector_error_model,
 };
 
+#[cfg(feature = "ops-contracts")]
+use stab_core::__circuit_to_detector_error_model_with_diagnostics;
+
 const NESTED_CIRCUIT: &str =
     include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_nested_loop.stim");
 const NESTED_EXPECTED: &str =
@@ -56,6 +59,83 @@ fn pfm_b5_gauge_loop_bounded() {
         .to_dem_string(),
         GAUGE_EXPECTED
     );
+}
+
+#[test]
+fn pfm_b5_nested_gauge_probe_consumes_transient_output() {
+    let circuit = "\
+R 0
+M 0
+REPEAT 2 {
+    REPEAT 1000000000 {
+        H 0
+        M 0
+        DETECTOR rec[-1]
+        R 0
+    }
+}
+";
+    let expected = "\
+error(0.5) D0
+repeat 1000000000 {
+    error(0.5) D1
+    shift_detectors 1
+}
+repeat 999999999 {
+    error(0.5) D1
+    detector D0
+    shift_detectors 1
+}
+detector D0
+";
+    assert_eq!(
+        analyze(
+            circuit,
+            ErrorAnalyzerOptions {
+                allow_gauge_detectors: true,
+                ..ErrorAnalyzerOptions::default()
+            },
+        )
+        .to_dem_string(),
+        expected
+    );
+}
+
+#[test]
+fn pfm_b5_repeat_diagnostics_never_reject_valid_analysis() {
+    let circuit = "\
+REPEAT 9223372036854775807 {
+    SHIFT_COORDS(1)
+}
+REPEAT 9223372036854775807 {
+    SHIFT_COORDS(1)
+}
+REPEAT 9223372036854775807 {
+    SHIFT_COORDS(1)
+}
+";
+    assert_eq!(
+        analyze(circuit, ErrorAnalyzerOptions::default()).to_dem_string(),
+        "repeat 9223372036854775807 {\n    shift_detectors(1) 0\n}\nrepeat 9223372036854775807 {\n    shift_detectors(1) 0\n}\nrepeat 9223372036854775807 {\n    shift_detectors(1) 0\n}\n"
+    );
+}
+
+#[cfg(feature = "ops-contracts")]
+#[test]
+fn pfm_b5_repeat_diagnostics_saturate() {
+    let circuit = Circuit::from_stim_str(
+        "REPEAT 9223372036854775807 {\nSHIFT_COORDS(1)\n}\nREPEAT 9223372036854775807 {\nSHIFT_COORDS(1)\n}\nREPEAT 9223372036854775807 {\nSHIFT_COORDS(1)\n}\n",
+    )
+    .expect("valid repeated circuit");
+    let (_, diagnostics) = __circuit_to_detector_error_model_with_diagnostics(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect("diagnostics must not alter analysis semantics");
+    assert_eq!(diagnostics.represented_repeat_iterations, u64::MAX);
 }
 
 #[test]

@@ -35,7 +35,7 @@ impl FoldedAnalyzer {
         let mut fallback_options = self.options;
         fallback_options.fold_loops = false;
         let model = Analyzer::new(fallback_options).analyze(circuit)?;
-        let emitted_compact_dem_items = reverse_fold::compact_dem_item_count(&model)?;
+        let emitted_compact_dem_items = reverse_fold::compact_dem_item_count(&model);
         Ok((
             model,
             super::ErrorAnalyzerDiagnostics {

@@ -2,22 +2,31 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{Circuit, CircuitError, CircuitResult, DemTarget};
 
-use super::SparseReverseFrameTracker;
+use super::{GaugeOutputPolicy, SparseReverseFrameTracker};
 
 pub(super) fn undo_loop(
     tracker: &mut SparseReverseFrameTracker,
     body: &Circuit,
     repetitions: u64,
 ) -> CircuitResult<()> {
+    undo_loop_with_gauge_output(tracker, body, repetitions, GaugeOutputPolicy::Preserve)
+}
+
+pub(super) fn undo_loop_with_gauge_output(
+    tracker: &mut SparseReverseFrameTracker,
+    body: &Circuit,
+    repetitions: u64,
+    gauge_output: GaugeOutputPolicy,
+) -> CircuitResult<()> {
     if repetitions < 5 {
-        return undo_loop_by_unrolling(tracker, body, repetitions);
+        return undo_loop_by_unrolling_with_gauge_output(tracker, body, repetitions, gauge_output);
     }
 
     let mut tortoise = tracker.clone();
     let mut hare_steps = 0_u64;
     let mut tortoise_steps = 0_u64;
     loop {
-        tracker.undo_circuit(body)?;
+        undo_probe_iteration(tracker, body, gauge_output)?;
         hare_steps = hare_steps.checked_add(1).ok_or_else(|| {
             CircuitError::invalid_detector_error_model(
                 "sparse reverse repeat step count overflowed",
@@ -28,11 +37,16 @@ pub(super) fn undo_loop(
         }
 
         if hare_steps > repetitions.saturating_sub(hare_steps) {
-            return undo_loop_by_unrolling(tracker, body, repetitions - hare_steps);
+            return undo_loop_by_unrolling_with_gauge_output(
+                tracker,
+                body,
+                repetitions - hare_steps,
+                gauge_output,
+            );
         }
 
         if hare_steps & 1 == 0 {
-            tortoise.undo_circuit(body)?;
+            undo_probe_iteration(&mut tortoise, body, gauge_output)?;
             tortoise_steps = tortoise_steps.checked_add(1).ok_or_else(|| {
                 CircuitError::invalid_detector_error_model(
                     "sparse reverse repeat step count overflowed",
@@ -87,7 +101,7 @@ pub(super) fn undo_loop(
             )
         })?;
 
-    undo_loop_by_unrolling(tracker, body, repetitions - hare_steps)
+    undo_loop_by_unrolling_with_gauge_output(tracker, body, repetitions - hare_steps, gauge_output)
 }
 
 pub(super) fn undo_loop_by_unrolling(
@@ -95,10 +109,35 @@ pub(super) fn undo_loop_by_unrolling(
     body: &Circuit,
     repetitions: u64,
 ) -> CircuitResult<()> {
+    undo_loop_by_unrolling_with_gauge_output(
+        tracker,
+        body,
+        repetitions,
+        GaugeOutputPolicy::Preserve,
+    )
+}
+
+fn undo_loop_by_unrolling_with_gauge_output(
+    tracker: &mut SparseReverseFrameTracker,
+    body: &Circuit,
+    repetitions: u64,
+    gauge_output: GaugeOutputPolicy,
+) -> CircuitResult<()> {
     for _ in 0..repetitions {
-        tracker.undo_circuit(body)?;
+        undo_probe_iteration(tracker, body, gauge_output)?;
     }
     Ok(())
+}
+
+fn undo_probe_iteration(
+    tracker: &mut SparseReverseFrameTracker,
+    body: &Circuit,
+    gauge_output: GaugeOutputPolicy,
+) -> CircuitResult<()> {
+    match gauge_output {
+        GaugeOutputPolicy::Preserve => tracker.undo_circuit(body),
+        GaugeOutputPolicy::Discard => tracker.undo_circuit_for_analyzer_probe(body),
+    }
 }
 
 pub(super) fn is_shifted_copy(

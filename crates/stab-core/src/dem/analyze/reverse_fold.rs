@@ -112,7 +112,7 @@ impl ReverseFoldAnalyzer {
             reversed_model: DetectorErrorModel::new(),
             error_probabilities: BTreeMap::new(),
             diagnostics: ReverseFoldDiagnostics {
-                represented_repeat_iterations: represented_repeat_iterations(circuit, 1)?,
+                represented_repeat_iterations: represented_repeat_iterations(circuit, 1),
                 ..ReverseFoldDiagnostics::default()
             },
         })
@@ -129,7 +129,7 @@ impl ReverseFoldAnalyzer {
         let mut base_detector_id = 0_u64;
         let mut seen = BTreeSet::new();
         let model = unreverse_model(&self.reversed_model, &mut base_detector_id, &mut seen)?;
-        self.diagnostics.emitted_compact_dem_items = compact_dem_item_count(&model)?;
+        self.diagnostics.emitted_compact_dem_items = compact_dem_item_count(&model);
         Ok((model, self.diagnostics))
     }
 
@@ -639,7 +639,7 @@ impl ReverseFoldAnalyzer {
         if iterations == 0 {
             return Ok(());
         }
-        self.observe_boundary_entries(self.tracker.boundary_entry_count())?;
+        self.observe_boundary_entries(self.tracker.boundary_entry_count());
         if !self.options.fold_loops {
             return self.undo_loop_by_unrolling(body, iterations);
         }
@@ -650,18 +650,16 @@ impl ReverseFoldAnalyzer {
         let mut tortoise_iterations = 0_u64;
         let mut found_cycle = false;
         while hare_iterations < iterations && hare_iterations < MAX_LOOP_CYCLE_STEPS {
-            hare.undo_circuit(body)?;
-            hare.take_gauge_errors();
-            self.record_recurrence_probe(&hare)?;
+            hare.undo_circuit_for_analyzer_probe(body)?;
+            self.record_recurrence_probe(&hare);
             hare_iterations = checked_add(hare_iterations, 1, "hare iteration")?;
             if hare.is_shifted_copy(&tortoise) {
                 found_cycle = true;
                 break;
             }
             if hare_iterations.is_multiple_of(2) {
-                tortoise.undo_circuit(body)?;
-                tortoise.take_gauge_errors();
-                self.record_recurrence_probe(&tortoise)?;
+                tortoise.undo_circuit_for_analyzer_probe(body)?;
+                self.record_recurrence_probe(&tortoise);
                 tortoise_iterations = checked_add(tortoise_iterations, 1, "tortoise iteration")?;
                 if hare.is_shifted_copy(&tortoise) {
                     found_cycle = true;
@@ -697,7 +695,7 @@ impl ReverseFoldAnalyzer {
                 ));
             }
             self.diagnostics.recurrences_found =
-                checked_add(self.diagnostics.recurrences_found, 1, "recurrence count")?;
+                self.diagnostics.recurrences_found.saturating_add(1);
             self.diagnostics.max_recurrence_period =
                 self.diagnostics.max_recurrence_period.max(period);
             let remaining = iterations.checked_sub(tortoise_iterations).ok_or_else(|| {
@@ -726,26 +724,15 @@ impl ReverseFoldAnalyzer {
         self.undo_loop_by_unrolling(body, remaining)
     }
 
-    fn record_recurrence_probe(
-        &mut self,
-        tracker: &SparseReverseFrameTracker,
-    ) -> CircuitResult<()> {
-        self.diagnostics.recurrence_search_steps = checked_add(
-            self.diagnostics.recurrence_search_steps,
-            1,
-            "recurrence search step",
-        )?;
+    fn record_recurrence_probe(&mut self, tracker: &SparseReverseFrameTracker) {
+        self.diagnostics.recurrence_search_steps =
+            self.diagnostics.recurrence_search_steps.saturating_add(1);
         self.observe_boundary_entries(tracker.boundary_entry_count())
     }
 
-    fn observe_boundary_entries(&mut self, entries: usize) -> CircuitResult<()> {
-        let entries = u64::try_from(entries).map_err(|_| {
-            CircuitError::invalid_detector_error_model(
-                "folded analyzer boundary entry count does not fit u64",
-            )
-        })?;
+    fn observe_boundary_entries(&mut self, entries: usize) {
+        let entries = u64::try_from(entries).unwrap_or(u64::MAX);
         self.diagnostics.max_boundary_entries = self.diagnostics.max_boundary_entries.max(entries);
-        Ok(())
     }
 
     fn capture_repeated_period(
@@ -785,11 +772,10 @@ impl ReverseFoldAnalyzer {
         })?;
         let folded_iterations =
             checked_product_u64(period, skipped_periods, "folded repeat iteration")?;
-        self.diagnostics.folded_repeat_iterations = checked_add(
-            self.diagnostics.folded_repeat_iterations,
-            folded_iterations,
-            "folded repeat iteration total",
-        )?;
+        self.diagnostics.folded_repeat_iterations = self
+            .diagnostics
+            .folded_repeat_iterations
+            .saturating_add(folded_iterations);
         let skipped_measurements =
             checked_product_usize(measurements_per_period, skipped_periods, "measurement skip")?;
         let skipped_detectors =
@@ -856,25 +842,17 @@ fn contains_unsupported_reverse_fold_instruction(circuit: &Circuit) -> bool {
     })
 }
 
-fn represented_repeat_iterations(circuit: &Circuit, multiplier: u64) -> CircuitResult<u64> {
+fn represented_repeat_iterations(circuit: &Circuit, multiplier: u64) -> u64 {
     let mut total = 0_u64;
     for item in circuit.items() {
         let CircuitItem::RepeatBlock(repeat) = item else {
             continue;
         };
-        let repeated = checked_product_u64(
-            multiplier,
-            repeat.repeat_count().get(),
-            "represented repeat multiplicity",
-        )?;
-        total = checked_add(total, repeated, "represented repeat iteration")?;
-        total = checked_add(
-            total,
-            represented_repeat_iterations(repeat.body(), repeated)?,
-            "nested represented repeat iteration",
-        )?;
+        let repeated = multiplier.saturating_mul(repeat.repeat_count().get());
+        total = total.saturating_add(repeated);
+        total = total.saturating_add(represented_repeat_iterations(repeat.body(), repeated));
     }
-    Ok(total)
+    total
 }
 
 fn analyzer_pauli(pauli: AnalyzerPauli) -> Pauli {
@@ -950,19 +928,15 @@ fn push_items(target: &mut DetectorErrorModel, items: &[crate::DemItem]) {
     }
 }
 
-pub(super) fn compact_dem_item_count(model: &DetectorErrorModel) -> CircuitResult<u64> {
+pub(super) fn compact_dem_item_count(model: &DetectorErrorModel) -> u64 {
     let mut count = 0_u64;
     for item in model.items() {
-        count = checked_add(count, 1, "compact DEM item count")?;
+        count = count.saturating_add(1);
         if let crate::DemItem::RepeatBlock(repeat) = item {
-            count = checked_add(
-                count,
-                compact_dem_item_count(repeat.body())?,
-                "compact DEM nested item count",
-            )?;
+            count = count.saturating_add(compact_dem_item_count(repeat.body()));
         }
     }
-    Ok(count)
+    count
 }
 
 fn checked_add(left: u64, right: u64, context: &str) -> CircuitResult<u64> {

@@ -12,9 +12,9 @@ pub(super) fn locally_decompose_combinations(
             if let DemTarget::RelativeDetector(detector) = target {
                 let next = involved_detectors.len();
                 if !involved_detectors.contains_key(detector) {
-                    if next >= 15 {
+                    if next >= 16 {
                         return Err(CircuitError::invalid_detector_error_model(
-                            "an error case in a composite error exceeded 15 detector symptoms",
+                            "an error case in a composite error exceeded 16 detector symptoms",
                         ));
                     }
                     involved_detectors.insert(*detector, next);
@@ -251,4 +251,36 @@ fn indexed_mut<'a, T>(
             "folded analyzer {context} index {index} is out of range"
         ))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::panic_in_result_fn,
+        reason = "unit tests use direct assertions for compact boundary diagnostics"
+    )]
+
+    use super::*;
+
+    fn detector_basis_errors(count: u64) -> CircuitResult<Vec<BTreeSet<DemTarget>>> {
+        (0..count)
+            .map(|detector| Ok(BTreeSet::from([DemTarget::relative_detector(detector)?])))
+            .collect()
+    }
+
+    #[test]
+    fn local_decomposition_accepts_sixteen_detector_symptoms() -> CircuitResult<()> {
+        let basis_errors = detector_basis_errors(16)?;
+        locally_decompose_combinations(&basis_errors, &mut [Vec::new()])
+    }
+
+    #[test]
+    fn local_decomposition_rejects_seventeen_detector_symptoms() -> CircuitResult<()> {
+        let basis_errors = detector_basis_errors(17)?;
+        let error = locally_decompose_combinations(&basis_errors, &mut [Vec::new()])
+            .expect_err("seventeen detector symptoms must exceed the local mask contract");
+        assert!(error.to_string().contains("exceeded 16 detector symptoms"));
+        Ok(())
+    }
 }

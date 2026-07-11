@@ -90,14 +90,39 @@ impl SparseReverseFrameTracker {
     }
 
     pub(crate) fn undo_circuit(&mut self, circuit: &Circuit) -> CircuitResult<()> {
+        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Preserve)
+    }
+
+    pub(crate) fn undo_circuit_for_analyzer_probe(
+        &mut self,
+        circuit: &Circuit,
+    ) -> CircuitResult<()> {
+        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Discard)
+    }
+
+    fn undo_circuit_with_gauge_output(
+        &mut self,
+        circuit: &Circuit,
+        gauge_output: GaugeOutputPolicy,
+    ) -> CircuitResult<()> {
         for item in circuit.items().iter().rev() {
             match item {
-                CircuitItem::Instruction(instruction) => self.undo_instruction(instruction)?,
+                CircuitItem::Instruction(instruction) => {
+                    self.undo_instruction(instruction)?;
+                    if gauge_output == GaugeOutputPolicy::Discard {
+                        self.take_gauge_errors();
+                    }
+                }
                 CircuitItem::RepeatBlock(repeat) => {
                     if unitary_repeat::try_undo_supported_unitary_repeat(self, repeat)? {
                         continue;
                     }
-                    shifted_repeat::undo_loop(self, repeat.body(), repeat.repeat_count().get())?;
+                    shifted_repeat::undo_loop_with_gauge_output(
+                        self,
+                        repeat.body(),
+                        repeat.repeat_count().get(),
+                        gauge_output,
+                    )?;
                 }
             }
         }
@@ -899,6 +924,12 @@ impl SparseReverseFrameTracker {
             )
         })
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum GaugeOutputPolicy {
+    Preserve,
+    Discard,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

@@ -30,7 +30,7 @@ pub fn __circuit_to_detector_error_model_with_diagnostics(
         return FoldedAnalyzer::new(options).analyze_with_diagnostics(circuit);
     }
     let model = Analyzer::new(options).analyze(circuit)?;
-    let emitted_compact_dem_items = reverse_fold::compact_dem_item_count(&model)?;
+    let emitted_compact_dem_items = reverse_fold::compact_dem_item_count(&model);
     Ok((
         model,
         ErrorAnalyzerDiagnostics {
