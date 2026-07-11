@@ -984,31 +984,34 @@
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
-            "kind": "test-family",
-            "test": "FrameSimulator unitary gate families",
-            "subcase": "all canonical fixed-tableau gates and legal plain-qubit target roles",
-            "anchors": [
-              "FrameSimulator.bulk_operations_consistent_with_tableau_data",
-              "FrameSimulator.runs_on_general_circuit"
-            ]
+            "kind": "gtest-case",
+            "test": "FrameSimulator.bulk_operations_consistent_with_tableau_data",
+            "subcase": "all canonical fixed-tableau gates match their inverse tableau actions"
           },
           "comparator": "state-equivalence",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_fixed_tableau",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::gate_surface_contract_fixed_tableau",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-fixed-tableau"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-fixed-tableau",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_fixed_tableau|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -1037,33 +1040,34 @@
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
-            "kind": "test-family",
-            "test": "FrameSimulator measurement and reset families",
-            "subcase": "M, MX, MY, R, RX, RY, MR, MRX, and MRY target roles",
-            "anchors": [
-              "FrameSimulator.resets_vs_measurements",
-              "FrameSimulator.noisy_measurement_reset_x",
-              "FrameSimulator.noisy_measurement_reset_y",
-              "FrameSimulator.noisy_measurement_reset_z"
-            ]
+            "kind": "gtest-case",
+            "test": "FrameSimulator.resets_vs_measurements",
+            "subcase": "M, MX, MY, R, RX, RY, MR, MRX, and MRY deterministic target roles"
           },
           "comparator": "state-equivalence",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_measure_reset",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-measure-reset"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-measure-reset",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -1090,31 +1094,34 @@
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
-            "kind": "test-family",
-            "test": "FrameSimulator pair measurement families",
-            "subcase": "MXX, MYY, and MZZ grouped target roles",
-            "anchors": [
-              "FrameSimulator.mxxyyzz_basis",
-              "FrameSimulator.mxxyyzz_inversion"
-            ]
+            "kind": "gtest-case",
+            "test": "FrameSimulator.mxxyyzz_basis",
+            "subcase": "MXX, MYY, and MZZ deterministic basis behavior"
           },
           "comparator": "state-equivalence",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_pair_measurement",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::gate_surface_contract_pair_measurement",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-pair-measurement"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-pair-measurement",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_pair_measurement|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -1146,22 +1153,29 @@
             "subcase": "deterministic four-body Pauli-product measurement records"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_mpp_deterministic",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::gate_surface_contract_mpp_deterministic",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-mpp-deterministic"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-mpp-deterministic",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_mpp_deterministic|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -1193,22 +1207,29 @@
             "subcase": "anti-Hermitian same-qubit Pauli products reject during semantic execution"
           },
           "comparator": "error-class",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_mpp_anti_hermitian_rejection",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::gate_surface_contract_mpp_anti_hermitian_rejection",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-mpp-anti-hermitian-rejection"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-mpp-anti-hermitian-rejection",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_mpp_anti_hermitian_rejection|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/tableau_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
@@ -1239,22 +1260,29 @@
             "subcase": "deterministic zero and one measurement-pad records"
           },
           "comparator": "exact",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_mpad_deterministic",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::gate_surface_contract_mpad_deterministic",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-mpad-deterministic"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-mpad-deterministic",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_mpad_deterministic|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -1293,26 +1321,39 @@
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
             "buckets": [
-              "mpp-zero",
-              "mpp-one"
+              {
+                "name": "mpp-zero",
+                "expected_probability": 0.75
+              },
+              {
+                "name": "mpp-one",
+                "expected_probability": 0.25
+              }
             ]
           },
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_mpp_stochastic",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_mpp_stochastic",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-mpp-stochastic"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-mpp-stochastic",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_mpp_stochastic|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/tableau_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -1351,26 +1392,39 @@
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
             "buckets": [
-              "mpad-zero",
-              "mpad-one"
+              {
+                "name": "mpad-zero",
+                "expected_probability": 0.75
+              },
+              {
+                "name": "mpad-one",
+                "expected_probability": 0.25
+              }
             ]
           },
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_mpad_stochastic",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_mpad_stochastic",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-mpad-stochastic"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-mpad-stochastic",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_mpad_stochastic|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.inl"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -1397,32 +1451,34 @@
           ],
           "upstream": {
             "path": "src/stim/circuit/gate_decomposition.test.cc",
-            "kind": "test-family",
-            "test": "SPP and SPP_DAG decomposition semantics",
-            "subcase": "Hermitian products, multiple groups, inversions, and anti-Hermitian rejection",
-            "anchors": [
-              "gate_decomposition.decompose_spp_or_spp_dag_operation_simple",
-              "gate_decomposition.decompose_spp_or_spp_dag_operation_multiple",
-              "gate_decomposition.decompose_spp_or_spp_dag_operation_bad"
-            ]
+            "kind": "gtest-case",
+            "test": "gate_decomposition.decompose_spp_or_spp_dag_operation_simple",
+            "subcase": "simple Hermitian SPP and SPP_DAG decomposition semantics"
           },
           "comparator": "state-equivalence",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_spp",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::gate_surface_contract_spp",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-spp"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-spp",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_spp|--quiet|--|--exact",
+              "upstream_source": "src/stim/circuit/gate_decomposition.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -1449,13 +1505,9 @@
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
-            "kind": "test-family",
-            "test": "FrameSimulator Pauli error gates",
-            "subcase": "X_ERROR, Y_ERROR, and Z_ERROR probability and target roles",
-            "anchors": [
-              "FrameSimulator.consistency",
-              "FrameSimulator.runs_on_general_circuit"
-            ]
+            "kind": "gtest-case",
+            "test": "FrameSimulator.consistency",
+            "subcase": "X_ERROR, Y_ERROR, and Z_ERROR probability and target roles"
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1465,28 +1517,47 @@
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
             "buckets": [
-              "identity",
-              "x",
-              "y",
-              "z"
+              {
+                "name": "identity",
+                "expected_probability": 0.25
+              },
+              {
+                "name": "x",
+                "expected_probability": 0.25
+              },
+              {
+                "name": "y",
+                "expected_probability": 0.25
+              },
+              {
+                "name": "z",
+                "expected_probability": 0.25
+              }
             ]
           },
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_pauli_noise",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-pauli-noise"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-pauli-noise",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
@@ -1512,13 +1583,9 @@
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
-            "kind": "test-family",
-            "test": "FrameSimulator Pauli channel families",
-            "subcase": "PAULI_CHANNEL_1 and PAULI_CHANNEL_2 valid probability tuples",
-            "anchors": [
-              "FrameSimulator.consistency",
-              "FrameSimulator.runs_on_general_circuit"
-            ]
+            "kind": "gtest-case",
+            "test": "FrameSimulator.consistency",
+            "subcase": "PAULI_CHANNEL_1 and PAULI_CHANNEL_2 probability tuples"
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1528,44 +1595,111 @@
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
             "buckets": [
-              "pc1-i",
-              "pc1-x",
-              "pc1-y",
-              "pc1-z",
-              "pc2-ii",
-              "pc2-ix",
-              "pc2-iy",
-              "pc2-iz",
-              "pc2-xi",
-              "pc2-xx",
-              "pc2-xy",
-              "pc2-xz",
-              "pc2-yi",
-              "pc2-yx",
-              "pc2-yy",
-              "pc2-yz",
-              "pc2-zi",
-              "pc2-zx",
-              "pc2-zy",
-              "pc2-zz"
+              {
+                "name": "pc1-i",
+                "expected_probability": 0.4
+              },
+              {
+                "name": "pc1-x",
+                "expected_probability": 0.1
+              },
+              {
+                "name": "pc1-y",
+                "expected_probability": 0.2
+              },
+              {
+                "name": "pc1-z",
+                "expected_probability": 0.3
+              },
+              {
+                "name": "pc2-ii",
+                "expected_probability": 0.4
+              },
+              {
+                "name": "pc2-ix",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-iy",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-iz",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-xi",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-xx",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-xy",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-xz",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-yi",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-yx",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-yy",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-yz",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-zi",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-zx",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-zy",
+                "expected_probability": 0.04
+              },
+              {
+                "name": "pc2-zz",
+                "expected_probability": 0.04
+              }
             ]
           },
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_pauli_channels",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-pauli-channels"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-pauli-channels",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
@@ -1596,22 +1730,29 @@
             "subcase": "I_ERROR and II_ERROR execute as exact semantic no-ops"
           },
           "comparator": "semantic-invariant",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_identity_noise",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::gate_surface_contract_identity_noise",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-identity-noise"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-identity-noise",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_identity_noise|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.inl"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
@@ -1637,13 +1778,9 @@
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
-            "kind": "test-family",
-            "test": "FrameSimulator depolarizing families",
-            "subcase": "DEPOLARIZE1 and DEPOLARIZE2 target roles",
-            "anchors": [
-              "FrameSimulator.consistency",
-              "FrameSimulator.runs_on_general_circuit"
-            ]
+            "kind": "gtest-case",
+            "test": "FrameSimulator.consistency",
+            "subcase": "DEPOLARIZE1 and DEPOLARIZE2 probability and target roles"
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1653,30 +1790,55 @@
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
             "buckets": [
-              "depol1-i",
-              "depol1-x",
-              "depol1-y",
-              "depol1-z",
-              "depol2-ii",
-              "depol2-nonidentity"
+              {
+                "name": "depol1-i",
+                "expected_probability": 0.4
+              },
+              {
+                "name": "depol1-x",
+                "expected_probability": 0.2
+              },
+              {
+                "name": "depol1-y",
+                "expected_probability": 0.2
+              },
+              {
+                "name": "depol1-z",
+                "expected_probability": 0.2
+              },
+              {
+                "name": "depol2-ii",
+                "expected_probability": 0.25
+              },
+              {
+                "name": "depol2-nonidentity",
+                "expected_probability": 0.75
+              }
             ]
           },
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_depolarization",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-depolarization"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-depolarization",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
@@ -1702,13 +1864,9 @@
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
-            "kind": "test-family",
-            "test": "FrameSimulator correlated error blocks",
-            "subcase": "CORRELATED_ERROR and ELSE_CORRELATED_ERROR block semantics",
-            "anchors": [
-              "FrameSimulator.correlated_error",
-              "FrameSimulator.runs_on_general_circuit"
-            ]
+            "kind": "gtest-case",
+            "test": "FrameSimulator.correlated_error",
+            "subcase": "CORRELATED_ERROR and ELSE_CORRELATED_ERROR conditional branch semantics"
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1718,28 +1876,47 @@
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
             "buckets": [
-              "no-error",
-              "first-branch",
-              "else-branch-one",
-              "else-branch-two"
+              {
+                "name": "no-error",
+                "expected_probability": 0.3
+              },
+              {
+                "name": "first-branch",
+                "expected_probability": 0.2
+              },
+              {
+                "name": "else-branch-one",
+                "expected_probability": 0.2
+              },
+              {
+                "name": "else-branch-two",
+                "expected_probability": 0.3
+              }
             ]
           },
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_correlated_errors",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_correlated_errors",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-correlated-errors"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-correlated-errors",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_correlated_errors|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
@@ -1765,15 +1942,9 @@
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
-            "kind": "test-family",
-            "test": "FrameSimulator heralded noise families",
-            "subcase": "HERALDED_ERASE and HERALDED_PAULI_CHANNEL_1 records and errors",
-            "anchors": [
-              "FrameSimulator.heralded_erase_detect_statistics",
-              "FrameSimulator.heralded_pauli_channel_1_statistics",
-              "FrameSimulator.heralded_erase_statistics_offset_by_2",
-              "FrameSimulator.heralded_pauli_channel_1_statistics_offset_by_2"
-            ]
+            "kind": "gtest-case",
+            "test": "FrameSimulator.heralded_erase_detect_statistics",
+            "subcase": "HERALDED_ERASE detector and Pauli bucket statistics"
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1783,29 +1954,51 @@
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
             "buckets": [
-              "no-herald",
-              "herald-no-data-error",
-              "herald-x",
-              "herald-y",
-              "herald-z"
+              {
+                "name": "erase-no-herald",
+                "expected_probability": 0.9
+              },
+              {
+                "name": "erase-i",
+                "expected_probability": 0.025
+              },
+              {
+                "name": "erase-x",
+                "expected_probability": 0.025
+              },
+              {
+                "name": "erase-y",
+                "expected_probability": 0.025
+              },
+              {
+                "name": "erase-z",
+                "expected_probability": 0.025
+              }
             ]
           },
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_heralded_noise",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_noise",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-heralded-noise"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-heralded-noise",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_noise|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
@@ -1831,32 +2024,34 @@
           ],
           "upstream": {
             "path": "src/stim/simulators/error_analyzer.test.cc",
-            "kind": "test-family",
-            "test": "ErrorAnalyzer annotation handling",
-            "subcase": "DETECTOR, OBSERVABLE_INCLUDE, TICK, QUBIT_COORDS, and SHIFT_COORDS",
-            "anchors": [
-              "ErrorAnalyzer.omit_vacuous_detector_observable_instructions",
-              "ErrorAnalyzer.coordinate_tracking",
-              "ErrorAnalyzer.tagged_noise"
-            ]
+            "kind": "gtest-case",
+            "test": "ErrorAnalyzer.omit_vacuous_detector_observable_instructions",
+            "subcase": "vacuous detector and observable declarations are omitted without losing error targets"
           },
           "comparator": "semantic-invariant",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_annotations",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::gate_surface_contract_annotations",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-annotations"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-annotations",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_annotations|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
@@ -1884,33 +2079,34 @@
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
-            "kind": "test-family",
-            "test": "FrameSimulator feedback and sweep controls",
-            "subcase": "record and sweep target roles for CX, CY, CZ, XCZ, and YCZ",
-            "anchors": [
-              "FrameSimulator.quantum_cannot_control_classical",
-              "FrameSimulator.classical_can_control_quantum",
-              "FrameSimulator.classical_controls",
-              "FrameSimulator.ignores_sweep_controls_when_given_no_sweep_data"
-            ]
+            "kind": "gtest-case",
+            "test": "FrameSimulator.classical_controls",
+            "subcase": "record and sweep target-role matrix for controlled Pauli gates"
           },
           "comparator": "state-equivalence",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_classical_controls",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::gate_surface_contract_classical_controls",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-classical-controls"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-classical-controls",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_classical_controls|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "existing",
@@ -1942,28 +2138,1201 @@
             "subcase": "REPEAT is parser-owned control flow and executes through circuit structure instead of regular instruction dispatch"
           },
           "comparator": "structural",
-          "status": "planned",
+          "status": "implemented",
           "test": {
-            "state": "planned",
+            "state": "existing",
             "selector": [
               "cargo",
               "test",
               "-p",
               "stab-core",
-              "gate_surface_contract_control_flow",
-              "--quiet"
+              "gate::semantic_contract::tests::execution::gate_surface_contract_control_flow",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
-            "state": "planned",
-            "classification": "planned",
-            "value": "pfm-b2-gate-contract-control-flow"
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-control-flow",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_control_flow|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
           },
           "benchmark": {
             "state": "not-applicable",
             "value": "Repeat execution already has dedicated sampler and folded-consumer benchmarks; this shard proves dispatch ownership instead of adding a duplicate microbenchmark."
           },
           "resource_contract": "Keep repeat execution and folding at circuit-item level without materializing bounded-output-independent repeat counts."
+        },
+        {
+          "id": "pfm3-contract-fixed-tableau-general-circuit",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "fixed-tableau"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.runs_on_general_circuit",
+            "subcase": "mixed general circuit executes every fixed-tableau dispatch without changing inverse-pair state"
+          },
+          "comparator": "state-equivalence",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_fixed_tableau_general_circuit",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-fixed-tableau-general",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_fixed_tableau_general_circuit|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Compile and execute a mixed fixed-tableau circuit without per-gate heap allocation in execution loops."
+        },
+        {
+          "id": "pfm3-contract-measure-reset-x",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "measure-reset"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.noisy_measurement_reset_x",
+            "subcase": "MRX noise rate and X-basis reset postcondition"
+          },
+          "comparator": "statistical",
+          "statistical_plan": {
+            "shots": 100000,
+            "seed": 12648440,
+            "sigma_multiplier": 6,
+            "absolute_probability_floor": 0.01,
+            "familywise_false_positive_budget": 0.000001,
+            "buckets": [
+              {
+                "name": "measurement-zero",
+                "expected_probability": 0.95
+              },
+              {
+                "name": "measurement-one",
+                "expected_probability": 0.05
+              }
+            ]
+          },
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_x",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-measure-reset-x",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_x|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Reuse per-shot measurement and reset state while sampling the declared MRX flip probability."
+        },
+        {
+          "id": "pfm3-contract-measure-reset-y",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "measure-reset"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.noisy_measurement_reset_y",
+            "subcase": "MRY noise rate and Y-basis reset postcondition"
+          },
+          "comparator": "statistical",
+          "statistical_plan": {
+            "shots": 100000,
+            "seed": 12648441,
+            "sigma_multiplier": 6,
+            "absolute_probability_floor": 0.01,
+            "familywise_false_positive_budget": 0.000001,
+            "buckets": [
+              {
+                "name": "measurement-zero",
+                "expected_probability": 0.95
+              },
+              {
+                "name": "measurement-one",
+                "expected_probability": 0.05
+              }
+            ]
+          },
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_y",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-measure-reset-y",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_y|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Reuse per-shot measurement and reset state while sampling the declared MRY flip probability."
+        },
+        {
+          "id": "pfm3-contract-measure-reset-z",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "measure-reset"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.noisy_measurement_reset_z",
+            "subcase": "MR noise rate and Z-basis reset postcondition"
+          },
+          "comparator": "statistical",
+          "statistical_plan": {
+            "shots": 100000,
+            "seed": 12648442,
+            "sigma_multiplier": 6,
+            "absolute_probability_floor": 0.01,
+            "familywise_false_positive_budget": 0.000001,
+            "buckets": [
+              {
+                "name": "measurement-zero",
+                "expected_probability": 0.95
+              },
+              {
+                "name": "measurement-one",
+                "expected_probability": 0.05
+              }
+            ]
+          },
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_z",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-measure-reset-z",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_measure_reset_z|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Reuse per-shot measurement and reset state while sampling the declared MR flip probability."
+        },
+        {
+          "id": "pfm3-contract-pair-measurement-inversion",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pair-measurement"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.mxxyyzz_inversion",
+            "subcase": "MXX, MYY, and MZZ inverted targets and probability-one record flips"
+          },
+          "comparator": "state-equivalence",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_pair_measurement_inversion",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-pair-measurement-inversion",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_pair_measurement_inversion|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Process pair-measurement inversions in place without materializing target pairs."
+        },
+        {
+          "id": "pfm3-contract-spp-multiple",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pauli-product-phase"
+          ],
+          "upstream": {
+            "path": "src/stim/circuit/gate_decomposition.test.cc",
+            "kind": "gtest-case",
+            "test": "gate_decomposition.decompose_spp_or_spp_dag_operation_multiple",
+            "subcase": "multiple Hermitian SPP and SPP_DAG product groups match explicit decomposition"
+          },
+          "comparator": "state-equivalence",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_spp_multiple",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-spp-multiple",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_spp_multiple|--quiet|--|--exact",
+              "upstream_source": "src/stim/circuit/gate_decomposition.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Lower one Pauli-product group at a time with scratch proportional to the largest group."
+        },
+        {
+          "id": "pfm3-contract-spp-rejection",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pauli-product-phase"
+          ],
+          "upstream": {
+            "path": "src/stim/circuit/gate_decomposition.test.cc",
+            "kind": "gtest-case",
+            "test": "gate_decomposition.decompose_spp_or_spp_dag_operation_bad",
+            "subcase": "anti-Hermitian SPP and SPP_DAG products fail closed on semantic surfaces"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_spp_rejection",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-spp-rejection",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_spp_rejection|--quiet|--|--exact",
+              "upstream_source": "src/stim/circuit/gate_decomposition.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Reject anti-Hermitian products during bounded group validation before semantic execution."
+        },
+        {
+          "id": "pfm3-contract-pauli-noise-general-circuit",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pauli-noise"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.runs_on_general_circuit",
+            "subcase": "general-circuit X_ERROR, Y_ERROR, and Z_ERROR dispatch"
+          },
+          "comparator": "state-equivalence",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise_general_circuit",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-pauli-noise-general",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise_general_circuit|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Execute Pauli-noise instructions with reusable frame state and no shot-count materialization."
+        },
+        {
+          "id": "pfm3-contract-pauli-channels-general-circuit",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "pauli-channel"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.runs_on_general_circuit",
+            "subcase": "general-circuit PAULI_CHANNEL_1 and PAULI_CHANNEL_2 dispatch"
+          },
+          "comparator": "state-equivalence",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels_general_circuit",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-pauli-channels-general",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels_general_circuit|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Validate channel tuples once and reuse per-shot channel dispatch state."
+        },
+        {
+          "id": "pfm3-contract-depolarization-general-circuit",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "depolarization"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.runs_on_general_circuit",
+            "subcase": "general-circuit DEPOLARIZE1 and DEPOLARIZE2 dispatch"
+          },
+          "comparator": "state-equivalence",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization_general_circuit",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-depolarization-general",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization_general_circuit|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Execute depolarizing channels from reusable frame buffers without per-shot allocation."
+        },
+        {
+          "id": "pfm3-contract-correlated-errors-general-circuit",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "correlated-error"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.runs_on_general_circuit",
+            "subcase": "general-circuit correlated and else-correlated dispatch"
+          },
+          "comparator": "state-equivalence",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_correlated_errors_general_circuit",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-correlated-errors-general",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_correlated_errors_general_circuit|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Track one conditional branch state per shot without growing state with branch count."
+        },
+        {
+          "id": "pfm3-contract-heralded-channel",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "heralded-noise"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.heralded_pauli_channel_1_statistics",
+            "subcase": "HERALDED_PAULI_CHANNEL_1 herald and Pauli bucket statistics"
+          },
+          "comparator": "statistical",
+          "statistical_plan": {
+            "shots": 100000,
+            "seed": 12648437,
+            "sigma_multiplier": 6,
+            "absolute_probability_floor": 0.01,
+            "familywise_false_positive_budget": 0.000001,
+            "buckets": [
+              {
+                "name": "no-herald",
+                "expected_probability": 0.45
+              },
+              {
+                "name": "herald-no-data-error",
+                "expected_probability": 0.05
+              },
+              {
+                "name": "herald-x",
+                "expected_probability": 0.1
+              },
+              {
+                "name": "herald-y",
+                "expected_probability": 0.15
+              },
+              {
+                "name": "herald-z",
+                "expected_probability": 0.25
+              }
+            ]
+          },
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_channel",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-heralded-channel",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_channel|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Reuse herald and Pauli classification buffers across shots."
+        },
+        {
+          "id": "pfm3-contract-heralded-erase-offset",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "heralded-noise"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.heralded_erase_statistics_offset_by_2",
+            "subcase": "HERALDED_ERASE statistics are invariant under a two-qubit index offset"
+          },
+          "comparator": "statistical",
+          "statistical_plan": {
+            "shots": 100000,
+            "seed": 12648438,
+            "sigma_multiplier": 6,
+            "absolute_probability_floor": 0.01,
+            "familywise_false_positive_budget": 0.000001,
+            "buckets": [
+              {
+                "name": "erase-no-herald",
+                "expected_probability": 0.9
+              },
+              {
+                "name": "erase-i",
+                "expected_probability": 0.025
+              },
+              {
+                "name": "erase-x",
+                "expected_probability": 0.025
+              },
+              {
+                "name": "erase-y",
+                "expected_probability": 0.025
+              },
+              {
+                "name": "erase-z",
+                "expected_probability": 0.025
+              }
+            ]
+          },
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_erase_offset",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-heralded-erase-offset",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_erase_offset|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Index heralded erasure state by active qubits without dense allocation below the offset."
+        },
+        {
+          "id": "pfm3-contract-heralded-channel-offset",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "heralded-noise"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.heralded_pauli_channel_1_statistics_offset_by_2",
+            "subcase": "HERALDED_PAULI_CHANNEL_1 statistics are invariant under a two-qubit index offset"
+          },
+          "comparator": "statistical",
+          "statistical_plan": {
+            "shots": 100000,
+            "seed": 12648439,
+            "sigma_multiplier": 6,
+            "absolute_probability_floor": 0.01,
+            "familywise_false_positive_budget": 0.000001,
+            "buckets": [
+              {
+                "name": "no-herald",
+                "expected_probability": 0.45
+              },
+              {
+                "name": "herald-no-data-error",
+                "expected_probability": 0.05
+              },
+              {
+                "name": "herald-x",
+                "expected_probability": 0.1
+              },
+              {
+                "name": "herald-y",
+                "expected_probability": 0.15
+              },
+              {
+                "name": "herald-z",
+                "expected_probability": 0.25
+              }
+            ]
+          },
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_channel_offset",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-heralded-channel-offset",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_heralded_channel_offset|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Index heralded channel state by active qubits without dense allocation below the offset."
+        },
+        {
+          "id": "pfm3-contract-annotation-coordinates",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "annotation"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/error_analyzer.test.cc",
+            "kind": "gtest-case",
+            "test": "ErrorAnalyzer.coordinate_tracking",
+            "subcase": "detector coordinates and coordinate shifts preserve exact DEM ordering"
+          },
+          "comparator": "exact",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_annotation_coordinates",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-annotation-coordinates",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_annotation_coordinates|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Accumulate coordinate shifts in fixed-dimensional vectors without expanding detector records."
+        },
+        {
+          "id": "pfm3-contract-annotation-tags",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "annotation"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/error_analyzer.test.cc",
+            "kind": "gtest-case",
+            "test": "ErrorAnalyzer.tagged_noise",
+            "subcase": "error, detector, observable, and shift tags survive analyzer conversion"
+          },
+          "comparator": "exact",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_annotation_tags",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-annotation-tags",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_annotation_tags|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Carry one interned tag reference per tagged instruction without duplicating tag text per shot."
+        },
+        {
+          "id": "pfm3-contract-classical-control-rejection",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "forward-classical-control",
+            "reverse-classical-control"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.quantum_cannot_control_classical",
+            "subcase": "quantum controls targeting record bits fail closed in frame-style sampling"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_rejection",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-classical-control-rejection",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_rejection|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Reject invalid target roles during compilation before allocating execution state."
+        },
+        {
+          "id": "pfm3-contract-classical-control-feedback",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "forward-classical-control",
+            "reverse-classical-control"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.classical_can_control_quantum",
+            "subcase": "measurement records control CX, CY, XCZ, and YCZ in both target directions"
+          },
+          "comparator": "exact",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_feedback",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-classical-control-feedback",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_feedback|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Resolve bounded record lookback directly from the reusable measurement record."
+        },
+        {
+          "id": "pfm3-contract-classical-control-no-sweep-data",
+          "surface": "all eight gate contract surfaces",
+          "gate_surfaces": [
+            "parser",
+            "measurement-sampler",
+            "reference-sampler",
+            "detection-converter",
+            "detector-frame",
+            "detection-sampler",
+            "error-analyzer",
+            "flow-generator"
+          ],
+          "gate_families": [
+            "forward-classical-control"
+          ],
+          "upstream": {
+            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "kind": "gtest-case",
+            "test": "FrameSimulator.ignores_sweep_controls_when_given_no_sweep_data",
+            "subcase": "omitted sweep data is interpreted as all-false for forward sweep controls"
+          },
+          "comparator": "exact",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_no_sweep_data",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b2-gate-contract-classical-control-no-sweep",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::gate_surface_contract_classical_control_no_sweep_data|--quiet|--|--exact",
+              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "existing",
+            "value": "pf3-gate-semantic-wide",
+            "classification": "report-only"
+          },
+          "resource_contract": "Treat omitted sweep input as a zero view without allocating a dense maximum-ID buffer."
         }
       ]
     },
@@ -2118,12 +3487,30 @@
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
             "buckets": [
-              "folded-all-zero-joint-record:p=0.5",
-              "folded-joint-nonzero-record:p=0.5",
-              "combination-detector-0:p=0.34",
-              "combination-detector-1:p=0.26",
-              "combination-detector-2:p=0.38",
-              "combination-even-parity:p=1"
+              {
+                "name": "folded-all-zero-joint-record",
+                "expected_probability": 0.5
+              },
+              {
+                "name": "folded-joint-nonzero-record",
+                "expected_probability": 0.5
+              },
+              {
+                "name": "combination-detector-0",
+                "expected_probability": 0.34
+              },
+              {
+                "name": "combination-detector-1",
+                "expected_probability": 0.26
+              },
+              {
+                "name": "combination-detector-2",
+                "expected_probability": 0.38
+              },
+              {
+                "name": "combination-even-parity",
+                "expected_probability": 1.0
+              }
             ]
           },
           "status": "implemented",

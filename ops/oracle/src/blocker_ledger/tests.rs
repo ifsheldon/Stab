@@ -57,22 +57,6 @@ fn case_mut<'a>(value: &'a mut Value, blocker_id: &str, case_id: &str) -> &'a mu
         .expect("named case")
 }
 
-fn planned_case_mut(value: &mut Value) -> &mut Value {
-    value
-        .get_mut("blockers")
-        .and_then(Value::as_array_mut)
-        .expect("blocker array")
-        .iter_mut()
-        .find_map(|blocker| {
-            blocker
-                .get_mut("cases")
-                .and_then(Value::as_array_mut)?
-                .iter_mut()
-                .find(|case| case.get("status").and_then(Value::as_str) == Some("planned"))
-        })
-        .expect("source ledger has a planned case for planned-selector validation")
-}
-
 fn validation_text(error: BlockerLedgerError) -> String {
     match error {
         BlockerLedgerError::Validation(message) => message.into(),
@@ -304,9 +288,8 @@ fn blocker_ledger_rejects_owned_case_semantic_substitution() {
 #[test]
 fn blocker_ledger_requires_planned_selectors_for_planned_cases() {
     let ledger = mutated_ledger(|value| {
-        let case = planned_case_mut(value);
-        let test = case.get_mut("test").expect("test reference");
-        *test.get_mut("state").expect("test state") = Value::from("existing");
+        let case = case_mut(value, "pfm3-gate-execution", "pfm3-contract-fixed-tableau");
+        *case.get_mut("status").expect("case status") = Value::from("planned");
     });
 
     let error = ledger
@@ -831,8 +814,13 @@ fn blocker_ledger_requires_exact_anchors_for_test_families() {
     let ledger = mutated_ledger(|value| {
         let upstream = case_mut(value, "pfm3-gate-execution", "pfm3-contract-fixed-tableau")
             .get_mut("upstream")
+            .and_then(Value::as_object_mut)
             .expect("upstream source");
-        *upstream.get_mut("anchors").expect("family anchors") = Value::Array(Vec::new());
+        *upstream.get_mut("kind").expect("provenance kind") = Value::from("test-family");
+        upstream.insert("anchors".to_string(), Value::Array(Vec::new()));
+        *case_mut(value, "pfm3-gate-execution", "pfm3-contract-fixed-tableau")
+            .get_mut("status")
+            .expect("case status") = Value::from("planned");
     });
 
     let error = ledger
@@ -844,8 +832,17 @@ fn blocker_ledger_requires_exact_anchors_for_test_families() {
 #[test]
 fn blocker_ledger_forbids_test_family_aggregation_as_completion_evidence() {
     let ledger = mutated_ledger(|value| {
-        let case = case_mut(value, "pfm3-gate-execution", "pfm3-contract-fixed-tableau");
-        *case.get_mut("status").expect("case status") = Value::from("implemented");
+        let upstream = case_mut(value, "pfm3-gate-execution", "pfm3-contract-fixed-tableau")
+            .get_mut("upstream")
+            .and_then(Value::as_object_mut)
+            .expect("upstream source");
+        *upstream.get_mut("kind").expect("provenance kind") = Value::from("test-family");
+        upstream.insert(
+            "anchors".to_string(),
+            Value::Array(vec![Value::from(
+                "FrameSimulator.bulk_operations_consistent_with_tableau_data",
+            )]),
+        );
     });
 
     let error = ledger
@@ -889,6 +886,90 @@ fn blocker_ledger_rejects_weak_statistical_false_positive_budget() {
         .check(&repo_root())
         .expect_err("weak false-positive budget");
     assert!(validation_text(error).contains("false-positive budget"));
+}
+
+#[test]
+fn blocker_ledger_rejects_statistical_probability_drift_from_core_contract() {
+    let ledger = mutated_ledger(|value| {
+        let buckets = case_mut(value, "pfm3-gate-execution", "pfm3-contract-pauli-channels")
+            .get_mut("statistical_plan")
+            .and_then(|plan| plan.get_mut("buckets"))
+            .and_then(Value::as_array_mut)
+            .expect("statistical buckets");
+        *buckets
+            .first_mut()
+            .and_then(|bucket| bucket.get_mut("expected_probability"))
+            .expect("first expected probability") = Value::from(0.39);
+    });
+
+    let error = ledger
+        .check(&repo_root())
+        .expect_err("statistical probability drift");
+    assert!(validation_text(error).contains("differs from the canonical core gate contract"));
+}
+
+#[test]
+fn blocker_ledger_rejects_out_of_range_statistical_probability() {
+    let ledger = mutated_ledger(|value| {
+        let buckets = case_mut(value, "pfm3-gate-execution", "pfm3-contract-pauli-noise")
+            .get_mut("statistical_plan")
+            .and_then(|plan| plan.get_mut("buckets"))
+            .and_then(Value::as_array_mut)
+            .expect("statistical buckets");
+        *buckets
+            .first_mut()
+            .and_then(|bucket| bucket.get_mut("expected_probability"))
+            .expect("first expected probability") = Value::from(1.1);
+    });
+
+    let error = ledger
+        .check(&repo_root())
+        .expect_err("out-of-range probability");
+    assert!(validation_text(error).contains("probability 1.1 is outside [0, 1]"));
+}
+
+#[test]
+fn blocker_ledger_checks_exact_binomial_familywise_tail() {
+    let ledger = mutated_ledger(|value| {
+        let plan = case_mut(value, "pfm3-gate-execution", "pfm3-contract-pauli-channels")
+            .get_mut("statistical_plan")
+            .expect("statistical plan");
+        *plan
+            .get_mut("familywise_false_positive_budget")
+            .expect("false-positive budget") = Value::from(0.000_000_000_001_f64);
+    });
+
+    let error = ledger
+        .check(&repo_root())
+        .expect_err("exact familywise tail exceeds budget");
+    assert!(validation_text(error).contains("exact binomial familywise rejection probability"));
+}
+
+#[test]
+fn blocker_ledger_core_statistical_plans_meet_their_exact_tail_budgets() {
+    for expected in stab_core::__gate_contract_statistical_plans() {
+        let mut familywise_bound = 0.0;
+        for bucket in expected.buckets {
+            let standard_deviation = (bucket.expected_probability
+                * (1.0 - bucket.expected_probability)
+                / expected.shots as f64)
+                .sqrt();
+            let allowed_delta = expected
+                .absolute_probability_floor
+                .max(expected.sigma_multiplier * standard_deviation);
+            familywise_bound += super::statistical::binomial_rejection_probability(
+                expected.shots,
+                bucket.expected_probability,
+                allowed_delta,
+            );
+        }
+        assert!(
+            familywise_bound <= expected.familywise_false_positive_budget,
+            "{} exact familywise bound {familywise_bound:.6e} exceeds {:.6e}",
+            expected.case_id,
+            expected.familywise_false_positive_budget
+        );
+    }
 }
 
 #[test]

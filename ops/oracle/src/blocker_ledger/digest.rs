@@ -114,7 +114,16 @@ pub(super) fn computed_semantic_digest(ledger: &BlockerLedger) -> sha2::digest::
                         &plan.familywise_false_positive_budget.to_string(),
                     );
                     for bucket in &plan.buckets {
-                        digest_field(&mut hasher, "case.statistical_plan.bucket", bucket);
+                        digest_field(
+                            &mut hasher,
+                            "case.statistical_plan.bucket.name",
+                            &bucket.name,
+                        );
+                        digest_field(
+                            &mut hasher,
+                            "case.statistical_plan.bucket.expected_probability",
+                            &bucket.expected_probability.to_string(),
+                        );
                     }
                 }
                 None => digest_field(&mut hasher, "case.statistical_plan", "none"),

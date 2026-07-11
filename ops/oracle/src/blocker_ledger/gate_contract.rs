@@ -227,4 +227,20 @@ pub(super) fn validate_gate_family_coverage(blocker: &BlockerRecord, violations:
             "gate contract cases must cover all nineteen semantic families; missing=[{missing}] extra=[{extra}]"
         ));
     }
+
+    let actual_statistical_cases = blocker
+        .cases
+        .iter()
+        .filter(|case| case.statistical_plan.is_some())
+        .map(|case| case.id.as_str())
+        .collect::<BTreeSet<_>>();
+    let expected_statistical_cases = stab_core::__gate_contract_statistical_plans()
+        .iter()
+        .map(|plan| plan.case_id)
+        .collect::<BTreeSet<_>>();
+    if actual_statistical_cases != expected_statistical_cases {
+        violations.push(format!(
+            "gate contract statistical case set differs from canonical core metadata; ledger={actual_statistical_cases:?} core={expected_statistical_cases:?}"
+        ));
+    }
 }

@@ -19,6 +19,7 @@ use gate_contract::{
 use oracle::validate_oracle_reference;
 use provenance::validate_upstream_source;
 use selector::CargoTestSelector;
+use statistical::validate_statistical_plan;
 use support::{validate_supporting_benchmarks, validate_supporting_oracles};
 
 mod digest;
@@ -27,13 +28,14 @@ mod gate_contract;
 mod oracle;
 mod provenance;
 mod selector;
+mod statistical;
 mod support;
 
 const SCHEMA_VERSION: u32 = 2;
 const STIM_VERSION: &str = "v1.16.0";
 const EXPECTED_LEDGER_DIGEST: [u8; 32] = [
-    0x23, 0xfe, 0x03, 0x2a, 0x25, 0xaa, 0x37, 0xf7, 0x26, 0x98, 0x1e, 0xb7, 0x77, 0xfa, 0xca, 0x0a,
-    0x53, 0x7d, 0x28, 0xed, 0x05, 0x41, 0x4f, 0x47, 0x31, 0x42, 0x2f, 0xf3, 0x57, 0x7e, 0x03, 0x8b,
+    0x98, 0x18, 0x4b, 0x8e, 0x4a, 0x05, 0x3f, 0x80, 0x37, 0x08, 0x61, 0x15, 0x40, 0xe5, 0x46, 0x2e,
+    0xe0, 0xff, 0x9f, 0x3c, 0xec, 0x2d, 0xdb, 0xd4, 0x75, 0x9e, 0xac, 0xee, 0x57, 0xb2, 0x42, 0xb0,
 ];
 const MAX_LEDGER_BYTES: u64 = 1 << 20;
 const MAX_MANIFEST_BYTES: u64 = 16 << 20;
@@ -219,7 +221,14 @@ struct StatisticalPlan {
     sigma_multiplier: f64,
     absolute_probability_floor: f64,
     familywise_false_positive_budget: f64,
-    buckets: Vec<String>,
+    buckets: Vec<StatisticalBucket>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StatisticalBucket {
+    name: String,
+    expected_probability: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -955,61 +964,36 @@ fn validate_resource_contract(case: &BlockerCase, violations: &mut Vec<String>) 
     }
 }
 
-fn validate_statistical_plan(case: &BlockerCase, violations: &mut Vec<String>) {
-    match (case.comparator, &case.statistical_plan) {
-        (ComparatorKind::Statistical, Some(plan)) => {
-            if !(10_000..=10_000_000).contains(&plan.shots) {
-                violations.push(format!(
-                    "case {:?} statistical shots {} are outside 10000..=10000000",
-                    case.id, plan.shots
-                ));
-            }
-            if !(6.0..=10.0).contains(&plan.sigma_multiplier) {
-                violations.push(format!(
-                    "case {:?} statistical sigma multiplier must be within 6..=10",
-                    case.id
-                ));
-            }
-            if !(0.0 < plan.absolute_probability_floor && plan.absolute_probability_floor <= 0.02) {
-                violations.push(format!(
-                    "case {:?} statistical absolute probability floor must be within (0, 0.02]",
-                    case.id
-                ));
-            }
-            if !(0.0 < plan.familywise_false_positive_budget
-                && plan.familywise_false_positive_budget <= 0.0001)
-            {
-                violations.push(format!(
-                    "case {:?} statistical false-positive budget must be within (0, 0.0001]",
-                    case.id
-                ));
-            }
-            if !(2..=32).contains(&plan.buckets.len()) {
-                violations.push(format!(
-                    "case {:?} statistical plan must name 2..=32 buckets",
-                    case.id
-                ));
-            }
-            let mut buckets = BTreeSet::new();
-            for bucket in &plan.buckets {
-                validate_display_text("statistical bucket", bucket, violations);
-                if !buckets.insert(bucket) {
-                    violations.push(format!(
-                        "case {:?} repeats statistical bucket {:?}",
-                        case.id, bucket
-                    ));
-                }
-            }
-        }
-        (ComparatorKind::Statistical, None) => violations.push(format!(
-            "case {:?} statistical comparator lacks a reproducible plan",
+fn validate_gate_statistical_plan(
+    case: &BlockerCase,
+    plan: &StatisticalPlan,
+    violations: &mut Vec<String>,
+) {
+    let Some(expected) = stab_core::__gate_contract_statistical_plans()
+        .iter()
+        .find(|expected| expected.case_id == case.id)
+    else {
+        return;
+    };
+    let scalar_fields_match = plan.shots == expected.shots
+        && plan.seed == expected.seed
+        && plan.sigma_multiplier == expected.sigma_multiplier
+        && plan.absolute_probability_floor == expected.absolute_probability_floor
+        && plan.familywise_false_positive_budget == expected.familywise_false_positive_budget;
+    let buckets_match = plan.buckets.len() == expected.buckets.len()
+        && plan
+            .buckets
+            .iter()
+            .zip(expected.buckets)
+            .all(|(actual, expected)| {
+                actual.name == expected.name
+                    && actual.expected_probability == expected.expected_probability
+            });
+    if !scalar_fields_match || !buckets_match {
+        violations.push(format!(
+            "case {:?} statistical plan differs from the canonical core gate contract",
             case.id
-        )),
-        (_, Some(_)) => violations.push(format!(
-            "case {:?} has a statistical plan but does not use a statistical comparator",
-            case.id
-        )),
-        (_, None) => {}
+        ));
     }
 }
 
@@ -1033,10 +1017,11 @@ fn validate_test_reference(
     }
     match CargoTestSelector::parse(&case.test.selector) {
         Ok(selector)
-            if matches!(
+            if (matches!(
                 blocker.milestone,
                 BlockerMilestone::B1 | BlockerMilestone::B4 | BlockerMilestone::B5
-            ) && case.test.state == EvidenceState::Existing
+            ) || blocker.id == "pfm3-gate-execution")
+                && case.test.state == EvidenceState::Existing
                 && !selector.is_exact() =>
         {
             violations.push(format!(
