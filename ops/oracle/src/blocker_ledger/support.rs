@@ -43,12 +43,16 @@ const PFM6_ANALYZER_SEARCH_ORACLES: &[&str] = &[
     "pfm-b5-analyzer-coordinate-loop",
     "pfm-b5-analyzer-gauge-loop",
     "pfm-b5-analyzer-nested-probe-budget-rust",
+    "pfm-b5-analyzer-unitary-nested-probe-budget-rust",
     "pfm-b5-analyzer-local-decomposition-17-rust",
     "pfm-b5-analyzer-repetition-code-loop-rust",
     "pfm-b5-graphlike-finite-corpus-rust",
     "pfm-b5-graphlike-state-payload-rust",
+    "pfm-b5-search-aggregate-target-work-rust",
+    "pfm-b5-graphlike-construction-budget-rust",
     "pfm-b5-hypergraph-finite-corpus-rust",
     "pfm-b5-hypergraph-state-payload-rust",
+    "pfm-b5-hypergraph-construction-budget-rust",
     "pfm-b5-wcnf-finite-corpus-rust",
 ];
 #[derive(Clone, Copy)]

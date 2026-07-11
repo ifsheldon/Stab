@@ -4696,6 +4696,16 @@
         },
         {
           "classification": "rust-test-proxy",
+          "value": "pfm-b5-analyzer-unitary-nested-probe-budget-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|dem::analyze::reverse_fold::tests::pfm_b5_supported_unitary_nested_analyzer_probe_work_is_bounded|--|--exact",
+            "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
           "value": "pfm-b5-analyzer-local-decomposition-17-rust",
           "signature": {
             "parity_mode": "structural",
@@ -4736,6 +4746,26 @@
         },
         {
           "classification": "rust-test-proxy",
+          "value": "pfm-b5-search-aggregate-target-work-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|dem::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work|--|--exact",
+            "upstream_source": "src/stim/search/graphlike/graph.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
+          "value": "pfm-b5-graphlike-construction-budget-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|dem::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload|--|--exact",
+            "upstream_source": "src/stim/search/graphlike/graph.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
           "value": "pfm-b5-hypergraph-finite-corpus-rust",
           "signature": {
             "parity_mode": "structural",
@@ -4752,6 +4782,16 @@
             "comparator": "structural",
             "argv": "cargo-test|-p|stab-core|dem::hyper::resource_tests::hypergraph_search_bounds_variable_state_payloads|--|--exact",
             "upstream_source": "src/stim/search/hyper/search_state.test.cc"
+          }
+        },
+        {
+          "classification": "rust-test-proxy",
+          "value": "pfm-b5-hypergraph-construction-budget-rust",
+          "signature": {
+            "parity_mode": "structural",
+            "comparator": "structural",
+            "argv": "cargo-test|-p|stab-core|dem::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload|--|--exact",
+            "upstream_source": "src/stim/search/hyper/graph.test.cc"
           }
         },
         {
@@ -5357,6 +5397,46 @@
           "resource_contract": "Charge one cumulative one-million-unit recurrence budget across nested probe circuits and instructions."
         },
         {
+          "id": "pfm6-analyzer-supported-unitary-nested-probe-budget",
+          "surface": "circuit_to_detector_error_model folded recurrence probing through the sparse reverse tracker",
+          "upstream": {
+            "path": "src/stim/simulators/error_analyzer.test.cc",
+            "kind": "gtest-case",
+            "test": "ErrorAnalyzer.loop_folding_nested_loop",
+            "subcase": "nested supported-unitary billion-repeat probe work bound"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "dem::analyze::reverse_fold::tests::pfm_b5_supported_unitary_nested_analyzer_probe_work_is_bounded",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-analyzer-unitary-nested-probe-budget-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|dem::analyze::reverse_fold::tests::pfm_b5_supported_unitary_nested_analyzer_probe_work_is_bounded|--|--exact",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "The nested supported-unitary case is a hostile-input admission boundary and must terminate with a domain error instead of becoming a timing workload."
+          },
+          "resource_contract": "Route analyzer probes through the shared recurrence budget even when the nested repeat is eligible for the normal supported-unitary fast path."
+        },
+        {
           "id": "pfm6-analyzer-coordinate-loop",
           "surface": "circuit_to_detector_error_model fold_loops",
           "upstream": {
@@ -5568,6 +5648,86 @@
             "value": "The payload admission boundary protects hostile models and is not a successful search workload."
           },
           "resource_contract": "Preflight at most 65,536 terms per state before cloning and at most 5,000,000 stored terms across map keys predecessors and queued copies."
+        },
+        {
+          "id": "pfm6-search-aggregate-target-work-budget",
+          "surface": "shared graphlike and hypergraph DEM error traversal",
+          "upstream": {
+            "path": "src/stim/search/graphlike/graph.test.cc",
+            "kind": "gtest-case",
+            "test": "search_graphlike.DemAdjGraph_from_dem",
+            "subcase": "aggregate source-target work across individually bounded nonzero errors"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "dem::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-search-aggregate-target-work-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|dem::error_traversal::tests::search_traversal_bounds_aggregate_error_target_work|--|--exact",
+              "upstream_source": "src/stim/search/graphlike/graph.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "Aggregate hostile-input traversal admission is a rejection boundary instead of a successful throughput workload."
+          },
+          "resource_contract": "Charge at most 20,000,000 source target occurrences across all expanded nonzero error mechanisms before graph construction."
+        },
+        {
+          "id": "pfm6-graphlike-construction-budget",
+          "surface": "shortest_graphlike_error graph construction",
+          "upstream": {
+            "path": "src/stim/search/graphlike/graph.test.cc",
+            "kind": "gtest-case",
+            "test": "search_graphlike.DemAdjGraph_add_outward_edge",
+            "subcase": "indexed unique-edge and persistent observable-mask admission"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "dem::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-graphlike-construction-budget-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|dem::graphlike::resource_tests::graphlike_construction_bounds_unique_edges_and_persistent_payload|--|--exact",
+              "upstream_source": "src/stim/search/graphlike/graph.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "Unique-edge and persistent-mask admission protects hostile graph construction and is not a successful search workload."
+          },
+          "resource_contract": "Use indexed edge deduplication and admit at most 1,000,000 unique outward edges and 20,000,000 persistent detector or observable graph terms before cloning into both graph indexes."
         },
         {
           "id": "pfm6-graphlike-distance-one",
@@ -5950,6 +6110,46 @@
             "value": "The payload admission boundary protects hostile models and is not a successful search workload."
           },
           "resource_contract": "Preflight symmetric-difference cardinality before cloning with at most 65,536 terms per state and 5,000,000 stored terms overall; cap each source error at 65,536 targets before normalization."
+        },
+        {
+          "id": "pfm6-hypergraph-construction-budget",
+          "surface": "search_hypergraph_logical_error graph construction",
+          "upstream": {
+            "path": "src/stim/search/hyper/graph.test.cc",
+            "kind": "gtest-case",
+            "test": "search_hyper_graph.add_edge_from_dem_targets",
+            "subcase": "indexed unique-edge incidence and persistent observable-mask admission"
+          },
+          "comparator": "error-class",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "dem::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "rust-test-proxy",
+            "value": "pfm-b5-hypergraph-construction-budget-rust",
+            "signature": {
+              "parity_mode": "structural",
+              "comparator": "structural",
+              "argv": "cargo-test|-p|stab-core|dem::hyper::resource_tests::hyper_graph_bounds_unique_edges_and_persistent_payload|--|--exact",
+              "upstream_source": "src/stim/search/hyper/graph.test.cc"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "Unique-edge and persistent-mask admission protects hostile graph construction and is not a successful search workload."
+          },
+          "resource_contract": "Use indexed edge and incidence deduplication and transactionally admit at most 1,000,000 unique edges and 20,000,000 persistent edge or adjacency terms before installation."
         },
         {
           "id": "pfm6-hypergraph-distance-one",
