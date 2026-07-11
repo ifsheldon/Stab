@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemInstruction,
     DemRepeatBlock, DemTarget, DetectorErrorModel, Pauli, Probability, RepeatCount, Target,
-    sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    sparse_rev_frame_tracker::{AnalyzerProbeBudget, SparseReverseFrameTracker},
 };
 
 use super::{
@@ -20,13 +20,18 @@ use super::{
 
 mod local_decomposition;
 mod output;
+#[cfg(test)]
+mod tests;
 
 use local_decomposition::{
     locally_decompose_combinations, merge_indistinguishable_disjoint_probabilities,
 };
 use output::unreverse_model;
 
+#[cfg(not(test))]
 const MAX_LOOP_CYCLE_STEPS: u64 = 1_000_000;
+#[cfg(test)]
+const MAX_LOOP_CYCLE_STEPS: u64 = 4_096;
 const MAX_BOUNDED_REPEAT_UNROLL: u64 = 100_000;
 
 type ErrorKey = (Vec<DemTarget>, Option<String>);
@@ -89,6 +94,7 @@ struct ReverseFoldAnalyzer {
     ticks_left: u64,
     reversed_model: DetectorErrorModel,
     error_probabilities: BTreeMap<ErrorKey, Probability>,
+    probe_budget: AnalyzerProbeBudget,
     diagnostics: ReverseFoldDiagnostics,
 }
 
@@ -111,6 +117,7 @@ impl ReverseFoldAnalyzer {
             ticks_left: circuit.count_ticks()?,
             reversed_model: DetectorErrorModel::new(),
             error_probabilities: BTreeMap::new(),
+            probe_budget: AnalyzerProbeBudget::new(MAX_LOOP_CYCLE_STEPS),
             diagnostics: ReverseFoldDiagnostics {
                 represented_repeat_iterations: represented_repeat_iterations(circuit, 1),
                 ..ReverseFoldDiagnostics::default()
@@ -165,6 +172,10 @@ impl ReverseFoldAnalyzer {
             }
             "MXX" | "MYY" | "MZZ" | "MPP" => {
                 self.record_measurement_errors(instruction, instruction.target_groups().len())?;
+                self.tracker.undo_instruction(instruction)?;
+            }
+            "MPAD" => {
+                self.record_measurement_errors(instruction, instruction.targets().len())?;
                 self.tracker.undo_instruction(instruction)?;
             }
             "DETECTOR" => {
@@ -650,7 +661,7 @@ impl ReverseFoldAnalyzer {
         let mut tortoise_iterations = 0_u64;
         let mut found_cycle = false;
         while hare_iterations < iterations && hare_iterations < MAX_LOOP_CYCLE_STEPS {
-            hare.undo_circuit_for_analyzer_probe(body)?;
+            hare.undo_circuit_for_analyzer_probe(body, &mut self.probe_budget)?;
             self.record_recurrence_probe(&hare);
             hare_iterations = checked_add(hare_iterations, 1, "hare iteration")?;
             if hare.is_shifted_copy(&tortoise) {
@@ -658,7 +669,7 @@ impl ReverseFoldAnalyzer {
                 break;
             }
             if hare_iterations.is_multiple_of(2) {
-                tortoise.undo_circuit_for_analyzer_probe(body)?;
+                tortoise.undo_circuit_for_analyzer_probe(body, &mut self.probe_budget)?;
                 self.record_recurrence_probe(&tortoise);
                 tortoise_iterations = checked_add(tortoise_iterations, 1, "tortoise iteration")?;
                 if hare.is_shifted_copy(&tortoise) {
@@ -725,8 +736,7 @@ impl ReverseFoldAnalyzer {
     }
 
     fn record_recurrence_probe(&mut self, tracker: &SparseReverseFrameTracker) {
-        self.diagnostics.recurrence_search_steps =
-            self.diagnostics.recurrence_search_steps.saturating_add(1);
+        self.diagnostics.recurrence_search_steps = self.probe_budget.consumed_steps();
         self.observe_boundary_entries(tracker.boundary_entry_count())
     }
 

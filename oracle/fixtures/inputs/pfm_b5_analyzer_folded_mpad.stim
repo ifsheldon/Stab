@@ -1,0 +1,5 @@
+MPAD(0.25) 0
+DETECTOR rec[-1]
+REPEAT 1 {
+    TICK
+}

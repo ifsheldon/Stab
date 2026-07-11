@@ -2,14 +2,20 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{Circuit, CircuitError, CircuitResult, DemTarget};
 
-use super::{GaugeOutputPolicy, SparseReverseFrameTracker};
+use super::{AnalyzerProbeBudget, GaugeOutputPolicy, SparseReverseFrameTracker};
 
 pub(super) fn undo_loop(
     tracker: &mut SparseReverseFrameTracker,
     body: &Circuit,
     repetitions: u64,
 ) -> CircuitResult<()> {
-    undo_loop_with_gauge_output(tracker, body, repetitions, GaugeOutputPolicy::Preserve)
+    undo_loop_with_gauge_output(
+        tracker,
+        body,
+        repetitions,
+        GaugeOutputPolicy::Preserve,
+        None,
+    )
 }
 
 pub(super) fn undo_loop_with_gauge_output(
@@ -17,16 +23,28 @@ pub(super) fn undo_loop_with_gauge_output(
     body: &Circuit,
     repetitions: u64,
     gauge_output: GaugeOutputPolicy,
+    mut analyzer_probe_budget: Option<&mut AnalyzerProbeBudget>,
 ) -> CircuitResult<()> {
     if repetitions < 5 {
-        return undo_loop_by_unrolling_with_gauge_output(tracker, body, repetitions, gauge_output);
+        return undo_loop_by_unrolling_with_gauge_output(
+            tracker,
+            body,
+            repetitions,
+            gauge_output,
+            analyzer_probe_budget,
+        );
     }
 
     let mut tortoise = tracker.clone();
     let mut hare_steps = 0_u64;
     let mut tortoise_steps = 0_u64;
     loop {
-        undo_probe_iteration(tracker, body, gauge_output)?;
+        undo_probe_iteration(
+            tracker,
+            body,
+            gauge_output,
+            analyzer_probe_budget.as_deref_mut(),
+        )?;
         hare_steps = hare_steps.checked_add(1).ok_or_else(|| {
             CircuitError::invalid_detector_error_model(
                 "sparse reverse repeat step count overflowed",
@@ -42,11 +60,17 @@ pub(super) fn undo_loop_with_gauge_output(
                 body,
                 repetitions - hare_steps,
                 gauge_output,
+                analyzer_probe_budget,
             );
         }
 
         if hare_steps & 1 == 0 {
-            undo_probe_iteration(&mut tortoise, body, gauge_output)?;
+            undo_probe_iteration(
+                &mut tortoise,
+                body,
+                gauge_output,
+                analyzer_probe_budget.as_deref_mut(),
+            )?;
             tortoise_steps = tortoise_steps.checked_add(1).ok_or_else(|| {
                 CircuitError::invalid_detector_error_model(
                     "sparse reverse repeat step count overflowed",
@@ -101,7 +125,13 @@ pub(super) fn undo_loop_with_gauge_output(
             )
         })?;
 
-    undo_loop_by_unrolling_with_gauge_output(tracker, body, repetitions - hare_steps, gauge_output)
+    undo_loop_by_unrolling_with_gauge_output(
+        tracker,
+        body,
+        repetitions - hare_steps,
+        gauge_output,
+        analyzer_probe_budget,
+    )
 }
 
 pub(super) fn undo_loop_by_unrolling(
@@ -114,6 +144,7 @@ pub(super) fn undo_loop_by_unrolling(
         body,
         repetitions,
         GaugeOutputPolicy::Preserve,
+        None,
     )
 }
 
@@ -122,9 +153,15 @@ fn undo_loop_by_unrolling_with_gauge_output(
     body: &Circuit,
     repetitions: u64,
     gauge_output: GaugeOutputPolicy,
+    mut analyzer_probe_budget: Option<&mut AnalyzerProbeBudget>,
 ) -> CircuitResult<()> {
     for _ in 0..repetitions {
-        undo_probe_iteration(tracker, body, gauge_output)?;
+        undo_probe_iteration(
+            tracker,
+            body,
+            gauge_output,
+            analyzer_probe_budget.as_deref_mut(),
+        )?;
     }
     Ok(())
 }
@@ -133,10 +170,18 @@ fn undo_probe_iteration(
     tracker: &mut SparseReverseFrameTracker,
     body: &Circuit,
     gauge_output: GaugeOutputPolicy,
+    analyzer_probe_budget: Option<&mut AnalyzerProbeBudget>,
 ) -> CircuitResult<()> {
     match gauge_output {
         GaugeOutputPolicy::Preserve => tracker.undo_circuit(body),
-        GaugeOutputPolicy::Discard => tracker.undo_circuit_for_analyzer_probe(body),
+        GaugeOutputPolicy::Discard => {
+            let budget = analyzer_probe_budget.ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "analyzer recurrence probe is missing its nested work budget",
+                )
+            })?;
+            tracker.undo_circuit_for_analyzer_probe(body, budget)
+        }
     }
 }
 

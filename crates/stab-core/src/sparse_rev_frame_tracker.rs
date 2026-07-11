@@ -22,6 +22,41 @@ use crate::circuit_flow::transitions::{ReverseFlowTransition, reverse_flow_trans
 
 static EMPTY_TARGETS: LazyLock<BTreeSet<DemTarget>> = LazyLock::new(BTreeSet::new);
 
+#[derive(Debug)]
+pub(crate) struct AnalyzerProbeBudget {
+    consumed_steps: u64,
+    max_steps: u64,
+}
+
+impl AnalyzerProbeBudget {
+    pub(crate) fn new(max_steps: u64) -> Self {
+        Self {
+            consumed_steps: 0,
+            max_steps,
+        }
+    }
+
+    pub(crate) fn consumed_steps(&self) -> u64 {
+        self.consumed_steps
+    }
+
+    fn consume_work_unit(&mut self) -> CircuitResult<()> {
+        let next = self.consumed_steps.checked_add(1).ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "analyze_errors recurrence probe step count overflowed",
+            )
+        })?;
+        if next > self.max_steps {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "analyze_errors recurrence probing currently supports at most {} work units across nested circuits and instructions, got at least {next}",
+                self.max_steps
+            )));
+        }
+        self.consumed_steps = next;
+        Ok(())
+    }
+}
+
 fn tracker_basis(basis: PauliBasis) -> CircuitResult<TrackerBasis> {
     TrackerBasis::from_pauli_basis(basis).ok_or_else(|| {
         CircuitError::invalid_detector_error_model(
@@ -90,24 +125,30 @@ impl SparseReverseFrameTracker {
     }
 
     pub(crate) fn undo_circuit(&mut self, circuit: &Circuit) -> CircuitResult<()> {
-        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Preserve)
+        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Preserve, None)
     }
 
     pub(crate) fn undo_circuit_for_analyzer_probe(
         &mut self,
         circuit: &Circuit,
+        budget: &mut AnalyzerProbeBudget,
     ) -> CircuitResult<()> {
-        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Discard)
+        budget.consume_work_unit()?;
+        self.undo_circuit_with_gauge_output(circuit, GaugeOutputPolicy::Discard, Some(budget))
     }
 
     fn undo_circuit_with_gauge_output(
         &mut self,
         circuit: &Circuit,
         gauge_output: GaugeOutputPolicy,
+        mut analyzer_probe_budget: Option<&mut AnalyzerProbeBudget>,
     ) -> CircuitResult<()> {
         for item in circuit.items().iter().rev() {
             match item {
                 CircuitItem::Instruction(instruction) => {
+                    if let Some(budget) = analyzer_probe_budget.as_deref_mut() {
+                        budget.consume_work_unit()?;
+                    }
                     self.undo_instruction(instruction)?;
                     if gauge_output == GaugeOutputPolicy::Discard {
                         self.take_gauge_errors();
@@ -122,6 +163,7 @@ impl SparseReverseFrameTracker {
                         repeat.body(),
                         repeat.repeat_count().get(),
                         gauge_output,
+                        analyzer_probe_budget.as_deref_mut(),
                     )?;
                 }
             }

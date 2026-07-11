@@ -5,6 +5,9 @@
 
 use stab_core::{Circuit, ErrorAnalyzerOptions, Probability, circuit_to_detector_error_model};
 
+#[cfg(feature = "ops-contracts")]
+use stab_core::__circuit_to_detector_error_model_with_diagnostics;
+
 fn analyze_folding_loops(text: &str) -> String {
     let circuit = Circuit::from_stim_str(text).expect("circuit");
     circuit_to_detector_error_model(
@@ -459,6 +462,73 @@ fn pf6_dem_analyzer_fallback_preserves_delayed_rec_dependency() {
     assert_eq!(actual, expected);
     assert!(actual.contains("error(0.125) D4 D8"), "{actual}");
     assert!(!actual.contains("repeat"), "{actual}");
+}
+
+#[cfg(feature = "ops-contracts")]
+#[test]
+fn pf6_dem_analyzer_fallback_reports_unsupported_instruction_path() {
+    let circuit = Circuit::from_stim_str(
+        "\
+REPEAT 2 {
+    HERALDED_ERASE(0.125) 0
+    DETECTOR rec[-1]
+}
+",
+    )
+    .expect("valid heralded fallback circuit");
+    let (model, diagnostics) = __circuit_to_detector_error_model_with_diagnostics(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            approximate_disjoint_errors_threshold: Some(
+                Probability::try_new(1.0).expect("valid threshold"),
+            ),
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect("bounded heralded fallback");
+
+    assert!(diagnostics.used_bounded_fallback);
+    assert!(!diagnostics.used_reverse_fold);
+    assert_eq!(model.to_dem_string(), "error(0.125) D0\nerror(0.125) D1\n");
+}
+
+#[test]
+fn pf6_dem_analyzer_fallback_enforces_each_expansion_budget() {
+    let cases = [
+        (
+            "REPEAT 100001 {\n    HERALDED_ERASE(0.125) 0\n}\n".to_string(),
+            "repeat counts up to 100000",
+        ),
+        (
+            "REPEAT 1001 {\n    REPEAT 1000 {\n        HERALDED_ERASE(0.125) 0\n    }\n}\n"
+                .to_string(),
+            "at most 1000000 expanded repeat iterations",
+        ),
+        (
+            format!(
+                "REPEAT 100000 {{\n{} }}\n",
+                "    HERALDED_ERASE(0.125) 0\n    TICK\n".repeat(6)
+            ),
+            "at most 1000000 expanded instructions",
+        ),
+    ];
+
+    for (text, expected) in cases {
+        let circuit = Circuit::from_stim_str(&text).expect("valid fallback budget circuit");
+        let error = circuit_to_detector_error_model(
+            &circuit,
+            ErrorAnalyzerOptions {
+                fold_loops: true,
+                ..ErrorAnalyzerOptions::default()
+            },
+        )
+        .expect_err("fallback expansion must be preflighted");
+        assert!(
+            error.to_string().contains(expected),
+            "expected {expected:?} for:\n{text}\ngot: {error}"
+        );
+    }
 }
 
 #[test]

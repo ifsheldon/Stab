@@ -41,6 +41,10 @@ const LOCAL_DECOMPOSITION_16_CIRCUIT: &str =
     include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_local_decomposition_16.stim");
 const LOCAL_DECOMPOSITION_16_EXPECTED: &str =
     include_str!("../../../oracle/fixtures/expected/pfm_b5_analyzer_local_decomposition_16.stdout");
+const FOLDED_MPAD_CIRCUIT: &str =
+    include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_folded_mpad.stim");
+const FOLDED_MPAD_EXPECTED: &str =
+    include_str!("../../../oracle/fixtures/expected/pfm_b5_analyzer_folded_mpad.stdout");
 
 #[test]
 fn pfm_b5_nested_loop_folding() {
@@ -101,7 +105,7 @@ fn pfm_b5_repeat_diagnostics_never_reject_valid_analysis() {
 }
 
 #[test]
-fn pfm_b5_local_decomposition_boundary_matches_stim() {
+fn pfm_b5_local_decomposition_accepts_sixteen_like_stim() {
     assert_eq!(
         analyze(
             LOCAL_DECOMPOSITION_16_CIRCUIT,
@@ -114,7 +118,10 @@ fn pfm_b5_local_decomposition_boundary_matches_stim() {
         .to_dem_string(),
         LOCAL_DECOMPOSITION_16_EXPECTED
     );
+}
 
+#[test]
+fn pfm_b5_local_decomposition_rejects_seventeen_like_stim() {
     let circuit = Circuit::from_stim_str(&format!(
         "{LOCAL_DECOMPOSITION_16_CIRCUIT}DETECTOR rec[-1]\n"
     ))
@@ -130,6 +137,14 @@ fn pfm_b5_local_decomposition_boundary_matches_stim() {
     )
     .expect_err("seventeen detector symptoms exceed the local decomposition mask");
     assert!(error.to_string().contains("exceeded 16 detector symptoms"));
+}
+
+#[test]
+fn pfm_b5_folded_noisy_mpad_matches_stim() {
+    assert_eq!(
+        analyze(FOLDED_MPAD_CIRCUIT, ErrorAnalyzerOptions::default()).to_dem_string(),
+        FOLDED_MPAD_EXPECTED
+    );
 }
 
 #[cfg(feature = "ops-contracts")]
