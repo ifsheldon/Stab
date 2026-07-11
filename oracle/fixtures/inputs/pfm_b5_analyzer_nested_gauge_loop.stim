@@ -1,0 +1,10 @@
+R 0
+M 0
+REPEAT 2 {
+    REPEAT 1000000000 {
+        H 0
+        M 0
+        DETECTOR rec[-1]
+        R 0
+    }
+}

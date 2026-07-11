@@ -29,6 +29,18 @@ const REPETITION_CIRCUIT: &str =
     include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_repetition_code.stim");
 const REPETITION_EXPECTED: &str =
     include_str!("../../../oracle/fixtures/expected/pfm_b5_analyzer_repetition_code.stdout");
+const NESTED_GAUGE_CIRCUIT: &str =
+    include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_nested_gauge_loop.stim");
+const NESTED_GAUGE_EXPECTED: &str =
+    include_str!("../../../oracle/fixtures/expected/pfm_b5_analyzer_nested_gauge_loop.stdout");
+const DIAGNOSTIC_SATURATION_CIRCUIT: &str =
+    include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_diagnostic_saturation.stim");
+const DIAGNOSTIC_SATURATION_EXPECTED: &str =
+    include_str!("../../../oracle/fixtures/expected/pfm_b5_analyzer_diagnostic_saturation.stdout");
+const LOCAL_DECOMPOSITION_16_CIRCUIT: &str =
+    include_str!("../../../oracle/fixtures/inputs/pfm_b5_analyzer_local_decomposition_16.stim");
+const LOCAL_DECOMPOSITION_16_EXPECTED: &str =
+    include_str!("../../../oracle/fixtures/expected/pfm_b5_analyzer_local_decomposition_16.stdout");
 
 #[test]
 fn pfm_b5_nested_loop_folding() {
@@ -63,70 +75,68 @@ fn pfm_b5_gauge_loop_bounded() {
 
 #[test]
 fn pfm_b5_nested_gauge_probe_consumes_transient_output() {
-    let circuit = "\
-R 0
-M 0
-REPEAT 2 {
-    REPEAT 1000000000 {
-        H 0
-        M 0
-        DETECTOR rec[-1]
-        R 0
-    }
-}
-";
-    let expected = "\
-error(0.5) D0
-repeat 1000000000 {
-    error(0.5) D1
-    shift_detectors 1
-}
-repeat 999999999 {
-    error(0.5) D1
-    detector D0
-    shift_detectors 1
-}
-detector D0
-";
     assert_eq!(
         analyze(
-            circuit,
+            NESTED_GAUGE_CIRCUIT,
             ErrorAnalyzerOptions {
                 allow_gauge_detectors: true,
                 ..ErrorAnalyzerOptions::default()
             },
         )
         .to_dem_string(),
-        expected
+        NESTED_GAUGE_EXPECTED
     );
 }
 
 #[test]
 fn pfm_b5_repeat_diagnostics_never_reject_valid_analysis() {
-    let circuit = "\
-REPEAT 9223372036854775807 {
-    SHIFT_COORDS(1)
-}
-REPEAT 9223372036854775807 {
-    SHIFT_COORDS(1)
-}
-REPEAT 9223372036854775807 {
-    SHIFT_COORDS(1)
-}
-";
     assert_eq!(
-        analyze(circuit, ErrorAnalyzerOptions::default()).to_dem_string(),
-        "repeat 9223372036854775807 {\n    shift_detectors(1) 0\n}\nrepeat 9223372036854775807 {\n    shift_detectors(1) 0\n}\nrepeat 9223372036854775807 {\n    shift_detectors(1) 0\n}\n"
+        analyze(
+            DIAGNOSTIC_SATURATION_CIRCUIT,
+            ErrorAnalyzerOptions::default()
+        )
+        .to_dem_string(),
+        DIAGNOSTIC_SATURATION_EXPECTED
     );
+}
+
+#[test]
+fn pfm_b5_local_decomposition_boundary_matches_stim() {
+    assert_eq!(
+        analyze(
+            LOCAL_DECOMPOSITION_16_CIRCUIT,
+            ErrorAnalyzerOptions {
+                decompose_errors: true,
+                ignore_decomposition_failures: true,
+                ..ErrorAnalyzerOptions::default()
+            },
+        )
+        .to_dem_string(),
+        LOCAL_DECOMPOSITION_16_EXPECTED
+    );
+
+    let circuit = Circuit::from_stim_str(&format!(
+        "{LOCAL_DECOMPOSITION_16_CIRCUIT}DETECTOR rec[-1]\n"
+    ))
+    .expect("valid seventeen-detector boundary circuit");
+    let error = circuit_to_detector_error_model(
+        &circuit,
+        ErrorAnalyzerOptions {
+            fold_loops: true,
+            decompose_errors: true,
+            ignore_decomposition_failures: true,
+            ..ErrorAnalyzerOptions::default()
+        },
+    )
+    .expect_err("seventeen detector symptoms exceed the local decomposition mask");
+    assert!(error.to_string().contains("exceeded 16 detector symptoms"));
 }
 
 #[cfg(feature = "ops-contracts")]
 #[test]
 fn pfm_b5_repeat_diagnostics_saturate() {
-    let circuit = Circuit::from_stim_str(
-        "REPEAT 9223372036854775807 {\nSHIFT_COORDS(1)\n}\nREPEAT 9223372036854775807 {\nSHIFT_COORDS(1)\n}\nREPEAT 9223372036854775807 {\nSHIFT_COORDS(1)\n}\n",
-    )
-    .expect("valid repeated circuit");
+    let circuit =
+        Circuit::from_stim_str(DIAGNOSTIC_SATURATION_CIRCUIT).expect("valid repeated circuit");
     let (_, diagnostics) = __circuit_to_detector_error_model_with_diagnostics(
         &circuit,
         ErrorAnalyzerOptions {

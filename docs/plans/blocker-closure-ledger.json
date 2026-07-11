@@ -5051,6 +5051,144 @@
           "resource_contract": "Canonical gauge state must stop growing after reaching its recurrence."
         },
         {
+          "id": "pfm6-analyzer-nested-gauge-loop",
+          "surface": "circuit_to_detector_error_model nested gauge recurrence",
+          "upstream": {
+            "path": "src/stim/simulators/error_analyzer.test.cc",
+            "kind": "gtest-case",
+            "test": "ErrorAnalyzer.multi_round_gauge_detectors_dont_grow",
+            "subcase": "billion-round gauge-producing repeat nested inside an outer repeat"
+          },
+          "comparator": "exact",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "--test",
+              "dem_analyzer_pfm_b5",
+              "pfm_b5_nested_gauge_probe_consumes_transient_output",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "direct",
+            "value": "pfm-b5-analyzer-nested-gauge-loop",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "analyze_errors|--fold_loops|--allow_gauge_detectors",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
+              "stdin_path": "inputs/pfm_b5_analyzer_nested_gauge_loop.stim",
+              "expected_stdout_path": "expected/pfm_b5_analyzer_nested_gauge_loop.stdout",
+              "stdin_sha256": "2e878ec341e7be66adf65fad3ce2d5b68b14a452a9d036248b18be1efe1652ad",
+              "expected_stdout_sha256": "0821b23a7930b9914ed8114badc6d98ac7ae2196946fef0fe7856c114f6e35f0"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "The existing analyzer cycle-folding benchmark covers recurrence throughput; this case is a bounded-output regression."
+          },
+          "resource_contract": "Analyzer recurrence probes must consume gauge outputs at instruction boundaries and remain bounded across nested repeats."
+        },
+        {
+          "id": "pfm6-analyzer-diagnostic-saturation",
+          "surface": "circuit_to_detector_error_model analyzer diagnostics",
+          "upstream": {
+            "path": "src/stim/simulators/error_analyzer.test.cc",
+            "kind": "gtest-case",
+            "test": "ErrorAnalyzer.loop_folding",
+            "subcase": "multiple maximum-count repeats whose aggregate diagnostic count exceeds u64"
+          },
+          "comparator": "exact",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "--test",
+              "dem_analyzer_pfm_b5",
+              "pfm_b5_repeat_diagnostics_never_reject_valid_analysis",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "direct",
+            "value": "pfm-b5-analyzer-diagnostic-saturation",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "analyze_errors|--fold_loops",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
+              "stdin_path": "inputs/pfm_b5_analyzer_diagnostic_saturation.stim",
+              "expected_stdout_path": "expected/pfm_b5_analyzer_diagnostic_saturation.stdout",
+              "stdin_sha256": "7694e06e797891dfb2146909fad8e9514d903f33c38e2f5f985eb0c7c9ddb1c3",
+              "expected_stdout_sha256": "31cf9c24ff9c7e069f8e23a31d1a4b111fbef865bb52ff66a6a13c2bcd5cca2c"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "Diagnostic saturation is a constant-time correctness contract rather than a distinct throughput workload."
+          },
+          "resource_contract": "Observational diagnostic counters saturate and never change analyzer success or output."
+        },
+        {
+          "id": "pfm6-analyzer-local-decomposition-boundary",
+          "surface": "circuit_to_detector_error_model local composite decomposition",
+          "upstream": {
+            "path": "src/stim/simulators/error_analyzer.test.cc",
+            "kind": "gtest-case",
+            "test": "ErrorAnalyzer.too_many_symptoms",
+            "subcase": "accept sixteen detector symptoms and reject seventeen"
+          },
+          "comparator": "exact",
+          "status": "implemented",
+          "test": {
+            "state": "existing",
+            "selector": [
+              "cargo",
+              "test",
+              "-p",
+              "stab-core",
+              "--test",
+              "dem_analyzer_pfm_b5",
+              "pfm_b5_local_decomposition_boundary_matches_stim",
+              "--quiet",
+              "--exact"
+            ]
+          },
+          "oracle": {
+            "state": "existing",
+            "classification": "direct",
+            "value": "pfm-b5-analyzer-local-decomposition-16",
+            "signature": {
+              "parity_mode": "exact-output",
+              "comparator": "exact-output",
+              "argv": "analyze_errors|--fold_loops|--decompose_errors|--ignore_decomposition_failures",
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
+              "stdin_path": "inputs/pfm_b5_analyzer_local_decomposition_16.stim",
+              "expected_stdout_path": "expected/pfm_b5_analyzer_local_decomposition_16.stdout",
+              "stdin_sha256": "555421f60f4167103ed2a3a376d044814d9c81368d656c029e3166cc96381382",
+              "expected_stdout_sha256": "e518a38d57feb0e551d856d839edc871877c8e560f5df657f7fb529da8596135"
+            }
+          },
+          "benchmark": {
+            "state": "not-applicable",
+            "value": "The sixteen-versus-seventeen symptom boundary is too small to be a useful benchmark."
+          },
+          "resource_contract": "Local decomposition uses a fixed sixteen-bit detector-symptom contract and rejects the seventeenth before combinatorial work."
+        },
+        {
           "id": "pfm6-analyzer-coordinate-loop",
           "surface": "circuit_to_detector_error_model fold_loops",
           "upstream": {

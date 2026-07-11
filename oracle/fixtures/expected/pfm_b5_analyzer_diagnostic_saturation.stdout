@@ -1,0 +1,9 @@
+repeat 9223372036854775807 {
+    shift_detectors(1) 0
+}
+repeat 9223372036854775807 {
+    shift_detectors(1) 0
+}
+repeat 9223372036854775807 {
+    shift_detectors(1) 0
+}
