@@ -333,7 +333,7 @@ Acceptance criteria:
 
 ### PFM-B5: Generic Analyzer Loop Folding And Search Closure
 
-Status: A later final review found a supported-unitary nested-probe bypass, unbounded graph-construction work and payloads, allocation-heavy graphlike state comparison, weak generated-result membership checks, stale fallback metadata, and an overstated SAT output-bound claim. Production and executable-evidence remediation is committed in `a7173fe` and `23b0d72`; fresh clean benchmark evidence, milestone-audit closure, and final full-code-review sign-off remain, as recorded in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
+Status: A later final review found a supported-unitary nested-probe bypass, unbounded graph-construction work and payloads, allocation-heavy graphlike state comparison, weak generated-result membership checks, stale fallback metadata, and an overstated SAT output-bound claim. Production and executable-evidence remediation is committed in `a7173fe`, `23b0d72`, `e7b7760`, and `93b80da`; clean PF6 allocation evidence is recorded from `HEAD=93b80dafcf50282088d96c68604f84bf0eed94e1`, while milestone-audit closure and final full-code-review sign-off remain, as recorded in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
 
 Objective: resolve the PFM6 blocker by replacing fixture-shaped folding with a general finite-state loop summary and by closing a finite search corpus.
 
@@ -372,7 +372,7 @@ Benchmarks:
 
 - `pfm-b5-analyzer-cycle-folding` measures transient, short-period, long-period, nested, gauge, and coordinate recurrence through production diagnostics, and `pfm-b5-analyzer-generated-qec` measures repetition r100000 plus rotated-surface d11/r100000000 analysis.
 - `pfm-b5-graphlike-search-direct-dem`, `pfm-b5-hypergraph-search-direct-dem`, `pfm-b5-hypergraph-search-generated-qec`, `pfm-b5-wcnf-direct-dem`, and `pfm-b5-wcnf-generated-qec` remain report-only contract rows.
-- `pfm-b5-graphlike-generated-d25` and `pfm-b5-graphlike-generated-d11-r1000` are faithful pinned-Stim direct matches; clean second-review ratios of 5.960x and 5.490x keep them report-only and outside the 1.25x gate.
+- `pfm-b5-graphlike-generated-d25` and `pfm-b5-graphlike-generated-d11-r1000` are faithful pinned-Stim direct matches; clean post-review ratios of 4.726x and 4.214x keep them report-only and outside the 1.25x gate.
 - Record represented iterations, state size, emitted DEM items, search nodes or clauses, peak live bytes, and sampled resident delta.
 - Promote only faithful stable rows into the 1.25x gate; keep structural or no-faithful-baseline rows report-only.
 

@@ -6,7 +6,7 @@ PFM-B5 implementation, executable evidence, original milestone-audit remediation
 A later final review found a supported-unitary nested-probe bypass, unbounded graph-construction work and payloads, allocation-heavy graphlike state comparison, weak generated-result membership checks, stale fallback metadata, and an overstated SAT output-bound claim.
 Production remediation is committed in `a7173fe`, and the expanded executable evidence is committed in `23b0d72`.
 The milestone now owns 52 independently selected ledger cases: fifteen analyzer cases, ten graphlike cases, eleven hypergraph cases, twelve shortest or weighted WCNF cases, two sparse reverse-tracker cases, one shared search-traversal resource case, and one matched-error value-object case.
-Fresh committed-HEAD benchmark evidence, a new milestone-audit pass, and a final full-code-review pass remain required before this report may be treated as the PFM-B5 completion record.
+Fresh committed-HEAD benchmark evidence is recorded at `93b80da`; a new milestone-audit pass and a final full-code-review pass remain required before this report may be treated as the PFM-B5 completion record.
 
 ## Scope Result
 
@@ -88,33 +88,34 @@ A parameterized touched-detector test crosses the effective-node boundary withou
 
 ## Benchmark Evidence
 
-The last clean pre-final-review source-owned artifacts are listed below for historical comparison. They do not close the current post-review implementation, which requires a fresh committed-HEAD refresh.
+The current clean post-final-review source-owned artifacts are:
 
-- Baseline: `target/benchmarks/pfm-b5-second-review-baseline/baseline.json`.
-- Compare: `target/benchmarks/pfm-b5-second-review-compare/compare.json`.
-- Stab commit: `37cf5860c72456347d1365340735fc7ef126d4de`.
+- Baseline: `target/benchmarks/pfm-b5-final-review-v3-baseline/baseline.json`.
+- Compare: `target/benchmarks/pfm-b5-final-review-v3-compare/compare.json`.
+- Stab commit: `93b80dafcf50282088d96c68604f84bf0eed94e1`.
 - Frozen Stim commit: `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, tag `v1.16.0`.
 - Worktree state: `local_modifications=false`.
 - Method: release profile, warmup, three measurement runs, allocation tracking, and required profiler notes.
 
 | Row | Representative Stab time | Stim time | Ratio | Peak live allocation | Disposition |
 | --- | ---: | ---: | ---: | ---: | --- |
-| `pfm-b5-analyzer-cycle-folding` | 6.704 us to 489.423 us | No faithful aggregate filter | None | 94,336 B | Report-only |
-| `pfm-b5-analyzer-generated-qec` | 46.800 us and 13.830 ms | No faithful aggregate filter | None | 6,430,472 B | Report-only |
-| `pfm-b5-graphlike-search-direct-dem` | 824.463 us | No faithful direct-model filter | None | 615,896 B | Report-only |
-| `pfm-b5-graphlike-generated-d25` | 184.769 ms | 31 ms | 5.960x | 12,437,520 B | Direct match, report-only |
-| `pfm-b5-graphlike-generated-d11-r1000` | 1.427 s | 260 ms | 5.490x | 92,643,408 B | Direct match, report-only |
-| `pfm-b5-hypergraph-search-direct-dem` | 57.600 us | No faithful direct-model filter | None | 57,768 B | Report-only |
-| `pfm-b5-hypergraph-search-generated-qec` | 47.464 ms | No faithful filter | None | 12,661,296 B | Report-only |
-| `pfm-b5-wcnf-direct-dem` | 383.296 us and 434.143 us | No faithful filter | None | 453,518 B | Report-only |
-| `pfm-b5-wcnf-generated-qec` | 3.338 ms and 3.550 ms | No faithful filter | None | 3,844,106 B | Report-only |
+| `pfm-b5-analyzer-cycle-folding` | 6.832 us to 497.488 us | No faithful aggregate filter | None | 94,336 B | Report-only |
+| `pfm-b5-analyzer-generated-qec` | 46.624 us and 14.035 ms | No faithful aggregate filter | None | 6,430,472 B | Report-only |
+| `pfm-b5-graphlike-search-direct-dem` | 345.312 us | No faithful direct-model filter | None | 663,000 B | Report-only |
+| `pfm-b5-graphlike-generated-d25` | 146.499 ms | 31 ms | 4.726x | 15,461,688 B | Direct match, report-only |
+| `pfm-b5-graphlike-generated-d11-r1000` | 1.096 s | 260 ms | 4.214x | 115,199,520 B | Direct match, report-only |
+| `pfm-b5-hypergraph-search-direct-dem` | 56.272 us | No faithful direct-model filter | None | 78,488 B | Report-only |
+| `pfm-b5-hypergraph-search-generated-qec` | 50.898 ms | No faithful filter | None | 12,440,968 B | Report-only |
+| `pfm-b5-wcnf-direct-dem` | 392.817 us and 442.417 us | No faithful filter | None | 453,518 B | Report-only |
+| `pfm-b5-wcnf-generated-qec` | 3.385 ms and 3.613 ms | No faithful filter | None | 3,844,106 B | Report-only |
 
 The analyzer diagnostics prove that the transient, period-8, period-127, nested, gauge, and coordinate workloads all use the generic reverse-fold path with no bounded fallback.
 The gauge case represents `10^15` repeat iterations and arithmetically skips `999,999,999,999,996` entered-loop iterations.
 For nested loops, `represented_repeat_iterations` recursively counts all source-represented inner work, while `folded_repeat_iterations` counts arithmetic skips at the loop levels actually entered by the analyzer and must not be interpreted as the total represented nested work.
 
 The two faithful graphlike rows do not meet the 1.25x performance gate and were not added to `benchmarks/m12-primary-thresholds.json`.
-Their source-owned profiler notes record the allocation evidence, the host's `perf_event_paranoid=4` sampling limitation, and the required compact interned-state frontier work.
+Collision-checked edge-arena indexing improves the clean ratios from 5.960x to 4.726x for d25/r25 and from 5.490x to 4.214x for d11/r1000 while bounding construction work. Peak live allocation rises from the pre-index 12,437,520 bytes to 15,461,688 bytes for d25 and from 92,643,408 bytes to 115,199,520 bytes for d11/r1000 because the compact hash index adds one arena position per edge; the rejected duplicate-payload prototype reached 31,165,504 and 214,962,720 bytes respectively and was not retained.
+The source-owned profiler notes record this tradeoff, the host's `perf_event_paranoid=4` sampling limitation, and the remaining compact interned-state frontier work.
 All other new rows remain report-only because no pinned Stim filter measures a faithful equivalent workload.
 
 ## Verification
@@ -146,11 +147,18 @@ just oracle::blockers --check-selectors
 just oracle::run --milestone PF6 --exact
 ```
 
-The second-review benchmark refresh additionally passed:
+The earlier second-review benchmark refresh additionally passed:
 
 ```sh
 just bench::baseline --only PF6 --out target/benchmarks/pfm-b5-second-review-baseline
 cargo run -q -p stab-bench --profile release --features count-allocations -- compare --only PF6 --baseline target/benchmarks/pfm-b5-second-review-baseline/baseline.json --report target/benchmarks/pfm-b5-second-review-compare --track-allocations --warmup --measurement-runs 3 --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/pfm-b5
+```
+
+The post-final-review benchmark refresh passed from clean `HEAD=93b80dafcf50282088d96c68604f84bf0eed94e1`:
+
+```sh
+just bench::baseline --only PF6 --out target/benchmarks/pfm-b5-final-review-v3-baseline
+cargo run -q -p stab-bench --profile release --features count-allocations -- compare --only PF6 --baseline target/benchmarks/pfm-b5-final-review-v3-baseline/baseline.json --report target/benchmarks/pfm-b5-final-review-v3-compare --track-allocations --warmup --measurement-runs 3 --require-profiler-notes --profiler-notes-dir benchmarks/profiler-notes/pfm-b5
 ```
 
 Post-final-review remediation has passed:
@@ -165,7 +173,7 @@ just oracle::blockers --check-selectors
 just oracle::run --milestone PF6 --exact
 ```
 
-Fresh benchmark and final workspace verification remain pending.
+Final workspace verification remains pending.
 
 ## Audit And Review Status
 
@@ -179,7 +187,7 @@ The next required full-code-review pass found that folded noisy `MPAD` errors we
 Commits `d1d6554`, `433252c`, and `d3ffc5f` fix those findings, split overclaimed ledger rows, add direct folded-`MPAD` and structural resource evidence, and expand PFM-B5 from 39 to 48 independently selected cases.
 A later final review found that nested supported-unitary repeats still bypassed analyzer-probe admission, graph construction could spend quadratic time and retain unbounded edge payload before search-state admission, graphlike comparisons cloned observable masks, generated search comparators did not prove source membership, zero-probability diagnostics were asserted only by substring, the generated coordinate row still claimed fallback, and the SAT output-byte limit was documented as independent despite being unreachable behind stricter clause and literal caps.
 Commit `a7173fe` shares shifted-recurrence discovery, routes analyzer probes around the normal unitary fast path, adds aggregate traversal and graph-construction budgets, indexes edge lookup, removes graphlike comparison clones and duplicate map traversals, and strengthens exact and generated search tests. Commit `23b0d72` expands PFM-B5 from 48 to 52 independent cases, freezes fifteen supporting oracle rows, and proves the generated coordinate case uses generic reverse folding without fallback.
-Fresh benchmark evidence, milestone audit, and final full-code review have not yet been completed against this synchronized implementation and evidence, so PFM-B5 remains open.
+Fresh benchmark evidence is complete at clean `HEAD=93b80dafcf50282088d96c68604f84bf0eed94e1`; milestone audit and final full-code review have not yet been completed against this synchronized implementation and evidence, so PFM-B5 remains open.
 
 | Requirement | Status | Evidence |
 | --- | --- | --- |
@@ -189,14 +197,14 @@ Fresh benchmark evidence, milestone audit, and final full-code review have not y
 | Exact shortest and weighted WCNF corpus | Satisfied | Twelve independently selected `pfm_b5_wcnf_*` cases |
 | Sparse IDs and distinct traversal, graph-construction, or search limits | Satisfied | Sparse resource tests; per-error and aggregate traversal tests; unique-edge, graph-payload, state, transition, state-payload, edge-arena, and SAT preflight tests |
 | Source-owned oracle evidence | Satisfied | Content-bound direct rows, 52 exact selectors, fifteen supporting oracle rows, and ten direct exact PF6 rows |
-| Fresh source-owned benchmark evidence | Pending | Regenerate allocation-tracked PF6 artifacts from the committed post-review head |
-| Honest 1.25x gate disposition | Satisfied | Direct-match ratios 5.960x and 5.490x remain report-only with updated profiler notes |
+| Fresh source-owned benchmark evidence | Satisfied | Clean allocation-tracked PF6 artifacts from `93b80dafcf50282088d96c68604f84bf0eed94e1` |
+| Honest 1.25x gate disposition | Satisfied | Direct-match ratios 4.726x and 4.214x remain report-only with updated profiler notes |
 | Final milestone audit and full-code review | Pending | Re-run both after evidence and documentation synchronization |
 | Deferred provenance remains excluded | Satisfied | Checklist, ledger, and this report name full ErrorMatcher provenance as deferred |
 
 ## Remaining Work Outside PFM-B5
 
-The selected PFM-B5 semantic scope has no intentionally unimplemented child case, but fresh benchmark evidence, milestone-audit closure, and final review sign-off are still pending.
+The selected PFM-B5 semantic scope has no intentionally unimplemented child case, but milestone-audit closure and final review sign-off are still pending.
 Full ErrorMatcher stack-frame, heralded, and repeat-contained provenance plus `stim explain_errors` remain intentionally deferred.
 The graphlike direct-match slowdown is an optimization backlog item and an explicit reason the rows remain outside the primary gate; it does not invalidate semantic closure.
 PFM-B2 still owns the generated exhaustive gate-by-surface semantic matrix, and PFM-B6 still owns final audit and status rollup.
