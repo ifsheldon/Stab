@@ -1,5 +1,7 @@
 # PFM6 Period-127 Observable Folding Scope
 
+Historical note: this selected period-shaped slice is now subsumed by the generic PFM-B5 recurrence engine. Its retired benchmark ID is historical evidence only; current ownership is in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
+
 ## Summary
 
 This note records the selected PFM6 analyzer slice for the pinned Stim v1.16.0 `ErrorAnalyzer.loop_folding` case whose logical observable oscillates with period 127 across a huge repeat.

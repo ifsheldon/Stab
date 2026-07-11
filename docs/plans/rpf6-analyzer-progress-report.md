@@ -1,5 +1,7 @@
 # RPF6 Analyzer Progress Report
 
+Historical note: PFM-B5 supersedes this staged analyzer report. Retired period-specific benchmark IDs below are historical evidence only; current ownership is in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
+
 ## Summary
 
 This RPF6 report makes the generated-QEC analyzer subset, the selected prefix/repeat/tail true-folded analyzer subset, the selected loop-carried observable true-folded analyzer subset, the selected period-8 observable true-folded analyzer subset, the selected period-127 observable true-folded analyzer subset, the selected loop-folded error-decomposition subset, the selected folded observable-dependency rejection guard, the bounded mixed-top-level `fold_loops=true` fallback, and the selected matched-error canonicalization hardening explicit in the source-owned evidence.

@@ -1,6 +1,7 @@
 # Partial Feature Closure Plan
 
 Historical note: this document is retained as the first post-beta PF planning pass.
+PFM-B5 supersedes its staged PF6 analyzer and search benchmark references; retired `pf6-*` row IDs in this file are historical evidence only, and current ownership is in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
 The active execution plan for remaining non-deferred partial rows is `docs/plans/non-deferred-partial-feature-milestones.md`, and `docs/plans/GOAL.md` now points at that plan.
 
 ## Summary

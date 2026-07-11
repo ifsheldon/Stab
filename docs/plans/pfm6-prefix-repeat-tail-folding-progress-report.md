@@ -1,5 +1,7 @@
 # PFM6 Prefix-Repeat-Tail Folding Progress Report
 
+Historical note: PFM-B5 subsumes this selected folding slice with one generic recurrence engine. Retired benchmark IDs below are historical evidence only; current ownership is in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
+
 ## Scope
 
 This slice promotes a narrow true-folded `circuit_to_detector_error_model(..., fold_loops=true)` analyzer path for top-level circuits shaped as plain instructions, one `REPEAT` block, and plain tail instructions.

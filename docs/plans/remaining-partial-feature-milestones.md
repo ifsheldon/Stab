@@ -1,5 +1,7 @@
 # Remaining Partial Feature Milestones
 
+Historical note: PFM-B5 supersedes the staged PF6 analyzer and search benchmark references in this plan. Retired `pf6-*` row IDs below are historical evidence only; current ownership is in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
+
 ## Summary
 
 This historical plan covers every feature row marked `Partial` in `docs/stab-feature-checklist.md` whose remaining work is not intentionally deferred.

@@ -1,5 +1,7 @@
 # RPF6 Search Progress Report
 
+Historical note: PFM-B5 supersedes this staged search report. Retired generated-search and WCNF benchmark IDs below are historical evidence only; current ownership is in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
+
 ## Summary
 
 This report records the promoted PF6 direct DEM graphlike and hypergraph exact-output subset, selected direct DEM sparse high-detector resource behavior, selected high-observable analyzer-to-search behavior, and the generated-QEC graphlike, hypergraph, and SAT/WCNF search subset.

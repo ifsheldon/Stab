@@ -1,5 +1,7 @@
 # PFM6 Loop-Carried Observable Folding Scope
 
+Historical note: this selected period-shaped slice is now subsumed by the generic PFM-B5 recurrence engine. Its retired benchmark ID is historical evidence only; current ownership is in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
+
 ## Summary
 
 This note records the selected PFM6 analyzer slice for the pinned Stim v1.16.0 `ErrorAnalyzer.loop_folding` case where a huge odd repeat count has a tail `OBSERVABLE_INCLUDE` that adds the same logical observable to the repeated body errors.

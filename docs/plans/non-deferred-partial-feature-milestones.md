@@ -333,6 +333,8 @@ Acceptance criteria:
 
 ### PFM-B5: Generic Analyzer Loop Folding And Search Closure
 
+Status: Implementation, executable evidence, and milestone audit are complete for the selected Rust and CLI scope at `872e3a3`; only the required GPT-5.6/max full-code-review sign-off remains, as recorded in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
+
 Objective: resolve the PFM6 blocker by replacing fixture-shaped folding with a general finite-state loop summary and by closing a finite search corpus.
 
 Analyzer implementation requirements:
@@ -365,8 +367,9 @@ Sparse tracker and matched errors:
 
 Benchmarks:
 
-- Replace period-specific benchmark interpretation with `transient`, `short-period`, `long-period`, `nested`, and `generated-QEC` loop submeasurements.
-- Keep graphlike, hypergraph, and SAT rows split by direct DEM and generated-QEC workloads.
+- `pfm-b5-analyzer-cycle-folding` measures transient, short-period, long-period, nested, gauge, and coordinate recurrence through production diagnostics, and `pfm-b5-analyzer-generated-qec` measures repetition r100000 plus rotated-surface d11/r100000000 analysis.
+- `pfm-b5-graphlike-search-direct-dem`, `pfm-b5-hypergraph-search-direct-dem`, `pfm-b5-hypergraph-search-generated-qec`, `pfm-b5-wcnf-direct-dem`, and `pfm-b5-wcnf-generated-qec` remain report-only contract rows.
+- `pfm-b5-graphlike-generated-d25` and `pfm-b5-graphlike-generated-d11-r1000` are faithful pinned-Stim direct matches, but clean ratios of 5.938x and 5.247x keep them report-only and outside the 1.25x gate.
 - Record represented iterations, state size, emitted DEM items, search nodes or clauses, peak live bytes, and sampled resident delta.
 - Promote only faithful stable rows into the 1.25x gate; keep structural or no-faithful-baseline rows report-only.
 
@@ -375,7 +378,7 @@ Acceptance criteria:
 - No production analyzer branch matches a test fixture's exact instruction sequence or hard-coded recurrence period.
 - Owned folded outputs match pinned Stim exactly where deterministic, and structural search comparators prove minimum-weight parity where ordering is non-contractual.
 - Eligible huge repeats use memory bounded by loop state, body, and emitted compact output rather than repeat count.
-- PFM6 closes for active analyzer, search, sparse-tracker, and matched-error value semantics while full provenance remains explicitly deferred.
+- PFM6 is closed for active analyzer, search, sparse-tracker, and matched-error value semantics while full provenance remains explicitly deferred.
 
 ### PFM-B6: Resolve Spec Gaps And Roll Up Status
 
@@ -710,6 +713,8 @@ Acceptance criteria:
 
 ## PFM6: Analyzer, Search, Sparse Reverse Tracking, And Active Matched-Error Values
 
+Status: Superseded and completed by PFM-B5 for the selected Rust and CLI scope. The staged evidence below remains historical context; current tests, oracle rows, resource contracts, and benchmark IDs are in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
+
 Objective: close analyzer and logical-error search gaps without taking on full ErrorMatcher provenance or `stim explain_errors`.
 
 Rows covered:
@@ -758,9 +763,9 @@ Oracle rows:
 
 Benchmarks:
 
-- Keep or refresh `pf6-analyze-errors-generated-surface`.
-- Keep or refresh `pf6-graphlike-search-generated`, `pf6-hypergraph-search-generated`, and `pf6-generated-sat-wcnf`, which have report-only runner coverage for the promoted generated rotated-surface-code search and SAT/WCNF subsets.
-- Keep `pf6-error-decomp-loop-folded` synchronized with the promoted repeated composite-error loop-folded decomposition subset, keep `pf6-analyzer-loop-observable-folded` synchronized with the promoted selected loop-carried observable folding subset, keep `pf6-analyzer-period8-observable-folded` synchronized with the promoted selected period-8 logical-observable folding subset, keep `pf6-analyzer-period127-observable-folded` synchronized with the promoted selected period-127 logical-observable folding subset, and extend or split them if broader decomposition or observable-period families become active; keep the implemented `pf6-sparse-rev-frame-loop` row report-only unless a faithful pinned-Stim comparator is added.
+- Historical period-specific rows were replaced by `pfm-b5-analyzer-cycle-folding` and `pfm-b5-analyzer-generated-qec`.
+- Current search and encoding rows are `pfm-b5-graphlike-search-direct-dem`, `pfm-b5-graphlike-generated-d25`, `pfm-b5-graphlike-generated-d11-r1000`, `pfm-b5-hypergraph-search-direct-dem`, `pfm-b5-hypergraph-search-generated-qec`, `pfm-b5-wcnf-direct-dem`, and `pfm-b5-wcnf-generated-qec`.
+- `pf6-error-decomp-loop-folded` and `pf6-sparse-rev-frame-loop` remain supporting report-only rows.
 - Do not add a benchmark for matched-error canonicalization unless a future analyzer or search surface puts it on a measured throughput path.
 - Use schema-version-2 submeasurement thresholds for bundled analyzer or search rows.
 - Promote only faithful pinned-Stim rows with repeated stable evidence.
@@ -864,7 +869,7 @@ Acceptance criteria:
 
 Current evidence:
 
-- `docs/plans/pfm8-rollup-evidence-report.md` records the current PFM8 rollup evidence snapshot. It is intentionally not a final PFM8 completion report because PFM-B2 and PFM-B5 retain implementation work and PFM-B6 must audit and roll up the completed children; PFM-B1, PFM-B3, and PFM-B4 are complete.
+- `docs/plans/pfm8-rollup-evidence-report.md` records the current PFM8 rollup evidence snapshot. It is intentionally not a final PFM8 completion report because the PFM-B2 generated semantic matrix and PFM-B6 audit or rollup remain; PFM-B1, PFM-B3, PFM-B4, and PFM-B5 implementation are complete.
 
 ## Final Verification
 
