@@ -7,8 +7,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::{Display, Formatter};
 
 use super::{
-    DemDetectorId, DemInstruction, DemInstructionKind, DemItem, DemObservableId, DemTarget,
-    DetectorErrorModel,
+    DemDetectorId, DemInstruction, DemItem, DemObservableId, DemTarget, DetectorErrorModel,
     error_traversal::{
         SearchGraphTargetPolicy, search_graph_nonzero_error_targets, visit_search_graph_errors,
     },
@@ -53,6 +52,16 @@ impl ObservableMask {
             }
         }
         Self { observables }
+    }
+
+    fn symmetric_difference_len(&self, other: &Self) -> usize {
+        self.observables
+            .symmetric_difference(&other.observables)
+            .count()
+    }
+
+    fn len(&self) -> usize {
+        self.observables.len()
     }
 
     fn is_empty(&self) -> bool {
@@ -444,6 +453,17 @@ impl SearchState {
         }
     }
 
+    fn term_count(&self) -> CircuitResult<usize> {
+        self.detectors
+            .len()
+            .checked_add(self.observables.len())
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "hypergraph search state term count overflowed",
+                )
+            })
+    }
+
     fn append_transition_as_error_instruction_to(
         &self,
         next: &Self,
@@ -511,7 +531,7 @@ pub(super) fn find_undetectable_logical_error(
     let mut queue = VecDeque::new();
     let mut back_map = BTreeMap::new();
     let mut budget = SearchBudget::new("hypergraph search");
-    budget.admit_state()?;
+    budget.admit_state(0, 0, false)?;
     back_map.insert(empty.clone(), empty.clone());
 
     for (node_index, node) in graph.nodes.iter().enumerate() {
@@ -522,14 +542,28 @@ pub(super) fn find_undetectable_logical_error(
             if edge.observables.is_empty() || edge.detectors.iter().next() != Some(&source) {
                 continue;
             }
+            if edge.detectors.len() > dont_explore_detection_event_sets_with_size_above {
+                continue;
+            }
+            let start_terms = edge
+                .detectors
+                .len()
+                .checked_add(edge.observables.len())
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "hypergraph initial search state term count overflowed",
+                    )
+                })?;
+            budget.preflight_state_terms(start_terms)?;
             let start = SearchState::new(edge.detectors.clone(), edge.observables.clone());
-            if let std::collections::btree_map::Entry::Vacant(entry) = back_map.entry(start.clone())
-            {
-                budget.admit_state()?;
-                entry.insert(empty.clone());
-                if start.detectors.len() <= dont_explore_detection_event_sets_with_size_above {
-                    queue.push_back(start);
+            if !back_map.contains_key(&start) {
+                budget.admit_state(start_terms, 0, true)?;
+                if back_map.insert(start.clone(), empty.clone()).is_some() {
+                    return Err(CircuitError::invalid_detector_error_model(
+                        "hypergraph initial search state was inserted twice",
+                    ));
                 }
+                queue.push_back(start);
             }
         }
     }
@@ -546,25 +580,46 @@ pub(super) fn find_undetectable_logical_error(
                 "hypergraph active detector is outside the graph",
             ));
         };
+        let current_terms = current.term_count()?;
         for edge_id in &node.edge_ids {
             let edge = graph.edge(*edge_id)?;
             budget.record_transition()?;
-            let next = current.after_crossing_edge(edge);
-            if next.detectors.len() > dont_explore_detection_event_sets_with_size_above {
+            let next_detector_terms = current
+                .detectors
+                .symmetric_difference(&edge.detectors)
+                .count();
+            if next_detector_terms > dont_explore_detection_event_sets_with_size_above {
                 continue;
             }
             if dont_explore_edges_increasing_symptom_degree
-                && next.detectors.len() > current.detectors.len()
+                && next_detector_terms > current.detectors.len()
             {
                 continue;
             }
-            let std::collections::btree_map::Entry::Vacant(entry) = back_map.entry(next.clone())
-            else {
+            let next_terms = next_detector_terms
+                .checked_add(
+                    current
+                        .observables
+                        .symmetric_difference_len(&edge.observables),
+                )
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "hypergraph next search state term count overflowed",
+                    )
+                })?;
+            budget.preflight_state_terms(next_terms)?;
+            let next = current.after_crossing_edge(edge);
+            if back_map.contains_key(&next) {
                 continue;
-            };
-            budget.admit_state()?;
-            entry.insert(current.clone());
-            if next.is_undetected() {
+            }
+            let undetected = next.is_undetected();
+            budget.admit_state(next_terms, current_terms, !undetected)?;
+            if back_map.insert(next.clone(), current.clone()).is_some() {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "hypergraph search state was inserted twice",
+                ));
+            }
+            if undetected {
                 if next.observables.is_empty() {
                     return Err(CircuitError::invalid_detector_error_model(
                         "hypergraph search reached an empty logical state unexpectedly",
@@ -650,42 +705,12 @@ fn no_hypergraph_logical_error_message(
             "\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors.",
         );
     }
-    if count_nonzero_error_instructions(model)? == 0 {
+    if model.count_errors()? == 0 {
         message.push_str(
             "\n    WARNING: NO ERRORS. The circuit or detector error model didn't include any errors, making it vacuously impossible to find a logical error.",
         );
     }
     Ok(message)
-}
-
-fn count_nonzero_error_instructions(model: &DetectorErrorModel) -> CircuitResult<usize> {
-    let mut total = 0usize;
-    for item in model.items() {
-        let count = match item {
-            DemItem::Instruction(instruction) => usize::from(
-                instruction.kind() == DemInstructionKind::Error
-                    && instruction.args().first().copied().unwrap_or(0.0) != 0.0,
-            ),
-            DemItem::RepeatBlock(repeat) => {
-                let repeat_count = usize::try_from(repeat.repeat_count().get()).map_err(|_| {
-                    CircuitError::invalid_detector_error_model(
-                        "repeat count does not fit usize while counting hypergraph errors",
-                    )
-                })?;
-                repeat_count
-                    .checked_mul(count_nonzero_error_instructions(repeat.body())?)
-                    .ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
-                            "hypergraph error count overflowed",
-                        )
-                    })?
-            }
-        };
-        total = total.checked_add(count).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("hypergraph error count overflowed")
-        })?;
-    }
-    Ok(total)
 }
 
 fn toggled_dem_targets(
@@ -719,6 +744,9 @@ fn format_detector(detector: DemDetectorId) -> String {
 fn format_observable(observable: DemObservableId) -> String {
     format!("L{}", observable.get())
 }
+
+#[cfg(test)]
+mod resource_tests;
 
 #[cfg(test)]
 mod tests {
@@ -933,49 +961,6 @@ mod tests {
         );
         assert_eq!(graph.edges.len(), 2);
         assert_eq!(graph.edge_incidences, 4);
-    }
-
-    #[test]
-    fn hyper_graph_rejects_excessive_edge_degree_before_adjacency_allocation() {
-        let mut graph = Graph::new(MAX_HYPERGRAPH_EDGE_DEGREE + 1, 0);
-        let targets = (0..=MAX_HYPERGRAPH_EDGE_DEGREE)
-            .map(|detector| DemTarget::relative_detector(detector as u64).unwrap())
-            .collect::<Vec<_>>();
-
-        let error = graph
-            .add_edge_from_dem_targets(&targets, usize::MAX)
-            .expect_err("hard edge-degree cap");
-        assert!(
-            error
-                .to_string()
-                .contains("edges with at most 64 detectors")
-        );
-        assert!(graph.edges.is_empty());
-        assert_eq!(graph.edge_incidences, 0);
-    }
-
-    #[test]
-    fn hyper_graph_rejects_excessive_edge_incidences_before_allocation() {
-        let mut graph = Graph::new(MAX_HYPERGRAPH_EDGE_DEGREE, 5);
-        let detector_targets = (0..MAX_HYPERGRAPH_EDGE_DEGREE)
-            .map(|detector| DemTarget::relative_detector(detector as u64).unwrap())
-            .collect::<Vec<_>>();
-        for observable in 0..4 {
-            let mut targets = detector_targets.clone();
-            targets.push(DemTarget::logical_observable(observable).unwrap());
-            graph
-                .add_edge_from_dem_targets(&targets, usize::MAX)
-                .unwrap();
-        }
-
-        let mut rejected = detector_targets;
-        rejected.push(DemTarget::logical_observable(4).unwrap());
-        let error = graph
-            .add_edge_from_dem_targets(&rejected, usize::MAX)
-            .expect_err("hard edge-incidence cap");
-        assert!(error.to_string().contains("at most 256 edge incidences"));
-        assert_eq!(graph.edges.len(), 4);
-        assert_eq!(graph.edge_incidences, 256);
     }
 
     #[test]

@@ -20,7 +20,6 @@ use instance::{
 };
 
 const UNSAT_WDIMACS: &str = "p wcnf 1 2 3\n3 -1 0\n3 1 0\n";
-const MAX_SAT_EFFECTIVE_TARGET_COUNT: usize = 1_000_000;
 
 #[derive(Clone, Debug, PartialEq)]
 struct FlattenedError {
@@ -51,7 +50,6 @@ impl SatTargetIndex {
                 }
             }
         }
-        validate_sat_effective_target_counts(detectors.len(), observables.len())?;
         Ok(Self {
             detector_to_slot: detectors
                 .into_iter()
@@ -191,6 +189,9 @@ fn sat_problem_as_wcnf_string(
     model: &DetectorErrorModel,
     mode: SatProblemMode,
 ) -> CircuitResult<String> {
+    if model.count_observables()? == 0 || model.count_errors()? == 0 {
+        return Ok(UNSAT_WDIMACS.to_string());
+    }
     let errors = flattened_error_instructions(model, mode)?;
     if errors.is_empty() {
         return Ok(UNSAT_WDIMACS.to_string());
@@ -245,23 +246,6 @@ fn sat_problem_as_wcnf_string(
     instance.add_clause(Clause::hard(observable_clause_vars))?;
     instance.validate_shape(shape)?;
     instance.to_wdimacs(mode)
-}
-
-fn validate_sat_effective_target_counts(
-    detector_count: usize,
-    observable_count: usize,
-) -> CircuitResult<()> {
-    if detector_count > MAX_SAT_EFFECTIVE_TARGET_COUNT {
-        return Err(CircuitError::invalid_detector_error_model(format!(
-            "SAT problem generation currently supports at most {MAX_SAT_EFFECTIVE_TARGET_COUNT} effective detector nodes, got {detector_count}"
-        )));
-    }
-    if observable_count > MAX_SAT_EFFECTIVE_TARGET_COUNT {
-        return Err(CircuitError::invalid_detector_error_model(format!(
-            "SAT problem generation currently supports at most {MAX_SAT_EFFECTIVE_TARGET_COUNT} effective observable nodes, got {observable_count}"
-        )));
-    }
-    Ok(())
 }
 
 fn add_error_parity_terms(
@@ -557,9 +541,8 @@ mod tests {
     )]
 
     use super::{
-        MAX_SAT_EFFECTIVE_TARGET_COUNT, MAX_SAT_TARGET_OCCURRENCES, SatErrorVisitor,
-        SatProblemMode, likeliest_error_sat_problem, shortest_error_sat_problem,
-        validate_sat_effective_target_counts,
+        MAX_SAT_TARGET_OCCURRENCES, SatErrorVisitor, SatProblemMode, likeliest_error_sat_problem,
+        shortest_error_sat_problem,
     };
     use crate::{CircuitError, CircuitResult, DemTarget, DetectorErrorModel};
 
@@ -575,41 +558,6 @@ p wcnf 3 8 9
 9 -3 0
 9 1 0
 ";
-
-    #[test]
-    fn sat_effective_target_caps_are_independent_and_inclusive() {
-        assert!(
-            validate_sat_effective_target_counts(
-                MAX_SAT_EFFECTIVE_TARGET_COUNT,
-                MAX_SAT_EFFECTIVE_TARGET_COUNT,
-            )
-            .is_ok()
-        );
-
-        let detector_rejected = match validate_sat_effective_target_counts(
-            MAX_SAT_EFFECTIVE_TARGET_COUNT + 1,
-            MAX_SAT_EFFECTIVE_TARGET_COUNT,
-        ) {
-            Ok(()) => false,
-            Err(error) => {
-                assert!(error.to_string().contains("effective detector nodes"));
-                true
-            }
-        };
-        assert!(detector_rejected);
-
-        let observable_rejected = match validate_sat_effective_target_counts(
-            MAX_SAT_EFFECTIVE_TARGET_COUNT,
-            MAX_SAT_EFFECTIVE_TARGET_COUNT + 1,
-        ) {
-            Ok(()) => false,
-            Err(error) => {
-                assert!(error.to_string().contains("effective observable nodes"));
-                true
-            }
-        };
-        assert!(observable_rejected);
-    }
 
     fn dem(input: &str) -> CircuitResult<DetectorErrorModel> {
         DetectorErrorModel::from_dem_str(input)

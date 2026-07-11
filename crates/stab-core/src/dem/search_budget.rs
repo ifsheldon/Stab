@@ -10,11 +10,22 @@ const MAX_DEM_SEARCH_TRANSITIONS: u64 = 20_000_000;
 #[cfg(test)]
 const MAX_DEM_SEARCH_TRANSITIONS: u64 = 4_096;
 
+#[cfg(not(test))]
+const MAX_DEM_SEARCH_STATE_TERMS: usize = 65_536;
+#[cfg(test)]
+const MAX_DEM_SEARCH_STATE_TERMS: usize = 64;
+
+#[cfg(not(test))]
+const MAX_DEM_SEARCH_STORED_STATE_TERMS: usize = 5_000_000;
+#[cfg(test)]
+const MAX_DEM_SEARCH_STORED_STATE_TERMS: usize = 256;
+
 #[derive(Debug)]
 pub(super) struct SearchBudget {
     context: &'static str,
     states: usize,
     transitions: u64,
+    stored_state_terms: usize,
 }
 
 impl SearchBudget {
@@ -23,10 +34,28 @@ impl SearchBudget {
             context,
             states: 0,
             transitions: 0,
+            stored_state_terms: 0,
         }
     }
 
-    pub(super) fn admit_state(&mut self) -> CircuitResult<()> {
+    pub(super) fn preflight_state_terms(&self, state_terms: usize) -> CircuitResult<()> {
+        if state_terms > MAX_DEM_SEARCH_STATE_TERMS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "{} currently supports at most {MAX_DEM_SEARCH_STATE_TERMS} detector and observable terms per search state, got {state_terms}",
+                self.context
+            )));
+        }
+        Ok(())
+    }
+
+    pub(super) fn admit_state(
+        &mut self,
+        state_terms: usize,
+        predecessor_terms: usize,
+        queued: bool,
+    ) -> CircuitResult<()> {
+        self.preflight_state_terms(state_terms)?;
+        self.preflight_state_terms(predecessor_terms)?;
         let next = self.states.checked_add(1).ok_or_else(|| {
             CircuitError::invalid_detector_error_model(format!(
                 "{} search state count overflowed",
@@ -39,7 +68,33 @@ impl SearchBudget {
                 self.context
             )));
         }
+        let state_copies = if queued { 2 } else { 1 };
+        let added_state_terms = state_terms
+            .checked_mul(state_copies)
+            .and_then(|terms| terms.checked_add(predecessor_terms))
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{} stored search-state term count overflowed",
+                    self.context
+                ))
+            })?;
+        let stored_state_terms = self
+            .stored_state_terms
+            .checked_add(added_state_terms)
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "{} stored search-state term count overflowed",
+                    self.context
+                ))
+            })?;
+        if stored_state_terms > MAX_DEM_SEARCH_STORED_STATE_TERMS {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "{} currently supports at most {MAX_DEM_SEARCH_STORED_STATE_TERMS} stored detector and observable search-state terms, got at least {stored_state_terms}",
+                self.context
+            )));
+        }
         self.states = next;
+        self.stored_state_terms = stored_state_terms;
         Ok(())
     }
 
@@ -74,11 +129,13 @@ mod tests {
     fn search_budget_enforces_state_and_transition_limits() {
         let mut state_budget = SearchBudget::new("test");
         for _ in 0..MAX_DEM_SEARCH_STATES {
-            state_budget.admit_state().expect("state within limit");
+            state_budget
+                .admit_state(0, 0, false)
+                .expect("state within limit");
         }
         assert!(
             state_budget
-                .admit_state()
+                .admit_state(0, 0, false)
                 .expect_err("state beyond limit")
                 .to_string()
                 .contains("at most 64 search states")
@@ -96,6 +153,37 @@ mod tests {
                 .expect_err("transition beyond limit")
                 .to_string()
                 .contains("at most 4096 search transitions")
+        );
+    }
+
+    #[test]
+    fn search_budget_enforces_per_state_and_aggregate_payload_limits() {
+        let mut budget = SearchBudget::new("test");
+        assert!(
+            budget
+                .preflight_state_terms(MAX_DEM_SEARCH_STATE_TERMS)
+                .is_ok()
+        );
+        assert!(
+            budget
+                .preflight_state_terms(MAX_DEM_SEARCH_STATE_TERMS + 1)
+                .expect_err("state payload beyond limit")
+                .to_string()
+                .contains("at most 64 detector and observable terms per search state")
+        );
+
+        budget
+            .admit_state(MAX_DEM_SEARCH_STATE_TERMS, MAX_DEM_SEARCH_STATE_TERMS, true)
+            .expect("three bounded payload copies fit the aggregate limit");
+        budget
+            .admit_state(MAX_DEM_SEARCH_STATE_TERMS, 0, false)
+            .expect("aggregate boundary is inclusive");
+        assert!(
+            budget
+                .admit_state(1, 0, false)
+                .expect_err("aggregate state payload beyond limit")
+                .to_string()
+                .contains("at most 256 stored detector and observable search-state terms")
         );
     }
 }

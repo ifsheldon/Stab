@@ -312,6 +312,25 @@ fn pfm_b5_hypergraph_many_observables() {
 }
 
 #[test]
+fn pfm_b5_graphlike_zero_probability_diagnostics_match_stim() {
+    let model = dem("error(0) L0\n");
+    let graphlike = shortest_graphlike_undetectable_logical_error(&model, false)
+        .expect_err("zero-probability graphlike model has no logical error")
+        .to_string();
+    assert!(graphlike.contains("WARNING: NO GRAPHLIKE ERRORS"));
+    assert!(!graphlike.contains("WARNING: NO ERRORS"));
+}
+
+#[test]
+fn pfm_b5_hypergraph_zero_probability_diagnostics_match_stim() {
+    let model = dem("error(0) L0\n");
+    let hypergraph = find_undetectable_logical_error(&model, usize::MAX, usize::MAX, false)
+        .expect_err("zero-probability hypergraph model has no logical error")
+        .to_string();
+    assert!(!hypergraph.contains("WARNING: NO ERRORS"));
+}
+
+#[test]
 fn pfm_b5_wcnf_shortest_no_error() {
     assert_eq!(
         shortest_error_sat_problem(&DetectorErrorModel::new()).expect("WCNF"),
@@ -331,6 +350,15 @@ fn pfm_b5_wcnf_shortest_observable_only() {
 fn pfm_b5_wcnf_shortest_detector_only() {
     assert_eq!(
         shortest_error_sat_problem(&dem("error(0.1) D0\n")).expect("WCNF"),
+        UNSAT_WDIMACS
+    );
+}
+
+#[test]
+fn pfm_b5_wcnf_shortest_large_detector_only_is_unsat() {
+    let model = dem("repeat 100001 {\n    error(0.1) D0\n    shift_detectors 1\n}\n");
+    assert_eq!(
+        shortest_error_sat_problem(&model).expect("trivial detector-only WCNF"),
         UNSAT_WDIMACS
     );
 }
@@ -426,6 +454,15 @@ p wcnf 3 7 71
 71 -3 0
 71 1 0
 "
+    );
+}
+
+#[test]
+fn pfm_b5_wcnf_likeliest_low_quantization_header_matches_stim() {
+    assert_eq!(
+        likeliest_error_sat_problem(&dem("error(0.1) D0 L0\nerror(0.49) D0\n"), 1)
+            .expect("low-quantization WCNF"),
+        "p wcnf 3 8 9\n1 -1 0\n9 1 2 -3 0\n9 1 -2 3 0\n9 -1 2 3 0\n9 -1 -2 -3 0\n9 -3 0\n9 1 0\n"
     );
 }
 

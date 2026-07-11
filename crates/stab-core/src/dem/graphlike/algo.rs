@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, VecDeque, btree_map::Entry};
+use std::collections::{BTreeMap, VecDeque};
 
 use super::{Graph, ObservableMask, SearchState};
 use crate::dem::search_budget::SearchBudget;
@@ -20,17 +20,32 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
     let mut queue = VecDeque::new();
     let mut back_map = BTreeMap::new();
     let mut budget = SearchBudget::new("graphlike search");
-    budget.admit_state()?;
+    budget.admit_state(0, 0, false)?;
     back_map.insert(empty.clone(), empty.clone());
 
     for (source_index, node) in graph.nodes.iter().enumerate() {
         let source = graph.detector_for_node_index(source_index)?;
         for edge in &node.edges {
             if !edge.observables.is_empty() && edge.detector.is_none_or(|target| source < target) {
+                let start_terms = edge
+                    .observables
+                    .len()
+                    .checked_add(1)
+                    .and_then(|count| count.checked_add(usize::from(edge.detector.is_some())))
+                    .ok_or_else(|| {
+                        CircuitError::invalid_detector_error_model(
+                            "graphlike initial search state term count overflowed",
+                        )
+                    })?;
+                budget.preflight_state_terms(start_terms)?;
                 let start = SearchState::new(Some(source), edge.detector, edge.observables.clone());
-                if let Entry::Vacant(entry) = back_map.entry(start.clone()) {
-                    budget.admit_state()?;
-                    entry.insert(empty.clone());
+                if !back_map.contains_key(&start) {
+                    budget.admit_state(start_terms, 0, true)?;
+                    if back_map.insert(start.clone(), empty.clone()).is_some() {
+                        return Err(CircuitError::invalid_detector_error_model(
+                            "graphlike initial search state was inserted twice",
+                        ));
+                    }
                     queue.push_back(start);
                 }
             }
@@ -49,19 +64,36 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
                 "graphlike active detector is outside the graph",
             ));
         };
+        let current_terms = current.term_count()?;
         for edge in &node.edges {
             budget.record_transition()?;
+            let next_terms = edge
+                .observables
+                .symmetric_difference_len(&current.observables)
+                .checked_add(usize::from(edge.detector.is_some()))
+                .and_then(|count| count.checked_add(usize::from(current.detector_held.is_some())))
+                .ok_or_else(|| {
+                    CircuitError::invalid_detector_error_model(
+                        "graphlike next search state term count overflowed",
+                    )
+                })?;
+            budget.preflight_state_terms(next_terms)?;
             let mut next = SearchState::new(
                 edge.detector,
                 current.detector_held,
                 edge.observables.symmetric_difference(&current.observables),
             );
-            let Entry::Vacant(entry) = back_map.entry(next.clone()) else {
+            if back_map.contains_key(&next) {
                 continue;
-            };
-            budget.admit_state()?;
-            entry.insert(current.clone());
-            if next.is_undetected() {
+            }
+            let undetected = next.is_undetected();
+            budget.admit_state(next_terms, current_terms, !undetected)?;
+            if back_map.insert(next.clone(), current.clone()).is_some() {
+                return Err(CircuitError::invalid_detector_error_model(
+                    "graphlike search state was inserted twice",
+                ));
+            }
+            if undetected {
                 return backtrack_path(&back_map, &next);
             }
             if next.detector_active.is_none() {
@@ -131,7 +163,7 @@ fn no_graphlike_logical_error_message(
             "\n    WARNING: NO DETECTORS. The circuit or detector error model didn't define any detectors.",
         );
     }
-    if count_nonzero_error_instructions(model)? == 0 {
+    if model.count_errors()? == 0 {
         message.push_str(
             "\n    WARNING: NO ERRORS. The circuit or detector error model didn't include any errors, making it vacuously impossible to find a logical error.",
         );
@@ -145,36 +177,6 @@ fn no_graphlike_logical_error_message(
 
 fn graph_has_edges(graph: &Graph) -> bool {
     graph.nodes.iter().any(|node| !node.edges.is_empty())
-}
-
-fn count_nonzero_error_instructions(model: &DetectorErrorModel) -> CircuitResult<usize> {
-    let mut total = 0usize;
-    for item in model.items() {
-        let count = match item {
-            DemItem::Instruction(instruction) => usize::from(
-                instruction.kind() == crate::DemInstructionKind::Error
-                    && instruction.args().first().copied().unwrap_or(0.0) != 0.0,
-            ),
-            DemItem::RepeatBlock(repeat) => {
-                let repeat_count = usize::try_from(repeat.repeat_count().get()).map_err(|_| {
-                    CircuitError::invalid_detector_error_model(
-                        "repeat count does not fit usize while counting graphlike errors",
-                    )
-                })?;
-                repeat_count
-                    .checked_mul(count_nonzero_error_instructions(repeat.body())?)
-                    .ok_or_else(|| {
-                        CircuitError::invalid_detector_error_model(
-                            "graphlike error count overflowed",
-                        )
-                    })?
-            }
-        };
-        total = total.checked_add(count).ok_or_else(|| {
-            CircuitError::invalid_detector_error_model("graphlike error count overflowed")
-        })?;
-    }
-    Ok(total)
 }
 
 #[cfg(test)]
@@ -197,6 +199,40 @@ mod tests {
         let error = shortest_graphlike_undetectable_logical_error(&model, false)
             .expect_err("search state cap");
         assert!(error.to_string().contains("at most 64 search states"));
+    }
+
+    #[test]
+    fn graphlike_search_bounds_variable_state_payloads() {
+        let per_state = variable_payload_model(64, 2);
+        let error = shortest_graphlike_undetectable_logical_error(&per_state, false)
+            .expect_err("per-state payload cap");
+        assert!(
+            error
+                .to_string()
+                .contains("at most 64 detector and observable terms per search state")
+        );
+
+        let aggregate = variable_payload_model(60, 4);
+        let error = shortest_graphlike_undetectable_logical_error(&aggregate, false)
+            .expect_err("aggregate payload cap");
+        assert!(
+            error
+                .to_string()
+                .contains("at most 256 stored detector and observable search-state terms")
+        );
+    }
+
+    fn variable_payload_model(observables: usize, hops: usize) -> DetectorErrorModel {
+        let mut text = String::from("error(0.1) D0 D1");
+        for observable in 0..observables {
+            text.push_str(&format!(" L{observable}"));
+        }
+        text.push_str("\nerror(0.1) D0 D2\n");
+        for detector in 2..=hops {
+            text.push_str(&format!("error(0.1) D{detector} D{}\n", detector + 1));
+        }
+        text.push_str(&format!("error(0.1) D{}\nerror(0.1) D1\n", hops + 1));
+        DetectorErrorModel::from_dem_str(&text).expect("valid variable-payload model")
     }
 
     fn shortest(dem: &str) -> CircuitResult<String> {

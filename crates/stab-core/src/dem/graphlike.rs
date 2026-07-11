@@ -46,6 +46,16 @@ impl ObservableMask {
         Self { observables }
     }
 
+    fn symmetric_difference_len(&self, other: &Self) -> usize {
+        self.observables
+            .symmetric_difference(&other.observables)
+            .count()
+    }
+
+    fn len(&self) -> usize {
+        self.observables.len()
+    }
+
     fn toggle(&mut self, observable: DemObservableId) {
         if !self.observables.insert(observable) {
             self.observables.remove(&observable);
@@ -438,6 +448,18 @@ impl SearchState {
     pub(super) fn is_undetected(&self) -> bool {
         let canonical = self.canonical();
         canonical.detector_active.is_none() && canonical.detector_held.is_none()
+    }
+
+    pub(super) fn term_count(&self) -> CircuitResult<usize> {
+        self.observables
+            .len()
+            .checked_add(usize::from(self.detector_active.is_some()))
+            .and_then(|count| count.checked_add(usize::from(self.detector_held.is_some())))
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "graphlike search state term count overflowed",
+                )
+            })
     }
 
     pub(super) fn canonical(&self) -> Self {

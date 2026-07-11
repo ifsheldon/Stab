@@ -15,6 +15,11 @@ const MAX_DEM_SEARCH_ERROR_MECHANISMS: u64 = 5_000_000;
 #[cfg(test)]
 const MAX_DEM_SEARCH_ERROR_MECHANISMS: u64 = 10_000;
 
+#[cfg(not(test))]
+const MAX_DEM_SEARCH_ERROR_TARGET_OCCURRENCES: usize = 65_536;
+#[cfg(test)]
+const MAX_DEM_SEARCH_ERROR_TARGET_OCCURRENCES: usize = 128;
+
 pub(in crate::dem) fn search_graph_nonzero_error_targets(
     traversal: &FoldedDemTraversal<'_>,
     context: &'static str,
@@ -72,6 +77,13 @@ where
                 return Err(CircuitError::invalid_detector_error_model(format!(
                     "DEM {} currently supports at most {MAX_DEM_SEARCH_ERROR_MECHANISMS} expanded nonzero error mechanisms, got at least {}",
                     self.context, self.visited_error_mechanisms
+                )));
+            }
+            let target_occurrences = instruction.targets().len();
+            if target_occurrences > MAX_DEM_SEARCH_ERROR_TARGET_OCCURRENCES {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "DEM {} currently supports at most {MAX_DEM_SEARCH_ERROR_TARGET_OCCURRENCES} target occurrences per nonzero error mechanism, got {target_occurrences}",
+                    self.context
                 )));
             }
             (self.visit_error)(instruction, state.detector_offset())?;
@@ -352,5 +364,20 @@ mod tests {
         .to_string();
         assert!(error.contains("at most 2 effective detector nodes, got 3"));
         assert!(!error.contains("expanded nonzero error mechanisms"));
+    }
+
+    #[test]
+    fn search_traversal_rejects_large_error_target_lists_before_normalization() {
+        let mut text = String::from("error(0.1)");
+        for observable in 0..=MAX_DEM_SEARCH_ERROR_TARGET_OCCURRENCES {
+            text.push_str(&format!(" L{observable}"));
+        }
+        text.push('\n');
+        let model = DetectorErrorModel::from_dem_str(&text).unwrap();
+        let traversal = FoldedDemTraversal::new(&model).unwrap();
+        let error = visit_search_graph_errors(&traversal, "test search", |_, _| Ok(()))
+            .expect_err("target occurrence cap")
+            .to_string();
+        assert!(error.contains("at most 128 target occurrences per nonzero error mechanism"));
     }
 }
