@@ -178,7 +178,7 @@ Acceptance criteria:
 
 Objective: resolve both PFM3 entries by closing unsupported ambiguity across parser, measurement sampler, reference sampler, detection converter, detector frame, detection sampler, error analyzer, and flow-generator surfaces.
 
-Status: Contract groundwork is complete as of 2026-07-10 and recorded in `docs/plans/pfm-b2-gate-surface-contract-groundwork-report.md`. Final generated semantic execution, statistical evidence, oracle shards, and any production dispatch fixes remain pending after the shared B3, B4, B1, and B5 foundations stabilize.
+Status: Contract groundwork is complete as of 2026-07-10. Final semantic implementation and executable evidence landed in `f60ea17` and `e7a67a0`: 37 exact pinned subcases replace the original 18 semantic-family rollups as completion evidence, all 37 selectors and PF3 oracle rows pass, and the 165-case source ledger has no planned row. Clean committed-HEAD benchmark evidence, milestone audit, GPT-5.6/max review, and final PFM-B6 documentation rollup remain pending.
 
 Tasks:
 
@@ -201,7 +201,7 @@ Tests:
 - Accepted-target classification tests covering mixed classical-control groups plus Hermitian and anti-Hermitian Pauli-product groups.
 - Generated positive tests for each executable or no-op class and generated negative tests for each unsupported target role.
 - Exact deterministic comparisons for reference samples, detection conversion, and analyzer DEM output.
-- Statistical comparisons for stochastic MPP, MPAD, Pauli channels, depolarization, correlated errors, and heralded noise with source-owned shot counts, tolerances, and false-positive budgets.
+- Statistical comparisons for noisy MRX, MRY, and MR, stochastic MPP and MPAD, Pauli noise and channels, depolarization, correlated errors, and heralded noise with source-owned shot counts, exact bucket probabilities, tolerances, and false-positive budgets.
 - Cross-surface tests proving the same target-role pattern is accepted or rejected consistently wherever the contract says the surfaces share semantics.
 - Sweep ordering tests for `CX`, `CY`, `CZ`, `XCZ`, and `YCZ`, including the current classical-only no-op matrix and omitted all-false sweep behavior.
 - Maximum legal sweep-ID analyzer regression proving resource use is not proportional to sweep-index magnitude.
@@ -209,7 +209,7 @@ Tests:
 
 Oracle rows:
 
-- Replace broad `pf3-gate-semantic-execution` wording with generated contract shards grouped by gate family.
+- Replace broad `pf3-gate-semantic-execution` wording with 37 exact contract shards grouped by semantic family but split at every selected pinned test anchor.
 - Keep deterministic MPP, anti-Hermitian MPP rejection, deterministic MPAD, stochastic MPP, and stochastic MPAD evidence in separate ledger cases with exact, error-class, or statistical comparators as appropriate.
 - Keep `pf3-sweep-analyzer` as the complete selected analyzer sweep row and record that no unowned pinned subcase remains.
 - Use statistical rows only for genuinely probabilistic behavior.

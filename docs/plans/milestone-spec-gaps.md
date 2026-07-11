@@ -105,6 +105,20 @@ Resolution: Exact closure scope is selected by PFM-B2 in `docs/plans/non-deferre
 
 ## Resolved Entries
 
+## 2026-07-12 - PFM-B2: Semantic Rollups Versus Exact Upstream Provenance
+
+Status: Resolved
+
+Revealed by: final PFM-B2 ledger promotion after all 18 planned semantic-family tests passed.
+
+Current text: the PFM-B2 plan and progress report treated 18 gate-family records as the final independently selectable evidence set, while 11 records still used `test-family` provenance with 30 named pinned-Stim test anchors.
+
+Gap: the ledger validator correctly forbids promoting a test-family aggregation as implementation evidence. Relabeling each aggregation as one convenient test case would have discarded 19 selected upstream anchors, while weakening the validator would have violated PFM-B0's one-record-per-owned-subcase rule. The 18-row count therefore described semantic ownership but under-specified final provenance granularity.
+
+Proposed amendment: retain the 18 records as semantic-family rollups, split every additional named pinned anchor into an independently selectable case, and require exact Cargo selectors, direct oracle signatures, honest comparator classes, source-owned statistical plans where the upstream behavior is probabilistic, and no shared selectors.
+
+Resolution: eleven rollups are resolved to exact primary anchors and nineteen additional exact subcases bring PFM-B2 gate execution to 37 implemented cases. All 37 selectors are independent, all 37 PF3 oracle shards pass, thirteen statistical plans are shared between executable core tests and ledger validation, and the complete source ledger now has 165 cases with no planned row.
+
 ## 2026-07-07 - PFM3: Analyzer Sweep-Shape Boundary
 
 Status: Resolved
