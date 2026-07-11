@@ -8,10 +8,10 @@ use stab_core::{
     Circuit, CircuitError, CodeDistance, CompiledDetectionConverter, CompiledSampler,
     DetectionConversionOptions, DetectionObservableOutputMode, ErrorAnalyzerOptions, Flow, Gate,
     Probability, RepetitionCodeParams, RepetitionCodeTask, RoundCount, SampleFormat,
-    check_if_circuit_has_unsigned_stabilizer_flows, circuit_has_all_unsigned_stabilizer_flows,
-    circuit_to_detector_error_model, circuit_with_inlined_feedback,
-    convert_measurements_to_detection_events, generate_repetition_code_circuit,
-    measurement_record_count,
+    check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
+    circuit_has_all_unsigned_stabilizer_flows, circuit_to_detector_error_model,
+    circuit_with_inlined_feedback, convert_measurements_to_detection_events,
+    generate_repetition_code_circuit, measurement_record_count,
     result_formats::write_ptb64_records_checked,
     result_formats::{read_records, write_records},
     sample_detection_events, try_for_each_sampled_detection_event, write_detection_records,
@@ -58,6 +58,8 @@ const GATE_SEMANTIC_SURFACES_PER_GATE: usize = 3;
 const GATE_SEMANTIC_SPP_CASES: usize = 4;
 const GATE_SEMANTIC_SPP_SURFACES_PER_CASE: usize = 2;
 const GATE_SEMANTIC_SPP_ANALYZER_CASES: usize = 4;
+const GATE_SEMANTIC_EXTENDED_CASES: usize = 18;
+const GATE_SEMANTIC_EXTENDED_SURFACES_PER_CASE: usize = 6;
 const FEEDBACK_INLINE_MPP: &str = "RX 0\n\
                                   RY 1\n\
                                   RZ 2\n\
@@ -204,7 +206,9 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
         ("pf3-gate-semantic-wide", "stab_pf3_gate_semantic_contract") => Some((
             (GATE_SEMANTIC_FIXED_TABLEAU_GATES * GATE_SEMANTIC_SURFACES_PER_GATE
                 + GATE_SEMANTIC_SPP_CASES * GATE_SEMANTIC_SPP_SURFACES_PER_CASE
-                + GATE_SEMANTIC_SPP_ANALYZER_CASES) as f64,
+                + GATE_SEMANTIC_SPP_ANALYZER_CASES
+                + GATE_SEMANTIC_EXTENDED_CASES * GATE_SEMANTIC_EXTENDED_SURFACES_PER_CASE)
+                as f64,
             "surface-checks/s",
         )),
         ("m9-feedback-inline-mpp-batch", "stab_feedback_inline_mpp_transforms") => {
@@ -282,7 +286,7 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
             "report-only: Stab measures the Rust sweep-conditioned detection sampler using omitted all-false sweep bits for non-frame and frame-path workloads; no faithful pinned Stim CLI ratio is claimed for this partial PF3 surface",
         ),
         "pf3-gate-semantic-wide" => Some(
-            "report-only: Stab measures fixed-tableau gate execution contract coverage plus promoted supported Hermitian SPP/SPP_DAG sampler, detection-conversion, and analyzer checks without a faithful pinned Stim CLI timing ratio",
+            "report-only: Stab measures representative fixed-tableau, measurement, Pauli-product, stochastic-noise, annotation, classical-control, and repeat execution across sampler, reference, conversion, detection, analyzer, and flow paths without a faithful pinned Stim CLI timing ratio",
         ),
         _ => detecting_region_rows::compare_note(row_id)
             .or_else(|| missing_detector_rows::compare_note(row_id)),
@@ -486,6 +490,16 @@ fn run_gate_semantic_wide_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
     let circuits = fixed_tableau_gate_execution_circuits(&row.id)?;
     let spp_circuits = spp_gate_execution_circuits(&row.id)?;
     let spp_analyzer_circuits = spp_analyzer_execution_circuits(&row.id)?;
+    let extended_circuits = extended_gate_semantic_execution_circuits(&row.id)?;
+    if extended_circuits.len() != GATE_SEMANTIC_EXTENDED_CASES {
+        return Err(BenchError::StabRunner {
+            row_id: row.id.clone(),
+            message: format!(
+                "PF3 gate semantic benchmark expected {GATE_SEMANTIC_EXTENDED_CASES} extended cases but found {}",
+                extended_circuits.len()
+            ),
+        });
+    }
     Ok(vec![measure_stab_iterations(
         "stab_pf3_gate_semantic_contract",
         super::STAB_COMPARE_ITERATIONS,
@@ -546,6 +560,49 @@ fn run_gate_semantic_wide_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, Be
                 checked = checked.checked_add(1).ok_or_else(|| {
                     gate_semantic_count_overflow_error(row, "SPP analyzer checks")
                 })?;
+            }
+
+            for circuit in &extended_circuits {
+                let sampler = CompiledSampler::compile(circuit)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(sampler.sample_zero_one_with_seed(1, Some(29)));
+                black_box(sampler.reference_sample());
+
+                let converter = CompiledDetectionConverter::compile(
+                    circuit,
+                    DetectionConversionOptions {
+                        skip_reference_sample: false,
+                    },
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(converter.detector_count());
+
+                let detections = sample_detection_events(circuit, 1, Some(31))
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(detections.records.len());
+
+                let dem = circuit_to_detector_error_model(
+                    circuit,
+                    ErrorAnalyzerOptions {
+                        approximate_disjoint_errors_threshold: Some(
+                            Probability::try_new(1.0)
+                                .map_err(|error| stab_runner_error(&row.id, error))?,
+                        ),
+                        ..ErrorAnalyzerOptions::default()
+                    },
+                )
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(dem.items().len());
+
+                let flows = circuit_flow_generators(circuit)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                black_box(flows.len());
+
+                checked = checked
+                    .checked_add(GATE_SEMANTIC_EXTENDED_SURFACES_PER_CASE)
+                    .ok_or_else(|| {
+                        gate_semantic_count_overflow_error(row, "extended semantic checks")
+                    })?;
             }
             black_box(checked);
             Ok(())
@@ -958,6 +1015,32 @@ fn spp_analyzer_execution_circuits(row_id: &str) -> Result<Vec<Circuit>, BenchEr
         "SPP_DAG Z0\nS 0\nM 0\nDETECTOR rec[-1]\n",
         "SPP !Z0\nS 0\nM 0\nDETECTOR rec[-1]\n",
         "SPP X0\nH 0\nS_DAG 0\nH 0\nM 0\nDETECTOR rec[-1]\n",
+    ]
+    .into_iter()
+    .map(|text| parse_circuit(row_id, text))
+    .collect()
+}
+
+fn extended_gate_semantic_execution_circuits(row_id: &str) -> Result<Vec<Circuit>, BenchError> {
+    [
+        "X 0\nMR(0.05) !0\nM 0\nDETECTOR rec[-1]\n",
+        "R 0 1\nMZZ 0 1\nDETECTOR rec[-1]\n",
+        "R 0\nMPP(0.05) Z0\nDETECTOR rec[-1]\n",
+        "MPAD(0.05) 0\nDETECTOR rec[-1]\n",
+        "R 0\nX_ERROR(0.01) 0\nM 0\nDETECTOR rec[-1]\n",
+        "R 0\nPAULI_CHANNEL_1(0.01,0.02,0.03) 0\nM 0\nDETECTOR rec[-1]\n",
+        "R 0 1\nPAULI_CHANNEL_2(0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001) 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0 1\nI_ERROR(0.5) 0\nII_ERROR(0.5) 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0\nDEPOLARIZE1(0.01) 0\nM 0\nDETECTOR rec[-1]\n",
+        "R 0 1\nDEPOLARIZE2(0.01) 0 1\nM 0 1\nDETECTOR rec[-1] rec[-2]\n",
+        "R 0\nE(0.01) X0\nELSE_CORRELATED_ERROR(0.02) Y0\nM 0\nDETECTOR rec[-1]\n",
+        "HERALDED_ERASE(0.01) 0\nDETECTOR rec[-1]\n",
+        "HERALDED_PAULI_CHANNEL_1(0.01,0.01,0.01,0.01) 0\nDETECTOR rec[-1]\n",
+        "QUBIT_COORDS(1,2) 0\nM 0\nDETECTOR(3) rec[-1]\nSHIFT_COORDS(4)\n",
+        "MPAD 1\nCX rec[-1] 0\nM 0\nDETECTOR rec[-1]\n",
+        "MPAD 1\nXCZ 0 rec[-1]\nM 0\nDETECTOR rec[-1]\n",
+        "MPAD 0 0\nCZ rec[-1] rec[-2]\nM 0\nDETECTOR rec[-1]\n",
+        "REPEAT 2 {\n    H 0\n    H 0\n}\nM 0\nDETECTOR rec[-1]\n",
     ]
     .into_iter()
     .map(|text| parse_circuit(row_id, text))
