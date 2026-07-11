@@ -302,30 +302,20 @@ impl Graph {
             SearchGraphTargetPolicy::Hypergraph { max_weight },
             MAX_FULL_DEM_SEARCH_GRAPH_NODES,
         )?;
-        let mut graph = if full_detector_count <= MAX_FULL_DEM_SEARCH_GRAPH_NODES as u64 {
-            let node_count = usize::try_from(full_detector_count).map_err(|_| {
-                CircuitError::invalid_detector_error_model("detector count does not fit usize")
-            })?;
-            let num_observables = usize::try_from(full_observable_count).map_err(|_| {
-                CircuitError::invalid_detector_error_model("observable count does not fit usize")
-            })?;
-            Self::try_new(node_count, num_observables)?
-        } else {
-            let effective_detector_count = effective_detectors.len();
-            if effective_detector_count > MAX_FULL_DEM_SEARCH_GRAPH_NODES {
-                return Err(CircuitError::invalid_detector_error_model(format!(
-                    "hypergraph search currently supports at most {MAX_FULL_DEM_SEARCH_GRAPH_NODES} effective detector nodes, got {effective_detector_count}"
-                )));
-            }
-            let num_observables = usize::try_from(full_observable_count).map_err(|_| {
-                CircuitError::invalid_detector_error_model("observable count does not fit usize")
-            })?;
-            Self::try_new_sparse(
-                effective_detectors,
-                num_observables,
-                full_detector_count > 0,
-            )?
-        };
+        let effective_detector_count = effective_detectors.len();
+        if effective_detector_count > MAX_FULL_DEM_SEARCH_GRAPH_NODES {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "hypergraph search currently supports at most {MAX_FULL_DEM_SEARCH_GRAPH_NODES} effective detector nodes, got {effective_detector_count}"
+            )));
+        }
+        let num_observables = usize::try_from(full_observable_count).map_err(|_| {
+            CircuitError::invalid_detector_error_model("observable count does not fit usize")
+        })?;
+        let mut graph = Self::try_new_sparse(
+            effective_detectors,
+            num_observables,
+            full_detector_count > 0,
+        )?;
         visit_search_graph_errors(
             &traversal,
             "hypergraph search",
@@ -674,6 +664,14 @@ mod tests {
         Edge::new(detector_set(detectors), obs_mask(observables))
     }
 
+    fn sparse_graph(detectors: &[u64], nodes: Vec<Node>, num_observables: usize) -> Graph {
+        let mut graph =
+            Graph::try_new_sparse(detector_set(detectors), num_observables, true).unwrap();
+        assert_eq!(graph.nodes.len(), nodes.len());
+        graph.nodes = nodes;
+        graph
+    }
+
     fn state(detectors: &[u64], observables: u64) -> SearchState {
         SearchState::new(detector_set(detectors), obs_mask(observables))
     }
@@ -865,58 +863,44 @@ mod tests {
 
         assert_eq!(
             Graph::from_dem(&dem, usize::MAX).unwrap(),
-            Graph::from_parts(
+            sparse_graph(
+                &[0, 1, 2, 3, 5, 6, 7],
                 vec![
                     Node::new(vec![edge(&[0], 0), edge(&[0, 1], 0)]),
                     Node::new(vec![edge(&[0, 1], 0), edge(&[1, 2], 0)]),
                     Node::new(vec![edge(&[1, 2], 0), edge(&[2, 3], 0)]),
                     Node::new(vec![edge(&[2, 3], 0), edge(&[3], 128)]),
-                    Node::default(),
                     Node::new(vec![edge(&[5, 6, 7], 4)]),
                     Node::new(vec![edge(&[5, 6, 7], 4)]),
                     Node::new(vec![edge(&[5, 6, 7], 4)]),
-                    Node::default(),
                 ],
                 8,
-                obs_mask(0),
             )
         );
 
         assert_eq!(
             Graph::from_dem(&dem, 2).unwrap(),
-            Graph::from_parts(
+            sparse_graph(
+                &[0, 1, 2, 3],
                 vec![
                     Node::new(vec![edge(&[0], 0), edge(&[0, 1], 0)]),
                     Node::new(vec![edge(&[0, 1], 0), edge(&[1, 2], 0)]),
                     Node::new(vec![edge(&[1, 2], 0), edge(&[2, 3], 0)]),
                     Node::new(vec![edge(&[2, 3], 0), edge(&[3], 128)]),
-                    Node::default(),
-                    Node::default(),
-                    Node::default(),
-                    Node::default(),
-                    Node::default(),
                 ],
                 8,
-                obs_mask(0),
             )
         );
 
         assert_eq!(
             Graph::from_dem(&dem, 1).unwrap(),
-            Graph::from_parts(
+            sparse_graph(
+                &[0, 3],
                 vec![
                     Node::new(vec![edge(&[0], 0)]),
-                    Node::default(),
-                    Node::default(),
                     Node::new(vec![edge(&[3], 128)]),
-                    Node::default(),
-                    Node::default(),
-                    Node::default(),
-                    Node::default(),
-                    Node::default(),
                 ],
                 8,
-                obs_mask(0),
             )
         );
     }

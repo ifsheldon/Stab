@@ -379,30 +379,20 @@ impl Graph {
             },
             MAX_FULL_DEM_SEARCH_GRAPH_NODES,
         )?;
-        let mut graph = if full_detector_count <= MAX_FULL_DEM_SEARCH_GRAPH_NODES as u64 {
-            let node_count = usize::try_from(full_detector_count).map_err(|_| {
-                CircuitError::invalid_detector_error_model("detector count does not fit usize")
-            })?;
-            let num_observables = usize::try_from(full_observable_count).map_err(|_| {
-                CircuitError::invalid_detector_error_model("observable count does not fit usize")
-            })?;
-            Self::try_new(node_count, num_observables)?
-        } else {
-            let effective_detector_count = effective_detectors.len();
-            if effective_detector_count > MAX_FULL_DEM_SEARCH_GRAPH_NODES {
-                return Err(CircuitError::invalid_detector_error_model(format!(
-                    "graphlike search currently supports at most {MAX_FULL_DEM_SEARCH_GRAPH_NODES} effective detector nodes, got {effective_detector_count}"
-                )));
-            }
-            let num_observables = usize::try_from(full_observable_count).map_err(|_| {
-                CircuitError::invalid_detector_error_model("observable count does not fit usize")
-            })?;
-            Self::try_new_sparse(
-                effective_detectors,
-                num_observables,
-                full_detector_count > 0,
-            )?
-        };
+        let effective_detector_count = effective_detectors.len();
+        if effective_detector_count > MAX_FULL_DEM_SEARCH_GRAPH_NODES {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "graphlike search currently supports at most {MAX_FULL_DEM_SEARCH_GRAPH_NODES} effective detector nodes, got {effective_detector_count}"
+            )));
+        }
+        let num_observables = usize::try_from(full_observable_count).map_err(|_| {
+            CircuitError::invalid_detector_error_model("observable count does not fit usize")
+        })?;
+        let mut graph = Self::try_new_sparse(
+            effective_detectors,
+            num_observables,
+            full_detector_count > 0,
+        )?;
         visit_search_graph_errors(
             &traversal,
             "graphlike search",
@@ -589,6 +579,18 @@ mod tests {
             }
         }
         ObservableMask { observables }
+    }
+
+    fn sparse_graph(detectors: &[u64], nodes: Vec<Node>, num_observables: usize) -> Graph {
+        let mut graph = Graph::try_new_sparse(
+            detectors.iter().copied().map(detector).collect(),
+            num_observables,
+            true,
+        )
+        .unwrap();
+        assert_eq!(graph.nodes.len(), nodes.len());
+        graph.nodes = nodes;
+        graph
     }
 
     fn state(active: Option<u64>, held: Option<u64>, observables: u64) -> SearchState {
@@ -911,7 +913,8 @@ mod tests {
 
         assert_eq!(
             Graph::from_dem(&model, false).unwrap(),
-            Graph::from_parts(
+            sparse_graph(
+                &[0, 1, 2, 3, 5, 6, 7],
                 vec![
                     Node::new(vec![
                         Edge::new(None, obs_mask(0)),
@@ -929,14 +932,11 @@ mod tests {
                         Edge::new(Some(detector(2)), obs_mask(0)),
                         Edge::new(None, obs_mask(128)),
                     ]),
-                    Node::default(),
                     Node::new(vec![Edge::new(None, obs_mask(0))]),
                     Node::new(vec![Edge::new(Some(detector(7)), obs_mask(4))]),
                     Node::new(vec![Edge::new(Some(detector(6)), obs_mask(4))]),
-                    Node::default(),
                 ],
                 8,
-                obs_mask(0),
             )
         );
     }

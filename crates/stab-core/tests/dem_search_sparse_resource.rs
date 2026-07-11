@@ -6,8 +6,32 @@
 
 use stab_core::{
     DetectorErrorModel, find_undetectable_logical_error, likeliest_error_sat_problem,
-    shortest_graphlike_undetectable_logical_error,
+    shortest_error_sat_problem, shortest_graphlike_undetectable_logical_error,
 };
+
+const TWO_ERROR_UNWEIGHTED_WDIMACS: &str = "\
+p wcnf 3 8 9
+1 -1 0
+9 1 2 -3 0
+9 1 -2 3 0
+9 -1 2 3 0
+9 -1 -2 -3 0
+1 -2 0
+9 -3 0
+9 1 0
+";
+
+const TWO_ERROR_WEIGHTED_WDIMACS: &str = "\
+p wcnf 3 8 81
+10 -1 0
+81 1 2 -3 0
+81 1 -2 3 0
+81 -1 2 3 0
+81 -1 -2 -3 0
+10 -2 0
+81 -3 0
+81 1 0
+";
 
 fn sparse_high_detector_model() -> DetectorErrorModel {
     DetectorErrorModel::from_dem_str(
@@ -62,6 +86,26 @@ repeat 1000001 {
 error(0.1) D0
 error(0.1) D0 D1 D2 D2 L0
 error(0.1) D1
+",
+    )
+    .unwrap()
+}
+
+fn sparse_high_observable_model() -> DetectorErrorModel {
+    DetectorErrorModel::from_dem_str(
+        "\
+error(0.1) D0 L1000001
+error(0.1) D0
+",
+    )
+    .unwrap()
+}
+
+fn sparse_sat_high_detector_model() -> DetectorErrorModel {
+    DetectorErrorModel::from_dem_str(
+        "\
+error(0.1) D1000001 L0
+error(0.1) D1000001
 ",
     )
     .unwrap()
@@ -129,16 +173,20 @@ fn pf6_search_sparse_high_detectors_hypergraph_uses_toggled_degree() {
 }
 
 #[test]
-fn pf6_search_sparse_high_detectors_keeps_sat_dense_cap() {
-    let sat_error = likeliest_error_sat_problem(&sparse_high_detector_model(), 10)
-        .expect_err("SAT uses dense target vectors and should keep the documented cap")
-        .to_string();
-    assert!(
-        sat_error.contains(
-            "SAT problem generation currently supports at most 1000000 effective detector nodes"
-        ),
-        "{sat_error}"
-    );
+fn pf6_search_sparse_high_targets_sat_compresses_ids() {
+    for model in [
+        sparse_sat_high_detector_model(),
+        sparse_high_observable_model(),
+    ] {
+        assert_eq!(
+            shortest_error_sat_problem(&model).expect("shortest WCNF"),
+            TWO_ERROR_UNWEIGHTED_WDIMACS
+        );
+        assert_eq!(
+            likeliest_error_sat_problem(&model, 10).expect("weighted WCNF"),
+            TWO_ERROR_WEIGHTED_WDIMACS
+        );
+    }
 }
 
 #[test]

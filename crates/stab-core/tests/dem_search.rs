@@ -98,14 +98,12 @@ fn pf4_dem_search_skips_zero_probability_repeat_bodies() {
         expected
     );
 
-    let sat_error = shortest_error_sat_problem(&zero_repeat)
-        .expect_err("unweighted SAT should keep high-index structural zero-probability caps")
-        .to_string();
-    assert!(
-        sat_error.contains(
-            "SAT problem generation currently supports at most 1000000 effective detector nodes"
-        ),
-        "{sat_error}"
+    let compact_structural =
+        DetectorErrorModel::from_dem_str("error(0) D1 L1\nerror(0.1) D0\nerror(0.1) D0 L0\n")
+            .unwrap();
+    assert_eq!(
+        shortest_error_sat_problem(&zero_repeat).unwrap(),
+        shortest_error_sat_problem(&compact_structural).unwrap()
     );
 }
 
@@ -617,20 +615,16 @@ fn assert_nonzero_shift_search_repeat_rejected() {
 }
 
 #[test]
-fn pf4_dem_search_weighted_sat_rejects_shifted_zero_probability_repeat_node_explosion() {
+fn pf4_dem_search_weighted_sat_skips_shifted_zero_probability_repeat() {
     let hostile = DetectorErrorModel::from_dem_str(
         "repeat 1000001 {\n    error(0) D0\n    shift_detectors 1\n}\nerror(0.1) D0\nerror(0.1) D0 L0\n",
     )
     .unwrap();
 
-    let sat_error = likeliest_error_sat_problem(&hostile, 10)
-        .expect_err("weighted SAT should reject huge shifted dense detector allocation")
-        .to_string();
-    assert!(
-        sat_error.contains(
-            "SAT problem generation currently supports at most 1000000 effective detector nodes"
-        ),
-        "{sat_error}"
+    let compact = DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D0 L0\n").unwrap();
+    assert_eq!(
+        likeliest_error_sat_problem(&hostile, 10).unwrap(),
+        likeliest_error_sat_problem(&compact, 10).unwrap()
     );
 }
 

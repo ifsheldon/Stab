@@ -1,7 +1,8 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::ControlFlow;
 
 use super::{
-    DemInstruction, DemInstructionKind, DemObservableId, DemRepeatBlock, DemTarget,
+    DemDetectorId, DemInstruction, DemInstructionKind, DemObservableId, DemRepeatBlock, DemTarget,
     DetectorErrorModel, MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS, MAX_DEM_FLATTEN_REPEAT_ITERATIONS,
     MAX_DEM_FLATTEN_REPEAT_UNROLL,
     traversal::{
@@ -12,7 +13,7 @@ use super::{
 use crate::{CircuitError, CircuitResult};
 
 const UNSAT_WDIMACS: &str = "p wcnf 1 2 3\n3 -1 0\n3 1 0\n";
-const MAX_SAT_DENSE_TARGET_COUNT: u64 = 1_000_000;
+const MAX_SAT_EFFECTIVE_TARGET_COUNT: usize = 1_000_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SatProblemMode {
@@ -270,6 +271,69 @@ struct FlattenedError {
     targets: Vec<DemTarget>,
 }
 
+#[derive(Clone, Debug)]
+struct SatTargetIndex {
+    detector_to_slot: BTreeMap<DemDetectorId, usize>,
+    observable_to_slot: BTreeMap<DemObservableId, usize>,
+}
+
+impl SatTargetIndex {
+    fn from_errors(errors: &[FlattenedError]) -> CircuitResult<Self> {
+        let mut detectors = BTreeSet::new();
+        let mut observables = BTreeSet::new();
+        for error in errors {
+            for target in &error.targets {
+                match *target {
+                    DemTarget::RelativeDetector(detector) => {
+                        detectors.insert(detector);
+                    }
+                    DemTarget::LogicalObservable(observable) => {
+                        observables.insert(observable);
+                    }
+                    DemTarget::Separator | DemTarget::Numeric(_) => {}
+                }
+            }
+        }
+        validate_sat_effective_target_counts(detectors.len(), observables.len())?;
+        Ok(Self {
+            detector_to_slot: detectors
+                .into_iter()
+                .enumerate()
+                .map(|(slot, detector)| (detector, slot))
+                .collect(),
+            observable_to_slot: observables
+                .into_iter()
+                .enumerate()
+                .map(|(slot, observable)| (observable, slot))
+                .collect(),
+        })
+    }
+
+    fn detector_slot(&self, detector: DemDetectorId) -> CircuitResult<usize> {
+        self.detector_to_slot
+            .get(&detector)
+            .copied()
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "SAT detector target D{} has no compressed slot",
+                    detector.get()
+                ))
+            })
+    }
+
+    fn observable_slot(&self, observable: DemObservableId) -> CircuitResult<usize> {
+        self.observable_to_slot
+            .get(&observable)
+            .copied()
+            .ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(format!(
+                    "SAT observable target L{} has no compressed slot",
+                    observable.get()
+                ))
+            })
+    }
+}
+
 pub fn shortest_error_sat_problem(model: &DetectorErrorModel) -> CircuitResult<String> {
     sat_problem_as_wcnf_string(model, SatProblemMode::Unweighted)
 }
@@ -294,26 +358,18 @@ fn sat_problem_as_wcnf_string(
     if errors.is_empty() {
         return Ok(UNSAT_WDIMACS.to_string());
     }
-    let (detector_count, observable_count) = flattened_error_target_counts(&errors)?;
-    if observable_count == 0 {
+    let target_index = SatTargetIndex::from_errors(&errors)?;
+    if target_index.observable_to_slot.is_empty() {
         return Ok(UNSAT_WDIMACS.to_string());
     }
-    validate_sat_dense_target_counts(detector_count, observable_count)?;
-
-    let num_observables = usize::try_from(observable_count).map_err(|_| {
-        CircuitError::invalid_detector_error_model("observable count does not fit usize")
-    })?;
-    let num_detectors = usize::try_from(detector_count).map_err(|_| {
-        CircuitError::invalid_detector_error_model("detector count does not fit usize")
-    })?;
     let mut instance = MaxSatInstance::default();
     let mut errors_activated = Vec::with_capacity(errors.len());
     for _ in &errors {
         errors_activated.push(instance.new_bool()?);
     }
 
-    let mut detectors_activated = vec![BoolRef::false_ref(); num_detectors];
-    let mut observables_flipped = vec![BoolRef::false_ref(); num_observables];
+    let mut detectors_activated = vec![BoolRef::false_ref(); target_index.detector_to_slot.len()];
+    let mut observables_flipped = vec![BoolRef::false_ref(); target_index.observable_to_slot.len()];
     for (error_index, error) in errors.iter().enumerate() {
         let error_ref = errors_activated
             .get(error_index)
@@ -323,6 +379,7 @@ fn sat_problem_as_wcnf_string(
             &mut instance,
             error_ref,
             &error.targets,
+            &target_index,
             &mut detectors_activated,
             &mut observables_flipped,
         )?;
@@ -343,18 +400,18 @@ fn sat_problem_as_wcnf_string(
     instance.to_wdimacs(mode)
 }
 
-fn validate_sat_dense_target_counts(
-    detector_count: u64,
-    observable_count: u64,
+fn validate_sat_effective_target_counts(
+    detector_count: usize,
+    observable_count: usize,
 ) -> CircuitResult<()> {
-    if detector_count > MAX_SAT_DENSE_TARGET_COUNT {
+    if detector_count > MAX_SAT_EFFECTIVE_TARGET_COUNT {
         return Err(CircuitError::invalid_detector_error_model(format!(
-            "SAT problem generation currently supports at most {MAX_SAT_DENSE_TARGET_COUNT} effective detector nodes, got {detector_count}"
+            "SAT problem generation currently supports at most {MAX_SAT_EFFECTIVE_TARGET_COUNT} effective detector nodes, got {detector_count}"
         )));
     }
-    if observable_count > MAX_SAT_DENSE_TARGET_COUNT {
+    if observable_count > MAX_SAT_EFFECTIVE_TARGET_COUNT {
         return Err(CircuitError::invalid_detector_error_model(format!(
-            "SAT problem generation currently supports at most {MAX_SAT_DENSE_TARGET_COUNT} effective observable nodes, got {observable_count}"
+            "SAT problem generation currently supports at most {MAX_SAT_EFFECTIVE_TARGET_COUNT} effective observable nodes, got {observable_count}"
         )));
     }
     Ok(())
@@ -364,13 +421,14 @@ fn add_error_parity_terms(
     instance: &mut MaxSatInstance,
     error_ref: BoolRef,
     targets: &[DemTarget],
+    target_index: &SatTargetIndex,
     detectors_activated: &mut [BoolRef],
     observables_flipped: &mut [BoolRef],
 ) -> CircuitResult<()> {
     for target in targets {
         match *target {
             DemTarget::RelativeDetector(detector) => {
-                let index = dem_detector_index(detector)?;
+                let index = target_index.detector_slot(detector)?;
                 let current = detectors_activated.get(index).copied().ok_or_else(|| {
                     CircuitError::invalid_detector_error_model(format!(
                         "SAT detector target D{} is outside the detector vector",
@@ -387,7 +445,7 @@ fn add_error_parity_terms(
                 *slot = next;
             }
             DemTarget::LogicalObservable(observable) => {
-                let index = dem_observable_index(observable)?;
+                let index = target_index.observable_slot(observable)?;
                 let current = observables_flipped.get(index).copied().ok_or_else(|| {
                     CircuitError::invalid_detector_error_model(format!(
                         "SAT observable target L{} is outside the observable vector",
@@ -554,53 +612,6 @@ impl FoldedDemVisitor for SatErrorVisitor<'_> {
     }
 }
 
-fn flattened_error_target_counts(errors: &[FlattenedError]) -> CircuitResult<(u64, u64)> {
-    let mut detector_count = 0_u64;
-    let mut observable_count = 0_u64;
-    for error in errors {
-        for target in &error.targets {
-            match *target {
-                DemTarget::RelativeDetector(detector) => {
-                    detector_count =
-                        detector_count.max(detector.get().checked_add(1).ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(
-                                "SAT detector count overflowed",
-                            )
-                        })?);
-                }
-                DemTarget::LogicalObservable(observable) => {
-                    observable_count =
-                        observable_count.max(observable.get().checked_add(1).ok_or_else(|| {
-                            CircuitError::invalid_detector_error_model(
-                                "SAT observable count overflowed",
-                            )
-                        })?);
-                }
-                DemTarget::Separator | DemTarget::Numeric(_) => {}
-            }
-        }
-    }
-    Ok((detector_count, observable_count))
-}
-
-fn dem_detector_index(detector: super::DemDetectorId) -> CircuitResult<usize> {
-    usize::try_from(detector.get()).map_err(|_| {
-        CircuitError::invalid_detector_error_model(format!(
-            "SAT detector target D{} does not fit usize",
-            detector.get()
-        ))
-    })
-}
-
-fn dem_observable_index(observable: DemObservableId) -> CircuitResult<usize> {
-    usize::try_from(observable.get()).map_err(|_| {
-        CircuitError::invalid_detector_error_model(format!(
-            "SAT observable target L{} does not fit usize",
-            observable.get()
-        ))
-    })
-}
-
 fn rounded_nonnegative_usize(value: f64) -> CircuitResult<usize> {
     if !value.is_finite() || value < 0.0 {
         return Err(CircuitError::invalid_detector_error_model(
@@ -764,7 +775,7 @@ error(0.1) D0 L0
     }
 
     #[test]
-    fn sat_problem_likeliest_rejects_shifted_zero_probability_repeat_node_explosion()
+    fn sat_problem_likeliest_skips_shifted_zero_probability_repeat_without_dense_allocation()
     -> CircuitResult<()> {
         let model = dem("\
 repeat 1000001 {
@@ -774,36 +785,18 @@ repeat 1000001 {
 error(0.1) D0
 error(0.1) D0 L0
 ")?;
-        let error = match likeliest_error_sat_problem(&model, 10) {
-            Ok(_) => {
-                return Err(CircuitError::invalid_detector_error_model(
-                    "weighted SAT unexpectedly accepted huge shifted dense detector allocation",
-                ));
-            }
-            Err(error) => error.to_string(),
-        };
-        assert!(
-            error.contains(
-                "SAT problem generation currently supports at most 1000000 effective detector nodes"
-            ),
-            "{error}"
+        assert_eq!(
+            likeliest_error_sat_problem(&model, 10)?,
+            likeliest_error_sat_problem(&dem("error(0.1) D0\nerror(0.1) D0 L0\n")?, 10)?
         );
         Ok(())
     }
 
     #[test]
-    fn sat_problem_likeliest_rejects_huge_dense_observable_vector() -> CircuitResult<()> {
-        let error = match likeliest_error_sat_problem(&dem("error(0.1) L1000001\n")?, 10) {
-            Ok(_) => {
-                return Err(CircuitError::invalid_detector_error_model(
-                    "weighted SAT unexpectedly accepted huge dense observable allocation",
-                ));
-            }
-            Err(error) => error.to_string(),
-        };
-        assert!(
-            error.contains("SAT problem generation currently supports at most 1000000 effective observable nodes"),
-            "{error}"
+    fn sat_problem_likeliest_compresses_sparse_observable_ids() -> CircuitResult<()> {
+        assert_eq!(
+            likeliest_error_sat_problem(&dem("error(0.1) L1000001\n")?, 10)?,
+            likeliest_error_sat_problem(&dem("error(0.1) L0\n")?, 10)?
         );
         Ok(())
     }
