@@ -76,7 +76,7 @@ The bounded fallback remains subject to its existing repeat-count, repeat-iterat
 
 Graphlike and hypergraph traversal count expanded nonzero error mechanisms separately from annotations, reject more than 5,000,000 such mechanisms in production, cap each mechanism at 65,536 source target occurrences, and cap aggregate source-target work at 20,000,000 occurrences.
 Graphlike and hypergraph construction independently cap effective touched detector nodes at 1,000,000.
-Graphlike and hypergraph construction cap unique edges at 1,000,000 and persistent detector, observable, edge-index, and adjacency terms at 20,000,000; graphlike edge lookup and hypergraph edge-incidence lookup use ordered indexes instead of linear scans.
+Graphlike and hypergraph construction cap unique edges at 5,000,000 and persistent detector, observable, edge-index, and adjacency terms at 20,000,000; graphlike edge lookup and hypergraph edge-incidence lookup use ordered indexes instead of linear scans. The five-million edge ceiling preserves the selected generated d11/r1000 workload that exposed the original one-million ceiling as too strict.
 Both searches cap unique states at 1,000,000 and attempted transitions at 20,000,000 in production.
 Each search state is capped at 65,536 detector and observable terms, and aggregate persisted map, predecessor, and queue copies are capped at 5,000,000 terms.
 Hypergraph construction caps an explored edge at 4,096 detector symptoms and total edge incidences at 5,000,000 while storing each unique edge once in an arena.

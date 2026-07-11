@@ -21,7 +21,7 @@ const MAX_DEM_SEARCH_STORED_STATE_TERMS: usize = 5_000_000;
 const MAX_DEM_SEARCH_STORED_STATE_TERMS: usize = 256;
 
 #[cfg(not(test))]
-const MAX_DEM_SEARCH_GRAPH_EDGES: usize = 1_000_000;
+const MAX_DEM_SEARCH_GRAPH_EDGES: usize = 5_000_000;
 #[cfg(test)]
 const MAX_DEM_SEARCH_GRAPH_EDGES: usize = 64;
 
