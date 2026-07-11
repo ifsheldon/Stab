@@ -239,7 +239,7 @@ src/stim/search/sat/wcnf.test.cc
 Small features:
 
 - Graphlike and hypergraph search nodes, edges, graph construction, search-state transitions, logical-error search, and WCNF/SAT problem output.
-- Current PFM-B5 closure is executable in `crates/stab-core/tests/dem_search_pfm_b5.rs`: seven graphlike cases, eight hypergraph cases, and ten exact shortest or weighted WDIMACS cases port the selected `algo.test.cc` and `wcnf.test.cc` behavior with independent selectors. Generated tie-sensitive results use minimum-distance and canonical target-signature invariants; deterministic direct results and WCNF text use exact assertions.
+- Current PFM-B5 closure covers nine graphlike, ten hypergraph, and twelve selected exact shortest or weighted WDIMACS ledger cases through `crates/stab-core/tests/dem_search_pfm_b5.rs` and focused graphlike or hypergraph unit regressions. Generated tie-sensitive results use minimum-distance and canonical target-signature invariants; deterministic direct results and finite WCNF text use exact assertions, including Stim's stored-clause header for a low-quantization clause whose output line is omitted. Resource tests independently cross mechanism, per-error target-list, touched-node, search-state, transition, per-state term, aggregate stored-term, hyperedge-degree, edge-incidence, SAT total-target, clause, literal, and output admission boundaries; sparse-ID and large folded-repeat WCNF compression intentionally prove semantic equivalence instead of universal byte identity.
 
 ### Simulators
 
@@ -262,7 +262,7 @@ src/stim/simulators/vector_simulator.test.cc
 Small features:
 
 - Frame simulation, frame-simulator detection-output helpers, Pauli-target observable include behavior, tableau simulation, vector simulation, graph simulation, error analysis, error matching, DEM sampling, measurement-to-detection conversion, matched errors, and sparse reverse-frame tracking.
-- Current PFM-B5 analyzer closure is executable in `crates/stab-core/tests/dem_analyzer_pfm_b5.rs` plus the existing giant-loop tests. It ports nested, coordinate, gauge, generated repetition-code, loop-carried observable, period-8, period-127, and cross-iteration rejection behavior and adds sixteen seeded folded-versus-unrolled loops plus one nested coordinate differential case.
+- Current PFM-B5 analyzer closure is executable in `crates/stab-core/tests/dem_analyzer_pfm_b5.rs`, focused analyzer unit tests, and the existing giant-loop tests. It ports nested, coordinate, ordinary gauge, nested billion-round gauge, generated repetition-code, loop-carried observable, period-8, period-127, saturating-diagnostic, folded noisy `MPAD`, cumulative nested-probe admission, inclusive sixteen-detector local-decomposition, separate seventeen-detector rejection, and cross-iteration rejection behavior and adds sixteen seeded folded-versus-unrolled loops plus one nested coordinate differential case. Direct CLI rows bind fixture content and all PFM-B5 ledger selectors resolve one exact Rust test.
 - Current M12 graph/vector coverage lives in `crates/stab-core/tests/simulator_cross_checks.rs` as scoped tableau and amplitude semantic checks adapted from `graph_simulator.test.cc` and `vector_simulator.test.cc`; broader public graph/vector simulator APIs remain deferred until Stab exposes equivalent surfaces.
 
 ### Stabilizers And Algebra

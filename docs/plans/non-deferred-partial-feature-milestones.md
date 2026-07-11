@@ -333,7 +333,7 @@ Acceptance criteria:
 
 ### PFM-B5: Generic Analyzer Loop Folding And Search Closure
 
-Status: Implementation, executable evidence, and milestone audit are complete for the selected Rust and CLI scope at `872e3a3`; only the required GPT-5.6/max full-code-review sign-off remains, as recorded in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
+Status: The required second full-code review found additional correctness, resource-accounting, and evidence-specificity defects after `15b55cc`. Remediation is committed in `d1d6554`, `433252c`, and `d3ffc5f`; fresh committed-HEAD PF6 benchmark evidence, milestone-audit closure, and final full-code-review sign-off remain, as recorded in `docs/plans/pfm-b5-analyzer-search-progress-report.md`.
 
 Objective: resolve the PFM6 blocker by replacing fixture-shaped folding with a general finite-state loop summary and by closing a finite search corpus.
 
@@ -350,14 +350,17 @@ Owned analyzer subcases:
 
 - Port or lock exact slices from `ErrorAnalyzer.loop_folding`, `loop_folding_nested_loop`, `loop_folding_rep_code_circuit`, `multi_round_gauge_detectors_dont_grow`, `coordinate_tracking`, and `dont_fold_when_observable_dependencies_cross_iterations`.
 - Retain the existing prefix/repeat/tail, huge odd observable, period-8, period-127, decomposition, remnant-edge, generated surface-coordinate fallback, and folded-observable guard evidence.
+- Prove nested billion-round gauge folding, saturating observational diagnostics, folded noisy `MPAD`, cumulative nested-probe admission, and the inclusive sixteen-detector local-decomposition boundary with a separately selected seventeen-detector rejection case.
 
 Search and SAT closure:
 
 - Cover graphlike `no_error`, `distance_1`, `distance_2`, `distance_3`, `surface_code`, `repetition_code`, and `many_observables`.
 - Cover hypergraph `no_error`, `distance_1`, `distance_2`, `distance_3`, `hyper_error`, `surface_code`, `repetition_code`, and `many_observables`.
-- Cover shortest and likeliest WCNF cases for empty models, detector-only models, observable-only models, detector plus observable models, large probabilities, and half probability.
-- Use exact output for stable WCNF and deterministic DEM text, and canonical target-set or minimum-weight structural comparators for tie-sensitive search output.
-- Route folded DEM access through PFM-B3 and document caps for genuinely exponential search spaces.
+- Cover shortest and likeliest WCNF cases for empty models, detector-only models, observable-only models, detector plus observable models, large probabilities, half probability, and low quantization whose suppressed output line still counts in Stim's stored-clause header.
+- Use exact output for the selected finite WCNF corpus and deterministic DEM text, and canonical target-set or minimum-weight structural comparators for tie-sensitive search output. Treat sparse-ID and large folded-repeat WCNF compression as an intentional resource-hardening semantic deviation, not a universal byte-exact Stim claim.
+- Route folded DEM access through PFM-B3; cap expanded nonzero mechanisms, per-error source target occurrences, touched nodes, search states, attempted transitions, per-state terms, aggregate stored state terms, hyperedge degree, edge incidences, SAT mechanisms, total target occurrences, variables, clauses, literals, and conservative output bytes independently.
+- Return the canonical trivial UNSAT WCNF before flattening models with no observables or no source error declarations, including large detector-only shifted repeats.
+- Preserve Stim's distinction between a model with no error declarations and one whose declared errors all have zero probability.
 
 Sparse tracker and matched errors:
 
@@ -369,7 +372,7 @@ Benchmarks:
 
 - `pfm-b5-analyzer-cycle-folding` measures transient, short-period, long-period, nested, gauge, and coordinate recurrence through production diagnostics, and `pfm-b5-analyzer-generated-qec` measures repetition r100000 plus rotated-surface d11/r100000000 analysis.
 - `pfm-b5-graphlike-search-direct-dem`, `pfm-b5-hypergraph-search-direct-dem`, `pfm-b5-hypergraph-search-generated-qec`, `pfm-b5-wcnf-direct-dem`, and `pfm-b5-wcnf-generated-qec` remain report-only contract rows.
-- `pfm-b5-graphlike-generated-d25` and `pfm-b5-graphlike-generated-d11-r1000` are faithful pinned-Stim direct matches, but clean ratios of 5.938x and 5.247x keep them report-only and outside the 1.25x gate.
+- `pfm-b5-graphlike-generated-d25` and `pfm-b5-graphlike-generated-d11-r1000` are faithful pinned-Stim direct matches; the prior clean first-review ratios of 5.969x and 5.500x keep them report-only and outside the 1.25x gate, and fresh evidence is required after second-review remediation.
 - Record represented iterations, state size, emitted DEM items, search nodes or clauses, peak live bytes, and sampled resident delta.
 - Promote only faithful stable rows into the 1.25x gate; keep structural or no-faithful-baseline rows report-only.
 
@@ -378,6 +381,8 @@ Acceptance criteria:
 - No production analyzer branch matches a test fixture's exact instruction sequence or hard-coded recurrence period.
 - Owned folded outputs match pinned Stim exactly where deterministic, and structural search comparators prove minimum-weight parity where ordering is non-contractual.
 - Eligible huge repeats use memory bounded by loop state, body, and emitted compact output rather than repeat count.
+- Every one of the 48 owned cases has an independently resolving exact Cargo selector; direct CLI fixtures bind both path and SHA-256 while still comparing live pinned Stim with Stab.
+- Search and SAT resource limits fail with domain errors before uncontrolled state, edge-incidence, clause, literal, or output growth, and the tests cross each independently claimed boundary.
 - PFM6 is closed for active analyzer, search, sparse-tracker, and matched-error value semantics while full provenance remains explicitly deferred.
 
 ### PFM-B6: Resolve Spec Gaps And Roll Up Status
