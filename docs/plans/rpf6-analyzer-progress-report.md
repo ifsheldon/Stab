@@ -4,7 +4,7 @@ Historical note: PFM-B5 supersedes this staged analyzer report. Retired period-s
 
 ## Summary
 
-This RPF6 report makes the generated-QEC analyzer subset, the selected prefix/repeat/tail true-folded analyzer subset, the selected loop-carried observable true-folded analyzer subset, the selected period-8 observable true-folded analyzer subset, the selected period-127 observable true-folded analyzer subset, the selected loop-folded error-decomposition subset, the selected folded observable-dependency rejection guard, the bounded mixed-top-level `fold_loops=true` fallback, and the selected matched-error canonicalization hardening explicit in the source-owned evidence.
+This RPF6 report historically made the generated-QEC analyzer subset, the selected prefix/repeat/tail true-folded analyzer subset, the selected loop-carried observable true-folded analyzer subset, the selected period-8 observable true-folded analyzer subset, the selected period-127 observable true-folded analyzer subset, the selected loop-folded error-decomposition subset, the selected folded observable-dependency rejection guard, the bounded unsupported-family `fold_loops=true` fallback, and the selected matched-error canonicalization hardening explicit in the source-owned evidence. PFM-B5 later moved the selected generated surface-coordinate circuit onto generic reverse folding.
 It does not complete RPF6 because broad true folded generated-loop output beyond the selected detector-chain, loop-carried observable, period-8 observable, and period-127 observable slices, graphlike and hypergraph generated search beyond the promoted QEC subset, and sparse reverse tracker work beyond supported-Clifford unitary repeats remain open; additional matched-error value-object hardening belongs to future analyzer or search slices only when those outputs require it.
 
 ## Implemented Evidence Slice
@@ -17,7 +17,7 @@ It does not complete RPF6 because broad true folded generated-loop output beyond
 - `circuit_to_detector_error_model` now emits the exact Stim-style compact folded DEM output for the selected pinned period-8 logical-observable oscillation case after validating the candidate against a non-folded nine-iteration expansion.
 - `circuit_to_detector_error_model` now emits the exact Stim-style compact folded DEM output for the selected pinned period-127 logical-observable oscillation case with a deterministic tail detector after validating the candidate against a non-folded 338-iteration expansion.
 - `circuit_to_detector_error_model` is covered for the selected upstream `fold_loops + decompose_errors + approximate_disjoint_errors` rejection case where `OBSERVABLE_INCLUDE` omits loop-carried measurement dependencies across folded iterations and must fail with nondeterministic-observable evidence instead of producing a folded DEM.
-- `circuit_to_detector_error_model` handles unsafe or still-unsupported mixed top-level `fold_loops=true` shapes through the existing capped non-folded analyzer. This selected bounded fallback covers the pinned generated surface-code prefix, repeat, and tail coordinate case without claiming true folded output for broader generated-loop families.
+- `circuit_to_detector_error_model` retains capped non-folded fallback for preflighted unsupported instruction families. The pinned generated surface-code prefix, repeat, and tail coordinate case now uses generic reverse folding, and ops diagnostics prove that it does not use this fallback.
 - `ExplainedError::canonicalize` and `CircuitErrorLocation::canonicalize` now sort DEM terms, circuit error locations, flipped Pauli products, and flipped measured observables like pinned Stim, while `ErrorMatcher` preserves upstream-like returned location order by avoiding implicit location canonicalization.
 - The promoted evidence is primarily Rust-core analyzer evidence. The selected loop-carried, period-8, and period-127 observable slices also have narrow exact-output `stab analyze_errors --fold_loops` CLI fixtures, but this report does not claim full public `stab analyze_errors` CLI parity.
 
@@ -67,10 +67,13 @@ Implemented rows:
 - `pf6-analyze-errors-period127-observable-cli`
 - `pf6-error-decomp-loop-folded-rust`
 
-Implemented bounded fallback row:
+Implemented bounded unsupported-family fallback row:
 
 - `pf6-analyzer-mixed-top-level-fallback-rust`
-- `pf6-analyzer-generated-fold-loop-fallback-rust`
+
+Implemented generic generated-coordinate row:
+
+- `pf6-analyzer-generated-fold-loop-coordinates-rust`
 
 Implemented folded-observable rejection row:
 
@@ -138,7 +141,7 @@ cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_period
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_period127_observable --quiet
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_rejects_folded_observables_crossing_iterations --quiet
 cargo test -p stab-core --test dem_analyzer_loop_folding pf6_dem_analyzer_fallback_ --quiet
-cargo test -p stab-core --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit --quiet
+cargo test -p stab-core --features ops-contracts --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit --quiet
 cargo test -p stab-core matched_error_canonicalize_sorts_terms_like_upstream --quiet
 cargo test -p stab-bench pf6_analyzer_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-bench --quiet
@@ -157,6 +160,8 @@ just bench::compare --only pf6-analyzer-period127-observable-folded --baseline t
 ```
 
 ## Remaining RPF6 Work
+
+This list records what remained when the historical RPF6 slice closed. Current active ownership is the finite PFM-B5 ledger and explicitly deferred surfaces, so these broad phrases are not implementation instructions.
 
 - True folded generated-loop analyzer behavior beyond the promoted prefix/repeat/tail detector-chain slice, selected loop-carried observable slice, selected period-8 observable slice, selected period-127 observable slice, generated-QEC semantic subset, and bounded mixed-top-level fallback.
 - Broader loop-folded error decomposition subcases beyond the promoted repeated composite-error and remnant-edge blocking fixtures.

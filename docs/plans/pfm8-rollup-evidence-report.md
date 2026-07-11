@@ -28,7 +28,7 @@ After the selected PFM2 MPAD duplicate observable-id record parity slice was com
 After the PFM0 evidence-lock cleanup, selected PFM5 observable-neutral final-repeat missing-detector slice, and selected PFM2 pinned feedback public-method evidence repair landed, the current refresh passed again on 2026-07-08 from clean committed `HEAD=0cf2d3eee423` with `local_modifications=false`, including `pf5-missing-detectors-observable-neutral-final-repeat-rust` and `pf2-feedback-inline-pinned-upstream-rust`.
 On 2026-07-10, `just oracle::run --implemented-only`, `just oracle::blockers --check-selectors`, and `just bench::smoke` passed from clean PFM-B3 implementation `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`.
 On 2026-07-12, the first-review PFM-B5 remediation passed the full `stab-core`, `stab-oracle`, and `stab-bench` test suites, focused Clippy checks, clean fixture recording, exact selector validation, nine exact PF6 CLI oracle rows, and benchmark smoke. The clean first-review baseline and compare artifacts identify `HEAD=15b55cc8bf2c1aa0dabab401389fa88ad14b3fb1` with `local_modifications=false`.
-A required second review then found additional analyzer, resource-accounting, SAT-preflight, diagnostic-parity, and evidence-specificity defects. Remediation is committed in `d1d6554`, `433252c`, and `d3ffc5f`; the ledger now validates 48 PFM-B5 cases and ten direct exact PF6 rows. Clean PF6 allocation evidence identifies `HEAD=37cf5860c72456347d1365340735fc7ef126d4de` with `local_modifications=false`; milestone-audit closure and final review remain.
+A required second review then found additional analyzer, resource-accounting, SAT-preflight, diagnostic-parity, and evidence-specificity defects. Remediation was committed in `d1d6554`, `433252c`, and `d3ffc5f`, followed by clean PF6 allocation evidence from `HEAD=37cf5860c72456347d1365340735fc7ef126d4de`. A later final review found supported-unitary nested-probe, graph-construction, comparator, metadata, and SAT-claim defects; production remediation is committed in `a7173fe`, executable evidence is committed in `23b0d72`, and the ledger now validates 52 PFM-B5 cases plus ten direct exact PF6 rows. Fresh clean benchmark evidence, milestone-audit closure, and final review remain.
 
 Metadata evidence is healthy for the current manifests.
 The current PFM8 verification pass reran oracle, matrix, and benchmark metadata checks after the latest committed PFM0, PFM2, and PFM5 evidence slices, and found no implemented oracle drift or manifest parsing failure.
@@ -46,7 +46,7 @@ The current PFM8 verification pass reran oracle, matrix, and benchmark metadata 
 ## PFM-B0 Blocker Ledger
 
 PFM-B0 replaces broad under-specification with a schema-versioned, machine-checked ledger.
-`just oracle::blockers` currently validates 142 cases across all eight open blocker families after PFM-B2 independently sourced deterministic MPP, anti-Hermitian MPP rejection, deterministic MPAD, stochastic MPP, and stochastic MPAD evidence and added identity-noise and control-flow owners, and after PFM-B5 split overclaimed evidence and added twelve independently selected review regressions.
+`just oracle::blockers` currently validates 146 cases across all eight open blocker families after PFM-B2 independently sourced deterministic MPP, anti-Hermitian MPP rejection, deterministic MPAD, stochastic MPP, and stochastic MPAD evidence and added identity-noise and control-flow owners, and after PFM-B5 split overclaimed evidence and added sixteen independently selected review regressions.
 
 | Blocker | Milestone | Decision | Cases | Planned | Implemented | Evidence close |
 | --- | --- | --- | ---: | ---: | ---: | ---: |
@@ -57,10 +57,10 @@ PFM-B0 replaces broad under-specification with a schema-versioned, machine-check
 | PFM5 detecting regions | PFM-B4 | Evidence close | 2 | 0 | 0 | 2 |
 | PFM5 missing detectors | PFM-B4 | Evidence close | 14 | 0 | 0 | 14 |
 | PFM5 flow engine | PFM-B4 | Implement | 33 | 0 | 33 | 0 |
-| PFM6 analyzer and search | PFM-B5 | Implement | 48 | 0 | 48 | 0 |
+| PFM6 analyzer and search | PFM-B5 | Implement | 52 | 0 | 52 | 0 |
 
 The three evidence-close blocker records freeze 17 additional promoted supporting oracle rows: one analyzer CLI row, ten detecting-region rows, and six missing-detector rows.
-The PFM-B4 flow blocker freezes four retained checker rows and PFM-B5 freezes eleven supporting analyzer or search rows, so 32 supporting oracle signatures are machine-bound across the ledger. PFM-B5 additionally owns ten direct CLI case signatures whose paths and SHA-256 digests are bound while the runner compares live pinned Stim and Stab.
+The PFM-B4 flow blocker freezes four retained checker rows and PFM-B5 freezes fifteen supporting analyzer or search rows, so 36 supporting oracle signatures are machine-bound across the ledger. PFM-B5 additionally owns ten direct CLI case signatures whose paths and SHA-256 digests are bound while the runner compares live pinned Stim and Stab.
 The ledger freezes 21 supporting benchmark rows: four PFM-B1 reverse-flow rows, six PFM-B4 detector or flow rows, and eleven PFM-B5 analyzer, search, WCNF, decomposition, and sparse-tracker rows.
 Every implemented or evidence-closed case now has an independently resolving selector; PFM-B5 removed the remaining shared-selector debt.
 
@@ -77,7 +77,7 @@ They are finite ledger-backed implementation and evidence-splitting programs:
 - PFM-B2 contract groundwork is complete and evidence-closes analyzer sweep behavior at the selected matrix; its final phase still implements eighteen planned cases covering all nineteen semantic families.
 - PFM-B3 implements the seven selected shared folded-DEM traversal contracts.
 - PFM-B4 is complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc` for detecting regions, missing detectors, and all thirty-three flow cases. All milestone-audit and GPT-5.6/max findings are closed, and the matrix-solver plus sparse-repeat reports record clean committed-HEAD allocation evidence with zero resident delta.
-- PFM-B5 second-review remediation is committed for all 48 selected analyzer, graphlike, hypergraph, WCNF, sparse-tracker, and matched-error cases with zero shared selectors, no fixture-specific recurrence periods, bounded analyzer and search work, early trivial SAT handling, and content-bound direct oracle fixtures. Clean allocation-tracked evidence is recorded from `37cf586`; milestone-audit closure and final GPT-5.6/max review sign-off remain before closure.
+- PFM-B5 final-review remediation is committed for all 52 selected analyzer, graphlike, hypergraph, shared traversal, WCNF, sparse-tracker, and matched-error cases with zero shared selectors, no fixture-specific recurrence periods, bounded analyzer, graph-construction, and search work, early trivial SAT handling, exact diagnostic and source-membership assertions, and content-bound direct oracle fixtures. Fresh allocation-tracked evidence, milestone-audit closure, and final GPT-5.6/max review sign-off remain before closure.
 
 These exact ledger-owned items are the legitimate remaining work for the full GOAL and must be executed from `docs/plans/blocker-closure-ledger.json`, not reconstructed from checklist prose.
 Broader repeat-contained feedback, future analyzer sweep shapes, and detecting-region or missing-detector behavior outside the selected evidence-close cases remain deferred or require an explicit plan revision; they are not active PFM8 blockers.
@@ -85,14 +85,14 @@ Broader repeat-contained feedback, future analyzer sweep shapes, and detecting-r
 ## Benchmarks
 
 No primary benchmark gate changed in this PFM8 evidence slice.
-PFM-B5 replaces period-specific report-only rows with a generic analyzer and finite search matrix; its clean second-review d25/r25 and d11/r1000 graphlike rows remain report-only at 5.960x and 5.490x Stim and therefore do not enter the 1.25x threshold file.
+PFM-B5 replaces period-specific report-only rows with a generic analyzer and finite search matrix; its last clean pre-final-review d25/r25 and d11/r1000 graphlike rows were report-only at 5.960x and 5.490x Stim and therefore did not enter the 1.25x threshold file. Post-review clean evidence is pending.
 Before PFM8 can become a completion report, the commands in `docs/plans/GOAL.md` and the PFM8 section of `docs/plans/non-deferred-partial-feature-milestones.md` must be rerun from current committed `HEAD`, including primary timing and memory evidence if any benchmark gate changes.
 
 ## Audit Notes
 
 This PFM8 pass confirms that the current rollup rows should stay conservative.
 PFM-B2 contract groundwork is complete and recorded in `docs/plans/pfm-b2-gate-surface-contract-groundwork-report.md`.
-PFM-B1 is complete with `19/19 implemented`, zero shared selectors, and four clean reports from `HEAD=4f193f19cebf132f7baf0a3aa1cc799a153a71ed` with `local_modifications=false`; its maximum peak live allocation is 84,280 bytes and maximum sampled resident delta is 8,192 bytes. PFM-B3 shared DEM traversal is complete at `4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`, and PFM-B4 is complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc`. PFM-B5 second-review remediation is committed through `d3ffc5f` with clean benchmark evidence from `37cf586`, but audit and review closure remain before the PFM-B2 generated semantic matrix and PFM-B6 rollup continue.
+PFM-B1 is complete with `19/19 implemented`, zero shared selectors, and four clean reports from `HEAD=4f193f19cebf132f7baf0a3aa1cc799a153a71ed` with `local_modifications=false`; its maximum peak live allocation is 84,280 bytes and maximum sampled resident delta is 8,192 bytes. PFM-B3 shared DEM traversal is complete at `4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`, and PFM-B4 is complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc`. PFM-B5 final-review remediation is committed through `23b0d72`; clean benchmark refresh, audit, and review closure remain before the PFM-B2 generated semantic matrix and PFM-B6 rollup continue.
 
 ## Verification
 

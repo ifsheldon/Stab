@@ -37,10 +37,9 @@ Ledger schema version 2 requires all eight surfaces per gate-family case, valida
 PFM-B3 is complete as of 2026-07-10: all seven ledger cases use the shared folded traversal or the documented direct compact-transform path, have independent tests and oracle rows, and have clean committed-HEAD allocation evidence from `4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`. Its milestone-audit and GPT-5.6/max review findings are closed, with only non-blocking future ledger-schema hardening logged.
 PFM-B1 is complete as of 2026-07-11: all nineteen transform cases have direct executable evidence, the general sparse reverse-flow engine replaces packet dispatch, the pinned C++ recorder and digest-bound ledger fail closed, all milestone-audit and GPT-5.6/max findings are fixed, and four clean allocation reports identify `HEAD=4f193f19cebf132f7baf0a3aa1cc799a153a71ed` with `local_modifications=false`.
 PFM-B4 is complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc`.
-The required second PFM-B5 full-code review found additional analyzer correctness, nested-probe accounting, search-state memory, trivial-SAT preflight, diagnostic-parity, and evidence-specificity defects after `15b55cc`.
-Remediation is committed in `d1d6554`, `433252c`, and `d3ffc5f`; all 48 cases now have independent exact selectors, the ledger reports eleven supporting oracle rows and eleven benchmarks, and ten direct PF6 exact rows pass.
-Clean PF6 baseline and allocation-tracked compare evidence identifies `HEAD=37cf5860c72456347d1365340735fc7ef126d4de` with `local_modifications=false`; the faithful graphlike rows remain report-only at 5.960x and 5.490x Stim.
-Run milestone-audit and full-code-review again against the synchronized implementation and evidence before declaring PFM-B5 complete.
+The later final PFM-B5 review found a supported-unitary nested-probe bypass, unbounded graph-construction work and payloads, allocation-heavy graphlike state comparison, weak generated-result membership checks, stale fallback metadata, and an overstated SAT output-bound claim after the clean `37cf586` evidence run.
+Production remediation is committed in `a7173fe`, and executable evidence is committed in `23b0d72`; all 52 cases now have independent exact selectors, the ledger reports fifteen supporting oracle rows and eleven benchmarks, and ten direct PF6 exact rows pass.
+Regenerate clean PF6 baseline and allocation-tracked compare evidence from the committed post-review head, then run milestone-audit and full-code-review against the synchronized implementation, evidence, and documentation before declaring PFM-B5 complete.
 Then implement the eighteen remaining PFM-B2 gate-surface cases and proceed to PFM-B6.
 Do not reopen PFM-B0, PFM-B1, PFM-B2 contract groundwork, PFM-B3, PFM-B4, or the fixed PFM-B5 semantic scope unless their frozen contracts change.
 
@@ -106,7 +105,7 @@ A milestone is incomplete if any step is missing.
 - Analyzer loop folding must identify recurrence from canonical boundary state, not hard-coded periods such as 8 or 127.
 - A public materializing API may retain a documented cap when its result is inherently expanded.
 - A bounded-result internal consumer may not flatten repeated input merely for inspection.
-- Search may retain documented limits for genuinely exponential state spaces, but traversal limits and search-complexity limits must be distinct and tested.
+- Search may retain documented limits for genuinely exponential state spaces, but traversal, graph-construction, persistent graph-payload, and search-complexity limits must be distinct and tested.
 - Unsupported runtime shapes must return precise typed errors and must not silently skip work or substitute fallback semantics.
 
 If implementation cannot satisfy these guardrails, stop and revise the milestone contract before adding another special case.

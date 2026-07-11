@@ -25,7 +25,7 @@ Pinned Stim's unfiltered map returns every detector id below `count_detectors()`
 - Large non-flat repeat bodies now use actual declared-detector bounds when choosing candidate outer iterations, so valid selected detectors inside the dense detector count but outside the repeat body's declared-detector bounds return empty coordinates instead of exhausting the one-million candidate cap.
 - The pinned Stim v1.16.0 trivial selected-coordinate examples are now ported exactly for a single declared detector, error-only detector allocation with empty coordinates, shifted detector declarations, and out-of-range selected detector rejection.
 - PF4 transform evidence now separately covers final detector shifts, final coordinate shifts, detector counts, observable counts, error counts, and selected coordinate lookups through shifted repeats.
-- The pinned Stim generated surface-code coordinate case now succeeds through the PFM6 bounded mixed-top-level analyzer fallback: `fold_loops=true` produces a DEM for the generated prefix, repeat, and tail circuit shape, and the DEM detector coordinates match the circuit detector coordinates for all 168 detectors.
+- The pinned Stim generated surface-code coordinate case originally succeeded through the PFM6 bounded mixed-top-level analyzer fallback. PFM-B5 now runs the generated prefix, repeat, and tail circuit through generic reverse folding, proves fallback was not used through ops diagnostics, and matches DEM and circuit coordinates for all 168 detectors.
 
 ## Tests
 
@@ -49,7 +49,7 @@ Related PFM6 generated-loop coordinate evidence:
 
 - `pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit`
 
-This test documents the pinned Stim generated surface-code coordinate comparison, while broader true folded generated-loop output remains PFM6 work.
+This test documents the pinned Stim generated surface-code coordinate comparison. PFM-B5 later moved this selected circuit onto the generic reverse-fold path and added diagnostics proving bounded fallback is not used.
 
 ## Oracle Rows
 
@@ -59,7 +59,7 @@ Implemented row:
 
 Related PFM6 generated-loop coordinate row:
 
-- `pf6-analyzer-generated-fold-loop-fallback-rust`
+- `pf6-analyzer-generated-fold-loop-coordinates-rust`
 
 Historical broad rows at the time of this slice:
 
@@ -86,7 +86,7 @@ Target checks for this slice:
 
 ```sh
 cargo test -p stab-core --test dem_api pf4_dem_coordinates_ --quiet
-cargo test -p stab-core --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit --quiet
+cargo test -p stab-core --features ops-contracts --test dem_api pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit --quiet
 cargo test -p stab-bench pf4_dem_transform_benchmark_rows_have_stab_compare_runners --quiet
 cargo test -p stab-bench --quiet
 cargo test -p stab-oracle fixtures --quiet
@@ -105,12 +105,12 @@ Milestone-audit status for the original coordinate-resource slice: complete agai
 That audit checked that the slice named the supported nested sparse-overlap subcase, kept all-detector materialization capped, preserved selected lookup behavior through typed `DemDetectorId`, updated oracle and benchmark metadata, and kept the benchmark row report-only.
 
 Milestone-audit status for the follow-up trivial-coordinate and generated-loop coordinate slice: complete with broader PFM6 generated-loop folding still active.
-The follow-up audit checked that pinned Stim trivial selected-coordinate behavior is direct PFM4 coordinate evidence, while the generated surface-code coordinate case is counted only for the selected bounded analyzer fallback and coordinate-equivalence subcase.
+The follow-up audit checked that pinned Stim trivial selected-coordinate behavior is direct PFM4 coordinate evidence, while the generated surface-code coordinate case is counted only for its selected analyzer dependency and coordinate-equivalence subcase. PFM-B5 later promoted that dependency to generic reverse folding.
 
 Milestone-audit status for the declared-bound sparse-hole refresh: complete against the scoped declared-bound sparse-hole text. PFM-B3 later closed the selected shared traversal; coordinate families beyond its bounded algebraic and selected-iteration contract require an explicit plan revision instead of remaining implicitly active.
 
 Full-code-review status for the follow-up slice: findings resolved.
-Two GPT-5.5/xhigh sidecars found that the generated-loop evidence was easy to miss because it was not covered by the documented PF4 coordinate filter; the generated coordinate case now has a dedicated PF6 oracle row, `pf6-analyzer-generated-fold-loop-fallback-rust`, and the verification commands name it explicitly.
+Two GPT-5.5/xhigh sidecars found that the generated-loop evidence was easy to miss because it was not covered by the documented PF4 coordinate filter; the generated coordinate case now has a dedicated PF6 oracle row, `pf6-analyzer-generated-fold-loop-coordinates-rust`, and the verification commands name it explicitly.
 The earlier Rust/resource review finding about eager coordinate-vector materialization remains resolved by streaming local declarations into `FlatRepeatScan` and delaying coordinate materialization until a candidate wins.
 
 Full-code-review status for the declared-bound sparse-hole refresh: findings resolved.
@@ -119,6 +119,6 @@ The Rust/API GPT-5.5/xhigh sidecar reported no code findings; the docs/metadata 
 ## Post-PFM-B3 Disposition
 
 - PFM-B3 closes the selected shared traversal and explicit-cap contract for coordinates, sampler compilation, graphlike or hypergraph collection, SAT/WCNF collection, and ErrorMatcher filter keys.
-- Broader generated-loop analyzer and search semantics remain PFM-B5 work; the pinned `surface_code_coords_dont_infinite_loop` coordinate case remains covered through bounded fallback evidence.
+- The selected generated-loop analyzer and search semantics are now governed by the finite PFM-B5 ledger; the pinned `surface_code_coords_dont_infinite_loop` coordinate case is covered through generic reverse-fold evidence with fallback diagnostics.
 - Nested or non-flat ambiguous overlapping coordinate families beyond the current bounded declaration scans and selected-iteration policy require a separately approved plan instead of remaining implicit RPF4 work.
 - No additional Rust mutation ergonomics or malformed-input families are selected by this historical slice.
