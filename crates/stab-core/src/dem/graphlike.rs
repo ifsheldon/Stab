@@ -169,6 +169,7 @@ impl Node {
             return Ok(());
         }
         let edge_hash = self.edge_index.hash(&edge);
+        let admission = budget.preflight_unique_edge(edge.term_count()?, 1, 1)?;
         self.edges.try_reserve(1).map_err(|_| {
             CircuitError::invalid_detector_error_model(
                 "graphlike search cannot allocate another outward edge",
@@ -176,11 +177,11 @@ impl Node {
         })?;
         self.edge_index
             .try_reserve(&self.edges, "graphlike search")?;
-        budget.admit_unique_edge(edge.term_count()?, 1, 1)?;
         let edge_index = self.edges.len();
         self.edges.push(edge);
         self.edge_index
             .insert_reserved(edge_hash, edge_index, &self.edges);
+        budget.commit_unique_edge(admission)?;
         Ok(())
     }
 }

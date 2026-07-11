@@ -37,6 +37,14 @@ pub(super) struct GraphConstructionBudget {
     stored_terms: usize,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct GraphEdgeAdmission {
+    prior_edges: usize,
+    prior_stored_terms: usize,
+    edges: usize,
+    stored_terms: usize,
+}
+
 impl GraphConstructionBudget {
     pub(super) fn new(context: &'static str) -> Self {
         Self {
@@ -46,12 +54,24 @@ impl GraphConstructionBudget {
         }
     }
 
+    #[cfg(test)]
     pub(super) fn admit_unique_edge(
         &mut self,
         edge_terms: usize,
         edge_stored_copies: usize,
         adjacency_stored_terms: usize,
     ) -> CircuitResult<()> {
+        let admission =
+            self.preflight_unique_edge(edge_terms, edge_stored_copies, adjacency_stored_terms)?;
+        self.commit_unique_edge(admission)
+    }
+
+    pub(super) fn preflight_unique_edge(
+        &self,
+        edge_terms: usize,
+        edge_stored_copies: usize,
+        adjacency_stored_terms: usize,
+    ) -> CircuitResult<GraphEdgeAdmission> {
         let edges = self.edges.checked_add(1).ok_or_else(|| {
             CircuitError::invalid_detector_error_model(format!(
                 "{} graph edge count overflowed",
@@ -74,8 +94,27 @@ impl GraphConstructionBudget {
                 ))
             })?;
         let stored_terms = self.checked_stored_terms(added_terms)?;
-        self.edges = edges;
-        self.stored_terms = stored_terms;
+        Ok(GraphEdgeAdmission {
+            prior_edges: self.edges,
+            prior_stored_terms: self.stored_terms,
+            edges,
+            stored_terms,
+        })
+    }
+
+    pub(super) fn commit_unique_edge(
+        &mut self,
+        admission: GraphEdgeAdmission,
+    ) -> CircuitResult<()> {
+        if self.edges != admission.prior_edges || self.stored_terms != admission.prior_stored_terms
+        {
+            return Err(CircuitError::invalid_detector_error_model(format!(
+                "{} graph construction admission became stale before commit",
+                self.context
+            )));
+        }
+        self.edges = admission.edges;
+        self.stored_terms = admission.stored_terms;
         Ok(())
     }
 
@@ -295,5 +334,42 @@ mod tests {
                 .to_string()
                 .contains("at most 2048 stored graph payload terms")
         );
+    }
+
+    #[test]
+    fn graph_construction_preflight_does_not_consume_budget_until_commit() {
+        let mut budget = GraphConstructionBudget::new("test graph");
+        let admission = budget
+            .preflight_unique_edge(3, 1, 2)
+            .expect("edge fits the construction budget");
+        assert_eq!(budget.edges, 0);
+        assert_eq!(budget.stored_terms, 0);
+
+        budget
+            .commit_unique_edge(admission)
+            .expect("fresh admission commits");
+        assert_eq!(budget.edges, 1);
+        assert_eq!(budget.stored_terms, 5);
+    }
+
+    #[test]
+    fn graph_construction_rejects_a_stale_admission() {
+        let mut budget = GraphConstructionBudget::new("test graph");
+        let first = budget
+            .preflight_unique_edge(1, 1, 0)
+            .expect("first edge fits");
+        let stale = budget
+            .preflight_unique_edge(1, 1, 0)
+            .expect("concurrent preflight also fits");
+        budget
+            .commit_unique_edge(first)
+            .expect("first admission commits");
+
+        let error = budget
+            .commit_unique_edge(stale)
+            .expect_err("stale admission must not overwrite the committed counters");
+        assert!(error.to_string().contains("admission became stale"));
+        assert_eq!(budget.edges, 1);
+        assert_eq!(budget.stored_terms, 1);
     }
 }

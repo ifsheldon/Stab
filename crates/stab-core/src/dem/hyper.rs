@@ -307,6 +307,17 @@ impl Graph {
         }
         let edge_hash = self.edge_index.hash(&edge);
         let edge_id = self.edges.len();
+        let stored_index_and_adjacency_terms =
+            adjacency_stored_terms.checked_add(1).ok_or_else(|| {
+                CircuitError::invalid_detector_error_model(
+                    "hypergraph stored graph index count overflowed",
+                )
+            })?;
+        let admission = self.construction_budget.preflight_unique_edge(
+            edge.term_count()?,
+            1,
+            stored_index_and_adjacency_terms,
+        )?;
         self.edges.try_reserve(1).map_err(|_| {
             CircuitError::invalid_detector_error_model(
                 "hypergraph search cannot allocate another edge",
@@ -314,20 +325,10 @@ impl Graph {
         })?;
         self.edge_index
             .try_reserve(&self.edges, "hypergraph search")?;
-        let stored_index_and_adjacency_terms =
-            adjacency_stored_terms.checked_add(1).ok_or_else(|| {
-                CircuitError::invalid_detector_error_model(
-                    "hypergraph stored graph index count overflowed",
-                )
-            })?;
-        self.construction_budget.admit_unique_edge(
-            edge.term_count()?,
-            1,
-            stored_index_and_adjacency_terms,
-        )?;
         self.edges.push(edge);
         self.edge_index
             .insert_reserved(edge_hash, edge_id, &self.edges);
+        self.construction_budget.commit_unique_edge(admission)?;
         Ok((edge_id, true))
     }
 
