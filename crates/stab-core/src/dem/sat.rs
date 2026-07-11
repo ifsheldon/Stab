@@ -654,7 +654,10 @@ mod tests {
         reason = "unit tests use direct assertions for compact diagnostics"
     )]
 
-    use super::{likeliest_error_sat_problem, shortest_error_sat_problem};
+    use super::{
+        MAX_SAT_EFFECTIVE_TARGET_COUNT, likeliest_error_sat_problem, shortest_error_sat_problem,
+        validate_sat_effective_target_counts,
+    };
     use crate::{CircuitError, CircuitResult, DetectorErrorModel};
 
     const UNSAT_WDIMACS: &str = "p wcnf 1 2 3\n3 -1 0\n3 1 0\n";
@@ -669,6 +672,41 @@ p wcnf 3 8 9
 9 -3 0
 9 1 0
 ";
+
+    #[test]
+    fn sat_effective_target_caps_are_independent_and_inclusive() {
+        assert!(
+            validate_sat_effective_target_counts(
+                MAX_SAT_EFFECTIVE_TARGET_COUNT,
+                MAX_SAT_EFFECTIVE_TARGET_COUNT,
+            )
+            .is_ok()
+        );
+
+        let detector_rejected = match validate_sat_effective_target_counts(
+            MAX_SAT_EFFECTIVE_TARGET_COUNT + 1,
+            MAX_SAT_EFFECTIVE_TARGET_COUNT,
+        ) {
+            Ok(()) => false,
+            Err(error) => {
+                assert!(error.to_string().contains("effective detector nodes"));
+                true
+            }
+        };
+        assert!(detector_rejected);
+
+        let observable_rejected = match validate_sat_effective_target_counts(
+            MAX_SAT_EFFECTIVE_TARGET_COUNT,
+            MAX_SAT_EFFECTIVE_TARGET_COUNT + 1,
+        ) {
+            Ok(()) => false,
+            Err(error) => {
+                assert!(error.to_string().contains("effective observable nodes"));
+                true
+            }
+        };
+        assert!(observable_rejected);
+    }
 
     fn dem(input: &str) -> CircuitResult<DetectorErrorModel> {
         DetectorErrorModel::from_dem_str(input)

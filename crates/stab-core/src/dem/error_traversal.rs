@@ -333,4 +333,24 @@ mod tests {
         assert!(error.contains("at most 10000 expanded nonzero error mechanisms"));
         assert!(!error.contains("expanded instructions"));
     }
+
+    #[test]
+    fn search_target_collection_has_a_distinct_effective_detector_cap() {
+        let model =
+            DetectorErrorModel::from_dem_str("error(0.1) D0\nerror(0.1) D1\nerror(0.1) D2\n")
+                .unwrap();
+        let traversal = FoldedDemTraversal::new(&model).unwrap();
+        let error = search_graph_nonzero_error_targets(
+            &traversal,
+            "test graphlike search",
+            SearchGraphTargetPolicy::Graphlike {
+                ignore_ungraphlike_errors: false,
+            },
+            2,
+        )
+        .expect_err("three touched detectors should exceed the two-node test cap")
+        .to_string();
+        assert!(error.contains("at most 2 effective detector nodes, got 3"));
+        assert!(!error.contains("expanded nonzero error mechanisms"));
+    }
 }
