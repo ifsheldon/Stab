@@ -32,8 +32,12 @@ mod pf2;
 mod pf4;
 mod pf5;
 mod pf6;
+mod rates;
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+pub(crate) use rates::measurement_rate_work;
 
 #[cfg(not(test))]
 const STAB_COMPARE_ITERATIONS: usize = 128;
@@ -818,29 +822,12 @@ pub(crate) fn summarize_measurements(measurements: &[Measurement]) -> String {
 
 pub(crate) fn summarize_stab_measurements(row_id: &str, measurements: &[Measurement]) -> String {
     let summary = summarize_measurements(measurements);
-    let rates = summarize_measurement_rates(row_id, measurements);
+    let rates = rates::summarize_measurement_rates(row_id, measurements);
     if rates.is_empty() {
         summary
     } else {
         format!("{summary} rates={rates}")
     }
-}
-
-fn summarize_measurement_rates(row_id: &str, measurements: &[Measurement]) -> String {
-    measurements
-        .iter()
-        .filter_map(|measurement| {
-            measurement_work(row_id, &measurement.name).map(|(work, unit)| {
-                let rate = if measurement.seconds > 0.0 {
-                    work / measurement.seconds
-                } else {
-                    0.0
-                };
-                format!("{}={rate:.3e}{unit}", measurement.name)
-            })
-        })
-        .collect::<Vec<_>>()
-        .join(",")
 }
 
 pub(crate) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'static str)> {

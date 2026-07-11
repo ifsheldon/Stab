@@ -1,4 +1,4 @@
-use super::super::{compare_note, measurement_work, run_stab_compare_row};
+use super::super::{compare_note, measurement_rate_work, measurement_work, run_stab_compare_row};
 use crate::manifest::{BenchmarkRow, Milestone, Runner};
 
 #[test]
@@ -290,11 +290,23 @@ fn assert_benchmark_measurements(id: &str, row: BenchmarkRow, expected_measureme
         assert!(observation_value(short_period, "folded_repeat_iterations") > 0);
         assert!(observation_value(long_period, "folded_repeat_iterations") > 0);
     }
-    for name in names {
+    for measurement in &measurements {
         assert!(
-            measurement_work(id, name).is_some(),
-            "{id}/{name} should report normalized work"
+            measurement_rate_work(id, measurement).is_some(),
+            "{id}/{} should report normalized work",
+            measurement.name
         );
+    }
+    if id == "pfm-b5-wcnf-generated-qec" {
+        for measurement in &measurements {
+            assert_eq!(
+                measurement_rate_work(id, measurement),
+                Some((
+                    observation_value(measurement, "clauses") as f64,
+                    "clauses/s"
+                ))
+            );
+        }
     }
 }
 

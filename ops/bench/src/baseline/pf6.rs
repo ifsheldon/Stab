@@ -182,10 +182,7 @@ pub(super) fn measurement_work(row_id: &str, name: &str) -> Option<(f64, &'stati
             Some((direct_wcnf_clauses() as f64, "clauses/s"))
         }
         ("pfm-b5-wcnf-generated-qec", "stab_pfm_b5_wcnf_shortest_generated")
-        | ("pfm-b5-wcnf-generated-qec", "stab_pfm_b5_wcnf_likeliest_generated") => Some((
-            generated_detector_count(GENERATED_REPORT_DISTANCE, GENERATED_REPORT_ROUNDS) as f64,
-            "detector-nodes/s",
-        )),
+        | ("pfm-b5-wcnf-generated-qec", "stab_pfm_b5_wcnf_likeliest_generated") => None,
         _ => None,
     }
 }
