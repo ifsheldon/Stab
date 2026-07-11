@@ -11,6 +11,7 @@ mod generated_qec_tests;
 mod graphlike;
 mod hyper;
 mod sat;
+mod search_budget;
 mod traversal;
 
 #[cfg(feature = "ops-contracts")]

@@ -1,6 +1,7 @@
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, VecDeque, btree_map::Entry};
 
 use super::{Graph, ObservableMask, SearchState};
+use crate::dem::search_budget::SearchBudget;
 use crate::{CircuitError, CircuitResult, DemItem, DetectorErrorModel};
 
 pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
@@ -18,6 +19,8 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
 
     let mut queue = VecDeque::new();
     let mut back_map = BTreeMap::new();
+    let mut budget = SearchBudget::new("graphlike search");
+    budget.admit_state()?;
     back_map.insert(empty.clone(), empty.clone());
 
     for (source_index, node) in graph.nodes.iter().enumerate() {
@@ -25,7 +28,9 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
         for edge in &node.edges {
             if !edge.observables.is_empty() && edge.detector.is_none_or(|target| source < target) {
                 let start = SearchState::new(Some(source), edge.detector, edge.observables.clone());
-                if back_map.insert(start.clone(), empty.clone()).is_none() {
+                if let Entry::Vacant(entry) = back_map.entry(start.clone()) {
+                    budget.admit_state()?;
+                    entry.insert(empty.clone());
                     queue.push_back(start);
                 }
             }
@@ -45,15 +50,17 @@ pub(in crate::dem) fn shortest_graphlike_undetectable_logical_error(
             ));
         };
         for edge in &node.edges {
+            budget.record_transition()?;
             let mut next = SearchState::new(
                 edge.detector,
                 current.detector_held,
                 edge.observables.symmetric_difference(&current.observables),
             );
-            if back_map.contains_key(&next) {
+            let Entry::Vacant(entry) = back_map.entry(next.clone()) else {
                 continue;
-            }
-            back_map.insert(next.clone(), current.clone());
+            };
+            budget.admit_state()?;
+            entry.insert(current.clone());
             if next.is_undetected() {
                 return backtrack_path(&back_map, &next);
             }
@@ -179,6 +186,18 @@ mod tests {
     )]
 
     use super::*;
+
+    #[test]
+    fn graphlike_search_rejects_excessive_search_states() {
+        let mut text = String::new();
+        for observable in 0..=64 {
+            text.push_str(&format!("error(0.1) D0 L{observable}\n"));
+        }
+        let model = DetectorErrorModel::from_dem_str(&text).expect("valid search model");
+        let error = shortest_graphlike_undetectable_logical_error(&model, false)
+            .expect_err("search state cap");
+        assert!(error.to_string().contains("at most 64 search states"));
+    }
 
     fn shortest(dem: &str) -> CircuitResult<String> {
         let model = DetectorErrorModel::from_dem_str(dem)?;
