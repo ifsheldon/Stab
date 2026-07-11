@@ -617,6 +617,25 @@ fn blocker_ledger_rejects_tampered_pinned_golden_digest() {
 }
 
 #[test]
+fn blocker_ledger_rejects_tampered_direct_digest() {
+    let ledger = mutated_ledger(|value| {
+        *case_mut(value, "pfm6-analyzer-search", "pfm6-analyzer-nested-loop")
+            .get_mut("oracle")
+            .and_then(|oracle| oracle.get_mut("signature"))
+            .and_then(|signature| signature.get_mut("expected_stdout_sha256"))
+            .expect("direct digest") = Value::from("0".repeat(64));
+    });
+
+    let error = ledger
+        .check(&repo_root())
+        .expect_err("tampered direct evidence");
+    assert!(
+        validation_text(error).contains("evidence signature is incompatible"),
+        "tampered direct fixture must invalidate the frozen evidence binding"
+    );
+}
+
+#[test]
 fn blocker_ledger_requires_implemented_oracle_rows() {
     let ledger = mutated_ledger(|value| {
         let oracle = case_mut(

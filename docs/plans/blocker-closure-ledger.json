@@ -4792,8 +4792,9 @@
               "stab-core",
               "--test",
               "dem_analyzer_loop_folding",
-              "pf6_dem_analyzer_loop_carried_observable",
-              "--quiet"
+              "pf6_dem_analyzer_loop_carried_observable_folds_like_upstream",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -4804,7 +4805,11 @@
               "parity_mode": "exact-output",
               "comparator": "exact-output",
               "argv": "analyze_errors|--fold_loops",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
+              "stdin_path": "inputs/analyze_errors_loop_carried_observable.stim",
+              "expected_stdout_path": "expected/pf6_analyze_errors_loop_carried_observable.stdout",
+              "stdin_sha256": "c94bb91b258a0e5caffe3af91a542aae9b72ad7e33aca74a2e23c2504c935e5d",
+              "expected_stdout_sha256": "be726094c8e9ed7c1d1f3f7ea42b39495ea3a292ed2afb2f891c8b82d86beb83"
             }
           },
           "benchmark": {
@@ -4834,8 +4839,9 @@
               "stab-core",
               "--test",
               "dem_analyzer_loop_folding",
-              "pf6_dem_analyzer_period8_observable",
-              "--quiet"
+              "pf6_dem_analyzer_period8_observable_folds_like_upstream",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -4846,7 +4852,11 @@
               "parity_mode": "exact-output",
               "comparator": "exact-output",
               "argv": "analyze_errors|--fold_loops",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
+              "stdin_path": "inputs/analyze_errors_period8_observable.stim",
+              "expected_stdout_path": "expected/pf6_analyze_errors_period8_observable.stdout",
+              "stdin_sha256": "c7cb64349ae335de2077c2a5591169903229f121c19e8791e7a87c5f0e4a1ffc",
+              "expected_stdout_sha256": "f28d309855aabddcca7e8a6b1c2b770ceb1aeabd7791c0a4a0bf1a4af1bca762"
             }
           },
           "benchmark": {
@@ -4876,8 +4886,9 @@
               "stab-core",
               "--test",
               "dem_analyzer_loop_folding",
-              "pf6_dem_analyzer_period127_observable",
-              "--quiet"
+              "pf6_dem_analyzer_period127_observable_folds_like_upstream",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -4888,7 +4899,11 @@
               "parity_mode": "exact-output",
               "comparator": "exact-output",
               "argv": "analyze_errors|--fold_loops",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
+              "stdin_path": "inputs/analyze_errors_period127_observable.stim",
+              "expected_stdout_path": "expected/pf6_analyze_errors_period127_observable.stdout",
+              "stdin_sha256": "11437e0e88a335623d918926f8570e98720710f0f6b3df21fa8094b1d5789e79",
+              "expected_stdout_sha256": "d7994f3927b3d2da41eebde395f083ff76c4b92c9394d19c92d1d1a057e7311a"
             }
           },
           "benchmark": {
@@ -4931,7 +4946,11 @@
               "parity_mode": "exact-output",
               "comparator": "exact-output",
               "argv": "analyze_errors|--fold_loops",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
+              "stdin_path": "inputs/pfm_b5_analyzer_nested_loop.stim",
+              "expected_stdout_path": "expected/pfm_b5_analyzer_nested_loop.stdout",
+              "stdin_sha256": "80ccda85814cb6c0c16ab5db73425cb3595709775554bbf2e743a296ed8dc1d3",
+              "expected_stdout_sha256": "69d2eafade091213f95e1c8dd35f23de313ca91b978931635f4c71d581bbb2c5"
             }
           },
           "benchmark": {
@@ -5017,7 +5036,11 @@
               "parity_mode": "exact-output",
               "comparator": "exact-output",
               "argv": "analyze_errors|--fold_loops|--allow_gauge_detectors",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
+              "stdin_path": "inputs/pfm_b5_analyzer_gauge_loop.stim",
+              "expected_stdout_path": "expected/pfm_b5_analyzer_gauge_loop.stdout",
+              "stdin_sha256": "84a3145d6e0be39044382cd43bc8ac0e0c39b73009c546de9167321f5a6be9a8",
+              "expected_stdout_sha256": "e017a7d26b34059254d6073ea7adf994cee5a21919e6520d6465b56ae1619a77"
             }
           },
           "benchmark": {
@@ -5060,7 +5083,11 @@
               "parity_mode": "exact-output",
               "comparator": "exact-output",
               "argv": "analyze_errors|--fold_loops",
-              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc",
+              "stdin_path": "inputs/pfm_b5_analyzer_coordinate_loop.stim",
+              "expected_stdout_path": "expected/pfm_b5_analyzer_coordinate_loop.stdout",
+              "stdin_sha256": "09092a4651282b2d510e8017fb6e40aacf4dab76faa062834c49d97f6bacf2b5",
+              "expected_stdout_sha256": "06520c056a5650bbaf592c40c434b21e589f35a2e9834ef647647c14bed3fef4"
             }
           },
           "benchmark": {
@@ -5091,7 +5118,8 @@
               "--test",
               "dem_analyzer_loop_folding",
               "pf6_dem_analyzer_rejects_folded_observables_crossing_iterations",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -6201,8 +6229,9 @@
               "test",
               "-p",
               "stab-core",
-              "unitary_repeat_folding_handles_huge_periodic_loop",
-              "--quiet"
+              "sparse_rev_frame_tracker::unitary_repeat::tests::unitary_repeat_folding_handles_huge_periodic_loop",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -6241,8 +6270,9 @@
               "test",
               "-p",
               "stab-core",
-              "sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period",
-              "--quiet"
+              "sparse_rev_frame_tracker::tests::sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -6281,8 +6311,9 @@
               "test",
               "-p",
               "stab-core",
-              "matched_error_canonicalize_sorts_terms_like_upstream",
-              "--quiet"
+              "matched_error::tests::matched_error_canonicalize_sorts_terms_like_upstream",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {

@@ -182,20 +182,31 @@ fn oracle_evidence_binding_matches(
         signature.stdin_sha256.as_ref(),
         signature.expected_stdout_sha256.as_ref(),
     );
-    if classification != OracleEvidenceClass::PinnedGolden {
+    if !matches!(
+        classification,
+        OracleEvidenceClass::Direct | OracleEvidenceClass::PinnedGolden
+    ) {
         return matches!(bindings, (None, None, None, None));
     }
     let (Some(stdin_path), Some(stdout_path), Some(stdin_digest), Some(stdout_digest)) = bindings
     else {
-        violations
-            .push("pinned-golden oracle signature lacks path and SHA-256 bindings".to_string());
+        violations.push(format!(
+            "{} oracle signature lacks path and SHA-256 bindings",
+            match classification {
+                OracleEvidenceClass::Direct => "direct",
+                OracleEvidenceClass::PinnedGolden => "pinned-golden",
+                OracleEvidenceClass::RustTestProxy | OracleEvidenceClass::Planned => {
+                    "non-file-backed"
+                }
+            }
+        ));
         return false;
     };
     if row.stdin_path.as_ref() != Some(stdin_path)
         || row.expected_stdout_path.as_ref() != Some(stdout_path)
     {
         violations.push(format!(
-            "pinned-golden oracle paths {:?} and {:?} do not match manifest paths {:?} and {:?}",
+            "file-backed oracle paths {:?} and {:?} do not match manifest paths {:?} and {:?}",
             stdin_path.0,
             stdout_path.0,
             row.stdin_path.as_ref().map(|path| &path.0),
@@ -203,9 +214,9 @@ fn oracle_evidence_binding_matches(
         ));
         return false;
     }
-    evidence_file_sha256(root, "pinned-golden stdin", stdin_path, violations)
+    evidence_file_sha256(root, "file-backed oracle stdin", stdin_path, violations)
         .is_some_and(|actual| actual == *stdin_digest)
-        && evidence_file_sha256(root, "pinned-golden stdout", stdout_path, violations)
+        && evidence_file_sha256(root, "file-backed oracle stdout", stdout_path, violations)
             .is_some_and(|actual| actual == *stdout_digest)
 }
 
