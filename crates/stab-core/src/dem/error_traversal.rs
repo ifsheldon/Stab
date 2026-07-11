@@ -6,10 +6,14 @@ use super::traversal::{
 };
 use super::{
     DemDetectorId, DemInstruction, DemInstructionKind, DemRepeatBlock, DemTarget,
-    MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS, MAX_DEM_FLATTEN_REPEAT_ITERATIONS,
-    MAX_DEM_FLATTEN_REPEAT_UNROLL,
+    MAX_DEM_FLATTEN_REPEAT_ITERATIONS, MAX_DEM_FLATTEN_REPEAT_UNROLL,
 };
 use crate::{CircuitError, CircuitResult};
+
+#[cfg(not(test))]
+const MAX_DEM_SEARCH_ERROR_MECHANISMS: u64 = 5_000_000;
+#[cfg(test)]
+const MAX_DEM_SEARCH_ERROR_MECHANISMS: u64 = 10_000;
 
 pub(in crate::dem) fn search_graph_nonzero_error_targets(
     traversal: &FoldedDemTraversal<'_>,
@@ -35,7 +39,7 @@ where
     traversal.validate_repeat_depth(context)?;
     let mut visitor = SearchErrorVisitor {
         context,
-        visited_instructions: 0,
+        visited_error_mechanisms: 0,
         visit_error,
     };
     let _ = traversal.try_visit(&mut visitor)?;
@@ -44,7 +48,7 @@ where
 
 struct SearchErrorVisitor<F> {
     context: &'static str,
-    visited_instructions: u64,
+    visited_error_mechanisms: u64,
     visit_error: F,
 }
 
@@ -57,19 +61,19 @@ where
         instruction: &DemInstruction,
         state: &DemTraversalState,
     ) -> CircuitResult<ControlFlow<()>> {
-        self.visited_instructions = self
-            .visited_instructions
-            .checked_add(1)
-            .ok_or_else(|| traversal_error(self.context, "instruction count overflowed"))?;
-        if self.visited_instructions > MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS {
-            return Err(CircuitError::invalid_detector_error_model(format!(
-                "DEM {} currently supports at most {MAX_DEM_FLATTEN_EXPANDED_INSTRUCTIONS} expanded instructions, got at least {}",
-                self.context, self.visited_instructions
-            )));
-        }
         if instruction.kind() == DemInstructionKind::Error
             && instruction.args().first().copied().unwrap_or(0.0) != 0.0
         {
+            self.visited_error_mechanisms = self
+                .visited_error_mechanisms
+                .checked_add(1)
+                .ok_or_else(|| traversal_error(self.context, "error mechanism count overflowed"))?;
+            if self.visited_error_mechanisms > MAX_DEM_SEARCH_ERROR_MECHANISMS {
+                return Err(CircuitError::invalid_detector_error_model(format!(
+                    "DEM {} currently supports at most {MAX_DEM_SEARCH_ERROR_MECHANISMS} expanded nonzero error mechanisms, got at least {}",
+                    self.context, self.visited_error_mechanisms
+                )));
+            }
             (self.visit_error)(instruction, state.detector_offset())?;
         }
         Ok(ControlFlow::Continue(()))
@@ -286,5 +290,47 @@ impl DemErrorTargetCounts {
             self.max_detector_nodes,
             self.detectors.len()
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "unit tests use fixed valid DEM fixtures for traversal diagnostics"
+    )]
+
+    use super::*;
+    use crate::DetectorErrorModel;
+
+    #[test]
+    fn search_traversal_budgets_nonzero_error_mechanisms_not_annotations() {
+        let annotations = DetectorErrorModel::from_dem_str(
+            "repeat 10001 {\n    detector D0\n    logical_observable L0\n    shift_detectors 0\n}\nerror(0.1) L0\n",
+        )
+        .unwrap();
+        let traversal = FoldedDemTraversal::new(&annotations).unwrap();
+        let mut visited = 0;
+        visit_search_graph_errors(&traversal, "test search", |_, _| {
+            visited += 1;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(visited, 1);
+    }
+
+    #[test]
+    fn search_traversal_has_a_distinct_error_mechanism_cap() {
+        let mechanisms = DetectorErrorModel::from_dem_str(
+            "repeat 10001 {\n    error(0.1) D0\n    shift_detectors 1\n}\n",
+        )
+        .unwrap();
+        let traversal = FoldedDemTraversal::new(&mechanisms).unwrap();
+        let error = visit_search_graph_errors(&traversal, "test search", |_, _| Ok(()))
+            .expect_err("expanded nonzero mechanisms should hit the search-specific cap")
+            .to_string();
+        assert!(error.contains("at most 10000 expanded nonzero error mechanisms"));
+        assert!(!error.contains("expanded instructions"));
     }
 }
