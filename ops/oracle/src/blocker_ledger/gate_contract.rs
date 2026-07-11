@@ -231,13 +231,20 @@ pub(super) fn validate_gate_family_coverage(blocker: &BlockerRecord, violations:
     let actual_statistical_cases = blocker
         .cases
         .iter()
-        .filter(|case| case.statistical_plan.is_some())
+        .filter(|case| {
+            case.statistical_plan.is_some()
+                && matches!(case.comparator, super::ComparatorKind::Statistical)
+        })
         .map(|case| case.id.as_str())
         .collect::<BTreeSet<_>>();
-    let expected_statistical_cases = stab_core::__gate_contract_statistical_plans()
+    let core_statistical_plans = stab_core::__gate_contract_statistical_plans();
+    let expected_statistical_cases = core_statistical_plans
         .iter()
         .map(|plan| plan.case_id)
         .collect::<BTreeSet<_>>();
+    if expected_statistical_cases.len() != core_statistical_plans.len() {
+        violations.push("canonical core gate contract repeats a statistical case id".to_string());
+    }
     if actual_statistical_cases != expected_statistical_cases {
         violations.push(format!(
             "gate contract statistical case set differs from canonical core metadata; ledger={actual_statistical_cases:?} core={expected_statistical_cases:?}"

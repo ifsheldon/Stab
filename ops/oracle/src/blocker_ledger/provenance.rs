@@ -157,14 +157,63 @@ fn validate_named_gtest_anchor(
     let Some(content) = read_upstream_anchor_source(case, path, violations) else {
         return;
     };
-    let test = format!("TEST({suite}, {name}");
-    let word_size_test = format!("TEST_EACH_WORD_SIZE_W({suite}, {name}");
-    if !content.contains(&test) && !content.contains(&word_size_test) {
+    let test = format!("TEST({suite}, {name})");
+    let word_size_test = format!("TEST_EACH_WORD_SIZE_W({suite}, {name},");
+    let anchor_start = content
+        .find(&test)
+        .or_else(|| content.find(&word_size_test));
+    let Some(anchor_start) = anchor_start else {
         violations.push(format!(
             "case {:?} gtest anchor {:?} is absent from {:?}",
             case.id, anchor, path
         ));
+        return;
+    };
+    if case.gate_families.is_empty() {
+        return;
     }
+
+    let anchor_body = gtest_anchor_body(&content, anchor_start);
+    let uppercase_anchor_body = anchor_body.to_ascii_uppercase();
+    for gate in stab_core::Gate::all() {
+        let gate_name = gate.canonical_name();
+        if gate_name.len() > 1
+            && contains_identifier(&case.upstream.subcase, gate_name)
+            && !uppercase_anchor_body.contains(gate_name)
+        {
+            violations.push(format!(
+                "case {:?} upstream subcase names gate {gate_name}, but gtest anchor {:?} does not contain it",
+                case.id, anchor
+            ));
+        }
+    }
+}
+
+fn gtest_anchor_body(content: &str, anchor_start: usize) -> &str {
+    let remainder = content.get(anchor_start..).unwrap_or(content);
+    let next_test = ["\nTEST(", "\nTEST_EACH_WORD_SIZE_W("]
+        .into_iter()
+        .filter_map(|marker| remainder.get(1..)?.find(marker).map(|index| index + 1))
+        .min()
+        .unwrap_or(remainder.len());
+    remainder.get(..next_test).unwrap_or(remainder)
+}
+
+fn contains_identifier(text: &str, identifier: &str) -> bool {
+    text.match_indices(identifier).any(|(start, matched)| {
+        let end = start + matched.len();
+        let valid_start = start == 0
+            || text
+                .as_bytes()
+                .get(start - 1)
+                .is_some_and(|byte| !byte.is_ascii_alphanumeric() && *byte != b'_');
+        let valid_end = end == text.len()
+            || text
+                .as_bytes()
+                .get(end)
+                .is_some_and(|byte| !byte.is_ascii_alphanumeric() && *byte != b'_');
+        valid_start && valid_end
+    })
 }
 
 fn validate_pytest_anchor(case: &BlockerCase, path: &Path, violations: &mut Vec<String>) {

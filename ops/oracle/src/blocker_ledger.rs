@@ -34,14 +34,15 @@ mod support;
 const SCHEMA_VERSION: u32 = 2;
 const STIM_VERSION: &str = "v1.16.0";
 const EXPECTED_LEDGER_DIGEST: [u8; 32] = [
-    0x98, 0x18, 0x4b, 0x8e, 0x4a, 0x05, 0x3f, 0x80, 0x37, 0x08, 0x61, 0x15, 0x40, 0xe5, 0x46, 0x2e,
-    0xe0, 0xff, 0x9f, 0x3c, 0xec, 0x2d, 0xdb, 0xd4, 0x75, 0x9e, 0xac, 0xee, 0x57, 0xb2, 0x42, 0xb0,
+    0xdc, 0x82, 0x8e, 0x53, 0xb8, 0x38, 0x04, 0x9c, 0xe6, 0xdf, 0x7b, 0xd8, 0x29, 0x71, 0xaf, 0xeb,
+    0x5c, 0x9c, 0x0b, 0x25, 0xeb, 0x7a, 0x7e, 0xb3, 0xa7, 0x23, 0xc9, 0x6f, 0x26, 0x8e, 0x40, 0x6e,
 ];
 const MAX_LEDGER_BYTES: u64 = 1 << 20;
 const MAX_MANIFEST_BYTES: u64 = 16 << 20;
 const MAX_MANIFEST_ROWS: usize = 16_384;
 const MAX_BLOCKERS: usize = 64;
 const MAX_CASES: usize = 4_096;
+const MAX_STATISTICAL_BUCKET_EVALUATIONS: usize = 128;
 const MAX_DISPLAY_BYTES: usize = 1_024;
 const MAX_IDENTIFIER_BYTES: usize = 128;
 const MAX_TRACKED_PATH_BYTES: usize = crate::process::OUTPUT_LIMIT_BYTES;
@@ -630,6 +631,17 @@ impl BlockerLedger {
     }
 
     fn check(&self, root: &RepoRoot) -> Result<(), BlockerLedgerError> {
+        let computed_digest = computed_semantic_digest(self);
+        let digest_matches = computed_digest.as_slice() == EXPECTED_LEDGER_DIGEST;
+        let statistical_bucket_count = self
+            .blockers
+            .iter()
+            .flat_map(|blocker| &blocker.cases)
+            .filter_map(|case| case.statistical_plan.as_ref())
+            .map(|plan| plan.buckets.len())
+            .sum::<usize>();
+        let statistical_work_is_bounded =
+            statistical_bucket_count <= MAX_STATISTICAL_BUCKET_EVALUATIONS;
         let oracle_rows = read_oracle_manifest(&root.fixture_manifest())?;
         let benchmark_rows = read_benchmark_manifest(&root.benchmark_manifest())?;
         let tracked_stim_paths = read_tracked_stim_paths(root)?;
@@ -647,12 +659,16 @@ impl BlockerLedger {
                 self.stim_version
             ));
         }
-        let computed_digest = computed_semantic_digest(self);
-        if computed_digest.as_slice() != EXPECTED_LEDGER_DIGEST {
+        if !digest_matches {
             violations.push(format!(
                 "blocker ledger semantic SHA-256 digest {} does not match the frozen inventory {}",
                 digest_hex(computed_digest.as_slice()),
                 digest_hex(&EXPECTED_LEDGER_DIGEST)
+            ));
+        }
+        if !statistical_work_is_bounded {
+            violations.push(format!(
+                "ledger requests {statistical_bucket_count} statistical bucket evaluations; limit is {MAX_STATISTICAL_BUCKET_EVALUATIONS}"
             ));
         }
 
@@ -675,6 +691,11 @@ impl BlockerLedger {
 
         let mut blocker_ids = BTreeSet::new();
         let mut case_ids = BTreeSet::new();
+        let evidence_indexes = EvidenceIndexes {
+            oracle_rows: &oracle_rows,
+            benchmark_rows: &benchmark_rows,
+            tracked_stim_paths: &tracked_stim_paths,
+        };
         validate_gate_schema(&mut violations);
         for blocker in &self.blockers {
             if !blocker_ids.insert(blocker.id.as_str()) {
@@ -706,9 +727,8 @@ impl BlockerLedger {
                     root,
                     blocker,
                     case,
-                    &oracle_rows,
-                    &benchmark_rows,
-                    &tracked_stim_paths,
+                    evidence_indexes,
+                    digest_matches && statistical_work_is_bounded,
                     &mut violations,
                 );
             }
@@ -890,13 +910,19 @@ fn validate_expected_blockers(blockers: &[BlockerRecord], violations: &mut Vec<S
     }
 }
 
+#[derive(Clone, Copy)]
+struct EvidenceIndexes<'a> {
+    oracle_rows: &'a BTreeMap<FixtureId, OracleManifestRow>,
+    benchmark_rows: &'a BTreeMap<BenchmarkId, BenchmarkManifestRow>,
+    tracked_stim_paths: &'a BTreeSet<StimSourcePath>,
+}
+
 fn validate_case(
     root: &RepoRoot,
     blocker: &BlockerRecord,
     case: &BlockerCase,
-    oracle_rows: &BTreeMap<FixtureId, OracleManifestRow>,
-    benchmark_rows: &BTreeMap<BenchmarkId, BenchmarkManifestRow>,
-    tracked_stim_paths: &BTreeSet<StimSourcePath>,
+    evidence: EvidenceIndexes<'_>,
+    evaluate_false_positive_budget: bool,
     violations: &mut Vec<String>,
 ) {
     validate_identifier("case", &case.id, violations);
@@ -905,11 +931,11 @@ fn validate_case(
     validate_display_text("upstream test", &case.upstream.test, violations);
     validate_display_text("upstream subcase", &case.upstream.subcase, violations);
     validate_resource_contract(case, violations);
-    validate_statistical_plan(case, violations);
-    validate_upstream_source(root, case, tracked_stim_paths, violations);
+    validate_statistical_plan(case, evaluate_false_positive_budget, violations);
+    validate_upstream_source(root, case, evidence.tracked_stim_paths, violations);
     validate_test_reference(blocker, case, violations);
-    validate_oracle_reference(root, case, oracle_rows, violations);
-    validate_benchmark_reference(case, benchmark_rows, violations);
+    validate_oracle_reference(root, case, evidence.oracle_rows, violations);
+    validate_benchmark_reference(case, evidence.benchmark_rows, violations);
 
     if blocker.disposition == BlockerDisposition::Implement
         && case.status == CaseStatus::EvidenceClose
@@ -973,6 +999,12 @@ fn validate_gate_statistical_plan(
         .iter()
         .find(|expected| expected.case_id == case.id)
     else {
+        if !case.gate_families.is_empty() {
+            violations.push(format!(
+                "gate contract case {:?} has no canonical core statistical plan",
+                case.id
+            ));
+        }
         return;
     };
     let scalar_fields_match = plan.shots == expected.shots

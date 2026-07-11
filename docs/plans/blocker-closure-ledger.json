@@ -1150,9 +1150,9 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.measure_pauli_product_4body",
-            "subcase": "deterministic four-body Pauli-product measurement records"
+            "subcase": "four-body Pauli-product measurement parity invariants"
           },
-          "comparator": "exact",
+          "comparator": "semantic-invariant",
           "status": "implemented",
           "test": {
             "state": "existing",
@@ -1504,9 +1504,9 @@
             "pauli-noise"
           ],
           "upstream": {
-            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "path": "src/stim/simulators/tableau_simulator.test.cc",
             "kind": "gtest-case",
-            "test": "FrameSimulator.consistency",
+            "test": "TableauSimulator.certain_errors_consistent_with_gates",
             "subcase": "X_ERROR, Y_ERROR, and Z_ERROR probability and target roles"
           },
           "comparator": "statistical",
@@ -1556,7 +1556,7 @@
               "parity_mode": "structural",
               "comparator": "structural",
               "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise|--quiet|--|--exact",
-              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+              "upstream_source": "src/stim/simulators/tableau_simulator.test.cc"
             }
           },
           "benchmark": {
@@ -1582,9 +1582,9 @@
             "pauli-channel"
           ],
           "upstream": {
-            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
-            "test": "FrameSimulator.consistency",
+            "test": "ErrorAnalyzer.pauli_channel_threshold",
             "subcase": "PAULI_CHANNEL_1 and PAULI_CHANNEL_2 probability tuples"
           },
           "comparator": "statistical",
@@ -1698,7 +1698,7 @@
               "parity_mode": "structural",
               "comparator": "structural",
               "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels|--quiet|--|--exact",
-              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
           "benchmark": {
@@ -1777,9 +1777,9 @@
             "depolarization"
           ],
           "upstream": {
-            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
-            "test": "FrameSimulator.consistency",
+            "test": "ErrorAnalyzer.composite_error_analysis",
             "subcase": "DEPOLARIZE1 and DEPOLARIZE2 probability and target roles"
           },
           "comparator": "statistical",
@@ -1837,7 +1837,7 @@
               "parity_mode": "structural",
               "comparator": "structural",
               "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization|--quiet|--|--exact",
-              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
           "benchmark": {
@@ -2614,12 +2614,12 @@
             "pauli-noise"
           ],
           "upstream": {
-            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "path": "src/stim/simulators/tableau_simulator.test.cc",
             "kind": "gtest-case",
-            "test": "FrameSimulator.runs_on_general_circuit",
+            "test": "TableauSimulator.certain_errors_consistent_with_gates",
             "subcase": "general-circuit X_ERROR, Y_ERROR, and Z_ERROR dispatch"
           },
-          "comparator": "state-equivalence",
+          "comparator": "semantic-invariant",
           "status": "implemented",
           "test": {
             "state": "existing",
@@ -2641,7 +2641,7 @@
               "parity_mode": "structural",
               "comparator": "structural",
               "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_noise_general_circuit|--quiet|--|--exact",
-              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+              "upstream_source": "src/stim/simulators/tableau_simulator.test.cc"
             }
           },
           "benchmark": {
@@ -2668,12 +2668,12 @@
             "pauli-channel"
           ],
           "upstream": {
-            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
-            "test": "FrameSimulator.runs_on_general_circuit",
+            "test": "ErrorAnalyzer.pauli_channel_threshold",
             "subcase": "general-circuit PAULI_CHANNEL_1 and PAULI_CHANNEL_2 dispatch"
           },
-          "comparator": "state-equivalence",
+          "comparator": "semantic-invariant",
           "status": "implemented",
           "test": {
             "state": "existing",
@@ -2695,7 +2695,7 @@
               "parity_mode": "structural",
               "comparator": "structural",
               "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_pauli_channels_general_circuit|--quiet|--|--exact",
-              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
           "benchmark": {
@@ -2722,12 +2722,12 @@
             "depolarization"
           ],
           "upstream": {
-            "path": "src/stim/simulators/frame_simulator.test.cc",
+            "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
-            "test": "FrameSimulator.runs_on_general_circuit",
+            "test": "ErrorAnalyzer.composite_error_analysis",
             "subcase": "general-circuit DEPOLARIZE1 and DEPOLARIZE2 dispatch"
           },
-          "comparator": "state-equivalence",
+          "comparator": "semantic-invariant",
           "status": "implemented",
           "test": {
             "state": "existing",
@@ -2749,7 +2749,7 @@
               "parity_mode": "structural",
               "comparator": "structural",
               "argv": "cargo-test|-p|stab-core|--lib|gate::semantic_contract::tests::execution::statistical::gate_surface_contract_depolarization_general_circuit|--quiet|--|--exact",
-              "upstream_source": "src/stim/simulators/frame_simulator.test.cc"
+              "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
           "benchmark": {
@@ -2778,10 +2778,10 @@
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
-            "test": "FrameSimulator.runs_on_general_circuit",
+            "test": "FrameSimulator.correlated_error",
             "subcase": "general-circuit correlated and else-correlated dispatch"
           },
-          "comparator": "state-equivalence",
+          "comparator": "semantic-invariant",
           "status": "implemented",
           "test": {
             "state": "existing",

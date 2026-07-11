@@ -938,11 +938,124 @@ fn blocker_ledger_checks_exact_binomial_familywise_tail() {
             .get_mut("familywise_false_positive_budget")
             .expect("false-positive budget") = Value::from(0.000_000_000_001_f64);
     });
+    let case = ledger
+        .blockers
+        .iter()
+        .flat_map(|blocker| &blocker.cases)
+        .find(|case| case.id == "pfm3-contract-pauli-channels")
+        .expect("statistical case");
+    let mut violations = Vec::new();
+    super::statistical::validate_statistical_plan(case, true, &mut violations);
+    assert!(
+        violations
+            .iter()
+            .any(|violation| violation.contains("exact binomial familywise rejection probability")),
+        "{violations:#?}"
+    );
+}
+
+#[test]
+fn blocker_ledger_skips_exact_tail_work_after_digest_mismatch() {
+    let ledger = mutated_ledger(|value| {
+        let plan = case_mut(value, "pfm3-gate-execution", "pfm3-contract-pauli-channels")
+            .get_mut("statistical_plan")
+            .expect("statistical plan");
+        *plan
+            .get_mut("familywise_false_positive_budget")
+            .expect("false-positive budget") = Value::from(0.000_000_000_001_f64);
+    });
+
+    let error = ledger.check(&repo_root()).expect_err("digest mismatch");
+    let message = validation_text(error);
+    assert!(message.contains("semantic SHA-256 digest"));
+    assert!(!message.contains("exact binomial familywise rejection probability"));
+}
+
+#[test]
+fn blocker_ledger_caps_aggregate_statistical_bucket_work() {
+    let ledger = mutated_ledger(|value| {
+        let cases = value
+            .get_mut("blockers")
+            .and_then(Value::as_array_mut)
+            .expect("blockers")
+            .iter_mut()
+            .flat_map(|blocker| {
+                blocker
+                    .get_mut("cases")
+                    .and_then(Value::as_array_mut)
+                    .expect("cases")
+            });
+        for (case_index, case) in cases.enumerate() {
+            let Some(buckets) = case
+                .get_mut("statistical_plan")
+                .and_then(|plan| plan.get_mut("buckets"))
+                .and_then(Value::as_array_mut)
+            else {
+                continue;
+            };
+            while buckets.len() < 32 {
+                buckets.push(serde_json::json!({
+                    "name": format!("extra-{case_index}-{}", buckets.len()),
+                    "expected_probability": 0.5
+                }));
+            }
+        }
+    });
 
     let error = ledger
         .check(&repo_root())
-        .expect_err("exact familywise tail exceeds budget");
-    assert!(validation_text(error).contains("exact binomial familywise rejection probability"));
+        .expect_err("statistical work cap");
+    assert!(validation_text(error).contains("statistical bucket evaluations; limit is 128"));
+}
+
+#[test]
+fn blocker_ledger_rejects_gate_statistical_case_without_core_owner() {
+    let ledger = mutated_ledger(|value| {
+        *case_mut(value, "pfm3-gate-execution", "pfm3-contract-pauli-noise")
+            .get_mut("id")
+            .expect("case id") = Value::from("pfm3-contract-pauli-noise-unowned");
+    });
+
+    let error = ledger.check(&repo_root()).expect_err("unowned plan");
+    assert!(validation_text(error).contains("has no canonical core statistical plan"));
+}
+
+#[test]
+fn blocker_ledger_rejects_gtest_name_prefixes() {
+    let ledger = mutated_ledger(|value| {
+        let upstream = case_mut(
+            value,
+            "pfm3-gate-execution",
+            "pfm3-contract-correlated-errors",
+        )
+        .get_mut("upstream")
+        .expect("upstream");
+        *upstream.get_mut("test").expect("test name") =
+            Value::from("FrameSimulator.correlated_erro");
+    });
+
+    let error = ledger.check(&repo_root()).expect_err("prefix anchor");
+    let message = validation_text(error);
+    assert!(message.contains("gtest anchor"));
+    assert!(message.contains("is absent"));
+}
+
+#[test]
+fn blocker_ledger_requires_gate_markers_inside_gtest_anchor() {
+    let ledger = mutated_ledger(|value| {
+        let upstream = case_mut(value, "pfm3-gate-execution", "pfm3-contract-pauli-noise")
+            .get_mut("upstream")
+            .expect("upstream");
+        *upstream.get_mut("test").expect("test name") = Value::from("TableauSimulator.simulate");
+    });
+
+    let error = ledger.check(&repo_root()).expect_err("missing markers");
+    let message = validation_text(error);
+    assert!(
+        message.contains("upstream subcase names gate X_ERROR"),
+        "{message}"
+    );
+    assert!(message.contains("does not contain it"), "{message}");
 }
 
 #[test]

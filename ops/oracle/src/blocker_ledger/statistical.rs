@@ -1,11 +1,17 @@
 use std::collections::BTreeSet;
 
+use statrs::distribution::{Binomial, DiscreteCDF as _};
+
 use super::{
     BlockerCase, ComparatorKind, StatisticalPlan, validate_display_text,
     validate_gate_statistical_plan,
 };
 
-pub(super) fn validate_statistical_plan(case: &BlockerCase, violations: &mut Vec<String>) {
+pub(super) fn validate_statistical_plan(
+    case: &BlockerCase,
+    evaluate_false_positive_budget: bool,
+    violations: &mut Vec<String>,
+) {
     match (case.comparator, &case.statistical_plan) {
         (ComparatorKind::Statistical, Some(plan)) => {
             if !(10_000..=10_000_000).contains(&plan.shots) {
@@ -58,7 +64,9 @@ pub(super) fn validate_statistical_plan(case: &BlockerCase, violations: &mut Vec
                     ));
                 }
             }
-            validate_statistical_false_positive_budget(case, plan, violations);
+            if evaluate_false_positive_budget {
+                validate_statistical_false_positive_budget(case, plan, violations);
+            }
             validate_gate_statistical_plan(case, plan, violations);
         }
         (ComparatorKind::Statistical, None) => violations.push(format!(
@@ -126,6 +134,9 @@ pub(super) fn binomial_rejection_probability(
     let Ok(bounded_shots) = u32::try_from(shots) else {
         return 1.0;
     };
+    let Ok(distribution) = Binomial::new(probability, shots) else {
+        return 1.0;
+    };
 
     let lower_boundary = probability - allowed_delta;
     let upper_boundary = probability + allowed_delta;
@@ -140,10 +151,15 @@ pub(super) fn binomial_rejection_probability(
         Some(u64::from(first_count_above(bounded_shots, upper_boundary)))
     };
     lower_max
-        .map(|boundary| binomial_lower_tail(shots, probability, boundary))
+        .map(|boundary| distribution.cdf(boundary))
         .unwrap_or(0.0)
         + upper_min
-            .map(|boundary| binomial_upper_tail(shots, probability, boundary))
+            .map(|boundary| {
+                boundary
+                    .checked_sub(1)
+                    .map(|excluded_max| distribution.sf(excluded_max))
+                    .unwrap_or(1.0)
+            })
             .unwrap_or(0.0)
 }
 
@@ -173,42 +189,4 @@ fn first_count_above(shots: u32, probability: f64) -> u32 {
         }
     }
     low
-}
-
-fn binomial_lower_tail(shots: u64, probability: f64, boundary: u64) -> f64 {
-    let mut term = binomial_probability_mass(shots, probability, boundary);
-    let mut sum = term;
-    for k in (1..=boundary).rev() {
-        term *= k as f64 / (shots - k + 1) as f64 * (1.0 - probability) / probability;
-        sum += term;
-        if term <= sum * f64::EPSILON {
-            break;
-        }
-    }
-    sum.min(1.0)
-}
-
-fn binomial_upper_tail(shots: u64, probability: f64, boundary: u64) -> f64 {
-    let mut term = binomial_probability_mass(shots, probability, boundary);
-    let mut sum = term;
-    for k in boundary..shots {
-        term *= (shots - k) as f64 / (k + 1) as f64 * probability / (1.0 - probability);
-        sum += term;
-        if term <= sum * f64::EPSILON {
-            break;
-        }
-    }
-    sum.min(1.0)
-}
-
-fn binomial_probability_mass(shots: u64, probability: f64, successes: u64) -> f64 {
-    let smaller_side = successes.min(shots - successes);
-    let mut log_coefficient = 0.0;
-    for offset in 1..=smaller_side {
-        log_coefficient += ((shots - smaller_side + offset) as f64).ln() - (offset as f64).ln();
-    }
-    (log_coefficient
-        + successes as f64 * probability.ln()
-        + (shots - successes) as f64 * (-probability).ln_1p())
-    .exp()
 }
