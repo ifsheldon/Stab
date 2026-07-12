@@ -2,7 +2,9 @@
 
 ## Status
 
-CQ0 implementation, milestone audit, and independent-review closure are complete in the working tree and pending clean committed-revision verification.
+CQ0 is complete.
+
+Source-owned evidence revision: `02c93c19566bdc465ad9c795f35e956e1ff85440` with `local_modifications=false`.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
@@ -153,7 +155,8 @@ just qualification::correctness-check
 
 The latest focused qualification run executed 46 tests with no failures.
 The workspace test run passed with only the repository's pre-existing documented long-running parser fuzz smoke ignored.
-`just maintenance::pre-commit` and clean committed-revision verification remain to be recorded after final review closure.
+`just maintenance::pre-commit` passed before the implementation commit.
+`just qualification::correctness-check` then passed from committed revision `02c93c19566bdc465ad9c795f35e956e1ff85440` with a clean worktree.
 
 ## Remaining Program Work
 

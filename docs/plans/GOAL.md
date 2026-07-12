@@ -44,6 +44,9 @@ Do not expand product scope while building qualification infrastructure.
 
 ## Program Order
 
+Program checkpoint: CQ0 is complete at source-owned evidence revision `02c93c19566bdc465ad9c795f35e956e1ff85440`; the active milestone is PQ0.
+Do not reopen CQ0 inventory semantics while implementing PQ0 unless pinned-source drift, a newly exported default-feature API, a stale referenced id, or a confirmed CQ0 defect changes the frozen digest.
+
 Execute the milestones in this dependency order:
 
 1. Complete CQ0 to freeze case-level correctness ids and upstream dispositions.
