@@ -87,7 +87,8 @@ pub use error_matcher::explain_errors_from_circuit;
 #[cfg(feature = "ops-contracts")]
 #[doc(hidden)]
 pub use gate::{
-    __gate_contract_family_names, __gate_contract_statistical_plans, __gate_contract_surface_names,
+    __gate_contract_family_names, __gate_contract_statistical_plans,
+    __gate_contract_statistical_rejection_boundaries, __gate_contract_surface_names,
     GateContractStatisticalBucket, GateContractStatisticalPlan,
 };
 pub use gate::{

@@ -19,10 +19,10 @@ macro_rules! define_gate_contract_enum {
             ];
             #[cfg(any(test, feature = "ops-contracts"))]
             pub(super) const NAMES: [&'static str; [$(stringify!($variant)),+].len()] = [
-                $($wire_name),+
+                $(Self::$variant.as_str()),+
             ];
 
-            #[cfg(test)]
+            #[cfg(any(test, feature = "ops-contracts"))]
             pub(super) const fn as_str(self) -> &'static str {
                 match self {
                     $(Self::$variant => $wire_name),+
@@ -56,12 +56,28 @@ define_gate_contract_enum! {
         PairMeasurement => "pair-measurement",
     }
 }
+
+#[cfg(any(test, feature = "ops-contracts"))]
+define_gate_contract_enum! {
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    pub(crate) enum GateSurface {
+        Parser => "parser",
+        MeasurementSampler => "measurement-sampler",
+        ReferenceSampler => "reference-sampler",
+        DetectionConverter => "detection-converter",
+        DetectorFrame => "detector-frame",
+        DetectionSampler => "detection-sampler",
+        ErrorAnalyzer => "error-analyzer",
+        FlowGenerator => "flow-generator",
+    }
+}
+
 #[cfg(test)]
 mod surface;
 
 #[cfg(test)]
 pub(crate) use surface::{
-    GateShapeExclusion, GateSurface, GateSurfaceBehavior, GateSurfaceContract, GateTargetPattern,
+    GateShapeExclusion, GateSurfaceBehavior, GateSurfaceContract, GateTargetPattern,
 };
 
 #[cfg(feature = "ops-contracts")]
@@ -71,16 +87,7 @@ pub(super) fn gate_contract_family_names() -> &'static [&'static str] {
 
 #[cfg(feature = "ops-contracts")]
 pub(super) fn gate_contract_surface_names() -> &'static [&'static str] {
-    &[
-        "parser",
-        "measurement-sampler",
-        "reference-sampler",
-        "detection-converter",
-        "detector-frame",
-        "detection-sampler",
-        "error-analyzer",
-        "flow-generator",
-    ]
+    &GateSurface::NAMES
 }
 
 #[cfg(any(test, feature = "ops-contracts"))]
@@ -88,12 +95,16 @@ mod statistical_plan;
 
 #[cfg(all(test, not(feature = "ops-contracts")))]
 pub(crate) use statistical_plan::GateContractStatisticalPlan;
-#[cfg(test)]
-pub(crate) use statistical_plan::gate_contract_statistical_plan;
-#[cfg(feature = "ops-contracts")]
-pub(super) use statistical_plan::gate_contract_statistical_plans;
 #[cfg(feature = "ops-contracts")]
 pub use statistical_plan::{GateContractStatisticalBucket, GateContractStatisticalPlan};
+#[cfg(test)]
+pub(crate) use statistical_plan::{
+    gate_contract_statistical_count_is_accepted, gate_contract_statistical_plan,
+};
+#[cfg(feature = "ops-contracts")]
+pub(super) use statistical_plan::{
+    gate_contract_statistical_plans, gate_contract_statistical_rejection_boundaries,
+};
 
 pub(super) const fn gate(
     name: &'static str,

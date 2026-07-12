@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 
 use super::super::{
     GateSemanticFamily, GateSurface, GateSurfaceBehavior, GateTargetPattern,
-    gate_contract_statistical_plan,
+    gate_contract_statistical_count_is_accepted, gate_contract_statistical_plan,
 };
 use crate::{
     Circuit, CircuitResult, CompiledDetectionConverter, CompiledSampler,
@@ -949,6 +949,7 @@ fn assert_statistical_counts(case_id: &str, counts: &StatisticalCounts) {
         let count = counts
             .get(bucket.name)
             .unwrap_or_else(|| panic!("{case_id} missing bucket {}", bucket.name));
+        let count = u64::try_from(count).expect("statistical bucket count fits u64");
         let observed = count as f64 / plan.shots as f64;
         let standard_deviation =
             (bucket.expected_probability * (1.0 - bucket.expected_probability) / plan.shots as f64)
@@ -957,7 +958,12 @@ fn assert_statistical_counts(case_id: &str, counts: &StatisticalCounts) {
             .absolute_probability_floor
             .max(plan.sigma_multiplier * standard_deviation);
         assert!(
-            (observed - bucket.expected_probability).abs() <= allowed_delta,
+            gate_contract_statistical_count_is_accepted(
+                count,
+                plan.shots,
+                bucket.expected_probability,
+                allowed_delta,
+            ),
             "{case_id} bucket {} observed {observed:.6}, expected {:.6} +/- {allowed_delta:.6}",
             bucket.name,
             bucket.expected_probability

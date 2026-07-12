@@ -131,25 +131,15 @@ pub(super) fn binomial_rejection_probability(
     if probability == 0.0 || probability == 1.0 {
         return 0.0;
     }
-    let Ok(bounded_shots) = u32::try_from(shots) else {
-        return 1.0;
-    };
     let Ok(distribution) = Binomial::new(probability, shots) else {
         return 1.0;
     };
 
-    let lower_boundary = probability - allowed_delta;
-    let upper_boundary = probability + allowed_delta;
-    let lower_max = if lower_boundary <= 0.0 {
-        None
-    } else {
-        Some(u64::from(last_count_below(bounded_shots, lower_boundary)))
-    };
-    let upper_min = if upper_boundary >= 1.0 {
-        None
-    } else {
-        Some(u64::from(first_count_above(bounded_shots, upper_boundary)))
-    };
+    let (lower_max, upper_min) = stab_core::__gate_contract_statistical_rejection_boundaries(
+        shots,
+        probability,
+        allowed_delta,
+    );
     lower_max
         .map(|boundary| distribution.cdf(boundary))
         .unwrap_or(0.0)
@@ -161,32 +151,4 @@ pub(super) fn binomial_rejection_probability(
                     .unwrap_or(1.0)
             })
             .unwrap_or(0.0)
-}
-
-fn last_count_below(shots: u32, probability: f64) -> u32 {
-    let mut low = 0;
-    let mut high = shots;
-    while low < high {
-        let middle = low + (high - low).div_ceil(2);
-        if f64::from(middle) / f64::from(shots) < probability {
-            low = middle;
-        } else {
-            high = middle - 1;
-        }
-    }
-    low
-}
-
-fn first_count_above(shots: u32, probability: f64) -> u32 {
-    let mut low = 0;
-    let mut high = shots;
-    while low < high {
-        let middle = low + (high - low) / 2;
-        if f64::from(middle) / f64::from(shots) > probability {
-            high = middle;
-        } else {
-            low = middle + 1;
-        }
-    }
-    low
 }

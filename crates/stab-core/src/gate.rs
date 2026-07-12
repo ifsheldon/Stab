@@ -138,6 +138,20 @@ pub fn __gate_contract_statistical_plans() -> &'static [GateContractStatisticalP
     semantic_contract::gate_contract_statistical_plans()
 }
 
+#[cfg(feature = "ops-contracts")]
+#[doc(hidden)]
+pub fn __gate_contract_statistical_rejection_boundaries(
+    shots: u64,
+    expected_probability: f64,
+    allowed_delta: f64,
+) -> (Option<u64>, Option<u64>) {
+    semantic_contract::gate_contract_statistical_rejection_boundaries(
+        shots,
+        expected_probability,
+        allowed_delta,
+    )
+}
+
 #[derive(Debug, Eq, PartialEq)]
 struct GateInfo {
     name: &'static str,

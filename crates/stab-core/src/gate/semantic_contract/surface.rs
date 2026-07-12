@@ -1,22 +1,8 @@
 use std::collections::BTreeMap;
 
 use super::super::{Gate, TargetRule};
-use super::GateSemanticFamily;
+use super::{GateSemanticFamily, GateSurface};
 use crate::{Pauli, PauliBasis, PauliPhase, QubitId, Target};
-
-define_gate_contract_enum! {
-    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    pub(crate) enum GateSurface {
-        Parser => "parser",
-        MeasurementSampler => "measurement-sampler",
-        ReferenceSampler => "reference-sampler",
-        DetectionConverter => "detection-converter",
-        DetectorFrame => "detector-frame",
-        DetectionSampler => "detection-sampler",
-        ErrorAnalyzer => "error-analyzer",
-        FlowGenerator => "flow-generator",
-    }
-}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) enum GateSurfaceBehavior {
