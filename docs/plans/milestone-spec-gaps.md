@@ -105,6 +105,48 @@ Resolution: PFM-B2 now classifies all 81 canonical gates across eight implemente
 
 ## Resolved Entries
 
+## 2026-07-13 - CQ0: Pytest Parameterized Subcase Identity
+
+Status: Resolved
+
+Revealed by: GPT-5.6/max correctness-contract review of the first frozen qualification inventory.
+
+Current text: CQ0 required every relevant Python semantic test and parameter subcase to receive a case-level disposition, but it specified only pytest function discovery.
+
+Gap: a function-level AST record silently collapsed statically enumerable `pytest.mark.parametrize` cases and gave dynamic parameter expressions no finite identity rule. This could hide distinct semantic cases behind one planned selector or pretend an unbounded dynamic family was executable evidence.
+
+Proposed amendment: expand literal collections, literal ranges, supported dictionary keys, `itertools.product`, and stacked parameter decorators into deterministic content-addressed subcases with a bounded Cartesian-product limit; represent every unsupported dynamic expression as one content-addressed `dynamic-family` record and reject it from executable scope until a later milestone selects finite explicit cases.
+
+Resolution: [comprehensive-correctness-qualification-plan.md](comprehensive-correctness-qualification-plan.md) now states the static and dynamic parameterization contract. The CQ0 extractor implements it without importing pinned test modules, the manifest records `none`, `static-subcase`, or `dynamic-family`, and validation rejects executable dynamic families.
+
+## 2026-07-13 - CQ0: Domain Relevance, Evidence Ownership, And Claim Staging
+
+Status: Resolved
+
+Revealed by: GPT-5.6/max architecture and correctness-contract reviews of the first frozen qualification inventory.
+
+Current text: CQ0 required domain ids, primary cases, statistical plans, negative axes, and resource contracts but did not distinguish source relevance from executable proof or define how planned statistical evidence could exist before CQ1.
+
+Gap: one ownership field could either erase deferred cases from domain summaries or let deferred cases count as passing evidence. Planned statistical rows also had no honest plan reference before CQ1, and feature-wide default negative or resource claims allowed an atomic semantic test to appear to prove boundaries it never exercised.
+
+Proposed amendment: store domain relevance separately from executable evidence ownership; require deferred and not-applicable records to remain visible without owning passing evidence; require implemented statistical rows to reference existing source-owned plans while planned rows reference their future qualification-case owner; and assign negative axes or resource contracts only to dedicated evidence that directly measures those claims.
+
+Resolution: [comprehensive-correctness-qualification-plan.md](comprehensive-correctness-qualification-plan.md) now defines the separation and staging rules. The CQ0 schema uses `domain_ids`, executable `ownerships`, independent `behavioral_surface` and `provenance`, typed statistical-plan references, and neutral semantic-only resource contracts; validation rejects stale, missing, or overclaimed combinations.
+
+## 2026-07-13 - CQ0: Finite Cross-Cutting Resource Ownership
+
+Status: Resolved
+
+Revealed by: GPT-5.6/max CQ0 correctness-contract review after the first manifest treated one symlink regression as sufficient to make `CQ-RESOURCE` nonempty.
+
+Current text: the domain matrix required admission, buffering, traversal, allocation, writer and visitor failure, path, and symlink evidence and forbade an umbrella case from closing a domain, while CQ0 acceptance required only one implemented or evidence-close case per feature.
+
+Gap: the first frozen inventory contained one implemented symlink case and no planned resource cases, so CQ2 through CQ5 had no finite source-owned resource ledger to implement and generic feature non-emptiness could incorrectly present the domain as inventoried.
+
+Proposed amendment: freeze independent planned owners for parser admission, checked count arithmetic, result-record admission, materialized expansion, streaming buffer slope, writer failure, visitor failure, replay and side-input admission, folded traversal work, search and solver admission, allocation scaling, typed path boundaries, and output-file lifecycle; retain symlink rejection as an independent implemented owner and validate the exact source-id set.
+
+Resolution: [comprehensive-correctness-qualification-plan.md](comprehensive-correctness-qualification-plan.md) now names the thirteen planned boundary families. `qualification/resource.rs` owns those cases plus the implemented symlink regression, and manifest validation rejects a missing, stale, or incorrectly promoted resource owner.
+
 ## 2026-07-12 - PFM-B2: Semantic Rollups Versus Exact Upstream Provenance
 
 Status: Resolved

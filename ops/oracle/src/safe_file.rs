@@ -1,9 +1,11 @@
 use std::io::{Read, Write};
 use std::path::{Component, Path};
+#[cfg(not(windows))]
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use thiserror::Error;
 
+#[cfg(not(windows))]
 static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Error)]
@@ -137,9 +139,17 @@ fn atomic_write_regular_file_unix(path: &Path, bytes: &[u8]) -> Result<(), SafeF
 fn open_or_create_parent_unix(
     path: &Path,
 ) -> Result<(std::os::fd::OwnedFd, &std::ffi::OsStr), SafeFileError> {
+    let (components, file_name) = split_absolute_file_path(path)?;
+    let directory = open_or_create_directory_components(components)?;
+    Ok((directory, file_name))
+}
+
+#[cfg(unix)]
+fn open_or_create_directory_components(
+    components: Vec<&std::ffi::OsStr>,
+) -> Result<std::os::fd::OwnedFd, SafeFileError> {
     use rustix::fs::{Mode, OFlags};
 
-    let (components, file_name) = split_absolute_file_path(path)?;
     let mut directory = open_root_directory()?;
     for component in components {
         let next = rustix::fs::openat(
@@ -174,7 +184,7 @@ fn open_or_create_parent_unix(
             Err(source) => return Err(SafeFileError::Io(source.into())),
         };
     }
-    Ok((directory, file_name))
+    Ok(directory)
 }
 
 #[cfg(unix)]
@@ -258,44 +268,71 @@ fn open_regular_file_fallback(path: &Path) -> Result<std::fs::File, SafeFileErro
     Ok(file)
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
 fn atomic_write_regular_file_fallback(path: &Path, bytes: &[u8]) -> Result<(), SafeFileError> {
     let parent = path.parent().ok_or(SafeFileError::UnsafePath)?;
-    std::fs::create_dir_all(parent)?;
-    validate_existing_components(parent, true)?;
-    for _ in 0..128 {
-        let sequence = TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let temporary = parent.join(format!(
-            ".stab-oracle-{}-{sequence}.tmp",
-            std::process::id()
-        ));
-        let mut file = match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temporary)
-        {
-            Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(error) => return Err(SafeFileError::Io(error)),
-        };
-        let result = (|| -> Result<(), SafeFileError> {
-            file.write_all(bytes)?;
-            file.sync_all()?;
-            if path.exists() {
-                std::fs::remove_file(path)?;
-            }
-            std::fs::rename(&temporary, path)?;
-            Ok(())
-        })();
-        if result.is_err() {
-            drop(std::fs::remove_file(&temporary));
-        }
-        return result;
+    ensure_directory_fallback(parent)?;
+    let mut temporary = tempfile::Builder::new()
+        .prefix(".stab-oracle-")
+        .tempfile_in(parent)?;
+    temporary.write_all(bytes)?;
+    temporary.as_file().sync_all()?;
+    temporary
+        .persist(path)
+        .map_err(|error| SafeFileError::Io(error.error))?;
+    Ok(())
+}
+
+#[cfg(not(any(unix, windows)))]
+fn atomic_write_regular_file_fallback(path: &Path, bytes: &[u8]) -> Result<(), SafeFileError> {
+    let parent = path.parent().ok_or(SafeFileError::UnsafePath)?;
+    ensure_directory_fallback(parent)?;
+    let temporary = parent.join(format!(
+        ".stab-oracle-{}-{}.tmp",
+        std::process::id(),
+        TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)?;
+    let result = (|| -> Result<(), SafeFileError> {
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        std::fs::rename(&temporary, path)?;
+        Ok(())
+    })();
+    if result.is_err() {
+        drop(std::fs::remove_file(&temporary));
     }
-    Err(SafeFileError::Io(std::io::Error::new(
-        std::io::ErrorKind::AlreadyExists,
-        "failed to reserve a unique temporary output file",
-    )))
+    result
+}
+
+#[cfg(not(unix))]
+fn ensure_directory_fallback(path: &Path) -> Result<(), SafeFileError> {
+    if !path.is_absolute()
+        || path
+            .components()
+            .any(|component| matches!(component, Component::CurDir | Component::ParentDir))
+    {
+        return Err(SafeFileError::UnsafePath);
+    }
+    let mut ancestor = Some(path);
+    loop {
+        let candidate = ancestor.ok_or(SafeFileError::UnsafePath)?;
+        match std::fs::symlink_metadata(candidate) {
+            Ok(_) => {
+                validate_existing_components(candidate, true)?;
+                break;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                ancestor = candidate.parent();
+            }
+            Err(error) => return Err(SafeFileError::Io(error)),
+        }
+    }
+    std::fs::create_dir_all(path)?;
+    validate_existing_components(path, true)
 }
 
 #[cfg(not(unix))]

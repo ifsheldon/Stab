@@ -20,7 +20,5 @@ serde_json = { workspace = true }
 sha2 = { workspace = true }
 stab-core = { path = "../../crates/stab-core", features = ["ops-contracts"] }
 statrs = { workspace = true }
-thiserror = { workspace = true }
-
-[dev-dependencies]
 tempfile = { workspace = true }
+thiserror = { workspace = true }

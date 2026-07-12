@@ -27,7 +27,7 @@ mod evidence;
 mod gate_contract;
 mod oracle;
 mod provenance;
-mod selector;
+pub(crate) mod selector;
 mod statistical;
 mod support;
 

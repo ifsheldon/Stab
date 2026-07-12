@@ -12,6 +12,7 @@
 - `docs/plans/rust-stim-drop-in-rewrite.md` is the current implementation roadmap for the Rust Stim drop-in rewrite.
 - `docs/plans/GOAL.md` is the active execution contract, and it currently points at `docs/plans/comprehensive-correctness-qualification-plan.md` and `docs/plans/comprehensive-stim-performance-qualification-plan.md`.
 - During the qualification program, do not promote a correctness claim from file-level or broad shared evidence, and do not promote a Stim performance ratio until its exact correctness prerequisites and equivalent semantic work pass.
+- Use `just qualification::correctness-list`, `just qualification::correctness-check`, and `just qualification::correctness-regenerate --check` for the CQ0 case and public-API inventory; update the frozen digest and checked manifest together when reviewed source ownership changes.
 - When changing planned scope, milestone order, compatibility targets, public CLI behavior, or benchmark acceptance gates, update the matching plan document in the same change set.
 - Use `.agents/skills/milestone-audit` when auditing whether a milestone implementation satisfies its objective, tasks, linked tests, benchmarks, and done criteria, or when implementation reveals milestone loopholes or under-specified scope.
 - When changing implemented behavior, public APIs, CLI flags, supported file formats, operational workflows, or developer workflows, update the matching documentation in the same change set.

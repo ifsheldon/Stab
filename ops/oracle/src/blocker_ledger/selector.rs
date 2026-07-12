@@ -2,7 +2,7 @@ const MAX_SELECTOR_PARTS: usize = 9;
 const MAX_SELECTOR_PART_BYTES: usize = 128;
 
 #[derive(Clone, Copy, Debug)]
-pub(super) struct CargoTestSelector<'a> {
+pub(crate) struct CargoTestSelector<'a> {
     package: &'a str,
     target: Option<&'a str>,
     filter: &'a str,
@@ -10,7 +10,7 @@ pub(super) struct CargoTestSelector<'a> {
 }
 
 impl<'a> CargoTestSelector<'a> {
-    pub(super) fn parse(parts: &'a [String]) -> Result<Self, &'static str> {
+    pub(crate) fn parse(parts: &'a [String]) -> Result<Self, &'static str> {
         if parts.len() > MAX_SELECTOR_PARTS
             || parts
                 .iter()
@@ -102,11 +102,11 @@ impl<'a> CargoTestSelector<'a> {
         })
     }
 
-    pub(super) fn is_exact(self) -> bool {
+    pub(crate) fn is_exact(self) -> bool {
         self.exact
     }
 
-    pub(super) fn display(self) -> String {
+    pub(crate) fn display(self) -> String {
         let exact = if self.exact { " --exact" } else { "" };
         match self.target {
             Some(target) => format!(
@@ -120,7 +120,7 @@ impl<'a> CargoTestSelector<'a> {
         }
     }
 
-    pub(super) fn args(self) -> Vec<&'a str> {
+    pub(crate) fn args(self) -> Vec<&'a str> {
         let mut args = vec!["test", "-p", self.package];
         if let Some(target) = self.target {
             args.extend(["--test", target]);
@@ -134,7 +134,7 @@ impl<'a> CargoTestSelector<'a> {
     }
 }
 
-pub(super) fn test_listing_match_count(stdout: &str) -> usize {
+pub(crate) fn test_listing_match_count(stdout: &str) -> usize {
     stdout
         .lines()
         .filter(|line| line.ends_with(": test") || line.ends_with(": benchmark"))

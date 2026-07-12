@@ -50,24 +50,35 @@ If these sources disagree, the qualification inventory must record the disagreem
 Add `oracle/qualification-manifest.json` as the source-owned case inventory.
 Do not duplicate fixture payloads, benchmark rows, or blocker-ledger details inside it; reference their stable ids and reject missing or stale references.
 
-Each case must include:
+Schema version 1 normalizes the inventory into four arrays so source discovery is not confused with executable evidence:
+
+- `features`: the sixteen selected `CQ-*` domains and their exact `PERF-*` dependencies.
+- `upstream_cases`: every extracted C++ GTest expansion and Python pytest semantic record with path, line, complete symbol, parameter subcase, parameterization kind, disposition, named deferred product where applicable, one or more domain-relevance ids, and zero or more executable ownership records carrying comparator and evidence owner.
+- `public_api_items`: every default-feature reachable behavioral Rust API path, including re-exports, variants, fields, inherent methods, trait methods, and distinct generic trait implementations, with source span and exact evidence owner.
+- `evidence_cases`: executable or planned ownership records that carry the comparator, primary and supporting selectors, resource contract, negative axes, performance groups, and status.
+
+Every evidence case must include:
 
 - `id`: stable qualification case id.
 - `feature_id`: stable feature id from the domain matrix in this plan.
-- `public_api_items`: exact rustdoc paths for exported Rust items owned by the case, empty only for non-Rust surfaces.
-- `surface`: Rust API, CLI, file format, engine, or resource boundary under test.
-- `upstream`: exact path, provenance kind, complete test or source symbol, subcase, and typed gate markers where relevant.
-- `disposition`: `exact-oracle`, `ported-rust`, `semantic-mining`, `deferred-product`, `not-applicable`, or `superseded`.
+- `behavioral_surface`: Rust API, CLI, file format, engine, or resource boundary under test.
+- `provenance`: upstream semantic case, public Rust API, oracle fixture, Rust regression, blocker-ledger evidence source, or a source-owned planned qualification case.
 - `comparator`: `exact-bytes`, `exact-value`, `canonical`, `error-class`, `structural`, `state-equivalence`, `semantic-invariant`, `statistical`, `property`, or `resource`.
 - `primary_selector`: one exact Cargo test, oracle fixture id, property target, or ops check that selects only this case.
 - `supporting_selectors`: optional shared evidence that cannot replace the primary selector.
-- `statistical_plan`: required only for statistical cases and bound to executable core data.
+- `statistical_plan`: required only for statistical cases; implemented and evidence-close cases reference an existing source-owned oracle, blocker-ledger, or qualification plan, while planned cases reference their planned qualification-case owner until CQ1 supplies executable plan data.
 - `resource_contract`: `streaming`, `bounded-materialized`, `bounded-search`, `constant-scratch`, or `not-applicable`, plus explicit limits or slope rules.
 - `negative_axes`: named malformed, unsupported, overflow, path, width, count, or writer-failure cases.
 - `performance_groups`: benchmark qualification groups whose timed workloads depend on this case.
 - `status`: `planned`, `implemented`, `evidence-close`, or `deferred`.
 
 The manifest schema must deny unknown fields, enforce bounded row and string counts before expensive work, reject unsafe paths and symlinks, validate exact upstream anchors inside pinned files, and include a frozen semantic digest.
+The checked manifest must exactly match deterministic regeneration from the pinned Stim tree, the default-feature rustdoc JSON graph, and current implemented oracle rows.
+Case ids, API paths, and repository-relative source paths must deserialize through validated domain types, and public API classification must reject unknown ownership instead of using `CQ-RESOURCE` as a miscellaneous fallback.
+The manifest header must record the exact pinned Python version used for isolated AST extraction, and regeneration must invoke that version explicitly so AST-derived case ids do not vary with the developer environment.
+Static `pytest.mark.parametrize` values must expand through isolated AST into deterministic subcase records, including stacked-decorator Cartesian products; a dynamic expression must become one content-addressed `dynamic-family` record and cannot enter executable scope until a later milestone replaces it with finite explicit subcases.
+Domain relevance and executable evidence ownership are separate: deferred and not-applicable cases remain visible in applicable domain summaries but own no passing evidence, while selected executable cases carry exact ownership records.
+An atomic semantic case proves only its declared comparator; it must not inherit feature-wide negative axes or resource claims, which require dedicated cases that directly exercise those boundaries.
 
 ### Operational Surface
 
@@ -77,6 +88,7 @@ Expose thin recipes from a new modular `justfiles/qualification.just` file:
 ```sh
 just qualification::correctness-list
 just qualification::correctness-check
+just qualification::correctness-regenerate --check
 just qualification::correctness-run --tier pr
 just qualification::correctness-run --tier full
 just qualification::correctness-run --tier soak
@@ -185,10 +197,14 @@ Convert the current file-level test hierarchy and feature checklist into a finit
 - Generate a deterministic rustdoc JSON inventory for selected `stab-core` and `stab-cli` exports and assign every public item to a qualification feature, explicit parent contract, or documented non-semantic API disposition.
 - Define the public API filter as default-feature reachable types, functions, constants, inherent methods, and explicitly implemented public traits; exclude compiler-generated auto or blanket implementation noise and the evidence-only `ops-contracts` feature from product API counts while testing that evidence-only exports do not leak into default builds.
 - Record the exact extraction grammar, including `TEST`, `TEST_F`, `TYPED_TEST`, and Stim word-size macros; reject ambiguous or duplicate anchors.
+- Use Python's isolated standard-library AST through `uv` to find module, class, and async pytest functions without executing test modules or accepting declarations hidden in comments, strings, or nested helper functions.
+- Expand statically enumerable `pytest.mark.parametrize` decorators, including stacked Cartesian products, into deterministic subcases; record dynamic expressions as one content-addressed non-executable family instead of silently collapsing them into one executable test.
+- Expand Stim's word-size macro into explicit 64-bit, 128-bit, and 256-bit semantic subcases so architecture-dependent C++ preprocessing cannot erase portable-SIMD ownership.
 - Classify every upstream case in a file that contributes to an implemented selected surface.
 - Import existing blocker-ledger, oracle, and Cargo-test evidence by stable id without copying its content.
-- Assign every selected feature one or more domain ids and primary qualification cases.
+- Assign every upstream record one or more domain-relevance ids where applicable and assign every selected executable record one or more exact primary qualification owners without allowing deferred records to contribute passing evidence.
 - Name all deferred-product and not-applicable cases explicitly.
+- Freeze independent planned `CQ-RESOURCE` owners for parser admission, checked count arithmetic, result-record admission, materialized expansion, streaming buffer slope, writer failure, visitor failure, replay and side-input admission, folded traversal work, search and solver admission, allocation scaling, typed path boundaries, and output-file lifecycle; retain symlink rejection as its own implemented owner.
 - Add a semantic digest and bounded validation before source-file reads or statistical work.
 
 ### Tests
@@ -196,8 +212,11 @@ Convert the current file-level test hierarchy and feature checklist into a finit
 - Parser tests for every supported GTest macro form and pytest function form.
 - Regressions for declaration prefixes, comments, strings containing fake declarations, duplicate names, one-character gates, longer gate-name substrings, and anchors present only in declarations.
 - Manifest tests for duplicate ids, missing fields, unsafe paths, symlinks, unknown dispositions, stale evidence ids, shared primary selectors, unknown feature ids, and digest mismatch.
+- Manifest tests for bounded strings and arrays, bounded diagnostics, invalid digest shape, missing statistical-plan owners, invalid behavioral-surface or provenance combinations, and semantic cases that overclaim negative or resource evidence.
+- Python extractor tests for static, stacked, and dynamic parameterization, with validation that dynamic parameter families cannot enter executable scope.
 - Public API inventory tests for duplicate canonical paths, stale items, undocumented additions, re-exports, trait implementations, feature-gated exports, and items mapped to missing cases.
 - A completeness test proving every selected feature id has an executable or explicitly evidence-closed case and every deferred case names its product.
+- A resource-inventory test proving every required boundary family has its own source-owned primary case and cannot disappear behind the existing symlink regression.
 
 ### Acceptance Criteria
 
@@ -205,7 +224,9 @@ Convert the current file-level test hierarchy and feature checklist into a finit
 - No selected feature is represented only by a file-level row.
 - No selected exported Rust API item is unclassified or represented only by module-level evidence.
 - No implemented case has a shared or non-resolving primary selector.
+- `CQ-RESOURCE` contains the exact finite boundary-family inventory required by this milestone, with one independent planned or implemented owner per family.
 - The inventory can be regenerated deterministically from pinned Stim and checked without modifying it.
+- `just qualification::correctness-regenerate --check` byte-compares the checked manifest with fresh pinned-source and rustdoc discovery.
 
 ## Milestone CQ1: Build The Qualification Harness
 

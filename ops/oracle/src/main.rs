@@ -13,6 +13,7 @@ mod blocker_ledger;
 mod fixtures;
 mod matrix;
 mod process;
+mod qualification;
 mod safe_file;
 
 use std::ffi::{OsStr, OsString};
@@ -129,6 +130,12 @@ enum Command {
         #[arg(long)]
         check_selectors: bool,
     },
+
+    /// Build, inspect, or validate comprehensive qualification inventories.
+    Qualification {
+        #[command(subcommand)]
+        command: qualification::Command,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -152,6 +159,9 @@ enum OracleError {
 
     #[error(transparent)]
     Matrix(#[from] matrix::MatrixError),
+
+    #[error(transparent)]
+    Qualification(#[from] qualification::QualificationError),
 
     #[error("{0}")]
     InvalidRunSelection(String),
@@ -348,6 +358,10 @@ impl RepoRoot {
             .join("blocker-closure-ledger.json")
     }
 
+    fn qualification_manifest(&self) -> PathBuf {
+        self.path.join("oracle").join("qualification-manifest.json")
+    }
+
     fn benchmark_manifest(&self) -> PathBuf {
         self.path.join("benchmarks").join("manifest.csv")
     }
@@ -490,6 +504,10 @@ fn run(cli: Cli) -> Result<(), OracleError> {
         } => {
             validate_stim_source(&root)?;
             blocker_ledger::validate_and_print(&root, list, check_selectors)?;
+        }
+        Command::Qualification { command } => {
+            validate_stim_source(&root)?;
+            qualification::run(&root, command)?;
         }
     }
     Ok(())

@@ -100,7 +100,19 @@ The matrix lives at `oracle/compatibility-matrix.csv` and records upstream sourc
 
 The active follow-up plans are [comprehensive correctness qualification](docs/plans/comprehensive-correctness-qualification-plan.md) and [comprehensive Stim performance qualification](docs/plans/comprehensive-stim-performance-qualification-plan.md), with execution rules in [GOAL.md](docs/plans/GOAL.md).
 These plans will add case-level correctness and feature-level performance disposition ledgers, independently selectable evidence, full and soak tiers, symmetric process CLI comparisons, faithful pinned-Stim adapter coverage, paired confidence intervals, and memory or scaling checks.
-Their qualification commands are planned interfaces until CQ1 and PQ1 implement them; the existing oracle and benchmark commands below remain authoritative during migration.
+Correctness run or report tiers and performance qualification commands remain planned until CQ1 and PQ1 implement them; the existing oracle and benchmark commands below remain authoritative during migration.
+
+CQ0 inventory discovery is implemented through:
+
+```sh
+just qualification::correctness-list
+just qualification::correctness-list --feature CQ-RESULT-FORMATS
+just qualification::correctness-check
+just qualification::correctness-regenerate --check
+```
+
+These commands validate or deterministically regenerate `oracle/qualification-manifest.json` from the pinned C++ and Python test tree, default-feature rustdoc JSON, and current implemented oracle rows.
+The correctness run and report tiers remain planned until CQ1.
 
 Benchmark contracts live at `benchmarks/manifest.csv`.
 Each benchmark row owns its runner, threshold class, and comparability class; `just bench::list` prints all three, and manifest validation requires the comparability field to agree with the source-owned compare-note prefix.
