@@ -34,8 +34,8 @@ mod support;
 const SCHEMA_VERSION: u32 = 2;
 const STIM_VERSION: &str = "v1.16.0";
 const EXPECTED_LEDGER_DIGEST: [u8; 32] = [
-    0xdc, 0x82, 0x8e, 0x53, 0xb8, 0x38, 0x04, 0x9c, 0xe6, 0xdf, 0x7b, 0xd8, 0x29, 0x71, 0xaf, 0xeb,
-    0x5c, 0x9c, 0x0b, 0x25, 0xeb, 0x7a, 0x7e, 0xb3, 0xa7, 0x23, 0xc9, 0x6f, 0x26, 0x8e, 0x40, 0x6e,
+    0x73, 0x93, 0x5b, 0x22, 0x58, 0x34, 0xc5, 0x34, 0x91, 0xe1, 0xc9, 0x01, 0xb4, 0x87, 0x4e, 0xc3,
+    0xe7, 0x3e, 0x3d, 0x9a, 0x2e, 0x5c, 0xa7, 0xb9, 0x93, 0x02, 0xe4, 0x58, 0x54, 0x68, 0xe9, 0xbd,
 ];
 const MAX_LEDGER_BYTES: u64 = 1 << 20;
 const MAX_MANIFEST_BYTES: u64 = 16 << 20;
@@ -240,7 +240,29 @@ struct UpstreamSource {
     test: String,
     subcase: String,
     #[serde(default)]
+    gate_markers: Vec<GateMarker>,
+    #[serde(default)]
     anchors: Vec<String>,
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct GateMarker(String);
+
+impl GateMarker {
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for GateMarker {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let marker = String::deserialize(deserializer)?;
+        stab_core::Gate::from_name(&marker).map_err(serde::de::Error::custom)?;
+        Ok(Self(marker))
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]

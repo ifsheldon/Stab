@@ -1042,7 +1042,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.resets_vs_measurements",
-            "subcase": "M, MX, MY, R, RX, RY, MR, MRX, and MRY deterministic target roles"
+            "subcase": "M, MX, MY, R, RX, RY, MR, MRX, and MRY deterministic target roles",
+            "gate_markers": ["MRX"]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -1096,7 +1097,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.mxxyyzz_basis",
-            "subcase": "MXX, MYY, and MZZ deterministic basis behavior"
+            "subcase": "MXX, MYY, and MZZ deterministic basis behavior",
+            "gate_markers": ["MXX"]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -1150,7 +1152,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.measure_pauli_product_4body",
-            "subcase": "four-body Pauli-product measurement parity invariants"
+            "subcase": "four-body Pauli-product measurement parity invariants",
+            "gate_markers": ["MPP"]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -1204,7 +1207,8 @@
             "path": "src/stim/simulators/tableau_simulator.test.cc",
             "kind": "gtest-case",
             "test": "TableauSimulator.measure_pauli_product_bad",
-            "subcase": "anti-Hermitian same-qubit Pauli products reject during semantic execution"
+            "subcase": "anti-Hermitian same-qubit Pauli products reject during semantic execution",
+            "gate_markers": ["MPP"]
           },
           "comparator": "error-class",
           "status": "implemented",
@@ -1257,7 +1261,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.mpad",
-            "subcase": "deterministic zero and one measurement-pad records"
+            "subcase": "deterministic zero and one measurement-pad records",
+            "gate_markers": ["MPAD"]
           },
           "comparator": "exact",
           "status": "implemented",
@@ -1311,7 +1316,8 @@
             "path": "src/stim/simulators/tableau_simulator.test.cc",
             "kind": "gtest-case",
             "test": "TableauSimulator.measure_pauli_product_noisy",
-            "subcase": "MPP(p) flips deterministic Pauli-product measurement records at the declared probability"
+            "subcase": "MPP(p) flips deterministic Pauli-product measurement records at the declared probability",
+            "gate_markers": ["MPP"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1452,8 +1458,9 @@
           "upstream": {
             "path": "src/stim/circuit/gate_decomposition.test.cc",
             "kind": "gtest-case",
-            "test": "gate_decomposition.decompose_spp_or_spp_dag_operation_simple",
-            "subcase": "simple Hermitian SPP and SPP_DAG decomposition semantics"
+            "test": "gate_decomposition.decompose_spp_or_spp_dag_operation_inverted3",
+            "subcase": "simple Hermitian SPP_DAG decomposition semantics",
+            "gate_markers": ["SPP_DAG"]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -1507,7 +1514,8 @@
             "path": "src/stim/simulators/tableau_simulator.test.cc",
             "kind": "gtest-case",
             "test": "TableauSimulator.certain_errors_consistent_with_gates",
-            "subcase": "X_ERROR, Y_ERROR, and Z_ERROR probability and target roles"
+            "subcase": "X_ERROR, Y_ERROR, and Z_ERROR probability and target roles",
+            "gate_markers": ["X_ERROR"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1585,7 +1593,8 @@
             "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.pauli_channel_threshold",
-            "subcase": "PAULI_CHANNEL_1 and PAULI_CHANNEL_2 probability tuples"
+            "subcase": "PAULI_CHANNEL_1 and PAULI_CHANNEL_2 probability tuples",
+            "gate_markers": ["PAULI_CHANNEL_1"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1780,7 +1789,8 @@
             "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.composite_error_analysis",
-            "subcase": "DEPOLARIZE1 and DEPOLARIZE2 probability and target roles"
+            "subcase": "DEPOLARIZE1 and DEPOLARIZE2 probability and target roles",
+            "gate_markers": ["DEPOLARIZE1"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1866,7 +1876,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.correlated_error",
-            "subcase": "CORRELATED_ERROR and ELSE_CORRELATED_ERROR conditional branch semantics"
+            "subcase": "CORRELATED_ERROR and ELSE_CORRELATED_ERROR conditional branch semantics",
+            "gate_markers": ["CORRELATED_ERROR"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -1944,7 +1955,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.heralded_erase_detect_statistics",
-            "subcase": "HERALDED_ERASE detector and Pauli bucket statistics"
+            "subcase": "HERALDED_ERASE detector and Pauli bucket statistics",
+            "gate_markers": ["HERALDED_ERASE"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -2026,7 +2038,8 @@
             "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.omit_vacuous_detector_observable_instructions",
-            "subcase": "vacuous detector and observable declarations are omitted without losing error targets"
+            "subcase": "vacuous detector and observable declarations are omitted without losing error targets",
+            "gate_markers": ["DETECTOR"]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -2081,7 +2094,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.classical_controls",
-            "subcase": "record and sweep target-role matrix for controlled Pauli gates"
+            "subcase": "record and sweep target-role matrix for controlled Pauli gates",
+            "gate_markers": ["CX"]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -2135,7 +2149,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.stream_huge_case",
-            "subcase": "REPEAT is parser-owned control flow and executes through circuit structure instead of regular instruction dispatch"
+            "subcase": "REPEAT is parser-owned control flow and executes through circuit structure instead of regular instruction dispatch",
+            "gate_markers": ["REPEAT"]
           },
           "comparator": "structural",
           "status": "implemented",
@@ -2242,7 +2257,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.noisy_measurement_reset_x",
-            "subcase": "MRX noise rate and X-basis reset postcondition"
+            "subcase": "MRX noise rate and X-basis reset postcondition",
+            "gate_markers": ["MRX"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -2313,7 +2329,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.noisy_measurement_reset_y",
-            "subcase": "MRY noise rate and Y-basis reset postcondition"
+            "subcase": "MRY noise rate and Y-basis reset postcondition",
+            "gate_markers": ["MRY"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -2384,7 +2401,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.noisy_measurement_reset_z",
-            "subcase": "MR noise rate and Z-basis reset postcondition"
+            "subcase": "MR noise rate and Z-basis reset postcondition",
+            "gate_markers": ["MRZ"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -2455,7 +2473,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.mxxyyzz_inversion",
-            "subcase": "MXX, MYY, and MZZ inverted targets and probability-one record flips"
+            "subcase": "MXX, MYY, and MZZ inverted targets and probability-one record flips",
+            "gate_markers": ["MXX"]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -2509,7 +2528,8 @@
             "path": "src/stim/circuit/gate_decomposition.test.cc",
             "kind": "gtest-case",
             "test": "gate_decomposition.decompose_spp_or_spp_dag_operation_multiple",
-            "subcase": "multiple Hermitian SPP and SPP_DAG product groups match explicit decomposition"
+            "subcase": "multiple Hermitian SPP product groups match explicit decomposition",
+            "gate_markers": ["SPP"]
           },
           "comparator": "state-equivalence",
           "status": "implemented",
@@ -2563,7 +2583,8 @@
             "path": "src/stim/circuit/gate_decomposition.test.cc",
             "kind": "gtest-case",
             "test": "gate_decomposition.decompose_spp_or_spp_dag_operation_bad",
-            "subcase": "anti-Hermitian SPP and SPP_DAG products fail closed on semantic surfaces"
+            "subcase": "anti-Hermitian SPP products fail closed on semantic surfaces",
+            "gate_markers": ["SPP"]
           },
           "comparator": "error-class",
           "status": "implemented",
@@ -2617,7 +2638,8 @@
             "path": "src/stim/simulators/tableau_simulator.test.cc",
             "kind": "gtest-case",
             "test": "TableauSimulator.certain_errors_consistent_with_gates",
-            "subcase": "general-circuit X_ERROR, Y_ERROR, and Z_ERROR dispatch"
+            "subcase": "general-circuit X_ERROR, Y_ERROR, and Z_ERROR dispatch",
+            "gate_markers": ["X_ERROR"]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -2671,7 +2693,8 @@
             "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.pauli_channel_threshold",
-            "subcase": "general-circuit PAULI_CHANNEL_1 and PAULI_CHANNEL_2 dispatch"
+            "subcase": "general-circuit PAULI_CHANNEL_1 and PAULI_CHANNEL_2 dispatch",
+            "gate_markers": ["PAULI_CHANNEL_1"]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -2725,7 +2748,8 @@
             "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.composite_error_analysis",
-            "subcase": "general-circuit DEPOLARIZE1 and DEPOLARIZE2 dispatch"
+            "subcase": "general-circuit DEPOLARIZE1 and DEPOLARIZE2 dispatch",
+            "gate_markers": ["DEPOLARIZE1"]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -2779,7 +2803,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.correlated_error",
-            "subcase": "general-circuit correlated and else-correlated dispatch"
+            "subcase": "general-circuit correlated and else-correlated dispatch",
+            "gate_markers": ["CORRELATED_ERROR"]
           },
           "comparator": "semantic-invariant",
           "status": "implemented",
@@ -2833,7 +2858,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.heralded_pauli_channel_1_statistics",
-            "subcase": "HERALDED_PAULI_CHANNEL_1 herald and Pauli bucket statistics"
+            "subcase": "HERALDED_PAULI_CHANNEL_1 herald and Pauli bucket statistics",
+            "gate_markers": ["HERALDED_PAULI_CHANNEL_1"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -2916,7 +2942,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.heralded_erase_statistics_offset_by_2",
-            "subcase": "HERALDED_ERASE statistics are invariant under a two-qubit index offset"
+            "subcase": "HERALDED_ERASE statistics are invariant under a two-qubit index offset",
+            "gate_markers": ["HERALDED_ERASE"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -2999,7 +3026,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.heralded_pauli_channel_1_statistics_offset_by_2",
-            "subcase": "HERALDED_PAULI_CHANNEL_1 statistics are invariant under a two-qubit index offset"
+            "subcase": "HERALDED_PAULI_CHANNEL_1 statistics are invariant under a two-qubit index offset",
+            "gate_markers": ["HERALDED_PAULI_CHANNEL_1"]
           },
           "comparator": "statistical",
           "statistical_plan": {
@@ -3082,7 +3110,8 @@
             "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.coordinate_tracking",
-            "subcase": "detector coordinates and coordinate shifts preserve exact DEM ordering"
+            "subcase": "detector coordinates and coordinate shifts preserve exact DEM ordering",
+            "gate_markers": ["DETECTOR"]
           },
           "comparator": "exact",
           "status": "implemented",
@@ -3136,7 +3165,8 @@
             "path": "src/stim/simulators/error_analyzer.test.cc",
             "kind": "gtest-case",
             "test": "ErrorAnalyzer.tagged_noise",
-            "subcase": "error, detector, observable, and shift tags survive analyzer conversion"
+            "subcase": "error, detector, observable, and shift tags survive analyzer conversion",
+            "gate_markers": ["X_ERROR"]
           },
           "comparator": "exact",
           "status": "implemented",
@@ -3191,7 +3221,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.quantum_cannot_control_classical",
-            "subcase": "quantum controls targeting record bits fail closed in frame-style sampling"
+            "subcase": "quantum controls targeting record bits fail closed in frame-style sampling",
+            "gate_markers": ["CNOT"]
           },
           "comparator": "error-class",
           "status": "implemented",
@@ -3246,7 +3277,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.classical_can_control_quantum",
-            "subcase": "measurement records control CX, CY, XCZ, and YCZ in both target directions"
+            "subcase": "measurement records control CX, CY, XCZ, and YCZ in both target directions",
+            "gate_markers": ["CX"]
           },
           "comparator": "exact",
           "status": "implemented",
@@ -3300,7 +3332,8 @@
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.ignores_sweep_controls_when_given_no_sweep_data",
-            "subcase": "omitted sweep data is interpreted as all-false for forward sweep controls"
+            "subcase": "omitted sweep data is interpreted as all-false for forward sweep controls",
+            "gate_markers": ["CNOT"]
           },
           "comparator": "exact",
           "status": "implemented",

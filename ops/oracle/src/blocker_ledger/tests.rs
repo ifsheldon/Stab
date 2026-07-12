@@ -1052,10 +1052,69 @@ fn blocker_ledger_requires_gate_markers_inside_gtest_anchor() {
     let error = ledger.check(&repo_root()).expect_err("missing markers");
     let message = validation_text(error);
     assert!(
-        message.contains("upstream subcase names gate X_ERROR"),
+        message.contains("upstream gate marker X_ERROR"),
         "{message}"
     );
-    assert!(message.contains("does not contain it"), "{message}");
+    assert!(message.contains("is absent"), "{message}");
+}
+
+#[test]
+fn blocker_ledger_gate_markers_are_identifier_exact() {
+    let ledger = mutated_ledger(|value| {
+        let upstream = case_mut(value, "pfm3-gate-execution", "pfm3-contract-pauli-channels")
+            .get_mut("upstream")
+            .expect("upstream");
+        *upstream.get_mut("test").expect("test name") =
+            Value::from("ErrorAnalyzer.heralded_pauli_channel_1");
+        *upstream.get_mut("subcase").expect("subcase") =
+            Value::from("PAULI_CHANNEL_1 probability tuples");
+    });
+
+    let error = ledger.check(&repo_root()).expect_err("substring marker");
+    let message = validation_text(error);
+    assert!(
+        message.contains("upstream gate marker PAULI_CHANNEL_1"),
+        "{message}"
+    );
+}
+
+#[test]
+fn blocker_ledger_checks_single_character_gate_markers() {
+    let ledger = mutated_ledger(|value| {
+        let upstream = case_mut(value, "pfm3-gate-execution", "pfm3-contract-pauli-noise")
+            .get_mut("upstream")
+            .expect("upstream");
+        *upstream.get_mut("test").expect("test name") = Value::from("TableauSimulator.simulate");
+        *upstream.get_mut("subcase").expect("subcase") = Value::from("R gate execution");
+        *upstream.get_mut("gate_markers").expect("gate markers") = serde_json::json!(["R"]);
+    });
+
+    let error = ledger
+        .check(&repo_root())
+        .expect_err("single-character marker");
+    let message = validation_text(error);
+    assert!(message.contains("upstream gate marker R"), "{message}");
+}
+
+#[test]
+fn blocker_ledger_does_not_count_the_gtest_declaration_as_a_gate_marker() {
+    let ledger = mutated_ledger(|value| {
+        let upstream = case_mut(value, "pfm3-gate-execution", "pfm3-contract-spp")
+            .get_mut("upstream")
+            .expect("upstream");
+        *upstream.get_mut("test").expect("test name") =
+            Value::from("gate_decomposition.decompose_spp_or_spp_dag_operation_simple");
+        *upstream.get_mut("subcase").expect("subcase") = Value::from("SPP_DAG execution");
+    });
+
+    let error = ledger
+        .check(&repo_root())
+        .expect_err("declaration-only marker");
+    let message = validation_text(error);
+    assert!(
+        message.contains("upstream gate marker SPP_DAG"),
+        "{message}"
+    );
 }
 
 #[test]

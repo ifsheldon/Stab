@@ -78,6 +78,11 @@ pub(super) fn computed_semantic_digest(ledger: &BlockerLedger) -> sha2::digest::
             );
             digest_field(&mut hasher, "case.upstream.test", &case.upstream.test);
             digest_field(&mut hasher, "case.upstream.subcase", &case.upstream.subcase);
+            let mut gate_markers = case.upstream.gate_markers.iter().collect::<Vec<_>>();
+            gate_markers.sort();
+            for marker in gate_markers {
+                digest_field(&mut hasher, "case.upstream.gate_marker", marker.as_str());
+            }
             for anchor in &case.upstream.anchors {
                 digest_field(&mut hasher, "case.upstream.anchor", anchor);
             }

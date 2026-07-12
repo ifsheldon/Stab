@@ -170,33 +170,59 @@ fn validate_named_gtest_anchor(
         return;
     };
     if case.gate_families.is_empty() {
+        if !case.upstream.gate_markers.is_empty() {
+            violations.push(format!(
+                "case {:?} has upstream gate markers without a gate-family contract",
+                case.id
+            ));
+        }
         return;
     }
 
-    let anchor_body = gtest_anchor_body(&content, anchor_start);
+    let anchor_body = gtest_executable_body(&content, anchor_start);
     let uppercase_anchor_body = anchor_body.to_ascii_uppercase();
-    for gate in stab_core::Gate::all() {
-        let gate_name = gate.canonical_name();
-        if gate_name.len() > 1
-            && contains_identifier(&case.upstream.subcase, gate_name)
-            && !uppercase_anchor_body.contains(gate_name)
-        {
+    let mut unique_markers = BTreeSet::new();
+    for marker in &case.upstream.gate_markers {
+        let marker = marker.as_str();
+        validate_display_text("upstream gate marker", marker, violations);
+        if !unique_markers.insert(marker) {
             violations.push(format!(
-                "case {:?} upstream subcase names gate {gate_name}, but gtest anchor {:?} does not contain it",
+                "case {:?} repeats upstream gate marker {marker:?}",
+                case.id
+            ));
+        }
+        if !contains_gate_marker(&uppercase_anchor_body, marker) {
+            violations.push(format!(
+                "case {:?} upstream gate marker {marker} is absent from executable gtest anchor {:?}",
                 case.id, anchor
             ));
         }
     }
+    let has_generic_gate_anchor = contains_identifier(&uppercase_anchor_body, "GATE_DATA")
+        || contains_identifier(
+            &uppercase_anchor_body,
+            "GENERATE_TEST_CIRCUIT_WITH_ALL_OPERATIONS",
+        );
+    if case.upstream.gate_markers.is_empty() && !has_generic_gate_anchor {
+        violations.push(format!(
+            "case {:?} gtest gate-family provenance must name an exact gate marker",
+            case.id
+        ));
+    }
 }
 
-fn gtest_anchor_body(content: &str, anchor_start: usize) -> &str {
+fn gtest_executable_body(content: &str, anchor_start: usize) -> &str {
     let remainder = content.get(anchor_start..).unwrap_or(content);
     let next_test = ["\nTEST(", "\nTEST_EACH_WORD_SIZE_W("]
         .into_iter()
         .filter_map(|marker| remainder.get(1..)?.find(marker).map(|index| index + 1))
         .min()
         .unwrap_or(remainder.len());
-    remainder.get(..next_test).unwrap_or(remainder)
+    let body_start = remainder
+        .get(..next_test)
+        .and_then(|anchor| anchor.find('{'))
+        .map_or(0, |index| index + 1);
+    remainder.get(body_start..next_test).unwrap_or(remainder)
 }
 
 fn contains_identifier(text: &str, identifier: &str) -> bool {
@@ -214,6 +240,12 @@ fn contains_identifier(text: &str, identifier: &str) -> bool {
                 .is_some_and(|byte| !byte.is_ascii_alphanumeric() && *byte != b'_');
         valid_start && valid_end
     })
+}
+
+fn contains_gate_marker(uppercase_body: &str, marker: &str) -> bool {
+    let marker = marker.to_ascii_uppercase();
+    contains_identifier(uppercase_body, &marker)
+        || contains_identifier(uppercase_body, &format!("DO_{marker}"))
 }
 
 fn validate_pytest_anchor(case: &BlockerCase, path: &Path, violations: &mut Vec<String>) {
