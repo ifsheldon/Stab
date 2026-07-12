@@ -1,12 +1,14 @@
 # Non-Deferred Partial Feature Milestones
 
+Status: Complete for the finite selected PFM-B ledger; see `docs/plans/pfm8-rollup-evidence-report.md`.
+
 ## Summary
 
 This plan covers every feature row that is marked `Partial` in `docs/stab-feature-checklist.md` and still has non-deferred Rust or CLI work.
 It excludes rows whose remaining work is only Python bindings, JavaScript/WASM, diagrams, ecosystem integrations, public simulator products, C++ header compatibility, exact random-stream parity, or deprecated `--detector_hypergraph` support.
 
-This is the active planning document for finishing the remaining partial feature surfaces and preserving the resolutions of the eight under-specification entries recorded in `docs/plans/milestone-spec-gaps.md`.
-Use `docs/plans/remaining-partial-feature-milestones.md`, `docs/plans/partial-feature-inventory.md`, and existing RPF progress reports as historical context and source material, but execute this document when deciding the next implementation packet.
+This is the completed planning document for the finite non-deferred blocker program and preserves the resolutions of the eight under-specification entries recorded in `docs/plans/milestone-spec-gaps.md`.
+Use `docs/plans/remaining-partial-feature-milestones.md`, `docs/plans/partial-feature-inventory.md`, and existing RPF or PFM progress reports as historical context and source material; execute `docs/plans/GOAL.md` and the linked CQ and PQ plans for the active qualification program.
 
 The main planning rule is simple: a row may not move from `Partial` to `Done` because nearby functionality exists.
 It moves only when the exact active subcases have implementation, tests, oracle evidence where relevant, benchmark evidence where relevant, synchronized documentation, milestone-audit closure, and full-code-review closure.

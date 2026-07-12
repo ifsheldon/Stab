@@ -4,6 +4,11 @@
 Each row names the owning implementation milestone, threshold class, runner, upstream Stim source, workload phase, and measurement family.
 `just bench::smoke` validates that required M3 contracts remain present, including the primary benchmark matrix, canonical print and convert contracts, result-format convert CLI rows, bit-packed detector conversion contracts, and the M12 performance-hardening target.
 
+The planned comprehensive follow-up is defined in [../docs/plans/comprehensive-stim-performance-qualification-plan.md](../docs/plans/comprehensive-stim-performance-qualification-plan.md).
+PQ0 will audit every existing manifest row instead of assuming that historical coverage is already comprehensive, and it will add a schema-versioned feature-disposition overlay, correctness dependencies, scale families, symmetric process CLI evidence, faithful pinned-Stim adapter evidence where needed, paired confidence intervals, and memory or scaling contracts.
+Until PQ1 implements the planned qualification commands and PQ6 explicitly graduates replacement thresholds, the current manifest, M12 primary matrix, threshold files, waiver files, and commands documented below remain authoritative.
+The required correctness preconditions are planned in [../docs/plans/comprehensive-correctness-qualification-plan.md](../docs/plans/comprehensive-correctness-qualification-plan.md); a timed row may not become comprehensive evidence merely because it runs successfully.
+
 Runner meanings:
 
 - `stim-perf`: run pinned C++ Stim's `stim_perf` binary with the row's `stim_perf_filter`.

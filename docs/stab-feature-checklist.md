@@ -2,7 +2,7 @@
 
 This checklist maps the Stim v1.16.0 inventory in [stim-feature-list.md](stim-feature-list.md) onto the current Stab codebase.
 It is a feature-availability document, not a new roadmap.
-Use [plans/non-deferred-partial-feature-milestones.md](plans/non-deferred-partial-feature-milestones.md), [plans/rust-stim-drop-in-rewrite.md](plans/rust-stim-drop-in-rewrite.md), and [plans/GOAL.md](plans/GOAL.md) for active implementation goals.
+Use [plans/comprehensive-correctness-qualification-plan.md](plans/comprehensive-correctness-qualification-plan.md), [plans/comprehensive-stim-performance-qualification-plan.md](plans/comprehensive-stim-performance-qualification-plan.md), and [plans/GOAL.md](plans/GOAL.md) for the active qualification goals; the historical implementation roadmap remains [plans/rust-stim-drop-in-rewrite.md](plans/rust-stim-drop-in-rewrite.md).
 
 Status key:
 
@@ -214,11 +214,15 @@ The final 37-case execution matrix turns that contract integrity into completion
 
 ## 16. Test And Benchmark Surface
 
+The rows below describe current evidence, not the planned comprehensive qualification claim.
+The CQ and PQ plans must split partial checklist rows into exact implemented and unimplemented children, create a case-level correctness disposition for every selected contract, and assign every performance-relevant implemented contract a faithful benchmark disposition before this section can claim comprehensive qualification.
+Planning those suites does not change a feature's current availability status until their executable evidence lands.
+
 | Feature | Stab status | Evidence and notes |
 | --- | --- | --- |
-| Upstream test inventory and porting plan | Done | [plans/stim-test-porting-plan.md](plans/stim-test-porting-plan.md) groups upstream tests and planned Rust ports. |
-| Oracle fixture matrix | Done for implemented surfaces | `oracle/fixtures/manifest.csv`, `ops/oracle`, and milestone reports track exact, statistical, structural, and semantic-mining rows. |
-| Benchmark manifest and primary beta gate | Done for current performance infrastructure | `benchmarks/manifest.csv`, `benchmarks/m12-primary-thresholds.json`, `benchmarks/m12-primary-beta-waivers.json`, and M12/post-beta reports provide primary benchmark evidence. |
+| Upstream test inventory and porting plan | Done as a file-level hierarchy; case-level qualification planned | [plans/stim-test-porting-plan.md](plans/stim-test-porting-plan.md) groups upstream files and historical Rust port priorities. CQ0 in [plans/comprehensive-correctness-qualification-plan.md](plans/comprehensive-correctness-qualification-plan.md) owns the stricter case-level disposition ledger. |
+| Oracle fixture matrix | Done for current implemented surfaces; comprehensive qualification planned | `oracle/fixtures/manifest.csv`, `ops/oracle`, and milestone reports track current exact, statistical, structural, and semantic-mining rows. CQ0 through CQ6 will audit independently selectable evidence, negative boundaries, statistical budgets, resource contracts, and full or soak tiers. |
+| Benchmark manifest and primary beta gate | Done for current performance infrastructure; comprehensive qualification planned | `benchmarks/manifest.csv`, `benchmarks/m12-primary-thresholds.json`, `benchmarks/m12-primary-beta-waivers.json`, and M12/post-beta reports provide current primary evidence. PQ0 through PQ7 in [plans/comprehensive-stim-performance-qualification-plan.md](plans/comprehensive-stim-performance-qualification-plan.md) will requalify existing rows and add faithful paired, process, memory, and scaling evidence. |
 | Current beta performance gate | Done for current report state | The expanded clean 1.25x beta evidence records 80 comparable rows passing and 5 checked no-ratio waivers across 85 primary rows. |
 | Tests for deferred Python, JS, diagrams, and ecosystem packages | Deferred | These are intentionally future work and should not be used as blockers for the current Rust/CLI beta surface. |
 

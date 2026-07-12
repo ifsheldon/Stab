@@ -6,6 +6,8 @@ Primary sources are Stim's upstream generated references and binding/source file
 
 Stim's stable 1.x compatibility contract covers the Python API and command-line API. The C++ API is exposed through headers but explicitly makes no compatibility guarantees, so this document treats it as an implementation and porting surface instead of a stable public contract.
 
+The current Stab mapping is [stab-feature-checklist.md](stab-feature-checklist.md), while case-level correctness and feature-level performance qualification of the implemented selected surface are planned in [plans/comprehensive-correctness-qualification-plan.md](plans/comprehensive-correctness-qualification-plan.md) and [plans/comprehensive-stim-performance-qualification-plan.md](plans/comprehensive-stim-performance-qualification-plan.md).
+
 ## 1. Top-Level Product Surface
 
 - **Main purpose:** high-performance stabilizer circuit simulation and QEC-oriented analysis, especially bulk sampling and detector error model generation.

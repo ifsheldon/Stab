@@ -9,6 +9,7 @@ Target: Stim v1.16.0, tag commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 Pinned upstream source: `vendor/stim`.
 
 Counts in this document are file-level counts, not individual test-case counts.
+These counts are a navigation aid and must not be used as comprehensive correctness coverage or milestone-completion evidence.
 
 ## Porting Policy
 
@@ -22,6 +23,16 @@ Use the following priorities when converting Stim tests into Stab tests.
 | P3 | Deferred ecosystem surface | Track in the compatibility matrix, but do not port until Stab deliberately supports that ecosystem surface. |
 | Bench | Benchmark source | Convert into Criterion, CLI benchmark, or `ops` benchmark workloads. |
 | Skip | Not useful as a Rust test | Replace with Cargo, Rust API, documentation, or CI guarantees instead of porting literally. |
+
+## Comprehensive Qualification Follow-Up
+
+The active case-level follow-up is [comprehensive-correctness-qualification-plan.md](comprehensive-correctness-qualification-plan.md).
+Milestone CQ0 must enumerate every relevant C++ GTest and Python semantic subcase within the implemented selected Rust and CLI scope, assign an executable or non-executable disposition, and bind executable cases to independently selectable evidence.
+This document remains the upstream hierarchy and historical priority guide; a source file appearing here does not prove that all tests in that file were ported.
+
+The active performance follow-up is [comprehensive-stim-performance-qualification-plan.md](comprehensive-stim-performance-qualification-plan.md).
+Milestone PQ0 must reconcile all 23 upstream perf files, every existing `benchmarks/manifest.csv` row, and every performance-relevant implemented feature before a benchmark group counts as comprehensive Stim evidence.
+The current M3 and M12 rows remain valid historical and regression evidence, but they are not automatically grandfathered into the stricter paired qualification suite.
 
 ## Oracle Fixture Execution
 
@@ -43,11 +54,19 @@ Keep exact CLI or file-output compatibility rows on oracle fixtures that compare
 
 ## Recommended Port Order
 
+Steps 1 through 5 describe the original M1 through M12 program and are retained as historical sequencing.
+The active qualification program continues with steps 6 through 10.
+
 1. M1 should create a machine-readable compatibility matrix from the hierarchy below, including priority, milestone, parity mode, and upstream path.
 2. M2 should create red or manifest-only oracle cases for all P0 and P1 files needed by M4 through M11.
 3. M3 should convert the `Bench` files into a pinned C++ Stim baseline before Rust implementations exist.
 4. M4 through M11 should flip the relevant red parity tests green as each feature lands.
 5. The Future Plan in `docs/plans/rust-stim-drop-in-rewrite.md` should revisit P3 Python, JS, Crumble, and diagram snapshot tests after the core CLI and Rust library are stable.
+6. CQ0 should replace file-level acceptance with a frozen case-level disposition ledger for every implemented selected contract.
+7. CQ1 through CQ5 should port or create independently selectable deterministic, CLI, statistical, property, negative, and resource evidence by domain.
+8. CQ6 should run the full and soak tiers, audit every selected case, and publish the comprehensive correctness report.
+9. PQ0 through PQ5 should requalify existing benchmark rows and add faithful paired coverage only after their referenced CQ cases pass.
+10. PQ6 and PQ7 should graduate stable timing, memory, and scaling evidence and publish the final Stim performance qualification report.
 
 ## C++ GTest Hierarchy
 
@@ -584,7 +603,7 @@ testdata/two_qubits_gates.svg
 
 Source of truth: `vendor/stim/file_lists/perf_files`.
 
-Action: Bench. Use these files to define M3 C++ baseline workloads and M12 Rust-vs-C++ comparisons.
+Action: Bench. Use these files to define M3 C++ baseline workloads, M12 Rust-vs-C++ comparisons, and the PQ0 case-level performance disposition audit.
 
 ```text
 src/stim/circuit/circuit.perf.cc
@@ -616,6 +635,7 @@ Benchmark grouping:
 
 - M3 baseline: parse/print, gate lookup, result reading, CLI startup, bit kernels, graphlike search, simulator sampling, DEM sampling, analyzer, stabilizer algebra, probability utilities, reference sampling, and stabilizers-to-tableau conversion.
 - M12 hardening: keep the same matrix stable and add Stab-specific regressions only when a profiler identifies a hot path not covered by Stim's perf files.
+- PQ qualification: map each performance-relevant implemented feature to a faithful `stim-perf`, symmetric process CLI, or pinned-Stim adapter comparison; add scale, memory, work-equivalence, output-digest, and paired-confidence evidence without treating unlike work as a ratio.
 
 ## Test Support Assets
 

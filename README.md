@@ -98,6 +98,10 @@ just oracle::matrix --milestone M4
 
 The matrix lives at `oracle/compatibility-matrix.csv` and records upstream source paths, owners, milestones, priorities, parity modes, comparators, status, acceptance checks, and deferred future buckets.
 
+The active follow-up plans are [comprehensive correctness qualification](docs/plans/comprehensive-correctness-qualification-plan.md) and [comprehensive Stim performance qualification](docs/plans/comprehensive-stim-performance-qualification-plan.md), with execution rules in [GOAL.md](docs/plans/GOAL.md).
+These plans will add case-level correctness and feature-level performance disposition ledgers, independently selectable evidence, full and soak tiers, symmetric process CLI comparisons, faithful pinned-Stim adapter coverage, paired confidence intervals, and memory or scaling checks.
+Their qualification commands are planned interfaces until CQ1 and PQ1 implement them; the existing oracle and benchmark commands below remain authoritative during migration.
+
 Benchmark contracts live at `benchmarks/manifest.csv`.
 Each benchmark row owns its runner, threshold class, and comparability class; `just bench::list` prints all three, and manifest validation requires the comparability field to agree with the source-owned compare-note prefix.
 The M3 benchmark workflow validates those contracts, records pinned C++ Stim baseline results, and writes generated reports under `target/benchmarks/`.

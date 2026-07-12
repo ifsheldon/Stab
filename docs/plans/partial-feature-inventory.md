@@ -1,10 +1,13 @@
 # Partial Feature Closure Inventory
 
+Status: Frozen historical inventory for the completed PFM-B blocker program.
+
 ## Purpose
 
 This inventory is the source-owned map from `docs/stab-feature-checklist.md` partial rows to the non-deferred partial feature milestones in `docs/plans/non-deferred-partial-feature-milestones.md`.
 It still records the earlier PF milestone ids because existing oracle rows, benchmark rows, and progress reports use those ids.
 It exists so later implementation agents do not have to infer active scope from broad Stim source files or from checklist prose.
+Its `Active` status labels describe the execution state at the time of the PFM plan and do not identify current work; `docs/plans/GOAL.md` owns the active qualification program.
 
 Every active item below has an owner milestone, owner crate or surface, upstream source, first test strategy, oracle status, benchmark plan, and explicit exclusions.
 Rows that are partial only because deferred products are absent are recorded in the exclusion table and must not block the current Rust and CLI beta closure work.
