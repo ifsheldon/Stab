@@ -1,232 +1,125 @@
-# Goal: Resolve The Remaining Non-Deferred Blockers
+# Goal: Finalize The Non-Deferred Blocker Rollup
 
 ## Mission
 
-Finish the blocker closure program in `docs/plans/non-deferred-partial-feature-milestones.md`.
-The objective is to resolve all eight open entries in `docs/plans/milestone-spec-gaps.md`, close every remaining active Rust or CLI feature gap, and stop treating intentionally deferred products or unbounded words such as `full`, `broader`, and `every` as implementation instructions.
+Finish PFM-B6 in `docs/plans/non-deferred-partial-feature-milestones.md`.
+PFM-B1 through PFM-B5 are implemented for the selected Rust and CLI scope; this goal now owns only final review remediation, cross-document synchronization, verification, and a conservative completion record.
+Do not add new product scope under this goal.
 
-The required outcome is not another collection of selected fixture-shaped handlers.
-The required outcome is a maintainable semantic foundation with exhaustive support contracts, shared traversal and flow engines, generic loop folding, exact source-owned tests, honest benchmark classifications, and synchronized status documentation.
-
-Read `docs/plans/lessons-learned.md` before starting each milestone.
-The central lesson is that ambiguity must be removed before coding and that nearby tests, broad upstream files, stale reports, and report-only benchmarks do not prove a feature claim.
-
-## Active Sources Of Truth
-
-- Execution plan: `docs/plans/non-deferred-partial-feature-milestones.md`, especially PFM-B0 through PFM-B6.
-- Executable closure ledger: `docs/plans/blocker-closure-ledger.json`, validated with `just oracle::blockers --check-selectors`.
-- Open blocker log: `docs/plans/milestone-spec-gaps.md`.
-- Current rollup evidence: `docs/plans/pfm8-rollup-evidence-report.md`.
-- Feature status: `docs/stab-feature-checklist.md`.
-- Stim inventory: `docs/stim-feature-list.md`.
-- Partial-row map: `docs/plans/partial-feature-inventory.md`.
-- Lessons learned: `docs/plans/lessons-learned.md`.
-- Historical roadmap: `docs/plans/rust-stim-drop-in-rewrite.md`.
-- Test-porting map: `docs/plans/stim-test-porting-plan.md`.
-- Frozen oracle: Stim v1.16.0 in `vendor/stim`.
-- Oracle metadata: `oracle/fixtures/manifest.csv`.
-- Benchmark metadata: `benchmarks/manifest.csv`, `benchmarks/m12-primary-thresholds.json`, `benchmarks/m12-primary-beta-waivers.json`, and `benchmarks/profiler-notes/`.
-
-If these sources disagree, fix the disagreement before implementation continues.
+Read `docs/plans/lessons-learned.md` before changing acceptance claims.
+A green test is not sufficient when provenance, benchmark classification, resource behavior, or documentation still overstates what was proved.
 
 ## Current Checkpoint
 
-PFM-B0 is complete as of 2026-07-10.
-PFM-B2 contract groundwork is also complete: canonical metadata now classifies all 81 gates across eight surfaces and maps parser-accepted target groups, including anti-Hermitian Pauli products, to typed behavior or rejection decisions with no unknown state.
-Ledger schema version 2 requires all eight surfaces per gate-family case, validates its surface and family names against canonical core metadata, and gives every one of the nineteen semantic families an explicit owner. Final PFM-B2 implementation and executable evidence landed in `f60ea17` and `e7a67a0`: 37 exact pinned subcases replace the original 18 semantic rollups as completion evidence, thirteen source-owned statistical plans are validated against canonical core metadata and exact binomial false-positive budgets, every selector is independent, and the 165-case source ledger has no planned row.
-PFM-B3 is complete as of 2026-07-10: all seven ledger cases use the shared folded traversal or the documented direct compact-transform path, have independent tests and oracle rows, and have clean committed-HEAD allocation evidence from `4a984c26b39f6236fde5e3ff10cf0b42e8b155a2`. Its milestone-audit and GPT-5.6/max review findings are closed, with only non-blocking future ledger-schema hardening logged.
-PFM-B1 is complete as of 2026-07-11: all nineteen transform cases have direct executable evidence, the general sparse reverse-flow engine replaces packet dispatch, the pinned C++ recorder and digest-bound ledger fail closed, all milestone-audit and GPT-5.6/max findings are fixed, and four clean allocation reports identify `HEAD=4f193f19cebf132f7baf0a3aa1cc799a153a71ed` with `local_modifications=false`.
-PFM-B4 is complete at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc`.
-PFM-B5 is complete as of 2026-07-12. The final review and audit sequence closed supported-unitary nested-probe admission, graph-construction work and payload bounds, allocation-heavy state comparison, generated-result source membership, fallback metadata, SAT bound claims, and the final cap-after-reservation defect through `4c5901e`.
-All 52 PFM-B5 cases have independent exact selectors, the ledger reports fifteen supporting oracle rows and eleven benchmarks, and ten direct PF6 exact rows pass. Clean PF6 baseline and allocation-tracked compare evidence identifies `HEAD=4c5901e2eaf03ddf0c8043b5655d943b70b92a70` with `local_modifications=false`; the faithful graphlike rows remain report-only at 4.647x and 4.279x Stim.
-The active checkpoint is final PFM-B2 evidence closure. Record clean committed-HEAD `pf3-gate-semantic-wide` and `pf3-analyze-errors-sweep` timing and allocation evidence, run milestone-audit and fix implementation findings, run the required GPT-5.6/max full-code-review and fix all findings, then synchronize the completion documents before proceeding to PFM-B6.
-Do not reopen PFM-B0, PFM-B1, PFM-B2 contract groundwork, PFM-B3, PFM-B4, or PFM-B5 unless their frozen contracts change.
+- PFM-B0 froze the schema-version-2 blocker ledger.
+- PFM-B1 closed nineteen reverse-flow and QEC-transform cases.
+- PFM-B2 closed one analyzer sweep evidence case and 37 independently selectable gate-by-surface cases covering all nineteen semantic families.
+- PFM-B3 closed seven shared folded-DEM traversal contracts.
+- PFM-B4 closed two detecting-region cases, fourteen missing-detector cases, and thirty-three flow cases.
+- PFM-B5 closed fifty-two analyzer, search, SAT/WCNF, sparse-tracker, and matched-error cases.
+- `just oracle::blockers --check-selectors` validates 165 cases with no planned row and no shared selector.
+- PFM-B2 review remediation is committed in `f1f6e42`, oracle hardening in `6bdff8b`, and the first split benchmark runner in `6576273`.
+- Final-review remediation removes the sweep-reference record copy in `2f46c33`, unifies canonical surface and statistical boundaries in `25f352b`, requires exact upstream gate markers in `8ab85e4`, and exposes detector-frame timing without heterogeneous medians in `fb47b03`.
+- The clean reports from `6576273` are superseded because the final-review benchmark and hot-path fixes changed the measured contract. Fresh clean timing and allocation reports are required before completion.
 
-## Scope Decisions
+There is no remaining implementation blocker in the finite ledger.
+The only remaining blockers are confirmed findings from the final GPT-5.6/max re-review, documentation disagreement, or a failing final verification command.
 
-The following decisions are fixed for this goal:
+## Active Sources Of Truth
 
-- Implement general reverse-flow and QEC transform semantics for the selected Rust APIs.
-- Keep broader repeat-contained feedback-inlining beyond the already selected bounded loop cases deferred unless a later plan explicitly reopens it.
-- Evidence-close analyzer sweep behavior at the current pinned matrix instead of inventing additional sweep shapes.
-- Implement an exhaustive gate-by-surface semantic contract for legal execution behavior.
-- Implement one shared folded DEM traversal for bounded-result consumers.
-- Evidence-close detecting regions and missing detectors from their complete named pinned subcases plus existing promoted evidence.
-- Implement general GF(2) flow solving and shared stabilizer-flow transitions.
-- Implement generic analyzer loop-state cycle folding and finite graphlike, hypergraph, and SAT/WCNF closure corpora.
-- Keep full ErrorMatcher provenance and `explain_errors` deferred.
+- Execution and acceptance: `docs/plans/non-deferred-partial-feature-milestones.md`.
+- Executable inventory: `docs/plans/blocker-closure-ledger.json`.
+- Planning resolutions: `docs/plans/milestone-spec-gaps.md`.
+- Final gate evidence: `docs/plans/pfm-b2-gate-surface-progress-report.md`.
+- Final rollup: `docs/plans/pfm8-rollup-evidence-report.md`.
+- User-facing status: `docs/stab-feature-checklist.md`.
+- Child-surface inventory: `docs/plans/partial-feature-inventory.md`.
+- Historical roadmap and test hierarchy: `docs/plans/rust-stim-drop-in-rewrite.md` and `docs/plans/stim-test-porting-plan.md`.
+- Frozen compatibility oracle: Stim v1.16.0 in `vendor/stim`.
+- Lessons: `docs/plans/lessons-learned.md`.
 
-The following surfaces remain excluded: Python bindings, JS/WASM, diagrams, `repl`, QASM, Quirk, Crumble, ecosystem packages, GPU, exact random-stream parity, public graph or vector simulator products, C++ header compatibility, and deprecated `--detector_hypergraph` behavior.
+If these sources disagree, fix the disagreement before completion.
 
-An excluded surface must not keep an otherwise completed Rust or CLI child row marked as an active blocker.
+## Required Work
 
-## Required Execution Order
+1. Complete the final GPT-5.6/max full-code-review over core, CLI, oracle, benchmark, and documentation changes.
+2. Fix every confirmed correctness, compatibility, hostile-input, performance, resource, architecture, evidence, and documentation finding.
+3. Log only genuine newly revealed under-specification in `docs/plans/milestone-spec-gaps.md`; do not use a new entry to avoid a decision already made by PFM-B0 through PFM-B5.
+4. Finish PFM-B6 synchronization across the checklist, partial inventory, roadmap, test-porting plan, PFM8 rollup, PFM-B2 report, historical progress reports, README, oracle metadata, and benchmark metadata where affected.
+5. Run the final verification commands from the resulting worktree.
+6. Commit the final review fixes and documentation in focused commits.
 
-Execute the blocker milestones in this order:
+## Status Rules
 
-1. PFM-B0: freeze the subcase-level closure ledger.
-2. PFM-B2 contract groundwork: add the gate-by-surface classification before changing shared execution semantics.
-3. PFM-B3: add shared folded DEM traversal before migrating analyzer, search, SAT, or matcher consumers.
-4. PFM-B4 flow foundation: replace exhaustive flow solving and establish shared stabilizer transitions.
-5. PFM-B1: finish reverse-flow and QEC transforms using the shared flow foundation.
-6. PFM-B5: implement generic analyzer loop folding and finish search, SAT, sparse-tracker, and active matched-error closure.
-7. Finish the PFM-B2 generated semantic matrix after the shared engines stabilize.
-8. PFM-B6: resolve spec gaps, run audits and review, and roll up statuses.
+Use `Done for selected Rust API scope` or `Done for selected Rust/CLI scope` when every non-deferred child in that selected surface is complete.
+Keep a literal full-product rollup `Partial` only when a named deferred product prevents an honest full-Stim claim.
+Do not describe deferred Python, JS/WASM, diagrams, ecosystem packages, public simulator products, full ErrorMatcher provenance, exact random streams, or deprecated behavior as active implementation blockers.
+Future behavior outside the 165-case ledger requires a new exact plan with named subcases, comparators, tests, resource contracts, oracle disposition, and benchmark disposition.
 
-PFM-B4 detecting-region and missing-detector evidence closure may run in parallel with PFM-B3 because it must not add speculative behavior.
-Do not begin PFM-B6 while any owned blocker row lacks executable evidence.
+## Evidence Rules
 
-## Work Loop For Every Milestone
+- Every completion claim must point to an independently selectable test, an evidence-close contract, or a source-owned report.
+- Exact GTest provenance must identify a complete macro name and a matching gate marker inside that test body when the subcase names a gate.
+- Statistical plans must remain bijective with the core catalog and use bounded exact-tail evaluation only after the frozen digest matches.
+- Probabilistic tests must retain source-owned shots, seeds, bucket probabilities, tolerance rules, and familywise false-positive budgets.
+- Resource claims must use direct allocation regressions or allocation-tracked reports, not infer constant memory from semantic success.
+- Report-only and contract-only rows must not imply a Stim ratio, beta-gate pass, or primary threshold.
+- Clean benchmark evidence must record the committed Stab revision and `local_modifications=false`.
 
-For each PFM-B milestone:
+## PFM-B2 Evidence To Regenerate
 
-1. Re-read the exact milestone section and its owned blocker entries.
-2. Reconcile the closure ledger with pinned Stim source, the checklist, partial inventory, lessons learned, oracle manifest, and benchmark manifest.
-3. Write or refresh a scope or progress report naming every owned subcase, explicit rejection, deferral, comparator, public surface, resource contract, oracle row, benchmark row, and done criterion.
-4. Add or port meaningful tests before or alongside production changes.
-5. Implement the general abstraction named by the milestone and migrate the owned consumers.
-6. Run focused tests during iteration and fix semantic, error, and resource regressions.
-7. Update oracle rows and benchmark metadata in the same change set as behavior or performance-path changes.
-8. Update all affected documentation in the same change set.
-9. Run milestone-audit and fix every implementation, evidence, benchmark, test, and documentation finding.
-10. Log genuine newly discovered under-specification in `docs/plans/milestone-spec-gaps.md`; do not use a new gap entry to avoid a decision already made by this goal.
-11. Run full-code-review over the touched surfaces and fix findings.
+The final representative timing row must report seven independent measurements:
 
-A milestone is incomplete if any step is missing.
+| Surface | Required evidence |
+| --- | --- |
+| Sampler execution | Independent normalized circuits/s |
+| Reference sampling | Independent normalized circuits/s |
+| Converter compilation | Independent normalized circuits/s |
+| Ordinary detection sampling | Independent normalized circuits/s over the non-frame corpus |
+| Forced detector-frame sampling | Independent normalized circuits/s over the full representative corpus |
+| Error analysis | Independent normalized circuits/s |
+| Flow generation | Independent normalized circuits/s |
 
-## Architecture Guardrails
-
-- Do not add production code that recognizes fixture text, exact instruction sequences, exact recurrence periods, exact detector counts, or one generated circuit signature.
-- Gate semantics must be expressed by gate-family and target-role transitions.
-- Flow generation, flow checking, flow solving, time reversal, detecting regions, missing detectors, and sparse reverse tracking should share stabilizer transition logic where their semantics overlap.
-- Flow solving must use GF(2) elimination or an equivalently general polynomial algorithm, not exhaustive subset enumeration.
-- Folded DEM traversal must carry checked detector and coordinate shifts through nested repeats and support early termination.
-- Analyzer loop folding must identify recurrence from canonical boundary state, not hard-coded periods such as 8 or 127.
-- A public materializing API may retain a documented cap when its result is inherently expanded.
-- A bounded-result internal consumer may not flatten repeated input merely for inspection.
-- Search may retain documented limits for genuinely exponential state spaces, but traversal, graph-construction, persistent graph-payload, and search-complexity limits must be distinct and tested.
-- Unsupported runtime shapes must return precise typed errors and must not silently skip work or substitute fallback semantics.
-
-If implementation cannot satisfy these guardrails, stop and revise the milestone contract before adding another special case.
-
-## Test Rules
-
-- Every blocker ledger row must name a planned test selector, and every row claimed as implemented or evidence-closed must select an executable Rust test or explicit evidence-close check.
-- Multi-example upstream tests must be split into stable subcase ids before they count as complete.
-- PFM-B0 may record a selector shared by several stable subcase ids only as explicit evidence-splitting debt; the owning implementation or evidence-close milestone cannot complete until every owned case has an independently selectable test.
-- Use exact comparators for canonical circuit text, deterministic DEM text, stable WCNF text, deterministic flow lists, and CLI output where order is contractual.
-- Use structural comparators for detecting-region maps, flow spans, and tie-sensitive logical-error target sets.
-- Use statistical comparators only for probabilistic behavior, with source-owned shot counts, seeds, tolerances, bucket definitions, and false-positive budgets.
-- For blocker-ledger statistical plans, compare each observed bucket probability against its pinned expectation using `max(absolute_probability_floor, sigma_multiplier * sqrt(p * (1 - p) / shots))`; apply the declared familywise false-positive budget across all named buckets, and reject a plan during its owner milestone if an exact binomial-tail check shows that the declared budget is not met.
-- Add positive, negative, malformed-input, overflow, unsupported-shape, visitor-error, and resource-boundary tests for each relevant public or internal surface.
-- Add small generated differential tests whenever a folded or optimized path has a straightforward materialized reference implementation.
-- Property tests must use deterministic seeds and print enough minimized context to reproduce failures.
-
-Do not count tests that only restate metadata constants, static labels, or freshly constructed fields.
-
-## Benchmark Rules
-
-Every performance-sensitive milestone must update benchmark metadata before completion.
-
-For every changed or added row:
-
-- Assign a comparability class before timing it.
-- Define work units that reflect the algorithm, such as matrix bits or pivots, DEM items visited, represented repeat iterations, analyzer states, search nodes, clauses, or circuit operations.
-- Record peak live allocation and sampled resident delta for traversal, loop-folding, and large matrix workloads.
-- Add compare notes explaining whether pinned Stim is a faithful baseline.
-- Keep report-only, proxy, partial-match, tiny, and no-ratio rows out of the 1.25x threshold gate.
-- Use schema-version-2 submeasurement thresholds when one row contains different algorithms or size classes.
-- Update profiler notes and threshold entries in the same change set.
-
-New primary-gate evidence must use a fresh baseline from current committed `HEAD`:
-
-```sh
-just bench::baseline --primary --out target/benchmarks/blocker-closure-primary-baseline
-just bench::compare --primary --warmup --measurement-runs 3 --require-profiler-notes --baseline target/benchmarks/blocker-closure-primary-baseline/baseline.json --report target/benchmarks/blocker-closure-primary-compare
-just bench::primary-regression --baseline target/benchmarks/blocker-closure-primary-baseline/baseline.json --report target/benchmarks/blocker-closure-primary-regression
-just bench::primary-memory-regression --baseline target/benchmarks/blocker-closure-primary-baseline/baseline.json
-```
-
-Exploratory probes are not completion evidence.
-
-## Documentation Rules
-
-Every milestone must check and update, where applicable:
-
-- `docs/stab-feature-checklist.md`.
-- `docs/plans/non-deferred-partial-feature-milestones.md`.
-- `docs/plans/milestone-spec-gaps.md`.
-- `docs/plans/partial-feature-inventory.md`.
-- The matching scope and progress report.
-- `docs/plans/rust-stim-drop-in-rewrite.md`.
-- `docs/plans/stim-test-porting-plan.md`.
-- `docs/plans/pfm8-rollup-evidence-report.md`.
-- `README.md` and CLI or Rust API docs when public behavior changes.
-- Oracle and benchmark manifests, thresholds, waivers, profiler notes, and fixture metadata.
-
-Use `Done for selected Rust/CLI scope` when the active child surface is complete but literal full-Stim product parity still depends on deferred products.
-Do not leave such a row `Partial` and call it an active blocker.
-
-## Milestone Completion Criteria
-
-Each implementation milestone is complete only when:
-
-- Every owned subcase has implementation or evidence-close status and direct executable evidence.
-- Every promoted public behavior has a defined comparator, error contract, and resource contract.
-- Every unsupported shape fails closed with a precise error or is outside the selected public surface.
-- No production implementation depends on fixture signatures or hard-coded recurrence periods.
-- Tests cover correctness, compatibility, negative behavior, and resource boundaries.
-- Benchmark metadata and evidence match the milestone's performance claims.
-- Documentation agrees with current behavior.
-- Milestone-audit and full-code-review findings are fixed.
-
-## Goal Completion Criteria
-
-The whole goal is complete only when:
-
-- All eight open spec-gap entries are resolved.
-- PFM3 analyzer sweep, PFM5 detecting regions, and PFM5 missing detectors are evidence-closed without speculative scope growth.
-- The gate-by-surface contract covers every canonical gate and relevant implemented surface with no unknown classification.
-- Every legal target-role shape inside the selected Rust or CLI surface executes, lowers, or has defined no-op or annotation semantics; unsupported classifications are limited to invalid combinations or named exclusions and cannot satisfy a full-semantic status claim.
-- Reverse-flow transforms use general gate-family transitions and pass the owned pinned and generated corpus.
-- Flow solving has no exhaustive-subset size cliff.
-- Bounded-result DEM consumers use shared folded traversal or have a precise inherent-materialization rationale.
-- Analyzer loop folding has no fixture-specific or hard-coded-period production path.
-- Named graphlike, hypergraph, and SAT/WCNF corpora have exact or structural parity evidence.
-- Remaining caps protect inherent output or algorithmic complexity and have explicit tests.
-- Active checklist child rows are no longer generically partial.
-- Deferred product surfaces remain explicit and do not masquerade as active blockers.
-- Final PFM8 evidence comes from current `HEAD` and contains audit, review, tests, oracle, benchmark, and documentation closure.
+The Markdown report must leave the row-level Stab median empty and render every normalized submeasurement explicitly.
+The gate and sweep allocation reports must be regenerated from the same clean revision.
+These rows remain report-only and have no faithful pinned-Stim timing ratio.
 
 ## Final Verification
 
-Run before claiming the goal complete:
+Run after all review and documentation fixes:
 
 ```sh
 cargo fmt --all --check
 cargo clippy -p stab-core -p stab-cli -p stab-oracle -p stab-bench --all-targets -- -D warnings
 cargo test --workspace --quiet
+cargo test -p stab-core --features ops-contracts warmed_fixed_tableau_gate_execution_does_not_allocate_per_dispatch --quiet
+cargo test -p stab-core --features ops-contracts streamed_sweep_conversion_adds_no_per_shot_scratch_allocations --quiet
 just oracle::blockers --check-selectors
+just oracle::run --milestone PF3
+just oracle::run --milestone M8
 just oracle::run --implemented-only
 just bench::smoke
 just maintenance::pre-commit
 ```
 
-Run the primary benchmark commands when any primary runner, threshold, or shared hot path changes.
+A fresh primary benchmark run is required only if final remediation changes a primary runner, primary threshold, or shared primary hot path.
+The current PFM-B2 changes are report-only and do not alter the 1.25x primary gate.
 
-## Stop Conditions
+## Completion Criteria
 
-Stop and amend the plan when:
+This goal is complete only when:
 
-- An owned subcase still depends on a whole upstream file instead of stable subcase ids.
-- Expected behavior cannot be established from pinned Stim, a documented Stab hardening decision, or a precise invariant.
-- A proposed fix requires a fixture-shaped branch or hard-coded recurrence period.
-- A public parser, transformer, converter, sampler, analyzer, search, or writer path has neither streaming or folded behavior nor a documented cap.
-- A benchmark row cannot be classified or cannot define meaningful work units.
-- A performance claim depends on stale artifacts, unrecorded local modifications, missing profiler notes, or an informal waiver.
-- A checklist status would overstate Python, JS/WASM, diagram, ecosystem, simulator-product, or provenance parity.
+- Final GPT-5.6/max review has no unresolved confirmed finding.
+- All blocker-program entries in `docs/plans/milestone-spec-gaps.md` are resolved.
+- The source ledger remains at 165 cases with zero planned rows and independent selectors.
+- PFM-B1 through PFM-B5 progress reports and the PFM8 rollup agree on completion.
+- The checklist contains no non-deferred child row left `Partial` because of stale wording.
+- Literal product-level partial statuses identify the exact deferred products that prevent full parity.
+- Clean PFM-B2 timing and allocation evidence remains reproducible and honestly report-only.
+- Every final verification command passes.
+- Focused commits contain the final review remediation and documentation closure.
 
-## Commit Policy
+## Explicit Deferrals
 
-Do not commit solely because this goal exists.
-When a thread explicitly authorizes commits, group changes by blocker milestone, use the repository commit-message convention, and run the milestone's targeted verification before each focused commit.
+Python bindings and Python object shape, JS/WASM, diagrams, `repl`, QASM, Quirk, Crumble, ecosystem packages, GPU, exact random-stream parity, public graph or vector simulator products, C++ header compatibility, full ErrorMatcher provenance, `explain_errors`, deprecated `--detector_hypergraph`, and behavior outside the finite selected ledger remain future work.
+They do not block this goal.

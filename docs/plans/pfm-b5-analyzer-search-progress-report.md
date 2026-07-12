@@ -208,4 +208,4 @@ Fresh benchmark evidence is complete at clean `HEAD=4c5901e2eaf03ddf0c8043b5655d
 The selected PFM-B5 semantic scope is complete and has no intentionally unimplemented child case.
 Full ErrorMatcher stack-frame, heralded, and repeat-contained provenance plus `stim explain_errors` remain intentionally deferred.
 The graphlike direct-match slowdown is an optimization backlog item and an explicit reason the rows remain outside the primary gate; it does not invalidate semantic closure.
-PFM-B2 now owns the next active implementation blocker: eighteen generated exhaustive gate-by-surface semantic cases. PFM-B6 still owns final audit and status rollup after PFM-B2 closes.
+PFM-B2 subsequently closed 37 independently selectable gate-by-surface cases covering all nineteen semantic families. PFM-B6 owns the final cross-document audit and status rollup; no PFM-B5 implementation case remains active.

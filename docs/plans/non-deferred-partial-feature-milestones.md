@@ -5,7 +5,7 @@
 This plan covers every feature row that is marked `Partial` in `docs/stab-feature-checklist.md` and still has non-deferred Rust or CLI work.
 It excludes rows whose remaining work is only Python bindings, JavaScript/WASM, diagrams, ecosystem integrations, public simulator products, C++ header compatibility, exact random-stream parity, or deprecated `--detector_hypergraph` support.
 
-This is the active planning document for finishing the remaining partial feature surfaces and resolving the eight open under-specification entries recorded in `docs/plans/milestone-spec-gaps.md`.
+This is the active planning document for finishing the remaining partial feature surfaces and preserving the resolutions of the eight under-specification entries recorded in `docs/plans/milestone-spec-gaps.md`.
 Use `docs/plans/remaining-partial-feature-milestones.md`, `docs/plans/partial-feature-inventory.md`, and existing RPF progress reports as historical context and source material, but execute this document when deciding the next implementation packet.
 
 The main planning rule is simple: a row may not move from `Partial` to `Done` because nearby functionality exists.
@@ -92,7 +92,7 @@ An implementation milestone may preserve a documented cap when output size or al
 
 Objective: turn the blocker decisions into an executable, subcase-level evidence ledger before production code changes.
 
-Status: Complete as of 2026-07-10. The original 124-case source ledger, selector validation, exact oracle evidence signatures, typed benchmark runner, threshold, and comparability classifications, milestone audit, and full code review are recorded in `docs/plans/pfm-b0-blocker-ledger-progress-report.md`; PFM-B2 separated deterministic MPP, anti-Hermitian MPP rejection, deterministic MPAD, stochastic MPP, and stochastic MPAD provenance and added explicit identity-noise and control-flow owners, so the current ledger has 130 cases without changing the blocker set.
+Status: Complete as of 2026-07-10. The original 124-case source ledger, selector validation, exact oracle evidence signatures, typed benchmark runner, threshold, and comparability classifications, milestone audit, and full code review are recorded in `docs/plans/pfm-b0-blocker-ledger-progress-report.md`; later milestones split exact provenance and review regressions without changing the blocker set, so the final ledger has 165 cases.
 
 Tasks:
 
@@ -178,7 +178,7 @@ Acceptance criteria:
 
 Objective: resolve both PFM3 entries by closing unsupported ambiguity across parser, measurement sampler, reference sampler, detection converter, detector frame, detection sampler, error analyzer, and flow-generator surfaces.
 
-Status: Contract groundwork is complete as of 2026-07-10. Final semantic implementation and executable evidence landed in `f60ea17` and `e7a67a0`: 37 exact pinned subcases replace the original 18 semantic-family rollups as completion evidence, all 37 selectors and PF3 oracle rows pass, and the 165-case source ledger has no planned row. Clean committed-HEAD benchmark evidence, milestone audit, GPT-5.6/max review, and final PFM-B6 documentation rollup remain pending.
+Status: Complete for the selected Rust and CLI scope as of 2026-07-12. Final semantic implementation and executable evidence landed in `f60ea17` and `e7a67a0`; review remediation is committed through `fb47b03`. Thirty-seven independently selectable pinned-provenance subcases replace the original eighteen semantic-family rollups as completion evidence, all selectors and PF3 oracle rows pass, and the 165-case source ledger has no planned row. The clean reports from `6576273` are superseded by final-review hot-path and benchmark-contract fixes; PFM-B6 owns the fresh clean evidence, follow-up review, and cross-document rollup.
 
 Tasks:
 
@@ -209,7 +209,7 @@ Tests:
 
 Oracle rows:
 
-- Replace broad `pf3-gate-semantic-execution` wording with 37 exact contract shards grouped by semantic family but split at every selected pinned test anchor.
+- Replace broad `pf3-gate-semantic-execution` wording with 37 independently selectable contract shards grouped by semantic family but split at every selected pinned test anchor.
 - Keep deterministic MPP, anti-Hermitian MPP rejection, deterministic MPAD, stochastic MPP, and stochastic MPAD evidence in separate ledger cases with exact, error-class, or statistical comparators as appropriate.
 - Keep `pf3-sweep-analyzer` as the complete selected analyzer sweep row and record that no unowned pinned subcase remains.
 - Use statistical rows only for genuinely probabilistic behavior.
@@ -391,7 +391,7 @@ Objective: turn completed blocker work into conservative, durable status without
 
 Tasks:
 
-- Resolve all eight open entries in `docs/plans/milestone-spec-gaps.md` with links to implementation or evidence-close reports.
+- Confirm all eight blocker-program entries in `docs/plans/milestone-spec-gaps.md` are resolved with links to implementation or evidence-close reports.
 - Update checklist child rows to `Done for selected Rust/CLI scope` when their active work is complete.
 - Keep broad product-level rollups partial only when a named deferred product surface still prevents a literal full-Stim claim; do not call that an active implementation blocker.
 - Update the partial inventory, roadmap, test-porting plan, oracle manifest, benchmark manifest, profiler notes, waivers, and user-facing docs.
@@ -581,10 +581,10 @@ Rows covered:
 Tasks:
 
 - Finish or explicitly reject frame-path sweep-conditioned detector sampling for the current public detection surface. Selected frame-path Pauli-observable `detect` sampling with sweep-controlled `CX` and `CY` qubit targets, sweep-controlled `CZ`, `CZ` bit/bit no-op groups, and `XCZ` or `YCZ` qubit/sweep groups now uses omitted all-false sweep bits, and measurement-record `XCZ` or `YCZ` target feedback is accepted as X or Y feedback equivalent to `CX` or `CY` feedback. Pinned Stim v1.16.0 does not expose `stim detect --sweep`, so typed `detect` sweep files are not a CLI parity target; Python detector-sampler sweep-bit APIs and future explicit Rust detector-sampler APIs remain deferred unless a later plan selects them.
-- Expand analyzer sweep behavior beyond the original single no-op sweep-control subset only for selected exact subcases. The selected analyzer sweep-control matrix now covers `CX`, `CY`, `CZ`, `XCZ`, and `YCZ` no-op behavior, including `CZ` sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, plus invalid controlled-Pauli target-position rejections; the boundary is locked in `docs/plans/pfm3-analyzer-sweep-boundary-scope.md`, and any broader analyzer sweep-shape parity is under-specified in `docs/plans/milestone-spec-gaps.md` until exact remaining gate-target shapes, comparator, CLI and Rust surfaces, oracle metadata, resource behavior, and benchmark policy are selected.
+- Preserve the completed analyzer sweep-control matrix for `CX`, `CY`, `CZ`, `XCZ`, and `YCZ` no-op behavior, including `CZ` sweep/sweep, record/sweep, sweep/record, and record/record classical-only no-op groups, plus invalid controlled-Pauli target-position rejections. Any broader analyzer sweep-shape work is future scope and requires a new exact plan naming gate-target shapes, comparator, CLI and Rust surfaces, oracle metadata, resource behavior, and benchmark policy.
 - Keep `m2d --sweep` and `--sweep_format` behavior synchronized with core converter behavior for every accepted input format. The current public CLI matrix covers `01`, `b8`, `r8`, `hits`, `dets`, and input-only `ptb64` sweep records under `pf3-m2d-sweep-format-matrix-cli`.
 - Close sampler-backed target-order drift for Stim-parsed sweep targets: `CX q sweep[k]` and `CY q sweep[k]` must reject in reference sampling, detection conversion, non-frame detection sampling validation, and `stab m2d --sweep`, while sweep-first `CX` or `CY` and both-order `CZ` sweep/qubit groups must remain accepted.
-- Classify legal gate execution support across sampler, converter, detection, and analyzer paths. The fixed-tableau gate contract is implemented for current sampler, detection-conversion, and analyzer surfaces, supported Hermitian `SPP` and `SPP_DAG` products are implemented for the promoted sampler, detection-conversion, detector-frame, and analyzer paths, selected deterministic `MPP` Pauli-product measurement execution and selected deterministic `MPAD` measurement-pad execution are implemented for the promoted sampler, detection-conversion, non-frame detection-sampling, frame detection-sampling, and analyzer paths, selected stochastic `MPP(p)` and `MPAD(p)` sampler and detection-sampling record-flip behavior is implemented for the promoted sampler, detection-converter reference mapping, non-frame detection-sampling, and frame-path detection-sampling surfaces, selected noisy `MPAD(p)` analyzer pad-flip effects are implemented for detector and observable DEM terms, and the selected boundary is locked in `docs/plans/pfm3-gate-semantic-boundary-scope.md`; broader legal non-tableau execution remains under-specified in `docs/plans/milestone-spec-gaps.md` until exact gate families, execution surfaces, comparator, resource behavior, oracle metadata, and benchmark policy are selected.
+- Preserve the completed legal-gate execution contract across parser, measurement sampler, reference sampler, detection converter, detector frame, detection sampler, error analyzer, and flow generator. PFM-B2 classifies all 81 canonical gates, nineteen semantic families, and 22 accepted target patterns through 37 independently selectable exact, structural, rejection, semantic-invariant, state-equivalence, or statistical cases. Behavior outside this finite contract is future scope and requires a new exact plan rather than reopening completed PFM3 work.
 - Add precise errors for unsupported sweep target shapes, unsupported gate families, unsupported mixed feedback and sweep cases, and unsupported public output formats.
 - Preserve streaming or documented caps for public inputs and outputs.
 
@@ -875,7 +875,7 @@ Acceptance criteria:
 
 Current evidence:
 
-- `docs/plans/pfm8-rollup-evidence-report.md` records the current PFM8 rollup evidence snapshot. It is intentionally not a final PFM8 completion report because the PFM-B2 generated semantic matrix and PFM-B6 audit or rollup remain; PFM-B1, PFM-B3, PFM-B4, and PFM-B5 implementation are complete.
+- `docs/plans/pfm8-rollup-evidence-report.md` records the final blocker-program rollup. PFM-B1 through PFM-B5 implementation is complete; PFM-B6 owns documentation synchronization and final review closure without adding product scope.
 
 ## Final Verification
 

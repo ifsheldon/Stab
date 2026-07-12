@@ -1,5 +1,7 @@
 # PFM3 Gate Semantic Boundary Scope
 
+This document preserves the pre-PFM-B2 selected boundary. PFM-B2 later completed the exhaustive selected Rust and CLI gate-by-surface matrix; `docs/plans/pfm-b2-gate-surface-progress-report.md` is authoritative for current closure.
+
 ## Summary
 
 This scope note locks the current PFM3 gate semantic execution boundary.
@@ -50,7 +52,7 @@ It does not claim full legal-gate execution parity for every parser-accepted non
 - `dem_analyzer_spp_matches_explicit_phase_product_expansions`, `dem_analyzer_spp_nondeterministic_detector_matches_explicit_expansion`, `dem_analyzer_spp_nondeterministic_observable_matches_explicit_expansion`, and `dem_analyzer_rejects_anti_hermitian_spp_products` cover analyzer state, gauge, multiple product groups, and rejection behavior.
 - `gate_execution_contract_accepts_supported_spp_execution_paths` and `gate_metadata_api_contract_table_matches_rust_accessors` keep the support-contract table synchronized with the promoted execution surfaces.
 - Oracle rows `pf3-gate-semantic-wide-rust`, `pf3-gate-mpp-execution-rust`, `pf3-gate-mpp-stochastic-rust`, `pf3-gate-mpad-execution-rust`, `pf3-gate-mpad-stochastic-rust`, `pf3-analyze-errors-mpad-noisy-cli`, `pf3-gate-spp-analyzer-rust`, `pf3-gate-spp-contract-rust`, `pf3-analyze-errors-spp-state-propagation-cli`, and `pf3-analyze-errors-spp-nondeterministic-cli` select the promoted evidence.
-- Benchmark row `pf3-gate-semantic-wide` is report-only and measures only the selected fixed-tableau plus supported Hermitian `SPP` or `SPP_DAG` sampler, detection-conversion, and analyzer execution contract. The selected deterministic `MPP`, stochastic `MPP(p)`, deterministic `MPAD`, stochastic `MPAD(p)` sampler or detection-sampling, and noisy `MPAD` analyzer slices do not add benchmark rows because they are semantic bookkeeping contracts and do not change a hot throughput path.
+- Benchmark row `pf3-gate-semantic-wide` remains report-only and records separate sampler execution, reference sampling, converter compilation, ordinary detection sampling, forced detector-frame sampling, error-analysis, and flow-generation measurements over the final representative PFM-B2 corpus. Its row-level heterogeneous median is omitted, and no aggregate Stab/Stim ratio is claimed.
 
 ## Explicit Non-Goals
 

@@ -61,7 +61,7 @@ Resolved M8 spec entries:
 Full code review found issues in statistical false-positive budget enforcement, `circuit_vs_amplitudes` matrix ownership, strict benchmark placeholder-baseline acceptance, typoed benchmark milestone filters, anti-Hermitian MPP handling, noisy measurement probabilities, and CLI `--seed`/`--shots` integer bounds.
 Those issues were fixed with oracle budget validation, M12 matrix ownership for amplitude cross-checks, stricter benchmark baseline validation, milestone-filter rejection, MPP phase validation, measurement-result flip sampling, CLI value parsers, and focused regression tests.
 
-The review also raised heralded-noise sample-output emission, but direct verification against pinned Stim v1.16.0 showed `stim sample` does not emit herald bits as output bits for the M8 exact fixture; Stab keeps herald bits in the measurement record for feedback while preserving pinned Stim output compatibility.
+The review also raised heralded-noise sample-output emission. Direct verification against pinned Stim v1.16.0 showed a path distinction: compiled/frame sampling emits herald bits, while the default one-shot tableau CLI path retains heralds for feedback but omits them from output. Stab now matches all three pinned paths: one default shot omits herald columns, multiple shots emit them, and one shot with `--skip_reference_sample` emits them.
 
 ## Verification Commands
 

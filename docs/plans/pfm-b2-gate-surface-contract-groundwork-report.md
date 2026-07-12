@@ -2,7 +2,7 @@
 
 Date: 2026-07-10
 
-Status: Complete for contract groundwork; final PFM-B2 semantic execution remains in progress.
+Status: Complete historical groundwork. Final PFM-B2 semantic execution subsequently closed in `docs/plans/pfm-b2-gate-surface-progress-report.md`; references below to planned eighteen-case family rollups describe the pre-provenance-split state.
 
 ## Objective
 
