@@ -1,5 +1,7 @@
 # Goal: Finalize The Non-Deferred Blocker Rollup
 
+Status: Complete as of 2026-07-12 for the selected Rust and CLI blocker scope.
+
 ## Mission
 
 Finish PFM-B6 in `docs/plans/non-deferred-partial-feature-milestones.md`.
@@ -20,10 +22,10 @@ A green test is not sufficient when provenance, benchmark classification, resour
 - `just oracle::blockers --check-selectors` validates 165 cases with no planned row and no shared selector.
 - PFM-B2 review remediation is committed in `f1f6e42`, oracle hardening in `6bdff8b`, and the first split benchmark runner in `6576273`.
 - Final-review remediation removes the sweep-reference record copy in `2f46c33`, unifies canonical surface and statistical boundaries in `25f352b`, requires exact upstream gate markers in `8ab85e4`, and exposes detector-frame timing without heterogeneous medians in `fb47b03`.
-- The clean reports from `6576273` are superseded because the final-review benchmark and hot-path fixes changed the measured contract. Fresh clean timing and allocation reports are required before completion.
+- Fresh clean timing, gate-allocation, sweep-allocation, and sweep-conversion reports identify `HEAD=6474a7fb6752ec59448382cff73925eb6f30803b` with `local_modifications=false`, warmup enabled, and three measurement runs.
 
-There is no remaining implementation blocker in the finite ledger.
-The only remaining blockers are confirmed findings from the final GPT-5.6/max re-review, documentation disagreement, or a failing final verification command.
+There is no remaining blocker in the finite ledger.
+Follow-up GPT-5.6/max re-review found no remaining implementation or P0-P2 finding, its two P3 documentation findings are fixed, and every final verification command passes.
 
 ## Active Sources Of Truth
 
@@ -66,22 +68,24 @@ Future behavior outside the 165-case ledger requires a new exact plan with named
 - Report-only and contract-only rows must not imply a Stim ratio, beta-gate pass, or primary threshold.
 - Clean benchmark evidence must record the committed Stab revision and `local_modifications=false`.
 
-## PFM-B2 Evidence To Regenerate
+## PFM-B2 Evidence To Preserve
 
-The final representative timing row must report seven independent measurements:
+The final representative timing row reports seven independent measurements:
 
-| Surface | Required evidence |
-| --- | --- |
-| Sampler execution | Independent normalized circuits/s |
-| Reference sampling | Independent normalized circuits/s |
-| Converter compilation | Independent normalized circuits/s |
-| Ordinary detection sampling | Independent normalized circuits/s over the non-frame corpus |
-| Forced detector-frame sampling | Independent normalized circuits/s over the full representative corpus |
-| Error analysis | Independent normalized circuits/s |
-| Flow generation | Independent normalized circuits/s |
+| Surface | Median rate |
+| --- | ---: |
+| Sampler execution | `1.110e7 circuits/s` |
+| Reference sampling | `1.412e7 circuits/s` |
+| Converter compilation | `1.815e5 circuits/s` |
+| Ordinary detection sampling | `8.802e4 circuits/s` |
+| Forced detector-frame sampling | `4.191e5 circuits/s` |
+| Error analysis | `8.514e5 circuits/s` |
+| Flow generation | `1.666e5 circuits/s` |
 
-The Markdown report must leave the row-level Stab median empty and render every normalized submeasurement explicitly.
-The gate and sweep allocation reports must be regenerated from the same clean revision.
+The Markdown report leaves the row-level Stab median empty and renders every normalized submeasurement explicitly.
+The gate allocation report has a maximum peak live allocation of 12,284 bytes and maximum sampled resident delta of 8,192 bytes; forced detector-frame sampling peaks at 8,320 live bytes.
+Low and maximum analyzer sweep IDs both use 25 allocation calls, 3,783 total bytes, 11 peak-live allocations, 1,976 peak-live bytes, and zero sampled resident delta.
+The focused sweep-conversion row reports `1.669e5 shots/s` after removing the extra record copy.
 These rows remain report-only and have no faithful pinned-Stim timing ratio.
 
 ## Final Verification
@@ -123,3 +127,11 @@ This goal is complete only when:
 
 Python bindings and Python object shape, JS/WASM, diagrams, `repl`, QASM, Quirk, Crumble, ecosystem packages, GPU, exact random-stream parity, public graph or vector simulator products, C++ header compatibility, full ErrorMatcher provenance, `explain_errors`, deprecated `--detector_hypergraph`, and behavior outside the finite selected ledger remain future work.
 They do not block this goal.
+
+## Completion Record
+
+- The source ledger validates 165 cases with zero planned rows and zero shared selectors.
+- PFM-B1 through PFM-B5 are complete for the selected scope, and PFM-B6 documentation synchronization is complete.
+- Clean report-only evidence identifies `HEAD=6474a7fb6752ec59448382cff73925eb6f30803b` with `local_modifications=false` and no aggregate Stim ratio claim.
+- Final milestone-audit and GPT-5.6/max full-code-review found no remaining implementation or P0-P2 issue after remediation.
+- Formatting, touched-crate Clippy, the workspace test suite, both allocation regressions, blocker validation, PF3 and M8 oracle runs, all implemented oracle rows, benchmark smoke, and staged pre-commit checks pass.

@@ -7,7 +7,7 @@ The canonical table classifies all 81 gates, 19 semantic families, 22 accepted t
 The 18 original `pfm3-contract-*` records remain the semantic-family rollups, but implementation exposed that 11 of them aggregated 30 exact pinned-Stim test anchors and therefore could not honestly serve as completion evidence.
 Those aggregations are now split into 37 implemented ledger cases with 37 independent exact selectors and oracle shards; the full source ledger has 165 cases and no planned row.
 The clean timing and allocation reports from `6576273` are superseded by final-review remediation: `2f46c33` removes the sweep-reference record copy, `25f352b` unifies canonical surface and statistical boundaries, `8ab85e4` requires exact upstream gate markers, and `fb47b03` separates ordinary detection from forced detector-frame timing while suppressing heterogeneous report-only medians.
-Fresh clean timing and allocation reports plus a follow-up GPT-5.6/max re-review are the remaining process gates.
+Fresh clean reports identify `HEAD=6474a7fb6752ec59448382cff73925eb6f30803b` with `local_modifications=false`, warmup enabled, and three measurement runs. Follow-up GPT-5.6/max re-review found no remaining implementation or P0-P2 finding, and its two P3 documentation findings are fixed.
 
 ## Selected Surfaces
 
@@ -104,16 +104,41 @@ PFM-B2 fixed production defects in controlled-Pauli dispatch, heralded sampler a
 The existing `pf3-gate-semantic-wide` and `pf3-analyze-errors-sweep` rows therefore remain the representative performance and resource evidence; the mixed-contract trigger does not fire.
 If a future production compile or execution path starts consulting the semantic contract, add a mixed-family compile-and-execute row and classify it before timing.
 
-The clean timing command to rerun is:
+The clean timing command was:
 
 ```sh
 just bench::compare --only pf3-gate-semantic-wide --only pf3-analyze-errors-sweep --warmup --measurement-runs 3 --baseline target/benchmarks/pfm-b2-closure-baseline/baseline.json --report target/benchmarks/pfm-b2-closure-compare
 ```
 
-The new report must record all seven gate submeasurements plus the three analyzer-sweep submeasurements, leave the report-only row median empty, and render normalized rates in the report-only submeasurement table.
-Allocation-tracked reports must be stored under `target/benchmarks/pfm-b2-closure-gate-allocations` and `target/benchmarks/pfm-b2-closure-sweep-allocations`.
-The execution-only fixed-tableau regression separately proves warmed dispatch allocation does not scale with repetitions, and the sweep-conversion regression proves the converter adds no per-shot scratch allocation or record-copy buffer.
+The timing report records these normalized rates:
+
+| Measurement | Median seconds | Normalized rate |
+| --- | ---: | ---: |
+| Gate sampler execution | `0.000006128` | `1.110e7 circuits/s` |
+| Gate reference sampling | `0.000004816` | `1.412e7 circuits/s` |
+| Gate converter compilation | `0.000374721` | `1.815e5 circuits/s` |
+| Gate ordinary detection sampling | `0.000749825` | `8.802e4 circuits/s` |
+| Gate forced detector-frame sampling | `0.000162241` | `4.191e5 circuits/s` |
+| Gate error analysis | `0.000079872` | `8.514e5 circuits/s` |
+| Gate flow generation | `0.000408241` | `1.666e5 circuits/s` |
+| Analyzer sweep-control matrix | `0.000001088` | `9.191e5 circuits/s` |
+| Analyzer low sweep ID | `0.000000640` | `1.562e6 circuits/s` |
+| Analyzer maximum sweep ID | `0.000000640` | `1.562e6 circuits/s` |
+
+The report leaves both report-only row medians empty and renders all ten normalized submeasurements under `Report-Only Submeasurements`.
+Allocation-tracked reports are stored under `target/benchmarks/pfm-b2-closure-gate-allocations` and `target/benchmarks/pfm-b2-closure-sweep-allocations`.
+The gate row's maximum peak live allocation is 12,284 bytes and maximum sampled resident delta is 8,192 bytes. Forced detector-frame sampling uses 9,675 total allocation calls, 274,294 total allocated bytes, 137 peak-live allocations, 8,320 peak-live bytes, and zero sampled resident delta.
+Low and maximum sweep IDs both allocate 25 times, 3,783 total bytes, 11 peak-live allocations, and 1,976 peak-live bytes, with zero sampled resident delta.
+The execution-only fixed-tableau regression separately proves warmed dispatch allocation does not scale with repetitions, and the sweep-conversion regression proves the converter adds no per-shot scratch allocation. Direct output into the caller's reusable record in `sampling/reference.rs` removes the former record-copy buffer and full-record copy.
 Both rows remain `report-only` and `contract-only`; no aggregate Stab/Stim ratio or beta-gate claim is made.
+
+The focused clean sweep-conversion command measured the hot path changed by `2f46c33`:
+
+```sh
+just bench::compare --only pf3-m2d-sweep-b8 --warmup --measurement-runs 3 --baseline target/benchmarks/pfm-b2-closure-sweep-conversion-baseline/baseline.json --report target/benchmarks/pfm-b2-closure-sweep-conversion-compare
+```
+
+It reports `0.000029952` seconds or `1.669e5 shots/s`, remains report-only, and claims no Stim ratio.
 
 ## Completion Checklist
 
@@ -124,6 +149,6 @@ Both rows remain `report-only` and `contract-only`; no aggregate Stab/Stim ratio
 - [x] Every final ledger case is `implemented` with an existing test, oracle signature, and honest benchmark reference.
 - [x] All 37 oracle rows pass through `just oracle::run --milestone PF3`.
 - [x] The low and maximum sweep-ID allocation evidence remains clean.
-- [ ] Documentation agrees on active and deferred scope.
+- [x] Documentation agrees on active and deferred scope.
 - [x] Milestone-audit implementation, evidence, benchmark, and resource findings are fixed; the exact-provenance loophole is resolved in `milestone-spec-gaps.md`.
-- [ ] GPT-5.6/max full-code-review findings are fixed.
+- [x] GPT-5.6/max full-code-review findings are fixed; follow-up review found no remaining implementation or P0-P2 finding.

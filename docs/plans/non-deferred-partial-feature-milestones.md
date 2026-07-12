@@ -178,7 +178,7 @@ Acceptance criteria:
 
 Objective: resolve both PFM3 entries by closing unsupported ambiguity across parser, measurement sampler, reference sampler, detection converter, detector frame, detection sampler, error analyzer, and flow-generator surfaces.
 
-Status: Complete for the selected Rust and CLI scope as of 2026-07-12. Final semantic implementation and executable evidence landed in `f60ea17` and `e7a67a0`; review remediation is committed through `fb47b03`. Thirty-seven independently selectable pinned-provenance subcases replace the original eighteen semantic-family rollups as completion evidence, all selectors and PF3 oracle rows pass, and the 165-case source ledger has no planned row. The clean reports from `6576273` are superseded by final-review hot-path and benchmark-contract fixes; PFM-B6 owns the fresh clean evidence, follow-up review, and cross-document rollup.
+Status: Complete for the selected Rust and CLI scope as of 2026-07-12. Final semantic implementation and executable evidence landed in `f60ea17` and `e7a67a0`; review remediation is committed through `fb47b03`. Thirty-seven independently selectable pinned-provenance subcases replace the original eighteen semantic-family rollups as completion evidence, all selectors and PF3 oracle rows pass, and the 165-case source ledger has no planned row. Fresh clean timing and allocation reports identify `HEAD=6474a7fb6752ec59448382cff73925eb6f30803b` with `local_modifications=false`; PFM-B6 owns the follow-up review and final cross-document rollup.
 
 Tasks:
 
@@ -388,6 +388,8 @@ Acceptance criteria:
 ### PFM-B6: Resolve Spec Gaps And Roll Up Status
 
 Objective: turn completed blocker work into conservative, durable status without preserving stale `Partial` labels for already closed selected surfaces.
+
+Status: Complete as of 2026-07-12. The final rollup is recorded in `docs/plans/pfm8-rollup-evidence-report.md`; all 165 cases are closed, clean report-only evidence identifies `HEAD=6474a7fb6752ec59448382cff73925eb6f30803b`, follow-up GPT-5.6/max review has no remaining implementation or P0-P2 finding, and final verification passes.
 
 Tasks:
 

@@ -2,7 +2,7 @@
 
 Date: 2026-07-12
 
-Status: PFM-B1 through PFM-B5 are complete for the selected Rust and CLI scope. PFM-B6 documentation synchronization is in progress pending final GPT-5.6/max re-review.
+Status: Complete for the selected Rust and CLI blocker scope. PFM-B1 through PFM-B5 implementation, PFM-B6 documentation synchronization, clean evidence, milestone audit, and final GPT-5.6/max re-review are complete.
 
 ## Scope
 
@@ -24,7 +24,7 @@ It does not claim Python, JS/WASM, diagram, ecosystem, public interactive simula
 | Milestone | Selected scope | Completion evidence |
 | --- | --- | --- |
 | PFM-B1 | Reverse-flow and QEC transforms | 19 implemented cases, independent selectors, clean allocation reports from `HEAD=4f193f19cebf132f7baf0a3aa1cc799a153a71ed` |
-| PFM-B2 | Analyzer sweep evidence and gate-by-surface execution | 1 evidence-closed analyzer case and 37 implemented gate cases; final-review fixes are committed through `fb47b03`, with fresh clean timing and allocation evidence pending |
+| PFM-B2 | Analyzer sweep evidence and gate-by-surface execution | 1 evidence-closed analyzer case, 37 implemented gate cases, final-review fixes through `fb47b03`, and clean final timing plus allocation evidence from `HEAD=6474a7fb6752ec59448382cff73925eb6f30803b` |
 | PFM-B3 | Shared folded DEM traversal | 7 implemented consumer contracts and clean allocation evidence from `HEAD=4a984c26b39f6236fde5e3ff10cf0b42e8b155a2` |
 | PFM-B4 | Detecting regions, missing detectors, flow generation, checking, and solving | 16 evidence-closed detector-utility cases plus 33 implemented flow cases at `0f47eee04eacec96ed4e03dd36a18f58b76a0afc` |
 | PFM-B5 | Generic analyzer folding, graphlike and hypergraph search, SAT/WCNF, sparse tracking, and matched errors | 52 implemented cases with final admission fix at `4c5901e2eaf03ddf0c8043b5655d943b70b92a70` |
@@ -65,8 +65,12 @@ The final review remediation strengthens fixed-tableau inverse equivalence, grou
 
 No primary runner or 1.25x threshold changed during final PFM-B2 review, so no fresh primary-gate run is required.
 The earlier `target/benchmarks/pfm-b2-final-reviewed-*` reports at `6576273` are superseded because final review changed the sweep-reference hot path and split detector-frame timing from ordinary detection sampling.
-Fresh `target/benchmarks/pfm-b2-closure-*` reports must identify one committed revision with `local_modifications=false`, warmup enabled, and three measurement runs.
-The gate row must report sampler execution, reference sampling, converter compilation, ordinary detection sampling, forced detector-frame sampling, error analysis, and flow generation separately, omit its heterogeneous row median, and render every normalized submeasurement.
+Fresh `target/benchmarks/pfm-b2-closure-*` reports identify `HEAD=6474a7fb6752ec59448382cff73925eb6f30803b` with `local_modifications=false`, warmup enabled, and three measurement runs.
+The gate row reports sampler execution, reference sampling, converter compilation, ordinary detection sampling, forced detector-frame sampling, error analysis, and flow generation separately, omits its heterogeneous row median, and renders every normalized submeasurement.
+The seven rates are `1.110e7`, `1.412e7`, `1.815e5`, `8.802e4`, `4.191e5`, `8.514e5`, and `1.666e5 circuits/s` in that order.
+The gate allocation maximum is 12,284 peak-live bytes with an 8,192-byte sampled resident delta; forced detector-frame sampling peaks at 8,320 live bytes with zero sampled resident delta.
+Low and maximum analyzer sweep IDs remain identical at 25 allocation calls, 3,783 total bytes, 11 peak-live allocations, and 1,976 peak-live bytes, with zero sampled resident delta.
+The focused `pf3-m2d-sweep-b8` report records `1.669e5 shots/s` after removing the extra record copy.
 The gate and analyzer-sweep rows remain contract-only and report-only, so no Stab/Stim ratio or beta-gate claim is made.
 
 PFM-B5's faithful graphlike comparison rows remain report-only at 4.647x and 4.279x Stim.
@@ -78,7 +82,7 @@ Milestone audits for PFM-B1, PFM-B3, PFM-B4, and PFM-B5 are complete in their pr
 The PFM-B2 audit found semantic, provenance, allocation, benchmark-diagnostic, statistical-resource, and modularity defects in the first completion evidence; commits `f1f6e42`, `6bdff8b`, and `6576273` close that round.
 Final GPT-5.6/max review then found a sweep-reference copy, duplicated surface schema, floating statistical-boundary drift, non-exact GTest gate markers, hidden detector-frame timing, and a heterogeneous report median; commits `2f46c33`, `25f352b`, `8ab85e4`, and `fb47b03` close those findings.
 The exact-provenance loophole and final gate-scope boundary are resolved in `docs/plans/milestone-spec-gaps.md`.
-Fresh clean benchmark evidence and follow-up GPT-5.6/max re-review of the remediation remain blocking until complete.
+Follow-up GPT-5.6/max re-review found no remaining implementation or P0-P2 finding. Its two P3 documentation findings, stale blocking language and over-attribution of copy removal to an allocation test, are fixed in the final documentation change.
 
 ## Verification
 
@@ -96,7 +100,7 @@ The current PFM-B2/PFM-B6 pass completed:
 - `just bench::smoke`
 - clean PFM-B2 timing and allocation commands recorded in `docs/plans/pfm-b2-gate-surface-progress-report.md`
 
-Final documentation commit verification must rerun `just maintenance::pre-commit` and the standard checks after resolving any final review findings.
+The final documentation commit reruns `just maintenance::pre-commit`; all standard checks above passed after the final implementation changes, and `just oracle::run --implemented-only` completed successfully in the main task after the reviewer stopped its duplicate run.
 
 ## Explicitly Deferred Work
 
