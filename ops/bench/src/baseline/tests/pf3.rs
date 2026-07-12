@@ -37,6 +37,7 @@ fn pf3_sweep_benchmark_rows_have_stab_compare_runners() {
                 "stab_pf3_gate_reference_sampling",
                 "stab_pf3_gate_converter_compilation",
                 "stab_pf3_gate_detection_sampling",
+                "stab_pf3_gate_detector_frame_sampling",
                 "stab_pf3_gate_error_analysis",
                 "stab_pf3_gate_flow_generation",
             ][..],

@@ -2,6 +2,7 @@ use super::{
     compare_note, measurement_work, parse_stim_perf_line, run_stab_compare_row,
     selected_baseline_rows, validate_baseline_metadata,
 };
+use crate::comparability::ComparabilityClass;
 use crate::compare::{
     BaselineCompareStatus, BaselineSummary, CompareRowBuild, build_compare_row_result,
     compare_incomplete_details, summarize_baseline_row,
@@ -520,6 +521,40 @@ fn compare_row_result_records_ratio_and_beta_gate_status() {
     assert_eq!(result.relative_ratio, Some(1.5));
     assert_eq!(result.pass_fail_status, "fail");
     assert_eq!(result.note.as_deref(), Some("same workload"));
+}
+
+#[test]
+fn report_only_multi_measurement_rows_do_not_publish_a_mixed_median() {
+    let mut row = benchmark_row("report-only-row", Runner::ContractOnly);
+    row.comparability = ComparabilityClass::ReportOnly;
+    let stab_measurements = [0.001, 0.100]
+        .into_iter()
+        .enumerate()
+        .map(|(index, seconds)| Measurement {
+            name: format!("surface-{index}"),
+            seconds,
+            variance_seconds: None,
+            allocation: None,
+            resident_bytes: None,
+            resident_delta_bytes: None,
+            observations: Vec::new(),
+            iterations: Some(1),
+        })
+        .collect();
+
+    let result = build_compare_row_result(CompareRowBuild {
+        row: &row,
+        status: "measured",
+        baseline_summary: "contract-only",
+        stab_summary: "two unrelated surfaces",
+        note: Some("report-only: heterogeneous surfaces".to_string()),
+        stim_measurements: Vec::new(),
+        stab_measurements,
+        baseline_status: BaselineCompareStatus::Comparable,
+    });
+
+    assert_eq!(result.stab_median_seconds, None);
+    assert_eq!(result.relative_ratio, None);
 }
 
 #[test]

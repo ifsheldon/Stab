@@ -70,6 +70,10 @@ impl ComparabilityClass {
     pub(crate) fn uses_paired_ratios_without_mixed_median(self) -> bool {
         self == Self::PartialMatch
     }
+
+    pub(crate) fn omits_multi_measurement_median(self) -> bool {
+        matches!(self, Self::ReportOnly | Self::ContractOnly)
+    }
 }
 
 fn note_prefix(note: &str) -> Option<&str> {

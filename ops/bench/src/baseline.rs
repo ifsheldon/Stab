@@ -36,7 +36,6 @@ mod rates;
 #[cfg(test)]
 mod tests;
 
-#[cfg(test)]
 pub(crate) use rates::measurement_rate_work;
 
 #[cfg(not(test))]

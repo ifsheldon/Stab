@@ -443,7 +443,39 @@ pub(crate) fn render_compare_markdown_report(report: &CompareReport) -> String {
             row.note.as_deref().unwrap_or("")
         ));
     }
+    render_report_only_submeasurements(&mut out, report);
     out
+}
+
+fn render_report_only_submeasurements(out: &mut String, report: &CompareReport) {
+    let rows = report.rows.iter().filter(|row| {
+        row.comparability.omits_multi_measurement_median() && row.stab_measurements.len() > 1
+    });
+    let mut rows = rows.peekable();
+    if rows.peek().is_none() {
+        return;
+    }
+
+    out.push_str("\n## Report-Only Submeasurements\n\n");
+    out.push_str("| Benchmark | Measurement | Median | Normalized Rate |\n");
+    out.push_str("| --- | --- | ---: | ---: |\n");
+    for row in rows {
+        for measurement in &row.stab_measurements {
+            let normalized_rate = crate::baseline::measurement_rate_work(&row.id, measurement)
+                .map_or_else(String::new, |(work, unit)| {
+                    let rate = if measurement.seconds > 0.0 {
+                        work / measurement.seconds
+                    } else {
+                        0.0
+                    };
+                    format!("{rate:.3e} {unit}")
+                });
+            out.push_str(&format!(
+                "| {} | {} | {:.9}s | {} |\n",
+                row.id, measurement.name, measurement.seconds, normalized_rate
+            ));
+        }
+    }
 }
 
 fn format_beta_gate(row: &CompareRowResult) -> String {

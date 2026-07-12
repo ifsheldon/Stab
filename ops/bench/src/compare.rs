@@ -515,20 +515,26 @@ pub(crate) fn build_compare_row_result(input: CompareRowBuild<'_>) -> CompareRow
         stab_measurements,
         baseline_status,
     } = input;
-    let stim_median_seconds = median_seconds(&stim_measurements);
-    let stab_median_seconds = median_seconds(&stab_measurements);
-    let median_relative_ratio = match (stim_median_seconds, stab_median_seconds) {
-        (Some(stim_seconds), Some(stab_seconds)) if stim_seconds > 0.0 => {
-            Some(stab_seconds / stim_seconds)
-        }
-        _ => None,
-    };
     let comparability = if row.comparability
         == crate::comparability::ComparabilityClass::Unspecified
     {
         crate::comparability::ComparabilityClass::from_note_and_runner(note.as_deref(), row.runner)
     } else {
         row.comparability
+    };
+    let omit_mixed_median = comparability.omits_multi_measurement_median()
+        && (stim_measurements.len() > 1 || stab_measurements.len() > 1);
+    let stim_median_seconds = (!omit_mixed_median)
+        .then(|| median_seconds(&stim_measurements))
+        .flatten();
+    let stab_median_seconds = (!omit_mixed_median)
+        .then(|| median_seconds(&stab_measurements))
+        .flatten();
+    let median_relative_ratio = match (stim_median_seconds, stab_median_seconds) {
+        (Some(stim_seconds), Some(stab_seconds)) if stim_seconds > 0.0 => {
+            Some(stab_seconds / stim_seconds)
+        }
+        _ => None,
     };
     let measurement_ratios =
         paired_measurement_ratios(&stim_measurements, &stab_measurements, comparability);
