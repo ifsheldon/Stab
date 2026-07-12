@@ -9,7 +9,6 @@ use crate::{CircuitError, CircuitResult};
 pub(crate) struct ReferenceSampleScratch {
     rng: SmallRng,
     frame: StabilizerFrame,
-    record: Vec<bool>,
     output: Vec<bool>,
 }
 
@@ -31,7 +30,6 @@ impl CompiledSampler {
         ReferenceSampleScratch {
             rng: SmallRng::seed_from_u64(0),
             frame: StabilizerFrame::new(self.qubit_count),
-            record: Vec::with_capacity(self.measurement_count),
             output: Vec::with_capacity(self.measurement_count),
         }
     }
@@ -54,11 +52,9 @@ impl CompiledSampler {
             ExecutionMode::ReferenceSample,
             sweep_record,
             &mut scratch.frame,
-            &mut scratch.record,
+            record,
             &mut scratch.output,
         );
-        record.clear();
-        record.extend_from_slice(&scratch.record);
         Ok(())
     }
 }
