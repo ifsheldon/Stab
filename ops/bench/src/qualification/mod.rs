@@ -17,7 +17,7 @@ mod model;
 mod validation;
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "940af5e019459bdc797bfb5b0f20a810655941bac8fefa9e1aa43610a2950dad";
+    "40f7155022cf97205e802256a21290924af8605afc41c502dab34f6007c24ae6";
 const MAX_SUITE_BYTES: usize = 32 << 20;
 
 pub(crate) fn check(root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(), BenchError> {

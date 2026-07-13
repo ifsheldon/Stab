@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "7b8703977838aa796f3da6bf5e6321de4491a73dfc5af2a2a07785337918abb0",
-  "semantic_digest": "940af5e019459bdc797bfb5b0f20a810655941bac8fefa9e1aa43610a2950dad",
+  "correctness_digest": "b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141",
+  "semantic_digest": "40f7155022cf97205e802256a21290924af8605afc41c502dab34f6007c24ae6",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -2085,7 +2085,7 @@
     {
       "id": "PERFC-55676fc3004b7fd2",
       "source_line": 223,
-      "anchor_digest": "f5dd0dc47b6272c40c58ecfcdad0cc5a8a8b89d617050939755c8a033e795e32",
+      "anchor_digest": "3ceb9233f1c02b02d1c9017bcc96cd63c1f35e13f007c0cfb740314de08ffe08",
       "section": "16. Test And Benchmark Surface",
       "feature": "Upstream test inventory and porting plan",
       "raw_status": "Done as a file-level hierarchy and CQ0 frozen case inventory",
@@ -2247,10 +2247,10 @@
     {
       "id": "PERFC-5f2145ca0e3328b5",
       "source_line": 224,
-      "anchor_digest": "475b527b16edea728fbb31c83832dfcefa63c17373de8d3f0998e6516a6891d7",
+      "anchor_digest": "a317825f1bebbc6780ea6deb755b2f6667ee557ce445d26f51673048a79e8234",
       "section": "16. Test And Benchmark Surface",
       "feature": "Oracle fixture matrix",
-      "raw_status": "Done for current implemented surfaces; comprehensive qualification in progress",
+      "raw_status": "Done for current implemented surfaces; CQ1 clean acceptance pending",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
