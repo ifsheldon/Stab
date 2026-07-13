@@ -19,9 +19,10 @@ use super::statistics::{PairOrder, PairedSample, StatisticsSummary, pair_measure
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 4;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 5;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
-const CALIBRATION_MINIMUM: Duration = Duration::from_millis(250);
+const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
+const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
 const CALIBRATION_MAXIMUM: Duration = Duration::from_secs(2);
 const INVOCATION_TIMEOUT: Duration = Duration::from_secs(30);
 const MAXIMUM_ITERATIONS: u64 = 1_000_000_000;
@@ -158,7 +159,8 @@ pub(super) struct ImplementationCalibration {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct CalibrationEvidence {
-    pub(super) minimum_seconds: f64,
+    pub(super) acceptance_minimum_seconds: f64,
+    pub(super) target_minimum_seconds: f64,
     pub(super) maximum_seconds: f64,
     pub(super) stim: ImplementationCalibration,
     pub(super) stab: ImplementationCalibration,
@@ -209,13 +211,7 @@ pub(super) fn run(
     )?;
     pair_execution(&semantic_preflight)?;
 
-    let policy = CalibrationPolicy {
-        minimum: CALIBRATION_MINIMUM,
-        maximum: CALIBRATION_MAXIMUM,
-        timeout: INVOCATION_TIMEOUT,
-        maximum_iterations: NonZeroU64::new(MAXIMUM_ITERATIONS)
-            .ok_or(RunError::InvalidIterationCap)?,
-    };
+    let policy = calibration_policy()?;
     let (stim_decision, stim_probes) =
         calibrate_worker(&workers, Implementation::Stim, args.work_items, policy)?;
     let (stab_decision, stab_probes) =
@@ -231,7 +227,8 @@ pub(super) fn run(
     pair_execution(&common_validation)?;
     validate_common_calibration(&common_validation)?;
     let calibration = CalibrationEvidence {
-        minimum_seconds: CALIBRATION_MINIMUM.as_secs_f64(),
+        acceptance_minimum_seconds: CALIBRATION_ACCEPTANCE_MINIMUM.as_secs_f64(),
+        target_minimum_seconds: CALIBRATION_TARGET_MINIMUM.as_secs_f64(),
         maximum_seconds: CALIBRATION_MAXIMUM.as_secs_f64(),
         stim: calibration_evidence(Implementation::Stim, stim_decision, stim_probes),
         stab: calibration_evidence(Implementation::Stab, stab_decision, stab_probes),
@@ -409,6 +406,16 @@ fn calibrate_worker(
     Ok((decision, evidence))
 }
 
+fn calibration_policy() -> Result<CalibrationPolicy, RunError> {
+    Ok(CalibrationPolicy {
+        minimum: CALIBRATION_TARGET_MINIMUM,
+        maximum: CALIBRATION_MAXIMUM,
+        timeout: INVOCATION_TIMEOUT,
+        maximum_iterations: NonZeroU64::new(MAXIMUM_ITERATIONS)
+            .ok_or(RunError::InvalidIterationCap)?,
+    })
+}
+
 fn calibration_evidence(
     implementation: Implementation,
     decision: CalibrationDecision,
@@ -471,7 +478,7 @@ fn pair_execution(execution: &PairExecution) -> Result<Vec<PairedSample>, RunErr
 fn validate_common_calibration(execution: &PairExecution) -> Result<(), RunError> {
     for invocation in [&execution.stim, &execution.stab] {
         let measured = invocation.measured_duration()?;
-        if measured < CALIBRATION_MINIMUM || measured > CALIBRATION_MAXIMUM {
+        if !common_calibration_duration_is_accepted(measured) {
             return Err(RunError::CommonCalibrationOutOfBounds {
                 implementation: invocation.implementation,
                 measured,
@@ -479,6 +486,10 @@ fn validate_common_calibration(execution: &PairExecution) -> Result<(), RunError
         }
     }
     Ok(())
+}
+
+fn common_calibration_duration_is_accepted(measured: Duration) -> bool {
+    measured >= CALIBRATION_ACCEPTANCE_MINIMUM && measured <= CALIBRATION_MAXIMUM
 }
 
 fn memory_evidence(
@@ -685,5 +696,25 @@ mod tests {
             ClaimClass::DiagnosticInfrastructure,
             ClaimClass::PromotablePerformance
         );
+    }
+
+    #[test]
+    fn calibration_guard_band_preserves_the_acceptance_floor() {
+        let policy = calibration_policy().expect("calibration policy");
+        assert_eq!(policy.minimum, Duration::from_millis(350));
+        assert_eq!(CALIBRATION_ACCEPTANCE_MINIMUM, Duration::from_millis(250));
+        assert!(policy.minimum > CALIBRATION_ACCEPTANCE_MINIMUM);
+        assert!(!common_calibration_duration_is_accepted(
+            Duration::from_micros(249_999)
+        ));
+        assert!(common_calibration_duration_is_accepted(
+            Duration::from_millis(250)
+        ));
+        assert!(common_calibration_duration_is_accepted(
+            Duration::from_secs(2)
+        ));
+        assert!(!common_calibration_duration_is_accepted(
+            Duration::from_micros(2_000_001)
+        ));
     }
 }

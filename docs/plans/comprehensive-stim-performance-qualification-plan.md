@@ -197,6 +197,7 @@ Generated artifacts belong below `target/benchmarks/qualification/` and must nev
 ### Timing And Statistics
 
 - Calibrate each timed batch to at least 250 milliseconds and at most 2 seconds without exceeding the workload's declared iteration or memory cap.
+- Controllers may target a higher source-owned calibration duration to absorb ordinary run-to-run jitter, but must record that target separately and independently reject the retained common batch when it falls below 250 milliseconds or exceeds 2 seconds. PQ1 uses a 350-millisecond target and retains the 250-millisecond acceptance floor.
 - Use three untimed or unreported warmup batches before a full qualification measurement.
 - Use nine interleaved paired Stim and Stab samples for full qualification and fifteen for soak evidence.
 - Alternate deterministic `Stim, Stab` and `Stab, Stim` order across pairs to reduce drift bias.

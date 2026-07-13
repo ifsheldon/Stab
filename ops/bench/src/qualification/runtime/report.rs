@@ -361,7 +361,9 @@ pub(super) fn run(root: &crate::root::RepoRoot, args: ReportArgs) -> Result<Path
 
 fn validate_calibration(report: &QualificationReport) -> Result<(), ReportError> {
     let calibration = &report.calibration;
-    if calibration.minimum_seconds != 0.25
+    if calibration.acceptance_minimum_seconds != 0.25
+        || calibration.target_minimum_seconds != 0.35
+        || calibration.target_minimum_seconds <= calibration.acceptance_minimum_seconds
         || calibration.maximum_seconds != 2.0
         || calibration.common_iterations == 0
     {
@@ -386,6 +388,8 @@ fn validate_calibration(report: &QualificationReport) -> Result<(), ReportError>
             || selected.invocation.evidence_mode != EvidenceMode::Timing
             || selected.invocation.measured_duration()?.as_secs_f64()
                 != implementation.selected_measured_seconds
+            || implementation.selected_measured_seconds < calibration.target_minimum_seconds
+            || implementation.selected_measured_seconds > calibration.maximum_seconds
         {
             return Err(ReportError::Calibration);
         }
@@ -409,7 +413,9 @@ fn validate_calibration(report: &QualificationReport) -> Result<(), ReportError>
         &calibration.common_validation.stab,
     ] {
         let measured = invocation.measured_duration()?.as_secs_f64();
-        if measured < calibration.minimum_seconds || measured > calibration.maximum_seconds {
+        if measured < calibration.acceptance_minimum_seconds
+            || measured > calibration.maximum_seconds
+        {
             return Err(ReportError::Calibration);
         }
     }
@@ -608,7 +614,7 @@ pub(super) fn render_markdown(report: &QualificationReport, report_sha256: &str)
         format!("{:?}", value.outcome).to_ascii_lowercase()
     });
     format!(
-        "# PQ1 Qualification Harness Report\n\n- Group: `{}`\n- Claim class: diagnostic infrastructure\n- Tier: `{:?}`\n- Stim: `{}` (`{}`)\n- Stab commit: `{}`\n- Local modifications: `{}`\n- Host profile: `{}`\n- Host verified: `{}`\n- CPU: `{}` on `{}`\n- Frequency governor: `{:?}`\n- Rust toolchain: `{}`\n- Target: `{}`\n- Warmups: `{}`\n- Paired samples: `{}`\n- Median diagnostic ratio: `{}`\n- Upper bootstrap bound: `{}`\n- Diagnostic 1.25 outcome: `{}`\n- Process memory evidence: separate from timing\n- Promotable product claim: `false`\n- Report SHA-256: `{}`\n",
+        "# PQ1 Qualification Harness Report\n\n- Group: `{}`\n- Claim class: diagnostic infrastructure\n- Tier: `{:?}`\n- Stim: `{}` (`{}`)\n- Stab commit: `{}`\n- Local modifications: `{}`\n- Host profile: `{}`\n- Host verified: `{}`\n- CPU: `{}` on `{}`\n- Frequency governor: `{:?}`\n- Rust toolchain: `{}`\n- Target: `{}`\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Warmups: `{}`\n- Paired samples: `{}`\n- Median diagnostic ratio: `{}`\n- Upper bootstrap bound: `{}`\n- Diagnostic 1.25 outcome: `{}`\n- Process memory evidence: separate from timing\n- Promotable product claim: `false`\n- Report SHA-256: `{}`\n",
         report.group_id,
         report.tier,
         report.stim_tag,
@@ -622,6 +628,8 @@ pub(super) fn render_markdown(report: &QualificationReport, report_sha256: &str)
         report.host.frequency_governor_before,
         report.toolchain.rust_toolchain,
         report.toolchain.target_triple,
+        report.calibration.target_minimum_seconds,
+        report.calibration.acceptance_minimum_seconds,
         report.warmups.len(),
         report.samples.len(),
         median,

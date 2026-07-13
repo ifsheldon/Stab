@@ -123,6 +123,7 @@ When a commit is requested, use focused commits and run the repository's require
 - Never aggregate unlike phases into a row median or claim a ratio from a proxy that performs different work.
 - Timed output must be consumed, work counters must be positive and equal, and untimed output digests must match before a ratio is computed.
 - Full qualification uses calibrated batches, three warmups, nine interleaved paired samples, raw-sample retention, median paired ratios, relative median absolute deviation, and a fixed-seed bootstrap 95 percent confidence interval.
+- PQ1 targets 350-millisecond calibration batches and independently rejects a common retained batch below the contractual 250-millisecond floor or above the 2-second ceiling; do not retry only a below-floor validation without fixing or recording the calibration policy.
 - A primary row passes 1.25x only when both its median paired ratio and upper confidence bound are at most `1.25`.
 - A slow comparable row cannot be waived.
 - A noisy row may receive one complete group rerun, with both attempts retained; never discard only an unfavorable sample.
