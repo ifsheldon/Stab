@@ -6,13 +6,14 @@ Completed: 2026-07-13.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Correctness dependency: CQ0 semantic digest `7b8703977838aa796f3da6bf5e6321de4491a73dfc5af2a2a07785337918abb0`.
+Correctness dependency: corrected schema-version-3 CQ0 semantic digest `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`.
 
-Performance inventory digest: `940af5e019459bdc797bfb5b0f20a810655941bac8fefa9e1aa43610a2950dad`.
+Performance inventory digest after CQ1 checklist-status synchronization: `40f7155022cf97205e802256a21290924af8605afc41c502dab34f6007c24ae6`.
 
 Implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
-Clean evidence state: `local_modifications=false`; `just bench::qualification-check` and `just bench::qualification-regenerate --check` both passed in a detached checkout of that exact revision.
+The original PQ0 evidence state was clean at the source-owned revision above.
+CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
 
 PQ0 freezes inventory and migration decisions only.
 It does not claim that inherited timing ratios satisfy the comprehensive runner, preflight, scaling, memory, or statistical contract.
@@ -127,7 +128,7 @@ Targeted negative tests cover unknown correctness, fixture, measurement, feature
 
 ## Audit And Review
 
-The final `milestone-audit` found no remaining confirmed finding and approved PQ0 complete at digest `940af5e019459bdc797bfb5b0f20a810655941bac8fefa9e1aa43610a2950dad`.
+The final `milestone-audit` found no remaining confirmed finding and approved PQ0's dispositions; CQ1 checklist-status synchronization now freezes those same dispositions at digest `40f7155022cf97205e802256a21290924af8605afc41c502dab34f6007c24ae6`.
 The final `full-code-review` found no remaining confirmed finding across correctness, schema integrity, benchmark ownership, hostile inputs, filesystem containment, operational commands, tests, module boundaries, and documentation.
 
 Earlier audit and review passes found and drove fixes for truncated and Cartesian checklist ownership, duplicate global child/domain ownership, weak API owner binding, unhashed static fixtures, open-ended generator parameters, incomplete threshold and waiver digests, stale filter handling, asymmetric CLI claims, unsafe pinned-source and repository paths, unbounded manifest and CLI stdin reads, raceable atomic replacement, non-Unix path fallbacks, oversized modules, and stale benchmark-local documentation.

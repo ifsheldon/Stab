@@ -82,7 +82,7 @@ Manifest validation also requires every planned M4 through M11 P0/P1 C++ source 
 Manifest `argv` tokens may use `{fixture_input:inputs/name.ext}` for validated fixture-relative side inputs and `{fixture_output:expected/name.ext}` for exact-output side files written by Stim and Stab during comparison.
 Both placeholder forms reject absolute paths, parent-directory traversal, symlinks in fixture paths, and missing fixture inputs; fixture-output placeholders require committed expected files during normal validation and `just oracle::record --check-clean` unless the row is a statistical fixture with `source=fixture_output`.
 Statistical fixture rows default to `source=stdout`; `source=fixture_output` requires exactly one `{fixture_output:...}` placeholder, uses that fixture-relative path as a validated scratch label, exact-compares stdout and stderr against pinned Stim, and applies the row's statistical plan to both pinned Stim and Stab side-output bytes.
-During oracle runs, fixture-output placeholders are rewritten to fresh scratch paths under `target/oracle/fixture-outputs`; the scratch parent is rejected if any path component is a symlink, and exact-output row side-output bytes are compared in addition to stdout.
+On Linux oracle runs, fixture-output placeholders are rewritten to inherited `/proc/self/fd/...` paths backed by a fresh private directory under `/tmp`; the controller monitors and reads each side output relative to the retained directory descriptor with `NOFOLLOW`, performs bounded descriptor-relative cleanup, and compares exact-output row side-output bytes in addition to stdout.
 `just oracle::run --milestone Mx` scopes execution to implemented fixture rows for that milestone and reports pending red, ignored, or manifest-only rows in the same milestone.
 `just oracle::record --check-clean` checks runnable exact-output rows against pinned Stim; library-only parser/printer rows are run in-process by `stab-oracle` and are skipped by recording because they do not have a Stim CLI command.
 `just oracle::blockers` validates the schema-versioned blocker closure ledger against the pinned Stim tag and commit, tracked regular upstream source files, exact test and symbol anchors, planned test-family anchors, reproducible statistical plans, required PFM-B owners, test evidence state, implemented primary and supporting oracle rows, typed oracle and benchmark runners, benchmark comparability classes, resource contracts, resource limits, and the frozen SHA-256 semantic inventory.
@@ -99,8 +99,8 @@ just oracle::matrix --milestone M4
 The matrix lives at `oracle/compatibility-matrix.csv` and records upstream source paths, owners, milestones, priorities, parity modes, comparators, status, acceptance checks, and deferred future buckets.
 
 The active follow-up plans are [comprehensive correctness qualification](docs/plans/comprehensive-correctness-qualification-plan.md) and [comprehensive Stim performance qualification](docs/plans/comprehensive-stim-performance-qualification-plan.md), with execution rules in [GOAL.md](docs/plans/GOAL.md).
-CQ0 and PQ0 now provide case-level correctness and feature-level performance disposition ledgers; later milestones will add independently selectable execution evidence, full and soak tiers, symmetric process CLI comparisons, faithful pinned-Stim adapter coverage, paired confidence intervals, and memory or scaling checks.
-Correctness and performance run or report tiers remain planned until CQ1 and PQ1; the inventory commands and existing oracle and benchmark commands below remain authoritative during migration.
+CQ0 and PQ0 provide case-level correctness and feature-level performance disposition ledgers, and CQ1 now provides independently selectable correctness execution, PR/full/soak tiers, manifest-bound reports, and machine-readable preflight evidence.
+The symmetric performance runner, faithful pinned-Stim adapter coverage, paired confidence intervals, and memory or scaling qualification remain planned for PQ1 and later milestones.
 
 CQ0 inventory discovery is implemented through:
 
@@ -112,7 +112,29 @@ just qualification::correctness-regenerate --check
 ```
 
 These commands validate or deterministically regenerate `oracle/qualification-manifest.json` from the pinned C++ and Python test tree, default-feature rustdoc JSON, and current implemented oracle rows.
-The correctness run and report tiers remain planned until CQ1.
+CQ1 correctness execution and report commands are implemented through:
+
+```sh
+just qualification::correctness-provenance-probe
+just qualification::correctness-run --tier pr
+just qualification::correctness-run --tier full
+just qualification::correctness-run --tier soak
+just qualification::correctness-report --out target/qualification/correctness/latest
+just qualification::correctness-preflight --out target/qualification/correctness/latest --case <qualification-case-id> --request-sha256 <run-request-sha256> --completion-sha256 <run-completion-sha256>
+```
+
+Qualification runs require a pinned Stim checkout with no tracked or untracked modifications, build fresh private Release binaries for Stab and Stim with Cargo invoked from `/` using absolute manifest paths, execute exact source-owned selectors through immutable sealed copies of direct tools under a config-free explicit child environment, enforce bounded output with process-group cleanup, publish complete run directories atomically, and print the request, report, and completion digests needed by downstream controllers.
+The provenance probe rebuilds both binaries, runs one real source-owned exact case through the normal qualification runner, and reads back the request, execution, report, completion, and preflight artifacts to prove their executable, environment, selector, output, and digest bindings agree.
+Git metadata inspection uses a config-free private Git view whose index is reconstructed from `HEAD`, so caller index flags cannot hide tracked modifications; CMake modules and compiler include or support trees are copied into read-only content-bound snapshots, and compiler subordinate programs are sealed before the build; support-tree digests are included in the hashed execution environment and rechecked after every compiler-consuming case and before publication.
+Private build scratch uses fixed private directories under `/tmp`, Cargo's working directory is `/` so source or scratch ancestors cannot contribute `.cargo` configuration, and retained parent and root descriptors drive bounded cleanup of read-only support snapshots without following replacement paths; an over-budget cleanup is quarantined instead of falling through to unbounded path removal.
+`request.json` fixes the intended selection, canonical direct-executable role/hash/size ledger, and hashed execution environment before execution; each schema-version-3 case execution receipt fixes that same provenance together with process status, output framing, exact Cargo test count, exact statistical completion, and retained artifacts; and `completion.json` fixes the canonical report plus all case receipts after execution.
+Fixed Cargo statistical selectors must emit one source-owned completion marker per declared comparison after its structurally valid shot batches finish and before probabilistic acceptance; each marker must contain exactly the frozen batches per comparison, a malformed suffix retains only the validated marker prefix, and two-sided fixtures retain exact completed-side work on a failed attempt without allowing a partial attempt to pass.
+Staged evidence uses descriptor-relative artifact I/O, newly created receipt directories and their parents are synchronized before publication, publication is serialized by a lock anchored to the retained repository directory, cancellation is rechecked after acquiring that lock, and report regeneration reopens and identity-checks the complete output parent chain before accepting derived evidence.
+Preflight requires controller-approved request and completion digests and rejects stale, partial, failed, deferred, modified, executable-mismatched, directory-swapped, or selector-mismatched evidence.
+Dirty reports can be inspected with explicit `--allow-dirty` preflight permission but are never promotable completion evidence.
+CQ1 execution currently fails closed outside Linux because its evidence contract requires Linux process-group termination and atomic directory exchange.
+Promotable CQ1 evidence still assumes a controlled host: the outer `cargo run` bootstrap, Linux kernel, procfs, process and dynamic-loader semantics, system shared libraries, and dependency-cache contents remain in the trust root, while recorded SHA-256 identities provide reproducibility and tamper evidence rather than third-party authenticity.
+Cargo cases consume the live checkout after request publication, so promotable runs also require that no concurrent same-UID process transiently mutates and restores source files, Git refs or objects, or support-tree aliases during the run; pre-run and pre-publication validation detects persistent changes but is not an authenticated defense against a malicious local operator.
 
 PQ0 performance-ledger discovery is implemented through:
 

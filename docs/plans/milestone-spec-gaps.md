@@ -19,6 +19,64 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
+None.
+
+## Resolved Entries
+
+## 2026-07-13 - CQ1: Executable Provenance And Build Isolation
+
+Status: Resolved
+Revealed by: GPT-5.6/max full-code review of CQ1 execution receipts and fixture runners.
+Current text: CQ1 required exact selectors, exact commits, canonical receipts, and pinned Stim compatibility but did not define which executable bytes were trusted or whether shared build outputs could be reused.
+Gap: A mutable cached Stim or Stab binary, a replaced worker path, or a different Cargo or host-tool executable could produce internally consistent request and result receipts without appearing in the evidence contract.
+Proposed amendment: Require a fresh private Stab and Stim build for each qualification run, a canonical role/hash/size identity ledger for every direct build and execution tool, immutable execution through sealed Linux descriptors, the same ledger and hashed environment in every case receipt, and private config-free homes instead of unconstrained inheritance.
+Resolution: CQ1 now validates Stim source metadata before building, creates private Release binaries, copies direct and compiler-subordinate executable bytes into sealed memory files before use, freezes the canonical direct-tool ledger and execution-environment digest in `request.json`, repeats both in every schema-version-3 execution receipt, allocates fixed private runtime state under `/tmp`, invokes Cargo from `/` with absolute manifests and private configuration, reconstructs a config-free private Git index from `HEAD`, reuses only dependency caches, snapshots compiler and CMake support trees into read-only content-bound directories, revalidates those snapshots after compiler use and before publication, binds their digests into the explicit environment, and performs bounded descriptor-owned cleanup when the private runtime is dropped.
+
+## 2026-07-13 - CQ1: Statistical Multiplicity And Completion Credit
+
+Status: Resolved
+Revealed by: GPT-5.6/max statistical review of blocker-ledger and oracle-fixture qualification accounting.
+Current text: CQ1 required fixed shots, exact boundaries, familywise budgets, and per-seed attempt outcomes but did not define how one source plan accounts for several independent bucket checks, two compared implementations, or several shot-producing calls.
+Gap: A plan could understate its union bound and planned shot total, while a nonzero process exit or malformed short output could be mistaken for proof that all declared shots completed.
+Proposed amendment: Store independent comparisons and shot batches per attempt in source-owned plans, multiply exact tail bounds and shot totals by those counts, credit each compared side only from exact structurally valid records, retain exactly completed sides on failed attempts, and require every declared side and batch before an attempt can pass.
+Resolution: Blocker-ledger schema version 3 and the shared gate statistical plans now carry both multiplicities and reject shot batches that do not divide evenly across comparisons, fixture plans explicitly account for Stim and Stab, canonical integer boundaries are shared by validation and execution, fixed Cargo tests emit plan, seed, comparison, and exact per-comparison shot completion markers after structural completion but before probabilistic acceptance, malformed marker suffixes fail while retaining only a validated prefix, two-sided fixtures run both sides and retain exact partial completion, and report schema version 6 plus execution-receipt schema version 3 cross-check the same batch shape and per-attempt work. Probability bounds use a canonical 17-digit string representation so exact consumed-bound validation remains stable after JSON round trips.
+
+## 2026-07-13 - CQ1: Descriptor Ownership And Derived-Report Transactions
+
+Status: Resolved
+Revealed by: GPT-5.6/max filesystem review of staged evidence, report regeneration, and previous-run cleanup.
+Current text: CQ1 required safe artifact paths and atomic directory publication but did not state whether artifact operations had to remain bound to the originally opened directory or whether derived-report regeneration shared the publication transaction.
+Gap: Reopening staged or published artifacts by path permitted directory-identity swaps, report regeneration could race a concurrent publication, and recursive cleanup under the publication lock had no explicit depth or entry bound.
+Proposed amendment: Perform staged and locked report I/O relative to held directory descriptors, anchor the publication lock and output traversal to the retained repository directory, verify every output-parent component before publication and before releasing a report lock, release the publication lock before cleanup, and make cleanup iterative and bounded without turning a post-publication cleanup failure into evidence failure.
+Resolution: CQ1 now uses descriptor-relative atomic artifact I/O, a repository-anchored publication lock, identity-checked parent-chain traversal for publication and report or preflight operations, post-lock quarantine cleanup, and explicit depth and entry bounds with target, parent-chain, symlink, and deep-tree regressions.
+
+## 2026-07-13 - CQ1: Static Property Corpus Exemption
+
+Status: Resolved
+Revealed by: independent milestone audit of the CQ1 generated-property worker.
+Current text: The manifest allowed implemented property evidence to use either a generated seed panel or a frozen static corpus, while the property policy said every property case required a deterministic seed and persisted minimization.
+Gap: A valid exact Cargo regression corpus could not satisfy generated-seed and shrinking requirements, but the plan did not state whether it was exempt or incomplete.
+Proposed amendment: Apply deterministic seeds, reproduction, shrinking, target-bound persistence, and worker replay to generated property cases; allow static corpora only when the manifest freezes their source path, content digest, exact selector, and existing-focused-regression policy.
+Resolution: `docs/plans/comprehensive-correctness-qualification-plan.md` now states the exemption and its exact admission requirements, while generated targets retain the complete worker lifecycle.
+
+## 2026-07-13 - CQ1: Disposition And Comparator Report Axes
+
+Status: Resolved
+Revealed by: independent milestone audit of CQ1 report generation.
+Current text: The report contract requested passed, failed, deferred, semantic-mining, and not-applicable counts by domain and comparator.
+Gap: Semantic-mining and not-applicable are upstream dispositions that may intentionally own no executable comparator, so assigning them comparator counts would fabricate evidence semantics; deferred evidence also lacked explicit product ownership.
+Proposed amendment: Report executable evidence pass, fail, planned, and deferred counts by domain and comparator; report upstream dispositions by domain without a comparator; require every deferred evidence case to name its deferred product explicitly.
+Resolution: The plan and manifest model now separate those axes, `EvidenceCase` owns an optional product that is mandatory only for deferred status, and run reports derive deferred-product counts only from selected deferred evidence.
+
+## 2026-07-13 - CQ1: Process-Tree And Atomic-Publication Platform
+
+Status: Resolved
+Revealed by: independent milestone audit of CQ1 timeout and artifact publication behavior.
+Current text: CQ1 required killable worker timeouts and reproducible bounded reports but did not name a supported operating-system contract.
+Gap: The implementation could terminate descendant process groups only on Unix and could not atomically replace a nonempty run directory on every supported host, so a generic portability claim would permit weaker evidence behavior.
+Proposed amendment: Either implement equivalent process-tree termination and atomic directory publication on each supported platform or name a controlled platform and fail closed before execution elsewhere; controller cancellation must remain sticky across direct-child completion and prevent subsequent case execution or publication.
+Resolution: CQ1 qualification execution is explicitly Linux-only, installs one process-wide sticky cancellation state, checks it before and after every child, after acquiring the repository publication lock, and immediately before report publication and output commit, uses process-group termination plus atomic directory exchange, and fails before case execution on unsupported hosts; inventory, report reading, and other non-execution operations remain independently portable where their own contracts allow.
+
 ## 2026-07-13 - PQ0: Checklist Child And Generator Ownership Schema
 
 Status: Resolved
@@ -112,7 +170,33 @@ Gap: the selected evidence now covers all 46 fixed-tableau gates across sampler,
 Proposed amendment: keep the fixed-tableau plus supported Hermitian `SPP` or `SPP_DAG` plus selected deterministic `MPP`, selected stochastic `MPP(p)` sampler and detection-sampling, selected deterministic `MPAD`, selected stochastic `MPAD(p)` sampler and detection-sampling, and selected noisy `MPAD(p)` analyzer contract as the complete gate semantic evidence currently selected by PFM3. Do not add another legal-gate execution row until a future plan names exact gate families, execution surfaces, accepted and rejected behavior, positive and negative tests, resource-boundary behavior, oracle metadata, and benchmark or no-benchmark rationale.
 Resolution: PFM-B2 now classifies all 81 canonical gates across eight implemented surfaces, maps all accepted target groups to 22 typed patterns, and closes the nineteen semantic families through 37 independently selectable exact, structural, rejection, semantic-invariant, state-equivalence, or statistical cases. `just oracle::blockers --check-selectors` validates all 165 ledger cases with no planned row, and `just oracle::run --milestone PF3` passes all implemented PF3 shards. Review remediation strengthened fixed-tableau, pair-measurement, deterministic MPP, controlled-Pauli, general-noise, heralded-record, typed exact provenance, shared statistical boundaries, resource behavior, and independent detector-frame benchmark evidence. Clean timing and allocation reports identify `HEAD=6474a7fb6752ec59448382cff73925eb6f30803b` with `local_modifications=false`; future execution surfaces or unselected gate shapes require an explicit new plan instead of reopening this resolved phrase.
 
-## Resolved Entries
+## 2026-07-13 - CQ1: Property Plan Ownership And Execution
+
+Status: Resolved
+
+Revealed by: milestone audit of CQ1 property-runner evidence and future `property-target` promotion.
+
+Current text: CQ1 required deterministic seeds, shrinking, persisted regressions, timeouts, and oversized-case rejection, but the inventory carried only a property comparator and selector without a typed generator or corpus plan.
+
+Gap: a future property owner could have been promoted without freezing its generator domain, case count, seed panel, generated-byte cap, regression persistence policy, corpus identity, or killable execution mode, while a static exact Cargo regression and a generated worker target required different evidence contracts.
+
+Proposed amendment: require every property case to carry a typed `property_plan`; planned cases reference their future qualification owner, implemented static corpora bind a repository path and content digest to an exact Cargo subprocess, and generated targets bind deterministic seeds, limits, persistence, and qualification-worker execution.
+
+Resolution: Schema version 3 adds typed property-plan references and execution plans, validates source and status ownership, binds the four currently implemented static property corpora by path and digest, and rejects promotion of an unregistered or non-worker property target.
+
+## 2026-07-13 - CQ1: Deferred Diagnostic Selection
+
+Status: Resolved
+
+Revealed by: milestone audit of the `correctness-run --allow-deferred` option and report completion semantics.
+
+Current text: CQ1 required a selected deferred case to fail without selection permission, but it did not define whether permission applied to broad tier or feature runs, whether deferred-only runs were valid, or whether their reports could satisfy performance preflight.
+
+Gap: an implementation could silently omit an explicitly selected deferred case, use the flag to hide deferred scope in a broad run, or publish a zero-execution report that appeared promotable because selection completeness counted only executable cases.
+
+Proposed amendment: permit `--allow-deferred` only with explicit `--case` filters, retain permitted deferred cases as visible diagnostic counts without execution, reject planned and out-of-tier explicit cases, and make every preflight with a nonzero deferred count fail.
+
+Resolution: The CQ1 selection policy and report validator implement those rules, targeted tests cover explicit planned, out-of-tier, and unpermitted deferred selections, and the correctness plan now labels deferred-only reports as diagnostic rather than promotable evidence.
 
 ## 2026-07-13 - CQ0: Pytest Parameterized Subcase Identity
 

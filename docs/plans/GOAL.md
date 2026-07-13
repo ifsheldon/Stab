@@ -44,7 +44,7 @@ Do not expand product scope while building qualification infrastructure.
 
 ## Program Order
 
-Program checkpoint: CQ0 is complete at source-owned evidence revision `02c93c19566bdc465ad9c795f35e956e1ff85440`, and PQ0 is complete at source-owned implementation revision `abf7cd1bae0de045f62e976a290507238153f976` with performance inventory digest `940af5e019459bdc797bfb5b0f20a810655941bac8fefa9e1aa43610a2950dad`.
+Program checkpoint: CQ0 is complete at corrected correctness inventory digest `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`, and PQ0 must be dependency-regenerated from that digest during the current CQ1 closure; the original clean evidence revisions remain `02c93c19566bdc465ad9c795f35e956e1ff85440` for CQ0 and `abf7cd1bae0de045f62e976a290507238153f976` for PQ0, while the corrected digests require the current CQ1 closure commit and clean evidence run.
 The active milestones are CQ1 followed by PQ1: first make the frozen correctness selectors and comparator contracts executable, then build the symmetric paired benchmark harness, pinned-Stim adapter, Stab worker, preflight, host policy, statistics, memory evidence, and report commands against those executable CQ dependencies.
 Do not reopen CQ0 or PQ0 inventory semantics unless pinned-source drift, a newly exported default-feature API, a stale referenced id, a changed checklist or benchmark source of truth, or a confirmed inventory defect changes a frozen digest.
 Do not treat PQ0's 15 retained rows as qualified evidence: all 159 active inherited rows still record missing correctness preflight and output-digest evidence, 58 CLI rows remain asymmetric, 73 rows lack a current comparator, 124 lack required scale families, and 21 select heterogeneous upstream measurements.
@@ -91,6 +91,8 @@ When a commit is requested, use focused commits and run the repository's require
 ## Correctness Rules
 
 - Every selected case needs a stable id and an independently selectable primary selector.
+- Every executable run needs a canonical pre-execution request receipt, one canonical execution receipt per selected case, and a canonical post-execution completion receipt; dependent preflight must receive controller-approved request and completion digests instead of trusting report-owned filters or outcomes.
+- Promotable CQ evidence requires the documented controlled Linux host: invoke Cargo from `/` with absolute manifests and private configuration, reconstruct the config-free Git view index from `HEAD`, keep qualification artifacts, fixture side outputs, and support cleanup descriptor-owned, and do not run while another same-UID process can transiently mutate and restore the live checkout or linked Git and toolchain support state.
 - Every selected exported Rust API item from the deterministic rustdoc inventory needs an exact case or parent-contract mapping; module-level tests and documentation alone do not close it.
 - A whole upstream file, a broad Cargo filter, an all-green workspace suite, or a nearby test is supporting evidence, not a primary selector.
 - Exact upstream provenance must name the path, complete test or source symbol, subcase, and gate marker where relevant.
