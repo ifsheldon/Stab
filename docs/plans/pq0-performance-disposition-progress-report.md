@@ -12,7 +12,7 @@ Performance inventory digest after final CQ1 acceptance-status synchronization: 
 
 Implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
-Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca325860c57a9a2c973e11`; clean CQ1 evidence revision: `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`. The final acceptance-status regeneration is included with this report and does not change any PQ0 disposition or unresolved count.
+Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca325860c57a9a2c973e11`; clean CQ1 evidence revision: `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; final acceptance-status synchronization revision: `6d4c55fdddf84c90bd3f64c2bf49bf67a9b786ba`, validated with `local_modifications=false`. The final synchronization does not change any PQ0 disposition or unresolved count.
 
 The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
