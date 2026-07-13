@@ -2,10 +2,14 @@ use std::ffi::OsStr;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::process::Stdio;
+use std::sync::Arc;
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use super::{CapturedOutput, OracleError, ProcessOutput};
+use crate::safe_file::{SafeFileError, SafeFileLocation};
 
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(120);
 const PROCESS_POLL_INTERVAL: Duration = Duration::from_millis(10);
@@ -22,12 +26,25 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_process(Path::new(program), args, stdin, working_dir)?;
+    run_checked_path(Path::new(program), args, stdin, working_dir)
+}
+
+pub(super) fn run_checked_path<I, S>(
+    program: &Path,
+    args: I,
+    stdin: &[u8],
+    working_dir: Option<&Path>,
+) -> Result<ProcessOutput, OracleError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = run_process(program, args, stdin, working_dir)?;
     if output.success() {
         return Ok(output);
     }
     Err(OracleError::CommandFailed {
-        program: program.to_string(),
+        program: program.display().to_string(),
         status: display_status(output.status),
         stdout: output.stdout.render_for_diagnostics().into_boxed_str(),
         stderr: output.stderr.render_for_diagnostics().into_boxed_str(),
@@ -52,7 +69,7 @@ pub(super) fn run_process_monitoring_files<I, S>(
     args: I,
     stdin: &[u8],
     working_dir: Option<&Path>,
-    monitored_paths: &[&Path],
+    monitored_files: &[SafeFileLocation],
     file_limit: u64,
 ) -> Result<ProcessOutput, OracleError>
 where
@@ -65,12 +82,12 @@ where
         stdin,
         working_dir,
         COMMAND_TIMEOUT,
-        monitored_paths,
+        monitored_files,
         file_limit,
     )
 }
 
-fn run_process_with_timeout<I, S>(
+pub(super) fn run_process_with_timeout<I, S>(
     program: &Path,
     args: I,
     stdin: &[u8],
@@ -92,23 +109,158 @@ where
     )
 }
 
-fn run_process_with_timeout_and_monitored_files<I, S>(
+pub(super) fn run_process_with_timeout_and_monitored_files<I, S>(
     program: &Path,
     args: I,
     stdin: &[u8],
     working_dir: Option<&Path>,
     timeout: Duration,
-    monitored_paths: &[&Path],
+    monitored_files: &[SafeFileLocation],
     file_limit: u64,
 ) -> Result<ProcessOutput, OracleError>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
+    let cancellation = ProcessCancellation::for_signals()?;
+    run_process_with_control(
+        program,
+        None,
+        args,
+        stdin,
+        working_dir,
+        timeout,
+        monitored_files,
+        file_limit,
+        None,
+        &cancellation,
+    )
+}
+
+pub(super) fn run_qualification_process_with_timeout<I, S>(
+    program: &Path,
+    args: I,
+    stdin: &[u8],
+    working_dir: Option<&Path>,
+    timeout: Duration,
+    environment: &[(std::ffi::OsString, std::ffi::OsString)],
+) -> Result<ProcessOutput, OracleError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    run_qualification_process_with_timeout_and_monitored_files(
+        program,
+        args,
+        stdin,
+        working_dir,
+        timeout,
+        &[],
+        u64::MAX,
+        environment,
+    )
+}
+
+pub(super) fn run_qualification_process_with_timeout_and_arg0<I, S>(
+    program: &Path,
+    arg0: &OsStr,
+    args: I,
+    stdin: &[u8],
+    working_dir: Option<&Path>,
+    timeout: Duration,
+    environment: &[(std::ffi::OsString, std::ffi::OsString)],
+) -> Result<ProcessOutput, OracleError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let cancellation = ProcessCancellation::for_signals()?;
+    run_process_with_control(
+        program,
+        Some(arg0),
+        args,
+        stdin,
+        working_dir,
+        timeout,
+        &[],
+        u64::MAX,
+        Some(environment),
+        &cancellation,
+    )
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "qualification process contract is explicit"
+)]
+pub(super) fn run_qualification_process_with_timeout_and_monitored_files<I, S>(
+    program: &Path,
+    args: I,
+    stdin: &[u8],
+    working_dir: Option<&Path>,
+    timeout: Duration,
+    monitored_files: &[SafeFileLocation],
+    file_limit: u64,
+    environment: &[(std::ffi::OsString, std::ffi::OsString)],
+) -> Result<ProcessOutput, OracleError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let cancellation = ProcessCancellation::for_signals()?;
+    run_process_with_control(
+        program,
+        None,
+        args,
+        stdin,
+        working_dir,
+        timeout,
+        monitored_files,
+        file_limit,
+        Some(environment),
+        &cancellation,
+    )
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "process execution contract is explicit"
+)]
+fn run_process_with_control<I, S>(
+    program: &Path,
+    arg0: Option<&OsStr>,
+    args: I,
+    stdin: &[u8],
+    working_dir: Option<&Path>,
+    timeout: Duration,
+    monitored_files: &[SafeFileLocation],
+    file_limit: u64,
+    environment: Option<&[(std::ffi::OsString, std::ffi::OsString)]>,
+    cancellation: &ProcessCancellation,
+) -> Result<ProcessOutput, OracleError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    if cancellation.is_cancelled() {
+        return Err(interrupted_without_output(program));
+    }
     let mut command = std::process::Command::new(program);
+    #[cfg(unix)]
+    if let Some(arg0) = arg0 {
+        use std::os::unix::process::CommandExt as _;
+
+        command.arg0(arg0);
+    }
+    #[cfg(not(unix))]
+    let _ = arg0;
     command.args(args);
     if let Some(working_dir) = working_dir {
         command.current_dir(working_dir);
+    }
+    if let Some(environment) = environment {
+        command.env_clear();
+        command.envs(environment.iter().map(|(key, value)| (key, value)));
     }
     command
         .stdin(Stdio::piped())
@@ -155,12 +307,44 @@ where
 
     loop {
         if status.is_none() {
-            status = child.try_wait().map_err(|source| OracleError::Wait {
+            let observed_status = child.try_wait().map_err(|source| OracleError::Wait {
                 program: program_name.clone(),
                 source,
             })?;
+            if observed_status.is_some() {
+                status = observed_status;
+                kill_process_group(&mut child, &program_name)?;
+            }
         }
-        if let Some(violation) = monitored_output_violation(monitored_paths, file_limit) {
+        if cancellation.is_cancelled() {
+            terminate_process_tree(&mut child, &program_name)?;
+            if let Some(stdin) = stdin {
+                drop(stdin.join());
+            }
+            let stdout = join_output_reader(&program_name, stdout)?;
+            let stderr = join_output_reader(&program_name, stderr)?;
+            return Err(OracleError::Interrupted {
+                program: program_name,
+                stdout,
+                stderr,
+            });
+        }
+        if let Some(stream) = output_limit_violation(&stdout, &stderr) {
+            terminate_process_tree(&mut child, &program_name)?;
+            if let Some(stdin) = stdin {
+                drop(stdin.join());
+            }
+            let stdout = join_output_reader(&program_name, stdout)?;
+            let stderr = join_output_reader(&program_name, stderr)?;
+            return Err(OracleError::OutputLimitExceeded {
+                program: program_name,
+                stream,
+                limit: OUTPUT_LIMIT_BYTES,
+                stdout,
+                stderr,
+            });
+        }
+        if let Some(violation) = monitored_output_violation(monitored_files, file_limit) {
             terminate_process_tree(&mut child, &program_name)?;
             if let Some(stdin) = stdin {
                 drop(stdin.join());
@@ -185,8 +369,8 @@ where
             return Err(OracleError::TimedOut {
                 program: program_name,
                 milliseconds: timeout.as_millis(),
-                stdout: stdout.render_for_diagnostics().into_boxed_str(),
-                stderr: stderr.render_for_diagnostics().into_boxed_str(),
+                stdout,
+                stderr,
             });
         }
         std::thread::sleep(PROCESS_POLL_INTERVAL.min(deadline.duration_since(now)));
@@ -195,13 +379,103 @@ where
     join_stdin_writer(&program_name, stdin)?;
     let stdout = join_output_reader(&program_name, stdout)?;
     let stderr = join_output_reader(&program_name, stderr)?;
-    reject_truncated_output(&program_name, "stdout", &stdout)?;
-    reject_truncated_output(&program_name, "stderr", &stderr)?;
+    if cancellation.is_cancelled() {
+        return Err(OracleError::Interrupted {
+            program: program_name,
+            stdout,
+            stderr,
+        });
+    }
+    let truncated_stream = if stdout.truncated {
+        Some("stdout")
+    } else if stderr.truncated {
+        Some("stderr")
+    } else {
+        None
+    };
+    if let Some(stream) = truncated_stream {
+        return Err(OracleError::OutputLimitExceeded {
+            program: program_name,
+            stream,
+            limit: OUTPUT_LIMIT_BYTES,
+            stdout,
+            stderr,
+        });
+    }
     Ok(ProcessOutput {
         status: status.and_then(|status| status.code()),
         stdout,
         stderr,
     })
+}
+
+struct ProcessCancellation {
+    cancelled: Arc<AtomicBool>,
+}
+
+impl ProcessCancellation {
+    fn for_signals() -> Result<Self, OracleError> {
+        #[cfg(unix)]
+        {
+            static CANCELLED: OnceLock<Arc<AtomicBool>> = OnceLock::new();
+            static INSTALLATION: OnceLock<Result<(), String>> = OnceLock::new();
+            let cancelled = Arc::clone(CANCELLED.get_or_init(|| Arc::new(AtomicBool::new(false))));
+            let installation = INSTALLATION.get_or_init(|| {
+                for signal in [
+                    signal_hook::consts::signal::SIGINT,
+                    signal_hook::consts::signal::SIGTERM,
+                ] {
+                    signal_hook::flag::register(signal, Arc::clone(&cancelled))
+                        .map_err(|source| source.to_string())?;
+                }
+                Ok(())
+            });
+            if let Err(reason) = installation {
+                return Err(OracleError::InstallCancellationHandler(
+                    std::io::Error::other(reason.clone()),
+                ));
+            }
+            Ok(Self { cancelled })
+        }
+        #[cfg(not(unix))]
+        {
+            static CANCELLED: OnceLock<Arc<AtomicBool>> = OnceLock::new();
+            Ok(Self {
+                cancelled: Arc::clone(CANCELLED.get_or_init(|| Arc::new(AtomicBool::new(false)))),
+            })
+        }
+    }
+
+    #[cfg(test)]
+    fn from_flag(cancelled: Arc<AtomicBool>) -> Self {
+        Self { cancelled }
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancelled.load(Ordering::Acquire)
+    }
+}
+
+pub(crate) fn ensure_qualification_active() -> Result<(), OracleError> {
+    let cancellation = ProcessCancellation::for_signals()?;
+    if cancellation.is_cancelled() {
+        return Err(interrupted_without_output(Path::new(
+            "qualification controller",
+        )));
+    }
+    Ok(())
+}
+
+fn interrupted_without_output(program: &Path) -> OracleError {
+    let empty = CapturedOutput {
+        bytes: Vec::new(),
+        truncated: false,
+    };
+    OracleError::Interrupted {
+        program: program.display().to_string(),
+        stdout: empty.clone(),
+        stderr: empty,
+    }
 }
 
 enum MonitoredOutputViolation {
@@ -231,23 +505,19 @@ impl MonitoredOutputViolation {
     }
 }
 
-fn monitored_output_violation(paths: &[&Path], limit: u64) -> Option<MonitoredOutputViolation> {
-    for path in paths {
-        match std::fs::symlink_metadata(path) {
-            Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(error) => {
-                return Some(MonitoredOutputViolation::Unsafe {
-                    path: path.to_path_buf(),
-                    reason: error.to_string(),
-                });
-            }
-        }
-        let file = match crate::safe_file::open_regular_file(path) {
+fn monitored_output_violation(
+    files: &[SafeFileLocation],
+    limit: u64,
+) -> Option<MonitoredOutputViolation> {
+    for location in files {
+        let file = match location.open_regular_file() {
             Ok(file) => file,
+            Err(SafeFileError::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {
+                continue;
+            }
             Err(error) => {
                 return Some(MonitoredOutputViolation::Unsafe {
-                    path: path.to_path_buf(),
+                    path: location.display_path().to_path_buf(),
                     reason: error.to_string(),
                 });
             }
@@ -255,34 +525,19 @@ fn monitored_output_violation(paths: &[&Path], limit: u64) -> Option<MonitoredOu
         match file.metadata() {
             Ok(metadata) if metadata.len() > limit => {
                 return Some(MonitoredOutputViolation::TooLarge {
-                    path: path.to_path_buf(),
+                    path: location.display_path().to_path_buf(),
                 });
             }
             Ok(_) => {}
             Err(error) => {
                 return Some(MonitoredOutputViolation::Unsafe {
-                    path: path.to_path_buf(),
+                    path: location.display_path().to_path_buf(),
                     reason: error.to_string(),
                 });
             }
         }
     }
     None
-}
-
-fn reject_truncated_output(
-    program: &str,
-    stream: &'static str,
-    output: &CapturedOutput,
-) -> Result<(), OracleError> {
-    if output.truncated {
-        return Err(OracleError::OutputLimitExceeded {
-            program: program.to_string(),
-            stream,
-            limit: OUTPUT_LIMIT_BYTES,
-        });
-    }
-    Ok(())
 }
 
 fn spawn_stdin_writer(
@@ -302,6 +557,8 @@ fn join_stdin_writer(
     };
     match writer.join() {
         Ok(Ok(())) => Ok(()),
+        // The child may intentionally reject its arguments before reading stdin.
+        Ok(Err(source)) if source.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
         Ok(Err(source)) => Err(OracleError::WriteStdin {
             program: program.to_string(),
             source,
@@ -317,6 +574,15 @@ fn terminate_process_tree(
     child: &mut std::process::Child,
     program: &str,
 ) -> Result<(), OracleError> {
+    kill_process_group(child, program)?;
+    child.wait().map_err(|source| OracleError::Wait {
+        program: program.to_string(),
+        source,
+    })?;
+    Ok(())
+}
+
+fn kill_process_group(child: &mut std::process::Child, program: &str) -> Result<(), OracleError> {
     #[cfg(unix)]
     {
         let raw_pid =
@@ -346,19 +612,41 @@ fn terminate_process_tree(
             program: program.to_string(),
             source,
         })?;
-
-    child.wait().map_err(|source| OracleError::Wait {
-        program: program.to_string(),
-        source,
-    })?;
     Ok(())
 }
 
-fn spawn_output_reader<R>(mut reader: R) -> JoinHandle<Result<CapturedOutput, std::io::Error>>
+struct OutputReader {
+    handle: JoinHandle<Result<CapturedOutput, std::io::Error>>,
+    exceeded: Arc<AtomicBool>,
+}
+
+impl OutputReader {
+    fn is_finished(&self) -> bool {
+        self.handle.is_finished()
+    }
+
+    fn exceeded(&self) -> bool {
+        self.exceeded.load(Ordering::Acquire)
+    }
+}
+
+fn output_limit_violation(stdout: &OutputReader, stderr: &OutputReader) -> Option<&'static str> {
+    if stdout.exceeded() {
+        Some("stdout")
+    } else if stderr.exceeded() {
+        Some("stderr")
+    } else {
+        None
+    }
+}
+
+fn spawn_output_reader<R>(mut reader: R) -> OutputReader
 where
     R: Read + Send + 'static,
 {
-    std::thread::spawn(move || {
+    let exceeded = Arc::new(AtomicBool::new(false));
+    let reader_exceeded = Arc::clone(&exceeded);
+    let handle = std::thread::spawn(move || {
         let mut bytes = Vec::new();
         let mut buffer = [0u8; 8192];
         let mut truncated = false;
@@ -379,17 +667,16 @@ where
                 })?;
                 bytes.extend_from_slice(kept);
                 truncated = true;
+                reader_exceeded.store(true, Ordering::Release);
             }
         }
         Ok(CapturedOutput { bytes, truncated })
-    })
+    });
+    OutputReader { handle, exceeded }
 }
 
-fn join_output_reader(
-    program: &str,
-    handle: JoinHandle<Result<CapturedOutput, std::io::Error>>,
-) -> Result<CapturedOutput, OracleError> {
-    match handle.join() {
+fn join_output_reader(program: &str, reader: OutputReader) -> Result<CapturedOutput, OracleError> {
+    match reader.handle.join() {
         Ok(Ok(output)) => Ok(output),
         Ok(Err(source)) => Err(OracleError::CaptureOutput {
             program: program.to_string(),
@@ -427,34 +714,182 @@ pub(super) fn display_status(status: Option<i32>) -> String {
 #[cfg(test)]
 mod tests {
     #[cfg(unix)]
+    use std::ffi::OsString;
+    #[cfg(unix)]
     use std::path::Path;
+    #[cfg(unix)]
+    use std::sync::Arc;
+    #[cfg(unix)]
+    use std::sync::atomic::{AtomicBool, Ordering};
     #[cfg(unix)]
     use std::time::{Duration, Instant};
 
     #[cfg(unix)]
     use super::{
-        OUTPUT_LIMIT_BYTES, reject_truncated_output, run_process_with_timeout,
-        run_process_with_timeout_and_monitored_files,
+        OUTPUT_LIMIT_BYTES, ProcessCancellation, run_process_with_control,
+        run_process_with_timeout, run_process_with_timeout_and_monitored_files,
+        run_qualification_process_with_timeout,
     };
-    use crate::CapturedOutput;
     #[cfg(unix)]
     use crate::OracleError;
 
+    #[cfg(unix)]
     #[test]
-    fn truncated_process_output_fails_closed_before_comparison() {
-        let output = CapturedOutput {
-            bytes: vec![b'x'; OUTPUT_LIMIT_BYTES],
-            truncated: true,
-        };
+    fn output_limit_failure_retains_raw_captured_streams() {
+        let error = run_process_with_timeout(
+            Path::new("/bin/sh"),
+            [
+                "-c",
+                "dd if=/dev/zero bs=1048577 count=1 2>/dev/null; printf '\\377\\000' >&2",
+            ],
+            &[],
+            None,
+            Duration::from_secs(5),
+        )
+        .expect_err("stdout beyond the process limit must fail closed");
 
-        assert!(matches!(
-            reject_truncated_output("fixture", "stdout", &output),
-            Err(crate::OracleError::OutputLimitExceeded {
-                program,
-                stream: "stdout",
-                limit: OUTPUT_LIMIT_BYTES,
-            }) if program == "fixture"
-        ));
+        assert!(
+            matches!(&error, OracleError::OutputLimitExceeded { .. }),
+            "unexpected process error: {error}"
+        );
+        if let OracleError::OutputLimitExceeded {
+            stream,
+            limit,
+            stdout,
+            stderr,
+            ..
+        } = error
+        {
+            assert_eq!(stream, "stdout");
+            assert_eq!(limit, OUTPUT_LIMIT_BYTES);
+            assert_eq!(stdout.bytes.len(), OUTPUT_LIMIT_BYTES);
+            assert!(stdout.truncated);
+            assert_eq!(stderr.bytes, [0xff, 0]);
+            assert!(!stderr.truncated);
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn infinite_output_is_terminated_when_the_capture_limit_is_crossed() {
+        let started = Instant::now();
+        let error = run_process_with_timeout(
+            Path::new("/bin/sh"),
+            ["-c", "while :; do printf 0123456789abcdef; done"],
+            &[],
+            None,
+            Duration::from_secs(30),
+        )
+        .expect_err("unbounded stdout must be terminated at the capture limit");
+
+        assert!(matches!(error, OracleError::OutputLimitExceeded { .. }));
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn direct_child_exit_terminates_closed_stdio_descendants() {
+        let directory = tempfile::tempdir().expect("temporary marker directory");
+        let marker = directory.path().join("escaped-descendant");
+        let args = vec![
+            OsString::from("-c"),
+            OsString::from("exec 1>&- 2>&-; (sleep 0.3; printf escaped > \"$1\") & exit 0"),
+            OsString::from("qualification-child"),
+            marker.as_os_str().to_owned(),
+        ];
+
+        let output = run_process_with_timeout(
+            Path::new("/bin/sh"),
+            args,
+            &[],
+            None,
+            Duration::from_secs(2),
+        )
+        .expect("direct child exit should be collected");
+        assert_eq!(output.status, Some(0));
+        std::thread::sleep(Duration::from_millis(500));
+        assert!(!marker.exists(), "background descendant escaped cleanup");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn controller_cancellation_terminates_the_process_group() {
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let cancellation = ProcessCancellation::from_flag(Arc::clone(&cancelled));
+        let trigger = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            cancelled.store(true, Ordering::Release);
+        });
+        let started = Instant::now();
+
+        let error = run_process_with_control(
+            Path::new("/bin/sh"),
+            None,
+            ["-c", "sleep 30 & wait"],
+            &[],
+            None,
+            Duration::from_secs(30),
+            &[],
+            u64::MAX,
+            None,
+            &cancellation,
+        )
+        .expect_err("controller cancellation must terminate the child tree");
+        trigger.join().expect("cancellation trigger");
+
+        assert!(matches!(error, OracleError::Interrupted { .. }));
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn sticky_cancellation_prevents_a_later_process_from_starting() {
+        let directory = tempfile::tempdir().expect("temporary marker directory");
+        let marker = directory.path().join("must-not-start");
+        let cancellation = ProcessCancellation::from_flag(Arc::new(AtomicBool::new(true)));
+
+        let error = run_process_with_control(
+            Path::new("/bin/sh"),
+            None,
+            [
+                OsString::from("-c"),
+                OsString::from("printf started > \"$1\""),
+                OsString::from("qualification-child"),
+                marker.as_os_str().to_owned(),
+            ],
+            &[],
+            None,
+            Duration::from_secs(2),
+            &[],
+            u64::MAX,
+            None,
+            &cancellation,
+        )
+        .expect_err("sticky cancellation must reject a later spawn");
+
+        assert!(matches!(error, OracleError::Interrupted { .. }));
+        assert!(!marker.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn qualification_process_inherits_only_the_explicit_environment() {
+        let environment = vec![(OsString::from("CQ_VISIBLE"), OsString::from("bound"))];
+
+        let output = run_qualification_process_with_timeout(
+            Path::new("/bin/sh"),
+            [
+                "-c",
+                "printf '%s:%s' \"${CQ_VISIBLE-unset}\" \"${HOME-unset}\"",
+            ],
+            &[],
+            None,
+            Duration::from_secs(2),
+            &environment,
+        )
+        .expect("qualification environment probe");
+
+        assert_eq!(output.stdout.bytes, b"bound:unset");
     }
 
     #[cfg(unix)]
@@ -480,6 +915,7 @@ mod tests {
         let directory = tempfile::tempdir().expect("temporary output directory");
         let output = directory.path().join("side-output");
         std::fs::write(&output, b"too large").expect("oversized side output");
+        let monitored_output = crate::safe_file::SafeFileLocation::path(output);
         let started = Instant::now();
         let error = run_process_with_timeout_and_monitored_files(
             Path::new("/bin/sh"),
@@ -487,7 +923,7 @@ mod tests {
             &[],
             None,
             Duration::from_secs(5),
-            &[output.as_path()],
+            &[monitored_output],
             1,
         )
         .expect_err("oversized auxiliary output must terminate the child");
@@ -501,18 +937,18 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn process_timeout_terminates_descendants_after_parent_exits() {
+    fn parent_exit_terminates_descendants_holding_output_pipes() {
         let started = Instant::now();
-        let error = run_process_with_timeout(
+        let output = run_process_with_timeout(
             Path::new("/bin/sh"),
             ["-c", "sleep 30 & exit 0"],
             &[],
             None,
-            Duration::from_millis(200),
+            Duration::from_secs(5),
         )
-        .expect_err("descendant-held pipes should keep the process tree subject to the deadline");
+        .expect("direct-child success should terminate descendant-held pipes");
 
-        assert!(matches!(error, OracleError::TimedOut { .. }));
+        assert_eq!(output.status, Some(0));
         assert!(started.elapsed() < Duration::from_secs(2));
     }
 
@@ -532,5 +968,22 @@ mod tests {
 
         assert!(matches!(error, OracleError::TimedOut { .. }));
         assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn early_child_exit_preserves_process_output_after_broken_stdin_pipe() {
+        let stdin = vec![0; 1024 * 1024];
+        let output = run_process_with_timeout(
+            Path::new("/bin/sh"),
+            ["-c", "exec 0<&-; printf rejected >&2; exit 3"],
+            &stdin,
+            None,
+            Duration::from_secs(2),
+        )
+        .expect("an early argument rejection should remain observable");
+
+        assert_eq!(output.status, Some(3));
+        assert_eq!(output.stderr.bytes, b"rejected");
     }
 }

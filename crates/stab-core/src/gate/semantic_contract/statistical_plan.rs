@@ -26,6 +26,8 @@ pub struct GateContractStatisticalPlan {
     pub sigma_multiplier: f64,
     pub absolute_probability_floor: f64,
     pub familywise_false_positive_budget: f64,
+    pub independent_comparisons_per_attempt: u32,
+    pub shot_batches_per_attempt: u32,
     pub buckets: &'static [GateContractStatisticalBucket],
 }
 
@@ -100,58 +102,96 @@ const HERALDED_CHANNEL_BUCKETS: &[GateContractStatisticalBucket] = &[
 ];
 
 const GATE_CONTRACT_STATISTICAL_PLANS: &[GateContractStatisticalPlan] = &[
-    statistical_plan("pfm3-contract-mpp-stochastic", 12_648_431, MPP_BUCKETS),
-    statistical_plan("pfm3-contract-mpad-stochastic", 12_648_432, MPAD_BUCKETS),
-    statistical_plan("pfm3-contract-pauli-noise", 12_648_432, PAULI_NOISE_BUCKETS),
+    statistical_plan(
+        "pfm3-contract-mpp-stochastic",
+        12_648_431,
+        MPP_BUCKETS,
+        3,
+        3,
+    ),
+    statistical_plan(
+        "pfm3-contract-mpad-stochastic",
+        12_648_432,
+        MPAD_BUCKETS,
+        3,
+        3,
+    ),
+    statistical_plan(
+        "pfm3-contract-pauli-noise",
+        12_648_432,
+        PAULI_NOISE_BUCKETS,
+        3,
+        3,
+    ),
     statistical_plan(
         "pfm3-contract-pauli-channels",
         12_648_433,
         PAULI_CHANNEL_BUCKETS,
+        3,
+        6,
     ),
     statistical_plan(
         "pfm3-contract-depolarization",
         12_648_434,
         DEPOLARIZATION_BUCKETS,
+        3,
+        6,
     ),
     statistical_plan(
         "pfm3-contract-correlated-errors",
         12_648_435,
         CORRELATED_ERROR_BUCKETS,
+        3,
+        3,
     ),
     statistical_plan(
         "pfm3-contract-heralded-noise",
         12_648_436,
         HERALDED_ERASE_BUCKETS,
+        3,
+        3,
     ),
     statistical_plan(
         "pfm3-contract-heralded-channel",
         12_648_437,
         HERALDED_CHANNEL_BUCKETS,
+        3,
+        3,
     ),
     statistical_plan(
         "pfm3-contract-heralded-erase-offset",
         12_648_438,
         HERALDED_ERASE_BUCKETS,
+        1,
+        1,
     ),
     statistical_plan(
         "pfm3-contract-heralded-channel-offset",
         12_648_439,
         HERALDED_CHANNEL_BUCKETS,
+        1,
+        1,
     ),
     statistical_plan(
         "pfm3-contract-measure-reset-x",
         12_648_440,
         MEASURE_RESET_BUCKETS,
+        1,
+        1,
     ),
     statistical_plan(
         "pfm3-contract-measure-reset-y",
         12_648_441,
         MEASURE_RESET_BUCKETS,
+        1,
+        1,
     ),
     statistical_plan(
         "pfm3-contract-measure-reset-z",
         12_648_442,
         MEASURE_RESET_BUCKETS,
+        1,
+        1,
     ),
 ];
 
@@ -166,6 +206,8 @@ const fn statistical_plan(
     case_id: &'static str,
     seed: u64,
     buckets: &'static [GateContractStatisticalBucket],
+    independent_comparisons_per_attempt: u32,
+    shot_batches_per_attempt: u32,
 ) -> GateContractStatisticalPlan {
     GateContractStatisticalPlan {
         case_id,
@@ -174,6 +216,8 @@ const fn statistical_plan(
         sigma_multiplier: STATISTICAL_SIGMA,
         absolute_probability_floor: STATISTICAL_ABSOLUTE_FLOOR,
         familywise_false_positive_budget: STATISTICAL_FAMILYWISE_BUDGET,
+        independent_comparisons_per_attempt,
+        shot_batches_per_attempt,
         buckets,
     }
 }

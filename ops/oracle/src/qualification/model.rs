@@ -2,10 +2,11 @@ use std::fmt::{self, Display};
 use std::marker::PhantomData;
 use std::path::{Component, Path, PathBuf};
 
+use clap::ValueEnum;
 use serde::de::{Error as _, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-pub(super) const SCHEMA_VERSION: u32 = 1;
+pub(super) const SCHEMA_VERSION: u32 = 3;
 
 const MAX_CASE_ID_BYTES: usize = 128;
 const MAX_API_PATH_BYTES: usize = 1_024;
@@ -228,7 +229,7 @@ fn decode_lower_hex(value: u8) -> Result<u8, &'static str> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize, ValueEnum)]
 pub(super) enum FeatureId {
     #[serde(rename = "CQ-STIM-FORMAT")]
     StimFormat,
@@ -424,7 +425,26 @@ pub(super) enum DeferredProduct {
     ZxAndLatticeSurgery,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+impl DeferredProduct {
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Crumble => "crumble",
+            Self::DeprecatedDetectorHypergraph => "deprecated-detector-hypergraph",
+            Self::Diagrams => "diagrams",
+            Self::ExplainErrors => "explain-errors",
+            Self::InteractiveSimulators => "interactive-simulators",
+            Self::PythonBindings => "python-bindings",
+            Self::Qasm => "qasm",
+            Self::Quirk => "quirk",
+            Self::Sinter => "sinter",
+            Self::Stimcirq => "stimcirq",
+            Self::Stimflow => "stimflow",
+            Self::ZxAndLatticeSurgery => "zx-and-lattice-surgery",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum UpstreamProvenance {
     GtestCase,
@@ -450,9 +470,20 @@ impl UpstreamDisposition {
             Self::ExactOracle | Self::PortedRust | Self::SemanticMining
         )
     }
+
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::ExactOracle => "exact-oracle",
+            Self::PortedRust => "ported-rust",
+            Self::SemanticMining => "semantic-mining",
+            Self::DeferredProduct => "deferred-product",
+            Self::NotApplicable => "not-applicable",
+            Self::Superseded => "superseded",
+        }
+    }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(super) enum Comparator {
     ExactBytes,
@@ -513,7 +544,9 @@ pub(super) struct EvidenceCase {
     #[serde(deserialize_with = "deserialize_text")]
     pub(super) source_id: String,
     pub(super) comparator: Comparator,
+    pub(super) execution: ExecutionContract,
     pub(super) statistical_plan: Option<StatisticalPlanRef>,
+    pub(super) property_plan: Option<PropertyPlanRef>,
     pub(super) primary_selector: EvidenceSelector,
     #[serde(deserialize_with = "deserialize_vec_64")]
     pub(super) supporting_selectors: Vec<EvidenceSelector>,
@@ -522,7 +555,45 @@ pub(super) struct EvidenceCase {
     pub(super) negative_axes: Vec<String>,
     #[serde(deserialize_with = "deserialize_text_vec_16")]
     pub(super) performance_groups: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) deferred_product: Option<DeferredProduct>,
     pub(super) status: EvidenceStatus,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ExecutionContract {
+    #[serde(deserialize_with = "deserialize_vec_16")]
+    pub(super) tiers: Vec<ExecutionTier>,
+    pub(super) timeout_ms: u64,
+    pub(super) stdout_limit_bytes: usize,
+    pub(super) stderr_limit_bytes: usize,
+    pub(super) artifact_limit_bytes: usize,
+    pub(super) expected_skip: ExpectedSkip,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum ExecutionTier {
+    Pr,
+    Full,
+    Soak,
+}
+
+impl ExecutionTier {
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pr => "pr",
+            Self::Full => "full",
+            Self::Soak => "soak",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum ExpectedSkip {
+    Never,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -561,6 +632,52 @@ pub(super) enum StatisticalPlanSource {
     QualificationCase,
     OracleFixture,
     BlockerLedger,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PropertyPlanRef {
+    pub(super) state: EvidenceState,
+    pub(super) source: PropertyPlanSource,
+    #[serde(deserialize_with = "deserialize_text")]
+    pub(super) id: String,
+    pub(super) plan: Option<PropertyExecutionPlan>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum PropertyPlanSource {
+    QualificationCase,
+    OracleFixture,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PropertyExecutionPlan {
+    #[serde(deserialize_with = "deserialize_text")]
+    pub(super) generator_domain: String,
+    pub(super) maximum_generated_bytes: usize,
+    #[serde(deserialize_with = "deserialize_vec_64")]
+    pub(super) seeds: Vec<u64>,
+    pub(super) case_count: u32,
+    pub(super) corpus_path: Option<RelativeSourcePath>,
+    pub(super) corpus_sha256: Option<SemanticDigest>,
+    pub(super) persistence_policy: PropertyPersistencePolicy,
+    pub(super) execution_mode: PropertyExecutionMode,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum PropertyPersistencePolicy {
+    ExistingFocusedRegression,
+    PersistMinimizedRegression,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum PropertyExecutionMode {
+    CargoSubprocess,
+    QualificationWorkerSubprocess,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -605,6 +722,18 @@ pub(super) enum ResourceKind {
     BoundedSearch,
     ConstantScratch,
     NotApplicable,
+}
+
+impl ResourceKind {
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Streaming => "streaming",
+            Self::BoundedMaterialized => "bounded-materialized",
+            Self::BoundedSearch => "bounded-search",
+            Self::ConstantScratch => "constant-scratch",
+            Self::NotApplicable => "not-applicable",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]

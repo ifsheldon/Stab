@@ -13,15 +13,23 @@ mod direct_rust;
 mod milestone;
 mod outputs;
 mod paths;
+mod qualification;
 mod reverse_flow;
 mod statistical;
 
-#[cfg(test)]
-use direct_rust::{cargo_test_passed_test_count, check_direct_rust_fixture_executed_tests};
-use direct_rust::{is_direct_rust_fixture, run_direct_rust_fixture};
+pub(crate) use direct_rust::cargo_test_passed_test_count;
+use direct_rust::{
+    check_direct_rust_fixture_executed_tests, is_direct_rust_fixture, run_direct_rust_fixture,
+};
 pub(crate) use milestone::Milestone;
 use paths::{fixture_file, validate_fixture_path};
+pub(crate) use qualification::{
+    QualificationFixtureFailure, QualificationFixtureRunner, qualification_exact_cargo_selectors,
+    qualification_expected_statuses, qualification_statistical_plan_summaries,
+    run_qualification_core_worker,
+};
 use reverse_flow::core_time_reverse_flows_output;
+pub(crate) use statistical::FixtureStatisticalPlanSummary;
 
 const FIXTURE_ROOT: &str = "oracle/fixtures";
 
@@ -377,13 +385,7 @@ pub(crate) enum FixtureError {
     #[error("fixture file {path} exceeds the {limit}-byte limit")]
     FixtureFileTooLarge { path: PathBuf, limit: usize },
 
-    #[error("failed to inspect fixture output {path}: {source}")]
-    InspectOutput {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-
-    #[error("failed to create fixture output directory {path}: {source}")]
+    #[error("failed to prepare private fixture output directory at {path}: {source}")]
     CreateOutputDir {
         path: PathBuf,
         source: std::io::Error,
@@ -394,9 +396,6 @@ pub(crate) enum FixtureError {
         path: PathBuf,
         source: std::io::Error,
     },
-
-    #[error("unsafe fixture scratch path {path}: {reason}")]
-    UnsafeScratchPath { path: PathBuf, reason: String },
 
     #[error("{id} expected status {expected}, got {actual:?}")]
     StatusMismatch {
@@ -434,6 +433,9 @@ pub(crate) enum FixtureError {
         comparator: &'static str,
         reason: String,
     },
+
+    #[error("qualification fixture {id} cannot run: {reason}")]
+    QualificationCase { id: String, reason: String },
 }
 
 impl FixtureManifest {
@@ -500,6 +502,23 @@ impl FixtureManifest {
             );
             if is_direct_rust_fixture(row) && row.argv_tokens().len() < 2 {
                 violations.push(format!("{} cargo-test row has no cargo arguments", row.id));
+            }
+            match crate::blocker_ledger::selector::CargoTestSelector::normalize_fixture_argv(
+                &row.argv,
+            ) {
+                Ok(Some(parts)) => {
+                    match crate::blocker_ledger::selector::CargoTestSelector::parse(&parts) {
+                        Ok(selector) if selector.is_exact() => {}
+                        Ok(_) => violations.push(format!(
+                            "{} exact cargo-test row does not select one exact test",
+                            row.id
+                        )),
+                        Err(reason) => violations
+                            .push(format!("{} exact cargo-test row selector {reason}", row.id)),
+                    }
+                }
+                Ok(None) => {}
+                Err(reason) => violations.push(format!("{} {reason}", row.id)),
             }
             if row.comparator == FixtureComparator::ExactOutput
                 && row.status != FixtureStatus::ManifestOnly
@@ -849,17 +868,17 @@ fn run_prepared_fixture_process(
     command: &outputs::PreparedFixtureCommand,
     stdin: &[u8],
 ) -> Result<crate::ProcessOutput, OracleError> {
-    let monitored_paths = command
+    let monitored_files = command
         .outputs
         .iter()
-        .map(|output| output.actual_path.as_path())
+        .map(outputs::FixtureOutput::monitored_file)
         .collect::<Vec<_>>();
     crate::process::run_process_monitoring_files(
         program,
         &command.argv,
         stdin,
         Some(&root.path),
-        &monitored_paths,
+        &monitored_files,
         outputs::AUXILIARY_OUTPUT_LIMIT_BYTES,
     )
 }
@@ -1113,7 +1132,15 @@ fn compare_fixture(
         FixtureComparator::Statistical => match statistical::source_for_plan(&row.statistical_plan)
         {
             Ok(statistical::StatisticalSource::Stdout) => {
-                statistical::compare_statistical_plan(&row.statistical_plan, &stab.stdout.bytes)
+                statistical::compare_statistical_plan(&row.statistical_plan, &stim.stdout.bytes)
+                    .map(|reason| format!("Stim stdout: {reason}"))
+                    .or_else(|| {
+                        statistical::compare_statistical_plan(
+                            &row.statistical_plan,
+                            &stab.stdout.bytes,
+                        )
+                        .map(|reason| format!("Stab stdout: {reason}"))
+                    })
             }
             Ok(statistical::StatisticalSource::FixtureOutput) => compare_exact(stim, stab),
             Err(reason) => Some(reason),

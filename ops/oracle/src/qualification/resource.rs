@@ -2,13 +2,14 @@ use super::inventory::stable_id;
 use super::model::QualificationManifest;
 use super::model::{
     BehavioralSurface, Comparator, EvidenceCase, EvidenceProvenance, EvidenceSelector,
-    EvidenceState, EvidenceStatus, FeatureId, ResourceContract, ResourceKind, SelectorKind,
-    StableCaseDomain,
+    EvidenceState, EvidenceStatus, FeatureId, PropertyPlanRef, PropertyPlanSource,
+    ResourceContract, ResourceKind, SelectorKind, StableCaseDomain,
 };
 use super::validation::ValidationIssues;
 
 pub(super) const EXISTING_RESOURCE_SOURCE_ID: &str =
     "safe_file::tests::descriptor_walk_rejects_symlinked_parent";
+pub(super) const EXISTING_PROPERTY_SOURCE_ID: &str = super::property::PASS_TARGET_ID;
 
 struct PlannedResourceCaseSpec {
     source_id: &'static str,
@@ -111,6 +112,7 @@ const PLANNED_RESOURCE_CASES: [PlannedResourceCaseSpec; 13] = [
 
 pub(super) fn required_source_ids() -> impl Iterator<Item = &'static str> {
     std::iter::once(EXISTING_RESOURCE_SOURCE_ID)
+        .chain(std::iter::once(EXISTING_PROPERTY_SOURCE_ID))
         .chain(PLANNED_RESOURCE_CASES.iter().map(|spec| spec.source_id))
 }
 
@@ -133,7 +135,10 @@ pub(super) fn validate_inventory(
             .push("CQ-RESOURCE source-owned case inventory is incomplete or stale".to_string());
     }
     for case in resource_cases {
-        let existing = case.source_id == EXISTING_RESOURCE_SOURCE_ID;
+        let existing = matches!(
+            case.source_id.as_str(),
+            EXISTING_RESOURCE_SOURCE_ID | EXISTING_PROPERTY_SOURCE_ID
+        );
         let expected_status = if existing {
             EvidenceStatus::Implemented
         } else {
@@ -147,11 +152,7 @@ pub(super) fn validate_inventory(
         }
         if !existing
             && (case.primary_selector.kind != SelectorKind::PropertyTarget
-                || case.primary_selector.value.len() != 2
-                || case.primary_selector.value.first().map(String::as_str)
-                    != Some("qualification-resource")
-                || case.primary_selector.value.get(1).map(String::as_str)
-                    != Some(case.source_id.as_str()))
+                || case.primary_selector.value.as_slice() != [case.source_id.as_str()])
         {
             violations.push(format!(
                 "CQ-RESOURCE case {:?} has a stale planned selector",
@@ -172,14 +173,13 @@ pub(super) fn planned_evidence() -> Vec<EvidenceCase> {
             provenance: EvidenceProvenance::QualificationPlan,
             source_id: spec.source_id.to_string(),
             comparator: Comparator::Resource,
+            execution: super::execution_contract::for_status(EvidenceStatus::Planned),
             statistical_plan: None,
+            property_plan: None,
             primary_selector: EvidenceSelector {
                 state: EvidenceState::Planned,
                 kind: SelectorKind::PropertyTarget,
-                value: vec![
-                    "qualification-resource".to_string(),
-                    spec.source_id.to_string(),
-                ],
+                value: vec![spec.source_id.to_string()],
             },
             supporting_selectors: Vec::new(),
             resource_contract: ResourceContract {
@@ -196,6 +196,7 @@ pub(super) fn planned_evidence() -> Vec<EvidenceCase> {
                 .iter()
                 .map(|group| (*group).to_string())
                 .collect(),
+            deferred_product: None,
             status: EvidenceStatus::Planned,
         })
         .collect()
@@ -210,7 +211,9 @@ pub(super) fn existing_regression() -> EvidenceCase {
         provenance: EvidenceProvenance::RustRegression,
         source_id: EXISTING_RESOURCE_SOURCE_ID.to_string(),
         comparator: Comparator::Resource,
+        execution: super::execution_contract::for_status(EvidenceStatus::Implemented),
         statistical_plan: None,
+        property_plan: None,
         primary_selector: EvidenceSelector {
             state: EvidenceState::Existing,
             kind: SelectorKind::CargoTest,
@@ -236,6 +239,53 @@ pub(super) fn existing_regression() -> EvidenceCase {
             .iter()
             .map(|group| (*group).to_string())
             .collect(),
+        deferred_product: None,
+        status: EvidenceStatus::Implemented,
+    }
+}
+
+pub(super) fn existing_property_regression() -> EvidenceCase {
+    let feature_id = FeatureId::Resource;
+    EvidenceCase {
+        id: stable_id(
+            StableCaseDomain::EvidenceResource,
+            EXISTING_PROPERTY_SOURCE_ID,
+        ),
+        feature_id,
+        behavioral_surface: BehavioralSurface::ResourceBoundary,
+        provenance: EvidenceProvenance::QualificationPlan,
+        source_id: EXISTING_PROPERTY_SOURCE_ID.to_string(),
+        comparator: Comparator::Property,
+        execution: super::execution_contract::for_status(EvidenceStatus::Implemented),
+        statistical_plan: None,
+        property_plan: Some(PropertyPlanRef {
+            state: EvidenceState::Existing,
+            source: PropertyPlanSource::QualificationCase,
+            id: EXISTING_PROPERTY_SOURCE_ID.to_string(),
+            plan: super::property::registered_execution_plan(EXISTING_PROPERTY_SOURCE_ID),
+        }),
+        primary_selector: EvidenceSelector {
+            state: EvidenceState::Existing,
+            kind: SelectorKind::PropertyTarget,
+            value: vec![EXISTING_PROPERTY_SOURCE_ID.to_string()],
+        },
+        supporting_selectors: Vec::new(),
+        resource_contract: ResourceContract {
+            kind: ResourceKind::BoundedMaterialized,
+            detail: "The registered property worker binds its manifest seed, case-count, size, persistence, timeout, and replay contract before execution."
+                .to_string(),
+        },
+        negative_axes: vec![
+            "property-plan-drift".to_string(),
+            "property-worker-timeout".to_string(),
+            "property-replay-failure".to_string(),
+        ],
+        performance_groups: feature_id
+            .performance_groups()
+            .iter()
+            .map(|group| (*group).to_string())
+            .collect(),
+        deferred_product: None,
         status: EvidenceStatus::Implemented,
     }
 }

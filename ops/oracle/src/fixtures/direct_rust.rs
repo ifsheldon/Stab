@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::time::Duration;
 
 use super::{FixtureComparator, FixtureError, FixtureRow, RepoRoot, check_expected_process_shape};
 
@@ -12,15 +13,27 @@ pub(super) fn run_direct_rust_fixture(
     root: &RepoRoot,
     row: &FixtureRow,
 ) -> Result<crate::ProcessOutput, FixtureError> {
+    run_direct_rust_fixture_with_timeout(root, row, Duration::from_secs(120))
+}
+
+pub(super) fn run_direct_rust_fixture_with_timeout(
+    root: &RepoRoot,
+    row: &FixtureRow,
+    timeout: Duration,
+) -> Result<crate::ProcessOutput, FixtureError> {
     let tokens = row.argv_tokens();
     let args = std::iter::once("test").chain(tokens.iter().skip(1).map(String::as_str));
-    let output =
-        crate::run_process(Path::new("cargo"), args, &[], Some(&root.path)).map_err(|source| {
-            FixtureError::CoreFixtureFailed {
-                id: row.id.clone(),
-                reason: source.to_string(),
-            }
-        })?;
+    let output = crate::process::run_process_with_timeout(
+        Path::new("cargo"),
+        args,
+        &[],
+        Some(&root.path),
+        timeout,
+    )
+    .map_err(|source| FixtureError::CoreFixtureFailed {
+        id: row.id.clone(),
+        reason: source.to_string(),
+    })?;
     check_expected_process_shape(row, &output)?;
     check_direct_rust_fixture_executed_tests(row, &output)?;
     match row.comparator {
@@ -63,7 +76,7 @@ pub(super) fn check_direct_rust_fixture_executed_tests(
     Ok(())
 }
 
-pub(super) fn cargo_test_passed_test_count(output: &crate::ProcessOutput) -> usize {
+pub(crate) fn cargo_test_passed_test_count(output: &crate::ProcessOutput) -> usize {
     count_cargo_test_passed_lines(&output.stdout.bytes)
         + count_cargo_test_passed_lines(&output.stderr.bytes)
 }

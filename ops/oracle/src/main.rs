@@ -15,15 +15,17 @@ mod matrix;
 mod process;
 mod qualification;
 mod safe_file;
+mod statistical_contract;
 
 use std::ffi::{OsStr, OsString};
+use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use thiserror::Error;
 
-use process::{render_bytes_for_diagnostics, run_checked, run_process};
+use process::{render_bytes_for_diagnostics, run_checked, run_checked_path, run_process};
 
 const PREFIX: &str = "stab-oracle";
 const STIM_TAG: &str = "v1.16.0";
@@ -172,6 +174,12 @@ enum OracleError {
         source: std::io::Error,
     },
 
+    #[error("failed to resolve executable {program}: {reason}")]
+    ResolveExecutable {
+        program: &'static str,
+        reason: Box<str>,
+    },
+
     #[error("Stim source directory does not exist at {0}")]
     MissingStimSource(PathBuf),
 
@@ -226,11 +234,15 @@ enum OracleError {
         source: std::io::Error,
     },
 
-    #[error("{program} {stream} exceeded the {limit}-byte capture limit")]
+    #[error(
+        "{program} {stream} exceeded the {limit}-byte capture limit\nstdout:\n{stdout}\nstderr:\n{stderr}"
+    )]
     OutputLimitExceeded {
         program: String,
         stream: &'static str,
         limit: usize,
+        stdout: CapturedOutput,
+        stderr: CapturedOutput,
     },
 
     #[error("{program} auxiliary output {path} exceeded the {limit}-byte limit")]
@@ -251,9 +263,19 @@ enum OracleError {
     TimedOut {
         program: String,
         milliseconds: u128,
-        stdout: Box<str>,
-        stderr: Box<str>,
+        stdout: CapturedOutput,
+        stderr: CapturedOutput,
     },
+
+    #[error("{program} was interrupted\nstdout:\n{stdout}\nstderr:\n{stderr}")]
+    Interrupted {
+        program: String,
+        stdout: CapturedOutput,
+        stderr: CapturedOutput,
+    },
+
+    #[error("failed to install a process-cancellation handler: {0}")]
+    InstallCancellationHandler(std::io::Error),
 
     #[error("failed to terminate process group for {program}: {source}")]
     TerminateProcessGroup {
@@ -397,6 +419,23 @@ impl CapturedOutput {
 
     fn render_for_diagnostics(&self) -> String {
         render_bytes_for_diagnostics(&self.bytes, self.truncated)
+    }
+}
+
+impl fmt::Display for CapturedOutput {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.render_for_diagnostics())
+    }
+}
+
+impl OracleError {
+    fn captured_streams(&self) -> Option<(&CapturedOutput, &CapturedOutput)> {
+        match self {
+            Self::OutputLimitExceeded { stdout, stderr, .. }
+            | Self::TimedOut { stdout, stderr, .. }
+            | Self::Interrupted { stdout, stderr, .. } => Some((stdout, stderr)),
+            _ => None,
+        }
     }
 }
 
@@ -653,7 +692,13 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_checked("git", args, b"", Some(working_dir))?;
+    let git = qualification::executables::resolve_from_path("git").map_err(|source| {
+        OracleError::ResolveExecutable {
+            program: "git",
+            reason: source.to_string().into_boxed_str(),
+        }
+    })?;
+    let output = run_checked_path(&git, args, b"", Some(working_dir))?;
     Ok(String::from_utf8_lossy(&output.stdout.bytes)
         .trim()
         .to_string())

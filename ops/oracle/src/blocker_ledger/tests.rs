@@ -127,11 +127,11 @@ fn blocker_ledger_rejects_fifo_without_blocking() {
 #[test]
 fn blocker_ledger_rejects_unknown_schema_version() {
     let ledger = mutated_ledger(|value| {
-        *value.get_mut("schema_version").expect("schema version") = Value::from(3);
+        *value.get_mut("schema_version").expect("schema version") = Value::from(4);
     });
 
     let error = ledger.check(&repo_root()).expect_err("schema mismatch");
-    assert!(validation_text(error).contains("schema_version is 3"));
+    assert!(validation_text(error).contains("schema_version is 4"));
 }
 
 #[test]
@@ -533,6 +533,32 @@ fn blocker_selector_supports_exact_single_test_contracts() {
             "pfm_b4_flow_various_x: test\npfm_b4_flow_various_xcz_feedback: test\n"
         ),
         2
+    );
+}
+
+#[test]
+fn blocker_selector_normalizes_exact_library_fixture_contracts() {
+    let selector = super::selector::CargoTestSelector::normalize_fixture_argv(
+        "cargo-test|-p|stab-core|--lib|gate::tests::fixed_tableau|--quiet|--|--exact",
+    )
+    .expect("normalize exact fixture")
+    .expect("exact Cargo fixture");
+    let parsed =
+        super::selector::CargoTestSelector::parse(&selector).expect("parse exact library selector");
+
+    assert!(parsed.is_exact());
+    assert_eq!(
+        parsed.run_args(),
+        [
+            "test",
+            "-p",
+            "stab-core",
+            "--lib",
+            "--quiet",
+            "--",
+            "gate::tests::fixed_tableau",
+            "--exact",
+        ]
     );
 }
 

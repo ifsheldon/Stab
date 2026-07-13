@@ -125,12 +125,13 @@ pub(super) fn generate_rustdoc_inventory(
         OsString::from("--output-format"),
         OsString::from("json"),
     ];
+    let monitored_rustdoc = crate::safe_file::SafeFileLocation::path(rustdoc_path.clone());
     let output = crate::process::run_process_monitoring_files(
         Path::new("cargo"),
         args,
         &[],
         Some(root),
-        &[&rustdoc_path],
+        &[monitored_rustdoc],
         u64::try_from(MAX_RUSTDOC_JSON_BYTES).unwrap_or(u64::MAX),
     )
     .map_err(|source| PublicApiError::RustdocProcess {

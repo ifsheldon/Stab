@@ -19,6 +19,7 @@ use gate_contract::{
 use oracle::validate_oracle_reference;
 use provenance::validate_upstream_source;
 use selector::CargoTestSelector;
+pub(crate) use statistical::BlockerStatisticalPlanSummary;
 use statistical::validate_statistical_plan;
 use support::{validate_supporting_benchmarks, validate_supporting_oracles};
 
@@ -31,11 +32,11 @@ pub(crate) mod selector;
 mod statistical;
 mod support;
 
-const SCHEMA_VERSION: u32 = 2;
+const SCHEMA_VERSION: u32 = 3;
 const STIM_VERSION: &str = "v1.16.0";
 const EXPECTED_LEDGER_DIGEST: [u8; 32] = [
-    0x73, 0x93, 0x5b, 0x22, 0x58, 0x34, 0xc5, 0x34, 0x91, 0xe1, 0xc9, 0x01, 0xb4, 0x87, 0x4e, 0xc3,
-    0xe7, 0x3e, 0x3d, 0x9a, 0x2e, 0x5c, 0xa7, 0xb9, 0x93, 0x02, 0xe4, 0x58, 0x54, 0x68, 0xe9, 0xbd,
+    0xa1, 0x25, 0x2f, 0x62, 0x60, 0x46, 0x5a, 0x98, 0xa1, 0xa8, 0x6a, 0xaf, 0x80, 0xce, 0x48, 0x10,
+    0xc1, 0xcc, 0x6d, 0xad, 0x28, 0x59, 0xb8, 0x67, 0x9e, 0xd3, 0xf5, 0x45, 0x19, 0x8c, 0x34, 0xf0,
 ];
 const MAX_LEDGER_BYTES: u64 = 1 << 20;
 const MAX_MANIFEST_BYTES: u64 = 16 << 20;
@@ -222,6 +223,8 @@ struct StatisticalPlan {
     sigma_multiplier: f64,
     absolute_probability_floor: f64,
     familywise_false_positive_budget: f64,
+    independent_comparisons_per_attempt: u32,
+    shot_batches_per_attempt: u32,
     buckets: Vec<StatisticalBucket>,
 }
 
@@ -622,6 +625,40 @@ pub(crate) fn validate_and_print(
     }
     ledger.print_summary(list);
     Ok(())
+}
+
+pub(crate) fn qualification_existing_selectors(
+    root: &RepoRoot,
+) -> Result<BTreeMap<String, Vec<String>>, BlockerLedgerError> {
+    let path = root.blocker_ledger();
+    let ledger = BlockerLedger::read_from_path(&path)?;
+    ledger.check(root)?;
+    Ok(ledger
+        .blockers
+        .iter()
+        .flat_map(|blocker| &blocker.cases)
+        .filter(|case| case.test.state == EvidenceState::Existing)
+        .map(|case| (case.id.clone(), case.test.selector.clone()))
+        .collect())
+}
+
+pub(crate) fn qualification_statistical_plan_summaries(
+    root: &RepoRoot,
+) -> Result<Vec<BlockerStatisticalPlanSummary>, BlockerLedgerError> {
+    let path = root.blocker_ledger();
+    let ledger = BlockerLedger::read_from_path(&path)?;
+    ledger
+        .blockers
+        .iter()
+        .flat_map(|blocker| &blocker.cases)
+        .filter(|case| {
+            case.comparator == ComparatorKind::Statistical && case.status != CaseStatus::Planned
+        })
+        .map(|case| {
+            statistical::qualification_plan_summary(case)
+                .map_err(|reason| BlockerLedgerError::Validation(reason.into_boxed_str()))
+        })
+        .collect()
 }
 
 impl BlockerLedger {
@@ -1033,7 +1070,9 @@ fn validate_gate_statistical_plan(
         && plan.seed == expected.seed
         && plan.sigma_multiplier == expected.sigma_multiplier
         && plan.absolute_probability_floor == expected.absolute_probability_floor
-        && plan.familywise_false_positive_budget == expected.familywise_false_positive_budget;
+        && plan.familywise_false_positive_budget == expected.familywise_false_positive_budget
+        && plan.independent_comparisons_per_attempt == expected.independent_comparisons_per_attempt
+        && plan.shot_batches_per_attempt == expected.shot_batches_per_attempt;
     let buckets_match = plan.buckets.len() == expected.buckets.len()
         && plan
             .buckets
@@ -1070,14 +1109,7 @@ fn validate_test_reference(
         ));
     }
     match CargoTestSelector::parse(&case.test.selector) {
-        Ok(selector)
-            if (matches!(
-                blocker.milestone,
-                BlockerMilestone::B1 | BlockerMilestone::B4 | BlockerMilestone::B5
-            ) || blocker.id == "pfm3-gate-execution")
-                && case.test.state == EvidenceState::Existing
-                && !selector.is_exact() =>
-        {
+        Ok(selector) if case.test.state == EvidenceState::Existing && !selector.is_exact() => {
             violations.push(format!(
                 "{} case {:?} must use an exact executable test selector",
                 blocker.milestone.as_str(),

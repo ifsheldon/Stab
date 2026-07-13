@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "stim_version": "v1.16.0",
   "blockers": [
     {
@@ -59,7 +59,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|unpromoted_measurement_rewrites",
+              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec|circuit_inverse_qec_keeps_unpromoted_measurement_rewrites_fail_closed|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_inverse_qec.test.cc"
             }
           },
@@ -570,7 +570,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec_pfm_b1|pfm_b1_surface_code_reversal",
+              "argv": "cargo-test|-p|stab-core|--test|circuit_inverse_qec_pfm_b1|pfm_b1_surface_code_reversal|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_inverse_qec_test.py"
             }
           },
@@ -934,8 +934,9 @@
               "stab-core",
               "--test",
               "dem_analyzer_classical",
-              "sweep",
-              "--quiet"
+              "dem_analyzer_ignores_sweep_controls_like_upstream",
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -945,7 +946,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_classical|sweep",
+              "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_classical|dem_analyzer_ignores_sweep_controls_like_upstream|--|--exact",
               "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
@@ -1326,6 +1327,8 @@
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 3,
+            "shot_batches_per_attempt": 3,
             "buckets": [
               {
                 "name": "mpp-zero",
@@ -1397,6 +1400,8 @@
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 3,
+            "shot_batches_per_attempt": 3,
             "buckets": [
               {
                 "name": "mpad-zero",
@@ -1524,6 +1529,8 @@
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 3,
+            "shot_batches_per_attempt": 3,
             "buckets": [
               {
                 "name": "identity",
@@ -1603,6 +1610,8 @@
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 3,
+            "shot_batches_per_attempt": 6,
             "buckets": [
               {
                 "name": "pc1-i",
@@ -1799,6 +1808,8 @@
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 3,
+            "shot_batches_per_attempt": 6,
             "buckets": [
               {
                 "name": "depol1-i",
@@ -1886,6 +1897,8 @@
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 3,
+            "shot_batches_per_attempt": 3,
             "buckets": [
               {
                 "name": "no-error",
@@ -1965,6 +1978,8 @@
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 3,
+            "shot_batches_per_attempt": 3,
             "buckets": [
               {
                 "name": "erase-no-herald",
@@ -2267,6 +2282,8 @@
             "sigma_multiplier": 6,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 1,
+            "shot_batches_per_attempt": 1,
             "buckets": [
               {
                 "name": "measurement-zero",
@@ -2339,6 +2356,8 @@
             "sigma_multiplier": 6,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 1,
+            "shot_batches_per_attempt": 1,
             "buckets": [
               {
                 "name": "measurement-zero",
@@ -2411,6 +2430,8 @@
             "sigma_multiplier": 6,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 1,
+            "shot_batches_per_attempt": 1,
             "buckets": [
               {
                 "name": "measurement-zero",
@@ -2868,6 +2889,8 @@
             "sigma_multiplier": 6,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 3,
+            "shot_batches_per_attempt": 3,
             "buckets": [
               {
                 "name": "no-herald",
@@ -2952,6 +2975,8 @@
             "sigma_multiplier": 6,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 1,
+            "shot_batches_per_attempt": 1,
             "buckets": [
               {
                 "name": "erase-no-herald",
@@ -3036,6 +3061,8 @@
             "sigma_multiplier": 6,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 1,
+            "shot_batches_per_attempt": 1,
             "buckets": [
               {
                 "name": "no-herald",
@@ -3395,10 +3422,13 @@
               "test",
               "-p",
               "stab-core",
+              "--features",
+              "ops-contracts",
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_counts",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -3408,7 +3438,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_counts",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_counts|--|--exact",
               "upstream_source": "src/stim/dem/detector_error_model.test.cc"
             }
           },
@@ -3437,10 +3467,13 @@
               "test",
               "-p",
               "stab-core",
+              "--features",
+              "ops-contracts",
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_coordinates",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -3450,7 +3483,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_coordinates",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_coordinates|--|--exact",
               "upstream_source": "src/stim/dem/detector_error_model.test.cc"
             }
           },
@@ -3482,7 +3515,8 @@
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_transforms",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -3492,7 +3526,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_transforms",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_transforms|--|--exact",
               "upstream_source": "src/stim/dem/detector_error_model.test.cc"
             }
           },
@@ -3519,6 +3553,8 @@
             "sigma_multiplier": 6.0,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
+            "independent_comparisons_per_attempt": 1,
+            "shot_batches_per_attempt": 2,
             "buckets": [
               {
                 "name": "folded-all-zero-joint-record",
@@ -3554,10 +3590,13 @@
               "test",
               "-p",
               "stab-core",
+              "--features",
+              "ops-contracts",
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_sampler",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -3567,7 +3606,7 @@
             "signature": {
               "parity_mode": "statistical",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_sampler",
+              "argv": "cargo-test|-p|stab-core|--features|ops-contracts|--test|dem_folded_traversal|pfm_b3_folded_traversal_sampler|--|--exact",
               "upstream_source": "src/stim/simulators/dem_sampler.test.cc"
             }
           },
@@ -3599,7 +3638,8 @@
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_search",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -3609,7 +3649,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_search",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_search|--|--exact",
               "upstream_source": "src/stim/search/graphlike/algo.test.cc"
             }
           },
@@ -3641,7 +3681,8 @@
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_sat",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -3651,7 +3692,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_sat",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_sat|--|--exact",
               "upstream_source": "src/stim/search/sat/wcnf.test.cc"
             }
           },
@@ -3683,7 +3724,8 @@
               "--test",
               "dem_folded_traversal",
               "pfm_b3_folded_traversal_matcher_filter",
-              "--quiet"
+              "--quiet",
+              "--exact"
             ]
           },
           "oracle": {
@@ -3693,7 +3735,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_matcher_filter",
+              "argv": "cargo-test|-p|stab-core|--test|dem_folded_traversal|pfm_b3_folded_traversal_matcher_filter|--|--exact",
               "upstream_source": "src/stim/simulators/error_matcher.test.cc"
             }
           },
@@ -3778,7 +3820,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|detecting_regions_generated_repetition",
+            "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::generated::detecting_regions_generated_repetition_code_filters_and_regions|--|--exact",
             "upstream_source": "src/stim/circuit/circuit_pybind_test.py"
           }
         },
@@ -3788,7 +3830,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|detecting_regions_generated_rotated_surface_code",
+            "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::generated::detecting_regions_generated_rotated_surface_code_filters_and_regions|--|--exact",
             "upstream_source": "src/stim/gen/gen_surface_code.test.cc"
           }
         },
@@ -3798,7 +3840,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|detecting_regions_generated_unrotated_surface_code",
+            "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::generated::detecting_regions_generated_unrotated_surface_code_filters_and_regions|--|--exact",
             "upstream_source": "src/stim/gen/gen_surface_code.test.cc"
           }
         },
@@ -3808,7 +3850,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|detecting_regions_generated_surface_code_memory_x_basis_regions",
+            "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::generated::detecting_regions_generated_surface_code_memory_x_basis_regions|--|--exact",
             "upstream_source": "src/stim/gen/gen_surface_code.test.cc"
           }
         }
@@ -3862,7 +3904,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|detecting_regions_simple_h_cx_mxx",
+              "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::detecting_regions_simple_h_cx_mxx|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_to_detecting_regions.test.cc"
             }
           },
@@ -3903,7 +3945,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|detecting_regions_anticommutation_rejects_implicit_start_state",
+              "argv": "cargo-test|-p|stab-core|circuit_detecting_regions::tests::detecting_regions_anticommutation_rejects_implicit_start_state|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_to_detecting_regions_test.py"
             }
           },
@@ -3947,7 +3989,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|missing_detectors|pf5_missing_detectors_mpad",
+            "argv": "cargo-test|-p|stab-core|--test|missing_detectors|pf5_missing_detectors_mpad_measurement_pads_match_pinned_stim|--|--exact",
             "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
           }
         },
@@ -4537,7 +4579,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_honeycomb",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_honeycomb|--|--exact",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -4580,7 +4622,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_toric",
+              "argv": "cargo-test|-p|stab-core|--test|pfm_b4_missing_detector_evidence|pfm_b4_missing_toric|--|--exact",
               "upstream_source": "src/stim/util_top/missing_detectors.test.cc"
             }
           },
@@ -5926,7 +5968,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|python_multi_target",
+              "argv": "cargo-test|-p|stab-core|--test|circuit_flow_generators|circuit_flow_generators_promotes_python_multi_target_examples|--|--exact",
               "upstream_source": "src/stim/util_top/circuit_flow_generators_test.py"
             }
           },
@@ -6140,7 +6182,7 @@
           "signature": {
             "parity_mode": "structural",
             "comparator": "structural",
-            "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_pfm_b5|pfm_b5_repetition_code_loop",
+            "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_pfm_b5|pfm_b5_repetition_code_loop|--|--exact",
             "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
           }
         },
@@ -6492,7 +6534,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_pfm_b5|pfm_b5_repetition_code_loop",
+              "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_pfm_b5|pfm_b5_repetition_code_loop|--|--exact",
               "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
@@ -6935,7 +6977,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_loop_folding|pf6_dem_analyzer_rejects_folded_observables_crossing_iterations",
+              "argv": "cargo-test|-p|stab-core|--test|dem_analyzer_loop_folding|pf6_dem_analyzer_rejects_folded_observables_crossing_iterations|--|--exact",
               "upstream_source": "src/stim/simulators/error_analyzer.test.cc"
             }
           },
@@ -8456,7 +8498,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period",
+              "argv": "cargo-test|-p|stab-core|sparse_rev_frame_tracker::tests::sparse_rev_frame_tracker_folds_shifted_measurement_repeat_period|--|--exact",
               "upstream_source": "src/stim/simulators/sparse_rev_frame_tracker.test.cc"
             }
           },
@@ -8497,7 +8539,7 @@
             "signature": {
               "parity_mode": "structural",
               "comparator": "structural",
-              "argv": "cargo-test|-p|stab-core|matched_error_canonicalize_sorts_terms_like_upstream",
+              "argv": "cargo-test|-p|stab-core|matched_error::tests::matched_error_canonicalize_sorts_terms_like_upstream|--|--exact",
               "upstream_source": "src/stim/simulators/matched_error.test.cc"
             }
           },

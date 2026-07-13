@@ -1,8 +1,11 @@
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::io::Read;
-use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(target_os = "linux")]
+use std::os::fd::AsRawFd as _;
+use std::path::{Path, PathBuf};
+#[cfg(target_os = "linux")]
+use std::sync::Arc;
 
 use super::paths::{fixture_file, validate_fixture_path};
 use super::statistical::{self, StatisticalSource};
@@ -14,35 +17,64 @@ use super::{
 const FIXTURE_INPUT_TOKEN_PREFIX: &str = "{fixture_input:";
 const FIXTURE_OUTPUT_TOKEN_PREFIX: &str = "{fixture_output:";
 const FIXTURE_TOKEN_SUFFIX: &str = "}";
-const FIXTURE_OUTPUT_ROOT: &str = "target/oracle/fixture-outputs";
+#[cfg(target_os = "linux")]
+const FIXTURE_OUTPUT_PARENT: &str = "/tmp";
 pub(super) const AUXILIARY_OUTPUT_LIMIT_BYTES: u64 = 1024 * 1024;
-
-static RUN_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
 pub(super) struct PreparedFixtureCommand {
     pub(super) argv: Vec<OsString>,
     pub(super) outputs: Vec<FixtureOutput>,
-    _scratch: ScratchRunDirectory,
+    _scratch: Option<ScratchRunDirectory>,
 }
 
 #[derive(Debug)]
 struct ScratchRunDirectory {
-    path: Option<PathBuf>,
+    #[cfg(target_os = "linux")]
+    parent: std::fs::File,
+    #[cfg(target_os = "linux")]
+    directory: Arc<std::fs::File>,
+    #[cfg(target_os = "linux")]
+    name: OsString,
+    #[cfg(not(target_os = "linux"))]
+    temporary: tempfile::TempDir,
 }
 
 impl Drop for ScratchRunDirectory {
     fn drop(&mut self) {
-        if let Some(path) = self.path.take() {
-            drop(std::fs::remove_dir_all(path));
+        #[cfg(target_os = "linux")]
+        {
+            drop(crate::qualification::artifact::cleanup_owned_directory(
+                &self.parent,
+                &self.name,
+                &self.directory,
+            ));
         }
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub(super) struct FixtureOutput {
     pub(super) expected_relative: String,
-    pub(super) actual_path: PathBuf,
+    actual: crate::safe_file::SafeFileLocation,
+}
+
+impl FixtureOutput {
+    pub(super) fn actual_path(&self) -> &Path {
+        self.actual.display_path()
+    }
+
+    pub(super) fn monitored_file(&self) -> crate::safe_file::SafeFileLocation {
+        self.actual.clone()
+    }
+
+    #[cfg(test)]
+    pub(super) fn from_path(expected_relative: impl Into<String>, actual_path: PathBuf) -> Self {
+        Self {
+            expected_relative: expected_relative.into(),
+            actual: crate::safe_file::SafeFileLocation::path(actual_path),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -181,7 +213,7 @@ pub(super) fn prepare_command(
 ) -> Result<PreparedFixtureCommand, FixtureError> {
     let mut argv = Vec::new();
     let mut outputs = Vec::new();
-    let mut scratch_dir: Option<PathBuf> = None;
+    let mut scratch_dir = None;
     for token in row.argv_tokens() {
         match parse_fixture_arg_token(&row.id, &token)
             .map_err(|violation| FixtureError::Validation(violation.into_boxed_str()))?
@@ -190,22 +222,20 @@ pub(super) fn prepare_command(
                 argv.push(fixture_file(root, relative)?.into_os_string());
             }
             Some(FixtureArgToken::Output(relative)) => {
-                let run_dir = if let Some(existing) = &scratch_dir {
-                    existing.clone()
-                } else {
-                    let created = create_scratch_run_dir(root, row, process_label)?;
-                    scratch_dir = Some(created.clone());
-                    created
+                let run_dir = match &mut scratch_dir {
+                    Some(existing) => existing,
+                    None => scratch_dir.insert(ScratchRunDirectory::create(process_label)?),
                 };
-                let actual_path = run_dir.join(format!(
+                let file_name = OsString::from(format!(
                     "{:02}-{}",
                     outputs.len(),
                     safe_fixture_output_component(relative)
                 ));
-                argv.push(actual_path.clone().into_os_string());
+                let actual = run_dir.output_location(file_name);
+                argv.push(actual.display_path().as_os_str().to_owned());
                 outputs.push(FixtureOutput {
                     expected_relative: relative.to_string(),
-                    actual_path,
+                    actual,
                 });
             }
             None => argv.push(OsString::from(token)),
@@ -214,98 +244,97 @@ pub(super) fn prepare_command(
     Ok(PreparedFixtureCommand {
         argv,
         outputs,
-        _scratch: ScratchRunDirectory { path: scratch_dir },
+        _scratch: scratch_dir,
     })
 }
 
-fn create_scratch_run_dir(
-    root: &RepoRoot,
-    row: &FixtureRow,
-    process_label: &str,
-) -> Result<PathBuf, FixtureError> {
-    let scratch_root = root.path.join(FIXTURE_OUTPUT_ROOT);
-    ensure_directory_without_symlink_components(&scratch_root)?;
-    let pid = std::process::id();
-    for _ in 0..1024 {
-        let counter = RUN_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let path = scratch_root.join(format!(
-            "run-{pid}-{counter:016x}-{}-{}",
-            safe_fixture_output_component(&row.id),
+impl ScratchRunDirectory {
+    fn create(process_label: &str) -> Result<Self, FixtureError> {
+        let prefix = format!(
+            ".stab-oracle-{}-",
             safe_fixture_output_component(process_label)
-        ));
-        match std::fs::create_dir(&path) {
-            Ok(()) => return Ok(path),
-            Err(source) if source.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(source) => {
-                return Err(FixtureError::CreateOutputDir { path, source });
-            }
-        }
-    }
-    Err(FixtureError::CoreFixtureFailed {
-        id: row.id.clone(),
-        reason: "failed to allocate unique fixture output scratch directory".to_string(),
-    })
-}
-
-fn ensure_directory_without_symlink_components(path: &Path) -> Result<(), FixtureError> {
-    let mut current = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::Prefix(_) | Component::RootDir => current.push(component.as_os_str()),
-            Component::Normal(name) => {
-                current.push(name);
-                ensure_directory_component(&current)?;
-            }
-            Component::CurDir | Component::ParentDir => {
-                return Err(FixtureError::UnsafeScratchPath {
-                    path: path.to_path_buf(),
-                    reason: "scratch path contains relative components".to_string(),
-                });
-            }
-        }
-    }
-    Ok(())
-}
-
-fn ensure_directory_component(path: &Path) -> Result<(), FixtureError> {
-    match std::fs::symlink_metadata(path) {
-        Ok(metadata) => validate_directory_metadata(path, &metadata),
-        Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
-            std::fs::create_dir(path).map_err(|source| FixtureError::CreateOutputDir {
-                path: path.to_path_buf(),
-                source,
-            })?;
-            let metadata =
-                std::fs::symlink_metadata(path).map_err(|source| FixtureError::InspectOutput {
-                    path: path.to_path_buf(),
+        );
+        #[cfg(target_os = "linux")]
+        {
+            let temporary = tempfile::Builder::new()
+                .prefix(&prefix)
+                .tempdir_in(FIXTURE_OUTPUT_PARENT)
+                .map_err(|source| FixtureError::CreateOutputDir {
+                    path: PathBuf::from(FIXTURE_OUTPUT_PARENT),
                     source,
                 })?;
-            validate_directory_metadata(path, &metadata)
+            let temporary_path = temporary.path().to_path_buf();
+            let name = temporary_path
+                .file_name()
+                .ok_or_else(|| FixtureError::CreateOutputDir {
+                    path: temporary_path.clone(),
+                    source: std::io::Error::other(
+                        "temporary fixture output directory has no final component",
+                    ),
+                })?
+                .to_owned();
+            let parent = crate::safe_file::open_directory(Path::new(FIXTURE_OUTPUT_PARENT))
+                .map_err(|source| FixtureError::CreateOutputDir {
+                    path: PathBuf::from(FIXTURE_OUTPUT_PARENT),
+                    source: std::io::Error::other(source),
+                })?;
+            let directory = crate::qualification::artifact::open_directory_at(&parent, &name)
+                .map_err(|source| FixtureError::CreateOutputDir {
+                    path: temporary_path.clone(),
+                    source: source.into(),
+                })?;
+            rustix::io::fcntl_setfd(&directory, rustix::io::FdFlags::empty()).map_err(
+                |source| FixtureError::CreateOutputDir {
+                    path: temporary_path.clone(),
+                    source: source.into(),
+                },
+            )?;
+            drop(temporary.keep());
+            let scratch = Self {
+                parent,
+                directory: Arc::new(directory),
+                name,
+            };
+            rustix::fs::fsync(&scratch.parent).map_err(|source| FixtureError::CreateOutputDir {
+                path: temporary_path,
+                source: source.into(),
+            })?;
+            Ok(scratch)
         }
-        Err(source) => Err(FixtureError::InspectOutput {
-            path: path.to_path_buf(),
-            source,
-        }),
+        #[cfg(not(target_os = "linux"))]
+        {
+            let temporary =
+                tempfile::Builder::new()
+                    .prefix(&prefix)
+                    .tempdir()
+                    .map_err(|source| FixtureError::CreateOutputDir {
+                        path: std::env::temp_dir(),
+                        source,
+                    })?;
+            Ok(Self { temporary })
+        }
     }
-}
 
-fn validate_directory_metadata(
-    path: &Path,
-    metadata: &std::fs::Metadata,
-) -> Result<(), FixtureError> {
-    if metadata.file_type().is_symlink() {
-        return Err(FixtureError::UnsafeScratchPath {
-            path: path.to_path_buf(),
-            reason: "scratch path contains symlink component".to_string(),
-        });
+    fn output_location(&self, name: OsString) -> crate::safe_file::SafeFileLocation {
+        #[cfg(target_os = "linux")]
+        {
+            let child_path = PathBuf::from(format!(
+                "/proc/self/fd/{}/{}",
+                self.directory.as_raw_fd(),
+                name.to_string_lossy()
+            ));
+            crate::safe_file::SafeFileLocation::directory_entry(
+                Arc::clone(&self.directory),
+                name,
+                child_path,
+            )
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let path = self.temporary.path().join(name);
+            crate::safe_file::SafeFileLocation::path(path)
+        }
     }
-    if !metadata.is_dir() {
-        return Err(FixtureError::UnsafeScratchPath {
-            path: path.to_path_buf(),
-            reason: "scratch path component is not a directory".to_string(),
-        });
-    }
-    Ok(())
 }
 
 fn safe_fixture_output_component(value: &str) -> String {
@@ -457,28 +486,40 @@ fn compare_statistical_fixture_output(
     Ok(())
 }
 
+pub(super) fn completed_statistical_shots_for_output(
+    row: &FixtureRow,
+    outputs: &[FixtureOutput],
+) -> Option<u64> {
+    let [output] = outputs else {
+        return None;
+    };
+    let bytes = read_actual_fixture_output(row, output).ok()?;
+    statistical::completed_shots(&row.statistical_plan, &bytes)
+}
+
 pub(super) fn read_actual_fixture_output(
     row: &FixtureRow,
     output: &FixtureOutput,
 ) -> Result<Vec<u8>, FixtureError> {
-    let mut file = crate::safe_file::open_regular_file(&output.actual_path).map_err(|source| {
-        FixtureError::ReadFile {
-            path: output.actual_path.clone(),
+    let mut file = output
+        .actual
+        .open_regular_file()
+        .map_err(|source| FixtureError::ReadFile {
+            path: output.actual_path().to_path_buf(),
             source: std::io::Error::other(source),
-        }
-    })?;
+        })?;
     let mut bytes = Vec::new();
     Read::by_ref(&mut file)
         .take(AUXILIARY_OUTPUT_LIMIT_BYTES + 1)
         .read_to_end(&mut bytes)
         .map_err(|source| FixtureError::ReadFile {
-            path: output.actual_path.clone(),
+            path: output.actual_path().to_path_buf(),
             source,
         })?;
     if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > AUXILIARY_OUTPUT_LIMIT_BYTES {
         return Err(FixtureError::AuxiliaryOutputTooLarge {
             id: row.id.clone(),
-            path: output.actual_path.clone(),
+            path: output.actual_path().to_path_buf(),
             limit: AUXILIARY_OUTPUT_LIMIT_BYTES,
         });
     }

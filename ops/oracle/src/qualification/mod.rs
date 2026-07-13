@@ -8,18 +8,32 @@ use self::model::{EvidenceStatus, FeatureId, QualificationManifest, UpstreamDisp
 use crate::RepoRoot;
 use crate::blocker_ledger::selector::{CargoTestSelector, test_listing_match_count};
 
+pub(crate) mod artifact;
 mod classification;
+mod comparator;
+pub(crate) mod executables;
+mod execution_contract;
 mod extract;
 mod inventory;
 mod model;
+mod property;
+mod property_validation;
 mod public_api;
+mod public_api_validation;
+mod receipt;
+mod report;
 mod resource;
+mod runner;
 mod statistical_validation;
+mod statistics;
+mod tier;
 mod validation;
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "7b8703977838aa796f3da6bf5e6321de4491a73dfc5af2a2a07785337918abb0";
+    "b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141";
 const MAX_MANIFEST_BYTES: usize = 32 << 20;
+const PROVENANCE_PROBE_CASE_ID: &str = "cq-evidence-oracle-d4836033794f54f7";
+const PROVENANCE_PROBE_OUTPUT_DIR: &str = "target/qualification/correctness/provenance-probe";
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
@@ -48,6 +62,102 @@ pub(crate) enum CorrectnessCommand {
         #[arg(long)]
         check: bool,
     },
+
+    /// Rebuild private tools and validate one real case's complete provenance chain.
+    ProvenanceProbe {
+        /// Repository-relative diagnostic report directory under target/qualification.
+        #[arg(long, default_value = PROVENANCE_PROBE_OUTPUT_DIR)]
+        out: PathBuf,
+    },
+
+    /// Execute source-owned correctness cases and publish JSON, Markdown, and preflight reports.
+    Run {
+        /// Qualification tier to execute.
+        #[arg(long, value_enum)]
+        tier: model::ExecutionTier,
+
+        /// Restrict execution to one or more exact CQ feature ids.
+        #[arg(long)]
+        feature: Vec<String>,
+
+        /// Restrict execution to one or more exact qualification case ids.
+        #[arg(long)]
+        case: Vec<String>,
+
+        /// Permit explicitly selected deferred cases to remain visible without execution.
+        #[arg(long)]
+        allow_deferred: bool,
+
+        /// Repository-relative report directory under target/qualification.
+        #[arg(long, default_value = artifact::DEFAULT_OUTPUT_DIR)]
+        out: PathBuf,
+    },
+
+    /// Validate report JSON and regenerate derived Markdown and preflight indexes.
+    Report {
+        /// Repository-relative report directory under target/qualification.
+        #[arg(long, default_value = artifact::DEFAULT_OUTPUT_DIR)]
+        out: PathBuf,
+    },
+
+    /// Validate passing correctness prerequisites from a machine-readable report.
+    Preflight {
+        /// Repository-relative report directory under target/qualification.
+        #[arg(long, default_value = artifact::DEFAULT_OUTPUT_DIR)]
+        out: PathBuf,
+
+        /// Exact qualification case ids required by the dependent workload.
+        #[arg(long, required = true)]
+        case: Vec<String>,
+
+        /// Controller-approved digest of request.json for this exact run selection.
+        #[arg(long)]
+        request_sha256: String,
+
+        /// Controller-approved digest of completion.json for the executed outcomes.
+        #[arg(long)]
+        completion_sha256: String,
+
+        /// Permit a local report recorded from a modified worktree.
+        #[arg(long)]
+        allow_dirty: bool,
+    },
+
+    /// Execute one qualification adapter inside a killable worker process.
+    #[command(hide = true)]
+    Worker {
+        #[command(subcommand)]
+        command: WorkerCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub(crate) enum WorkerCommand {
+    /// Execute one validated in-process oracle fixture.
+    Fixture {
+        /// Exact implemented core fixture id.
+        #[arg(long)]
+        id: String,
+    },
+
+    /// Execute one registered property target.
+    Property {
+        /// Exact registered property target id.
+        #[arg(long)]
+        id: String,
+
+        /// Source-owned digest of the registered property execution plan.
+        #[arg(long)]
+        plan_sha256: String,
+
+        /// Dedicated bounded file for a minimized failing regression.
+        #[arg(long, conflicts_with = "replay_in")]
+        persistence_out: Option<PathBuf>,
+
+        /// Dedicated bounded regression file to replay in this worker.
+        #[arg(long, conflicts_with = "persistence_out")]
+        replay_in: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Error)]
@@ -56,10 +166,34 @@ pub(crate) enum QualificationError {
     BlockerLedger(#[from] crate::blocker_ledger::BlockerLedgerError),
 
     #[error(transparent)]
+    Fixture(#[from] crate::fixtures::FixtureError),
+
+    #[error(transparent)]
     Inventory(#[from] inventory::InventoryError),
 
     #[error(transparent)]
     Validation(#[from] validation::ValidationError),
+
+    #[error(transparent)]
+    Run(#[from] runner::RunError),
+
+    #[error(transparent)]
+    Report(#[from] report::ReportError),
+
+    #[error(transparent)]
+    Receipt(#[from] receipt::ReceiptError),
+
+    #[error(transparent)]
+    Artifact(#[from] artifact::ArtifactError),
+
+    #[error("qualification statistics are invalid: {0}")]
+    Statistics(Box<str>),
+
+    #[error("qualification worker failed: {0}")]
+    Worker(Box<str>),
+
+    #[error("qualification provenance probe failed: {0}")]
+    Provenance(Box<str>),
 
     #[error("failed to read qualification manifest {path}: {reason}")]
     ReadManifest { path: PathBuf, reason: Box<str> },
@@ -111,6 +245,7 @@ pub(crate) fn run(root: &RepoRoot, command: Command) -> Result<(), Qualification
             ensure_frozen()?;
             let checked = read_manifest(root)?;
             validation::validate(&checked, EXPECTED_FROZEN_DIGEST)?;
+            validate_source_statistics(root)?;
             check_existing_cargo_selectors(root, &checked)?;
             crate::blocker_ledger::validate_and_print(root, false, true)?;
             let generated = inventory::generate(root)?;
@@ -166,7 +301,275 @@ pub(crate) fn run(root: &RepoRoot, command: Command) -> Result<(), Qualification
                 );
             }
         }
+        CorrectnessCommand::ProvenanceProbe { out } => {
+            run_provenance_probe(root, out)?;
+        }
+        CorrectnessCommand::Run {
+            tier,
+            feature,
+            case,
+            allow_deferred,
+            out,
+        } => {
+            let checked = read_fresh_manifest(root)?;
+            runner::run(
+                root,
+                &checked,
+                runner::RunRequest {
+                    tier,
+                    features: feature,
+                    cases: case,
+                    allow_deferred,
+                    output: out,
+                },
+            )?;
+        }
+        CorrectnessCommand::Report { out } => {
+            let checked = read_fresh_manifest(root)?;
+            let output = artifact::QualificationOutputDir::parse(root, &out)?;
+            let locked = output.lock_published()?;
+            let (request, request_sha256) = receipt::RunRequestReceipt::read(locked.output())?;
+            let expectation =
+                runner::report_expectation(root, &checked, &request, &request_sha256)?;
+            report::regenerate(locked.output(), &expectation)?;
+            locked.finish()?;
+            println!(
+                "[stab-oracle] regenerated correctness report at {}",
+                output.relative().display()
+            );
+        }
+        CorrectnessCommand::Preflight {
+            out,
+            case,
+            request_sha256,
+            completion_sha256,
+            allow_dirty,
+        } => {
+            let checked = read_fresh_manifest(root)?;
+            let output = artifact::QualificationOutputDir::parse(root, &out)?;
+            let locked = output.lock_published()?;
+            let (request, actual_request_sha256) =
+                receipt::RunRequestReceipt::read(locked.output())?;
+            if actual_request_sha256 != request_sha256 {
+                return Err(QualificationError::Worker(
+                    "controller-approved run-request digest is stale".into(),
+                ));
+            }
+            let report_expectation =
+                runner::report_expectation(root, &checked, &request, &request_sha256)?;
+            let expected_selectors = runner::expected_selector_digests(root, &checked, &case)?;
+            report::validate_preflight(
+                locked.output(),
+                &report_expectation,
+                &report::PreflightExpectation {
+                    manifest_digest: EXPECTED_FROZEN_DIGEST.to_string(),
+                    run_request_sha256: request_sha256,
+                    stab_commit: report_expectation.metadata.stab_commit.clone(),
+                    stim_commit: checked.stim_commit.clone(),
+                    selectors: expected_selectors,
+                    current_worktree_dirty: report_expectation.metadata.local_modifications,
+                    allow_dirty,
+                    cases: case.clone(),
+                },
+                &completion_sha256,
+            )?;
+            locked.finish()?;
+            println!(
+                "[stab-oracle] correctness preflight passed for {} case(s)",
+                case.len()
+            );
+        }
+        CorrectnessCommand::Worker { command } => run_worker(root, command)?,
     }
+    Ok(())
+}
+
+fn run_provenance_probe(root: &RepoRoot, out: PathBuf) -> Result<(), QualificationError> {
+    let checked = read_fresh_manifest(root)?;
+    let cases = vec![PROVENANCE_PROBE_CASE_ID.to_string()];
+    runner::run(
+        root,
+        &checked,
+        runner::RunRequest {
+            tier: model::ExecutionTier::Pr,
+            features: Vec::new(),
+            cases: cases.clone(),
+            allow_deferred: false,
+            output: out.clone(),
+        },
+    )?;
+
+    let output = artifact::QualificationOutputDir::parse(root, &out)?;
+    let locked = output.lock_published()?;
+    let (request, request_sha256) = receipt::RunRequestReceipt::read(locked.output())?;
+    let report_expectation = runner::report_expectation(root, &checked, &request, &request_sha256)?;
+    report::regenerate(locked.output(), &report_expectation)?;
+    let qualification_report = report::QualificationReport::read(locked.output())?;
+    let (execution, execution_sha256) =
+        receipt::ExecutionReceipt::read(locked.output(), PROVENANCE_PROBE_CASE_ID)?;
+    let (completion, completion_sha256) = receipt::RunCompletionReceipt::read(locked.output())?;
+
+    if !request.schema_is_current()
+        || !execution.schema_is_current()
+        || !completion.schema_is_current()
+        || request.executables != execution.executables
+        || request.execution_environment_sha256 != execution.execution_environment_sha256
+        || execution.run_request_sha256 != request_sha256
+        || execution.verdict != receipt::ExecutionVerdict::Accepted
+        || qualification_report.run_request_sha256 != request_sha256
+        || qualification_report.selected_count != 1
+        || qualification_report.passed_count != 1
+        || qualification_report.failed_count != 0
+        || request.selected_cases.len() != 1
+        || qualification_report.results.len() != 1
+        || completion.cases.len() != 1
+    {
+        return Err(QualificationError::Provenance(
+            "published run metadata or provenance ledgers disagree".into(),
+        ));
+    }
+    let selected = request.selected_cases.first().ok_or_else(|| {
+        QualificationError::Provenance("published request omitted the selected case".into())
+    })?;
+    let result = qualification_report.results.first().ok_or_else(|| {
+        QualificationError::Provenance("published report omitted the selected case".into())
+    })?;
+    let completed = completion.cases.first().ok_or_else(|| {
+        QualificationError::Provenance("completion receipt omitted the selected case".into())
+    })?;
+    if selected.case_id != PROVENANCE_PROBE_CASE_ID
+        || selected.selector_sha256 != execution.selector_sha256
+        || result.case_id != PROVENANCE_PROBE_CASE_ID
+        || result.execution_receipt_sha256 != execution_sha256
+        || completed.case_id != PROVENANCE_PROBE_CASE_ID
+        || completed.execution_receipt_sha256 != execution_sha256
+    {
+        return Err(QualificationError::Provenance(
+            "published case selector or execution-receipt bindings disagree".into(),
+        ));
+    }
+
+    let expected_selectors = runner::expected_selector_digests(root, &checked, &cases)?;
+    report::validate_preflight(
+        locked.output(),
+        &report_expectation,
+        &report::PreflightExpectation {
+            manifest_digest: EXPECTED_FROZEN_DIGEST.to_string(),
+            run_request_sha256: request_sha256.clone(),
+            stab_commit: report_expectation.metadata.stab_commit.clone(),
+            stim_commit: checked.stim_commit.clone(),
+            selectors: expected_selectors,
+            current_worktree_dirty: report_expectation.metadata.local_modifications,
+            allow_dirty: true,
+            cases,
+        },
+        &completion_sha256,
+    )?;
+    locked.finish()?;
+    println!(
+        "[stab-oracle] correctness provenance probe passed case={PROVENANCE_PROBE_CASE_ID} request_sha256={request_sha256} completion_sha256={completion_sha256} report={}",
+        out.display()
+    );
+    Ok(())
+}
+
+fn read_fresh_manifest(root: &RepoRoot) -> Result<QualificationManifest, QualificationError> {
+    ensure_frozen()?;
+    let checked = read_manifest(root)?;
+    validation::validate(&checked, EXPECTED_FROZEN_DIGEST)?;
+    let generated = inventory::generate(root)?;
+    validation::validate(&generated, EXPECTED_FROZEN_DIGEST)?;
+    if checked != generated {
+        return Err(QualificationError::ManifestDrift);
+    }
+    Ok(checked)
+}
+
+fn run_worker(root: &RepoRoot, command: WorkerCommand) -> Result<(), QualificationError> {
+    let (output, property_failed) = match command {
+        WorkerCommand::Fixture { id } => (
+            crate::fixtures::run_qualification_core_worker(root, &id).map_err(|source| {
+                QualificationError::Worker(source.to_string().into_boxed_str())
+            })?,
+            false,
+        ),
+        WorkerCommand::Property {
+            id,
+            plan_sha256,
+            persistence_out,
+            replay_in,
+        } => {
+            if let Some(path) = replay_in {
+                let expected = property::registered_execution_plan_digest(&id)
+                    .map_err(|source| QualificationError::Worker(source.into_boxed_str()))?;
+                if expected != plan_sha256 {
+                    return Err(QualificationError::Worker(
+                        "property replay plan digest is stale".into(),
+                    ));
+                }
+                let bytes = crate::safe_file::read_regular_file_bounded(
+                    &path,
+                    property::MAX_TARGET_PERSISTENCE_BYTES,
+                )
+                .map_err(|source| {
+                    QualificationError::Worker(source.to_string().into_boxed_str())
+                })?;
+                property::replay_registered_failure(&id, &bytes)
+                    .map_err(|source| QualificationError::Worker(source.into_boxed_str()))?;
+                (
+                    crate::ProcessOutput {
+                        status: Some(0),
+                        stdout: crate::CapturedOutput {
+                            bytes: b"property regression replayed\n".to_vec(),
+                            truncated: false,
+                        },
+                        stderr: crate::CapturedOutput {
+                            bytes: Vec::new(),
+                            truncated: false,
+                        },
+                    },
+                    false,
+                )
+            } else {
+                let mut output = property::run_registered_worker(&id, &plan_sha256)
+                    .map_err(|source| QualificationError::Worker(source.into_boxed_str()))?;
+                let failed = !output.success();
+                if failed {
+                    let path = persistence_out.ok_or_else(|| {
+                        QualificationError::Worker(
+                            "failing property worker has no persistence output channel".into(),
+                        )
+                    })?;
+                    crate::safe_file::atomic_write_regular_file(&path, &output.stdout.bytes)
+                        .map_err(|source| {
+                            QualificationError::Worker(source.to_string().into_boxed_str())
+                        })?;
+                    output.stdout.bytes = b"property regression persisted\n".to_vec();
+                }
+                (output, failed)
+            }
+        }
+    };
+    use std::io::Write as _;
+    std::io::stdout()
+        .write_all(&output.stdout.bytes)
+        .map_err(|source| QualificationError::Worker(source.to_string().into_boxed_str()))?;
+    std::io::stderr()
+        .write_all(&output.stderr.bytes)
+        .map_err(|source| QualificationError::Worker(source.to_string().into_boxed_str()))?;
+    if property_failed {
+        return Err(QualificationError::Worker(
+            "registered property target failed".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_source_statistics(root: &RepoRoot) -> Result<(), QualificationError> {
+    let plans = statistics::source_plan_summaries(root)
+        .map_err(|source| QualificationError::Statistics(source.to_string().into_boxed_str()))?;
+    statistics::validate_selected_suite(&plans)
+        .map_err(|source| QualificationError::Statistics(source.to_string().into_boxed_str()))?;
     Ok(())
 }
 
@@ -210,19 +613,30 @@ fn check_existing_cargo_selectors(
     root: &RepoRoot,
     manifest: &QualificationManifest,
 ) -> Result<(), QualificationError> {
-    for case in &manifest.evidence_cases {
-        let selector = &case.primary_selector;
-        if selector.state != model::EvidenceState::Existing
-            || selector.kind != model::SelectorKind::CargoTest
-        {
-            continue;
-        }
-        let parsed = CargoTestSelector::parse(&selector.value).map_err(|reason| {
+    let mut selectors = manifest
+        .evidence_cases
+        .iter()
+        .filter_map(|case| {
+            let selector = &case.primary_selector;
+            (selector.state == model::EvidenceState::Existing
+                && selector.kind == model::SelectorKind::CargoTest)
+                .then(|| (case.id.to_string(), selector.value.clone()))
+        })
+        .collect::<Vec<_>>();
+    selectors.extend(crate::fixtures::qualification_exact_cargo_selectors(root)?);
+    for (owner, selector) in selectors {
+        let parsed = CargoTestSelector::parse(&selector).map_err(|reason| {
             QualificationError::SelectorProcess {
-                selector: selector.value.join(" "),
+                selector: format!("{owner}: {}", selector.join(" ")),
                 reason: reason.into(),
             }
         })?;
+        if !parsed.is_exact() {
+            return Err(QualificationError::SelectorProcess {
+                selector: format!("{owner}: {}", selector.join(" ")),
+                reason: "selector is not exact".into(),
+            });
+        }
         let display = parsed.display();
         let output = crate::run_process(
             std::path::Path::new("cargo"),
@@ -380,5 +794,46 @@ mod tests {
         let root = RepoRoot { path: root_path };
         let error = read_manifest_bytes(&root).expect_err("symlink must fail");
         assert!(matches!(error, QualificationError::ReadManifest { .. }));
+    }
+
+    #[test]
+    fn large_property_regressions_use_the_dedicated_file_channel() {
+        let temp = tempfile::tempdir().expect("temporary directory");
+        let root = RepoRoot {
+            path: temp.path().to_path_buf(),
+        };
+        let persistence = temp.path().join("large-regression.case");
+        let id = property::LARGE_FAILURE_TARGET_ID.to_string();
+        let plan_sha256 =
+            property::registered_execution_plan_digest(&id).expect("large target plan");
+
+        let error = run_worker(
+            &root,
+            WorkerCommand::Property {
+                id: id.clone(),
+                plan_sha256: plan_sha256.clone(),
+                persistence_out: Some(persistence.clone()),
+                replay_in: None,
+            },
+        )
+        .expect_err("large target deliberately fails");
+        assert!(matches!(error, QualificationError::Worker(_)));
+        let bytes = crate::safe_file::read_regular_file_bounded(
+            &persistence,
+            property::MAX_TARGET_PERSISTENCE_BYTES,
+        )
+        .expect("large persisted regression");
+        assert!(bytes.len() > crate::process::OUTPUT_LIMIT_BYTES);
+
+        run_worker(
+            &root,
+            WorkerCommand::Property {
+                id,
+                plan_sha256,
+                persistence_out: None,
+                replay_in: Some(persistence),
+            },
+        )
+        .expect("large persisted regression should replay through the worker");
     }
 }

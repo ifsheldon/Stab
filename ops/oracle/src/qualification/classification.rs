@@ -123,11 +123,13 @@ pub(super) fn classify_upstream_case(path: &Path, symbol: &str) -> UpstreamClass
             "C++ include-twice behavior has no Rust crate compatibility contract.",
         );
     }
+    if value.contains("/util_bot/twiddle.test.cc") {
+        return UpstreamClassification::selected(FeatureId::BitKernels);
+    }
     if value.contains("/mem/fixed_cap_vector.test.cc")
         || value.contains("/mem/monotonic_buffer.test.cc")
         || value.contains("/util_bot/test_util.test.cc")
         || value.contains("/util_bot/str_util.test.cc")
-        || value.contains("/util_bot/twiddle.test.cc")
     {
         return UpstreamClassification::not_applicable(
             "The pinned C++ implementation helper has no selected Stab public or semantic contract.",

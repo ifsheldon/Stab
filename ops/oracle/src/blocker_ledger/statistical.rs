@@ -7,6 +7,63 @@ use super::{
     validate_gate_statistical_plan,
 };
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct BlockerStatisticalPlanSummary {
+    pub(crate) id: String,
+    pub(crate) shots: u64,
+    pub(crate) primary_seed: u64,
+    pub(crate) buckets: Vec<BlockerStatisticalBucketSummary>,
+    pub(crate) declared_familywise_bound: f64,
+    pub(crate) independent_comparisons_per_attempt: u32,
+    pub(crate) shot_batches_per_attempt: u32,
+    pub(crate) seed_override_executable: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct BlockerStatisticalBucketSummary {
+    pub(crate) name: String,
+    pub(crate) expected_probability: f64,
+    pub(crate) allowed_delta: f64,
+}
+
+pub(super) fn qualification_plan_summary(
+    case: &BlockerCase,
+) -> Result<BlockerStatisticalPlanSummary, String> {
+    let plan = case.statistical_plan.as_ref().ok_or_else(|| {
+        format!(
+            "case {:?} statistical comparator lacks a reproducible plan",
+            case.id
+        )
+    })?;
+    let buckets = plan
+        .buckets
+        .iter()
+        .map(|bucket| {
+            let standard_deviation = (bucket.expected_probability
+                * (1.0 - bucket.expected_probability)
+                / plan.shots as f64)
+                .sqrt();
+            BlockerStatisticalBucketSummary {
+                name: bucket.name.clone(),
+                expected_probability: bucket.expected_probability,
+                allowed_delta: plan
+                    .absolute_probability_floor
+                    .max(plan.sigma_multiplier * standard_deviation),
+            }
+        })
+        .collect();
+    Ok(BlockerStatisticalPlanSummary {
+        id: case.id.clone(),
+        shots: plan.shots,
+        primary_seed: plan.seed,
+        buckets,
+        declared_familywise_bound: plan.familywise_false_positive_budget,
+        independent_comparisons_per_attempt: plan.independent_comparisons_per_attempt,
+        shot_batches_per_attempt: plan.shot_batches_per_attempt,
+        seed_override_executable: false,
+    })
+}
+
 pub(super) fn validate_statistical_plan(
     case: &BlockerCase,
     evaluate_false_positive_budget: bool,
@@ -37,6 +94,18 @@ pub(super) fn validate_statistical_plan(
             {
                 violations.push(format!(
                     "case {:?} statistical false-positive budget must be within (0, 0.0001]",
+                    case.id
+                ));
+            }
+            if !(1..=32).contains(&plan.independent_comparisons_per_attempt) {
+                violations.push(format!(
+                    "case {:?} statistical independent comparison count must be within 1..=32",
+                    case.id
+                ));
+            }
+            if !(1..=32).contains(&plan.shot_batches_per_attempt) {
+                violations.push(format!(
+                    "case {:?} statistical shot-batch count must be within 1..=32",
                     case.id
                 ));
             }
@@ -109,6 +178,7 @@ fn validate_statistical_false_positive_budget(
         familywise_bound +=
             binomial_rejection_probability(plan.shots, bucket.expected_probability, allowed_delta);
     }
+    familywise_bound *= f64::from(plan.independent_comparisons_per_attempt);
     if familywise_bound > plan.familywise_false_positive_budget {
         violations.push(format!(
             "case {:?} exact binomial familywise rejection probability {familywise_bound:.6e} exceeds declared budget {:.6e}",

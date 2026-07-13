@@ -13,8 +13,8 @@ use super::super::{
 };
 use crate::{
     Circuit, CircuitResult, CompiledDetectionConverter, CompiledSampler,
-    DetectionConversionOptions, ErrorAnalyzerOptions, Gate, Probability, circuit_flow_generators,
-    circuit_to_detector_error_model, sample_detection_events,
+    DetectionConversionOptions, ErrorAnalyzerOptions, Gate, PauliBasis, PauliSign, PauliString,
+    Probability, circuit_flow_generators, circuit_to_detector_error_model, sample_detection_events,
 };
 
 mod statistical;
@@ -115,6 +115,7 @@ fn gate_surface_contract_fixed_tableau() {
     let gates = gates_in_families(&[GateSemanticFamily::FixedTableau]);
     assert!(!gates.is_empty());
     for gate in gates {
+        assert_gate_matches_declared_tableau(gate);
         let inverse = gate.inverse().expect("fixed-tableau inverse");
         let targets = match gate.tableau().expect("fixed tableau").len() {
             1 => "0",
@@ -149,6 +150,7 @@ fn gate_surface_contract_fixed_tableau() {
 fn gate_surface_contract_fixed_tableau_general_circuit() {
     let mut text = String::new();
     for gate in gates_in_families(&[GateSemanticFamily::FixedTableau]) {
+        assert_gate_matches_declared_tableau(gate);
         let inverse = gate.inverse().expect("fixed-tableau inverse");
         let targets = match gate.tableau().expect("fixed tableau").len() {
             1 => "0",
@@ -164,6 +166,56 @@ fn gate_surface_contract_fixed_tableau_general_circuit() {
     text.push_str("M 0 1\n");
     assert_exact_reference_and_samples(&text, &[false, false]);
     assert_all_semantic_surfaces_execute(&text);
+}
+
+fn assert_gate_matches_declared_tableau(gate: Gate) {
+    let tableau = gate.tableau().expect("fixed tableau");
+    let targets = match tableau.len() {
+        1 => "0",
+        2 => "0 1",
+        arity => panic!("{} has unexpected arity {arity}", gate.canonical_name()),
+    };
+    for input in 0..tableau.len() {
+        for (preparation, output) in [
+            (
+                format!("RX {input}\n"),
+                tableau.x_output(input).expect("tableau X output"),
+            ),
+            (
+                String::new(),
+                tableau.z_output(input).expect("tableau Z output"),
+            ),
+        ] {
+            let measurement = mpp_target(output);
+            let text = format!(
+                "{preparation}{} {targets}\nMPP {measurement}\n",
+                gate.canonical_name()
+            );
+            assert_exact_reference_and_samples(&text, &[false]);
+        }
+    }
+}
+
+fn mpp_target(pauli: &PauliString) -> String {
+    let mut factors = Vec::new();
+    for index in 0..pauli.len() {
+        let basis = pauli.get(index).expect("tableau output index");
+        let name = match basis {
+            PauliBasis::I => continue,
+            PauliBasis::X => 'X',
+            PauliBasis::Y => 'Y',
+            PauliBasis::Z => 'Z',
+        };
+        factors.push(format!("{name}{index}"));
+    }
+    assert!(!factors.is_empty(), "tableau generator output is identity");
+    if pauli.sign() == PauliSign::Minus {
+        factors
+            .first_mut()
+            .expect("non-identity tableau output must have a first factor")
+            .insert(0, '!');
+    }
+    factors.join("*")
 }
 
 #[test]
@@ -945,6 +997,37 @@ fn statistical_shot_count(plan: &super::super::GateContractStatisticalPlan) -> u
 fn assert_statistical_counts(case_id: &str, counts: &StatisticalCounts) {
     let plan = statistical_plan(case_id);
     assert_eq!(counts.len(), plan.buckets.len(), "{case_id} bucket count");
+    let completed_shots = counts
+        .iter()
+        .try_fold(0_u64, |total, (_, count)| {
+            total.checked_add(u64::try_from(count).expect("statistical bucket count fits u64"))
+        })
+        .expect("statistical completed shot count does not overflow");
+    assert_eq!(
+        plan.shot_batches_per_attempt % plan.independent_comparisons_per_attempt,
+        0,
+        "{case_id} shot batches are not evenly owned by comparisons"
+    );
+    let expected_batches = plan.shot_batches_per_attempt / plan.independent_comparisons_per_attempt;
+    let bucket_probability_sum = plan
+        .buckets
+        .iter()
+        .map(|bucket| bucket.expected_probability)
+        .sum::<f64>();
+    assert!(
+        (bucket_probability_sum - f64::from(expected_batches)).abs()
+            <= f64::EPSILON * plan.buckets.len() as f64,
+        "{case_id} bucket probabilities do not describe whole shot batches"
+    );
+    let expected_shots = plan
+        .shots
+        .checked_mul(u64::from(expected_batches))
+        .expect("statistical expected shot count does not overflow");
+    assert_eq!(
+        completed_shots, expected_shots,
+        "{case_id} completed statistical shots"
+    );
+    emit_statistical_completion(case_id, plan.seed, completed_shots);
     for bucket in plan.buckets {
         let count = counts
             .get(bucket.name)
@@ -969,4 +1052,10 @@ fn assert_statistical_counts(case_id: &str, counts: &StatisticalCounts) {
             bucket.expected_probability
         );
     }
+}
+
+fn emit_statistical_completion(case_id: &str, seed: u64, completed_shots: u64) {
+    static NEXT_COMPARISON: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let comparison = NEXT_COMPARISON.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    println!("STAB_CQ1_STATISTICAL\t1\t{case_id}\t{seed}\t{comparison}\t{completed_shots}");
 }

@@ -1,5 +1,7 @@
 use std::io::{Read, Write};
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
+#[cfg(target_os = "linux")]
+use std::sync::Arc;
 #[cfg(not(windows))]
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -20,6 +22,57 @@ pub(crate) enum SafeFileError {
     Io(#[from] std::io::Error),
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct SafeFileLocation {
+    display_path: PathBuf,
+    kind: SafeFileLocationKind,
+}
+
+#[derive(Clone, Debug)]
+enum SafeFileLocationKind {
+    Path,
+    #[cfg(target_os = "linux")]
+    DirectoryEntry {
+        directory: Arc<std::fs::File>,
+        name: std::ffi::OsString,
+    },
+}
+
+impl SafeFileLocation {
+    pub(crate) fn path(path: PathBuf) -> Self {
+        Self {
+            display_path: path,
+            kind: SafeFileLocationKind::Path,
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    pub(crate) fn directory_entry(
+        directory: Arc<std::fs::File>,
+        name: std::ffi::OsString,
+        display_path: PathBuf,
+    ) -> Self {
+        Self {
+            display_path,
+            kind: SafeFileLocationKind::DirectoryEntry { directory, name },
+        }
+    }
+
+    pub(crate) fn display_path(&self) -> &Path {
+        &self.display_path
+    }
+
+    pub(crate) fn open_regular_file(&self) -> Result<std::fs::File, SafeFileError> {
+        match &self.kind {
+            SafeFileLocationKind::Path => open_regular_file(&self.display_path),
+            #[cfg(target_os = "linux")]
+            SafeFileLocationKind::DirectoryEntry { directory, name } => {
+                open_regular_file_at(directory, name)
+            }
+        }
+    }
+}
+
 pub(crate) fn open_regular_file(path: &Path) -> Result<std::fs::File, SafeFileError> {
     #[cfg(unix)]
     {
@@ -31,16 +84,42 @@ pub(crate) fn open_regular_file(path: &Path) -> Result<std::fs::File, SafeFileEr
     }
 }
 
+#[cfg(target_os = "linux")]
+fn open_regular_file_at(
+    directory: &std::fs::File,
+    name: &std::ffi::OsStr,
+) -> Result<std::fs::File, SafeFileError> {
+    use rustix::fs::{Mode, OFlags};
+
+    let descriptor = rustix::fs::openat(
+        directory,
+        name,
+        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
+        Mode::empty(),
+    )
+    .map_err(std::io::Error::from)?;
+    let file = std::fs::File::from(descriptor);
+    if !file.metadata()?.is_file() {
+        return Err(SafeFileError::NotRegular);
+    }
+    Ok(file)
+}
+
 pub(crate) fn read_regular_file_bounded(
     path: &Path,
     limit: usize,
 ) -> Result<Vec<u8>, SafeFileError> {
     let mut file = open_regular_file(path)?;
+    let limit_u64 = u64::try_from(limit).unwrap_or(u64::MAX);
+    if file.metadata()?.len() > limit_u64 {
+        return Err(SafeFileError::TooLarge { limit });
+    }
     let mut bytes = Vec::new();
     Read::by_ref(&mut file)
-        .take(u64::try_from(limit).unwrap_or(u64::MAX) + 1)
+        .take(limit_u64)
         .read_to_end(&mut bytes)?;
-    if bytes.len() > limit {
+    let mut extra = [0_u8; 1];
+    if bytes.len() == limit && file.read(&mut extra)? != 0 {
         return Err(SafeFileError::TooLarge { limit });
     }
     Ok(bytes)
@@ -68,6 +147,19 @@ pub(crate) fn open_directory(path: &Path) -> Result<std::fs::File, SafeFileError
     {
         validate_existing_components(path, true)?;
         Ok(std::fs::File::open(path)?)
+    }
+}
+
+pub(crate) fn create_directory_all(path: &Path) -> Result<(), SafeFileError> {
+    #[cfg(unix)]
+    {
+        let components = absolute_normal_components(path)?;
+        drop(open_or_create_directory_components(components)?);
+        Ok(())
+    }
+    #[cfg(not(unix))]
+    {
+        ensure_directory_fallback(path)
     }
 }
 
@@ -354,7 +446,18 @@ fn validate_existing_components(path: &Path, directory: bool) -> Result<(), Safe
 
 #[cfg(test)]
 mod tests {
-    use super::{atomic_write_regular_file, open_regular_file};
+    use super::{atomic_write_regular_file, open_regular_file, read_regular_file_bounded};
+
+    #[test]
+    fn bounded_read_handles_the_maximum_usize_without_overflow() {
+        let file = tempfile::NamedTempFile::new().expect("temporary file");
+        std::fs::write(file.path(), b"bounded").expect("write temporary file");
+
+        assert_eq!(
+            read_regular_file_bounded(file.path(), usize::MAX).expect("bounded read"),
+            b"bounded"
+        );
+    }
 
     #[cfg(unix)]
     #[test]

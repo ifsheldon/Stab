@@ -633,6 +633,7 @@ fn pfm_b3_folded_traversal_sampler() {
     let output = sampler
         .sample_detection_events_with_seed(SHOTS, Some(12_648_437))
         .expect("seeded folded sampling");
+    assert_eq!(output.records.len(), SHOTS, "folded statistical shots");
     let mut all_zero = 0_usize;
     let mut joint_nonzero = 0_usize;
     let mut unexpected = 0_usize;
@@ -644,8 +645,6 @@ fn pfm_b3_folded_traversal_sampler() {
         }
     }
     assert_eq!(unexpected, 0, "unexpected joint detector-observable bucket");
-    assert_probability(all_zero, SHOTS, 0.5);
-    assert_probability(joint_nonzero, SHOTS, 0.5);
 
     let combinations = CompiledDemSampler::compile(&dem(
         "error(0.1) D0 D1\nerror(0.2) D1 D2\nerror(0.3) D2 D0\n",
@@ -654,6 +653,11 @@ fn pfm_b3_folded_traversal_sampler() {
     let combination_output = combinations
         .sample_detection_events_with_seed(SHOTS, Some(12_648_437))
         .expect("seeded combination sampling");
+    assert_eq!(
+        combination_output.records.len(),
+        SHOTS,
+        "combination statistical shots"
+    );
     let mut detector_hits = [0_usize; 3];
     for record in &combination_output.records {
         for (index, detector) in record.detectors.iter().copied().enumerate() {
@@ -672,6 +676,13 @@ fn pfm_b3_folded_traversal_sampler() {
             "the three pair mechanisms must preserve even detector parity"
         );
     }
+    emit_statistical_completion(
+        "pfm4-traversal-sampler",
+        12_648_437,
+        u64::try_from(SHOTS * 2).expect("folded statistical shots fit u64"),
+    );
+    assert_probability(all_zero, SHOTS, 0.5);
+    assert_probability(joint_nonzero, SHOTS, 0.5);
     assert_probability(detector_hits[0], SHOTS, 0.34);
     assert_probability(detector_hits[1], SHOTS, 0.26);
     assert_probability(detector_hits[2], SHOTS, 0.38);
@@ -694,13 +705,32 @@ fn pfm_b3_folded_traversal_sampler() {
 }
 
 fn assert_probability(observed: usize, shots: usize, expected: f64) {
-    let observed = observed as f64 / shots as f64;
     let sigma = (expected * (1.0 - expected) / shots as f64).sqrt();
     let tolerance = 0.01_f64.max(6.0 * sigma);
+    #[cfg(feature = "ops-contracts")]
+    {
+        let shots = u64::try_from(shots).expect("statistical shots fit u64");
+        let observed = u64::try_from(observed).expect("statistical count fits u64");
+        let (minimum, maximum) =
+            stab_core::__gate_contract_statistical_rejection_boundaries(shots, expected, tolerance);
+        let minimum = minimum.map_or(0, |boundary| boundary + 1);
+        let maximum = maximum.map_or(shots, |boundary| boundary - 1);
+        assert!(
+            (minimum..=maximum).contains(&observed),
+            "observed={observed}/{shots} expected={expected} accepted={minimum}..={maximum}"
+        );
+    }
+    #[cfg(not(feature = "ops-contracts"))]
+    let observed = observed as f64 / shots as f64;
+    #[cfg(not(feature = "ops-contracts"))]
     assert!(
         (observed - expected).abs() <= tolerance,
         "observed={observed} expected={expected} tolerance={tolerance}"
     );
+}
+
+fn emit_statistical_completion(case_id: &str, seed: u64, completed_shots: u64) {
+    println!("STAB_CQ1_STATISTICAL\t1\t{case_id}\t{seed}\t0\t{completed_shots}");
 }
 
 #[test]

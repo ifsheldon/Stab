@@ -13,17 +13,25 @@ use super::extract::{
     extract_cpp_test_cases_bounded, extract_python_test_cases_bounded,
 };
 use super::model::{
-    ApiPath, BehavioralSurface, CaseId, Comparator, EvidenceCase, EvidenceProvenance,
-    EvidenceSelector, EvidenceState, EvidenceStatus, FeatureId, FeatureRecord, Parameterization,
-    PublicApiItem, QualificationManifest, RelativeSourcePath, ResourceContract, ResourceKind,
-    SCHEMA_VERSION, SelectorKind, SemanticDigest, StableCaseDomain, StatisticalPlanRef,
-    StatisticalPlanSource, UpstreamCase, UpstreamOwnership, UpstreamProvenance,
+    ApiPath, CaseId, EvidenceCase, EvidenceProvenance, EvidenceSelector, EvidenceState,
+    EvidenceStatus, FeatureId, FeatureRecord, Parameterization, PublicApiItem,
+    QualificationManifest, RelativeSourcePath, ResourceContract, ResourceKind, SCHEMA_VERSION,
+    SelectorKind, SemanticDigest, StableCaseDomain, UpstreamCase, UpstreamOwnership,
+    UpstreamProvenance,
 };
 use super::public_api::{ExtractedPublicApiItem, PublicApiError, generate_rustdoc_inventory};
 use crate::RepoRoot;
+use crate::blocker_ledger::selector::CargoTestSelector;
 
-const STIM_VERSION: &str = "v1.16.0";
-const STIM_COMMIT: &str = "e2fc1eca7fd21684d433aa5f10f4504ea4860d07";
+mod evidence;
+mod property_plan;
+
+use evidence::{
+    behavioral_surface_for_feature, infer_feature_from_oracle_argv, make_planned_evidence_case,
+    oracle_behavioral_surface, planned_api_selector, planned_selector,
+    semantic_only_resource_contract, statistical_plan_reference,
+};
+
 const RUST_TOOLCHAIN: &str = "nightly-2026-06-20";
 const CPP_TEST_FILE_COUNT: usize = 103;
 const PYTHON_TEST_FILE_COUNT: usize = 91;
@@ -38,6 +46,9 @@ const MAX_BLOCKER_LEDGER_BYTES: usize = 4 << 20;
 
 #[derive(Debug, Error)]
 pub(crate) enum InventoryError {
+    #[error("pinned Stim source validation failed: {0}")]
+    StimSource(Box<str>),
+
     #[error("failed to read qualification input {path}: {reason}")]
     Read { path: PathBuf, reason: Box<str> },
 
@@ -108,6 +119,22 @@ pub(crate) enum InventoryError {
     #[error("oracle fixture row {id:?} has unknown comparator {comparator:?}")]
     UnknownOracleComparator { id: String, comparator: String },
 
+    #[error("oracle fixture row {id:?} has invalid exact Cargo selector: {reason}")]
+    InvalidOracleSelector { id: String, reason: String },
+
+    #[error(
+        "implemented oracle fixture row {id:?} has no explicit qualification feature or supporting-only disposition"
+    )]
+    UnclassifiedOracleFixture { id: String },
+
+    #[error(
+        "supporting-only oracle fixture row {id:?} cannot find its canonical blocker owner {owner:?}"
+    )]
+    MissingSupportingOracleOwner { id: String, owner: String },
+
+    #[error("oracle property fixture {id:?} has no source-owned property plan")]
+    MissingOraclePropertyPlan { id: String },
+
     #[error("failed to parse blocker ledger {path}: {source}")]
     ParseBlockerLedger {
         path: PathBuf,
@@ -119,6 +146,9 @@ pub(crate) enum InventoryError {
 
     #[error("blocker case {id:?} has unknown status {status:?}")]
     UnknownBlockerStatus { id: String, status: String },
+
+    #[error("blocker case {id:?} has invalid terminal Cargo selector: {reason}")]
+    InvalidBlockerSelector { id: String, reason: String },
 
     #[error("blocker case {id:?} has no selected qualification feature")]
     UnclassifiedBlocker { id: String },
@@ -164,6 +194,12 @@ struct BlockerEvidenceCase {
     upstream: BlockerUpstream,
     comparator: String,
     status: String,
+    test: BlockerTest,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct BlockerTest {
+    selector: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -175,6 +211,8 @@ struct BlockerUpstream {
 }
 
 pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, InventoryError> {
+    let stim = crate::validate_stim_source(root)
+        .map_err(|source| InventoryError::StimSource(source.to_string().into_boxed_str()))?;
     let blocker_cases = read_blocker_cases(root)?;
     let direct_case_limit =
         MAX_CASES
@@ -218,11 +256,17 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
     ensure_limit("public API items", extracted_api.items.len())?;
     let (public_api_items, api_evidence) = make_public_api_records(&extracted_api.items)?;
     evidence_cases.extend(api_evidence);
-    evidence_cases.extend(generate_existing_oracle_evidence(root)?);
-    evidence_cases.extend(generate_blocker_evidence(&blocker_cases)?);
+    let mut blocker_evidence = generate_blocker_evidence(&blocker_cases)?;
+    evidence_cases.extend(generate_existing_oracle_evidence(
+        root,
+        &mut blocker_evidence,
+    )?);
+    evidence_cases.extend(blocker_evidence);
     evidence_cases.extend(super::resource::planned_evidence());
     evidence_cases.push(super::resource::existing_regression());
+    evidence_cases.push(super::resource::existing_property_regression());
     evidence_cases.sort_by(|left, right| left.id.cmp(&right.id));
+    super::execution_contract::assign_pr_tiers(&mut evidence_cases);
     ensure_limit("evidence cases", evidence_cases.len())?;
 
     let features = FeatureId::ALL
@@ -238,8 +282,8 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
         .collect();
     let mut manifest = QualificationManifest {
         schema_version: SCHEMA_VERSION,
-        stim_version: STIM_VERSION.to_string(),
-        stim_commit: STIM_COMMIT.to_string(),
+        stim_version: stim.tag,
+        stim_commit: stim.commit,
         rust_toolchain: RUST_TOOLCHAIN.to_string(),
         python_ast_version: PYTHON_AST_VERSION.to_string(),
         semantic_digest: SemanticDigest::ZERO,
@@ -568,7 +612,10 @@ fn make_public_api_records(
     Ok((public_items, evidence_by_id.into_values().collect()))
 }
 
-fn generate_existing_oracle_evidence(root: &RepoRoot) -> Result<Vec<EvidenceCase>, InventoryError> {
+fn generate_existing_oracle_evidence(
+    root: &RepoRoot,
+    blocker_evidence: &mut [EvidenceCase],
+) -> Result<Vec<EvidenceCase>, InventoryError> {
     let path = root.fixture_manifest();
     let bytes = crate::safe_file::read_regular_file_bounded(&path, MAX_ORACLE_MANIFEST_BYTES)
         .map_err(|source| InventoryError::Read {
@@ -589,12 +636,6 @@ fn generate_existing_oracle_evidence(root: &RepoRoot) -> Result<Vec<EvidenceCase
             InventoryError::InvalidSourcePath(format!("{:?}", row.upstream_source))
         })?;
         drop(validate_relative_source_path(source_text, "")?);
-        let classification = classify_upstream_path(&row.upstream_source);
-        let Some(feature_id) = infer_feature_from_oracle_argv(&row.argv)
-            .or_else(|| classification.feature_ids.first().copied())
-        else {
-            continue;
-        };
         let comparator = match row.comparator.as_str() {
             "exact-output" => super::model::Comparator::ExactBytes,
             "help-health" | "structural" => super::model::Comparator::Structural,
@@ -607,14 +648,87 @@ fn generate_existing_oracle_evidence(root: &RepoRoot) -> Result<Vec<EvidenceCase
                 });
             }
         };
+        let exact_cargo_selector = if let Some(parts) =
+            CargoTestSelector::normalize_fixture_argv(&row.argv).map_err(|reason| {
+                InventoryError::InvalidOracleSelector {
+                    id: row.id.clone(),
+                    reason: reason.to_string(),
+                }
+            })? {
+            let parsed = CargoTestSelector::parse(&parts).map_err(|reason| {
+                InventoryError::InvalidOracleSelector {
+                    id: row.id.clone(),
+                    reason: reason.to_string(),
+                }
+            })?;
+            if !parsed.is_exact() {
+                return Err(InventoryError::InvalidOracleSelector {
+                    id: row.id.clone(),
+                    reason: "selector is not exact".to_string(),
+                });
+            }
+            Some(parts)
+        } else {
+            None
+        };
+        if let Some(selector) = exact_cargo_selector.as_ref()
+            && let Some(owner) = blocker_evidence.iter_mut().find(|case| {
+                case.primary_selector.kind == SelectorKind::CargoTest
+                    && case.primary_selector.value == *selector
+            })
+        {
+            owner.supporting_selectors.push(EvidenceSelector {
+                state: EvidenceState::Existing,
+                kind: SelectorKind::OracleFixture,
+                value: vec![row.id],
+            });
+            continue;
+        }
+        if let Some((feature_id, owner_source_id, _reason)) =
+            supporting_only_oracle_fixture(&row.id)
+        {
+            let owner = blocker_evidence
+                .iter_mut()
+                .find(|case| case.feature_id == feature_id && case.source_id == owner_source_id)
+                .ok_or_else(|| InventoryError::MissingSupportingOracleOwner {
+                    id: row.id.clone(),
+                    owner: owner_source_id.to_string(),
+                })?;
+            owner.supporting_selectors.push(EvidenceSelector {
+                state: EvidenceState::Existing,
+                kind: SelectorKind::OracleFixture,
+                value: vec![row.id.clone()],
+            });
+            if let Some(value) = broad_cargo_selector(&row.argv) {
+                owner.supporting_selectors.push(EvidenceSelector {
+                    state: EvidenceState::Existing,
+                    kind: SelectorKind::CargoTest,
+                    value,
+                });
+            }
+            continue;
+        }
+        let classification = classify_upstream_path(&row.upstream_source);
+        let feature_id = oracle_feature_override(&row.id)
+            .or_else(|| infer_feature_from_oracle_argv(&row.argv))
+            .or_else(|| classification.feature_ids.first().copied())
+            .ok_or_else(|| InventoryError::UnclassifiedOracleFixture { id: row.id.clone() })?;
+        let broad_cargo_selector = broad_cargo_selector(&row.argv);
+        let status = if broad_cargo_selector.is_some() {
+            EvidenceStatus::Planned
+        } else {
+            EvidenceStatus::Implemented
+        };
         let id = stable_id(StableCaseDomain::EvidenceOracle, &row.id);
         let statistical_plan = statistical_plan_reference(
             comparator,
-            EvidenceStatus::Implemented,
+            status,
             EvidenceProvenance::OracleFixture,
             &row.id,
             &id,
         );
+        let property_plan =
+            property_plan::oracle_reference(root, comparator, status, &row.id, &id)?;
         evidence.push(EvidenceCase {
             id,
             feature_id,
@@ -622,13 +736,43 @@ fn generate_existing_oracle_evidence(root: &RepoRoot) -> Result<Vec<EvidenceCase
             provenance: EvidenceProvenance::OracleFixture,
             source_id: row.id.clone(),
             comparator,
+            execution: super::execution_contract::for_status(status),
             statistical_plan,
-            primary_selector: EvidenceSelector {
-                state: EvidenceState::Existing,
-                kind: SelectorKind::OracleFixture,
-                value: vec![row.id],
+            property_plan,
+            primary_selector: exact_cargo_selector
+                .clone()
+                .map(|value| EvidenceSelector {
+                    state: EvidenceState::Existing,
+                    kind: SelectorKind::CargoTest,
+                    value,
+                })
+                .unwrap_or_else(|| EvidenceSelector {
+                    state: if status == EvidenceStatus::Planned {
+                        EvidenceState::Planned
+                    } else {
+                        EvidenceState::Existing
+                    },
+                    kind: SelectorKind::OracleFixture,
+                    value: vec![row.id.clone()],
+                }),
+            supporting_selectors: {
+                let mut selectors = broad_cargo_selector
+                    .into_iter()
+                    .map(|value| EvidenceSelector {
+                        state: EvidenceState::Existing,
+                        kind: SelectorKind::CargoTest,
+                        value,
+                    })
+                    .collect::<Vec<_>>();
+                if exact_cargo_selector.is_some() {
+                    selectors.push(EvidenceSelector {
+                        state: EvidenceState::Existing,
+                        kind: SelectorKind::OracleFixture,
+                        value: vec![row.id.clone()],
+                    });
+                }
+                selectors
             },
-            supporting_selectors: Vec::new(),
             resource_contract: ResourceContract {
                 kind: ResourceKind::NotApplicable,
                 detail: "This imported oracle fixture proves its semantic comparator only; separate CQ cases own hostile-input and resource boundaries."
@@ -640,7 +784,8 @@ fn generate_existing_oracle_evidence(root: &RepoRoot) -> Result<Vec<EvidenceCase
                 .iter()
                 .map(|group| (*group).to_string())
                 .collect(),
-            status: EvidenceStatus::Implemented,
+            deferred_product: None,
+            status,
         });
         if evidence.len() > MAX_ORACLE_ROWS {
             return Err(InventoryError::TooManyOracleRows {
@@ -649,6 +794,35 @@ fn generate_existing_oracle_evidence(root: &RepoRoot) -> Result<Vec<EvidenceCase
         }
     }
     Ok(evidence)
+}
+
+fn oracle_feature_override(id: &str) -> Option<FeatureId> {
+    match id {
+        "coverage-util-bot-twiddle" => Some(FeatureId::BitKernels),
+        _ => None,
+    }
+}
+
+fn supporting_only_oracle_fixture(id: &str) -> Option<(FeatureId, &'static str, &'static str)> {
+    match id {
+        "pf5-detecting-regions-clifford-rust" => Some((
+            FeatureId::FlowUtils,
+            "pfm5-detecting-regions-simple",
+            "The broad Cargo filter is supporting provenance for the source-owned detecting-regions blocker and cannot own an atomic qualification case.",
+        )),
+        _ => None,
+    }
+}
+
+fn broad_cargo_selector(argv: &str) -> Option<Vec<String>> {
+    let tokens = argv.split('|').collect::<Vec<_>>();
+    if tokens.first().copied() != Some("cargo-test") || tokens.contains(&"--exact") {
+        return None;
+    }
+    let mut selector = vec!["cargo".to_string(), "test".to_string()];
+    selector.extend(tokens.into_iter().skip(1).map(ToOwned::to_owned));
+    selector.push("--quiet".to_string());
+    Some(selector)
 }
 
 fn read_blocker_cases(root: &RepoRoot) -> Result<Vec<BlockerEvidenceCase>, InventoryError> {
@@ -808,6 +982,20 @@ fn generate_blocker_evidence(
             &case.id,
             &evidence_id,
         );
+        let property_plan = None;
+        let terminal_selector =
+            CargoTestSelector::parse(&case.test.selector).map_err(|reason| {
+                InventoryError::InvalidBlockerSelector {
+                    id: case.id.clone(),
+                    reason: reason.to_string(),
+                }
+            })?;
+        if !terminal_selector.is_exact() {
+            return Err(InventoryError::InvalidBlockerSelector {
+                id: case.id.clone(),
+                reason: "selector is not exact".to_string(),
+            });
+        }
         evidence.push(EvidenceCase {
             id: evidence_id,
             feature_id,
@@ -818,13 +1006,19 @@ fn generate_blocker_evidence(
             provenance: EvidenceProvenance::BlockerLedger,
             source_id: case.id.clone(),
             comparator,
+            execution: super::execution_contract::for_status(status),
             statistical_plan,
+            property_plan,
             primary_selector: EvidenceSelector {
+                state: EvidenceState::Existing,
+                kind: SelectorKind::CargoTest,
+                value: case.test.selector.clone(),
+            },
+            supporting_selectors: vec![EvidenceSelector {
                 state: EvidenceState::Existing,
                 kind: SelectorKind::OpsCheck,
                 value: vec!["blocker-ledger".to_string(), case.id.clone()],
-            },
-            supporting_selectors: Vec::new(),
+            }],
             resource_contract: semantic_only_resource_contract(),
             negative_axes: Vec::new(),
             performance_groups: feature_id
@@ -832,6 +1026,7 @@ fn generate_blocker_evidence(
                 .iter()
                 .map(|group| (*group).to_string())
                 .collect(),
+            deferred_product: None,
             status,
         });
     }
@@ -873,172 +1068,6 @@ fn blocker_comparator(
             id: case.id.clone(),
             comparator: case.comparator.clone(),
         }),
-    }
-}
-
-fn infer_feature_from_oracle_argv(argv: &str) -> Option<FeatureId> {
-    let first = argv.split('|').next()?;
-    match first {
-        "--help" => Some(FeatureId::Cli),
-        "gen" => Some(FeatureId::Generation),
-        "convert" => Some(FeatureId::ResultFormats),
-        "sample" => Some(FeatureId::Sampling),
-        "detect" | "m2d" => Some(FeatureId::Detection),
-        "analyze_errors" => Some(FeatureId::Analyzer),
-        "sample_dem" => Some(FeatureId::DemSampling),
-        "core-parse-print" | "core-circuit-parse-print" => Some(FeatureId::StimFormat),
-        "core-dem-parse-print" => Some(FeatureId::DemFormat),
-        _ if first.starts_with("--gen=") => Some(FeatureId::Generation),
-        _ if first.starts_with("--sample=") => Some(FeatureId::Sampling),
-        _ => None,
-    }
-}
-
-fn oracle_behavioral_surface(argv: &str) -> BehavioralSurface {
-    match argv.split('|').next().unwrap_or("") {
-        "core-parse-print" | "core-circuit-parse-print" | "core-dem-parse-print" => {
-            BehavioralSurface::FileFormat
-        }
-        "cargo-test" => BehavioralSurface::Engine,
-        _ => BehavioralSurface::Cli,
-    }
-}
-
-fn behavioral_surface_for_feature(
-    feature_id: FeatureId,
-    provenance: EvidenceProvenance,
-) -> BehavioralSurface {
-    if provenance == EvidenceProvenance::PublicRustApi {
-        return BehavioralSurface::RustApi;
-    }
-    match feature_id {
-        FeatureId::Cli => BehavioralSurface::Cli,
-        FeatureId::StimFormat | FeatureId::DemFormat | FeatureId::ResultFormats => {
-            BehavioralSurface::FileFormat
-        }
-        FeatureId::Resource => BehavioralSurface::ResourceBoundary,
-        _ => BehavioralSurface::Engine,
-    }
-}
-
-fn statistical_plan_reference(
-    comparator: Comparator,
-    status: EvidenceStatus,
-    provenance: EvidenceProvenance,
-    source_id: &str,
-    case_id: &CaseId,
-) -> Option<StatisticalPlanRef> {
-    if comparator != Comparator::Statistical {
-        return None;
-    }
-    let (state, source, id) = match status {
-        EvidenceStatus::Planned => (
-            EvidenceState::Planned,
-            StatisticalPlanSource::QualificationCase,
-            case_id.to_string(),
-        ),
-        EvidenceStatus::Implemented | EvidenceStatus::EvidenceClose => (
-            EvidenceState::Existing,
-            match provenance {
-                EvidenceProvenance::OracleFixture => StatisticalPlanSource::OracleFixture,
-                EvidenceProvenance::BlockerLedger => StatisticalPlanSource::BlockerLedger,
-                EvidenceProvenance::UpstreamSemanticCase
-                | EvidenceProvenance::PublicRustApi
-                | EvidenceProvenance::RustRegression
-                | EvidenceProvenance::QualificationPlan => StatisticalPlanSource::QualificationCase,
-            },
-            source_id.to_string(),
-        ),
-        EvidenceStatus::Deferred => return None,
-    };
-    Some(StatisticalPlanRef { state, source, id })
-}
-
-fn semantic_only_resource_contract() -> ResourceContract {
-    ResourceContract {
-        kind: ResourceKind::NotApplicable,
-        detail: "This atomic semantic case makes no negative-axis or resource-boundary claim; dedicated CQ cases must own those contracts."
-            .to_string(),
-    }
-}
-
-fn make_planned_evidence_case(
-    id: CaseId,
-    feature_id: FeatureId,
-    provenance: EvidenceProvenance,
-    source_id: String,
-    comparator: Comparator,
-    primary_selector: EvidenceSelector,
-) -> EvidenceCase {
-    let statistical_plan = statistical_plan_reference(
-        comparator,
-        EvidenceStatus::Planned,
-        provenance,
-        "planned",
-        &id,
-    );
-    EvidenceCase {
-        id,
-        feature_id,
-        behavioral_surface: behavioral_surface_for_feature(feature_id, provenance),
-        provenance,
-        source_id,
-        comparator,
-        statistical_plan,
-        primary_selector,
-        supporting_selectors: Vec::new(),
-        resource_contract: semantic_only_resource_contract(),
-        negative_axes: Vec::new(),
-        performance_groups: feature_id
-            .performance_groups()
-            .iter()
-            .map(|group| (*group).to_string())
-            .collect(),
-        status: EvidenceStatus::Planned,
-    }
-}
-
-fn planned_selector(feature_id: FeatureId, source_id: &str) -> EvidenceSelector {
-    let package = if feature_id == FeatureId::Cli {
-        "stab-cli"
-    } else {
-        "stab-core"
-    };
-    let test_name = format!(
-        "{}_{}",
-        source_id.replace('-', "_"),
-        feature_id.as_str().to_ascii_lowercase().replace('-', "_")
-    );
-    EvidenceSelector {
-        state: EvidenceState::Planned,
-        kind: SelectorKind::CargoTest,
-        value: vec![
-            "cargo".to_string(),
-            "test".to_string(),
-            "-p".to_string(),
-            package.to_string(),
-            test_name,
-            "--quiet".to_string(),
-            "--exact".to_string(),
-        ],
-    }
-}
-
-fn planned_api_selector(crate_name: &str, owner_case_id: &CaseId) -> EvidenceSelector {
-    let package = crate_name.replace('_', "-");
-    let test_name = owner_case_id.as_str().replace('-', "_");
-    EvidenceSelector {
-        state: EvidenceState::Planned,
-        kind: SelectorKind::CargoTest,
-        value: vec![
-            "cargo".to_string(),
-            "test".to_string(),
-            "-p".to_string(),
-            package,
-            test_name,
-            "--quiet".to_string(),
-            "--exact".to_string(),
-        ],
     }
 }
 
@@ -1113,32 +1142,5 @@ pub(super) fn stable_id(domain: StableCaseDomain, key: &str) -> CaseId {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn source_paths_reject_absolute_parent_and_windows_spellings() {
-        for value in ["/tmp/a.test.cc", "../a.test.cc", "dir\\a.test.cc"] {
-            assert!(validate_relative_source_path(value, ".test.cc").is_err());
-        }
-        let path =
-            validate_relative_source_path("src/stim.test.cc", ".test.cc").expect("valid source");
-        assert_eq!(path.as_path(), Path::new("src/stim.test.cc"));
-    }
-
-    #[test]
-    fn stable_ids_are_deterministic_and_domain_separated() {
-        assert_eq!(
-            stable_id(StableCaseDomain::ApiItem, "same"),
-            stable_id(StableCaseDomain::ApiItem, "same")
-        );
-        assert_ne!(
-            stable_id(StableCaseDomain::ApiItem, "same"),
-            stable_id(StableCaseDomain::EvidenceApi, "same")
-        );
-        assert_ne!(
-            stable_id(StableCaseDomain::ApiItem, "same"),
-            stable_id(StableCaseDomain::ApiItem, "different")
-        );
-    }
-}
+#[path = "inventory/tests.rs"]
+mod tests;

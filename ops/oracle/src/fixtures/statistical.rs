@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::statistical_contract::AcceptedCountRange;
+
 const PROBABILITY_SUM_TOLERANCE: f64 = 1e-9;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -8,18 +10,90 @@ pub(super) enum StatisticalSource {
     FixtureOutput,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct FixtureStatisticalPlanSummary {
+    pub(crate) id: String,
+    pub(crate) shots: u64,
+    pub(crate) primary_seed: u64,
+    pub(crate) buckets: Vec<FixtureStatisticalBucketSummary>,
+    pub(crate) declared_familywise_bound: f64,
+    pub(crate) independent_comparisons_per_attempt: u32,
+    pub(crate) shot_batches_per_attempt: u32,
+    pub(crate) seed_override_executable: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct FixtureStatisticalBucketSummary {
+    pub(crate) name: String,
+    pub(crate) expected_probability: f64,
+    pub(crate) allowed_delta: f64,
+}
+
 pub(super) fn source_for_plan(plan: &str) -> Result<StatisticalSource, String> {
     parse_statistical_plan(plan).map(|plan| plan.source)
 }
 
 pub(super) fn compare_statistical_plan(plan: &str, bytes: &[u8]) -> Option<String> {
+    evaluate_statistical_plan(plan, bytes).reason
+}
+
+pub(super) fn completed_shots(plan: &str, bytes: &[u8]) -> Option<u64> {
+    evaluate_statistical_plan(plan, bytes).completed_shots
+}
+
+pub(super) fn argv_with_seed(argv: &str, seed: u64) -> Option<String> {
+    let mut tokens = argv.split('|').map(ToOwned::to_owned).collect::<Vec<_>>();
+    let mut index = 0;
+    while index < tokens.len() {
+        if tokens.get(index).is_some_and(|token| token == "--seed") {
+            *tokens.get_mut(index.checked_add(1)?)? = seed.to_string();
+            return Some(tokens.join("|"));
+        }
+        if tokens
+            .get(index)
+            .is_some_and(|token| token.starts_with("--seed="))
+        {
+            *tokens.get_mut(index)? = format!("--seed={seed}");
+            return Some(tokens.join("|"));
+        }
+        index += 1;
+    }
+    None
+}
+
+struct StatisticalEvaluation {
+    completed_shots: Option<u64>,
+    reason: Option<String>,
+}
+
+impl StatisticalEvaluation {
+    fn incomplete(reason: impl Into<String>) -> Self {
+        Self {
+            completed_shots: None,
+            reason: Some(reason.into()),
+        }
+    }
+
+    fn complete(sample_count: usize, reason: Option<String>) -> Self {
+        Self {
+            completed_shots: u64::try_from(sample_count).ok(),
+            reason,
+        }
+    }
+}
+
+fn evaluate_statistical_plan(plan: &str, bytes: &[u8]) -> StatisticalEvaluation {
     let plan = match parse_statistical_plan(plan) {
         Ok(plan) => plan,
-        Err(reason) => return Some(reason),
+        Err(reason) => return StatisticalEvaluation::incomplete(reason),
     };
     let text = match std::str::from_utf8(bytes) {
         Ok(text) => text,
-        Err(error) => return Some(format!("statistical output is not UTF-8: {error}")),
+        Err(error) => {
+            return StatisticalEvaluation::incomplete(format!(
+                "statistical output is not UTF-8: {error}"
+            ));
+        }
     };
     match plan.tolerance {
         StatisticalTolerance::Binomial {
@@ -68,12 +142,61 @@ pub(super) fn validate_statistical_plan(plan: &str, argv_tokens: &[String]) -> O
     None
 }
 
+pub(super) fn qualification_plan_summary(
+    id: &str,
+    plan: &str,
+    argv_tokens: &[String],
+) -> Result<FixtureStatisticalPlanSummary, String> {
+    if let Some(reason) = validate_statistical_plan(plan, argv_tokens) {
+        return Err(reason);
+    }
+    let plan = parse_statistical_plan(plan)?;
+    let shots = u64::try_from(plan.sample_count).map_err(|_| {
+        format!(
+            "statistical plan sample_count={} exceeds u64",
+            plan.sample_count
+        )
+    })?;
+    let buckets = match plan.tolerance {
+        StatisticalTolerance::Binomial {
+            expected_probability,
+            sigma,
+        } => vec![FixtureStatisticalBucketSummary {
+            name: "1".to_string(),
+            expected_probability,
+            allowed_delta: sigma
+                * binomial_standard_deviation(expected_probability, plan.sample_count),
+        }],
+        StatisticalTolerance::Buckets { expected, sigma } => expected
+            .into_iter()
+            .map(
+                |(name, expected_probability)| FixtureStatisticalBucketSummary {
+                    name,
+                    expected_probability,
+                    allowed_delta: sigma
+                        * binomial_standard_deviation(expected_probability, plan.sample_count),
+                },
+            )
+            .collect(),
+    };
+    Ok(FixtureStatisticalPlanSummary {
+        id: id.to_string(),
+        shots,
+        primary_seed: plan.fixed_seed,
+        buckets,
+        declared_familywise_bound: plan.false_positive_rate,
+        independent_comparisons_per_attempt: 2,
+        shot_batches_per_attempt: 2,
+        seed_override_executable: option_value(argv_tokens, "--seed").is_some(),
+    })
+}
+
 fn compare_binomial_samples(
     text: &str,
     sample_count: usize,
     expected_probability: f64,
     sigma: f64,
-) -> Option<String> {
+) -> StatisticalEvaluation {
     let mut total = 0usize;
     let mut hits = 0usize;
     for line in text.lines() {
@@ -84,30 +207,47 @@ fn compare_binomial_samples(
                 hits += 1;
             }
             _ => {
-                return Some(format!(
+                return StatisticalEvaluation::incomplete(format!(
                     "statistical comparator expected one 0/1 bit per shot, got {line:?}"
                 ));
             }
         }
     }
     if total == 0 {
-        return Some("statistical comparator received no samples".to_string());
+        return StatisticalEvaluation::incomplete("statistical comparator received no samples");
     }
     if total != sample_count {
-        return Some(format!(
+        return StatisticalEvaluation::incomplete(format!(
             "statistical comparator expected {sample_count} samples, got {total}",
         ));
     }
-    let actual_probability = hits as f64 / total as f64;
     let standard_deviation = binomial_standard_deviation(expected_probability, total);
     let allowed_delta = sigma * standard_deviation;
-    if (actual_probability - expected_probability).abs() > allowed_delta {
-        return Some(format!(
-            "actual hit rate {actual_probability:.6} from {hits}/{total} samples is outside {} sigma around expected {:.6}",
-            sigma, expected_probability
-        ));
-    }
-    None
+    let Ok(total_u64) = u64::try_from(total) else {
+        return StatisticalEvaluation::incomplete(
+            "statistical sample count exceeds the supported u64 range",
+        );
+    };
+    let Some(accepted) =
+        AcceptedCountRange::try_new(total_u64, expected_probability, allowed_delta)
+    else {
+        return StatisticalEvaluation::incomplete(
+            "statistical comparator could not derive an accepted integer count range",
+        );
+    };
+    let Ok(hits) = u64::try_from(hits) else {
+        return StatisticalEvaluation::incomplete(
+            "statistical hit count exceeds the supported u64 range",
+        );
+    };
+    let reason = (!accepted.contains(hits)).then(|| {
+        format!(
+            "actual hit count {hits}/{total} is outside the accepted integer range {}..={} around expected {expected_probability:.6}",
+            accepted.minimum(),
+            accepted.maximum()
+        )
+    });
+    StatisticalEvaluation::complete(sample_count, reason)
 }
 
 fn compare_bucket_samples(
@@ -115,7 +255,7 @@ fn compare_bucket_samples(
     sample_count: usize,
     expected: &[(String, f64)],
     sigma: f64,
-) -> Option<String> {
+) -> StatisticalEvaluation {
     let mut counts = expected
         .iter()
         .map(|(bucket, _)| (bucket.as_str(), 0usize))
@@ -123,7 +263,7 @@ fn compare_bucket_samples(
     let mut total = 0usize;
     for line in text.lines() {
         let Some(count) = counts.get_mut(line) else {
-            return Some(format!(
+            return StatisticalEvaluation::incomplete(format!(
                 "statistical comparator saw unplanned bucket {line:?}"
             ));
         };
@@ -131,25 +271,46 @@ fn compare_bucket_samples(
         total += 1;
     }
     if total == 0 {
-        return Some("statistical comparator received no samples".to_string());
+        return StatisticalEvaluation::incomplete("statistical comparator received no samples");
     }
     if total != sample_count {
-        return Some(format!(
+        return StatisticalEvaluation::incomplete(format!(
             "statistical comparator expected {sample_count} samples, got {total}",
         ));
     }
     for (bucket, expected_probability) in expected {
         let count = counts.get(bucket.as_str()).copied().unwrap_or_default();
-        let actual_probability = count as f64 / total as f64;
         let standard_deviation = binomial_standard_deviation(*expected_probability, total);
         let allowed_delta = sigma * standard_deviation;
-        if (actual_probability - expected_probability).abs() > allowed_delta {
-            return Some(format!(
-                "actual bucket {bucket:?} rate {actual_probability:.6} from {count}/{total} samples is outside {sigma} sigma around expected {expected_probability:.6}"
+        let Ok(total_u64) = u64::try_from(total) else {
+            return StatisticalEvaluation::incomplete(
+                "statistical sample count exceeds the supported u64 range",
+            );
+        };
+        let Some(accepted) =
+            AcceptedCountRange::try_new(total_u64, *expected_probability, allowed_delta)
+        else {
+            return StatisticalEvaluation::incomplete(format!(
+                "statistical comparator could not derive an accepted integer count range for bucket {bucket:?}"
             ));
+        };
+        let Ok(count) = u64::try_from(count) else {
+            return StatisticalEvaluation::incomplete(
+                "statistical bucket count exceeds the supported u64 range",
+            );
+        };
+        if !accepted.contains(count) {
+            return StatisticalEvaluation::complete(
+                sample_count,
+                Some(format!(
+                    "actual bucket {bucket:?} count {count}/{total} is outside the accepted integer range {}..={} around expected {expected_probability:.6}",
+                    accepted.minimum(),
+                    accepted.maximum()
+                )),
+            );
         }
     }
-    None
+    StatisticalEvaluation::complete(sample_count, None)
 }
 
 fn binomial_standard_deviation(probability: f64, sample_count: usize) -> f64 {
@@ -160,6 +321,7 @@ fn binomial_standard_deviation(probability: f64, sample_count: usize) -> f64 {
 struct StatisticalPlan {
     sample_count: usize,
     fixed_seed: u64,
+    false_positive_rate: f64,
     source: StatisticalSource,
     tolerance: StatisticalTolerance,
 }
@@ -255,6 +417,7 @@ fn parse_statistical_plan(plan: &str) -> Result<StatisticalPlan, String> {
             .ok_or_else(|| "statistical plan does not contain sample_count".to_string())?,
         fixed_seed: fixed_seed
             .ok_or_else(|| "statistical plan does not contain fixed_seed".to_string())?,
+        false_positive_rate,
         source: source.unwrap_or(StatisticalSource::Stdout),
         tolerance,
     })
@@ -378,4 +541,34 @@ fn option_value<'a>(tokens: &'a [String], option: &str) -> Option<&'a str> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod qualification_tests {
+    use super::*;
+
+    #[test]
+    fn qualification_summary_preserves_fixture_budget_and_exact_inputs() {
+        let argv = [
+            "sample".to_string(),
+            "--shots".to_string(),
+            "4000".to_string(),
+            "--seed".to_string(),
+            "17".to_string(),
+        ];
+        let plan = "sample_count=4000; fixed_seed=17; tolerate buckets 00=0.75,01=0.25 within 5 sigma; false_positive_rate<=0.001";
+        let summary = qualification_plan_summary("fixture-plan", plan, &argv)
+            .expect("valid fixture qualification plan");
+
+        assert_eq!(summary.id, "fixture-plan");
+        assert_eq!(summary.shots, 4_000);
+        assert_eq!(summary.primary_seed, 17);
+        assert_eq!(summary.declared_familywise_bound, 0.001);
+        assert!(summary.seed_override_executable);
+        assert_eq!(summary.buckets.len(), 2);
+        let first = summary.buckets.first().expect("first bucket");
+        assert_eq!(first.name, "00");
+        assert_eq!(first.expected_probability, 0.75);
+        assert!(first.allowed_delta > 0.0);
+    }
 }

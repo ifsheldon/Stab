@@ -402,8 +402,9 @@ fn repository_fixture_placeholder_files_exist() {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[test]
-fn fixture_output_placeholders_are_replaced_with_target_paths() {
+fn fixture_output_placeholders_use_inherited_descriptor_paths() {
     let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -424,28 +425,60 @@ fn fixture_output_placeholders_are_replaced_with_target_paths() {
         output.expected_relative,
         "expected/m11_sample_dem_observable_obs.stdout"
     );
-    assert!(
-        output.actual_path.starts_with(
-            root.path
-                .join("target")
-                .join("oracle")
-                .join("fixture-outputs")
-        )
-    );
+    assert!(output.actual_path().starts_with("/proc/self/fd/"));
     assert!(
         command
             .argv
             .iter()
-            .any(|token| token.to_string_lossy().contains("fixture-outputs"))
+            .any(|token| token.to_string_lossy().starts_with("/proc/self/fd/"))
     );
     let run_dir = output
-        .actual_path
+        .actual_path()
         .parent()
         .expect("fixture run directory")
         .to_path_buf();
     assert!(run_dir.is_dir());
+    let owned_run_dir = std::fs::read_link(&run_dir).expect("descriptor-owned run directory");
+    assert!(owned_run_dir.starts_with("/tmp"));
+    std::fs::write(output.actual_path(), b"descriptor-owned").expect("write side output");
+    assert_eq!(
+        outputs::read_actual_fixture_output(row, output).expect("read side output"),
+        b"descriptor-owned"
+    );
     drop(command);
-    assert!(!run_dir.exists(), "scratch run directory must be removed");
+    assert!(
+        !owned_run_dir.exists(),
+        "scratch run directory must be removed"
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn descriptor_owned_fixture_output_rejects_a_child_symlink() {
+    use std::os::unix::fs::symlink;
+
+    let manifest = FixtureManifest::from_csv(MANIFEST_CSV).expect("parse manifest");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(std::path::Path::parent)
+        .expect("repo root");
+    let root = crate::RepoRoot::resolve(root).expect("resolve repo root");
+    let row = manifest
+        .rows
+        .iter()
+        .find(|row| row.id == "m11-sample-dem-observable-output-exact")
+        .expect("M11 fixture output row");
+    let command = outputs::prepare_command(&root, row, "symlink-test").expect("prepare command");
+    let output = command.outputs.first().expect("one fixture output");
+    let outside = tempfile::NamedTempFile::new().expect("outside output");
+    std::fs::write(outside.path(), b"outside").expect("outside bytes");
+    symlink(outside.path(), output.actual_path()).expect("child output symlink");
+
+    assert!(outputs::read_actual_fixture_output(row, output).is_err());
+    assert_eq!(
+        std::fs::read(outside.path()).expect("outside bytes"),
+        b"outside"
+    );
 }
 
 #[test]
@@ -550,6 +583,30 @@ fn statistical_plan_source_rejects_unknown_values() {
 }
 
 #[test]
+fn two_sided_statistical_completion_retains_the_completed_side() {
+    let csv = format!(
+        "{HEADER}partial,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample|--shots|4|--seed|5,inputs/sample_noisy.stim,,0,empty,implemented,\"sample_count=4; fixed_seed=5; tolerate binomial p=0.5 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let row = manifest.rows.first().expect("one row");
+    let complete = process_output(Some(0), b"0\n0\n1\n1\n", b"");
+    let short = process_output(Some(1), b"0\n1\n", b"rejected");
+
+    let completion = super::qualification::completed_statistical_work(
+        row,
+        Some(&complete),
+        Some(&short),
+        &[],
+        &[],
+    )
+    .expect("partial statistical completion");
+
+    assert_eq!(completion.shots, 4);
+    assert_eq!(completion.comparisons, 1);
+    assert_eq!(completion.batches, 1);
+}
+
+#[test]
 fn statistical_fixture_output_placeholders_do_not_need_committed_expected_files() {
     let csv = format!(
         "{HEADER}good,M11,src/stim/simulators/dem_sampler.test.cc,statistical,statistical,stim sample_dem,sample_dem|--shots|1000|--seed|5|--obs_out|{{fixture_output:expected/missing-statistical.stdout}},inputs/sample_dem_observable_only_noisy.dem,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; source=fixture_output; tolerate buckets 000=0.75,001=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
@@ -608,14 +665,10 @@ fn statistical_fixture_output_comparator_checks_stab_side_output() {
         .expect("write stim side output");
     std::fs::write(&stab_path, observable_only_distribution_bytes())
         .expect("write stab side output");
-    let stim_output = outputs::FixtureOutput {
-        expected_relative: "expected/missing-statistical.stdout".to_string(),
-        actual_path: stim_path,
-    };
-    let stab_output = outputs::FixtureOutput {
-        expected_relative: "expected/missing-statistical.stdout".to_string(),
-        actual_path: stab_path,
-    };
+    let stim_output =
+        outputs::FixtureOutput::from_path("expected/missing-statistical.stdout", stim_path);
+    let stab_output =
+        outputs::FixtureOutput::from_path("expected/missing-statistical.stdout", stab_path);
 
     outputs::compare_outputs(row, &[stim_output], &[stab_output]).expect("statistical side output");
 }
@@ -633,14 +686,10 @@ fn statistical_fixture_output_comparator_checks_stim_side_output() {
     std::fs::write(&stim_path, b"created by Stim\n").expect("write stim side output");
     std::fs::write(&stab_path, observable_only_distribution_bytes())
         .expect("write stab side output");
-    let stim_output = outputs::FixtureOutput {
-        expected_relative: "expected/missing-statistical.stdout".to_string(),
-        actual_path: stim_path,
-    };
-    let stab_output = outputs::FixtureOutput {
-        expected_relative: "expected/missing-statistical.stdout".to_string(),
-        actual_path: stab_path,
-    };
+    let stim_output =
+        outputs::FixtureOutput::from_path("expected/missing-statistical.stdout", stim_path);
+    let stab_output =
+        outputs::FixtureOutput::from_path("expected/missing-statistical.stdout", stab_path);
     let error = outputs::compare_outputs(row, &[stim_output], &[stab_output])
         .expect_err("invalid Stim statistical side output should fail");
 
@@ -663,6 +712,30 @@ fn statistical_fixture_output_source_exact_compares_stdout() {
 }
 
 #[test]
+fn stdout_statistical_comparator_rejects_invalid_stim_distribution() {
+    let csv = format!(
+        "{HEADER}good,M8,src/stim/cmd/command_sample.test.cc,statistical,statistical,stim sample,sample|--shots|1000|--seed|5,inputs/sample_noisy.stim,,0,empty,implemented,\"sample_count=1000; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001\",hand-authored\n"
+    );
+    let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
+    let row = manifest.rows.first().expect("one row");
+    let mut invalid = Vec::new();
+    invalid.extend(std::iter::repeat_n(b"1\n", 500).flatten());
+    invalid.extend(std::iter::repeat_n(b"0\n", 500).flatten());
+    let mut valid = Vec::new();
+    valid.extend(std::iter::repeat_n(b"1\n", 250).flatten());
+    valid.extend(std::iter::repeat_n(b"0\n", 750).flatten());
+
+    let error = compare_fixture(
+        row,
+        &process_output(Some(0), &invalid, b""),
+        &process_output(Some(0), &valid, b""),
+    )
+    .expect_err("invalid Stim distribution must fail the fixture");
+
+    assert!(error.to_string().contains("Stim stdout"));
+}
+
+#[test]
 fn binomial_statistical_comparator_accepts_samples_within_tolerance() {
     let plan = "sample_count=1000; fixed_seed=5; tolerate binomial p=0.25 within 5 sigma; false_positive_rate<=0.001";
     let mut stdout = Vec::new();
@@ -670,6 +743,7 @@ fn binomial_statistical_comparator_accepts_samples_within_tolerance() {
     stdout.extend(std::iter::repeat_n(b"0\n", 750).flatten());
 
     assert_eq!(statistical::compare_statistical_plan(plan, &stdout), None);
+    assert_eq!(statistical::completed_shots(plan, &stdout), Some(1_000));
 }
 
 #[test]
@@ -682,8 +756,9 @@ fn binomial_statistical_comparator_rejects_samples_outside_tolerance() {
     assert!(
         statistical::compare_statistical_plan(plan, &stdout)
             .expect("statistical rejection")
-            .contains("outside 5 sigma")
+            .contains("outside the accepted integer range")
     );
+    assert_eq!(statistical::completed_shots(plan, &stdout), Some(1_000));
 }
 
 #[test]
@@ -695,6 +770,7 @@ fn binomial_statistical_comparator_rejects_non_bit_output() {
             .expect("statistical rejection")
             .contains("expected one 0/1 bit per shot")
     );
+    assert_eq!(statistical::completed_shots(plan, b"shot M0\n"), None);
 }
 
 #[test]
@@ -706,6 +782,7 @@ fn binomial_statistical_comparator_rejects_sample_count_mismatch() {
             .expect("statistical rejection")
             .contains("expected 2 samples")
     );
+    assert_eq!(statistical::completed_shots(plan, b"0\n"), None);
 }
 
 #[test]
@@ -879,9 +956,9 @@ fn validation_rejects_malformed_fixture_output_placeholder() {
     );
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 #[test]
-fn fixture_output_scratch_rejects_symlinked_parent() {
+fn fixture_output_scratch_ignores_repository_symlink() {
     let temp = tempfile::tempdir().expect("tempdir");
     let root = crate::RepoRoot::resolve(temp.path()).expect("resolve temp root");
     let fixture_parent = temp.path().join("oracle").join("fixtures");
@@ -916,10 +993,18 @@ fn fixture_output_scratch_rejects_symlinked_parent() {
     let manifest = FixtureManifest::from_csv(&csv).expect("parse manifest");
     let row = manifest.rows.first().expect("one fixture row");
 
-    let error = outputs::prepare_command(&root, row, "test")
-        .expect_err("symlinked scratch parent should fail");
+    let command = outputs::prepare_command(&root, row, "test")
+        .expect("repository scratch symlink is outside the descriptor-owned output path");
+    let output = command.outputs.first().expect("one output");
 
-    assert!(error.to_string().contains("scratch path contains symlink"));
+    assert!(output.actual_path().starts_with("/proc/self/fd/"));
+    std::fs::write(output.actual_path(), b"inside").expect("write descriptor-owned output");
+    assert_eq!(
+        std::fs::read_dir(&outside)
+            .expect("outside directory")
+            .count(),
+        0
+    );
 }
 
 #[test]
@@ -932,10 +1017,7 @@ fn child_fixture_output_read_enforces_descriptor_byte_limit() {
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse fixture row");
     let row = manifest.rows.first().expect("fixture row");
-    let output = outputs::FixtureOutput {
-        expected_relative: "expected/side.bin".to_string(),
-        actual_path: actual,
-    };
+    let output = outputs::FixtureOutput::from_path("expected/side.bin", actual);
 
     let error = outputs::read_actual_fixture_output(row, &output)
         .expect_err("oversized child output must fail closed");
@@ -961,10 +1043,7 @@ fn child_fixture_output_read_rejects_symlink() {
     );
     let manifest = FixtureManifest::from_csv(&csv).expect("parse fixture row");
     let row = manifest.rows.first().expect("fixture row");
-    let output = outputs::FixtureOutput {
-        expected_relative: "expected/side.bin".to_string(),
-        actual_path: actual,
-    };
+    let output = outputs::FixtureOutput::from_path("expected/side.bin", actual);
 
     assert!(outputs::read_actual_fixture_output(row, &output).is_err());
 }
