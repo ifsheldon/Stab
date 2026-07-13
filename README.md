@@ -100,7 +100,7 @@ The matrix lives at `oracle/compatibility-matrix.csv` and records upstream sourc
 
 The active follow-up plans are [comprehensive correctness qualification](docs/plans/comprehensive-correctness-qualification-plan.md) and [comprehensive Stim performance qualification](docs/plans/comprehensive-stim-performance-qualification-plan.md), with execution rules in [GOAL.md](docs/plans/GOAL.md).
 CQ0 and PQ0 provide case-level correctness and feature-level performance disposition ledgers, and CQ1 provides independently selectable correctness execution, PR/full/soak tiers, manifest-bound reports, and machine-readable preflight evidence. Clean CQ1 acceptance results are recorded in [the CQ1 progress report](docs/plans/cq1-correctness-harness-progress-report.md).
-The symmetric performance runner, faithful pinned-Stim adapter coverage, paired confidence intervals, and memory or scaling qualification remain planned for PQ1 and later milestones.
+PQ1 implementation provides the bounded symmetric process runner, pinned-Stim adapter, Stab worker, calibrated paired statistics, controlled-host checks, process-memory evidence, atomic reports, and regression dispatch. Its synthetic protocol-smoke group validates infrastructure only and can never become a product performance claim; product workload qualification, scaling, and threshold graduation remain PQ2 through PQ7 work.
 
 CQ0 inventory discovery is implemented through:
 
@@ -146,8 +146,22 @@ just bench::qualification-regenerate --check
 ```
 
 These commands validate or deterministically regenerate `benchmarks/stim-qualification-suite.json` from the frozen CQ0 digest, Stab feature checklist, current benchmark manifest, primary thresholds and waivers, and all pinned upstream perf sources and symbols.
-The paired runner, adapter, qualification tiers, and report commands remain planned until PQ1.
-Benchmark operations currently fail closed on non-Unix hosts because their checked source and output paths require descriptor-relative nofollow filesystem primitives; final performance qualification targets controlled Linux x86-64 and Linux AArch64 hosts.
+The PQ1 process and adapter contracts can be reproduced independently, and the paired controller can publish PR, full, or soak evidence through:
+
+```sh
+just bench::qualification-probe --group pq1-process-contract-smoke
+just bench::qualification-probe --group pq1-adapter-protocol-smoke
+just bench::qualification-run --tier pr --out target/benchmarks/qualification/pq1-pr
+just bench::qualification-run --tier full --out target/benchmarks/qualification/pq1-full
+just bench::qualification-run --tier soak --out target/benchmarks/qualification/pq1-soak
+just bench::qualification-report --input target/benchmarks/qualification/pq1-full
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-full
+```
+
+The controller validates `benchmarks/qualification-host-policy.json`, pins both workers to one selected CPU, calibrates measured batches to 250 milliseconds through 2 seconds, retains three warmups and every interleaved pair, computes fixed-seed bootstrap intervals, records setup and peak RSS separately from timing, and atomically publishes `report.json`, `preflight.json`, and `report.md`. Child stdin, stdout, stderr, runtime, process trees, and regular-file growth are bounded; file-writing qualification adapters must wait on the controller start barrier so the Linux file-size limit is installed before output begins.
+Strict runs reject host-policy violations. `--allow-unverified-host` preserves local diagnostic evidence with `host_verified=false`, but that evidence cannot be promoted. The PQ1 protocol-smoke group is report-only in `benchmarks/qualification-baseline.json`, does not accept CQ evidence, and must not be cited as Stab-versus-Stim product speed evidence.
+Stab allocation counts remain a separate Rust-only regression signal through `just bench::compare-allocations`; they are not mixed into paired timing or cross-implementation process-RSS claims.
+PQ1 qualification execution is Linux-only because affinity, process groups, procfs RSS, regular-file limits, and atomic directory exchange are part of its evidence contract. Final product performance qualification targets controlled Linux x86-64 and Linux AArch64 hosts independently.
 
 Benchmark contracts live at `benchmarks/manifest.csv`.
 Each benchmark row owns its runner, threshold class, and comparability class; `just bench::list` prints all three, and manifest validation requires the comparability field to agree with the source-owned compare-note prefix.

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "id": "linux-x86-64-controlled",
+      "operating_system": "linux",
+      "architecture": "x86_64",
+      "cpu_selection": "lowest-allowed",
+      "max_load_per_allowed_cpu": "0.50",
+      "minimum_available_memory_bytes": 4294967296,
+      "require_no_swap_activity": true,
+      "require_frequency_governor": true,
+      "allowed_frequency_governors": ["performance"]
+    },
+    {
+      "id": "linux-aarch64-controlled",
+      "operating_system": "linux",
+      "architecture": "aarch64",
+      "cpu_selection": "lowest-allowed",
+      "max_load_per_allowed_cpu": "0.50",
+      "minimum_available_memory_bytes": 4294967296,
+      "require_no_swap_activity": true,
+      "require_frequency_governor": true,
+      "allowed_frequency_governors": ["performance"]
+    }
+  ]
+}

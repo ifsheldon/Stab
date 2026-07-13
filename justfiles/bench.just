@@ -23,6 +23,26 @@ qualification-list *args:
 qualification-regenerate *args:
     cargo run -q -p stab-bench -- qualification-regenerate {{args}}
 
+# Reproduce one bounded paired-runner qualification probe.
+[working-directory: '..']
+qualification-probe *args:
+    cargo run -q -p stab-bench --profile release -- qualification-probe {{args}}
+
+# Execute the paired PQ1 qualification harness and publish validated evidence.
+[working-directory: '..']
+qualification-run *args:
+    cargo run -q -p stab-bench --profile release -- qualification-run {{args}}
+
+# Validate a paired qualification report and regenerate its derived artifacts.
+[working-directory: '..']
+qualification-report *args:
+    cargo run -q -p stab-bench --profile release -- qualification-report {{args}}
+
+# Check promotable qualification evidence against source-owned thresholds.
+[working-directory: '..']
+qualification-regression *args:
+    cargo run -q -p stab-bench --profile release -- qualification-regression {{args}}
+
 # Record pinned C++ Stim baseline benchmark results.
 [working-directory: '..']
 baseline *args:

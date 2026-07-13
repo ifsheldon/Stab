@@ -47,6 +47,7 @@ Do not expand product scope while building qualification infrastructure.
 
 Program checkpoint: CQ0 is complete at corrected correctness inventory digest `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`; PQ0 is dependency-regenerated after CQ1 acceptance at performance digest `cc9f6cabfb9a3245d9c52000e82c8f1bec76aed605f3563d1a15244d327c3fbd`; and CQ1 is complete with clean PR, full, and soak evidence from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`.
 The active milestone is PQ1: build the symmetric paired benchmark harness, pinned-Stim adapter, Stab worker, preflight, host policy, statistics, memory evidence, and report commands against CQ1's executable correctness dependencies.
+PQ1 implementation is present locally, but it is not accepted until both thin probes, clean PR/full/soak runs, independent report and regression validation, the milestone audit, and the full code review all pass. Its `pq1-adapter-protocol-smoke` ratio is permanently diagnostic and must never be reported as product speed evidence.
 Do not reopen CQ0 or PQ0 inventory semantics unless pinned-source drift, a newly exported default-feature API, a stale referenced id, a changed checklist or benchmark source of truth, or a confirmed inventory defect changes a frozen digest.
 Do not treat PQ0's 15 retained rows as qualified evidence: all 159 active inherited rows still record missing correctness preflight and output-digest evidence, 58 CLI rows remain asymmetric, 73 rows lack a current comparator, 124 lack required scale families, and 21 select heterogeneous upstream measurements.
 
@@ -205,16 +206,24 @@ just qualification::correctness-run --tier full
 just qualification::correctness-run --tier soak
 just bench::smoke
 just bench::qualification-check
-just bench::qualification-run --tier pr
-just bench::qualification-run --tier full
-just bench::qualification-run --tier soak
+just bench::qualification-probe --group pq1-process-contract-smoke
+just bench::qualification-probe --group pq1-adapter-protocol-smoke
+just bench::qualification-run --tier pr --out target/benchmarks/qualification/pq1-pr
+just bench::qualification-run --tier full --out target/benchmarks/qualification/pq1-full
+just bench::qualification-run --tier soak --out target/benchmarks/qualification/pq1-soak
+just bench::qualification-report --input target/benchmarks/qualification/pq1-pr
+just bench::qualification-report --input target/benchmarks/qualification/pq1-full
+just bench::qualification-report --input target/benchmarks/qualification/pq1-soak
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-pr
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-full
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-soak
 just bench::primary-beta --baseline <fresh-primary-baseline>
 just bench::primary-regression --baseline <fresh-primary-baseline> --report target/benchmarks/qualification/m12-regression
 just bench::primary-memory-regression --baseline <fresh-primary-baseline>
 just maintenance::pre-commit
 ```
 
-The CQ1 correctness commands are mandatory and complete; the PQ qualification commands become mandatory when PQ1 lands.
+The CQ1 correctness commands are mandatory and complete. The implemented PQ1 qualification commands are mandatory for PQ1 acceptance; later product qualification commands become mandatory as their workload groups land.
 Do not fake an early pass by omitting commands that the active milestone is required to implement.
 
 ## Completion Criteria

@@ -14,11 +14,61 @@ mod checklist;
 mod discovery;
 mod io;
 mod model;
+mod runtime;
 mod validation;
+
+pub(crate) use runtime::{ProbeArgs, RegressionArgs, ReportArgs, RunArgs, WorkerArgs};
 
 const EXPECTED_FROZEN_DIGEST: &str =
     "cc9f6cabfb9a3245d9c52000e82c8f1bec76aed605f3563d1a15244d327c3fbd";
 const MAX_SUITE_BYTES: usize = 32 << 20;
+
+pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
+    runtime::run_worker(args).map_err(BenchError::Qualification)
+}
+
+pub(crate) fn probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), BenchError> {
+    runtime::run_probe(root, args).map_err(BenchError::Qualification)
+}
+
+pub(crate) fn run_qualification(
+    root: &RepoRoot,
+    manifest: &BenchmarkManifest,
+    args: RunArgs,
+) -> Result<(), BenchError> {
+    check(root, manifest)?;
+    let checked = read(root)?;
+    let output = runtime::run_qualification(
+        root,
+        EXPECTED_FROZEN_DIGEST,
+        &checked.correctness_digest,
+        args,
+    )
+    .map_err(BenchError::Qualification)?;
+    println!(
+        "[{PREFIX}] published PQ1 qualification evidence at {}",
+        output.display()
+    );
+    Ok(())
+}
+
+pub(crate) fn report(root: &RepoRoot, args: ReportArgs) -> Result<(), BenchError> {
+    let output = runtime::run_report(root, args).map_err(BenchError::Qualification)?;
+    println!(
+        "[{PREFIX}] validated PQ1 qualification evidence at {}",
+        output.display()
+    );
+    Ok(())
+}
+
+pub(crate) fn regression(root: &RepoRoot, args: RegressionArgs) -> Result<(), BenchError> {
+    let summary = runtime::run_regression(root, args).map_err(BenchError::Qualification)?;
+    println!(
+        "[{PREFIX}] qualification regression group={} checked={} report_only={}",
+        summary.group_id, summary.checked_measurements, summary.report_only
+    );
+    Ok(())
+}
 
 pub(crate) fn check(root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(), BenchError> {
     ensure_frozen()?;
@@ -31,6 +81,7 @@ pub(crate) fn check(root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(),
     if checked_bytes != render(&generated)? {
         return Err(BenchError::QualificationDrift);
     }
+    runtime::check_contracts(root, EXPECTED_FROZEN_DIGEST).map_err(BenchError::Qualification)?;
     print_summary(&checked, None);
     Ok(())
 }

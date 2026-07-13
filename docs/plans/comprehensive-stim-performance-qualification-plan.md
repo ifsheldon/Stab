@@ -6,7 +6,9 @@ Planned: 2026-07-13.
 
 PQ0 completed: 2026-07-13, with source-owned evidence in [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md).
 
-PQ1 through PQ7 remain planned.
+PQ1 implementation in progress: 2026-07-14. The bounded process runner, independent process and adapter probes, symmetric protocol-smoke workers, calibration, paired statistics, correctness-preflight seam, host policy, process-memory evidence, atomic reports, and report-only regression dispatch are implemented locally; clean PR/full/soak evidence, milestone audit, and full code review remain required before PQ1 acceptance.
+
+PQ2 through PQ7 remain planned.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07` in `vendor/stim`.
 
@@ -403,6 +405,8 @@ Turn the checklist and current 161-row manifest into a finite, reviewable invent
 
 ## PQ1: Build The Paired Qualification Harness And Stim Adapter
 
+Implementation note: `pq1-adapter-protocol-smoke` is a synthetic diagnostic group used only to prove the harness. It cannot accept product correctness evidence, enter a threshold baseline, or support a Stab-versus-Stim product speed claim.
+
 ### Objective
 
 Make faithful comparison, calibration, statistics, and reporting reusable before expanding workload coverage.
@@ -635,9 +639,17 @@ cargo test --workspace --quiet
 just qualification::correctness-check
 just qualification::correctness-run --tier full
 just bench::qualification-check
-just bench::qualification-run --tier pr
-just bench::qualification-run --tier full
-just bench::qualification-run --tier soak
+just bench::qualification-probe --group pq1-process-contract-smoke
+just bench::qualification-probe --group pq1-adapter-protocol-smoke
+just bench::qualification-run --tier pr --out target/benchmarks/qualification/pq1-pr
+just bench::qualification-run --tier full --out target/benchmarks/qualification/pq1-full
+just bench::qualification-run --tier soak --out target/benchmarks/qualification/pq1-soak
+just bench::qualification-report --input target/benchmarks/qualification/pq1-pr
+just bench::qualification-report --input target/benchmarks/qualification/pq1-full
+just bench::qualification-report --input target/benchmarks/qualification/pq1-soak
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-pr
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-full
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-soak
 just bench::primary-beta --baseline <fresh-primary-baseline>
 just bench::primary-regression --baseline <fresh-primary-baseline> --report target/benchmarks/qualification/m12-regression
 just bench::primary-memory-regression --baseline <fresh-primary-baseline>

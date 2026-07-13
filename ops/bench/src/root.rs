@@ -81,6 +81,10 @@ impl RepoRoot {
             .join(format!("stim_perf{}", std::env::consts::EXE_SUFFIX))
     }
 
+    pub(crate) fn stim_library(&self) -> PathBuf {
+        self.build_dir().join("out").join("libstim.a")
+    }
+
     pub(crate) fn resolve_relative(&self, path: &Path) -> PathBuf {
         if path.is_absolute() {
             path.to_path_buf()

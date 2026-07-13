@@ -57,6 +57,10 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
+    /// Internal bounded worker used by the paired qualification controller.
+    #[command(name = "qualification-worker", hide = true)]
+    QualificationWorker(qualification::WorkerArgs),
+
     /// Print planned benchmark contracts grouped by milestone and threshold.
     List {
         /// Restrict output to one milestone such as M8.
@@ -83,6 +87,18 @@ enum Command {
         #[arg(long)]
         check: bool,
     },
+
+    /// Reproduce one bounded PQ1 runner probe.
+    QualificationProbe(qualification::ProbeArgs),
+
+    /// Run the paired PQ1 qualification harness and publish validated evidence.
+    QualificationRun(qualification::RunArgs),
+
+    /// Validate a paired qualification report and regenerate derived artifacts.
+    QualificationReport(qualification::ReportArgs),
+
+    /// Check promotable qualification evidence against source-owned thresholds.
+    QualificationRegression(qualification::RegressionArgs),
 
     /// Record pinned C++ Stim baseline benchmark results.
     Baseline {
@@ -203,10 +219,20 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: Cli) -> Result<(), BenchError> {
-    let root = RepoRoot::resolve(&cli.root)?;
+    let Cli { root, command } = cli;
+    let command = match command {
+        Command::QualificationWorker(args) => return qualification::run_worker(args),
+        command => command,
+    };
+    let root = RepoRoot::resolve(&root)?;
     let manifest = BenchmarkManifest::read(&root)?;
     manifest.check(&root)?;
-    match cli.command {
+    match command {
+        Command::QualificationWorker(_) => {
+            return Err(BenchError::Qualification(
+                "qualification worker dispatch reached the repository controller".to_string(),
+            ));
+        }
         Command::List { milestone } => {
             manifest.list(milestone.as_deref());
         }
@@ -224,6 +250,18 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         }
         Command::QualificationRegenerate { check } => {
             qualification::regenerate(&root, &manifest, check)?;
+        }
+        Command::QualificationProbe(args) => {
+            qualification::probe(&root, args)?;
+        }
+        Command::QualificationRun(args) => {
+            qualification::run_qualification(&root, &manifest, args)?;
+        }
+        Command::QualificationReport(args) => {
+            qualification::report(&root, args)?;
+        }
+        Command::QualificationRegression(args) => {
+            qualification::regression(&root, args)?;
         }
         Command::Baseline {
             stim,

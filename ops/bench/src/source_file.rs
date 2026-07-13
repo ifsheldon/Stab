@@ -110,6 +110,34 @@ pub(crate) fn read_regular_file_bounded(
     }
 }
 
+pub(crate) fn open_regular_file_bounded_descriptor(
+    path: &Path,
+    max_bytes: u64,
+) -> Result<std::fs::File, BenchError> {
+    #[cfg(unix)]
+    {
+        let file = open_regular_file_unix(path)?;
+        let metadata = file
+            .metadata()
+            .map_err(|source| BenchError::SourceInputIo {
+                path: path.to_path_buf(),
+                source,
+            })?;
+        if !metadata.is_file() || metadata.len() > max_bytes {
+            return Err(BenchError::SourceInput(format!(
+                "source input {} must be a regular file no larger than {max_bytes} bytes",
+                path.display()
+            )));
+        }
+        Ok(file)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (path, max_bytes);
+        Err(non_unix_unsupported("bounded descriptor input"))
+    }
+}
+
 #[cfg(unix)]
 fn read_regular_file_bounded_unix(path: &Path, max_bytes: usize) -> Result<Vec<u8>, BenchError> {
     let file = open_regular_file_unix(path)?;
