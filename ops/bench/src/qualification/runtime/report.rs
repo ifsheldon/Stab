@@ -80,6 +80,7 @@ pub(super) fn validate_report(report: &QualificationReport) -> Result<(), Report
         "correctness_inventory_sha256",
         &report.correctness_inventory_sha256,
     )?;
+    validate_sha256("host_policy_sha256", &report.host.policy_sha256)?;
     validate_sha256("stim_source_sha256", &report.workers.stim_source_sha256)?;
     validate_sha256(
         "stim_build_fingerprint",
@@ -122,6 +123,24 @@ pub(super) fn validate_report(report: &QualificationReport) -> Result<(), Report
         || report.host.cpu_identity.is_empty()
         || !report.host.allowed_cpus.contains(&report.host.selected_cpu)
         || report.host.verified != report.host.violations.is_empty()
+        || report.host.maximum_temperature_millidegrees_celsius <= 0
+        || !thermal_readings_valid(&report.host.thermal_readings_before)
+        || !thermal_readings_valid(&report.host.thermal_readings_after)
+        || report.host.thermal_probe_available
+            != (!report.host.thermal_readings_before.is_empty()
+                && !report.host.thermal_readings_after.is_empty())
+        || thermal_zone_keys(&report.host.thermal_readings_before)
+            != thermal_zone_keys(&report.host.thermal_readings_after)
+        || report.host.verified
+            && report
+                .host
+                .thermal_readings_before
+                .iter()
+                .chain(&report.host.thermal_readings_after)
+                .any(|reading| {
+                    reading.millidegrees_celsius
+                        > report.host.maximum_temperature_millidegrees_celsius
+                })
         || report.host.verified
             && (report.host.frequency_governor_before.is_none()
                 || report.host.frequency_governor_before != report.host.frequency_governor_after)
@@ -279,6 +298,12 @@ fn validate_correctness_evidence(report: &QualificationReport) -> Result<(), Rep
 }
 
 fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), ReportError> {
+    let preflight_stim = only_row(&report.semantic_preflight.stim.rows)?;
+    let preflight_stab = only_row(&report.semantic_preflight.stab.rows)?;
+    if preflight_stim.output_digest != preflight_stab.output_digest {
+        return Err(ReportError::WorkerReceipt);
+    }
+    let expected_output_digest = &preflight_stim.output_digest;
     let mut invocations = Vec::new();
     push_pair_invocations(&mut invocations, &report.semantic_preflight);
     for probe in &report.calibration.stim.probes {
@@ -303,6 +328,10 @@ fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), Repo
         }
         for row in &invocation.rows {
             row.validate_values()?;
+            let expected_work_count = row
+                .iteration_count
+                .checked_mul(report.command.work_items)
+                .ok_or(ReportError::WorkOverflow)?;
             let (source, build) = match invocation.implementation {
                 Implementation::Stim => (
                     &report.workers.stim_source_sha256,
@@ -317,6 +346,8 @@ fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), Repo
                 || row.evidence_mode != invocation.evidence_mode
                 || row.affinity_cpu != Some(expected_cpu)
                 || row.stim_commit.as_str() != report.stim_commit
+                || row.work_count != expected_work_count
+                || row.output_digest != *expected_output_digest
                 || row.source_digest.as_str() != source
                 || row.build_fingerprint.as_str() != build
             {
@@ -573,6 +604,27 @@ fn validate_sha256_value(value: &str) -> Result<(), ()> {
     }
 }
 
+fn thermal_readings_valid(readings: &[super::host::ThermalReading]) -> bool {
+    readings.len() <= 128
+        && readings.iter().all(|reading| {
+            !reading.zone.is_empty()
+                && reading.zone.len() <= 256
+                && reading.zone.is_ascii()
+                && !reading.kind.is_empty()
+                && reading.kind.len() <= 256
+                && reading.kind.is_ascii()
+                && (-273_150..=300_000).contains(&reading.millidegrees_celsius)
+        })
+        && thermal_zone_keys(readings).len() == readings.len()
+}
+
+fn thermal_zone_keys(readings: &[super::host::ThermalReading]) -> BTreeSet<(&str, &str)> {
+    readings
+        .iter()
+        .map(|reading| (reading.zone.as_str(), reading.kind.as_str()))
+        .collect()
+}
+
 pub(super) fn preflight_artifact(
     report: &QualificationReport,
     report_json: &[u8],
@@ -613,8 +665,15 @@ pub(super) fn render_markdown(report: &QualificationReport, report_sha256: &str)
     let outcome = summary.map_or("n/a".to_string(), |value| {
         format!("{:?}", value.outcome).to_ascii_lowercase()
     });
+    let maximum_temperature = |readings: &[super::host::ThermalReading]| {
+        readings
+            .iter()
+            .map(|reading| reading.millidegrees_celsius)
+            .max()
+            .map_or("unavailable".to_string(), |value| value.to_string())
+    };
     format!(
-        "# PQ1 Qualification Harness Report\n\n- Group: `{}`\n- Claim class: diagnostic infrastructure\n- Tier: `{:?}`\n- Stim: `{}` (`{}`)\n- Stab commit: `{}`\n- Local modifications: `{}`\n- Host profile: `{}`\n- Host verified: `{}`\n- CPU: `{}` on `{}`\n- Frequency governor: `{:?}`\n- Rust toolchain: `{}`\n- Target: `{}`\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Warmups: `{}`\n- Paired samples: `{}`\n- Median diagnostic ratio: `{}`\n- Upper bootstrap bound: `{}`\n- Diagnostic 1.25 outcome: `{}`\n- Process memory evidence: separate from timing\n- Promotable product claim: `false`\n- Report SHA-256: `{}`\n",
+        "# PQ1 Qualification Harness Report\n\n- Group: `{}`\n- Claim class: diagnostic infrastructure\n- Tier: `{:?}`\n- Stim: `{}` (`{}`)\n- Stab commit: `{}`\n- Local modifications: `{}`\n- Host profile: `{}`\n- Host verified: `{}`\n- CPU: `{}` on `{}`\n- Frequency governor: `{:?}`\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: `{}`\n- Target: `{}`\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Warmups: `{}`\n- Paired samples: `{}`\n- Median diagnostic ratio: `{}`\n- Upper bootstrap bound: `{}`\n- Diagnostic 1.25 outcome: `{}`\n- Process memory evidence: separate from timing\n- Promotable product claim: `false`\n- Report SHA-256: `{}`\n",
         report.group_id,
         report.tier,
         report.stim_tag,
@@ -626,6 +685,8 @@ pub(super) fn render_markdown(report: &QualificationReport, report_sha256: &str)
         report.host.selected_cpu,
         report.host.cpu_identity,
         report.host.frequency_governor_before,
+        maximum_temperature(&report.host.thermal_readings_before),
+        maximum_temperature(&report.host.thermal_readings_after),
         report.toolchain.rust_toolchain,
         report.toolchain.target_triple,
         report.calibration.target_minimum_seconds,
@@ -659,6 +720,8 @@ pub(super) enum ReportError {
     AdapterReceipt,
     #[error("qualification report worker receipt is stale or inconsistent")]
     WorkerReceipt,
+    #[error("qualification report semantic work count overflows u64")]
+    WorkOverflow,
     #[error("qualification report correctness evidence is structurally invalid")]
     CorrectnessEvidence,
     #[error("qualification report calibration evidence is invalid")]

@@ -21,6 +21,7 @@ const MAX_LIBRARY_BYTES: u64 = 1 << 30;
 const MAX_RECEIPT_BYTES: usize = 1 << 20;
 const BUILD_OUTPUT_BYTES: usize = 16 << 20;
 const BUILD_TIMEOUT: Duration = Duration::from_secs(900);
+const BUILD_FINGERPRINT_DEFINE: &str = "-DSTAB_ADAPTER_BUILD_FINGERPRINT=";
 
 #[derive(Clone, Debug)]
 pub(crate) struct AdapterExecutable {
@@ -48,6 +49,11 @@ impl AdapterExecutable {
             || library != self.receipt.stim_library_sha256
             || cmake != self.receipt.cmake.sha256
             || cxx != self.receipt.cxx.sha256
+            || !self.receipt.validates_report_identity(
+                self.source_digest.as_str(),
+                self.build_fingerprint.as_str(),
+                self.binary_digest.as_str(),
+            )
         {
             return Err(AdapterError::StaleBuild(
                 "adapter identity changed after preparation".to_string(),
@@ -89,6 +95,36 @@ impl AdapterBuildReceipt {
             && valid_tool_identity(&self.cmake)
             && valid_tool_identity(&self.cxx)
             && !self.compile_arguments.is_empty()
+            && self.recomputed_build_fingerprint().as_deref() == Some(build_fingerprint)
+    }
+
+    fn recomputed_build_fingerprint(&self) -> Option<String> {
+        let expected_argument = format!("{BUILD_FINGERPRINT_DEFINE}\"{}\"", self.build_fingerprint);
+        let pending_argument = format!("{BUILD_FINGERPRINT_DEFINE}\"PENDING\"");
+        let mut found = false;
+        let mut arguments = Vec::with_capacity(self.compile_arguments.len());
+        for argument in &self.compile_arguments {
+            if argument.starts_with(BUILD_FINGERPRINT_DEFINE) {
+                if found || argument != &expected_argument {
+                    return None;
+                }
+                found = true;
+                arguments.push(OsString::from(&pending_argument));
+            } else {
+                arguments.push(OsString::from(argument));
+            }
+        }
+        if !found {
+            return None;
+        }
+        build_fingerprint(
+            &self.adapter_source_sha256,
+            &self.stim_library_sha256,
+            &self.cmake,
+            &self.cxx,
+            &arguments,
+        )
+        .ok()
     }
 }
 
@@ -743,14 +779,34 @@ mod tests {
                 sha256: sha256_regular_file(&cxx, MAX_TOOL_BYTES).expect("cxx digest"),
                 version: "cxx test".to_string(),
             },
-            compile_arguments: vec!["-O3".to_string()],
-            build_fingerprint: "d".repeat(64),
+            compile_arguments: Vec::new(),
+            build_fingerprint: String::new(),
             binary_sha256: binary_digest.clone(),
+        };
+        let fingerprint_arguments = vec![
+            OsString::from("-O3"),
+            OsString::from(format!("{BUILD_FINGERPRINT_DEFINE}\"PENDING\"")),
+        ];
+        let fingerprint = build_fingerprint(
+            &receipt.adapter_source_sha256,
+            &receipt.stim_library_sha256,
+            &receipt.cmake,
+            &receipt.cxx,
+            &fingerprint_arguments,
+        )
+        .expect("build fingerprint");
+        let receipt = AdapterBuildReceipt {
+            compile_arguments: vec![
+                "-O3".to_string(),
+                format!("{BUILD_FINGERPRINT_DEFINE}\"{fingerprint}\""),
+            ],
+            build_fingerprint: fingerprint.clone(),
+            ..receipt
         };
         let executable = AdapterExecutable {
             path: binary,
             source_digest: Sha256Digest::try_new(source_digest).expect("source identity"),
-            build_fingerprint: Sha256Digest::try_new("d".repeat(64)).expect("build fingerprint"),
+            build_fingerprint: Sha256Digest::try_new(fingerprint).expect("build fingerprint"),
             binary_digest: Sha256Digest::try_new(binary_digest).expect("binary identity"),
             receipt,
             source_path: source.clone(),
@@ -761,6 +817,56 @@ mod tests {
         assert!(matches!(
             executable.verify(),
             Err(AdapterError::StaleBuild(_))
+        ));
+    }
+
+    #[test]
+    fn report_identity_rejects_tampered_compile_arguments_and_fingerprint_define() {
+        let tool = ToolIdentity {
+            path: "/usr/bin/tool".to_string(),
+            sha256: "a".repeat(64),
+            version: "tool 1".to_string(),
+        };
+        let source = "b".repeat(64);
+        let library = "c".repeat(64);
+        let pending = vec![
+            OsString::from("-O3"),
+            OsString::from(format!("{BUILD_FINGERPRINT_DEFINE}\"PENDING\"")),
+        ];
+        let fingerprint = build_fingerprint(&source, &library, &tool, &tool, &pending)
+            .expect("build fingerprint");
+        let receipt = AdapterBuildReceipt {
+            schema_version: RECEIPT_SCHEMA_VERSION,
+            stim_tag: STIM_TAG.to_string(),
+            stim_commit: STIM_COMMIT.to_string(),
+            adapter_source_sha256: source.clone(),
+            stim_library_sha256: library,
+            cmake: tool.clone(),
+            cxx: tool,
+            compile_arguments: vec![
+                "-O3".to_string(),
+                format!("{BUILD_FINGERPRINT_DEFINE}\"{fingerprint}\""),
+            ],
+            build_fingerprint: fingerprint.clone(),
+            binary_sha256: "d".repeat(64),
+        };
+        assert!(receipt.validates_report_identity(&source, &fingerprint, &"d".repeat(64)));
+
+        let mut tampered_flags = receipt.clone();
+        *tampered_flags
+            .compile_arguments
+            .first_mut()
+            .expect("receipt has a compiler flag") = "-O2".to_string();
+        assert!(!tampered_flags.validates_report_identity(&source, &fingerprint, &"d".repeat(64)));
+
+        let mut duplicate_define = receipt;
+        duplicate_define
+            .compile_arguments
+            .push(format!("{BUILD_FINGERPRINT_DEFINE}\"{}\"", fingerprint));
+        assert!(!duplicate_define.validates_report_identity(
+            &source,
+            &fingerprint,
+            &"d".repeat(64)
         ));
     }
 }

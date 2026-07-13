@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "profiles": [
     {
       "id": "linux-x86-64-controlled",
@@ -10,7 +10,9 @@
       "minimum_available_memory_bytes": 4294967296,
       "require_no_swap_activity": true,
       "require_frequency_governor": true,
-      "allowed_frequency_governors": ["performance"]
+      "allowed_frequency_governors": ["performance"],
+      "require_thermal_probe": true,
+      "maximum_temperature_millidegrees_celsius": 85000
     },
     {
       "id": "linux-aarch64-controlled",
@@ -21,7 +23,9 @@
       "minimum_available_memory_bytes": 4294967296,
       "require_no_swap_activity": true,
       "require_frequency_governor": true,
-      "allowed_frequency_governors": ["performance"]
+      "allowed_frequency_governors": ["performance"],
+      "require_thermal_probe": true,
+      "maximum_temperature_millidegrees_celsius": 85000
     }
   ]
 }

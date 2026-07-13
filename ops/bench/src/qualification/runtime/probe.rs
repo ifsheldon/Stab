@@ -93,12 +93,15 @@ fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
     };
     let output = checked_process(run_bounded_process(&request)?, "Stab worker")?;
     let rows = parse_worker_json_lines(&output.stdout)?;
+    let expected_work_count = expected_work_count(&args)?;
     ProtocolExpectation {
         implementation: Implementation::Stab,
         evidence_mode: args.evidence_mode.into(),
         workload_id: ProtocolId::try_new("protocol-smoke")?,
         measurement_ids: BTreeSet::from([ProtocolId::try_new("main")?]),
         iteration_count: args.iterations.get(),
+        expected_work_count,
+        expected_output_digest: None,
         affinity_cpu: None,
         stim_commit: GitCommit::try_new(STIM_COMMIT)?,
         source_digest: identity.source_digest.clone(),
@@ -177,12 +180,15 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
     let measurement_id = ProtocolId::try_new("main")?;
     let measurement_ids = BTreeSet::from([measurement_id.clone()]);
     let stim_commit = GitCommit::try_new(STIM_COMMIT)?;
+    let expected_work_count = expected_work_count(&args)?;
     ProtocolExpectation {
         implementation: Implementation::Stim,
         evidence_mode: args.evidence_mode.into(),
         workload_id: workload_id.clone(),
         measurement_ids: measurement_ids.clone(),
         iteration_count: args.iterations.get(),
+        expected_work_count,
+        expected_output_digest: None,
         affinity_cpu: None,
         stim_commit: stim_commit.clone(),
         source_digest: adapter.source_digest.clone(),
@@ -195,6 +201,8 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
         workload_id,
         measurement_ids,
         iteration_count: args.iterations.get(),
+        expected_work_count,
+        expected_output_digest: None,
         affinity_cpu: None,
         stim_commit,
         source_digest: worker_identity.source_digest,
@@ -256,6 +264,13 @@ fn worker_arguments(args: &ProbeArgs) -> Vec<OsString> {
     ]
 }
 
+fn expected_work_count(args: &ProbeArgs) -> Result<u64, ProbeError> {
+    args.iterations
+        .get()
+        .checked_mul(args.work_items.get())
+        .ok_or(ProbeError::WorkOverflow)
+}
+
 fn checked_process(output: ProcessResult, name: &'static str) -> Result<ProcessResult, ProbeError> {
     if output.status != Some(0) {
         return Err(ProbeError::Contract(format!(
@@ -312,6 +327,8 @@ pub(super) enum ProbeError {
     CurrentExecutable(std::io::Error),
     #[error("Stab qualification worker identity changed during the probe")]
     WorkerIdentityChanged,
+    #[error("qualification probe semantic work count overflows u64")]
+    WorkOverflow,
     #[error("qualification probe contract failed: {0}")]
     Contract(String),
 }

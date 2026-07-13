@@ -226,6 +226,8 @@ pub(crate) struct ProtocolExpectation {
     pub(super) workload_id: ProtocolId,
     pub(super) measurement_ids: BTreeSet<ProtocolId>,
     pub(super) iteration_count: u64,
+    pub(super) expected_work_count: u64,
+    pub(super) expected_output_digest: Option<SemanticDigest>,
     pub(super) affinity_cpu: Option<u32>,
     pub(super) stim_commit: GitCommit,
     pub(super) source_digest: Sha256Digest,
@@ -240,6 +242,11 @@ impl ProtocolExpectation {
                 || row.evidence_mode != self.evidence_mode
                 || row.workload_id != self.workload_id
                 || row.iteration_count != self.iteration_count
+                || row.work_count != self.expected_work_count
+                || self
+                    .expected_output_digest
+                    .as_ref()
+                    .is_some_and(|expected| row.output_digest != *expected)
                 || row.affinity_cpu != self.affinity_cpu
                 || row.stim_commit != self.stim_commit
                 || row.source_digest != self.source_digest
@@ -440,6 +447,8 @@ mod tests {
                 .into_iter()
                 .collect(),
             iteration_count: 4,
+            expected_work_count: 64,
+            expected_output_digest: None,
             affinity_cpu: None,
             stim_commit: GitCommit::try_new("e2fc1eca7fd21684d433aa5f10f4504ea4860d07")
                 .expect("commit"),
@@ -485,6 +494,8 @@ mod tests {
                 .into_iter()
                 .collect(),
             iteration_count: 4,
+            expected_work_count: 64,
+            expected_output_digest: None,
             affinity_cpu: Some(0),
             stim_commit: GitCommit::try_new("e2fc1eca7fd21684d433aa5f10f4504ea4860d07")
                 .expect("commit"),
@@ -501,5 +512,39 @@ mod tests {
         let mut expectation = expectation;
         expectation.affinity_cpu = None;
         assert!(expectation.validate(&rows).is_err());
+    }
+
+    #[test]
+    fn expectation_binds_parent_work_and_preflight_digest() {
+        let rows = parse_worker_json_lines(format!("{}\n", valid_line()).as_bytes())
+            .expect("valid protocol row");
+        let base = ProtocolExpectation {
+            implementation: Implementation::Stab,
+            evidence_mode: EvidenceMode::Timing,
+            workload_id: ProtocolId::try_new("protocol-smoke").expect("workload id"),
+            measurement_ids: [ProtocolId::try_new("main").expect("measurement id")]
+                .into_iter()
+                .collect(),
+            iteration_count: 4,
+            expected_work_count: 64,
+            expected_output_digest: Some(
+                SemanticDigest::try_new("a".repeat(64)).expect("semantic digest"),
+            ),
+            affinity_cpu: None,
+            stim_commit: GitCommit::try_new("e2fc1eca7fd21684d433aa5f10f4504ea4860d07")
+                .expect("commit"),
+            source_digest: Sha256Digest::try_new("b".repeat(64)).expect("source digest"),
+            build_fingerprint: Sha256Digest::try_new("c".repeat(64)).expect("build fingerprint"),
+        };
+        base.validate(&rows).expect("bound expectation");
+
+        let mut wrong_work = base.clone();
+        wrong_work.expected_work_count = 65;
+        assert!(wrong_work.validate(&rows).is_err());
+
+        let mut wrong_digest = base;
+        wrong_digest.expected_output_digest =
+            Some(SemanticDigest::try_new("d".repeat(64)).expect("different digest"));
+        assert!(wrong_digest.validate(&rows).is_err());
     }
 }

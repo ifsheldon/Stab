@@ -27,8 +27,6 @@ sha2 = { workspace = true }
 signal-hook = { workspace = true }
 stab-cli = { path = "../../crates/stab-cli" }
 stab-core = { path = "../../crates/stab-core", features = ["ops-contracts"] }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 wait-timeout = { workspace = true }
-
-[dev-dependencies]
-tempfile = { workspace = true }

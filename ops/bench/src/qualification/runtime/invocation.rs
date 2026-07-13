@@ -10,8 +10,8 @@ use thiserror::Error;
 use super::adapter::{AdapterExecutable, prepare_adapter};
 use super::process::{ProcessLimits, ProcessRequest, ProcessResult, run_bounded_process};
 use super::protocol::{
-    EvidenceMode, GitCommit, Implementation, ProtocolExpectation, ProtocolId, WorkerMeasurement,
-    parse_worker_json_lines,
+    EvidenceMode, GitCommit, Implementation, ProtocolExpectation, ProtocolId, SemanticDigest,
+    WorkerMeasurement, parse_worker_json_lines,
 };
 use super::worker;
 use crate::config::STIM_COMMIT;
@@ -80,6 +80,7 @@ impl PreparedWorkers {
         evidence_mode: EvidenceMode,
         iterations: NonZeroU64,
         work_items: NonZeroU64,
+        expected_output_digest: Option<&SemanticDigest>,
         timeout: Duration,
     ) -> Result<InvocationRecord, InvocationError> {
         let cpu = self.cpu.ok_or(InvocationError::MissingCpu)?;
@@ -133,12 +134,18 @@ impl PreparedWorkers {
         })?;
         let process = checked_process(process, implementation)?;
         let rows = parse_worker_json_lines(&process.stdout)?;
+        let expected_work_count = iterations
+            .get()
+            .checked_mul(work_items.get())
+            .ok_or(InvocationError::WorkOverflow)?;
         ProtocolExpectation {
             implementation,
             evidence_mode,
             workload_id: ProtocolId::try_new(WORKLOAD_ID)?,
             measurement_ids: BTreeSet::from([ProtocolId::try_new(MEASUREMENT_ID)?]),
             iteration_count: iterations.get(),
+            expected_work_count,
+            expected_output_digest: expected_output_digest.cloned(),
             affinity_cpu: Some(expected_cpu),
             stim_commit: GitCommit::try_new(STIM_COMMIT)?,
             source_digest,
@@ -244,6 +251,8 @@ pub(crate) enum InvocationError {
     CpuRange(usize),
     #[error("qualification workers were invoked before selecting a host-policy CPU")]
     MissingCpu,
+    #[error("qualification parent semantic work count overflows u64")]
+    WorkOverflow,
     #[error("qualification worker identity changed during the run")]
     WorkerIdentityChanged,
     #[error(

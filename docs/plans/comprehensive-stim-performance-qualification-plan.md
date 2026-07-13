@@ -6,7 +6,7 @@ Planned: 2026-07-13.
 
 PQ0 completed: 2026-07-13, with source-owned evidence in [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md).
 
-PQ1 implementation in progress: 2026-07-14. The bounded process runner, independent process and adapter probes, symmetric protocol-smoke workers, calibration, paired statistics, correctness-preflight seam, host policy, process-memory evidence, atomic reports, and report-only regression dispatch are implemented locally; clean PR/full/soak evidence, milestone audit, and full code review remain required before PQ1 acceptance.
+PQ1 implementation in progress: 2026-07-14. The bounded process runner, independent process and adapter probes, symmetric protocol-smoke workers, calibration, paired statistics, correctness-preflight seam, host policy, process-memory evidence, atomic reports, and report-only regression dispatch are implemented. The milestone audit exposed missing parent work and digest binding plus missing thermal evidence; those contracts, canonical adapter-receipt recomputation, and private-index clean-revision auditing are now implemented locally. Earlier clean PR/full/soak reports predate this hardening and are not current evidence; fresh clean reports, completion of the milestone audit, and the GPT-5.6/max full code review remain required before PQ1 acceptance.
 
 PQ2 through PQ7 remain planned.
 
@@ -407,6 +407,8 @@ Turn the checklist and current 161-row manifest into a finite, reviewable invent
 ## PQ1: Build The Paired Qualification Harness And Stim Adapter
 
 Implementation note: `pq1-adapter-protocol-smoke` is a synthetic diagnostic group used only to prove the harness. It cannot accept product correctness evidence, enter a threshold baseline, or support a Stab-versus-Stim product speed claim.
+
+Audit note: the parent must independently derive `iterations * work_items`, bind every timed and memory receipt to the untimed semantic-preflight digest, recompute the adapter build fingerprint from the receipt's canonical build inputs, and inspect the clean revision through a private index reconstructed from `HEAD`. Controlled host evidence requires stable thermal-zone identity and readings no higher than the profile limit whenever the platform exposes the required probes.
 
 ### Objective
 

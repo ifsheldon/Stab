@@ -262,7 +262,7 @@ fn open_or_create_directories(
         match open_directory_at(&current, component) {
             Ok(next) => current = next,
             Err(rustix::io::Errno::NOENT) => {
-                rustix::fs::mkdirat(
+                match rustix::fs::mkdirat(
                     &current,
                     *component,
                     rustix::fs::Mode::RUSR
@@ -272,8 +272,10 @@ fn open_or_create_directories(
                         | rustix::fs::Mode::XGRP
                         | rustix::fs::Mode::ROTH
                         | rustix::fs::Mode::XOTH,
-                )
-                .map_err(ArtifactError::Io)?;
+                ) {
+                    Ok(()) | Err(rustix::io::Errno::EXIST) => {}
+                    Err(source) => return Err(ArtifactError::Io(source)),
+                }
                 current = open_directory_at(&current, component).map_err(ArtifactError::Io)?;
             }
             Err(source) => return Err(ArtifactError::Io(source)),

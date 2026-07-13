@@ -5,8 +5,9 @@ use thiserror::Error;
 use crate::root::RepoRoot;
 
 const HOST_POLICY_PATH: &str = "benchmarks/qualification-host-policy.json";
-const HOST_POLICY_SCHEMA_VERSION: u32 = 1;
+const HOST_POLICY_SCHEMA_VERSION: u32 = 2;
 const MAX_HOST_POLICY_BYTES: usize = 1 << 20;
+const MAX_THERMAL_ZONES: usize = 128;
 const MEM_AVAILABLE_FIELD: &str = "MemAvailable:";
 
 #[derive(Clone, Debug, Deserialize)]
@@ -28,6 +29,8 @@ struct HostProfile {
     require_no_swap_activity: bool,
     require_frequency_governor: bool,
     allowed_frequency_governors: Vec<String>,
+    require_thermal_probe: bool,
+    maximum_temperature_millidegrees_celsius: i64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
@@ -61,9 +64,20 @@ pub(crate) struct HostEvidence {
     pub(super) frequency_governor_after: Option<String>,
     pub(super) frequency_khz_before: Option<u64>,
     pub(super) frequency_khz_after: Option<u64>,
+    pub(super) maximum_temperature_millidegrees_celsius: i64,
+    pub(super) thermal_readings_before: Vec<ThermalReading>,
+    pub(super) thermal_readings_after: Vec<ThermalReading>,
     pub(super) thermal_probe_available: bool,
     pub(super) verified: bool,
     pub(super) violations: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ThermalReading {
+    pub(super) zone: String,
+    pub(super) kind: String,
+    pub(super) millidegrees_celsius: i64,
 }
 
 #[derive(Debug)]
@@ -115,7 +129,11 @@ impl HostGuard {
             frequency_governor_after: before.frequency_governor.clone(),
             frequency_khz_before: before.frequency_khz,
             frequency_khz_after: before.frequency_khz,
-            thermal_probe_available: false,
+            maximum_temperature_millidegrees_celsius: profile
+                .maximum_temperature_millidegrees_celsius,
+            thermal_readings_before: before.thermal_readings.clone(),
+            thermal_readings_after: before.thermal_readings.clone(),
+            thermal_probe_available: !before.thermal_readings.is_empty(),
             verified: true,
             violations: Vec::new(),
         };
@@ -140,6 +158,9 @@ impl HostGuard {
         self.evidence.swap_out_after = after.swap_out;
         self.evidence.frequency_governor_after = after.frequency_governor.clone();
         self.evidence.frequency_khz_after = after.frequency_khz;
+        self.evidence.thermal_readings_after = after.thermal_readings.clone();
+        self.evidence.thermal_probe_available = !self.evidence.thermal_readings_before.is_empty()
+            && !self.evidence.thermal_readings_after.is_empty();
         append_snapshot_violations(&self.profile, &mut self.evidence, &after, false);
         append_swap_violation(&self.profile, &mut self.evidence, &after);
         if self.evidence.frequency_governor_before != self.evidence.frequency_governor_after {
@@ -212,6 +233,9 @@ fn validate_policy(policy: &HostPolicy) -> Result<(), HostError> {
         {
             return Err(HostError::IncompleteProfile(profile.id.clone()));
         }
+        if profile.require_thermal_probe && profile.maximum_temperature_millidegrees_celsius <= 0 {
+            return Err(HostError::IncompleteProfile(profile.id.clone()));
+        }
     }
     Ok(())
 }
@@ -254,6 +278,7 @@ struct HostSnapshot {
     swap_out: u64,
     frequency_governor: Option<String>,
     frequency_khz: Option<u64>,
+    thermal_readings: Vec<ThermalReading>,
 }
 
 impl HostSnapshot {
@@ -284,6 +309,7 @@ impl HostSnapshot {
                     .map_err(|_| HostError::MalformedOptionalProbe("scaling_cur_freq"))
             })
             .transpose()?,
+            thermal_readings: read_thermal_zones()?,
         })
     }
 }
@@ -323,6 +349,41 @@ fn append_snapshot_violations(
             "frequency governor probe is unavailable {phase} the run"
         )),
         _ => {}
+    }
+    if snapshot.thermal_readings.is_empty() {
+        if profile.require_thermal_probe {
+            evidence
+                .violations
+                .push(format!("thermal probe is unavailable {phase} the run"));
+        }
+    } else {
+        for reading in &snapshot.thermal_readings {
+            if reading.millidegrees_celsius > profile.maximum_temperature_millidegrees_celsius {
+                evidence.violations.push(format!(
+                    "thermal zone {} ({}) is {} millidegrees Celsius {phase} the run, exceeding {}",
+                    reading.zone,
+                    reading.kind,
+                    reading.millidegrees_celsius,
+                    profile.maximum_temperature_millidegrees_celsius
+                ));
+            }
+        }
+    }
+    if !before
+        && snapshot
+            .thermal_readings
+            .iter()
+            .map(|reading| (&reading.zone, &reading.kind))
+            .collect::<std::collections::BTreeSet<_>>()
+            != evidence
+                .thermal_readings_before
+                .iter()
+                .map(|reading| (&reading.zone, &reading.kind))
+                .collect::<std::collections::BTreeSet<_>>()
+    {
+        evidence
+            .violations
+            .push("thermal probe zone set changed during the run".to_string());
     }
 }
 
@@ -407,6 +468,64 @@ fn read_optional_probe(path: &str) -> Result<Option<String>, HostError> {
         return Err(HostError::MalformedOptionalProbe("cpufreq"));
     }
     Ok(Some(value.to_string()))
+}
+
+fn read_thermal_zones() -> Result<Vec<ThermalReading>, HostError> {
+    let entries = match std::fs::read_dir("/sys/class/thermal") {
+        Ok(entries) => entries,
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(source) => return Err(HostError::ThermalDirectory(source)),
+    };
+    let mut readings = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(HostError::ThermalDirectory)?;
+        let Some(zone) = entry.file_name().to_str().map(str::to_string) else {
+            continue;
+        };
+        let Some(index) = zone.strip_prefix("thermal_zone") else {
+            continue;
+        };
+        if index.is_empty() || !index.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(HostError::MalformedThermalProbe(zone));
+        }
+        let index = index
+            .parse::<u32>()
+            .map_err(|_| HostError::MalformedThermalProbe(zone.clone()))?;
+        if readings.len() == MAX_THERMAL_ZONES {
+            return Err(HostError::TooManyThermalZones(MAX_THERMAL_ZONES));
+        }
+        let kind = read_thermal_value(&entry.path().join("type"))?;
+        let temperature = read_thermal_value(&entry.path().join("temp"))?
+            .parse::<i64>()
+            .map_err(|_| HostError::MalformedThermalProbe(zone.clone()))?;
+        if !(-273_150..=300_000).contains(&temperature) {
+            return Err(HostError::MalformedThermalProbe(zone));
+        }
+        readings.push((
+            index,
+            ThermalReading {
+                zone,
+                kind,
+                millidegrees_celsius: temperature,
+            },
+        ));
+    }
+    readings.sort_by_key(|(index, _)| *index);
+    Ok(readings.into_iter().map(|(_, reading)| reading).collect())
+}
+
+fn read_thermal_value(path: &std::path::Path) -> Result<String, HostError> {
+    let value = std::fs::read_to_string(path).map_err(|source| HostError::ThermalProbe {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let value = value.trim();
+    if value.is_empty() || value.len() > 256 || !value.is_ascii() {
+        return Err(HostError::MalformedThermalProbe(
+            path.to_string_lossy().into_owned(),
+        ));
+    }
+    Ok(value.to_string())
 }
 
 fn cpu_identity() -> Result<String, HostError> {
@@ -564,6 +683,17 @@ pub(crate) enum HostError {
     },
     #[error("optional host probe {0} is malformed")]
     MalformedOptionalProbe(&'static str),
+    #[error("failed to enumerate thermal probes: {0}")]
+    ThermalDirectory(std::io::Error),
+    #[error("failed to read thermal probe {path}: {source}")]
+    ThermalProbe {
+        path: std::path::PathBuf,
+        source: std::io::Error,
+    },
+    #[error("thermal probe is malformed: {0}")]
+    MalformedThermalProbe(String),
+    #[error("thermal probe count exceeds {0}")]
+    TooManyThermalZones(usize),
     #[error("host probe is missing {0}")]
     MissingProbeField(&'static str),
     #[error("host probe field {0} is malformed")]
@@ -617,6 +747,9 @@ mod tests {
             frequency_governor_after: Some("performance".to_string()),
             frequency_khz_before: Some(1_000_000),
             frequency_khz_after: Some(1_000_000),
+            maximum_temperature_millidegrees_celsius: 85_000,
+            thermal_readings_before: Vec::new(),
+            thermal_readings_after: Vec::new(),
             thermal_probe_available: false,
             verified: true,
             violations: vec!["load too high".to_string()],
@@ -638,6 +771,8 @@ mod tests {
             require_no_swap_activity: true,
             require_frequency_governor: true,
             allowed_frequency_governors: vec!["performance".to_string()],
+            require_thermal_probe: false,
+            maximum_temperature_millidegrees_celsius: 85_000,
         };
         let mut evidence = HostEvidence {
             policy_sha256: "a".repeat(64),
@@ -662,6 +797,9 @@ mod tests {
             frequency_governor_after: Some("performance".to_string()),
             frequency_khz_before: Some(1_000_000),
             frequency_khz_after: Some(1_000_000),
+            maximum_temperature_millidegrees_celsius: 85_000,
+            thermal_readings_before: Vec::new(),
+            thermal_readings_after: Vec::new(),
             thermal_probe_available: false,
             verified: true,
             violations: Vec::new(),
@@ -673,6 +811,7 @@ mod tests {
             swap_out: 4,
             frequency_governor: Some("performance".to_string()),
             frequency_khz: Some(1_000_000),
+            thermal_readings: Vec::new(),
         };
 
         append_snapshot_violations(&profile, &mut evidence, &snapshot, true);
@@ -694,6 +833,8 @@ mod tests {
             require_no_swap_activity: true,
             require_frequency_governor: true,
             allowed_frequency_governors: vec!["performance".to_string()],
+            require_thermal_probe: false,
+            maximum_temperature_millidegrees_celsius: 85_000,
         };
         let mut evidence = HostEvidence {
             policy_sha256: "a".repeat(64),
@@ -718,6 +859,9 @@ mod tests {
             frequency_governor_after: None,
             frequency_khz_before: None,
             frequency_khz_after: None,
+            maximum_temperature_millidegrees_celsius: 85_000,
+            thermal_readings_before: Vec::new(),
+            thermal_readings_after: Vec::new(),
             thermal_probe_available: false,
             verified: true,
             violations: Vec::new(),
@@ -729,6 +873,7 @@ mod tests {
             swap_out: 0,
             frequency_governor: None,
             frequency_khz: None,
+            thermal_readings: Vec::new(),
         };
         append_snapshot_violations(&profile, &mut evidence, &unavailable, true);
         assert!(
@@ -749,6 +894,103 @@ mod tests {
                 .violations
                 .iter()
                 .any(|value| value.contains("powersave"))
+        );
+    }
+
+    #[test]
+    fn required_thermal_probe_must_stay_available_stable_and_below_limit() {
+        let profile = HostProfile {
+            id: "test".to_string(),
+            operating_system: "linux".to_string(),
+            architecture: "x86_64".to_string(),
+            cpu_selection: CpuSelection::LowestAllowed,
+            max_load_per_allowed_cpu: "0.50".to_string(),
+            minimum_available_memory_bytes: 1024,
+            require_no_swap_activity: true,
+            require_frequency_governor: false,
+            allowed_frequency_governors: Vec::new(),
+            require_thermal_probe: true,
+            maximum_temperature_millidegrees_celsius: 85_000,
+        };
+        let baseline = ThermalReading {
+            zone: "thermal_zone0".to_string(),
+            kind: "cpu".to_string(),
+            millidegrees_celsius: 45_000,
+        };
+        let mut evidence = HostEvidence {
+            policy_sha256: "a".repeat(64),
+            profile_id: "test".to_string(),
+            operating_system: "linux".to_string(),
+            architecture: "x86_64".to_string(),
+            allowed_cpus: vec![0],
+            logical_cpu_count: 1,
+            selected_cpu: 0,
+            cpu_identity: "test CPU".to_string(),
+            load_one_before: 0.0,
+            load_one_after: 0.0,
+            maximum_load_one: 0.5,
+            available_memory_before_bytes: 2048,
+            available_memory_after_bytes: 2048,
+            minimum_available_memory_bytes: 1024,
+            swap_in_before: 0,
+            swap_in_after: 0,
+            swap_out_before: 0,
+            swap_out_after: 0,
+            frequency_governor_before: None,
+            frequency_governor_after: None,
+            frequency_khz_before: None,
+            frequency_khz_after: None,
+            maximum_temperature_millidegrees_celsius: 85_000,
+            thermal_readings_before: vec![baseline.clone()],
+            thermal_readings_after: vec![baseline],
+            thermal_probe_available: true,
+            verified: true,
+            violations: Vec::new(),
+        };
+        let unavailable = HostSnapshot {
+            load_one: 0.0,
+            available_memory_bytes: 2048,
+            swap_in: 0,
+            swap_out: 0,
+            frequency_governor: None,
+            frequency_khz: None,
+            thermal_readings: Vec::new(),
+        };
+        append_snapshot_violations(&profile, &mut evidence, &unavailable, false);
+        assert!(
+            evidence
+                .violations
+                .iter()
+                .any(|value| value.contains("unavailable"))
+        );
+        assert!(
+            evidence
+                .violations
+                .iter()
+                .any(|value| value.contains("zone set changed"))
+        );
+
+        evidence.violations.clear();
+        let overheated = HostSnapshot {
+            thermal_readings: vec![ThermalReading {
+                zone: "thermal_zone0".to_string(),
+                kind: "cpu".to_string(),
+                millidegrees_celsius: 90_000,
+            }],
+            ..unavailable
+        };
+        append_snapshot_violations(&profile, &mut evidence, &overheated, false);
+        assert!(
+            evidence
+                .violations
+                .iter()
+                .any(|value| value.contains("exceeding 85000"))
+        );
+        assert!(
+            !evidence
+                .violations
+                .iter()
+                .any(|value| value.contains("zone set changed"))
         );
     }
 }
