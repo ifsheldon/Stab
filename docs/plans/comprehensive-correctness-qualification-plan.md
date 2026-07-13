@@ -251,6 +251,8 @@ Convert the current file-level test hierarchy and feature checklist into a finit
 
 ## Milestone CQ1: Build The Qualification Harness
 
+Status: Complete as of 2026-07-14. Clean PR, full, soak, report, preflight, audit, and review evidence is recorded in [cq1-correctness-harness-progress-report.md](cq1-correctness-harness-progress-report.md).
+
 ### Objective
 
 Make every comparator, selector, statistical plan, artifact, timeout, and report contract executable before expanding feature tests.

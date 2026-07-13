@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141",
-  "semantic_digest": "40f7155022cf97205e802256a21290924af8605afc41c502dab34f6007c24ae6",
+  "semantic_digest": "cc9f6cabfb9a3245d9c52000e82c8f1bec76aed605f3563d1a15244d327c3fbd",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -2247,10 +2247,10 @@
     {
       "id": "PERFC-5f2145ca0e3328b5",
       "source_line": 224,
-      "anchor_digest": "a317825f1bebbc6780ea6deb755b2f6667ee557ce445d26f51673048a79e8234",
+      "anchor_digest": "ed54cc1da20d7993823d7b9ccfaab0f040ac5199c676720e7b0849f9b220de81",
       "section": "16. Test And Benchmark Surface",
       "feature": "Oracle fixture matrix",
-      "raw_status": "Done for current implemented surfaces; CQ1 clean acceptance pending",
+      "raw_status": "Done for current implemented surfaces and CQ1 harness acceptance",
       "scope": "selected",
       "deferred_remainder": false,
       "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",

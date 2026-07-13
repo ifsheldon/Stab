@@ -2,7 +2,7 @@
 
 ## Status
 
-Active execution goal as of 2026-07-13.
+Active execution goal as of 2026-07-14.
 
 The previous non-deferred blocker rollup is complete and recorded in `docs/plans/pfm8-rollup-evidence-report.md`.
 This goal replaces that completed execution contract; it does not reopen the finite PFM-B ledger.
@@ -20,6 +20,7 @@ The plans were written to prevent the specific failures recorded there: file-lev
 ## Active Sources Of Truth
 
 - Correctness execution and acceptance: `docs/plans/comprehensive-correctness-qualification-plan.md`.
+- Completed CQ1 harness evidence: `docs/plans/cq1-correctness-harness-progress-report.md`.
 - Performance execution and acceptance: `docs/plans/comprehensive-stim-performance-qualification-plan.md`.
 - Implemented and deferred feature boundary: `docs/stab-feature-checklist.md`.
 - Upstream feature inventory: `docs/stim-feature-list.md`.
@@ -44,8 +45,8 @@ Do not expand product scope while building qualification infrastructure.
 
 ## Program Order
 
-Program checkpoint: CQ0 is complete at corrected correctness inventory digest `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`, and PQ0 must be dependency-regenerated from that digest during the current CQ1 closure; the original clean evidence revisions remain `02c93c19566bdc465ad9c795f35e956e1ff85440` for CQ0 and `abf7cd1bae0de045f62e976a290507238153f976` for PQ0, while the corrected digests require the current CQ1 closure commit and clean evidence run.
-The active milestones are CQ1 followed by PQ1: first make the frozen correctness selectors and comparator contracts executable, then build the symmetric paired benchmark harness, pinned-Stim adapter, Stab worker, preflight, host policy, statistics, memory evidence, and report commands against those executable CQ dependencies.
+Program checkpoint: CQ0 is complete at corrected correctness inventory digest `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`; PQ0 is dependency-regenerated after CQ1 acceptance at performance digest `cc9f6cabfb9a3245d9c52000e82c8f1bec76aed605f3563d1a15244d327c3fbd`; and CQ1 is complete with clean PR, full, and soak evidence from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`.
+The active milestone is PQ1: build the symmetric paired benchmark harness, pinned-Stim adapter, Stab worker, preflight, host policy, statistics, memory evidence, and report commands against CQ1's executable correctness dependencies.
 Do not reopen CQ0 or PQ0 inventory semantics unless pinned-source drift, a newly exported default-feature API, a stale referenced id, a changed checklist or benchmark source of truth, or a confirmed inventory defect changes a frozen digest.
 Do not treat PQ0's 15 retained rows as qualified evidence: all 159 active inherited rows still record missing correctness preflight and output-digest evidence, 58 CLI rows remain asymmetric, 73 rows lack a current comparator, 124 lack required scale families, and 21 select heterogeneous upstream measurements.
 
@@ -53,7 +54,7 @@ Execute the milestones in this dependency order:
 
 1. Complete CQ0 to freeze case-level correctness ids and upstream dispositions.
 2. Complete PQ0 using the frozen CQ0 feature and correctness ids.
-3. Complete CQ1 and PQ1 to build the validated correctness and paired benchmark harnesses.
+3. Keep completed CQ1 evidence valid and complete PQ1 to build the validated paired benchmark harness.
 4. Complete CQ2, then PQ2 for deterministic models, formats, gates, kernels, and algebra.
 5. Complete CQ3, then PQ3 for public CLI, generation, conversion, and startup.
 6. Complete CQ4, then PQ4 for sampling, detection, conversion, and DEM sampling.
@@ -213,8 +214,8 @@ just bench::primary-memory-regression --baseline <fresh-primary-baseline>
 just maintenance::pre-commit
 ```
 
-The qualification commands are planned interfaces and become mandatory when their owning CQ1 or PQ1 milestone lands.
-Do not fake an early pass by omitting commands that the active milestone was required to implement.
+The CQ1 correctness commands are mandatory and complete; the PQ qualification commands become mandatory when PQ1 lands.
+Do not fake an early pass by omitting commands that the active milestone is required to implement.
 
 ## Completion Criteria
 

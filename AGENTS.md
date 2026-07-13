@@ -11,6 +11,7 @@
 
 - `docs/plans/rust-stim-drop-in-rewrite.md` is the current implementation roadmap for the Rust Stim drop-in rewrite.
 - `docs/plans/GOAL.md` is the active execution contract, and it currently points at `docs/plans/comprehensive-correctness-qualification-plan.md` and `docs/plans/comprehensive-stim-performance-qualification-plan.md`.
+- CQ1 is complete at the clean evidence recorded in `docs/plans/cq1-correctness-harness-progress-report.md`; PQ1 is the active harness milestone, and later CQ2 through CQ6 work must preserve CQ1 receipt and preflight validity.
 - During the qualification program, do not promote a correctness claim from file-level or broad shared evidence, and do not promote a Stim performance ratio until its exact correctness prerequisites and equivalent semantic work pass.
 - Use `just qualification::correctness-list`, `just qualification::correctness-check`, and `just qualification::correctness-regenerate --check` for the CQ0 case and public-API inventory; update the frozen digest and checked manifest together when reviewed source ownership changes.
 - Use `just qualification::correctness-provenance-probe` to rebuild private Stab and Stim binaries, execute one real source-owned case through the normal qualification runner, and validate the published request, execution, report, completion, and preflight bindings.

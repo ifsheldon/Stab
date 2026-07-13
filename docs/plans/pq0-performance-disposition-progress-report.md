@@ -8,9 +8,11 @@ Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4
 
 Correctness dependency: corrected schema-version-3 CQ0 semantic digest `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`.
 
-Performance inventory digest after CQ1 checklist-status synchronization: `40f7155022cf97205e802256a21290924af8605afc41c502dab34f6007c24ae6`.
+Performance inventory digest after final CQ1 acceptance-status synchronization: `cc9f6cabfb9a3245d9c52000e82c8f1bec76aed605f3563d1a15244d327c3fbd`.
 
 Implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
+
+Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca325860c57a9a2c973e11`; clean CQ1 evidence revision: `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`. The final acceptance-status regeneration is included with this report and does not change any PQ0 disposition or unresolved count.
 
 The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
@@ -128,7 +130,7 @@ Targeted negative tests cover unknown correctness, fixture, measurement, feature
 
 ## Audit And Review
 
-The final `milestone-audit` found no remaining confirmed finding and approved PQ0's dispositions; CQ1 checklist-status synchronization now freezes those same dispositions at digest `40f7155022cf97205e802256a21290924af8605afc41c502dab34f6007c24ae6`.
+The final `milestone-audit` found no remaining confirmed finding and approved PQ0's dispositions; final CQ1 acceptance-status synchronization now freezes those same dispositions at digest `cc9f6cabfb9a3245d9c52000e82c8f1bec76aed605f3563d1a15244d327c3fbd`.
 The final `full-code-review` found no remaining confirmed finding across correctness, schema integrity, benchmark ownership, hostile inputs, filesystem containment, operational commands, tests, module boundaries, and documentation.
 
 Earlier audit and review passes found and drove fixes for truncated and Cartesian checklist ownership, duplicate global child/domain ownership, weak API owner binding, unhashed static fixtures, open-ended generator parameters, incomplete threshold and waiver digests, stale filter handling, asymmetric CLI claims, unsafe pinned-source and repository paths, unbounded manifest and CLI stdin reads, raceable atomic replacement, non-Unix path fallbacks, oversized modules, and stale benchmark-local documentation.
@@ -155,4 +157,4 @@ just bench::qualification-list --feature PERF-RESULT-IO
 ## Next Milestone
 
 PQ1 must build the symmetric process runner, pinned-Stim adapter, Stab worker protocol, correctness and output preflight, calibrated paired statistics, exact submeasurement pairing, host policy, and report commands.
-CQ1 must make the referenced correctness selectors executable before any dependent benchmark becomes qualified or enters a new comprehensive 1.25x claim.
+CQ1 now makes the referenced correctness selectors executable and supplies machine-readable preflight evidence. PQ1 must consume those exact prerequisites before any dependent benchmark becomes qualified or enters a new comprehensive 1.25x claim.

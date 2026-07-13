@@ -6,6 +6,8 @@ CQ0 is complete after CQ1-driven exact-selector and canonical-owner corrections.
 
 Original source-owned evidence revision: `02c93c19566bdc465ad9c795f35e956e1ff85440` with `local_modifications=false`.
 
+Corrected inventory execution evidence revision: `e7ba513822c26859a2b5c70c94d406e1c6adb6b6` with `local_modifications=false`.
+
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
 Current corrected schema-version-3 manifest digest: `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`.
@@ -27,7 +29,7 @@ This milestone freezes a finite source and API inventory; it does not claim that
 | Multi-domain relevance records | 686 | Primarily command plus engine behavior and mixed semantic methods; relevance does not itself confer passing evidence. |
 | Dynamic parameter families in executable scope | 0 | All 23 dynamic families are content-addressed, visible, and non-executable. |
 | Default-feature public API items | 1,922 | Includes re-exports, variants, enum payload fields, public struct fields, inherent methods, trait methods, and explicit non-synthetic, non-blanket trait implementations. |
-| Evidence owners | 4,070 | 2,681 upstream semantic owners, 804 public Rust API owners, 405 oracle-fixture primary owners, 165 blocker cases, fourteen qualification-plan owners, and one hostile-path regression; 33 exact oracle fixtures are retained as supporting provenance on their canonical blocker owners instead of duplicating terminal selectors. |
+| Evidence owners | 4,072 | 2,681 upstream semantic owners, 804 public Rust API owners, 407 oracle-fixture owners, 165 blocker cases, fourteen qualification-plan owners, and one hostile-path regression; 33 exact oracle fixtures are retained as supporting provenance on their canonical blocker owners instead of duplicating terminal selectors. |
 
 ### Upstream Dispositions
 
@@ -47,13 +49,13 @@ Of those deferred records, 163 remain relevant to at least one CQ domain summary
 
 | Status | Count |
 | --- | ---: |
-| `implemented` | 391 |
+| `implemented` | 393 |
 | `evidence-close` | 17 |
 | `planned` | 3,662 |
 | `deferred` | 0 |
 
-The 408 implemented or evidence-close owners establish that every CQ domain has at least one exact primary case; they do not close the remaining planned owners.
-All 438 implemented fixture-manifest rows are represented: 241 own exact existing oracle-fixture primary cases, 164 retain broad inherited Cargo filters only as supporting evidence behind planned atomic oracle-fixture selectors, and 33 exact fixtures are supporting provenance on canonical blocker-ledger owners that execute the same terminal Cargo test.
+The 410 implemented or evidence-close owners establish that every CQ domain has at least one exact primary case; they do not close the remaining planned owners.
+All 440 implemented fixture-manifest rows are represented: 243 own exact existing oracle-fixture primary cases, 164 retain broad inherited Cargo filters only as supporting evidence behind planned atomic oracle-fixture selectors, and 33 exact fixtures are supporting provenance on canonical blocker-ledger owners that execute the same terminal Cargo test.
 
 ### Comparator Inventory
 
@@ -128,11 +130,11 @@ All source discovery, bounded reads, rustdoc and AST subprocesses, stable-id gen
 | Support every selected C++ and pytest form | Satisfied | Extractor tests cover four C++ macros, masked fake declarations, module, class, async, static-parameter, stacked-parameter, dynamic-family, and nested-helper cases. |
 | Freeze default-feature public API inventory | Satisfied | 1,922 typed rows; tests cover re-exports, methods, variants, enum fields, implementing-type trait identities, exclusions, and cyclic glob re-exports. |
 | Classify source relevance and executable ownership | Satisfied | 2,886 records, 686 multi-domain relevance records, zero executable dynamic families, and twelve typed deferred products. |
-| Import existing evidence by stable id | Satisfied | All 438 implemented oracle rows are represented without copied fixture payloads; 241 own exact oracle-fixture primaries, 164 retain planned atomic primaries, and 33 are supporting selectors on canonical blocker owners. |
+| Import existing evidence by stable id | Satisfied | All 440 implemented oracle rows are represented without copied fixture payloads; 243 own exact oracle-fixture primaries, 164 retain planned atomic primaries, and 33 are supporting selectors on canonical blocker owners. |
 | Freeze cross-cutting resource owners | Satisfied | One implemented symlink case, one implemented property-worker case, and thirteen exact planned boundary families are required by manifest validation. |
 | Reject stale, duplicate, unsafe, shared, oversized, or unknown state | Satisfied | Adversarial schema and mutation tests plus exact selector resolution in `correctness-check`. |
 | Freeze semantic digest and deterministic bytes | Satisfied | `correctness-regenerate --check` compares a fresh pinned-source and rustdoc build with the checked manifest. |
-| Give every CQ domain executable or evidence-close ownership | Satisfied | `correctness-check` reports an implemented-or-closed count greater than zero for all sixteen domains from 408 canonical exact owners. |
+| Give every CQ domain executable or evidence-close ownership | Satisfied | `correctness-check` reports an implemented-or-closed count greater than zero for all sixteen domains from 410 canonical exact owners. |
 
 Implementation and review revealed three genuine CQ0 specification gaps: parameterized pytest identity; the separation of domain relevance, evidence ownership, statistical-plan staging, and dedicated resource claims; and a finite cross-cutting resource-owner inventory.
 All three gaps are resolved in `docs/plans/comprehensive-correctness-qualification-plan.md` and recorded in `docs/plans/milestone-spec-gaps.md`.
@@ -167,12 +169,12 @@ just qualification::correctness-check
 The corrected focused qualification run executes the CQ0 inventory tests plus the CQ1 selector and property-plan validation tests with no failures.
 The workspace test run passed with only the repository's pre-existing documented long-running parser fuzz smoke ignored.
 `just maintenance::pre-commit` passed before the implementation commit.
-The original `just qualification::correctness-check` passed from committed revision `02c93c19566bdc465ad9c795f35e956e1ff85440` with a clean worktree; the corrected digest requires new clean CQ1 closure evidence before promotion.
+The original `just qualification::correctness-check` passed from committed revision `02c93c19566bdc465ad9c795f35e956e1ff85440` with a clean worktree. The corrected digest then passed clean CQ1 PR, full, and soak execution from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; the full and soak tiers each passed all 410 implemented or evidence-close owners.
 
 ## Remaining Program Work
 
 - PQ0 is complete and has been regenerated against the corrected CQ digest without changing its performance dispositions.
-- CQ1 must finish audit, review, and clean committed-revision evidence for the implemented comparator, tier, timeout, statistical-budget, and report machinery.
+- CQ1 is complete with clean committed-revision audit, review, PR, full, soak, report, and preflight evidence in `docs/plans/cq1-correctness-harness-progress-report.md`.
 - CQ2 through CQ5 must replace all 3,662 planned evidence owners with direct cases or justified non-executable dispositions.
 - CQ6 must run and publish the final comprehensive correctness qualification.
 

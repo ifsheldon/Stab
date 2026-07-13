@@ -99,7 +99,7 @@ just oracle::matrix --milestone M4
 The matrix lives at `oracle/compatibility-matrix.csv` and records upstream source paths, owners, milestones, priorities, parity modes, comparators, status, acceptance checks, and deferred future buckets.
 
 The active follow-up plans are [comprehensive correctness qualification](docs/plans/comprehensive-correctness-qualification-plan.md) and [comprehensive Stim performance qualification](docs/plans/comprehensive-stim-performance-qualification-plan.md), with execution rules in [GOAL.md](docs/plans/GOAL.md).
-CQ0 and PQ0 provide case-level correctness and feature-level performance disposition ledgers, and CQ1 now provides independently selectable correctness execution, PR/full/soak tiers, manifest-bound reports, and machine-readable preflight evidence.
+CQ0 and PQ0 provide case-level correctness and feature-level performance disposition ledgers, and CQ1 provides independently selectable correctness execution, PR/full/soak tiers, manifest-bound reports, and machine-readable preflight evidence. Clean CQ1 acceptance results are recorded in [the CQ1 progress report](docs/plans/cq1-correctness-harness-progress-report.md).
 The symmetric performance runner, faithful pinned-Stim adapter coverage, paired confidence intervals, and memory or scaling qualification remain planned for PQ1 and later milestones.
 
 CQ0 inventory discovery is implemented through:
