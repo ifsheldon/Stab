@@ -19,6 +19,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
+## 2026-07-13 - PQ0: Checklist Child And Generator Ownership Schema
+
+Status: Resolved
+Revealed by: milestone audit of the first frozen performance disposition ledger.
+Current text: PQ0 required explicit selected and deferred checklist children, concrete planned generators and scales, and failure on missing or duplicate ownership, but it did not define child-to-domain identity, global primary-owner uniqueness, registered generator parameter schemas, or source-backed API fixture identity.
+Gap: a domain-wide checklist join let unrelated inherited and API workloads claim broad rows, partial checklist groups received every selected child as a Cartesian product, one analyzer sweep child/domain pair had two primary owners, and token-based generator validation accepted extra keys or a fake `cq-api-item-*` fixture id.
+Proposed amendment: store exact child-to-domain ownership in the checked ledger, allow checklist ownership only on exact row-and-domain parent groups, require global `(child_id, performance_feature)` primary-owner uniqueness, use row-specific child ids for semantically distinct scopes, and validate exact parameter key sets plus canonical source-backed fixture identities for every registered generator.
+Resolution: `docs/plans/comprehensive-stim-performance-qualification-plan.md` now defines exact checklist-child ownership, typed fixture and input-byte states, registered generator schemas, global child/domain uniqueness, and exact drift rejection. `ops/bench/src/qualification/checklist.rs`, `validation.rs`, and `validation/planned.rs` implement those contracts with negative tests for Cartesian ownership, duplicate global ownership, extra generator keys, fake API fixture ids, and same-length static fixture drift.
+
 ## 2026-07-08 - PFM2: Broader QEC Inverse And Measurement-Rich Transform Boundary
 
 Status: Resolved

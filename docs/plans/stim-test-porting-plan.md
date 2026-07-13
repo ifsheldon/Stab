@@ -36,7 +36,8 @@ The upstream record count remains case-based even when one exact command or Pyth
 The resource inventory contains one implemented symlink case and thirteen independent planned boundary families covering admission, buffering, failures, traversal, allocation, paths, and output lifecycle; later CQ milestones must implement those owners instead of treating resource non-emptiness as completion.
 
 The active performance follow-up is [comprehensive-stim-performance-qualification-plan.md](comprehensive-stim-performance-qualification-plan.md).
-Milestone PQ0 must reconcile all 23 upstream perf files, every existing `benchmarks/manifest.csv` row, and every performance-relevant implemented feature before a benchmark group counts as comprehensive Stim evidence.
+Milestone PQ0 reconciles all 23 upstream perf files, all 74 discovered `BENCHMARK(...)` symbols, every existing `benchmarks/manifest.csv` row, all 126 checklist rows, and all 1,922 CQ0 public API items in `benchmarks/stim-qualification-suite.json`.
+Its 15 retained, 135 reworked, 4 diagnostic, 5 superseded, and 2 removed row decisions are inventory evidence only; PQ1 through PQ7 must close the recorded runner, correctness-preflight, output-digest, scale, memory, and statistical gaps before a benchmark group counts as comprehensive Stim evidence.
 The current M3 and M12 rows remain valid historical and regression evidence, but they are not automatically grandfathered into the stricter paired qualification suite.
 
 ## Oracle Fixture Execution

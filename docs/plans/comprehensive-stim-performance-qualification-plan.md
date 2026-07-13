@@ -4,6 +4,10 @@
 
 Planned: 2026-07-13.
 
+PQ0 completed: 2026-07-13, with source-owned evidence in [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md).
+
+PQ1 through PQ7 remain planned.
+
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07` in `vendor/stim`.
 
 Scope target: every implemented, non-deferred Rust and CLI contract identified by `docs/stab-feature-checklist.md` and every exported Rust API item that implements those selected contracts, with measurements for all meaningful variable-size work.
@@ -62,20 +66,22 @@ If these sources disagree, the suite inventory must record the disagreement and 
 
 Add `benchmarks/stim-qualification-suite.json` as an overlay on `benchmarks/manifest.csv`.
 The manifest remains the row-level workload source of truth, while the qualification inventory owns feature completeness, scale families, comparator fidelity, correctness dependencies, and gate policy.
+Every selected checklist disposition must record exact selected-child ownership by performance domain; sharing a domain does not permit unrelated benchmark groups to claim the row or all of a partial row's children.
 
 Each qualification group must include:
 
 - `id`: stable benchmark qualification group id.
-- `feature_ids`: one or more feature ids from the domain matrix in this plan.
+- `performance_feature`: exactly one primary feature id from the domain matrix in this plan, with every secondary API or inherited-row domain preserved in its source-owned supporting-feature list and corresponding parent group.
 - `checklist_anchors`: exact section and row descriptions from `docs/stab-feature-checklist.md`.
+- `checklist_child_ids`: exact selected child ids owned by a checklist group in its one performance domain; API and inherited-row groups must leave checklist ownership empty.
 - `public_api_items`: exact rustdoc paths covered by the group or disposition.
 - `disposition`: `measured`, `covered-by-parent`, `not-performance-relevant`, or `no-faithful-stim-comparator`.
-- `reason`: required for every disposition other than `measured`.
-- `manifest_rows`: exact benchmark ids, with one declared primary row per measured phase and scale unless a named matrix owns the group.
+- `reason`: required for every group so retained, reworked, diagnostic, superseded, removed, and replacement intent remains reviewable.
+- `manifest_row` and `row_origin`: one nonempty stable primary row id classified as `inherited` when it exists in `benchmarks/manifest.csv` or `planned` when PQ0 owns a concrete future API, checklist, or resource workload.
 - `phase`: `startup`, `parse`, `compile`, `execute`, `convert`, `serialize`, `search`, `transform`, or `end-to-end`.
 - `runner_fidelity`: `stim-perf`, `adapter-library`, `process-cli`, or `stab-report-only`.
-- `correctness_cases`: exact qualification ids that must pass before timing can run.
-- `workload_family`: fixture generator, deterministic seed or corpus digest, scale parameters, and input byte counts.
+- `correctness_cases`: exact CQ0 owner ids that must pass before timing can run, or one stable `planned_correctness_case_id` when PQ0 has proved that no exact workload preflight exists yet; feature-level or truncated fallback cases are forbidden.
+- `workload_family`: a typed repository-file, generated, or inline fixture locator; a deterministic seed or static corpus SHA-256; a registered generator id; exact small, medium, and large scale parameters; and a typed exact or not-applicable input-byte count at every scale.
 - `work_unit`: bytes, bits, shots, gates, instructions, detector events, errors, flows, search nodes, or another named semantic unit.
 - `output_contract`: expected output bytes, record count, width, semantic digest, and sink policy.
 - `timing_policy`: warmup batches, paired samples, calibration bounds, timeout, and gate statistic.
@@ -85,6 +91,7 @@ Each qualification group must include:
 - `status`: `planned`, `implemented`, `qualified`, or `blocked`.
 
 The inventory schema must deny unknown fields, validate all referenced feature, correctness, fixture, manifest, measurement, and waiver ids, reject unsafe paths and symlinks, bound all row and string counts before expensive work, and include a frozen semantic digest.
+Benchmark source, fixture, stdin, and checked-output operations must use descriptor-relative nofollow traversal on qualification hosts; until equivalent non-Unix primitives are implemented, the ops binary must fail closed there instead of using path-check-then-open fallbacks.
 
 ### Pinned-Stim Adapter
 
@@ -117,6 +124,7 @@ Keep the human-facing commands in `justfiles/bench.just` and complex logic in `o
 ```sh
 just bench::qualification-list
 just bench::qualification-check
+just bench::qualification-regenerate --check
 just bench::qualification-probe --group <id>
 just bench::qualification-run --tier pr
 just bench::qualification-run --tier full
@@ -346,6 +354,12 @@ Soak catches nonlinear behavior and rare performance instability and does not re
 
 ## PQ0: Freeze The Performance Disposition Ledger
 
+Status: Complete.
+
+Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at frozen semantic digest `940af5e019459bdc797bfb5b0f20a810655941bac8fefa9e1aa43610a2950dad`.
+
+Implementation revision: `abf7cd1bae0de045f62e976a290507238153f976`, verified with `local_modifications=false`.
+
 ### Objective
 
 Turn the checklist and current 161-row manifest into a finite, reviewable inventory before adding more benchmark code.
@@ -366,6 +380,12 @@ Turn the checklist and current 161-row manifest into a finite, reviewable invent
 - Reject unknown feature, manifest, fixture, correctness, measurement, threshold, and waiver ids.
 - Reject stale, duplicate, or unclassified exported Rust API paths and feature-gated API items absent from the declared build matrix.
 - Reject a measured group without a primary row, phase, work unit, scale, output contract, or correctness dependency.
+- Reject an API disposition that drops its CQ0 `owner_case_id` or any primary or secondary performance domain.
+- Reject a planned primary row whose generator, seed, work unit, or small, medium, and large parameters say only to bind or decide them later.
+- Reject a planned primary row whose generator is not registered for its group kind, whose exact scale ids or parameters drift, or whose typed input-byte count is absent or inconsistent with its work unit.
+- Reject checklist groups that claim a domain-wide row set, a partial child outside their performance domain, a duplicate global `(child_id, performance_feature)` primary owner, or any checklist ownership from an inherited or API group.
+- Reject repository fixtures without a bounded nonsymlink path, exact byte count, and SHA-256 corpus digest, including same-length content changes.
+- Reject a heterogeneous row from `primary-1.25` when any selected Stim symbol lacks an exact named threshold pair.
 - Reject `covered-by-parent` cycles and parents that are not measured.
 - Reject `no-faithful-stim-comparator` when an existing Stim runner or adapter mapping is declared for the same contract.
 - Reject a primary gate row backed only by an in-process-versus-process comparison.
@@ -374,6 +394,9 @@ Turn the checklist and current 161-row manifest into a finite, reviewable invent
 ### Acceptance Criteria
 
 - Every selected checklist row has exactly one performance disposition.
+- Every partial checklist row has stable selected and deferred child ids, and every selected child domain has a concrete planned primary row.
+- Every selected checklist child has explicit domain ownership, and only its exact checklist parent groups carry that ownership.
+- Every behavioral API parent includes the exact CQ0 owner case and preserves all CQ0 performance domains.
 - Every current manifest row has an explicit retained, reworked, diagnostic, superseded, or removed decision.
 - The report contains no unowned row, missing feature, hidden waiver, or aggregate heterogeneous timing claim.
 - The frozen inventory digest is reviewed before PQ1 runner work begins.

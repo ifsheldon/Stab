@@ -2,7 +2,7 @@
 
 ## Status
 
-Active planning goal as of 2026-07-13.
+Active execution goal as of 2026-07-13.
 
 The previous non-deferred blocker rollup is complete and recorded in `docs/plans/pfm8-rollup-evidence-report.md`.
 This goal replaces that completed execution contract; it does not reopen the finite PFM-B ledger.
@@ -44,8 +44,10 @@ Do not expand product scope while building qualification infrastructure.
 
 ## Program Order
 
-Program checkpoint: CQ0 is complete at source-owned evidence revision `02c93c19566bdc465ad9c795f35e956e1ff85440`; the active milestone is PQ0.
-Do not reopen CQ0 inventory semantics while implementing PQ0 unless pinned-source drift, a newly exported default-feature API, a stale referenced id, or a confirmed CQ0 defect changes the frozen digest.
+Program checkpoint: CQ0 is complete at source-owned evidence revision `02c93c19566bdc465ad9c795f35e956e1ff85440`, and PQ0 is complete at source-owned implementation revision `abf7cd1bae0de045f62e976a290507238153f976` with performance inventory digest `940af5e019459bdc797bfb5b0f20a810655941bac8fefa9e1aa43610a2950dad`.
+The active milestones are CQ1 followed by PQ1: first make the frozen correctness selectors and comparator contracts executable, then build the symmetric paired benchmark harness, pinned-Stim adapter, Stab worker, preflight, host policy, statistics, memory evidence, and report commands against those executable CQ dependencies.
+Do not reopen CQ0 or PQ0 inventory semantics unless pinned-source drift, a newly exported default-feature API, a stale referenced id, a changed checklist or benchmark source of truth, or a confirmed inventory defect changes a frozen digest.
+Do not treat PQ0's 15 retained rows as qualified evidence: all 159 active inherited rows still record missing correctness preflight and output-digest evidence, 58 CLI rows remain asymmetric, 73 rows lack a current comparator, 124 lack required scale families, and 21 select heterogeneous upstream measurements.
 
 Execute the milestones in this dependency order:
 
