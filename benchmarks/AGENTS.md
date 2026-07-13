@@ -4,5 +4,7 @@
 - Keep benchmark rows explicit about owning milestone, threshold class, runner, upstream source, phase, measurement family, and description.
 - Use `contract-only` only when there is no direct pinned C++ executable runner yet, and keep those rows tied to an upstream source or future compatibility-matrix anchor.
 - Keep compare-note prefixes aligned with the benchmark comparability taxonomy in `README.md`; every primary row must resolve to a machine-readable class before it can count as M12 evidence.
-- Do not write generated benchmark outputs in this directory; generated artifacts belong under `target/benchmarks/`.
+- Do not write generated benchmark run outputs in this directory; machine-specific artifacts belong under `target/benchmarks/`.
+- Keep `stim-qualification-suite.json` checked in as the deterministic PQ0 source-owned contract, and update its frozen semantic digest only with reviewed source ownership changes.
+- Keep benchmark source and output operations fail-closed on non-Unix until an equivalent handle-relative, no-reparse-point implementation exists; do not restore path-check-then-open fallbacks.
 - When changing the manifest schema, runner meanings, generated artifact locations, or benchmark workflow, update `README.md`, the root operational docs, and the roadmap or spec-gap log as appropriate.

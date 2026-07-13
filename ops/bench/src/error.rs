@@ -10,12 +10,6 @@ pub(crate) enum BenchError {
         source: std::io::Error,
     },
 
-    #[error("failed to read benchmark manifest {path}: {source}")]
-    ReadManifest {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-
     #[error("failed to read benchmark baseline {path}: {source}")]
     ReadBaseline {
         path: PathBuf,
@@ -115,14 +109,34 @@ pub(crate) enum BenchError {
         source: std::io::Error,
     },
 
-    #[error("failed to read benchmark stdin {path}: {source}")]
-    ReadStdin {
+    #[error("failed to process benchmark JSON: {0}")]
+    Json(#[from] serde_json::Error),
+
+    #[error("source input validation failed: {0}")]
+    SourceInput(String),
+
+    #[error("failed to access source input {path}: {source}")]
+    SourceInputIo {
         path: PathBuf,
         source: std::io::Error,
     },
 
-    #[error("failed to process benchmark JSON: {0}")]
-    Json(#[from] serde_json::Error),
+    #[error("performance qualification validation failed:\n{0}")]
+    Qualification(String),
+
+    #[error("failed to access performance qualification input {path}: {source}")]
+    QualificationIo {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+
+    #[error(
+        "performance qualification inventory differs from deterministic regeneration; run just bench::qualification-regenerate"
+    )]
+    QualificationDrift,
+
+    #[error("performance qualification inventory digest is not frozen in source code")]
+    QualificationUnfrozen,
 
     #[error("failed to start {program}: {source}")]
     Spawn {

@@ -21,6 +21,38 @@ impl RepoRoot {
         self.path.join("benchmarks").join("manifest.csv")
     }
 
+    pub(crate) fn performance_qualification(&self) -> PathBuf {
+        self.path
+            .join("benchmarks")
+            .join("stim-qualification-suite.json")
+    }
+
+    pub(crate) fn correctness_manifest(&self) -> PathBuf {
+        self.path.join("oracle").join("qualification-manifest.json")
+    }
+
+    pub(crate) fn feature_checklist(&self) -> PathBuf {
+        self.path.join("docs").join("stab-feature-checklist.md")
+    }
+
+    pub(crate) fn primary_thresholds(&self) -> PathBuf {
+        self.path
+            .join("benchmarks")
+            .join("m12-primary-thresholds.json")
+    }
+
+    pub(crate) fn primary_beta_waivers(&self) -> PathBuf {
+        self.path
+            .join("benchmarks")
+            .join("m12-primary-beta-waivers.json")
+    }
+
+    pub(crate) fn primary_regression_waivers(&self) -> PathBuf {
+        self.path
+            .join("benchmarks")
+            .join("m12-primary-regression-waivers.json")
+    }
+
     pub(crate) fn compatibility_matrix(&self) -> PathBuf {
         self.path.join("oracle").join("compatibility-matrix.csv")
     }

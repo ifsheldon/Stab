@@ -7,6 +7,10 @@ use crate::comparability::ComparabilityClass;
 use crate::error::BenchError;
 use crate::root::RepoRoot;
 
+const MAX_MANIFEST_BYTES: usize = 8 << 20;
+const MAX_COMPATIBILITY_MATRIX_BYTES: usize = 16 << 20;
+const MAX_BENCHMARK_STDIN_BYTES: usize = 64 << 20;
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub(crate) struct BenchmarkRow {
     pub(crate) id: String,
@@ -205,11 +209,11 @@ pub(crate) struct BenchmarkManifest {
 impl BenchmarkManifest {
     pub(crate) fn read(root: &RepoRoot) -> Result<Self, BenchError> {
         let path = root.manifest();
-        let content = std::fs::read_to_string(&path)
-            .map_err(|source| BenchError::ReadManifest { path, source })?;
+        let content =
+            crate::source_file::read_repo_regular_file_bounded(root, &path, MAX_MANIFEST_BYTES)?;
         let mut reader = csv::ReaderBuilder::new()
             .trim(csv::Trim::All)
-            .from_reader(content.as_bytes());
+            .from_reader(content.as_slice());
         let rows = reader.deserialize().collect::<Result<Vec<_>, _>>()?;
         Ok(Self { rows })
     }
@@ -253,7 +257,7 @@ impl BenchmarkManifest {
                     resolved_comparability.as_str()
                 ));
             }
-            validate_vendor_source(&stim_source, row, &mut violations);
+            validate_vendor_source(root, &stim_source, row, &mut violations);
             match row.runner {
                 Runner::StimPerf => {
                     if row.stim_perf_filter.is_empty() {
@@ -387,7 +391,12 @@ impl BenchmarkManifest {
             .iter()
             .map(|row| row.upstream_source.as_str())
             .collect::<BTreeSet<_>>();
-        let content = match std::fs::read_to_string(root.compatibility_matrix()) {
+        let path = root.compatibility_matrix();
+        let content = match crate::source_file::read_repo_regular_file_bounded(
+            root,
+            &path,
+            MAX_COMPATIBILITY_MATRIX_BYTES,
+        ) {
             Ok(content) => content,
             Err(error) => {
                 violations.push(format!("failed to read compatibility matrix: {error}"));
@@ -396,7 +405,7 @@ impl BenchmarkManifest {
         };
         let mut reader = csv::ReaderBuilder::new()
             .trim(csv::Trim::All)
-            .from_reader(content.as_bytes());
+            .from_reader(content.as_slice());
         for row in reader.deserialize::<CompatibilityRow>() {
             match row {
                 Ok(row) => {
@@ -458,11 +467,16 @@ impl BenchmarkRow {
             return Ok(Vec::new());
         }
         let path = root.path.join(&self.stdin_path);
-        std::fs::read(&path).map_err(|source| BenchError::ReadStdin { path, source })
+        crate::source_file::read_repo_regular_file_bounded(root, &path, MAX_BENCHMARK_STDIN_BYTES)
     }
 }
 
-fn validate_vendor_source(stim_source: &Path, row: &BenchmarkRow, violations: &mut Vec<String>) {
+fn validate_vendor_source(
+    root: &RepoRoot,
+    stim_source: &Path,
+    row: &BenchmarkRow,
+    violations: &mut Vec<String>,
+) {
     let source = Path::new(&row.upstream_source);
     if source.components().any(unsafe_component) {
         violations.push(format!(
@@ -481,9 +495,9 @@ fn validate_vendor_source(stim_source: &Path, row: &BenchmarkRow, violations: &m
         return;
     }
     let path = stim_source.join(source);
-    if !path.is_file() {
+    if crate::source_file::validate_repo_regular_file(root, &path).is_err() {
         violations.push(format!(
-            "{} upstream source does not exist: {}",
+            "{} upstream source is missing or not a regular nonsymlink file: {}",
             row.id, row.upstream_source
         ));
     }
@@ -507,8 +521,10 @@ fn validate_repo_file(
         return Err(format!("{id} has unsafe {field} {relative}"));
     }
     let path = root.path.join(relative_path);
-    if !path.is_file() {
-        return Err(format!("{id} {field} does not exist: {relative}"));
+    if crate::source_file::validate_repo_regular_file(root, &path).is_err() {
+        return Err(format!(
+            "{id} {field} is missing or not a regular nonsymlink file: {relative}"
+        ));
     }
     Ok(())
 }
@@ -598,6 +614,7 @@ mod tests {
 
     const MANIFEST_CSV: &str = include_str!("../../../benchmarks/manifest.csv");
 
+    #[cfg(unix)]
     #[test]
     fn repository_benchmark_manifest_passes_validation() {
         let mut reader = csv::ReaderBuilder::new()
@@ -615,6 +632,21 @@ mod tests {
         let root = crate::root::RepoRoot::resolve(root).expect("resolve repo root");
 
         manifest.check(&root).expect("manifest validation");
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn repository_benchmark_manifest_fails_closed_without_descriptor_relative_io() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(std::path::Path::parent)
+            .expect("repo root");
+        let root = crate::root::RepoRoot::resolve(root).expect("resolve repo root");
+
+        let error = BenchmarkManifest::read(&root)
+            .expect_err("non-Unix benchmark source access must fail closed");
+
+        assert!(error.to_string().contains("requires race-resistant Unix"));
     }
 
     #[test]
@@ -835,5 +867,34 @@ mod tests {
         assert!(super::is_safe_benchmark_id("m11-sample_dem"));
         assert!(!super::is_safe_benchmark_id("m11/sample-dem"));
         assert!(!super::is_safe_benchmark_id("../m11-sample-dem"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn benchmark_stdin_rejects_symlinked_fixture() {
+        let mut reader = csv::ReaderBuilder::new()
+            .trim(csv::Trim::All)
+            .from_reader(MANIFEST_CSV.as_bytes());
+        let mut row = reader
+            .deserialize::<super::BenchmarkRow>()
+            .next()
+            .expect("manifest row")
+            .expect("parse manifest row");
+        let directory = tempfile::tempdir().expect("temporary repository");
+        let outside = tempfile::tempdir().expect("outside directory");
+        let fixture_dir = directory.path().join("benchmarks/fixtures");
+        std::fs::create_dir_all(&fixture_dir).expect("create fixture directory");
+        std::fs::write(outside.path().join("input.stim"), b"M 0\n").expect("write outside fixture");
+        std::os::unix::fs::symlink(
+            outside.path().join("input.stim"),
+            fixture_dir.join("input.stim"),
+        )
+        .expect("create fixture symlink");
+        row.stdin_path = "benchmarks/fixtures/input.stim".to_string();
+        let root = crate::root::RepoRoot::resolve(directory.path()).expect("resolve root");
+
+        let error = row.stdin(&root).expect_err("symlinked stdin must fail");
+
+        assert!(error.to_string().contains("nonsymlink file"));
     }
 }

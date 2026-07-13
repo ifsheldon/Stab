@@ -4,10 +4,13 @@
 Each row names the owning implementation milestone, threshold class, runner, upstream Stim source, workload phase, and measurement family.
 `just bench::smoke` validates that required M3 contracts remain present, including the primary benchmark matrix, canonical print and convert contracts, result-format convert CLI rows, bit-packed detector conversion contracts, and the M12 performance-hardening target.
 
-The planned comprehensive follow-up is defined in [../docs/plans/comprehensive-stim-performance-qualification-plan.md](../docs/plans/comprehensive-stim-performance-qualification-plan.md).
-PQ0 will audit every existing manifest row instead of assuming that historical coverage is already comprehensive, and it will add a schema-versioned feature-disposition overlay, correctness dependencies, scale families, symmetric process CLI evidence, faithful pinned-Stim adapter evidence where needed, paired confidence intervals, and memory or scaling contracts.
-Until PQ1 implements the planned qualification commands and PQ6 explicitly graduates replacement thresholds, the current manifest, M12 primary matrix, threshold files, waiver files, and commands documented below remain authoritative.
+The comprehensive follow-up is defined in [../docs/plans/comprehensive-stim-performance-qualification-plan.md](../docs/plans/comprehensive-stim-performance-qualification-plan.md).
+PQ0 freezes the schema-versioned feature-disposition overlay in `stim-qualification-suite.json`, including all inherited manifest decisions, correctness dependencies, exact checklist-child and public-API ownership, typed fixture identities, static corpus digests, planned scale families, threshold pairs, waivers, and upstream perf symbols.
+Use `just bench::qualification-list`, `just bench::qualification-check`, and `just bench::qualification-regenerate --check` to inspect or validate that checked ledger.
+PQ1 will add symmetric process CLI evidence, faithful pinned-Stim adapter evidence, paired confidence intervals, and memory execution; until PQ6 explicitly graduates replacement thresholds, the current manifest, M12 primary matrix, threshold files, waiver files, and commands documented below remain authoritative.
 The required correctness preconditions are planned in [../docs/plans/comprehensive-correctness-qualification-plan.md](../docs/plans/comprehensive-correctness-qualification-plan.md); a timed row may not become comprehensive evidence merely because it runs successfully.
+Benchmark operations currently require Unix descriptor-relative filesystem primitives and fail closed on non-Unix hosts; final qualification is already restricted to controlled Linux x86-64 and Linux AArch64 hosts.
+Stim CLI benchmark stdin is read at execution time through a bounded `64 MiB` regular nonsymlink repository-file boundary.
 
 Runner meanings:
 
@@ -18,7 +21,8 @@ Runner meanings:
 Some legacy benchmark ids still contain `contract` after they gain a faithful public CLI baseline.
 The `runner` column is authoritative for whether a row is contract-only, not the id suffix.
 
-Generated benchmark artifacts belong under `target/benchmarks/` and are not source files.
+Generated benchmark run artifacts belong under `target/benchmarks/` and are not source files.
+`stim-qualification-suite.json` is the exception: it is a deterministic, checked source-owned contract whose semantic digest is frozen by `ops/bench`, not a machine-specific timing result.
 The default baseline command writes `target/benchmarks/baseline/latest/baseline.json` and `target/benchmarks/baseline/latest/report.md`.
 Any explicit `--out` value must be a repository-relative path under `target/benchmarks/`.
 Use `--only` with exact benchmark ids or milestone names, for example `--only m4-circuit-parse` or `--only M9`.

@@ -8,6 +8,21 @@ smoke *args:
 list *args:
     cargo run -q -p stab-bench -- list {{args}}
 
+# Validate the comprehensive performance qualification ledger.
+[working-directory: '..']
+qualification-check *args:
+    cargo run -q -p stab-bench -- qualification-check {{args}}
+
+# List comprehensive performance qualification coverage.
+[working-directory: '..']
+qualification-list *args:
+    cargo run -q -p stab-bench -- qualification-list {{args}}
+
+# Regenerate the comprehensive performance qualification ledger.
+[working-directory: '..']
+qualification-regenerate *args:
+    cargo run -q -p stab-bench -- qualification-regenerate {{args}}
+
 # Record pinned C++ Stim baseline benchmark results.
 [working-directory: '..']
 baseline *args:
