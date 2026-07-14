@@ -457,6 +457,7 @@ fn validate_cross_references(manifest: &QualificationManifest, violations: &mut 
                         && owner.comparator == ownership.comparator
                         && ((owner.provenance == EvidenceProvenance::UpstreamSemanticCase
                             && owner.source_id == case.id.as_str())
+                            || owner.provenance == EvidenceProvenance::QualificationPlan
                             || (owner.provenance == EvidenceProvenance::BlockerLedger
                                 && case.disposition == UpstreamDisposition::PortedRust)) => {}
                 Some(_) => violations.push(format!(
@@ -473,9 +474,10 @@ fn validate_cross_references(manifest: &QualificationManifest, violations: &mut 
     for item in &manifest.public_api_items {
         match evidence.get(item.owner_case_id.as_str()) {
             Some(owner)
-                if owner.provenance == EvidenceProvenance::PublicRustApi
-                    && owner.feature_id == item.feature_id
-                    && api_path_is_owned_by(&owner.source_id, item.path.as_str()) => {}
+                if owner.feature_id == item.feature_id
+                    && ((owner.provenance == EvidenceProvenance::PublicRustApi
+                        && api_path_is_owned_by(&owner.source_id, item.path.as_str()))
+                        || owner.provenance == EvidenceProvenance::QualificationPlan) => {}
             Some(owner) => violations.push(format!(
                 "public API item {:?} path {:?} feature {} owner {:?} has surface {:?}, feature {}, and source {:?}",
                 item.id,
@@ -550,16 +552,22 @@ fn validate_cross_references(manifest: &QualificationManifest, violations: &mut 
                 let valid_status = match case.status {
                     EvidenceStatus::Planned => {
                         case.primary_selector.state == EvidenceState::Planned
+                            && case.primary_selector.kind == SelectorKind::PropertyTarget
                     }
                     EvidenceStatus::Implemented | EvidenceStatus::EvidenceClose => {
                         case.primary_selector.state == EvidenceState::Existing
-                            && case.comparator == Comparator::Property
+                            && matches!(
+                                case.primary_selector.kind,
+                                SelectorKind::CargoTest | SelectorKind::PropertyTarget
+                            )
+                            && (case.primary_selector.kind != SelectorKind::PropertyTarget
+                                || case.comparator == Comparator::Property)
                     }
                     EvidenceStatus::Deferred => false,
                 };
-                if !valid_status || case.primary_selector.kind != SelectorKind::PropertyTarget {
+                if !valid_status {
                     violations.push(format!(
-                        "qualification plan case {:?} is not a status-consistent property target",
+                        "qualification plan case {:?} is not a status-consistent exact selector",
                         case.id
                     ));
                 }
@@ -585,7 +593,14 @@ fn expected_behavioral_surface(case: &EvidenceCase) -> BehavioralSurface {
     match case.provenance {
         EvidenceProvenance::PublicRustApi => BehavioralSurface::RustApi,
         EvidenceProvenance::RustRegression => BehavioralSurface::ResourceBoundary,
-        EvidenceProvenance::QualificationPlan => BehavioralSurface::ResourceBoundary,
+        EvidenceProvenance::QualificationPlan => match case.feature_id {
+            FeatureId::Cli => BehavioralSurface::Cli,
+            FeatureId::StimFormat | FeatureId::DemFormat | FeatureId::ResultFormats => {
+                BehavioralSurface::FileFormat
+            }
+            FeatureId::Resource => BehavioralSurface::ResourceBoundary,
+            _ => BehavioralSurface::Engine,
+        },
         EvidenceProvenance::OracleFixture => case.behavioral_surface,
         EvidenceProvenance::UpstreamSemanticCase | EvidenceProvenance::BlockerLedger => {
             match case.feature_id {

@@ -5,7 +5,9 @@ use super::{
     InventoryError, OracleEvidenceRow, generate, stable_id, validate_relative_source_path,
 };
 use crate::RepoRoot;
-use crate::qualification::model::{SelectorKind, StableCaseDomain};
+use crate::qualification::model::{
+    EvidenceProvenance, EvidenceStatus, FeatureId, SelectorKind, StableCaseDomain,
+};
 
 #[test]
 fn source_paths_reject_absolute_parent_and_windows_spellings() {
@@ -89,4 +91,45 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         missing.is_empty(),
         "unowned implemented fixtures: {missing:?}"
     );
+
+    let qualification_cases = manifest
+        .evidence_cases
+        .iter()
+        .filter(|case| case.provenance == EvidenceProvenance::QualificationPlan)
+        .filter(|case| case.source_id.starts_with("cq2-stim-format-"))
+        .collect::<Vec<_>>();
+    assert_eq!(qualification_cases.len(), 19);
+    assert!(
+        qualification_cases
+            .iter()
+            .all(|case| case.status == EvidenceStatus::Implemented)
+    );
+
+    let canonical = qualification_cases
+        .iter()
+        .find(|case| case.source_id == "cq2-stim-format-canonical-round-trip")
+        .expect("canonical qualification parent");
+    let from_text = manifest
+        .upstream_cases
+        .iter()
+        .find(|case| {
+            case.path.as_path() == Path::new("src/stim/circuit/circuit.test.cc")
+                && case.symbol == "circuit.from_text"
+        })
+        .expect("from_text upstream case");
+    assert_eq!(
+        from_text
+            .ownerships
+            .iter()
+            .find(|owner| owner.feature_id == FeatureId::StimFormat)
+            .expect("format ownership")
+            .owner_case_id,
+        canonical.id
+    );
+    let from_stim_str = manifest
+        .public_api_items
+        .iter()
+        .find(|item| item.path.as_str() == "stab_core::Circuit::from_stim_str")
+        .expect("from_stim_str API item");
+    assert_eq!(from_stim_str.owner_case_id, canonical.id);
 }

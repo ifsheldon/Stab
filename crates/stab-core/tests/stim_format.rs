@@ -820,9 +820,6 @@ fn gate_inverse_metadata_matches_stim_v116() {
 fn typed_boundaries_reject_invalid_values() {
     assert_eq!(QubitId::new(4).unwrap().get(), 4);
     assert!(QubitId::new(1 << 24).is_err());
-    assert!(MeasureRecordOffset::try_new(0).is_err());
-    assert!(MeasureRecordOffset::try_new(1).is_err());
-    assert!(MeasureRecordOffset::try_new(-(1 << 24)).is_err());
     assert!(RepeatCount::try_new(0).is_err());
     assert!(Probability::try_new(-0.1).is_err());
     assert!(Probability::try_new(1.1).is_err());
@@ -832,6 +829,20 @@ fn typed_boundaries_reject_invalid_values() {
         ObservableId::new(u64::from(u32::MAX) + 1).get(),
         4_294_967_296
     );
+}
+
+#[test]
+fn measure_record_offset_enforces_negative_24_bit_boundary() {
+    let nearest = MeasureRecordOffset::try_new(-1).expect("nearest record offset");
+    assert_eq!(nearest.get(), -1);
+
+    let furthest =
+        MeasureRecordOffset::try_new(-((1 << 24) - 1)).expect("furthest supported record offset");
+    assert_eq!(furthest.get(), -((1 << 24) - 1));
+
+    assert!(MeasureRecordOffset::try_new(0).is_err());
+    assert!(MeasureRecordOffset::try_new(1).is_err());
+    assert!(MeasureRecordOffset::try_new(-(1 << 24)).is_err());
 }
 
 #[test]

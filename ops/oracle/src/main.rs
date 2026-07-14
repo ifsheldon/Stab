@@ -384,6 +384,10 @@ impl RepoRoot {
         self.path.join("oracle").join("qualification-manifest.json")
     }
 
+    fn qualification_cases(&self) -> PathBuf {
+        self.path.join("oracle").join("qualification-cases.json")
+    }
+
     fn benchmark_manifest(&self) -> PathBuf {
         self.path.join("benchmarks").join("manifest.csv")
     }

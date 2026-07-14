@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141",
-  "semantic_digest": "cc9f6cabfb9a3245d9c52000e82c8f1bec76aed605f3563d1a15244d327c3fbd",
+  "correctness_digest": "5d1fc9d21e511e13bef5ceb476dbcf9dd20ed067339edd2891013992fb06ced5",
+  "semantic_digest": "a7177e298b5e1f05979b871704514fdf2650070a7c48e5d72c6fb48bb80d13bf",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -2085,7 +2085,7 @@
     {
       "id": "PERFC-55676fc3004b7fd2",
       "source_line": 223,
-      "anchor_digest": "3ceb9233f1c02b02d1c9017bcc96cd63c1f35e13f007c0cfb740314de08ffe08",
+      "anchor_digest": "eab6b56cd64f8e09957a4f09d3204b372fc3e2e3927fa6d53482f784d2be31a7",
       "section": "16. Test And Benchmark Surface",
       "feature": "Upstream test inventory and porting plan",
       "raw_status": "Done as a file-level hierarchy and CQ0 frozen case inventory",
@@ -2247,7 +2247,7 @@
     {
       "id": "PERFC-5f2145ca0e3328b5",
       "source_line": 224,
-      "anchor_digest": "ed54cc1da20d7993823d7b9ccfaab0f040ac5199c676720e7b0849f9b220de81",
+      "anchor_digest": "9639358b32d721c46f93addf206a7fa5469c36a7f43b002bd20766272bd5a6a4",
       "section": "16. Test And Benchmark Surface",
       "feature": "Oracle fixture matrix",
       "raw_status": "Done for current implemented surfaces and CQ1 harness acceptance",
@@ -6195,7 +6195,7 @@
       "kind": "method",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a42a2b3041bad47d",
+      "correctness_case_id": "cq-evidence-qualification-112ab0aa2ed0fbe7",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd"
@@ -6208,7 +6208,7 @@
       "kind": "method",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-53609b17b4195552",
+      "correctness_case_id": "cq-evidence-qualification-1189c80e69a5989b",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd"
@@ -6522,7 +6522,7 @@
       "kind": "method",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-902d42eeda9bb7aa",
+      "correctness_case_id": "cq-evidence-qualification-24066267c4c9e76c",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd"
@@ -6535,7 +6535,7 @@
       "kind": "method",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-9a809cde03bdbb34",
+      "correctness_case_id": "cq-evidence-qualification-e660819ae9a223c6",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd"
@@ -6927,7 +6927,7 @@
       "kind": "method",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a3952b788ab6a06a",
+      "correctness_case_id": "cq-evidence-qualification-e660819ae9a223c6",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-da2577c75491f817"
@@ -6998,7 +6998,7 @@
       "kind": "method",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-25e9724241ee55fa",
+      "correctness_case_id": "cq-evidence-qualification-24066267c4c9e76c",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-da2577c75491f817"
@@ -16008,7 +16008,7 @@
       "kind": "struct",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f9cf99f9ceef655e",
+      "correctness_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -16019,7 +16019,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f9cf99f9ceef655e",
+      "correctness_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-9b937c91cd726b7e"
@@ -16032,7 +16032,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f9cf99f9ceef655e",
+      "correctness_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -16043,7 +16043,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f9cf99f9ceef655e",
+      "correctness_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -16054,7 +16054,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f9cf99f9ceef655e",
+      "correctness_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -16065,7 +16065,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f9cf99f9ceef655e",
+      "correctness_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-9b937c91cd726b7e"
@@ -16078,7 +16078,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f9cf99f9ceef655e",
+      "correctness_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-9b937c91cd726b7e"
@@ -16091,7 +16091,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f9cf99f9ceef655e",
+      "correctness_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-9b937c91cd726b7e"
@@ -16104,7 +16104,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f9cf99f9ceef655e",
+      "correctness_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -16115,7 +16115,7 @@
       "kind": "method",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-491a066b434ee592",
+      "correctness_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-9b937c91cd726b7e"
@@ -16128,7 +16128,7 @@
       "kind": "method",
       "performance_feature": "PERF-CIRCUIT-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-95c5321c1f5f2a4c",
+      "correctness_case_id": "cq-evidence-qualification-37ee1c40293af366",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-9b937c91cd726b7e"
@@ -32708,17 +32708,13 @@
         "cq-evidence-api-3d00e126764be9f4",
         "cq-evidence-api-464d99f869154fab",
         "cq-evidence-api-4d9c90ebb7dc5c36",
-        "cq-evidence-api-53609b17b4195552",
         "cq-evidence-api-54391a16f5f6a92f",
         "cq-evidence-api-5efa6879eb709a7c",
         "cq-evidence-api-68cca8da3c5763a0",
         "cq-evidence-api-71f66de27682bde6",
         "cq-evidence-api-8acdfcac5d9540ed",
-        "cq-evidence-api-902d42eeda9bb7aa",
         "cq-evidence-api-9761aa52023d2b2d",
         "cq-evidence-api-98a46c063ce1e3ef",
-        "cq-evidence-api-9a809cde03bdbb34",
-        "cq-evidence-api-a42a2b3041bad47d",
         "cq-evidence-api-adfc905be3ed3ab1",
         "cq-evidence-api-b38aed5ad13718bc",
         "cq-evidence-api-b770f36d0154cc5b",
@@ -32731,7 +32727,11 @@
         "cq-evidence-api-e38e53e3582cbe70",
         "cq-evidence-api-eb2b4a0b390f7588",
         "cq-evidence-api-f93de32301dc96da",
-        "cq-evidence-api-fa7318f9b6c1e588"
+        "cq-evidence-api-fa7318f9b6c1e588",
+        "cq-evidence-qualification-112ab0aa2ed0fbe7",
+        "cq-evidence-qualification-1189c80e69a5989b",
+        "cq-evidence-qualification-24066267c4c9e76c",
+        "cq-evidence-qualification-e660819ae9a223c6"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -41281,9 +41281,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-491a066b434ee592",
-        "cq-evidence-api-95c5321c1f5f2a4c",
-        "cq-evidence-api-f9cf99f9ceef655e"
+        "cq-evidence-qualification-37ee1c40293af366"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -46197,9 +46195,9 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-25e9724241ee55fa",
         "cq-evidence-api-5efa6879eb709a7c",
-        "cq-evidence-api-a3952b788ab6a06a"
+        "cq-evidence-qualification-24066267c4c9e76c",
+        "cq-evidence-qualification-e660819ae9a223c6"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,

@@ -25,6 +25,7 @@ use crate::blocker_ledger::selector::CargoTestSelector;
 
 mod evidence;
 mod property_plan;
+mod qualification_cases;
 
 use evidence::{
     behavioral_surface_for_feature, infer_feature_from_oracle_argv, make_planned_evidence_case,
@@ -43,6 +44,7 @@ const MAX_CASES: usize = 8_192;
 const MAX_ORACLE_MANIFEST_BYTES: usize = 16 << 20;
 const MAX_ORACLE_ROWS: usize = 16_384;
 const MAX_BLOCKER_LEDGER_BYTES: usize = 4 << 20;
+const MAX_QUALIFICATION_CASES_BYTES: usize = 16 << 20;
 
 #[derive(Debug, Error)]
 pub(crate) enum InventoryError {
@@ -140,6 +142,15 @@ pub(crate) enum InventoryError {
         path: PathBuf,
         source: serde_json::Error,
     },
+
+    #[error("failed to parse qualification case ledger {path}: {source}")]
+    ParseQualificationCases {
+        path: PathBuf,
+        source: serde_json::Error,
+    },
+
+    #[error("qualification case ledger is invalid: {0}")]
+    InvalidQualificationCases(String),
 
     #[error("blocker case {id:?} has unknown comparator {comparator:?}")]
     UnknownBlockerComparator { id: String, comparator: String },
@@ -254,7 +265,7 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
     extracted_api.items.extend(cli_api.items);
     extracted_api.items.sort();
     ensure_limit("public API items", extracted_api.items.len())?;
-    let (public_api_items, api_evidence) = make_public_api_records(&extracted_api.items)?;
+    let (mut public_api_items, api_evidence) = make_public_api_records(&extracted_api.items)?;
     evidence_cases.extend(api_evidence);
     let mut blocker_evidence = generate_blocker_evidence(&blocker_cases)?;
     evidence_cases.extend(generate_existing_oracle_evidence(
@@ -262,6 +273,14 @@ pub(super) fn generate(root: &RepoRoot) -> Result<QualificationManifest, Invento
         &mut blocker_evidence,
     )?);
     evidence_cases.extend(blocker_evidence);
+    qualification_cases::apply(
+        root,
+        &stim.tag,
+        &stim.commit,
+        &mut upstream_cases,
+        &mut public_api_items,
+        &mut evidence_cases,
+    )?;
     evidence_cases.extend(super::resource::planned_evidence());
     evidence_cases.push(super::resource::existing_regression());
     evidence_cases.push(super::resource::existing_property_regression());

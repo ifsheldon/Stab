@@ -49,7 +49,10 @@ pub(super) fn validate(case: &EvidenceCase, violations: &mut ValidationIssues) {
             PropertyPlanSource::QualificationCase,
             EvidenceProvenance::QualificationPlan,
         ) if reference.id == case.source_id
-            && case.primary_selector.kind == SelectorKind::PropertyTarget => {}
+            && matches!(
+                case.primary_selector.kind,
+                SelectorKind::PropertyTarget | SelectorKind::CargoTest
+            ) => {}
         _ => violations.push(format!(
             "property case {:?} plan source or id is stale",
             case.id
