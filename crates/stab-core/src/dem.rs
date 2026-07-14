@@ -491,10 +491,9 @@ impl FromStr for DemTarget {
                 "logical observable target",
             )?);
         }
-        Ok(Self::numeric(parse_unsigned_dem_value(
-            raw,
-            "numeric DEM target",
-        )?))
+        Err(CircuitError::invalid_detector_error_model(format!(
+            "invalid DEM target {raw:?}"
+        )))
     }
 }
 
@@ -815,7 +814,17 @@ fn parse_optional_args(line_number: usize, rest: &str) -> CircuitResult<(Vec<f64
 }
 
 fn parse_dem_targets(rest: &str) -> CircuitResult<Vec<DemTarget>> {
-    rest.split_whitespace().map(str::parse).collect()
+    rest.split_whitespace()
+        .map(|raw| {
+            if raw.bytes().all(|byte| byte.is_ascii_digit()) {
+                return Ok(DemTarget::numeric(parse_unsigned_dem_value(
+                    raw,
+                    "numeric DEM target",
+                )?));
+            }
+            raw.parse()
+        })
+        .collect()
 }
 
 fn parse_unsigned_dem_value(text: &str, kind: &'static str) -> CircuitResult<u64> {

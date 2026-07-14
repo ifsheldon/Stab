@@ -70,7 +70,13 @@ fn dem_instruction_targets_parse_stim_limits() {
         DemTarget::logical_observable(4_294_967_295).unwrap()
     );
     assert_eq!("^".parse::<DemTarget>().unwrap(), DemTarget::separator());
-    assert_eq!("10".parse::<DemTarget>().unwrap(), DemTarget::numeric(10));
+    assert!("10".parse::<DemTarget>().is_err());
+    assert_eq!(
+        DetectorErrorModel::from_dem_str("shift_detectors 10\n")
+            .unwrap()
+            .to_dem_string(),
+        "shift_detectors 10\n"
+    );
 
     assert!("D4611686018427387904".parse::<DemTarget>().is_err());
     assert!("L4294967296".parse::<DemTarget>().is_err());
