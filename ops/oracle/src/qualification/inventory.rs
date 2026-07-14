@@ -818,6 +818,10 @@ fn generate_existing_oracle_evidence(
 fn oracle_feature_override(id: &str) -> Option<FeatureId> {
     match id {
         "coverage-util-bot-twiddle" => Some(FeatureId::BitKernels),
+        "pf1-circuit-concat"
+        | "pf1-circuit-detector-coordinates"
+        | "pf1-circuit-insert-pop"
+        | "pf1-circuit-iterators" => Some(FeatureId::CircuitApi),
         _ => None,
     }
 }

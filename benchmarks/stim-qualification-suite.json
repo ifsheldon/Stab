@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "2b2f0456e568b86a973d4b9077b9688ab9f7748af1bd9cd349e2a2abf217d638",
-  "semantic_digest": "4e31a348b0c796ae4c4400369c70019eff8fa991592f201c80e7fee7d8718f7a",
+  "correctness_digest": "f30a56853dbc9334d1ba91a400da3a40c108d4ee2aa748d4edc9a5662093ba11",
+  "semantic_digest": "3c49ecdfde72eca0a331b9949f2bee4dd6f300ebfa015d779b4f5cbb7ac91355",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -6078,7 +6078,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5efa6879eb709a7c",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -6091,7 +6091,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5efa6879eb709a7c",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6107,7 +6107,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5efa6879eb709a7c",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -6120,7 +6120,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5efa6879eb709a7c",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6136,7 +6136,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5efa6879eb709a7c",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-da2577c75491f817",
@@ -6152,7 +6152,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5efa6879eb709a7c",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6168,7 +6168,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5efa6879eb709a7c",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -6181,7 +6181,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-17c6c56f9d953439",
+      "correctness_case_id": "cq-evidence-oracle-05418040cb8687e9",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6223,7 +6223,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-4d9c90ebb7dc5c36",
+      "correctness_case_id": "cq-evidence-qualification-bc6509ae4ef4f0db",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6239,7 +6239,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d10ba357ea641ffc",
+      "correctness_case_id": "cq-evidence-qualification-bc6509ae4ef4f0db",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6255,7 +6255,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-9761aa52023d2b2d",
+      "correctness_case_id": "cq-evidence-qualification-30a7be26ee2c38d5",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6271,7 +6271,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-f93de32301dc96da",
+      "correctness_case_id": "cq-evidence-oracle-05418040cb8687e9",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6287,7 +6287,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-20003b0d029edfa5",
+      "correctness_case_id": "cq-evidence-oracle-25b0e7b15e5ca033",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6303,7 +6303,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-8acdfcac5d9540ed",
+      "correctness_case_id": "cq-evidence-qualification-9b72ebd30ed42082",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6332,7 +6332,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-3d00e126764be9f4",
+      "correctness_case_id": "cq-evidence-qualification-9b72ebd30ed42082",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6348,7 +6348,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-54391a16f5f6a92f",
+      "correctness_case_id": "cq-evidence-qualification-9b72ebd30ed42082",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6364,7 +6364,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1f25af7d594754ad",
+      "correctness_case_id": "cq-evidence-qualification-300c3cd246d325e1",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6380,7 +6380,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-71f66de27682bde6",
+      "correctness_case_id": "cq-evidence-qualification-9b72ebd30ed42082",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6396,7 +6396,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-98a46c063ce1e3ef",
+      "correctness_case_id": "cq-evidence-qualification-9b72ebd30ed42082",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6412,7 +6412,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-048dda29bed17548",
+      "correctness_case_id": "cq-evidence-qualification-ec14807bed98deb3",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6428,7 +6428,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-eb2b4a0b390f7588",
+      "correctness_case_id": "cq-evidence-oracle-25b0e7b15e5ca033",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6444,7 +6444,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-26a1a03dfd8e1a74",
+      "correctness_case_id": "cq-evidence-oracle-25b0e7b15e5ca033",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6460,7 +6460,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-b770f36d0154cc5b",
+      "correctness_case_id": "cq-evidence-qualification-0fe6ac87fd414ede",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6476,7 +6476,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-464d99f869154fab",
+      "correctness_case_id": "cq-evidence-qualification-127a76c6386d07df",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6492,7 +6492,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-462d486320bb4b8c",
+      "correctness_case_id": "cq-evidence-qualification-56db332766d73980",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-faee43aee17dbdbc",
@@ -6508,7 +6508,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5a3d03cbfe698b3f",
+      "correctness_case_id": "cq-evidence-qualification-56db332766d73980",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-faee43aee17dbdbc",
@@ -6550,7 +6550,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d5dc93b39202c4c1",
+      "correctness_case_id": "cq-evidence-oracle-de062451759af712",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6566,7 +6566,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-cc57a3ca0c3a7a8f",
+      "correctness_case_id": "cq-evidence-oracle-de062451759af712",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6582,7 +6582,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-c16770e4fdb98eb9",
+      "correctness_case_id": "cq-evidence-oracle-de062451759af712",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6598,7 +6598,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-0edbe45a46891017",
+      "correctness_case_id": "cq-evidence-oracle-de062451759af712",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6614,7 +6614,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-adfc905be3ed3ab1",
+      "correctness_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6669,7 +6669,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-fa7318f9b6c1e588",
+      "correctness_case_id": "cq-evidence-qualification-9b72ebd30ed42082",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6685,7 +6685,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1bde36071fb8aba2",
+      "correctness_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6701,7 +6701,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-37236597651336fc",
+      "correctness_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6717,7 +6717,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-54bf0b1b723edc89",
+      "correctness_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-faee43aee17dbdbc",
@@ -6733,7 +6733,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1b3b05a624af240f",
+      "correctness_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-faee43aee17dbdbc",
@@ -6749,7 +6749,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-e38e53e3582cbe70",
+      "correctness_case_id": "cq-evidence-oracle-136c092657a9caaa",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6765,7 +6765,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1f8fcf61c5037ae3",
+      "correctness_case_id": "cq-evidence-qualification-9b72ebd30ed42082",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6781,7 +6781,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-0f170a45e93a3e45",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6797,7 +6797,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-b38aed5ad13718bc",
+      "correctness_case_id": "cq-evidence-oracle-de062451759af712",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6813,7 +6813,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-c50a63d656cd2311",
+      "correctness_case_id": "cq-evidence-oracle-de062451759af712",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6855,7 +6855,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1f0ffeeee6dda9b6",
+      "correctness_case_id": "cq-evidence-qualification-0bd1d8d0ab37a23d",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6871,7 +6871,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-68cca8da3c5763a0",
+      "correctness_case_id": "cq-evidence-qualification-0bd1d8d0ab37a23d",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6887,7 +6887,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-cd571199f25e2be7",
+      "correctness_case_id": "cq-evidence-qualification-f30b6c2f457cdf52",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2e16c4e7d23c82dd",
@@ -6968,7 +6968,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-7eef3655f7202088",
+      "correctness_case_id": "cq-evidence-qualification-abb855431f4d54c2",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-faee43aee17dbdbc",
@@ -6984,7 +6984,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-da7c160d8e581a38",
+      "correctness_case_id": "cq-evidence-qualification-bb746be0177421a7",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-faee43aee17dbdbc",
@@ -7013,7 +7013,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d73ff1f4c22b0b0f",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7026,7 +7026,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d73ff1f4c22b0b0f",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-7e9d7906514d9d6a",
@@ -7042,7 +7042,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d73ff1f4c22b0b0f",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7055,7 +7055,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d73ff1f4c22b0b0f",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7068,7 +7068,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d73ff1f4c22b0b0f",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7081,7 +7081,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d73ff1f4c22b0b0f",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-7e9d7906514d9d6a",
@@ -7097,7 +7097,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d73ff1f4c22b0b0f",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-7e9d7906514d9d6a",
@@ -7113,7 +7113,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d73ff1f4c22b0b0f",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-7e9d7906514d9d6a",
@@ -7129,7 +7129,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d73ff1f4c22b0b0f",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-7e9d7906514d9d6a",
@@ -7145,7 +7145,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d73ff1f4c22b0b0f",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7158,7 +7158,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-e99cd8ff853655cc",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-7e9d7906514d9d6a",
@@ -7174,7 +7174,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-64d9d926ba1b3883",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-7e9d7906514d9d6a",
@@ -7190,7 +7190,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7203,7 +7203,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-afd43e0537e883d9",
@@ -7219,7 +7219,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7232,7 +7232,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-3d764821b5738c21",
@@ -7248,7 +7248,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7261,7 +7261,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7274,7 +7274,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-afd43e0537e883d9",
@@ -7290,7 +7290,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7303,7 +7303,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7316,7 +7316,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7329,7 +7329,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7342,7 +7342,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7355,7 +7355,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7368,7 +7368,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7381,7 +7381,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7394,7 +7394,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7407,7 +7407,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7420,7 +7420,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7433,7 +7433,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7446,7 +7446,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7459,7 +7459,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7472,7 +7472,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7485,7 +7485,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7498,7 +7498,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7511,7 +7511,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7524,7 +7524,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7537,7 +7537,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7550,7 +7550,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7563,7 +7563,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7576,7 +7576,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7589,7 +7589,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7602,7 +7602,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7615,7 +7615,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7628,7 +7628,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7641,7 +7641,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7654,7 +7654,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7667,7 +7667,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7680,7 +7680,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7693,7 +7693,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7706,7 +7706,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7719,7 +7719,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7732,7 +7732,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7745,7 +7745,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7758,7 +7758,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -7771,7 +7771,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-5b2f382beefc04aa",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8042,7 +8042,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-6c61a18ddde83403",
+      "correctness_case_id": "cq-evidence-qualification-6c6d8daf8f0c3827",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8055,7 +8055,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-6c61a18ddde83403",
+      "correctness_case_id": "cq-evidence-qualification-6c6d8daf8f0c3827",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2f4cd1c54a5c0065",
@@ -8071,7 +8071,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-6c61a18ddde83403",
+      "correctness_case_id": "cq-evidence-qualification-6c6d8daf8f0c3827",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8084,7 +8084,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-6c61a18ddde83403",
+      "correctness_case_id": "cq-evidence-qualification-6c6d8daf8f0c3827",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2f4cd1c54a5c0065",
@@ -8100,7 +8100,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-2d5e3b62c20a174d",
+      "correctness_case_id": "cq-evidence-qualification-6c6d8daf8f0c3827",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8113,7 +8113,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-2d5e3b62c20a174d",
+      "correctness_case_id": "cq-evidence-qualification-6c6d8daf8f0c3827",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-07accda8fcbaeea6",
@@ -8129,7 +8129,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-2d5e3b62c20a174d",
+      "correctness_case_id": "cq-evidence-qualification-6c6d8daf8f0c3827",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8142,7 +8142,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-2d5e3b62c20a174d",
+      "correctness_case_id": "cq-evidence-qualification-6c6d8daf8f0c3827",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-07accda8fcbaeea6",
@@ -8158,7 +8158,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-47836b88708f3b28",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8171,7 +8171,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-47836b88708f3b28",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8187,7 +8187,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-47836b88708f3b28",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8200,7 +8200,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-47836b88708f3b28",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8216,7 +8216,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-47836b88708f3b28",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8245,7 +8245,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-7083f3358c4fb75b",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8261,7 +8261,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-f02d17fd6f393ced",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8277,7 +8277,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-46f60688c0f56e6e",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8325,7 +8325,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-4d6556455aab263d",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8341,7 +8341,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-943e4f79903b15bb",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8357,7 +8357,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-553e257e74d2f82b",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8373,7 +8373,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-8c91ed4dff656d57",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8389,7 +8389,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-a0fed4cee38d1b20",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8421,7 +8421,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-bab9277bce46fcae",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8434,7 +8434,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-bab9277bce46fcae",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-4ece5286e13cfd41",
@@ -8450,7 +8450,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-bab9277bce46fcae",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8463,7 +8463,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-bab9277bce46fcae",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-4ece5286e13cfd41",
@@ -8479,7 +8479,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-bab9277bce46fcae",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8492,7 +8492,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-bab9277bce46fcae",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8505,7 +8505,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-bab9277bce46fcae",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8518,7 +8518,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-bab9277bce46fcae",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8531,7 +8531,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-bab9277bce46fcae",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -8544,7 +8544,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-183f67cad6f35e8f",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-4ece5286e13cfd41",
@@ -8560,7 +8560,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-05c10e3ae703358d",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-4ece5286e13cfd41",
@@ -8576,7 +8576,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-834d0f239431e4ea",
+      "correctness_case_id": "cq-evidence-qualification-f55ab65c2e8e2588",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -16235,7 +16235,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1c9d1bb16138c29e",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -16248,7 +16248,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1c9d1bb16138c29e",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-354dba15faddc6eb",
@@ -16264,7 +16264,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1c9d1bb16138c29e",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -16277,7 +16277,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1c9d1bb16138c29e",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -16290,7 +16290,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1c9d1bb16138c29e",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -16303,7 +16303,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1c9d1bb16138c29e",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-354dba15faddc6eb",
@@ -16319,7 +16319,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1c9d1bb16138c29e",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-354dba15faddc6eb",
@@ -16335,7 +16335,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1c9d1bb16138c29e",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-354dba15faddc6eb",
@@ -16351,7 +16351,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1c9d1bb16138c29e",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -16364,7 +16364,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1062ee11f29ed3f6",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-354dba15faddc6eb",
@@ -16380,7 +16380,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-345a5f73514b10a3",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-354dba15faddc6eb",
@@ -17724,7 +17724,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-09db2061ebd9d6dc",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -17737,7 +17737,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-09db2061ebd9d6dc",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-eec5d29ac389aa40",
@@ -17753,7 +17753,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-09db2061ebd9d6dc",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -17766,7 +17766,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-09db2061ebd9d6dc",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -17779,7 +17779,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-09db2061ebd9d6dc",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -17792,7 +17792,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-09db2061ebd9d6dc",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-eec5d29ac389aa40",
@@ -17808,7 +17808,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-09db2061ebd9d6dc",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-eec5d29ac389aa40",
@@ -17824,7 +17824,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-09db2061ebd9d6dc",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-eec5d29ac389aa40",
@@ -17840,7 +17840,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-09db2061ebd9d6dc",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -17853,7 +17853,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-6565c4fd8edd25d7",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-eec5d29ac389aa40",
@@ -17869,7 +17869,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-ed0447851594bc9d",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-eec5d29ac389aa40",
@@ -18092,7 +18092,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-50687a5339b9d03f",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18105,7 +18105,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-50687a5339b9d03f",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-75f0e6f09b6ea0c4",
@@ -18121,7 +18121,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-50687a5339b9d03f",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18134,7 +18134,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-50687a5339b9d03f",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-75f0e6f09b6ea0c4",
@@ -18150,7 +18150,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-50687a5339b9d03f",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18163,7 +18163,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-6fc5eee7ef71223c",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-75f0e6f09b6ea0c4",
@@ -18179,7 +18179,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-14b3d1d280eaaede",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-75f0e6f09b6ea0c4",
@@ -18195,7 +18195,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1c566c4d12d103a2",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-75f0e6f09b6ea0c4",
@@ -18211,7 +18211,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-226539155aae2f4d",
+      "correctness_case_id": "cq-evidence-qualification-b5b61138f8aa98ac",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-75f0e6f09b6ea0c4",
@@ -18227,7 +18227,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-da8db4f6aeb9c11a",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18240,7 +18240,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-da8db4f6aeb9c11a",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b5e65b36e365f729",
@@ -18256,7 +18256,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-da8db4f6aeb9c11a",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18269,7 +18269,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-da8db4f6aeb9c11a",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18282,7 +18282,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-da8db4f6aeb9c11a",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18295,7 +18295,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-da8db4f6aeb9c11a",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b5e65b36e365f729",
@@ -18311,7 +18311,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-da8db4f6aeb9c11a",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b5e65b36e365f729",
@@ -18327,7 +18327,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-da8db4f6aeb9c11a",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b5e65b36e365f729",
@@ -18343,7 +18343,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-da8db4f6aeb9c11a",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18356,7 +18356,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-d049f3a8b70140ca",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b5e65b36e365f729",
@@ -18372,7 +18372,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-c430b89f4a2ef20b",
+      "correctness_case_id": "cq-evidence-qualification-700782cca9ccc969",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b5e65b36e365f729",
@@ -24263,7 +24263,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-2bef644c7219c753",
+      "correctness_case_id": "cq-evidence-qualification-ec14807bed98deb3",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-32ba736f7e1b5533",
@@ -24383,7 +24383,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-ea14d6b7039bba06",
+      "correctness_case_id": "cq-evidence-qualification-e9c13d24e25ae340",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-32ba736f7e1b5533",
@@ -25741,7 +25741,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-bdfc9ddce2740e87",
+      "correctness_case_id": "cq-evidence-qualification-f30b6c2f457cdf52",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-32ba736f7e1b5533",
@@ -30093,15 +30093,6 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-46f60688c0f56e6e",
-        "cq-evidence-api-47836b88708f3b28",
-        "cq-evidence-api-4d6556455aab263d",
-        "cq-evidence-api-553e257e74d2f82b",
-        "cq-evidence-api-7083f3358c4fb75b",
-        "cq-evidence-api-8c91ed4dff656d57",
-        "cq-evidence-api-943e4f79903b15bb",
-        "cq-evidence-api-a0fed4cee38d1b20",
-        "cq-evidence-api-f02d17fd6f393ced",
         "cq-evidence-qualification-7d805260941fd248"
       ],
       "correctness_binding": "exact-api-owners",
@@ -30180,7 +30171,7 @@
       "phase": "transform",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-2d5e3b62c20a174d"
+        "cq-evidence-qualification-6c6d8daf8f0c3827"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -31322,9 +31313,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-1062ee11f29ed3f6",
-        "cq-evidence-api-1c9d1bb16138c29e",
-        "cq-evidence-api-345a5f73514b10a3"
+        "cq-evidence-qualification-700782cca9ccc969"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -31717,9 +31706,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-09db2061ebd9d6dc",
-        "cq-evidence-api-6565c4fd8edd25d7",
-        "cq-evidence-api-ed0447851594bc9d"
+        "cq-evidence-qualification-700782cca9ccc969"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -31981,9 +31968,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-64d9d926ba1b3883",
-        "cq-evidence-api-d73ff1f4c22b0b0f",
-        "cq-evidence-api-e99cd8ff853655cc"
+        "cq-evidence-qualification-700782cca9ccc969"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -32494,15 +32479,6 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-46f60688c0f56e6e",
-        "cq-evidence-api-47836b88708f3b28",
-        "cq-evidence-api-4d6556455aab263d",
-        "cq-evidence-api-553e257e74d2f82b",
-        "cq-evidence-api-7083f3358c4fb75b",
-        "cq-evidence-api-8c91ed4dff656d57",
-        "cq-evidence-api-943e4f79903b15bb",
-        "cq-evidence-api-a0fed4cee38d1b20",
-        "cq-evidence-api-f02d17fd6f393ced",
         "cq-evidence-qualification-7d805260941fd248"
       ],
       "correctness_binding": "exact-api-owners",
@@ -32619,44 +32595,24 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-048dda29bed17548",
-        "cq-evidence-api-0edbe45a46891017",
-        "cq-evidence-api-0f170a45e93a3e45",
-        "cq-evidence-api-17c6c56f9d953439",
-        "cq-evidence-api-1bde36071fb8aba2",
-        "cq-evidence-api-1f0ffeeee6dda9b6",
-        "cq-evidence-api-1f25af7d594754ad",
-        "cq-evidence-api-1f8fcf61c5037ae3",
-        "cq-evidence-api-20003b0d029edfa5",
-        "cq-evidence-api-26a1a03dfd8e1a74",
-        "cq-evidence-api-37236597651336fc",
-        "cq-evidence-api-3d00e126764be9f4",
-        "cq-evidence-api-464d99f869154fab",
-        "cq-evidence-api-4d9c90ebb7dc5c36",
-        "cq-evidence-api-54391a16f5f6a92f",
-        "cq-evidence-api-5efa6879eb709a7c",
-        "cq-evidence-api-68cca8da3c5763a0",
-        "cq-evidence-api-71f66de27682bde6",
-        "cq-evidence-api-8acdfcac5d9540ed",
-        "cq-evidence-api-9761aa52023d2b2d",
-        "cq-evidence-api-98a46c063ce1e3ef",
-        "cq-evidence-api-adfc905be3ed3ab1",
-        "cq-evidence-api-b38aed5ad13718bc",
-        "cq-evidence-api-b770f36d0154cc5b",
-        "cq-evidence-api-c16770e4fdb98eb9",
-        "cq-evidence-api-c50a63d656cd2311",
-        "cq-evidence-api-cc57a3ca0c3a7a8f",
-        "cq-evidence-api-cd571199f25e2be7",
-        "cq-evidence-api-d10ba357ea641ffc",
-        "cq-evidence-api-d5dc93b39202c4c1",
-        "cq-evidence-api-e38e53e3582cbe70",
-        "cq-evidence-api-eb2b4a0b390f7588",
-        "cq-evidence-api-f93de32301dc96da",
-        "cq-evidence-api-fa7318f9b6c1e588",
+        "cq-evidence-oracle-05418040cb8687e9",
+        "cq-evidence-oracle-136c092657a9caaa",
+        "cq-evidence-oracle-25b0e7b15e5ca033",
+        "cq-evidence-oracle-de062451759af712",
+        "cq-evidence-qualification-0bd1d8d0ab37a23d",
+        "cq-evidence-qualification-0fe6ac87fd414ede",
         "cq-evidence-qualification-112ab0aa2ed0fbe7",
         "cq-evidence-qualification-1189c80e69a5989b",
+        "cq-evidence-qualification-127a76c6386d07df",
         "cq-evidence-qualification-24066267c4c9e76c",
-        "cq-evidence-qualification-e660819ae9a223c6"
+        "cq-evidence-qualification-300c3cd246d325e1",
+        "cq-evidence-qualification-30a7be26ee2c38d5",
+        "cq-evidence-qualification-9b72ebd30ed42082",
+        "cq-evidence-qualification-b5b61138f8aa98ac",
+        "cq-evidence-qualification-bc6509ae4ef4f0db",
+        "cq-evidence-qualification-e660819ae9a223c6",
+        "cq-evidence-qualification-ec14807bed98deb3",
+        "cq-evidence-qualification-f30b6c2f457cdf52"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -32818,7 +32774,7 @@
       "phase": "transform",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-6c61a18ddde83403"
+        "cq-evidence-qualification-6c6d8daf8f0c3827"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -33225,9 +33181,9 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-2bef644c7219c753",
-        "cq-evidence-api-bdfc9ddce2740e87",
-        "cq-evidence-api-ea14d6b7039bba06"
+        "cq-evidence-qualification-e9c13d24e25ae340",
+        "cq-evidence-qualification-ec14807bed98deb3",
+        "cq-evidence-qualification-f30b6c2f457cdf52"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -33309,9 +33265,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-1062ee11f29ed3f6",
-        "cq-evidence-api-1c9d1bb16138c29e",
-        "cq-evidence-api-345a5f73514b10a3"
+        "cq-evidence-qualification-700782cca9ccc969"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -33633,7 +33587,7 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-5b2f382beefc04aa"
+        "cq-evidence-qualification-f55ab65c2e8e2588"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -33795,9 +33749,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-c430b89f4a2ef20b",
-        "cq-evidence-api-d049f3a8b70140ca",
-        "cq-evidence-api-da8db4f6aeb9c11a"
+        "cq-evidence-qualification-700782cca9ccc969"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -35463,7 +35415,6 @@
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
         "cq-evidence-api-0ac00d9fcd332314",
-        "cq-evidence-api-2bef644c7219c753",
         "cq-evidence-api-3546045fba8c72e5",
         "cq-evidence-api-37e65c6eb5bca3d1",
         "cq-evidence-api-3b540c9a61407739",
@@ -35473,10 +35424,11 @@
         "cq-evidence-api-7f5f320c73647922",
         "cq-evidence-api-8c19c2aaf01302cd",
         "cq-evidence-api-ab2d1fdf833b30a1",
-        "cq-evidence-api-bdfc9ddce2740e87",
         "cq-evidence-api-ce4b4fd43f8cdfe0",
         "cq-evidence-api-e8ee8fbfd411d5ba",
-        "cq-evidence-api-ea14d6b7039bba06"
+        "cq-evidence-qualification-e9c13d24e25ae340",
+        "cq-evidence-qualification-ec14807bed98deb3",
+        "cq-evidence-qualification-f30b6c2f457cdf52"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -35810,7 +35762,7 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-5efa6879eb709a7c"
+        "cq-evidence-qualification-b5b61138f8aa98ac"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -35967,9 +35919,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-05c10e3ae703358d",
-        "cq-evidence-api-183f67cad6f35e8f",
-        "cq-evidence-api-bab9277bce46fcae"
+        "cq-evidence-qualification-b5b61138f8aa98ac"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -38820,11 +38770,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-14b3d1d280eaaede",
-        "cq-evidence-api-1c566c4d12d103a2",
-        "cq-evidence-api-226539155aae2f4d",
-        "cq-evidence-api-50687a5339b9d03f",
-        "cq-evidence-api-6fc5eee7ef71223c"
+        "cq-evidence-qualification-b5b61138f8aa98ac"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -39411,9 +39357,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-64d9d926ba1b3883",
-        "cq-evidence-api-d73ff1f4c22b0b0f",
-        "cq-evidence-api-e99cd8ff853655cc"
+        "cq-evidence-qualification-700782cca9ccc969"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -40290,11 +40234,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-14b3d1d280eaaede",
-        "cq-evidence-api-1c566c4d12d103a2",
-        "cq-evidence-api-226539155aae2f4d",
-        "cq-evidence-api-50687a5339b9d03f",
-        "cq-evidence-api-6fc5eee7ef71223c"
+        "cq-evidence-qualification-b5b61138f8aa98ac"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -41430,7 +41370,7 @@
       "phase": "transform",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-6c61a18ddde83403"
+        "cq-evidence-qualification-6c6d8daf8f0c3827"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -42728,7 +42668,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-5b2f382beefc04aa"
+        "cq-evidence-qualification-f55ab65c2e8e2588"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -42805,7 +42745,7 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-5b2f382beefc04aa"
+        "cq-evidence-qualification-f55ab65c2e8e2588"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -42883,7 +42823,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-5b2f382beefc04aa"
+        "cq-evidence-qualification-f55ab65c2e8e2588"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -43141,7 +43081,7 @@
       "phase": "transform",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-2d5e3b62c20a174d"
+        "cq-evidence-qualification-6c6d8daf8f0c3827"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -43509,9 +43449,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-c430b89f4a2ef20b",
-        "cq-evidence-api-d049f3a8b70140ca",
-        "cq-evidence-api-da8db4f6aeb9c11a"
+        "cq-evidence-qualification-700782cca9ccc969"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -43762,16 +43700,14 @@
       "correctness_cases": [
         "cq-evidence-api-05966da3672d43ec",
         "cq-evidence-api-1858f2065f13f36b",
-        "cq-evidence-api-1b3b05a624af240f",
-        "cq-evidence-api-462d486320bb4b8c",
-        "cq-evidence-api-54bf0b1b723edc89",
-        "cq-evidence-api-5a3d03cbfe698b3f",
         "cq-evidence-api-6c14b457dcb36c8c",
-        "cq-evidence-api-7eef3655f7202088",
         "cq-evidence-api-c30b80c8858151aa",
         "cq-evidence-api-d29b0d2580462b8e",
         "cq-evidence-api-d51b46dca9f992a3",
-        "cq-evidence-api-da7c160d8e581a38"
+        "cq-evidence-oracle-136c092657a9caaa",
+        "cq-evidence-qualification-56db332766d73980",
+        "cq-evidence-qualification-abb855431f4d54c2",
+        "cq-evidence-qualification-bb746be0177421a7"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -44354,9 +44290,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-05c10e3ae703358d",
-        "cq-evidence-api-183f67cad6f35e8f",
-        "cq-evidence-api-bab9277bce46fcae"
+        "cq-evidence-qualification-b5b61138f8aa98ac"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -45903,8 +45837,8 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-5efa6879eb709a7c",
         "cq-evidence-qualification-24066267c4c9e76c",
+        "cq-evidence-qualification-b5b61138f8aa98ac",
         "cq-evidence-qualification-e660819ae9a223c6"
       ],
       "correctness_binding": "exact-api-owners",
@@ -47686,40 +47620,20 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-048dda29bed17548",
-        "cq-evidence-api-0edbe45a46891017",
-        "cq-evidence-api-0f170a45e93a3e45",
-        "cq-evidence-api-17c6c56f9d953439",
-        "cq-evidence-api-1bde36071fb8aba2",
-        "cq-evidence-api-1f0ffeeee6dda9b6",
-        "cq-evidence-api-1f25af7d594754ad",
-        "cq-evidence-api-1f8fcf61c5037ae3",
-        "cq-evidence-api-20003b0d029edfa5",
-        "cq-evidence-api-26a1a03dfd8e1a74",
-        "cq-evidence-api-37236597651336fc",
-        "cq-evidence-api-3d00e126764be9f4",
-        "cq-evidence-api-464d99f869154fab",
-        "cq-evidence-api-4d9c90ebb7dc5c36",
-        "cq-evidence-api-54391a16f5f6a92f",
-        "cq-evidence-api-5efa6879eb709a7c",
-        "cq-evidence-api-68cca8da3c5763a0",
-        "cq-evidence-api-71f66de27682bde6",
-        "cq-evidence-api-8acdfcac5d9540ed",
-        "cq-evidence-api-9761aa52023d2b2d",
-        "cq-evidence-api-98a46c063ce1e3ef",
-        "cq-evidence-api-adfc905be3ed3ab1",
-        "cq-evidence-api-b38aed5ad13718bc",
-        "cq-evidence-api-b770f36d0154cc5b",
-        "cq-evidence-api-c16770e4fdb98eb9",
-        "cq-evidence-api-c50a63d656cd2311",
-        "cq-evidence-api-cc57a3ca0c3a7a8f",
-        "cq-evidence-api-cd571199f25e2be7",
-        "cq-evidence-api-d10ba357ea641ffc",
-        "cq-evidence-api-d5dc93b39202c4c1",
-        "cq-evidence-api-e38e53e3582cbe70",
-        "cq-evidence-api-eb2b4a0b390f7588",
-        "cq-evidence-api-f93de32301dc96da",
-        "cq-evidence-api-fa7318f9b6c1e588"
+        "cq-evidence-oracle-05418040cb8687e9",
+        "cq-evidence-oracle-136c092657a9caaa",
+        "cq-evidence-oracle-25b0e7b15e5ca033",
+        "cq-evidence-oracle-de062451759af712",
+        "cq-evidence-qualification-0bd1d8d0ab37a23d",
+        "cq-evidence-qualification-0fe6ac87fd414ede",
+        "cq-evidence-qualification-127a76c6386d07df",
+        "cq-evidence-qualification-300c3cd246d325e1",
+        "cq-evidence-qualification-30a7be26ee2c38d5",
+        "cq-evidence-qualification-9b72ebd30ed42082",
+        "cq-evidence-qualification-b5b61138f8aa98ac",
+        "cq-evidence-qualification-bc6509ae4ef4f0db",
+        "cq-evidence-qualification-ec14807bed98deb3",
+        "cq-evidence-qualification-f30b6c2f457cdf52"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -48116,9 +48030,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-09db2061ebd9d6dc",
-        "cq-evidence-api-6565c4fd8edd25d7",
-        "cq-evidence-api-ed0447851594bc9d"
+        "cq-evidence-qualification-700782cca9ccc969"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -49098,12 +49010,10 @@
       "phase": "transform",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-1b3b05a624af240f",
-        "cq-evidence-api-462d486320bb4b8c",
-        "cq-evidence-api-54bf0b1b723edc89",
-        "cq-evidence-api-5a3d03cbfe698b3f",
-        "cq-evidence-api-7eef3655f7202088",
-        "cq-evidence-api-da7c160d8e581a38"
+        "cq-evidence-oracle-136c092657a9caaa",
+        "cq-evidence-qualification-56db332766d73980",
+        "cq-evidence-qualification-abb855431f4d54c2",
+        "cq-evidence-qualification-bb746be0177421a7"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,

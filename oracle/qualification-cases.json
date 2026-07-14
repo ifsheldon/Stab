@@ -1204,6 +1204,9 @@
           "crate_name": "stab_core",
           "owner_path": "stab_core::Circuit::write_stim_file"
         }
+      ],
+      "oracle_fixture_owners": [
+        "pf1-circuit-file-helpers"
       ]
     },
     {
@@ -1234,6 +1237,9 @@
           "crate_name": "stab_core",
           "owner_path": "stab_core::Circuit::append_from_stim_text"
         }
+      ],
+      "oracle_fixture_owners": [
+        "pf1-circuit-append-text"
       ]
     },
     {
@@ -1259,6 +1265,12 @@
         "kind": "not-applicable",
         "detail": "This case proves the public append_from_stim_program_text alias delegates to canonical append semantics."
       },
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/circuit_pybind_test.py",
+          "symbol": "test_tags_append_from_stim_program_text"
+        }
+      ],
       "public_api_owners": [
         {
           "crate_name": "stab_core",
@@ -1682,7 +1694,8 @@
         "probability-domain",
         "probability-arity",
         "invalid-measurement-pad",
-        "invalid-classical-control-role"
+        "invalid-classical-control-role",
+        "odd-pair-target-count"
       ],
       "upstream_owners": [
         {
@@ -1708,6 +1721,10 @@
         {
           "path": "src/stim/circuit/circuit.test.cc",
           "symbol": "circuit.x_error_validation"
+        },
+        {
+          "path": "src/stim/circuit/circuit_pybind_test.py",
+          "symbol": "test_circuit_create_with_odd_cx"
         }
       ]
     },
@@ -1848,18 +1865,25 @@
         ]
       },
       "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This fixed corpus proves typed instruction construction, accessors, cloning, and value equality across differing gates, arguments, and targets."
+        "kind": "bounded-materialized",
+        "detail": "The first-invalid pair-target case rejects while constructing a single-target instruction; target grouping and segmentation materialize output only for the fixed small instruction corpus, without an asymptotic allocation claim."
       },
+      "negative_axes": [
+        "invalid-pair-target-count"
+      ],
       "static_property_plan": {
-        "generator_domain": "fixed CircuitInstruction constructor, accessor, clone, and equality variants",
-        "case_count": 4,
+        "generator_domain": "fixed CircuitInstruction constructor, tag-normalization, accessor, complete upstream target-group matrix, segmented-preservation, clone, equality, and rejection variants",
+        "case_count": 26,
         "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
       },
       "upstream_owners": [
         {
           "path": "src/stim/circuit/circuit_instruction_pybind_test.py",
           "symbol": "test_init_and_equality"
+        },
+        {
+          "path": "src/stim/circuit/circuit_instruction_pybind_test.py",
+          "symbol": "test_target_groups"
         }
       ],
       "public_api_owners": [
@@ -1878,6 +1902,42 @@
         {
           "crate_name": "stab_core",
           "owner_path": "stab_core::CircuitInstruction::targets"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::probability_argument"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::probability_arguments"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::observable_id_argument"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::coordinate_arguments"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::tag"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::target_groups"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::disjoint_target_segments"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::disjoint_target_segments_reversed"
         }
       ]
     },
@@ -1915,6 +1975,422 @@
           "symbol": "test_num_measurements"
         }
       ]
+    },
+    {
+      "id": "cq2-circuit-api-typed-identifiers",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "cq2_circuit_api", "cq2_circuit_api_typed_ids_enforce_value_boundaries", "--quiet", "--exact"]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Fixed boundary values prove typed qubit, detector, observable, and repeat-count construction without materializing circuit state."
+      },
+      "negative_axes": ["qubit-id-overflow", "zero-repeat-count"],
+      "static_property_plan": {
+        "generator_domain": "zero, maximum valid, and first-invalid typed circuit identifiers",
+        "case_count": 10,
+        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+      },
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::QubitId"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::QubitId::new"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::QubitId::get"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::ObservableId"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::ObservableId::new"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::ObservableId::get"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitDetectorId"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitDetectorId::new"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitDetectorId::get"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatCount"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatCount::try_new"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatCount::get"}
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-value-items-repeat-blocks",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "cq2_circuit_api", "cq2_circuit_api_value_items_and_repeat_blocks_are_independent", "--quiet", "--exact"]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The first-invalid zero repeat rejects before a block is constructed; the fixed value corpus clones only selected small circuit and repeat bodies and proves body, count, tag, and mutation independence."
+      },
+      "negative_axes": [
+        "zero-repeat-count"
+      ],
+      "static_property_plan": {
+        "generator_domain": "empty, instruction, tagged instruction, nested target and argument inequality, repeat-block body/count/tag inequality, zero-count rejection, clone, and mutation-independence variants",
+        "case_count": 21,
+        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+      },
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.assignment_copies_operations"},
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.equality"},
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.preserves_repetition_blocks"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_circuit_eq_tags"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_circuit_tags"},
+        {"path": "src/stim/circuit/circuit_repeat_block_test.py", "symbol": "test_init_and_equality"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::new"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitItem"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitItem::as_instruction"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitItem::as_repeat_block"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatBlock"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatBlock::new"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatBlock::repeat_count"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatBlock::body"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::RepeatBlock::tag"}
+      ],
+      "oracle_fixture_owners": ["pf1-circuit-rust-api"]
+    },
+    {
+      "id": "cq2-circuit-api-append-items",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "cq2_circuit_api", "cq2_circuit_api_append_items_preserve_tags_and_fuse", "--quiet", "--exact"]
+      },
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This fixed semantic corpus proves instruction and repeat-block append ownership, tag preservation, adjacent fusion, and required non-fusion cases without making a separate resource claim."
+      },
+      "static_property_plan": {
+        "generator_domain": "tagged fusing instructions and one tagged repeat block",
+        "case_count": 12,
+        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+      },
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.append_op_fuse"},
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.append_repeat_block"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tags_append"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_fuse"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::append_instruction"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::append_repeat_block"}
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-flattened-iterator-values",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "cq2_circuit_api", "cq2_circuit_api_flattened_iterators_clone_without_sharing_position", "--quiet", "--exact"]
+      },
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This fixed semantic corpus proves independent forward and reverse iterator clones over nested repeats without making a separate traversal-memory claim."
+      },
+      "static_property_plan": {
+        "generator_domain": "nested repeat forward and reverse iterator clone positions",
+        "case_count": 2,
+        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+      },
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitFlattenedInstructionIter"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitFlattenedInstructionRevIter"}
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-error-values",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "cq2_circuit_api", "cq2_circuit_api_error_value_contract_is_exhaustive", "--quiet", "--exact"]
+      },
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "The finite public error-variant corpus proves exhaustive typed equality, exact display text, and CircuitResult error propagation."
+      },
+      "static_property_plan": {
+        "generator_domain": "all public CircuitError variants plus typed CircuitResult error propagation",
+        "case_count": 15,
+        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+      },
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitError"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::CircuitResult"}
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-counts",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "cq2_circuit_api_count_contract_matches_selected_stim_semantics", "--quiet", "--exact"]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Scalar count results use parsed-circuit nesting state instead of materializing trillion-count logical repetitions, and checked arithmetic rejects the first overflowing folded count."
+      },
+      "negative_axes": ["trillion-count-logical-repeat", "checked-count-overflow"],
+      "static_property_plan": {
+        "generator_domain": "empty construction, append mutation, result-group counts, trillion-count folded repeats, and checked overflow",
+        "case_count": 18,
+        "corpus_path": "crates/stab-core/tests/circuit_api.rs"
+      },
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.count_sweep_bits"},
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.count_ticks"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_circuit_init_num_measurements_num_qubits"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_num_detectors"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_num_observables"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_num_ticks"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::len"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::is_empty"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_measurements"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_detectors"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_observables"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_ticks"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_sweep_bits"}
+      ],
+      "oracle_fixture_owners": ["pf1-circuit-stats-coordinates"]
+    },
+    {
+      "id": "cq2-circuit-api-qubit-count",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "cq2_circuit_api_qubit_count_contract_matches_selected_stim_semantics", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "bounded-materialized", "detail": "Qubit width returns one scalar while traversing nested 999,999-count repeats without materializing logical iterations."},
+      "negative_axes": ["deep-huge-repeat-count", "measurement-pad-numeric-target"],
+      "static_property_plan": {
+        "generator_domain": "empty, plain, annotation, measurement-pad, and five-level huge-repeat qubit-width cases",
+        "case_count": 5,
+        "corpus_path": "crates/stab-core/tests/circuit_api.rs"
+      },
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.count_qubits"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::count_qubits"}
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-final-coordinate-shift",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing", "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "pf1_circuit_stats_final_coordinate_shift_matches_nested_upstream_case", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "bounded-materialized", "detail": "Nested billion-scale coordinate shifts use parsed-circuit nesting state instead of materializing logical repetitions and return one bounded coordinate vector."},
+      "negative_axes": ["nested-billion-scale-repeat-expansion"],
+      "static_property_plan": {"generator_domain": "three nested coordinate-shift repeat dimensions", "case_count": 3, "corpus_path": "crates/stab-core/tests/circuit_api.rs"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.final_coord_shift"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::final_coordinate_shift"}
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-final-qubit-coordinates",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing", "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "pf1_circuit_stats_final_qubit_coordinates_apply_shifts_and_repeats", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "not-applicable", "detail": "This fixed semantic case proves final coordinates while a separate qualification case owns huge-repeat folding."},
+      "static_property_plan": {"generator_domain": "qubit coordinates before, within, and after repeated shifts", "case_count": 4, "corpus_path": "crates/stab-core/tests/circuit_api.rs"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.get_final_qubit_coords"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_coords"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::final_qubit_coordinates"}
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-final-qubit-coordinates-huge-repeat",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing", "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "cq2_circuit_api_final_qubit_coordinates_fold_huge_repeats", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "bounded-materialized", "detail": "Four nested repeat counts represent 64 trillion logical inner iterations while coordinate evaluation uses parsed-circuit nesting state plus the ten addressed-qubit results."},
+      "negative_axes": ["sixty-four-trillion-logical-iterations"],
+      "static_property_plan": {"generator_domain": "pinned Stim four-level huge-repeat coordinate circuit", "case_count": 10, "corpus_path": "crates/stab-core/tests/circuit_api.rs"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.get_final_qubit_coords_huge_repetition_count_efficiency"}
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-circuit-api-clear",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing", "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "pf1_circuit_stats_clear_resets_items_and_counts", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "not-applicable", "detail": "This fixed semantic case proves the empty post-clear invariant without a separate allocation claim."},
+      "static_property_plan": {"generator_domain": "instruction, measurement, and detector state cleared to empty", "case_count": 5, "corpus_path": "crates/stab-core/tests/circuit_api.rs"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_circuit_clear"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_clear"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::clear"}
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-repetition",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing", "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_api", "cq2_circuit_api_repetition_contract_matches_selected_stim_semantics", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "bounded-materialized", "detail": "Zero and one repetition use empty or cloned circuits, larger counts use one folded repeat block, and multiplication that overflows the repeat count rejects before expansion."},
+      "negative_axes": ["large-repeat-count", "repeat-count-multiplication-overflow"],
+      "static_property_plan": {"generator_domain": "zero, one, folded two and three, nested fusion, 1.23e18 count, and overflow cases", "case_count": 8, "corpus_path": "crates/stab-core/tests/circuit_api.rs"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.multiplication_repeats"},
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.big_rep_count"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::repeated"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::repeat_in_place"}
+      ],
+      "oracle_fixture_owners": ["pf1-circuit-repeat"]
+    },
+    {
+      "id": "cq2-circuit-api-without-tags",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing", "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "cq2_circuit_api", "cq2_circuit_api_without_tags_is_recursive_and_non_mutating", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "not-applicable", "detail": "This fixed semantic case proves recursive tag removal and source independence without a separate allocation limit claim."},
+      "static_property_plan": {"generator_domain": "top-level, repeat, measurement, detector, record-target, and source-independence tag cases", "case_count": 6, "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.without_tags"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_without_tags"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::without_tags"}
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-flattened-transform",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing", "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_transforms", "cq2_circuit_api_flattened_contract_matches_stim", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "bounded-materialized", "detail": "The aggregate proves the one-million-instruction materialization admission boundary, folded shift-only huge repeats, and coordinate-overflow rejection in addition to exact flattened semantics."},
+      "negative_axes": ["materialized-expansion-cap", "coordinate-overflow", "repeat-tag-removal"],
+      "static_property_plan": {"generator_domain": "basic, coordinate, tagged, flattened-operation, huge-repeat, cap-rejection, and overflow cases", "case_count": 7, "corpus_path": "crates/stab-core/tests/circuit_transforms.rs"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.flattened"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_flattened"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_flattened"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_circuit_flattened_operations"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::flattened"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::flattened_operations"}
+      ],
+      "oracle_fixture_owners": ["pf2-circuit-flatten-without-noise-rust"]
+    },
+    {
+      "id": "cq2-circuit-api-without-noise-transform",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing", "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_transforms", "cq2_circuit_api_without_noise_contract_matches_stim", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "not-applicable", "detail": "This fixed semantic aggregate proves ordinary and identity-error removal, measurement-noise stripping, heralded-result replacement, tag preservation, and annotation preservation without a separate size claim."},
+      "static_property_plan": {"generator_domain": "ordinary, measurement, heralded, identity-error, tagged, annotation, and record-preservation cases", "case_count": 8, "corpus_path": "crates/stab-core/tests/circuit_transforms.rs"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.noiseless_heralded_erase"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_without_noise"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_without_noise"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_without_noise_removes_id_errors"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::without_noise"}
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-decomposed-transform",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing", "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_transforms", "cq2_circuit_api_decomposed_contract_matches_stim", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "not-applicable", "detail": "This fixed semantic aggregate proves the selected ISWAP, MPP, SPP, pair-measurement, noise, annotation, tag, constant-product, and flow-preservation decomposition scope."},
+      "static_property_plan": {"generator_domain": "public example, tagged-noise, constant-product, anti-Hermitian, and measurement-rich flow cases", "case_count": 5, "corpus_path": "crates/stab-core/tests/circuit_transforms.rs"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_decomposed"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_decomposed"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::decomposed"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::decomposed_circuit"}
+      ],
+      "oracle_fixture_owners": ["pf2-circuit-decomposed-public-rust"]
+    },
+    {
+      "id": "cq2-circuit-api-simplified-transform",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing", "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "circuit_simplify", "cq2_circuit_api_simplified_contract_matches_selected_stim_scope", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "not-applicable", "detail": "This fixed selected-scope aggregate proves single- and two-qubit Clifford simplification, recursive repeats, unsupported-gate preservation, and classical-control preservation."},
+      "static_property_plan": {"generator_domain": "single-qubit, two-qubit, repeated, unsupported, and classical-control simplification cases", "case_count": 5, "corpus_path": "crates/stab-core/tests/circuit_simplify.rs"},
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::simplified"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::simplified_circuit"}
+      ],
+      "oracle_fixture_owners": ["coverage-util-top-simplified-circuit"]
+    },
+    {
+      "id": "cq2-circuit-api-mbqc-decomposition",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing", "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--test", "mbqc_decomposition", "cq2_circuit_api_mbqc_decomposition_contract_matches_selected_stim_scope", "--quiet", "--exact"]
+      },
+      "resource_contract": {"kind": "not-applicable", "detail": "This fixed selected-scope aggregate proves unsupported-category None results and canonical measurement, reset, Pauli, phase, identity, and CX decomposition text."},
+      "static_property_plan": {"generator_domain": "nine unsupported representatives plus exact canonical output and reparsing for all seventeen implemented measurement, reset, Pauli, phase, identity, and CX gates", "case_count": 26, "corpus_path": "crates/stab-core/tests/mbqc_decomposition.rs"},
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::mbqc_decomposition"}
+      ],
+      "oracle_fixture_owners": ["coverage-util-top-mbqc-decomposition"]
     },
     {
       "id": "cq2-result-sample-format-value-contract",
@@ -4983,6 +5459,68 @@
     }
   ],
   "existing_parent_mappings": [
+    {
+      "id": "cq2-map-circuit-concatenation",
+      "feature_id": "CQ-CIRCUIT-API",
+      "parent": {"provenance": "oracle-fixture", "source_id": "pf1-circuit-concat"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.append_circuit"},
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.concat_fuse"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_append_circuit_to_circuit"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::append_circuit"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::concatenated"}
+      ]
+    },
+    {
+      "id": "cq2-map-circuit-insert-pop",
+      "feature_id": "CQ-CIRCUIT-API",
+      "parent": {"provenance": "oracle-fixture", "source_id": "pf1-circuit-insert-pop"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.insert_circuit"},
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.insert_instruction"},
+        {"path": "src/stim/circuit/circuit_pybind_test.py", "symbol": "test_tag_insert"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::insert_item"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::insert_instruction"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::insert_circuit"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::insert_repeat_block"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::pop_item"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::pop_last_item"}
+      ]
+    },
+    {
+      "id": "cq2-map-circuit-iterators",
+      "feature_id": "CQ-CIRCUIT-API",
+      "parent": {"provenance": "oracle-fixture", "source_id": "pf1-circuit-iterators"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.for_each_operation"},
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.for_each_operation_reverse"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::items"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::iter_items"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::item_range"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::instruction_range"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::iter_flattened_instructions"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::iter_flattened_instructions_reverse"}
+      ]
+    },
+    {
+      "id": "cq2-map-circuit-detector-coordinates",
+      "feature_id": "CQ-CIRCUIT-API",
+      "parent": {"provenance": "oracle-fixture", "source_id": "pf1-circuit-detector-coordinates"},
+      "upstream_owners": [
+        {"path": "src/stim/circuit/circuit.test.cc", "symbol": "circuit.coords_of_detector"}
+      ],
+      "public_api_owners": [
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::coordinates_of_detector"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::detector_coordinates_for"},
+        {"crate_name": "stab_core", "owner_path": "stab_core::Circuit::detector_coordinates"}
+      ]
+    },
     {
       "id": "cq2-map-gate-metadata-accessors",
       "feature_id": "CQ-GATE-CONTRACT",

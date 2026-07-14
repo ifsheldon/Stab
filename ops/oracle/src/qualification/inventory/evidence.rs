@@ -7,7 +7,8 @@ use crate::qualification::model::{
 use super::property_plan;
 
 pub(super) fn infer_feature_from_oracle_argv(argv: &str) -> Option<FeatureId> {
-    let first = argv.split('|').next()?;
+    let tokens = argv.split('|').collect::<Vec<_>>();
+    let first = tokens.first().copied()?;
     match first {
         "--help" => Some(FeatureId::Cli),
         "gen" => Some(FeatureId::Generation),
@@ -20,8 +21,41 @@ pub(super) fn infer_feature_from_oracle_argv(argv: &str) -> Option<FeatureId> {
         "core-dem-parse-print" => Some(FeatureId::DemFormat),
         _ if first.starts_with("--gen=") => Some(FeatureId::Generation),
         _ if first.starts_with("--sample=") => Some(FeatureId::Sampling),
+        "cargo-test"
+            if selector_has_component(&tokens, "detecting_regions")
+                || selector_has_exact_component(&tokens, "circuit_flows")
+                || selector_has_component(&tokens, "has_all_flows") =>
+        {
+            Some(FeatureId::FlowUtils)
+        }
+        "cargo-test" if selector_has_component(&tokens, "pf1_circuit_reference_determined") => {
+            Some(FeatureId::Sampling)
+        }
+        "cargo-test"
+            if selector_has_component(&tokens, "pf1_circuit_file_helpers")
+                || selector_has_component(&tokens, "pf1_circuit_append_text") =>
+        {
+            Some(FeatureId::StimFormat)
+        }
         _ => None,
     }
+}
+
+fn selector_has_component(tokens: &[&str], stem: &str) -> bool {
+    tokens.iter().any(|token| {
+        token.split("::").any(|component| {
+            component == stem
+                || component
+                    .strip_prefix(stem)
+                    .is_some_and(|suffix| suffix.starts_with('_'))
+        })
+    })
+}
+
+fn selector_has_exact_component(tokens: &[&str], expected: &str) -> bool {
+    tokens
+        .iter()
+        .any(|token| token.split("::").any(|component| component == expected))
 }
 
 pub(super) fn oracle_behavioral_surface(argv: &str) -> BehavioralSurface {

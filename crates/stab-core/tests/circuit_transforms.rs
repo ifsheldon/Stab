@@ -6,7 +6,7 @@
 use stab_core::{
     Circuit, CircuitError, CircuitItem, ErrorAnalyzerOptions,
     check_if_circuit_has_unsigned_stabilizer_flows, circuit_flow_generators,
-    circuit_to_detector_error_model, circuit_with_inlined_feedback,
+    circuit_to_detector_error_model, circuit_with_inlined_feedback, decomposed_circuit,
 };
 
 fn circuit(text: &str) -> Circuit {
@@ -202,6 +202,17 @@ fn flattened_operations_unrolls_without_fusing() {
 
 #[test]
 fn flattened_rejects_excessive_materialized_expansion() {
+    let boundary = circuit("REPEAT 1000000 {\nH 0\n}\n")
+        .flattened()
+        .expect("accept exact materialized limit");
+    let boundary_instruction = boundary
+        .items()
+        .first()
+        .and_then(CircuitItem::as_instruction)
+        .expect("fused boundary instruction");
+    assert_eq!(boundary.len(), 1);
+    assert_eq!(boundary_instruction.targets().len(), 1_000_000);
+
     let circuit = circuit("REPEAT 1000001 {\nH 0\n}\n");
     let error = circuit.flattened().expect_err("reject large flatten");
 
@@ -322,16 +333,36 @@ SHIFT_COORDS[test7](5)
 }
 
 #[test]
+fn without_noise_removes_identity_errors_like_stim() {
+    let noiseless = circuit(
+        "
+        I_ERROR 0
+        I_ERROR(0.25) 1
+        II_ERROR 2 3
+        II_ERROR(0.125) 3 4
+        H 0
+    ",
+    )
+    .without_noise()
+    .expect("without noise");
+
+    assert_eq!(noiseless.to_stim_string(), "H 0\n");
+}
+
+#[test]
 fn decomposed_matches_public_stim_iswap_mpp_example() {
-    let decomposed = circuit(
+    let original = circuit(
         "
         ISWAP 0 1 2 1
         TICK
         MPP X1*Z2*Y3
     ",
-    )
-    .decomposed()
-    .expect("decompose");
+    );
+    let decomposed = original.decomposed().expect("decompose through method");
+    assert_eq!(
+        decomposed,
+        decomposed_circuit(&original).expect("decompose through free function")
+    );
 
     assert_eq!(
         decomposed.to_stim_string(),
@@ -824,4 +855,31 @@ fn flattened_rejects_coordinate_overflow() {
 
     assert!(matches!(error, CircuitError::InvalidResultFormat { .. }));
     assert!(error.to_string().contains("coordinate shift overflowed"));
+}
+
+#[test]
+fn cq2_circuit_api_flattened_contract_matches_stim() {
+    flattened_matches_pinned_stim_basic_cases();
+    flattened_applies_coordinate_shifts_through_repeats();
+    flattened_preserves_instruction_tags_and_drops_repeat_tags();
+    flattened_operations_unrolls_without_fusing();
+    flattened_rejects_excessive_materialized_expansion();
+    flattened_folds_shift_only_large_repeats();
+    flattened_rejects_coordinate_overflow();
+}
+
+#[test]
+fn cq2_circuit_api_without_noise_contract_matches_stim() {
+    without_noise_matches_pinned_stim_basic_cases();
+    without_noise_replaces_heralded_noise_with_measurement_pads();
+    without_noise_preserves_tags_annotations_and_records();
+    without_noise_removes_identity_errors_like_stim();
+}
+
+#[test]
+fn cq2_circuit_api_decomposed_contract_matches_stim() {
+    decomposed_matches_public_stim_iswap_mpp_example();
+    decomposed_preserves_tags_noise_annotations_and_spp_shape();
+    decomposed_handles_constant_mpp_products_and_rejects_anti_hermitian_products();
+    decomposed_preserves_selected_measurement_rich_flows();
 }

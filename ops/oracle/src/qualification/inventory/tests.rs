@@ -1,8 +1,10 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use super::evidence::infer_feature_from_oracle_argv;
 use super::{
-    InventoryError, OracleEvidenceRow, generate, stable_id, validate_relative_source_path,
+    InventoryError, OracleEvidenceRow, generate, oracle_feature_override, stable_id,
+    validate_relative_source_path,
 };
 use crate::RepoRoot;
 use crate::qualification::model::{
@@ -35,6 +37,62 @@ fn stable_ids_are_deterministic_and_domain_separated() {
 }
 
 #[test]
+fn flow_utility_cargo_fixtures_do_not_fall_back_to_circuit_api() {
+    for argv in [
+        "cargo-test|-p|stab-core|detecting_regions_target_api",
+        "cargo-test|-p|stab-core|--test|circuit_flows|circuit_has_all_flows",
+        "cargo-test|-p|stab-core|has_all_flows",
+    ] {
+        assert_eq!(
+            infer_feature_from_oracle_argv(argv),
+            Some(FeatureId::FlowUtils)
+        );
+    }
+    assert_eq!(
+        infer_feature_from_oracle_argv(
+            "cargo-test|-p|stab-core|--test|circuit_inverse_qec|unitary_subset"
+        ),
+        None
+    );
+    assert_eq!(
+        infer_feature_from_oracle_argv(
+            "cargo-test|-p|stab-core|--test|circuit_api|pf1_circuit_reference_determined_"
+        ),
+        Some(FeatureId::Sampling)
+    );
+    for argv in [
+        "cargo-test|-p|stab-core|--test|circuit_api|pf1_circuit_file_helpers_",
+        "cargo-test|-p|stab-core|--test|circuit_api|pf1_circuit_append_text_",
+    ] {
+        assert_eq!(
+            infer_feature_from_oracle_argv(argv),
+            Some(FeatureId::StimFormat)
+        );
+    }
+    for argv in [
+        "cargo-test|-p|stab-core|not_detecting_regions_target",
+        "cargo-test|-p|stab-core|unrelated::circuit_flows_helper",
+        "cargo-test|-p|stab-core|pf1_circuit_reference_determinedness",
+        "cargo-test|-p|stab-core|pf1_circuit_file_helpersExtraordinary",
+        "cargo-test|-p|stab-core|pf1_circuit_append_textual",
+    ] {
+        assert_eq!(infer_feature_from_oracle_argv(argv), None, "argv={argv}");
+    }
+}
+
+#[test]
+fn exact_circuit_api_fixtures_override_ambiguous_circuit_source_paths() {
+    for id in [
+        "pf1-circuit-concat",
+        "pf1-circuit-detector-coordinates",
+        "pf1-circuit-insert-pop",
+        "pf1-circuit-iterators",
+    ] {
+        assert_eq!(oracle_feature_override(id), Some(FeatureId::CircuitApi));
+    }
+}
+
+#[test]
 fn generation_fails_before_discovery_for_an_unvalidated_stim_checkout() {
     let temporary = tempfile::tempdir().expect("temporary repository");
     std::fs::create_dir_all(temporary.path().join("vendor/stim")).expect("fake Stim directory");
@@ -58,6 +116,18 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
             .to_path_buf(),
     };
     let manifest = generate(&root).expect("generated qualification manifest");
+    for (source_id, expected_feature) in [
+        ("pf1-circuit-concat", FeatureId::CircuitApi),
+        ("pf1-circuit-reference-determined", FeatureId::Sampling),
+        ("pf5-detecting-regions-targets-rust", FeatureId::FlowUtils),
+    ] {
+        let case = manifest
+            .evidence_cases
+            .iter()
+            .find(|case| case.source_id == source_id)
+            .expect("generated evidence source must exist");
+        assert_eq!(case.feature_id, expected_feature, "source_id={source_id}");
+    }
     let bytes = crate::safe_file::read_regular_file_bounded(
         &root.fixture_manifest(),
         super::MAX_ORACLE_MANIFEST_BYTES,

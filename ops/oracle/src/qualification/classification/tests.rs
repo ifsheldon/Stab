@@ -70,10 +70,7 @@ fn classifications_distinguish_selected_execution_domains() {
 fn classifications_split_mixed_python_cases_by_exact_symbol() {
     let path = Path::new("src/stim/circuit/circuit_pybind_test.py");
     let search = classify_upstream_case(path, "test_shortest_graphlike_error");
-    assert_eq!(
-        search.feature_ids,
-        vec![FeatureId::CircuitApi, FeatureId::Search]
-    );
+    assert_eq!(search.feature_ids, vec![FeatureId::Search]);
 
     let diagram = classify_upstream_case(path, "test_tag_diagram");
     assert_eq!(diagram.disposition, UpstreamDisposition::DeferredProduct);
@@ -187,10 +184,7 @@ fn classifications_reconcile_domain_matrix_sources() {
         Path::new("src/stim/circuit/circuit.test.cc"),
         "circuit.from_text",
     );
-    assert_eq!(
-        circuit.feature_ids,
-        vec![FeatureId::StimFormat, FeatureId::CircuitApi]
-    );
+    assert_eq!(circuit.feature_ids, vec![FeatureId::StimFormat]);
 
     let count = classify_upstream_case(
         Path::new("src/stim/circuit/circuit.test.cc"),
@@ -202,16 +196,14 @@ fn classifications_reconcile_domain_matrix_sources() {
         Path::new("src/stim/circuit/circuit.test.cc"),
         "circuit.parse_windows_newlines",
     );
-    assert_eq!(
-        windows.feature_ids,
-        vec![FeatureId::StimFormat, FeatureId::CircuitApi]
-    );
+    assert_eq!(windows.feature_ids, vec![FeatureId::StimFormat]);
 
     let approximate = classify_upstream_case(
         Path::new("src/stim/circuit/circuit.test.cc"),
         "circuit.approx_equals",
     );
-    assert_eq!(approximate.feature_ids, vec![FeatureId::CircuitApi]);
+    assert_eq!(approximate.disposition, UpstreamDisposition::NotApplicable);
+    assert!(approximate.feature_ids.is_empty());
 
     let frame = classify_upstream_case(
         Path::new("src/stim/simulators/frame_simulator.test.cc"),
@@ -413,4 +405,205 @@ fn classifications_split_portable_bit_contracts_from_cpp_storage_helpers() {
         classify_upstream_case(sparse, "sparse_xor_table.inplace_xor").disposition,
         UpstreamDisposition::NotApplicable
     );
+}
+
+#[test]
+fn classifications_split_circuit_rust_semantics_from_bindings_and_other_domains() {
+    let pybind = Path::new("src/stim/circuit/circuit_pybind_test.py");
+    for (symbol, feature) in [
+        ("test_circuit_compile_sampler", FeatureId::Sampling),
+        (
+            "test_circuit_compile_detector_sampler",
+            FeatureId::Detection,
+        ),
+        ("test_circuit_generation", FeatureId::Generation),
+        ("test_shortest_graphlike_error", FeatureId::Search),
+        ("test_has_flow_ry", FeatureId::FlowUtils),
+        ("test_to_tableau", FeatureId::Algebra),
+    ] {
+        let classified = classify_upstream_case(pybind, symbol);
+        assert_eq!(classified.disposition, UpstreamDisposition::SemanticMining);
+        assert_eq!(classified.feature_ids, vec![feature], "symbol={symbol}");
+    }
+
+    for symbol in [
+        "test_circuit_iadd",
+        "test_circuit_repr",
+        "test_copy",
+        "test_hash",
+        "test_slicing",
+        "test_approx_equals",
+        "test_pickle",
+        "test_append_pauli_string",
+        "test_reference_detector_and_observable_signs",
+        "test_circuit_append_operation",
+        "test_insert",
+        "test_pop",
+        "test_circuit_from_file",
+        "test_circuit_to_file",
+        "test_tag_from_file",
+        "test_append_instructions_and_blocks",
+        "test_reappend_gate_targets",
+        "test_append_tag",
+    ] {
+        let classified = classify_upstream_case(pybind, symbol);
+        assert_eq!(
+            classified.disposition,
+            UpstreamDisposition::DeferredProduct,
+            "symbol={symbol}"
+        );
+        assert_eq!(
+            classified.deferred_product,
+            Some(DeferredProduct::PythonBindings),
+            "symbol={symbol}"
+        );
+    }
+
+    let explain = classify_upstream_case(pybind, "test_explain_errors");
+    assert_eq!(explain.disposition, UpstreamDisposition::DeferredProduct);
+    assert_eq!(
+        explain.deferred_product,
+        Some(DeferredProduct::ExplainErrors)
+    );
+
+    for symbol in [
+        "test_circuit_init_num_measurements_num_qubits",
+        "test_num_ticks",
+        "test_coords",
+        "test_flattened",
+        "test_without_noise",
+        "test_decomposed",
+        "test_circuit_tags",
+        "test_without_tags",
+        "test_append_circuit_to_circuit",
+    ] {
+        let classified = classify_upstream_case(pybind, symbol);
+        assert_eq!(classified.disposition, UpstreamDisposition::SemanticMining);
+        assert_eq!(
+            classified.feature_ids,
+            vec![FeatureId::CircuitApi],
+            "symbol={symbol}"
+        );
+    }
+
+    let diagram = classify_upstream_case(pybind, "test_diagram");
+    assert_eq!(diagram.disposition, UpstreamDisposition::DeferredProduct);
+    assert_eq!(diagram.deferred_product, Some(DeferredProduct::Diagrams));
+    let detslice = classify_upstream_case(pybind, "test_detslice_filter_coords_flexibility");
+    assert_eq!(detslice.disposition, UpstreamDisposition::DeferredProduct);
+    assert_eq!(detslice.deferred_product, Some(DeferredProduct::Diagrams));
+    assert_eq!(
+        classify_upstream_case(pybind, "test_tags_append_from_stim_program_text").feature_ids,
+        vec![FeatureId::StimFormat]
+    );
+    assert_eq!(
+        classify_upstream_case(pybind, "test_circuit_create_with_odd_cx").feature_ids,
+        vec![FeatureId::StimFormat]
+    );
+}
+
+#[test]
+fn classifications_split_circuit_cpp_and_value_object_contracts_exactly() {
+    let circuit = Path::new("src/stim/circuit/circuit.test.cc");
+    for symbol in [
+        "circuit.append_circuit",
+        "circuit.for_each_operation",
+        "circuit.count_qubits",
+        "circuit.multiplication_repeats",
+        "circuit.get_final_qubit_coords",
+        "circuit.coords_of_detector",
+        "circuit.flattened",
+        "circuit.equality",
+        "circuit.insert_instruction",
+        "circuit.without_tags",
+    ] {
+        let classified = classify_upstream_case(circuit, symbol);
+        assert!(
+            classified.feature_ids.contains(&FeatureId::CircuitApi),
+            "symbol={symbol}"
+        );
+    }
+
+    for symbol in [
+        "circuit.max_lookback",
+        "circuit.addition_shares_blocks",
+        "circuit.aliased_noiseless_circuit",
+        "circuit.approx_equals",
+        "circuit.concat_self_fuse",
+        "circuit.count_detectors_num_observables",
+        "circuit.count_measurements",
+        "circuit.generate_test_circuit_with_all_operations",
+        "circuit.self_addition",
+    ] {
+        assert_eq!(
+            classify_upstream_case(circuit, symbol).disposition,
+            UpstreamDisposition::NotApplicable,
+            "symbol={symbol}"
+        );
+    }
+    let inverse = classify_upstream_case(circuit, "circuit.inverse");
+    assert_eq!(inverse.disposition, UpstreamDisposition::SemanticMining);
+    assert_eq!(inverse.feature_ids, vec![FeatureId::FlowUtils]);
+    let slice = classify_upstream_case(circuit, "circuit.py_get_slice");
+    assert_eq!(slice.disposition, UpstreamDisposition::DeferredProduct);
+    assert_eq!(
+        slice.deferred_product,
+        Some(DeferredProduct::PythonBindings)
+    );
+
+    let instruction = Path::new("src/stim/circuit/circuit_instruction_pybind_test.py");
+    let target_groups = classify_upstream_case(instruction, "test_target_groups");
+    assert_eq!(
+        target_groups.feature_ids,
+        vec![FeatureId::StimFormat, FeatureId::CircuitApi]
+    );
+    assert_eq!(
+        classify_upstream_case(instruction, "test_repr").disposition,
+        UpstreamDisposition::DeferredProduct
+    );
+
+    let repeat = Path::new("src/stim/circuit/circuit_repeat_block_test.py");
+    assert_eq!(
+        classify_upstream_case(repeat, "test_init_and_equality").feature_ids,
+        vec![FeatureId::CircuitApi]
+    );
+    assert_eq!(
+        classify_upstream_case(repeat, "test_name").disposition,
+        UpstreamDisposition::DeferredProduct
+    );
+}
+
+#[test]
+fn classifications_route_inverse_circuit_utilities_with_flow_transforms() {
+    for path in [
+        "src/stim/util_top/circuit_inverse_qec.test.cc",
+        "src/stim/util_top/circuit_inverse_qec_test.py",
+        "src/stim/util_top/circuit_inverse_unitary.test.cc",
+    ] {
+        let classified = classify_upstream_case(Path::new(path), "representative_case");
+        assert_eq!(classified.disposition, UpstreamDisposition::SemanticMining);
+        assert_eq!(
+            classified.feature_ids,
+            vec![FeatureId::FlowUtils],
+            "path={path}"
+        );
+    }
+}
+
+#[test]
+fn classifications_do_not_promote_broad_all_gate_transform_aggregates() {
+    for (path, symbol) in [
+        (
+            "src/stim/util_top/mbqc_decomposition.test.cc",
+            "mbqc_decomposition.all_gates",
+        ),
+        (
+            "src/stim/util_top/simplified_circuit.test.cc",
+            "gate_decomposition.simplifications_are_correct",
+        ),
+    ] {
+        let classified = classify_upstream_case(Path::new(path), symbol);
+        assert_eq!(classified.disposition, UpstreamDisposition::NotApplicable);
+        assert!(classified.feature_ids.is_empty());
+    }
 }

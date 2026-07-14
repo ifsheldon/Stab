@@ -25,11 +25,23 @@ fn simplified_circuit_rewrites_single_qubit_cliffords_to_h_s_base() {
         SQRT_Y_DAG 0
         S_DAG 1
         C_XYZ 0
+        C_NXYZ 1
+        C_XNYZ 2
+        C_XYNZ 0
         C_ZYX 1
+        C_NZYX 2
+        C_ZNYX 0
+        C_ZYNX 1
+        H 2
+        S 2
     ",
     );
 
     let simplified = simplified_circuit(&circuit).expect("simplify");
+    assert_eq!(
+        circuit.simplified().expect("simplify through method"),
+        simplified
+    );
     assert_h_s_cx_base(&simplified);
     assert_tableau_equivalent(&circuit, &simplified);
     assert!(!simplified.to_stim_string().contains("H_XY"));
@@ -44,6 +56,7 @@ fn simplified_circuit_rewrites_simple_two_qubit_cliffords_to_base() {
         CZ 0 1
         CY 1 2
         SWAP 0 2
+        CX 2 1
     ",
     );
 
@@ -92,6 +105,15 @@ fn simplified_circuit_preserves_classical_controlled_pairs() {
     );
     let simplified = simplified_circuit(&circuit).expect("simplify");
     assert_eq!(simplified, circuit);
+}
+
+#[test]
+fn cq2_circuit_api_simplified_contract_matches_selected_stim_scope() {
+    simplified_circuit_rewrites_single_qubit_cliffords_to_h_s_base();
+    simplified_circuit_rewrites_simple_two_qubit_cliffords_to_base();
+    simplified_circuit_recurses_into_repeat_blocks();
+    simplified_circuit_preserves_unsupported_gates_for_later_slices();
+    simplified_circuit_preserves_classical_controlled_pairs();
 }
 
 fn circuit(text: &str) -> Circuit {

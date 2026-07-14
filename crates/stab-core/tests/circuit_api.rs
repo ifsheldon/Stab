@@ -130,6 +130,19 @@ fn circuit_public_qubit_count_includes_mpad_numeric_targets_like_stim() {
 }
 
 #[test]
+fn cq2_circuit_api_qubit_count_contract_matches_selected_stim_semantics() {
+    assert_eq!(Circuit::new().count_qubits(), 0);
+    pf1_circuit_stats_detection_width_helpers_match_owned_upstream_semantics();
+    circuit_public_qubit_count_includes_mpad_numeric_targets_like_stim();
+
+    let huge_repeat = Circuit::from_stim_str(
+        "H 0\nREPEAT 999999 {\n    REPEAT 999999 {\n        REPEAT 999999 {\n            REPEAT 999999 {\n                X 1\n                REPEAT 999999 {\n                    Y 2\n                    M 2\n                }\n            }\n        }\n    }\n}\n",
+    )
+    .expect("parse huge folded qubit-count circuit");
+    assert_eq!(huge_repeat.count_qubits(), 3);
+}
+
+#[test]
 fn pf1_circuit_stats_measurement_counts_use_result_groups() {
     let circuit = Circuit::from_stim_str(
         "MPP X0*X1 Y2*Y3 Z4\n\
@@ -186,6 +199,25 @@ fn pf1_circuit_stats_counts_reject_folded_overflow() {
 }
 
 #[test]
+fn cq2_circuit_api_count_contract_matches_selected_stim_semantics() {
+    let mut constructed = Circuit::new();
+    assert_eq!(constructed.count_qubits(), 0);
+    assert_eq!(constructed.count_measurements().expect("measurements"), 0);
+    constructed.append_instruction(single_instruction("X 3\n").expect("X instruction"));
+    assert_eq!(constructed.count_qubits(), 4);
+    assert_eq!(constructed.count_measurements().expect("measurements"), 0);
+    constructed.append_instruction(single_instruction("M 0\n").expect("M instruction"));
+    assert_eq!(constructed.count_qubits(), 4);
+    assert_eq!(constructed.count_measurements().expect("measurements"), 1);
+    assert_eq!(constructed.to_stim_string(), "X 3\nM 0\n");
+
+    pf1_circuit_stats_counts_match_owned_upstream_semantics();
+    pf1_circuit_stats_measurement_counts_use_result_groups();
+    pf1_circuit_stats_counts_do_not_unroll_large_repeats();
+    pf1_circuit_stats_counts_reject_folded_overflow();
+}
+
+#[test]
 fn pf1_circuit_stats_final_coordinate_shift_matches_nested_upstream_case() {
     let circuit = Circuit::from_stim_str(
         "REPEAT 1000 {\n\
@@ -239,8 +271,66 @@ fn pf1_circuit_stats_final_qubit_coordinates_apply_shifts_and_repeats() {
 }
 
 #[test]
+fn cq2_circuit_api_final_qubit_coordinates_fold_huge_repeats() {
+    let circuit = Circuit::from_stim_str(
+        "QUBIT_COORDS(0) 0\n\
+         REPEAT 1000 {\n\
+             QUBIT_COORDS(1, 1) 1\n\
+             REPEAT 2000 {\n\
+                 QUBIT_COORDS(2, 0.5) 2\n\
+                 REPEAT 4000 {\n\
+                     QUBIT_COORDS(3) 3\n\
+                     REPEAT 8000 {\n\
+                         QUBIT_COORDS(4) 4\n\
+                         SHIFT_COORDS(100)\n\
+                         QUBIT_COORDS(5) 5\n\
+                     }\n\
+                     SHIFT_COORDS(10)\n\
+                     QUBIT_COORDS(6) 6\n\
+                 }\n\
+                 QUBIT_COORDS(7) 7\n\
+             }\n\
+             QUBIT_COORDS(8) 8\n\
+         }\n\
+         QUBIT_COORDS(9) 9\n",
+    )
+    .expect("parse huge folded coordinate circuit");
+
+    let total_shift = 6_400_080_000_000_000.0;
+    let expected = BTreeMap::from([
+        (QubitId::new(0).unwrap(), vec![0.0]),
+        (
+            QubitId::new(1).unwrap(),
+            vec![total_shift + 1.0 - 6_400_080_000_000.0, 1.0],
+        ),
+        (
+            QubitId::new(2).unwrap(),
+            vec![total_shift + 2.0 - 3_200_040_000.0, 0.5],
+        ),
+        (
+            QubitId::new(3).unwrap(),
+            vec![total_shift + 3.0 - 800_010.0],
+        ),
+        (QubitId::new(4).unwrap(), vec![total_shift + 4.0 - 110.0]),
+        (QubitId::new(5).unwrap(), vec![total_shift + 5.0 - 10.0]),
+        (QubitId::new(6).unwrap(), vec![total_shift + 6.0]),
+        (QubitId::new(7).unwrap(), vec![total_shift + 7.0]),
+        (QubitId::new(8).unwrap(), vec![total_shift + 8.0]),
+        (QubitId::new(9).unwrap(), vec![total_shift + 9.0]),
+    ]);
+
+    assert_eq!(
+        circuit
+            .final_qubit_coordinates()
+            .expect("fold huge repeats"),
+        expected
+    );
+}
+
+#[test]
 fn pf1_circuit_stats_clear_resets_items_and_counts() {
-    let mut circuit = Circuit::from_stim_str("H 0\nM 0\nDETECTOR rec[-1]\n").expect("parse");
+    let mut circuit =
+        Circuit::from_stim_str("H[gate] 0\nM[measure] 0\nDETECTOR[det] rec[-1]\n").expect("parse");
     circuit.clear();
 
     assert!(circuit.is_empty());
@@ -605,6 +695,24 @@ fn pf1_circuit_repeat_rejects_fused_repeat_count_overflow() {
             kind: "repetition count",
             value: "overflowed".to_string()
         }
+    );
+}
+
+#[test]
+fn cq2_circuit_api_repetition_contract_matches_selected_stim_semantics() {
+    pf1_circuit_repeat_matches_upstream_special_cases();
+    pf1_circuit_repeat_fuses_single_repeat_block_counts();
+    pf1_circuit_repeat_rejects_fused_repeat_count_overflow();
+
+    let large = Circuit::from_stim_str("REPEAT 1234567890123456789 {\n    M 1\n}\n")
+        .expect("parse large repeat count");
+    assert_eq!(
+        large.count_measurements().expect("large folded count"),
+        1_234_567_890_123_456_789
+    );
+    assert_eq!(
+        large.to_stim_string(),
+        "REPEAT 1234567890123456789 {\n    M 1\n}\n"
     );
 }
 

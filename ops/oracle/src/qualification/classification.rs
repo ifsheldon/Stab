@@ -230,7 +230,7 @@ pub(super) fn classify_upstream_case(path: &Path, symbol: &str) -> UpstreamClass
         return classify_util_bot(&value);
     }
     if value.contains("/util_top/") {
-        return classify_util_top(&value);
+        return classify_util_top(&value, symbol);
     }
     if value.ends_with("src/stim.test.cc") {
         return UpstreamClassification::not_applicable(
@@ -414,60 +414,225 @@ fn classify_circuit(value: &str, symbol: &str) -> UpstreamClassification {
     let leaf = symbol.rsplit('.').next().unwrap_or(symbol);
     if value.contains("gate_target") && matches!(leaf, "equality" | "test_init_and_equality") {
         UpstreamClassification::selected(FeatureId::GateContract)
-    } else if value.contains("circuit_instruction")
-        && matches!(leaf, "test_init_and_equality" | "test_num_measurements")
-    {
-        UpstreamClassification::selected(FeatureId::CircuitApi)
+    } else if value.ends_with("circuit_instruction_pybind_test.py") {
+        classify_circuit_instruction_binding(leaf)
+    } else if value.ends_with("circuit_repeat_block_test.py") {
+        classify_circuit_repeat_binding(leaf)
     } else if value.contains("gate_target") || value.contains("circuit_instruction") {
         UpstreamClassification::selected(FeatureId::StimFormat)
     } else if value.contains("gate_decomposition") {
         classify_gate_decomposition(symbol)
     } else if value.ends_with("circuit_pybind_test.py") {
-        let symbol = symbol.to_ascii_lowercase();
-        let secondary = if symbol.contains("shortest_graphlike")
-            || symbol.contains("search_for_undetectable")
-            || symbol.contains("sat_problem")
-            || symbol.contains("likeliest_error")
-        {
-            Some(FeatureId::Search)
-        } else if symbol.contains("compile_detector_sampler")
-            || symbol.contains("detector_sampling")
-        {
-            Some(FeatureId::Detection)
-        } else if symbol.contains("compile_sampler")
-            || symbol.contains("measurement_sampling")
-            || symbol.contains("reference_sample")
-            || symbol.contains("count_determined")
-        {
-            Some(FeatureId::Sampling)
-        } else if symbol.contains("detector_error_model") || symbol.contains("dem_conversion") {
-            Some(FeatureId::Analyzer)
-        } else if symbol.contains("generation") {
-            Some(FeatureId::Generation)
-        } else if symbol.contains("has_flow")
-            || symbol.contains("detecting_region")
-            || symbol.contains("time_reversed_for_flows")
-            || symbol.contains("inlined_feedback")
-        {
-            Some(FeatureId::FlowUtils)
-        } else if symbol.contains("to_tableau") {
-            Some(FeatureId::Algebra)
-        } else {
-            None
-        };
-        UpstreamClassification::selected_many(
-            [Some(FeatureId::CircuitApi), secondary]
-                .into_iter()
-                .flatten(),
-        )
+        classify_circuit_binding(symbol)
     } else if value.ends_with("circuit.test.cc") {
-        if symbol.is_empty() || circuit_case_has_stim_format_contract(symbol) {
-            UpstreamClassification::selected_many([FeatureId::StimFormat, FeatureId::CircuitApi])
-        } else {
-            UpstreamClassification::selected(FeatureId::CircuitApi)
-        }
+        classify_circuit_cpp(symbol)
     } else {
         UpstreamClassification::selected(FeatureId::CircuitApi)
+    }
+}
+
+fn classify_circuit_instruction_binding(leaf: &str) -> UpstreamClassification {
+    if matches!(leaf, "test_init_and_equality" | "test_num_measurements") {
+        UpstreamClassification::selected(FeatureId::CircuitApi)
+    } else if leaf == "test_target_groups" {
+        UpstreamClassification::selected_many([FeatureId::StimFormat, FeatureId::CircuitApi])
+    } else if matches!(leaf, "test_repr" | "test_hashable" | "test_init_from_str") {
+        deferred_python_circuit_binding()
+    } else {
+        UpstreamClassification::selected(FeatureId::StimFormat)
+    }
+}
+
+fn classify_circuit_repeat_binding(leaf: &str) -> UpstreamClassification {
+    if leaf == "test_init_and_equality" {
+        UpstreamClassification::selected(FeatureId::CircuitApi)
+    } else {
+        deferred_python_circuit_binding()
+    }
+}
+
+fn classify_circuit_binding(symbol: &str) -> UpstreamClassification {
+    let symbol = symbol.to_ascii_lowercase();
+    if symbol.contains("diagram") || symbol.contains("detslice") {
+        return UpstreamClassification::deferred_for(
+            [FeatureId::CircuitApi],
+            DeferredProduct::Diagrams,
+            "Circuit diagram and detector-slice rendering are explicitly deferred products.",
+        );
+    }
+    if symbol.contains("append_from_stim_program_text") {
+        return UpstreamClassification::selected(FeatureId::StimFormat);
+    }
+    if symbol.contains("shortest_graphlike")
+        || symbol.contains("search_for_undetectable")
+        || symbol.contains("sat_problem")
+        || symbol.contains("likeliest_error")
+    {
+        return UpstreamClassification::selected(FeatureId::Search);
+    }
+    if symbol.contains("compile_detector_sampler") || symbol.contains("detector_sampling") {
+        return UpstreamClassification::selected(FeatureId::Detection);
+    }
+    if symbol == "test_tag_compile_samplers" {
+        return UpstreamClassification::selected_many([FeatureId::Sampling, FeatureId::Detection]);
+    }
+    if symbol.contains("compile_sampler")
+        || symbol.contains("measurement_sampling")
+        || symbol.contains("reference_sample")
+        || symbol.contains("count_determined")
+    {
+        return UpstreamClassification::selected(FeatureId::Sampling);
+    }
+    if symbol.contains("detector_error_model")
+        || symbol.contains("dem_conversion")
+        || symbol.contains("explain_errors")
+        || symbol.contains("anti_commuting_mpp")
+        || symbol.contains("blocked_remnant_edge")
+    {
+        return UpstreamClassification::selected(FeatureId::Analyzer);
+    }
+    if symbol.contains("generation") {
+        return UpstreamClassification::selected(FeatureId::Generation);
+    }
+    if symbol.contains("has_flow")
+        || symbol.contains("detecting_region")
+        || symbol.contains("time_reversed_for_flows")
+        || symbol.contains("inlined_feedback")
+        || symbol == "test_circuit_inverse"
+        || symbol == "test_tag_inverse"
+    {
+        return UpstreamClassification::selected(FeatureId::FlowUtils);
+    }
+    if symbol.contains("to_tableau") {
+        return UpstreamClassification::selected(FeatureId::Algebra);
+    }
+    if symbol == "test_circuit_create_with_odd_cx" {
+        return UpstreamClassification::selected(FeatureId::StimFormat);
+    }
+    if is_python_only_circuit_binding(&symbol) {
+        return deferred_python_circuit_binding();
+    }
+    UpstreamClassification::selected(FeatureId::CircuitApi)
+}
+
+fn is_python_only_circuit_binding(symbol: &str) -> bool {
+    matches!(
+        symbol,
+        "test_approx_equals"
+            | "test_append_instructions_and_blocks"
+            | "test_append_tag"
+            | "test_append_extended_cases"
+            | "test_append_pauli_string"
+            | "test_backwards_compatibility_vs_safety_append_vs_append_operation"
+            | "test_circuit_add"
+            | "test_circuit_add_tags"
+            | "test_circuit_append_operation"
+            | "test_circuit_eq"
+            | "test_circuit_from_file"
+            | "test_circuit_get_item_tags"
+            | "test_circuit_iadd"
+            | "test_circuit_mul"
+            | "test_circuit_repr"
+            | "test_circuit_slice_reverse"
+            | "test_circuit_to_file"
+            | "test_complex_slice_does_not_seg_fault"
+            | "test_copy"
+            | "test_hash"
+            | "test_indexing_operations"
+            | "test_insert"
+            | "test_pickle"
+            | "test_pop"
+            | "test_reappend_gate_targets"
+            | "test_reference_detector_and_observable_signs"
+            | "test_slicing"
+            | "test_tag_approx_equals"
+            | "test_tag_copy"
+            | "test_tag_from_file"
+            | "test_tags_iadd"
+            | "test_tags_imul"
+            | "test_tags_mul"
+    )
+}
+
+fn deferred_python_circuit_binding() -> UpstreamClassification {
+    UpstreamClassification::deferred_for(
+        [FeatureId::CircuitApi],
+        DeferredProduct::PythonBindings,
+        "Python Circuit object shape, operators, indexing, copying, hashing, pickling, flexible target coercion, and binding-only helpers are deferred; selected Rust APIs own their semantic contracts independently.",
+    )
+}
+
+fn classify_circuit_cpp(symbol: &str) -> UpstreamClassification {
+    if symbol.is_empty() {
+        return UpstreamClassification::selected_many([
+            FeatureId::StimFormat,
+            FeatureId::CircuitApi,
+        ]);
+    }
+    let leaf = symbol.strip_prefix("circuit.").unwrap_or(symbol);
+    if leaf == "py_get_slice" {
+        return deferred_python_circuit_binding();
+    }
+    if leaf == "inverse" {
+        return UpstreamClassification::selected(FeatureId::FlowUtils);
+    }
+    if matches!(
+        leaf,
+        "count_detectors_num_observables" | "count_measurements"
+    ) {
+        return UpstreamClassification::not_applicable(
+            "This aggregate mixes selected non-overflow count semantics with C++ UINT64_MAX saturation. Exact Rust Circuit count owners prove the shared semantics and Stab's documented checked-overflow contract without claiming the incompatible saturation assertion.",
+        );
+    }
+    if matches!(
+        leaf,
+        "addition_shares_blocks"
+            | "aliased_noiseless_circuit"
+            | "approx_equals"
+            | "concat_self_fuse"
+            | "generate_test_circuit_with_all_operations"
+            | "max_lookback"
+            | "self_addition"
+    ) {
+        return UpstreamClassification::not_applicable(
+            "This case exercises a C++ storage-sharing, aliasing, approximate-comparison, private helper, or unexposed summary API outside the selected Stab Rust circuit contract.",
+        );
+    }
+
+    let format = circuit_case_has_stim_format_contract(symbol);
+    let circuit_api = matches!(
+        leaf,
+        "append_circuit"
+            | "append_op_fuse"
+            | "append_repeat_block"
+            | "assignment_copies_operations"
+            | "big_rep_count"
+            | "concat_fuse"
+            | "coords_of_detector"
+            | "count_qubits"
+            | "count_sweep_bits"
+            | "count_ticks"
+            | "equality"
+            | "final_coord_shift"
+            | "flattened"
+            | "for_each_operation"
+            | "for_each_operation_reverse"
+            | "get_final_qubit_coords"
+            | "get_final_qubit_coords_huge_repetition_count_efficiency"
+            | "insert_circuit"
+            | "insert_instruction"
+            | "multiplication_repeats"
+            | "noiseless_heralded_erase"
+            | "preserves_repetition_blocks"
+            | "without_tags"
+    );
+    match (format, circuit_api) {
+        (true, true) => {
+            UpstreamClassification::selected_many([FeatureId::StimFormat, FeatureId::CircuitApi])
+        }
+        (true, false) => UpstreamClassification::selected(FeatureId::StimFormat),
+        (false, true) => UpstreamClassification::selected(FeatureId::CircuitApi),
+        (false, false) => UpstreamClassification::selected(FeatureId::CircuitApi),
     }
 }
 
@@ -882,10 +1047,19 @@ fn classify_util_bot(value: &str) -> UpstreamClassification {
     }
 }
 
-fn classify_util_top(value: &str) -> UpstreamClassification {
-    if value.contains("circuit_to_dem") {
+fn classify_util_top(value: &str, symbol: &str) -> UpstreamClassification {
+    if (value.contains("mbqc_decomposition") && symbol == "mbqc_decomposition.all_gates")
+        || (value.contains("simplified_circuit")
+            && symbol == "gate_decomposition.simplifications_are_correct")
+    {
+        UpstreamClassification::not_applicable(
+            "This aggregate C++ all-gates test exceeds the selected scoped Rust transform contract; independently selectable Rust qualification cases own every implemented MBQC or simplification behavior without claiming the unselected aggregate.",
+        )
+    } else if value.contains("circuit_to_dem") {
         UpstreamClassification::selected(FeatureId::Analyzer)
     } else if value.contains("flow")
+        || value.contains("circuit_inverse_qec")
+        || value.contains("circuit_inverse_unitary")
         || value.contains("detecting_regions")
         || value.contains("missing_detectors")
         || value.contains("transform_without_feedback")
