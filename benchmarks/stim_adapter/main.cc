@@ -188,17 +188,17 @@ int main(int argc, const char **argv) {
     try {
         const Arguments arguments = parse_arguments(argc, argv);
 
+        if (arguments.start_barrier) {
+            wait_for_start_barrier();
+        }
+        verify_affinity(arguments.expected_cpu);
+
         // Linking and constructing a pinned Stim type ensures this is an adapter build, not a
         // free-standing synthetic comparator. Product workloads are added after PQ1.
         const stim::Circuit linked_stim("H 0\nM 0\n");
         if (linked_stim.count_qubits() != 1) {
             throw std::runtime_error("pinned Stim circuit smoke check failed");
         }
-
-        if (arguments.start_barrier) {
-            wait_for_start_barrier();
-        }
-        verify_affinity(arguments.expected_cpu);
 
         const uint64_t setup_rss = status_kib("VmRSS:");
         if (arguments.iterations > std::numeric_limits<uint64_t>::max() / arguments.work_items) {

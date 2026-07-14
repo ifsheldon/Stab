@@ -56,6 +56,9 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
     if request.limits.regular_file_bytes == Some(0) {
         return Err(ProcessError::ZeroFileLimit);
     }
+    let deadline = wall_started
+        .checked_add(request.limits.timeout)
+        .ok_or(ProcessError::DeadlineOverflow)?;
     let cancellation = ProcessCancellation::for_signals()?;
     if cancellation.is_cancelled() {
         return Err(ProcessError::Interrupted {
@@ -105,9 +108,6 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
         });
     }
     let pid = child.id();
-    let deadline = Instant::now()
-        .checked_add(request.limits.timeout)
-        .ok_or(ProcessError::DeadlineOverflow)?;
     child.start_io(request)?;
     let mut status = None;
     let mut peak_rss = None;
@@ -152,9 +152,6 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
                 stderr: captured.stderr,
             });
         }
-        if status.is_some() && child.io_finished()? {
-            break;
-        }
         let now = Instant::now();
         if now >= deadline {
             child.close_group()?;
@@ -166,10 +163,22 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
                 stderr: captured.stderr,
             });
         }
+        if status.is_some() && child.io_finished()? {
+            break;
+        }
         std::thread::sleep(POLL_INTERVAL.min(deadline.duration_since(now)));
     }
 
     let captured = child.join_io()?;
+    let wall_elapsed = wall_started.elapsed();
+    if wall_elapsed > request.limits.timeout {
+        return Err(ProcessError::TimedOut {
+            program: request.program.clone(),
+            timeout: request.limits.timeout,
+            stdout: captured.stdout,
+            stderr: captured.stderr,
+        });
+    }
     let status = status.ok_or_else(|| ProcessError::MissingStatus(request.program.clone()))?;
     #[cfg(unix)]
     {
@@ -190,7 +199,7 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
         stdout: captured.stdout,
         stderr: captured.stderr,
         parent_observed_peak_rss_bytes: peak_rss,
-        wall_elapsed: wall_started.elapsed(),
+        wall_elapsed,
     })
 }
 
@@ -778,6 +787,7 @@ mod tests {
             .find(|cpu| allowed.is_set(*cpu))
             .expect("at least one allowed CPU");
         let mut request = request("affinity");
+        request.stdin = vec![b'\n'];
         request.affinity_cpu = Some(cpu);
         request.environment.push((
             OsString::from(EXPECTED_CPU_ENV),
@@ -786,7 +796,12 @@ mod tests {
 
         let result = run_bounded_process(&request).expect("affinity helper succeeds");
 
-        assert_eq!(result.status, Some(0));
+        assert_eq!(
+            result.status,
+            Some(0),
+            "affinity helper stderr: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
         assert!(String::from_utf8_lossy(&result.stdout).contains("affinity-ok"));
     }
 
@@ -933,6 +948,11 @@ mod tests {
                 std::thread::sleep(Duration::from_secs(30));
             }
             "affinity" => {
+                let mut barrier = [0_u8; 1];
+                std::io::stdin()
+                    .read_exact(&mut barrier)
+                    .expect("read affinity barrier");
+                assert_eq!(barrier, *b"\n");
                 let expected = std::env::var(EXPECTED_CPU_ENV)
                     .expect("expected CPU")
                     .parse::<usize>()

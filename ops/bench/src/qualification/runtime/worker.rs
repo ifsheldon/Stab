@@ -101,7 +101,7 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         .ok_or(WorkerError::WorkOverflow)?;
 
     let started = Instant::now();
-    let digest = match args.workload {
+    let digest_state = match args.workload {
         WorkerWorkload::ProtocolSmoke => {
             protocol_smoke(args.iterations.get(), args.work_items.get())
         }
@@ -111,6 +111,7 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
     }
     let peak_rss_bytes = peak_rss_bytes()?.max(current_rss_bytes()?);
+    let digest = semantic_digest(digest_state);
     let row = WorkerMeasurement {
         schema_version: PROTOCOL_SCHEMA_VERSION,
         implementation: Implementation::Stab,
@@ -151,7 +152,7 @@ pub(super) fn source_digest() -> Result<Sha256Digest, WorkerError> {
     sha256_bytes(WORKER_SOURCE)
 }
 
-fn protocol_smoke(iterations: u64, work_items: u64) -> String {
+fn protocol_smoke(iterations: u64, work_items: u64) -> [u64; 4] {
     let mut state = [
         0x243f_6a88_85a3_08d3_u64,
         0x1319_8a2e_0370_7344_u64,
@@ -172,6 +173,10 @@ fn protocol_smoke(iterations: u64, work_items: u64) -> String {
         }
     }
     black_box(state);
+    state
+}
+
+fn semantic_digest(state: [u64; 4]) -> String {
     format!(
         "{:016x}{:016x}{:016x}{:016x}",
         state[0], state[1], state[2], state[3]
