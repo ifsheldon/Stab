@@ -4,17 +4,17 @@
 
 In progress as of 2026-07-14.
 
-The selected `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation domains are source-complete at exact upstream-symbol and exported-Rust-API granularity. Generation's milestone audit, GPT-5.6/max full-code-review, and broad verification are complete with every confirmed finding fixed; clean current-digest execution evidence remains required before its checkpoint is accepted. This checkpoint does not complete CQ2.
+The selected `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation domains are source-complete at exact upstream-symbol and exported-Rust-API granularity. Generation's milestone audit, GPT-5.6/max full-code-review, broad verification, clean current-digest correctness execution, exact preflight, and dependent PQ1 publication are complete with every confirmed finding fixed. This checkpoint does not complete CQ2 because `CQ-ALGEBRA` remains open.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Latest clean correctness evidence revision: `1eaf3740c5819271be30a37ce4b6f69e2010a2ba` with `local_modifications=false`, for the preceding circuit-refined digest. Those reports are historical and are not promotable for the current Generation-refined inventory.
+Latest clean correctness evidence revision: `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` with `local_modifications=false`, for the current Generation-refined digest.
 
 Current correctness inventory digest after Generation reconciliation: `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`.
 
 Current dependent performance inventory digest: `44276968d035fbd108fd57096dc96aed1d3967ac07d539a8dbfed8f0d5f16fcb`.
 
-Clean current-digest CQ1 and dependent PQ1 reports remain to be published from a reviewed committed revision. The prior artifact paths below are retained only as historical Circuit checkpoint evidence.
+Clean current-digest PR, full, and soak correctness reports and the dependent report-only PQ1 refresh are published from the reviewed committed revision above.
 
 ## Delivered Slices
 
@@ -85,7 +85,7 @@ The dependent PQ0 inventory was regenerated because circuit owner ids, upstream 
 - Pinned Stim's nominal generator distance domain extends through 2047, so the surface and color cap is documented as deliberate bounded-materialization behavior rather than exact acceptance parity. No performance threshold, waiver, comparator classification, or runtime group was changed while regenerating the dependent inventory.
 - Milestone audit found that typed and family rejection tests checked only generic errors or message fragments and that six private helper parents overclaimed constant-scratch resource behavior. The corrected tests match `CircuitError::InvalidDomainValue` plus exact `kind` and `value` fields, while the private fixed-target helper parents make no independent resource claim and point to the public generator admission parent.
 - Review also found that one broad generator-helper fixture could not remain an atomic primary. It is split into six exact independently runnable fixture rows, and qualification validation permits an imported exact fixture to become supporting provenance only when its normalized exact Cargo selector is identical to the reviewed qualification primary. Duplicate terminal primaries remain rejected.
-- Three earlier GPT-5.6/max full-code-review passes and the final focused GPT-5.6/max inventory review found incomplete deterministic matrix evidence, weak pre-allocation proof, stale fixture selectors, incorrect command documentation, Python probability overclaim, missing CLI resource ownership, stale dependent digests, stale CQ0/CQ1 current-evidence wording, and one owner-count drift. Every confirmed finding is fixed; no Generation implementation, audit, or review finding remains before clean committed-head execution.
+- Three earlier GPT-5.6/max full-code-review passes and the final focused GPT-5.6/max inventory review found incomplete deterministic matrix evidence, weak pre-allocation proof, stale fixture selectors, incorrect command documentation, Python probability overclaim, missing CLI resource ownership, stale dependent digests, stale CQ0/CQ1 current-evidence wording, and one owner-count drift. Every confirmed finding is fixed, and clean committed-head execution closed the final Generation acceptance requirement.
 
 ## Current CQ2 Inventory
 
@@ -103,17 +103,17 @@ The dependent PQ0 inventory was regenerated because circuit owner ids, upstream 
 
 These counts are evidence owners, not an estimate of required new test functions. Reviewed exact parents may close several owners only when one selector proves their complete common contract.
 
-## Previous Clean Correctness Evidence
+## Clean Generation-Refined Correctness Evidence
 
-The following reports predate Generation reconciliation. They prove the preceding Circuit checkpoint, but their inventory digest is stale and they cannot satisfy current-digest Generation acceptance.
+All three reports bind correctness inventory digest `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`, Stim v1.16.0 commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, Stab revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`, and `local_modifications=false`.
 
-| Tier | Selected | Passed | Failed | Artifact | Request digest | Completion digest |
-| --- | ---: | ---: | ---: | --- | --- | --- |
-| PR | 354 | 354 | 0 | `target/qualification/correctness/latest` | `33c6cdb706124de39c959583af18d9f83cb57b0199ed5437ab756f35a39ea0bd` | `a85eaf987a356f309252fc4d0286ea8424954a6026f72835181741b035026d1f` |
-| Full | 527 | 527 | 0 | `target/qualification/correctness/full` | `5b59782b51b506bad886e5793de02d9c57eefa907af2b9d7c9b64b13aa5eb186` | `939dcaa30e2b6a1663345a039b069a57f4202cd356b4b0e14f1ffb9b92d42c59` |
-| Soak | 527 | 527 | 0 | `target/qualification/correctness/soak` | `b677425b10cba61bd0d49aa387284494a5a015e18bda8d8ad32d68304e3d7f20` | `d113dde05b51a1f055b101e15fbeea6f1d03aad7820b51d0a09df733d6c6233b` |
+| Tier | Selected | Passed | Failed | Artifact | Request digest | Report digest | Completion digest |
+| --- | ---: | ---: | ---: | --- | --- | --- | --- |
+| PR | 363 | 363 | 0 | `target/qualification/correctness/latest` | `f9affb08ccfab6c21e8c025d8d8938a806007f1c422f0f5a65d87f1b1e84c162` | `fe5ad8245305b6ec6ac0ce636be5dd1d4cf7ab2f613501b5647bec82110efaa1` | `8e66107cebe5552bc7298346adc2fc4f99196a2fdac1456274cd0501d2eff2d4` |
+| Full | 541 | 541 | 0 | `target/qualification/correctness/full` | `190ede263f11820c8029a929b9fa6a9a45bdd0d5b5203fa338e76e700772169e` | `7feccbf9a54c6070f97ceab218dc547ecef764970ff7925dfb608e3044469e4d` | `8b21f2a6aead2a5b54b8050d23997b42e81313bdee3157974014583b54b3ab04` |
+| Soak | 541 | 541 | 0 | `target/qualification/correctness/soak` | `3caa6f875ee991a3ef45074bb9dfd8a5490ce53afda0573f4a289dba7fcd6e1d` | `2b88a261b9ab96c175f6810e87f025ecbdded21c11c2408790b2361fb754b41b` | `dec639361b610278c24156b172381390162461a4781d19f822005fc7e2da4d13` |
 
-Offline report regeneration passed for every tier. Exact PR, full, and soak preflight passed for `cq-evidence-qualification-0bd1d8d0ab37a23d`, the Circuit repetition and checked-overflow parent. Every preflight reconstructed the controller-approved manifest, commit, selection, selector, output, request, completion, and result bindings. PR and full each completed all 4,218,400 planned statistical shots with consumed false-positive bound `2.67062845963454362e-6`; soak completed all 4,847,200 shots with consumed bound `5.98047030092843113e-6`, below the declared suite budget `3.20000000000000053e-5`.
+Offline report regeneration passed for every tier. Exact PR, full, and soak preflight passed for the standalone CLI resource case `cq-evidence-qualification-31f61e175cdf6367` and Generation resource case `cq-evidence-qualification-a332fc484c66d6ba`. Every preflight reconstructed the controller-approved manifest, commit, selection, selector, output, request, completion, and result bindings. PR and full each completed all 4,218,400 planned statistical shots with consumed false-positive bound `2.67062845963454362e-6`; soak completed all 4,847,200 shots with consumed bound `5.98047030092843113e-6`, below the declared suite budget `3.20000000000000053e-5`.
 
 ## Dependent PQ1 Refresh
 
@@ -121,11 +121,11 @@ The PQ1 group remains diagnostic infrastructure with `promotable=false`, `report
 
 | Tier | Pairs | Median ratio | Bootstrap 95% interval | Ratio rMAD | Host | Artifact |
 | --- | ---: | ---: | --- | ---: | --- | --- |
-| PR | 3 | 1.015723 | [1.015313, 1.022859] | 0.000404 | Verified AArch64 | `target/benchmarks/qualification/pq1-circuit-pr-schema13` |
-| Full | 9 | 1.014777 | [1.014040, 1.016155] | 0.000929 | Verified AArch64 | `target/benchmarks/qualification/pq1-circuit-full-schema13` |
-| Soak | 15 | 1.015273 | [1.014637, 1.015942] | 0.000659 | Verified AArch64 | `target/benchmarks/qualification/pq1-circuit-soak-schema13` |
+| PR | 3 | 1.014015 | [1.013541, 1.014200] | 0.000182 | Verified AArch64 | `target/benchmarks/qualification/pq1-generation-pr-schema13` |
+| Full | 9 | 1.015160 | [1.013574, 1.016190] | 0.000801 | Verified AArch64 | `target/benchmarks/qualification/pq1-generation-full-schema13` |
+| Soak | 15 | 1.015225 | [1.014722, 1.015822] | 0.000586 | Verified AArch64 | `target/benchmarks/qualification/pq1-generation-soak-schema13` |
 
-All reports use schema version 13, the current correctness and performance digests, `local_modifications=false` before and after execution, and commit `eb6a6df8f48504239fbe7f640f924748b63617f2`. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. These ratios describe only the synthetic adapter protocol and must not be reported as Stab product performance.
+All reports use schema version 13, the current correctness and performance digests, `local_modifications=false` before and after execution, and commit `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. The PR, full, and soak report digests are `ff4d559937167dcf9c495838a22656de183fffdfe7b04fb7a2a74c9f43743a9c`, `eaeeeaf993521997c1aa2061a2c1fbeb4fceac8aba946291d9f5e1b46dd7db94`, and `9ddfd5154a0d768ae4e3e66308a13483fe46a2617257e2dc29f3d222dab480f5`. These ratios describe only the synthetic adapter protocol and must not be reported as Stab product performance.
 
 ## Verification
 
@@ -154,25 +154,25 @@ just qualification::correctness-run --tier soak --out target/qualification/corre
 just qualification::correctness-report --out target/qualification/correctness/latest
 just qualification::correctness-report --out target/qualification/correctness/full
 just qualification::correctness-report --out target/qualification/correctness/soak
-just qualification::correctness-preflight --out target/qualification/correctness/latest --case cq-evidence-qualification-0bd1d8d0ab37a23d --request-sha256 33c6cdb706124de39c959583af18d9f83cb57b0199ed5437ab756f35a39ea0bd --completion-sha256 a85eaf987a356f309252fc4d0286ea8424954a6026f72835181741b035026d1f
-just qualification::correctness-preflight --out target/qualification/correctness/full --case cq-evidence-qualification-0bd1d8d0ab37a23d --request-sha256 5b59782b51b506bad886e5793de02d9c57eefa907af2b9d7c9b64b13aa5eb186 --completion-sha256 939dcaa30e2b6a1663345a039b069a57f4202cd356b4b0e14f1ffb9b92d42c59
-just qualification::correctness-preflight --out target/qualification/correctness/soak --case cq-evidence-qualification-0bd1d8d0ab37a23d --request-sha256 b677425b10cba61bd0d49aa387284494a5a015e18bda8d8ad32d68304e3d7f20 --completion-sha256 d113dde05b51a1f055b101e15fbeea6f1d03aad7820b51d0a09df733d6c6233b
-just bench::qualification-run --tier pr --out target/benchmarks/qualification/pq1-circuit-pr-schema13
-just bench::qualification-run --tier full --out target/benchmarks/qualification/pq1-circuit-full-schema13
-just bench::qualification-run --tier soak --out target/benchmarks/qualification/pq1-circuit-soak-schema13
-just bench::qualification-report --input target/benchmarks/qualification/pq1-circuit-pr-schema13
-just bench::qualification-report --input target/benchmarks/qualification/pq1-circuit-full-schema13
-just bench::qualification-report --input target/benchmarks/qualification/pq1-circuit-soak-schema13
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-circuit-pr-schema13
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-circuit-full-schema13
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-circuit-soak-schema13
+just qualification::correctness-preflight --out target/qualification/correctness/latest --case cq-evidence-qualification-a332fc484c66d6ba --request-sha256 f9affb08ccfab6c21e8c025d8d8938a806007f1c422f0f5a65d87f1b1e84c162 --completion-sha256 8e66107cebe5552bc7298346adc2fc4f99196a2fdac1456274cd0501d2eff2d4
+just qualification::correctness-preflight --out target/qualification/correctness/full --case cq-evidence-qualification-a332fc484c66d6ba --request-sha256 190ede263f11820c8029a929b9fa6a9a45bdd0d5b5203fa338e76e700772169e --completion-sha256 8b21f2a6aead2a5b54b8050d23997b42e81313bdee3157974014583b54b3ab04
+just qualification::correctness-preflight --out target/qualification/correctness/soak --case cq-evidence-qualification-a332fc484c66d6ba --request-sha256 3caa6f875ee991a3ef45074bb9dfd8a5490ce53afda0573f4a289dba7fcd6e1d --completion-sha256 dec639361b610278c24156b172381390162461a4781d19f822005fc7e2da4d13
+just bench::qualification-run --tier pr --out target/benchmarks/qualification/pq1-generation-pr-schema13
+just bench::qualification-run --tier full --out target/benchmarks/qualification/pq1-generation-full-schema13
+just bench::qualification-run --tier soak --out target/benchmarks/qualification/pq1-generation-soak-schema13
+just bench::qualification-report --input target/benchmarks/qualification/pq1-generation-pr-schema13
+just bench::qualification-report --input target/benchmarks/qualification/pq1-generation-full-schema13
+just bench::qualification-report --input target/benchmarks/qualification/pq1-generation-soak-schema13
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-generation-pr-schema13
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-generation-full-schema13
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-generation-soak-schema13
 just maintenance::pre-commit
 ```
 
-The clean PR, full, soak, offline-report, exact-preflight, and dependent PQ1 artifacts above are authoritative only for the preceding circuit-refined digests. Current Generation-refined evidence must come from a clean committed revision after the now-closed audit and review.
+The clean PR, full, soak, offline-report, exact-preflight, and dependent PQ1 artifacts above are authoritative for the Generation-refined digests recorded in this report.
 
 ## Remaining Blocker
 
-CQ2 still has 635 planned evidence owners, all in `CQ-ALGEBRA`. Generation source ownership is closed at 25 of 25, audit and review have no unresolved finding, and broad verification passes; its only remaining acceptance work is clean current-digest PR/full/soak correctness evidence plus dependent report publication.
+CQ2 still has 635 planned evidence owners, all in `CQ-ALGEBRA`. Generation source ownership and acceptance are closed at 25 of 25 with clean current-digest PR, full, and soak correctness evidence plus dependent report-only PQ1 publication.
 
-No external dependency or user decision blocks this work. After Generation acceptance evidence is published, the active implementation blocker becomes `CQ-ALGEBRA`, where 635 of 636 owners remain planned; final CQ2-wide audit and review remain pending until Algebra is implemented.
+No external dependency or user decision blocks this work. The active implementation blocker is `CQ-ALGEBRA`, where 635 of 636 owners remain planned; final CQ2-wide audit and review remain pending until Algebra is implemented.

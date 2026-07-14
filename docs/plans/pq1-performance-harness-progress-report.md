@@ -1,6 +1,6 @@
 # PQ1 Paired Performance Harness Progress Report
 
-> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation source slices set correctness inventory digest `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6` and dependent performance inventory digest `44276968d035fbd108fd57096dc96aed1d3967ac07d539a8dbfed8f0d5f16fcb`. Clean dependent reports under these digests remain pending. The schema-version-13 PR, full, and soak reports from revision `d4301cc1085680ff650f9e0474e075998c14c4bd`, with diagnostic ratios 1.016046, 1.014565, and 1.015206, are historical evidence for the preceding bit-kernel checkpoint; see `docs/plans/cq2-deterministic-qualification-progress-report.md`. These ratios remain diagnostic infrastructure evidence, not product performance.
+> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation source slices set correctness inventory digest `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6` and dependent performance inventory digest `44276968d035fbd108fd57096dc96aed1d3967ac07d539a8dbfed8f0d5f16fcb`. Clean schema-version-13 PR, full, and soak dependent reports from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` validate these digests with diagnostic median ratios 1.014015, 1.015160, and 1.015225. These ratios remain report-only infrastructure evidence, not product performance; see `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 
@@ -38,6 +38,18 @@ All final reports use schema version 13, `local_modifications=false` before and 
 The ratios above describe only the synthetic protocol-smoke adapter and worker contract.
 They must not be cited as a speedup, slowdown, or parity result for any Stab product feature.
 Independent regression replay returned `checked=0 report_only=true` for every tier, as required by the source-owned baseline.
+
+## Current Dependency Refresh
+
+The Generation-refined dependency refresh uses schema version 13, `local_modifications=false` before and after execution, correctness inventory digest `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`, performance inventory digest `44276968d035fbd108fd57096dc96aed1d3967ac07d539a8dbfed8f0d5f16fcb`, and commit `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`.
+
+| Tier | Artifact | Pairs | Median diagnostic ratio | Bootstrap 95% interval | Ratio rMAD | Report digest |
+| --- | --- | ---: | ---: | --- | ---: | --- |
+| PR | `target/benchmarks/qualification/pq1-generation-pr-schema13` | 3 | 1.014015 | [1.013541, 1.014200] | 0.000182 | `ff4d559937167dcf9c495838a22656de183fffdfe7b04fb7a2a74c9f43743a9c` |
+| Full | `target/benchmarks/qualification/pq1-generation-full-schema13` | 9 | 1.015160 | [1.013574, 1.016190] | 0.000801 | `eaeeeaf993521997c1aa2061a2c1fbeb4fceac8aba946291d9f5e1b46dd7db94` |
+| Soak | `target/benchmarks/qualification/pq1-generation-soak-schema13` | 15 | 1.015225 | [1.014722, 1.015822] | 0.000586 | `9ddfd5154a0d768ae4e3e66308a13483fe46a2617257e2dc29f3d222dab480f5` |
+
+Offline report validation passed for every tier, and regression replay returned `checked=0 report_only=true`. The refresh closes current dependency publication for the harness but does not qualify a product workload or enter any ratio into the 1.25x gate.
 
 ## Audit And Review Closure
 

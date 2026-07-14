@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Source-current note, 2026-07-14: this report records CQ1 harness completion and historical evidence. Later selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation ownership changes set the source-current correctness digest to `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`, with 524 implemented and 17 evidence-close owners. Clean Generation-refined evidence remains pending; do not promote the older CQ1, bit-kernel, or circuit checkpoint reports under this digest. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Source-current note, 2026-07-14: this report records CQ1 harness completion and historical evidence. Later selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation ownership changes set the source-current correctness digest to `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`, with 524 implemented and 17 evidence-close owners. Current Generation-refined PR, full, and soak evidence is published from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`; do not promote the older CQ1, bit-kernel, or circuit checkpoint reports under this digest. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 
