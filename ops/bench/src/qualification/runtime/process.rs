@@ -11,6 +11,8 @@ use std::time::{Duration, Instant};
 use thiserror::Error;
 
 const POLL_INTERVAL: Duration = Duration::from_millis(5);
+const MAX_AFFINITY_PASSES: usize = 8;
+const MAX_CHILD_TASKS: usize = 4_096;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct ProcessLimits {
@@ -510,21 +512,106 @@ fn set_child_affinity(pid: u32, cpu: usize) -> Result<(), std::io::Error> {
             format!("CPU {cpu} exceeds the supported affinity mask"),
         ));
     }
+    let mut set = rustix::thread::CpuSet::new();
+    set.set(cpu);
+    let leader = process_id(pid)?;
+
+    // Pin the leader first so newly created threads inherit the requested mask,
+    // then close the post-spawn race by pinning threads that already exist.
+    set_task_affinity(leader, &set)?;
+    for _ in 0..MAX_AFFINITY_PASSES {
+        let task_ids = child_task_ids(pid)?;
+        for task_id in task_ids {
+            if let Err(source) = rustix::thread::sched_setaffinity(Some(task_id), &set)
+                && source != rustix::io::Errno::SRCH
+            {
+                return Err(source.into());
+            }
+        }
+
+        let mut complete = true;
+        for task_id in child_task_ids(pid)? {
+            match rustix::thread::sched_getaffinity(Some(task_id)) {
+                Ok(actual) if affinity_is_singleton(&actual, cpu) => {}
+                Ok(_) | Err(rustix::io::Errno::SRCH) => complete = false,
+                Err(source) => return Err(source.into()),
+            }
+        }
+        if complete {
+            return Ok(());
+        }
+    }
+
+    Err(std::io::Error::new(
+        std::io::ErrorKind::WouldBlock,
+        format!("child process {pid} did not converge to CPU {cpu} affinity"),
+    ))
+}
+
+fn process_id(pid: u32) -> Result<rustix::process::Pid, std::io::Error> {
     let raw_pid = i32::try_from(pid).map_err(|_| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             format!("child process id {pid} exceeds the supported Linux pid range"),
         )
     })?;
-    let pid = rustix::process::Pid::from_raw(raw_pid).ok_or_else(|| {
+    rustix::process::Pid::from_raw(raw_pid).ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             format!("child process id {pid} is invalid"),
         )
-    })?;
-    let mut set = rustix::thread::CpuSet::new();
-    set.set(cpu);
-    rustix::thread::sched_setaffinity(Some(pid), &set).map_err(Into::into)
+    })
+}
+
+fn set_task_affinity(
+    task_id: rustix::process::Pid,
+    set: &rustix::thread::CpuSet,
+) -> Result<(), std::io::Error> {
+    rustix::thread::sched_setaffinity(Some(task_id), set).map_err(Into::into)
+}
+
+fn child_task_ids(pid: u32) -> Result<Vec<rustix::process::Pid>, std::io::Error> {
+    let path = PathBuf::from(format!("/proc/{pid}/task"));
+    let entries = std::fs::read_dir(&path)?;
+    let mut task_ids = Vec::new();
+    for entry in entries {
+        if task_ids.len() == MAX_CHILD_TASKS {
+            return Err(std::io::Error::other(format!(
+                "child process {pid} exceeds the {MAX_CHILD_TASKS}-task affinity limit"
+            )));
+        }
+        let name = entry?.file_name().into_string().map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("child task directory {path:?} contains a non-UTF-8 entry"),
+            )
+        })?;
+        let raw_task_id = name.parse::<i32>().map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("child task directory {path:?} contains nonnumeric entry {name:?}"),
+            )
+        })?;
+        let task_id = rustix::process::Pid::from_raw(raw_task_id).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("child task directory {path:?} contains invalid task id {name:?}"),
+            )
+        })?;
+        task_ids.push(task_id);
+    }
+    if task_ids.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("child process {pid} has no visible tasks"),
+        ));
+    }
+    Ok(task_ids)
+}
+
+fn affinity_is_singleton(set: &rustix::thread::CpuSet, cpu: usize) -> bool {
+    (0..rustix::thread::CpuSet::MAX_CPU)
+        .all(|candidate| set.is_set(candidate) == (candidate == cpu))
 }
 
 fn set_child_file_limit(pid: u32, requested_maximum: u64) -> Result<(), std::io::Error> {
@@ -692,6 +779,7 @@ pub(crate) enum ProcessError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::BufRead as _;
 
     const HELPER_TEST: &str = "qualification::runtime::process::tests::process_helper";
     const HELPER_ENV: &str = "STAB_BENCH_PROCESS_HELPER";
@@ -803,6 +891,69 @@ mod tests {
             String::from_utf8_lossy(&result.stderr)
         );
         assert!(String::from_utf8_lossy(&result.stdout).contains("affinity-ok"));
+    }
+
+    #[test]
+    fn pins_threads_that_the_child_created_before_the_affinity_request() {
+        let allowed = rustix::thread::sched_getaffinity(None).expect("read parent affinity");
+        let cpu = (0..rustix::thread::CpuSet::MAX_CPU)
+            .find(|cpu| allowed.is_set(*cpu))
+            .expect("at least one allowed CPU");
+        let mut child =
+            std::process::Command::new(std::env::current_exe().expect("test executable"))
+                .args([HELPER_TEST, "--exact", "--ignored", "--nocapture"])
+                .env_clear()
+                .env(HELPER_ENV, "affinity-existing-threads")
+                .env(EXPECTED_CPU_ENV, cpu.to_string())
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .spawn()
+                .expect("spawn affinity helper");
+        let mut stdout = std::io::BufReader::new(child.stdout.take().expect("helper stdout"));
+        let mut captured_stdout = String::new();
+        let mut ready = false;
+        for _ in 0..16 {
+            let mut line = String::new();
+            if stdout.read_line(&mut line).expect("read ready marker") == 0 {
+                break;
+            }
+            captured_stdout.push_str(&line);
+            if line == "threads-ready\n" {
+                ready = true;
+                break;
+            }
+        }
+        if !ready {
+            drop(child.kill());
+            drop(child.wait());
+        }
+        assert!(ready, "helper omitted ready marker: {captured_stdout:?}");
+
+        set_child_affinity(child.id(), cpu).expect("pin every existing child task");
+        child
+            .stdin
+            .take()
+            .expect("helper stdin")
+            .write_all(b"\n")
+            .expect("release helper");
+
+        stdout
+            .read_to_string(&mut captured_stdout)
+            .expect("read helper stdout");
+        let mut captured_stderr = String::new();
+        child
+            .stderr
+            .take()
+            .expect("helper stderr")
+            .read_to_string(&mut captured_stderr)
+            .expect("read helper stderr");
+        let status = child.wait().expect("wait for affinity helper");
+        assert!(
+            status.success(),
+            "affinity helper failed: {captured_stderr}"
+        );
+        assert!(captured_stdout.contains("affinity-all-tasks-ok"));
     }
 
     #[test]
@@ -964,11 +1115,41 @@ mod tests {
                 assert_eq!(actual, [expected]);
                 println!("affinity-ok");
             }
+            "affinity-existing-threads" => {
+                let expected = std::env::var(EXPECTED_CPU_ENV)
+                    .expect("expected CPU")
+                    .parse::<usize>()
+                    .expect("numeric CPU");
+                let (release, wait) = std::sync::mpsc::channel();
+                let worker = std::thread::spawn(move || {
+                    wait.recv().expect("worker affinity barrier");
+                    assert_current_affinity(expected);
+                });
+                println!("threads-ready");
+                std::io::stdout().flush().expect("flush ready marker");
+                let mut barrier = [0_u8; 1];
+                std::io::stdin()
+                    .read_exact(&mut barrier)
+                    .expect("read affinity barrier");
+                assert_eq!(barrier, *b"\n");
+                release.send(()).expect("release affinity worker");
+                assert_current_affinity(expected);
+                worker.join().expect("affinity worker");
+                println!("affinity-all-tasks-ok");
+            }
             "grandchild" => std::thread::sleep(Duration::from_secs(30)),
             other => {
                 eprintln!("unknown helper mode {other}");
                 std::process::exit(125);
             }
         }
+    }
+
+    fn assert_current_affinity(expected: usize) {
+        let set = rustix::thread::sched_getaffinity(None).expect("read child affinity");
+        let actual = (0..rustix::thread::CpuSet::MAX_CPU)
+            .filter(|cpu| set.is_set(*cpu))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, [expected]);
     }
 }
