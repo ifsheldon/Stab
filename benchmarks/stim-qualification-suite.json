@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "cd82f99bd3f02446187b55c873e396e08c234f86693ba5f5734882fbe4814b56",
-  "semantic_digest": "2cd3f0cd44f2450297dc87abec98156eb717127483a051f8dd48ee29bdc39fcd",
+  "correctness_digest": "adcc3d19605e4fc7bd9e1b3f3373ddf38d81301430d891f062baaab0c6fdc8f6",
+  "semantic_digest": "46c573b72dfe20f72c85848ded16cd3bb3fbffebfe30a19daf623643878c984a",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -18802,7 +18802,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18815,7 +18815,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-cf38ba2626d7ae25",
@@ -18831,7 +18831,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18844,7 +18844,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18857,7 +18857,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18870,7 +18870,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-cf38ba2626d7ae25",
@@ -18886,7 +18886,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18899,7 +18899,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18912,7 +18912,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18925,7 +18925,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18938,7 +18938,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -18951,7 +18951,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0d3c24a6d8758516",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24425,7 +24425,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-6e8d57564d151a03",
+      "correctness_case_id": "cq-evidence-qualification-4abd56fbbff57da5",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24438,7 +24438,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-6e8d57564d151a03",
+      "correctness_case_id": "cq-evidence-qualification-4abd56fbbff57da5",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b869754e35879cf6",
@@ -24454,7 +24454,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-6e8d57564d151a03",
+      "correctness_case_id": "cq-evidence-qualification-4abd56fbbff57da5",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24467,7 +24467,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-6e8d57564d151a03",
+      "correctness_case_id": "cq-evidence-qualification-4abd56fbbff57da5",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24480,7 +24480,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-6e8d57564d151a03",
+      "correctness_case_id": "cq-evidence-qualification-4abd56fbbff57da5",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b869754e35879cf6",
@@ -24496,7 +24496,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-6e8d57564d151a03",
+      "correctness_case_id": "cq-evidence-qualification-4abd56fbbff57da5",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24509,7 +24509,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-73a86df3612f1cf4",
+      "correctness_case_id": "cq-evidence-qualification-ed2fdc64db3c0c9c",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b869754e35879cf6",
@@ -24525,7 +24525,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-32c66d4944f364fd",
+      "correctness_case_id": "cq-evidence-qualification-4abd56fbbff57da5",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b869754e35879cf6",
@@ -24541,7 +24541,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-5b625d76f2436fb0",
+      "correctness_case_id": "cq-evidence-qualification-4abd56fbbff57da5",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b869754e35879cf6",
@@ -24557,7 +24557,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-c99b9abe3ce42bf8",
+      "correctness_case_id": "cq-evidence-qualification-4abd56fbbff57da5",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-b869754e35879cf6",
@@ -24573,7 +24573,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-148f94a43ecdb4bc",
+      "correctness_case_id": "cq-evidence-qualification-4abd56fbbff57da5",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-06d3c650927d4ca7",
@@ -24589,7 +24589,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-469c60b04998c1ac",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24602,7 +24602,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-469c60b04998c1ac",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-49a9272d7e1e99a7",
@@ -24618,7 +24618,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-469c60b04998c1ac",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24631,7 +24631,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-469c60b04998c1ac",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24644,7 +24644,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-469c60b04998c1ac",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-49a9272d7e1e99a7",
@@ -24660,7 +24660,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-469c60b04998c1ac",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24673,7 +24673,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-3402bd739611a0c9",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-e4a9a673e2f057d3",
@@ -24689,7 +24689,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-b4082c34148734db",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-e4a9a673e2f057d3",
@@ -24705,7 +24705,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-ab109b3d6cc13808",
+      "correctness_case_id": "cq-evidence-qualification-ed2fdc64db3c0c9c",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-49a9272d7e1e99a7",
@@ -24721,7 +24721,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-e604c3d344039b77",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-49a9272d7e1e99a7",
@@ -24737,7 +24737,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-7b7db4b106b74905",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-49a9272d7e1e99a7",
@@ -24753,7 +24753,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-c80b078b5b76de1e",
+      "correctness_case_id": "cq-evidence-qualification-f4efbc23f1861383",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-49a9272d7e1e99a7",
@@ -24769,7 +24769,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-00c4296cdfc174f6",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-49a9272d7e1e99a7",
@@ -24785,7 +24785,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-c61c75b4a6cb0d21",
+      "correctness_case_id": "cq-evidence-qualification-7dd59229dcd263ea",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-49a9272d7e1e99a7",
@@ -24801,7 +24801,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-d48f018643e9ac25",
+      "correctness_case_id": "cq-evidence-qualification-d407a97429d4b320",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24814,7 +24814,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-d48f018643e9ac25",
+      "correctness_case_id": "cq-evidence-qualification-d407a97429d4b320",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-cf12cfbaf2bac626",
@@ -24830,7 +24830,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-d48f018643e9ac25",
+      "correctness_case_id": "cq-evidence-qualification-d407a97429d4b320",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24843,7 +24843,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-d48f018643e9ac25",
+      "correctness_case_id": "cq-evidence-qualification-d407a97429d4b320",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24856,7 +24856,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-d48f018643e9ac25",
+      "correctness_case_id": "cq-evidence-qualification-d407a97429d4b320",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-cf12cfbaf2bac626",
@@ -24872,7 +24872,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-d48f018643e9ac25",
+      "correctness_case_id": "cq-evidence-qualification-d407a97429d4b320",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24885,7 +24885,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-6e45657e9a5ca505",
+      "correctness_case_id": "cq-evidence-qualification-d407a97429d4b320",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-cf12cfbaf2bac626",
@@ -24901,7 +24901,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0a4610147ef45691",
+      "correctness_case_id": "cq-evidence-qualification-d407a97429d4b320",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-cf12cfbaf2bac626",
@@ -24917,7 +24917,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-03aa7b92fc85ef72",
+      "correctness_case_id": "cq-evidence-qualification-d407a97429d4b320",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-cf12cfbaf2bac626",
@@ -24933,7 +24933,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-cde42e5887d23762",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24946,7 +24946,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-cde42e5887d23762",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-dff4fb0279ca0724",
@@ -24962,7 +24962,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-cde42e5887d23762",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24975,7 +24975,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-cde42e5887d23762",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -24988,7 +24988,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-cde42e5887d23762",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-dff4fb0279ca0724",
@@ -25004,7 +25004,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-cde42e5887d23762",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25017,7 +25017,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-c05d176352e3c3be",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-dff4fb0279ca0724",
@@ -25033,7 +25033,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-b61ac0678704636c",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-dff4fb0279ca0724",
@@ -25049,7 +25049,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-3224dde824fd269b",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-dff4fb0279ca0724",
@@ -25065,7 +25065,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-e762903d8a8ce255",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-dff4fb0279ca0724",
@@ -25081,7 +25081,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-87781e049a39ebda",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-dff4fb0279ca0724",
@@ -25097,7 +25097,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-b990dde6d612bcc6",
+      "correctness_case_id": "cq-evidence-qualification-473f6f222e7488d6",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-dff4fb0279ca0724",
@@ -25113,7 +25113,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fb6a6213959c6b89",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-dff4fb0279ca0724",
@@ -25129,7 +25129,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-a014cf580e5866b8",
+      "correctness_case_id": "cq-evidence-qualification-dc4aee8eb5d9b848",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-dff4fb0279ca0724",
@@ -25145,7 +25145,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25158,7 +25158,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-40856afc6b0ada54",
@@ -25174,7 +25174,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25187,7 +25187,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25200,7 +25200,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25213,7 +25213,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-40856afc6b0ada54",
@@ -25229,7 +25229,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25242,7 +25242,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25255,7 +25255,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25268,7 +25268,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25281,7 +25281,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25294,7 +25294,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-fa1d39195cc48ba7",
+      "correctness_case_id": "cq-evidence-qualification-94831fa2a56c1142",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25307,7 +25307,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-feca08222512b58e",
+      "correctness_case_id": "cq-evidence-qualification-bcde0e52fb05fb70",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25320,7 +25320,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-feca08222512b58e",
+      "correctness_case_id": "cq-evidence-qualification-bcde0e52fb05fb70",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-f6f41f7098affbcd",
@@ -25336,7 +25336,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-feca08222512b58e",
+      "correctness_case_id": "cq-evidence-qualification-bcde0e52fb05fb70",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25349,7 +25349,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-feca08222512b58e",
+      "correctness_case_id": "cq-evidence-qualification-bcde0e52fb05fb70",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25362,7 +25362,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-feca08222512b58e",
+      "correctness_case_id": "cq-evidence-qualification-bcde0e52fb05fb70",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-f6f41f7098affbcd",
@@ -25378,7 +25378,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-feca08222512b58e",
+      "correctness_case_id": "cq-evidence-qualification-bcde0e52fb05fb70",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25391,7 +25391,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-feca08222512b58e",
+      "correctness_case_id": "cq-evidence-qualification-bcde0e52fb05fb70",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25404,7 +25404,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-772a5277b8e1821a",
+      "correctness_case_id": "cq-evidence-qualification-bcde0e52fb05fb70",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-f6f41f7098affbcd",
@@ -25420,7 +25420,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-feca08222512b58e",
+      "correctness_case_id": "cq-evidence-qualification-bcde0e52fb05fb70",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -25433,7 +25433,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-a9285f79f1a648e9",
+      "correctness_case_id": "cq-evidence-qualification-bcde0e52fb05fb70",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-f6f41f7098affbcd",
@@ -25449,7 +25449,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-9259cadeb96584a6",
+      "correctness_case_id": "cq-evidence-qualification-bcde0e52fb05fb70",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-f6f41f7098affbcd",
@@ -25465,7 +25465,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-1f3f7950abe7be93",
+      "correctness_case_id": "cq-evidence-qualification-9b04b26a9da1b3cc",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-160eff0bdaf3f15c",
@@ -25481,7 +25481,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-a5500138d7146bb1",
+      "correctness_case_id": "cq-evidence-qualification-26a553fce110f2b7",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-160eff0bdaf3f15c",
@@ -25497,7 +25497,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-99b2f2956e5cf549",
+      "correctness_case_id": "cq-evidence-qualification-9b04b26a9da1b3cc",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-160eff0bdaf3f15c",
@@ -25513,7 +25513,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-bc25612ca4a2ae1e",
+      "correctness_case_id": "cq-evidence-qualification-9b04b26a9da1b3cc",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-160eff0bdaf3f15c",
@@ -25529,7 +25529,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-87ed5b5108c8913e",
+      "correctness_case_id": "cq-evidence-qualification-db7d4cd87fe69099",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-160eff0bdaf3f15c",
@@ -25545,7 +25545,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-3b335f3bec5cb53f",
+      "correctness_case_id": "cq-evidence-qualification-9b04b26a9da1b3cc",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-160eff0bdaf3f15c",
@@ -25561,7 +25561,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-921ce31d8455da06",
+      "correctness_case_id": "cq-evidence-qualification-9b04b26a9da1b3cc",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-f526d6dd698da2fe",
@@ -25577,7 +25577,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-0e768174fb238896",
+      "correctness_case_id": "cq-evidence-qualification-db7d4cd87fe69099",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-f526d6dd698da2fe",
@@ -25593,7 +25593,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-92a61fbc6e7e652b",
+      "correctness_case_id": "cq-evidence-qualification-db7d4cd87fe69099",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-79ce23b35670733d",
@@ -25609,7 +25609,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-5902073aea43c6f4",
+      "correctness_case_id": "cq-evidence-qualification-9b04b26a9da1b3cc",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-79ce23b35670733d",
@@ -25625,7 +25625,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-1b072424785f357a",
+      "correctness_case_id": "cq-evidence-qualification-9b04b26a9da1b3cc",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-79ce23b35670733d",
@@ -25641,7 +25641,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-758b266784a355b0",
+      "correctness_case_id": "cq-evidence-qualification-db7d4cd87fe69099",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-79ce23b35670733d",
@@ -25657,7 +25657,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-7b4317c0dd7329e9",
+      "correctness_case_id": "cq-evidence-qualification-db7d4cd87fe69099",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-56c3371c946aaed3",
@@ -25673,7 +25673,7 @@
       "supporting_performance_features": [
         "PERF-CONVERT-CLI"
       ],
-      "correctness_case_id": "cq-evidence-api-2bb81dbc26b54607",
+      "correctness_case_id": "cq-evidence-qualification-9b04b26a9da1b3cc",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-79ce23b35670733d",
@@ -30003,7 +30003,7 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-148f94a43ecdb4bc"
+        "cq-evidence-qualification-4abd56fbbff57da5"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -30356,13 +30356,9 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-00c4296cdfc174f6",
-        "cq-evidence-api-469c60b04998c1ac",
-        "cq-evidence-api-7b7db4b106b74905",
-        "cq-evidence-api-ab109b3d6cc13808",
-        "cq-evidence-api-c61c75b4a6cb0d21",
-        "cq-evidence-api-c80b078b5b76de1e",
-        "cq-evidence-api-e604c3d344039b77"
+        "cq-evidence-qualification-7dd59229dcd263ea",
+        "cq-evidence-qualification-ed2fdc64db3c0c9c",
+        "cq-evidence-qualification-f4efbc23f1861383"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -30625,10 +30621,7 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-03aa7b92fc85ef72",
-        "cq-evidence-api-0a4610147ef45691",
-        "cq-evidence-api-6e45657e9a5ca505",
-        "cq-evidence-api-d48f018643e9ac25"
+        "cq-evidence-qualification-d407a97429d4b320"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -31116,12 +31109,9 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-1f3f7950abe7be93",
-        "cq-evidence-api-3b335f3bec5cb53f",
-        "cq-evidence-api-87ed5b5108c8913e",
-        "cq-evidence-api-99b2f2956e5cf549",
-        "cq-evidence-api-a5500138d7146bb1",
-        "cq-evidence-api-bc25612ca4a2ae1e"
+        "cq-evidence-qualification-26a553fce110f2b7",
+        "cq-evidence-qualification-9b04b26a9da1b3cc",
+        "cq-evidence-qualification-db7d4cd87fe69099"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -33128,15 +33118,8 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-3224dde824fd269b",
-        "cq-evidence-api-87781e049a39ebda",
-        "cq-evidence-api-a014cf580e5866b8",
-        "cq-evidence-api-b61ac0678704636c",
-        "cq-evidence-api-b990dde6d612bcc6",
-        "cq-evidence-api-c05d176352e3c3be",
-        "cq-evidence-api-cde42e5887d23762",
-        "cq-evidence-api-e762903d8a8ce255",
-        "cq-evidence-api-fb6a6213959c6b89"
+        "cq-evidence-qualification-473f6f222e7488d6",
+        "cq-evidence-qualification-dc4aee8eb5d9b848"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -33217,7 +33200,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-fa1d39195cc48ba7"
+        "cq-evidence-qualification-94831fa2a56c1142"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -34120,12 +34103,9 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-1f3f7950abe7be93",
-        "cq-evidence-api-3b335f3bec5cb53f",
-        "cq-evidence-api-87ed5b5108c8913e",
-        "cq-evidence-api-99b2f2956e5cf549",
-        "cq-evidence-api-a5500138d7146bb1",
-        "cq-evidence-api-bc25612ca4a2ae1e"
+        "cq-evidence-qualification-26a553fce110f2b7",
+        "cq-evidence-qualification-9b04b26a9da1b3cc",
+        "cq-evidence-qualification-db7d4cd87fe69099"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -34206,7 +34186,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-fa1d39195cc48ba7"
+        "cq-evidence-qualification-94831fa2a56c1142"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -34795,8 +34775,8 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-0e768174fb238896",
-        "cq-evidence-api-921ce31d8455da06"
+        "cq-evidence-qualification-9b04b26a9da1b3cc",
+        "cq-evidence-qualification-db7d4cd87fe69099"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -35280,13 +35260,9 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-00c4296cdfc174f6",
-        "cq-evidence-api-469c60b04998c1ac",
-        "cq-evidence-api-7b7db4b106b74905",
-        "cq-evidence-api-ab109b3d6cc13808",
-        "cq-evidence-api-c61c75b4a6cb0d21",
-        "cq-evidence-api-c80b078b5b76de1e",
-        "cq-evidence-api-e604c3d344039b77"
+        "cq-evidence-qualification-7dd59229dcd263ea",
+        "cq-evidence-qualification-ed2fdc64db3c0c9c",
+        "cq-evidence-qualification-f4efbc23f1861383"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -36401,7 +36377,7 @@
       "phase": "parse",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-7b4317c0dd7329e9"
+        "cq-evidence-qualification-db7d4cd87fe69099"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -36733,7 +36709,7 @@
       "phase": "parse",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-7b4317c0dd7329e9"
+        "cq-evidence-qualification-db7d4cd87fe69099"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -37851,11 +37827,8 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-1b072424785f357a",
-        "cq-evidence-api-2bb81dbc26b54607",
-        "cq-evidence-api-5902073aea43c6f4",
-        "cq-evidence-api-758b266784a355b0",
-        "cq-evidence-api-92a61fbc6e7e652b"
+        "cq-evidence-qualification-9b04b26a9da1b3cc",
+        "cq-evidence-qualification-db7d4cd87fe69099"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -39311,11 +39284,8 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-1b072424785f357a",
-        "cq-evidence-api-2bb81dbc26b54607",
-        "cq-evidence-api-5902073aea43c6f4",
-        "cq-evidence-api-758b266784a355b0",
-        "cq-evidence-api-92a61fbc6e7e652b"
+        "cq-evidence-qualification-9b04b26a9da1b3cc",
+        "cq-evidence-qualification-db7d4cd87fe69099"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -41334,8 +41304,7 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-3402bd739611a0c9",
-        "cq-evidence-api-b4082c34148734db"
+        "cq-evidence-qualification-7dd59229dcd263ea"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -42625,7 +42594,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-0d3c24a6d8758516"
+        "cq-evidence-qualification-94831fa2a56c1142"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -43279,7 +43248,7 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-148f94a43ecdb4bc"
+        "cq-evidence-qualification-4abd56fbbff57da5"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -43831,10 +43800,7 @@
       "phase": "parse",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-772a5277b8e1821a",
-        "cq-evidence-api-9259cadeb96584a6",
-        "cq-evidence-api-a9285f79f1a648e9",
-        "cq-evidence-api-feca08222512b58e"
+        "cq-evidence-qualification-bcde0e52fb05fb70"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -44173,11 +44139,8 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-32c66d4944f364fd",
-        "cq-evidence-api-5b625d76f2436fb0",
-        "cq-evidence-api-6e8d57564d151a03",
-        "cq-evidence-api-73a86df3612f1cf4",
-        "cq-evidence-api-c99b9abe3ce42bf8"
+        "cq-evidence-qualification-4abd56fbbff57da5",
+        "cq-evidence-qualification-ed2fdc64db3c0c9c"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -45526,10 +45489,7 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-03aa7b92fc85ef72",
-        "cq-evidence-api-0a4610147ef45691",
-        "cq-evidence-api-6e45657e9a5ca505",
-        "cq-evidence-api-d48f018643e9ac25"
+        "cq-evidence-qualification-d407a97429d4b320"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -45607,7 +45567,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-0d3c24a6d8758516"
+        "cq-evidence-qualification-94831fa2a56c1142"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -47077,15 +47037,8 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-3224dde824fd269b",
-        "cq-evidence-api-87781e049a39ebda",
-        "cq-evidence-api-a014cf580e5866b8",
-        "cq-evidence-api-b61ac0678704636c",
-        "cq-evidence-api-b990dde6d612bcc6",
-        "cq-evidence-api-c05d176352e3c3be",
-        "cq-evidence-api-cde42e5887d23762",
-        "cq-evidence-api-e762903d8a8ce255",
-        "cq-evidence-api-fb6a6213959c6b89"
+        "cq-evidence-qualification-473f6f222e7488d6",
+        "cq-evidence-qualification-dc4aee8eb5d9b848"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -47473,8 +47426,7 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-3402bd739611a0c9",
-        "cq-evidence-api-b4082c34148734db"
+        "cq-evidence-qualification-7dd59229dcd263ea"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -48919,8 +48871,8 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-0e768174fb238896",
-        "cq-evidence-api-921ce31d8455da06"
+        "cq-evidence-qualification-9b04b26a9da1b3cc",
+        "cq-evidence-qualification-db7d4cd87fe69099"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -49083,10 +49035,7 @@
       "phase": "parse",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-772a5277b8e1821a",
-        "cq-evidence-api-9259cadeb96584a6",
-        "cq-evidence-api-a9285f79f1a648e9",
-        "cq-evidence-api-feca08222512b58e"
+        "cq-evidence-qualification-bcde0e52fb05fb70"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -49668,11 +49617,8 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-32c66d4944f364fd",
-        "cq-evidence-api-5b625d76f2436fb0",
-        "cq-evidence-api-6e8d57564d151a03",
-        "cq-evidence-api-73a86df3612f1cf4",
-        "cq-evidence-api-c99b9abe3ce42bf8"
+        "cq-evidence-qualification-4abd56fbbff57da5",
+        "cq-evidence-qualification-ed2fdc64db3c0c9c"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,

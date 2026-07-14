@@ -1915,6 +1915,2009 @@
           "symbol": "test_num_measurements"
         }
       ]
+    },
+    {
+      "id": "cq2-result-sample-format-value-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_sample_format_value_contract_matches_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A fixed value corpus proves both public SampleFormat paths, all selected variants, copy and clone behavior, debug names, and equality."
+      },
+      "negative_axes": [
+        "variant-aliasing"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::SampleFormat"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::SampleFormat"
+        }
+      ]
+      },
+      {
+        "id": "cq2-result-writer-exact-format-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_writer_exact_format_bytes_match_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Exact fixed records prove 01, b8, hits, dets, and r8 writer bytes plus writer construction, value semantics, result-type transitions, and extraction."
+      },
+      "negative_axes": [
+        "bit-order-drift",
+        "result-type-offset-drift"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.Format01"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.FormatB8"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.FormatHits"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.FormatDets"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.FormatR8"
+          }
+        ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordWriter::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordWriter::write_bit"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordWriter::write_end"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordWriter::into_bytes"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordWriter::begin_result_type"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordWriter"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordWriter::with_capacity"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordWriter::write_bytes"
+        }
+      ]
+      },
+      {
+        "id": "cq2-result-writer-boundary-and-bits-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_writer_record_boundaries_and_bit_slices_match_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Exact records prove empty and repeated dets boundaries, long r8 gaps, and non-byte-aligned bit-slice writes."
+        },
+        "negative_axes": [
+          "long-zero-run",
+          "non-byte-aligned-tail"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.FormatDets_EmptyRecords"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.FormatDets_MultipleRecords"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.FormatR8_LongGap"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_bits_01_a"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_bits_01_b"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_bits_b8_a"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_bits_b8_b"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_bits_r8_a"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_bits_r8_b"
+          }
+        ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordWriter::write_bits"
+        }
+      ]
+      },
+      {
+        "id": "cq2-result-batch-writer-small-table-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_batch_writer_small_table_contract_matches_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A five-shot table proves shot-major batch writing in every selected non-PTB64 format and the exact 64-shot PTB64 measurement-major word layout."
+      },
+      "negative_axes": [
+        "shot-major-transposition",
+        "ptb64-word-order"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_batch_writer.test.cc",
+            "symbol": "MeasureRecordBatchWriter.basic_usage_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_batch_writer.test.cc",
+            "symbol": "MeasureRecordBatchWriter.basic_usage_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_batch_writer.test.cc",
+            "symbol": "MeasureRecordBatchWriter.basic_usage_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_table_data_small_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_table_data_small_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_table_data_small_64",
+            "subcase": "W=64"
+          }
+        ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatchWriter::write_end"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatchWriter::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatchWriter::batch_write_bit"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatchWriter"
+        }
+      ]
+      },
+      {
+        "id": "cq2-result-large-table-reference-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_large_table_reference_and_format_contract_matches_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A 100-bit reference-sample table proves exact sparse, packed, run-length, typed dets, and PTB64 bytes including one shot-local flip."
+      },
+      "negative_axes": [
+        "reference-index-drift",
+        "shot-local-flip-loss"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_table_data_large_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_table_data_large_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_writer.test.cc",
+            "symbol": "MeasureRecordWriter.write_table_data_large_64",
+            "subcase": "W=64"
+          }
+        ]
+      },
+      {
+        "id": "cq2-result-measure-record-state-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_formats",
+            "cq_result_measure_record_basic_usage_and_value_contract_match_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact 102-measurement sequence proves append, lookback, unwritten output, compaction, storage reporting, cloning, equality, and debug behavior."
+      },
+      "negative_axes": [
+        "duplicate-unwritten-output",
+        "lookback-compaction-loss"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record.test.cc",
+            "symbol": "MeasureRecord.basic_usage"
+          }
+        ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecord::write_unwritten_results_to"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecord::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecord::record_result"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecord"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecord::storage_len"
+        }
+      ]
+      },
+      {
+      "id": "cq2-result-lookback-limit-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_formats",
+            "cq_result_measure_records_enforce_configured_lookback_limit",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "constant-scratch",
+          "detail": "Fixed scalar and batch histories prove zero, available, beginning-of-time, and configured maximum lookback boundaries."
+        },
+        "negative_axes": [
+          "zero-lookback",
+          "past-history",
+          "past-configured-limit"
+        ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecord::lookback"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatch::lookback"
+        }
+      ]
+      },
+      {
+        "id": "cq2-result-batch-state-and-compaction-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_formats",
+            "cq_result_batch_basic_usage_and_compaction_match_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The pinned 1102-measurement five-shot sequence proves intermediate 256-row flushing, final output, written cursors, lookback retention, and compaction."
+      },
+      "negative_axes": [
+        "partial-intermediate-chunk",
+        "written-cursor-replay"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_batch.test.cc",
+            "symbol": "MeasureRecordBatch.basic_usage_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_batch.test.cc",
+            "symbol": "MeasureRecordBatch.basic_usage_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_batch.test.cc",
+            "symbol": "MeasureRecordBatch.basic_usage_64",
+            "subcase": "W=64"
+          }
+        ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatch::stored"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatch::final_write_unwritten_results_to"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatch"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatch::record_result"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatch::intermediate_write_unwritten_results_to"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatch::unwritten"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatch::new"
+        }
+      ]
+      },
+      {
+      "id": "cq2-result-batch-zero-edit-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_formats",
+            "cq_result_batch_zero_edit_and_value_contract_match_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A fixed five-shot history proves editable zero rows, width rejection, lookback values, cloning, equality, and debug behavior."
+        },
+        "negative_axes": [
+          "shot-width-mismatch"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_batch.test.cc",
+            "symbol": "MeasureRecordBatch.record_zero_result_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_batch.test.cc",
+            "symbol": "MeasureRecordBatch.record_zero_result_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_batch.test.cc",
+            "symbol": "MeasureRecordBatch.record_zero_result_64",
+            "subcase": "W=64"
+          }
+        ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::MeasureRecordBatch::record_zero_result_to_edit"
+        }
+      ]
+      },
+      {
+        "id": "cq2-result-batch-reference-cursor-regression",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_formats",
+            "cq_result_batch_intermediate_flushes_complete_chunks_once",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A 300-measurement regression proves complete chunks flush once, reference bits use global measurement indices, retained storage stays bounded, and final output appends only the remainder."
+        },
+        "negative_axes": [
+          "duplicate-intermediate-write",
+          "reference-index-after-compaction"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "cq2-result-batch-short-reference-regression",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_formats",
+            "cq_result_batch_reference_sample_is_measurement_indexed_and_zero_padded",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "A two-shot fixed record proves a short reference sample is measurement-indexed and zero-padded instead of being interpreted as one reference bit per shot."
+        },
+        "negative_axes": [
+          "short-reference-sample"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "cq2-result-reader-exact-format-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_reader_exact_format_records_match_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Pinned 18-bit records prove materialized, dense streaming, packed streaming, and sparse streaming decoding for 01, b8, hits, and r8."
+      },
+      "negative_axes": [
+        "cross-reader-bit-order-drift"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatB8_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatB8_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatB8_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatR8_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatR8_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatR8_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatR8_LongGap_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatR8_LongGap_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatR8_LongGap_64",
+            "subcase": "W=64"
+          }
+        ]
+      },
+      {
+        "id": "cq2-result-reader-round-trip-width-matrix",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_reader_round_trip_width_matrix_matches_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Deterministic 64, 128, 256, and 504-bit multi-record corpora prove all selected non-PTB64 formats through materialized, dense, packed, and sparse APIs."
+      },
+      "negative_axes": [
+        "record-boundary-collapse",
+        "non-word-aligned-tail-drift"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_WriteRead_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_WriteRead_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_WriteRead_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatB8_WriteRead_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatB8_WriteRead_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatB8_WriteRead_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatR8_WriteRead_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatR8_WriteRead_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatR8_WriteRead_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_WriteRead_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_WriteRead_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_WriteRead_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_WriteRead_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_WriteRead_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_WriteRead_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_WriteRead_MultipleRecords_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_WriteRead_MultipleRecords_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_WriteRead_MultipleRecords_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_WriteRead_MultipleRecords_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_WriteRead_MultipleRecords_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_WriteRead_MultipleRecords_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_WriteRead_MultipleRecords_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_WriteRead_MultipleRecords_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_WriteRead_MultipleRecords_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_records_into_RoundTrip_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_records_into_RoundTrip_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_records_into_RoundTrip_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_all_zero_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_all_zero_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_all_zero_64",
+            "subcase": "W=64"
+          }
+        ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::write_records"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::read_records"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_streaming::for_each_record"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_streaming::for_each_sparse_record"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_streaming::for_each_packed_record"
+        }
+      ]
+      },
+      {
+        "id": "cq2-result-reader-boundary-type-newline-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_reader_record_boundaries_types_and_crlf_match_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Exact multi-record inputs prove final-line handling, empty dets records, measurement-only dets typing, blank-line handling, and CRLF acceptance."
+        },
+        "negative_axes": [
+          "non-measurement-dets-token"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_MultipleRecords_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_MultipleRecords_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_MultipleRecords_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_MultipleShortRecords_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_MultipleShortRecords_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_MultipleShortRecords_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_windows_newlines_01_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_windows_newlines_01_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_windows_newlines_01_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_windows_newlines_hits_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_windows_newlines_hits_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_windows_newlines_hits_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_windows_newlines_dets_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_windows_newlines_dets_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_windows_newlines_dets_64",
+            "subcase": "W=64"
+          }
+        ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::read_measurement_records"
+        }
+      ]
+      },
+      {
+        "id": "cq2-result-reader-typed-layout-matrix",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::convert::convert_circuit_dl_all_format_matrix_matches_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A circuit-derived detector and observable layout proves typed D/L offsets and every 01, b8, r8, hits, and dets conversion direction."
+      },
+      "negative_axes": [
+        "detector-observable-offset-alias",
+        "cross-format-layout-drift"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_detections_observables_with_circuit_no_dets"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_MultipleResultTypes_D0L0_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_MultipleResultTypes_D0L0_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_MultipleResultTypes_D0L0_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_bits_into_bytes_entire_record_across_result_type_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_bits_into_bytes_entire_record_across_result_type_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_bits_into_bytes_entire_record_across_result_type_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_r8_detection_event_data_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_r8_detection_event_data_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_r8_detection_event_data_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_b8_detection_event_data_full_run_together_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_b8_detection_event_data_full_run_together_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_b8_detection_event_data_full_run_together_64",
+            "subcase": "W=64"
+          }
+        ]
+      },
+      {
+        "id": "cq2-result-reader-large-observable-layout",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::convert::convert_dets_keeps_detector_and_large_observable_namespaces_distinct",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Typed dets input proves detector and observable namespaces stay distinct through observable index 1000 and flatten into the declared layout exactly."
+        },
+        "negative_axes": [
+          "typed-index-offset-alias"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_HugeObservables_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_HugeObservables_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_HugeObservables_64",
+            "subcase": "W=64"
+          }
+        ]
+      },
+      {
+      "id": "cq2-result-reader-malformed-input-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_reader_rejects_malformed_widths_and_indices",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Positive integer parsing and exact negative cases prove width, byte, run-length, sparse-index, u64-overflow, dets-prefix, and token validation in every reader family."
+        },
+        "negative_axes": [
+          "integer-overflow",
+          "record-width-mismatch",
+          "run-length-overshoot",
+          "sparse-index-out-of-range",
+          "invalid-dets-prefix"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "read_unsigned_int.BasicUsage"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "read_unsigned_int.ValueTooBig"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_InvalidInput_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_InvalidInput_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.Format01_InvalidInput_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_InvalidInput_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_InvalidInput_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_InvalidInput_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_InvalidInput_sparse_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_InvalidInput_sparse_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_InvalidInput_sparse_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Sparse_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Sparse_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Sparse_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Dense_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Dense_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatDets_InvalidInput_Dense_64",
+            "subcase": "W=64"
+          }
+        ]
+      },
+      {
+        "id": "cq2-result-reader-duplicate-dense-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_formats",
+            "cq_result_sparse_duplicate_tokens_toggle_dense_records",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Repeated hits and dets tokens prove dense materialized, dense streaming, and packed streaming readers toggle duplicate indices."
+      },
+      "negative_axes": [
+        "duplicate-token-set-semantics"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_Repeated_Dense_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_Repeated_Dense_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_Repeated_Dense_64",
+            "subcase": "W=64"
+          }
+        ]
+      },
+      {
+        "id": "cq2-result-reader-duplicate-sparse-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_formats",
+            "cq_result_sparse_visitors_preserve_token_order_and_duplicates",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Repeated and out-of-order sparse tokens prove sparse visitors preserve the source token sequence without sorting or deduplication."
+      },
+      "negative_axes": [
+        "sparse-token-normalization"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_Repeated_Sparse_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_Repeated_Sparse_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.FormatHits_Repeated_Sparse_64",
+            "subcase": "W=64"
+          }
+        ]
+      },
+      {
+        "id": "cq2-result-ptb64-layout-prefix-validation-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_ptb64_dense_sparse_prefix_and_validation_match_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Two 64-shot groups of 71-bit records prove PTB64 layout, inferred counts, bounded prefixes, dense and sparse reconstruction, and exact group, width, and truncation failures."
+        },
+        "negative_axes": [
+          "partial-shot-group",
+          "mixed-record-width",
+          "truncated-group",
+          "zero-width"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_ptb64_dense_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_ptb64_dense_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_ptb64_dense_64",
+            "subcase": "W=64"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_ptb64_sparse_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_ptb64_sparse_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.start_and_read_entire_record_ptb64_sparse_64",
+            "subcase": "W=64"
+          }
+        ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_streaming::for_each_ptb64_record_all"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::ptb64_record_count"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_streaming::ptb64_record_count"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::validate_ptb64_shot_count"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_streaming::for_each_ptb64_record"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::write_ptb64_records_checked"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::read_ptb64_records"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::read_ptb64_records_all"
+        }
+      ]
+      },
+      {
+        "id": "cq2-result-large-all-format-table-round-trip",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_large_all_format_table_round_trip_matches_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A deterministic 576 by 1000-bit table proves exact write/read round trips across all selected formats, including nine complete PTB64 groups."
+      },
+      "negative_axes": [
+        "large-table-transposition",
+        "multi-group-ptb64-truncation"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_file_data_into_shot_table_vs_write_table_128",
+            "subcase": "W=128"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_file_data_into_shot_table_vs_write_table_256",
+            "subcase": "W=256"
+          },
+          {
+            "path": "src/stim/io/measure_record_reader.test.cc",
+            "symbol": "MeasureRecordReader.read_file_data_into_shot_table_vs_write_table_64",
+            "subcase": "W=64"
+          }
+        ]
+      },
+      {
+        "id": "cq2-result-streaming-visitor-cancellation",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "structural",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_streaming_visitors_stop_at_first_error",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "streaming",
+          "detail": "Every public streaming visitor family stops after its first callback error without parsing or visiting a later record."
+        },
+        "negative_axes": [
+          "visitor-error"
+        ],
+        "standalone": true
+      },
+      {
+        "id": "cq2-result-sparse-shot-value-contract",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-core",
+            "--test",
+            "cq2_result_io",
+            "cq_result_sparse_shot_value_string_and_mask_match_stim",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Fixed sparse shots prove public fields, construction, cloning, equality, debug output, Stim-style text, and low-64 observable mask semantics."
+      },
+      "negative_axes": [
+        "observable-mask-high-bit-leak",
+        "sparse-text-order-drift"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/io/sparse_shot.test.cc",
+            "symbol": "sparse_shot.equality"
+          },
+          {
+            "path": "src/stim/io/sparse_shot.test.cc",
+            "symbol": "sparse_shot.str"
+          },
+          {
+            "path": "src/stim/io/sparse_shot.test.cc",
+            "symbol": "spares_shot.obs_mask_as_u64"
+          }
+        ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::SparseShot::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::SparseShot::stim_debug_string"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::SparseShot::obs_mask_as_u64"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::result_formats::SparseShot"
+        }
+      ]
+      },
+      {
+        "id": "cq2-result-cli-measurement-circuit-convert",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::convert::convert_measurements_with_circuit_types_m_to_dets",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Circuit-derived measurement layout converts exact 01, b8, hits, and r8 records to typed dets output."
+      },
+      "negative_axes": [
+        "measurement-token-type-drift"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_measurements_with_circuit_to_dets"
+          }
+        ]
+      },
+      {
+        "id": "cq2-result-cli-detection-observable-routing",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::convert::convert_detection_observable_records_with_circuit_and_obs_out",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Circuit-derived detector and observable records prove primary typed dets output and exact observable side-output routing."
+      },
+      "negative_axes": [
+        "observable-side-output-duplication",
+        "observable-primary-output-leak"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_detections_observables_with_circuit_to_dets"
+          },
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_detections_observables_with_circuit_to_dets_with_obs_out"
+          }
+        ]
+      },
+      {
+        "id": "cq2-result-cli-layout-source-matrices",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::convert::convert_round_trips_detection_observable_records_from_counts_and_dem",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Explicit measurement, detector, and observable counts plus DEM-derived layouts prove every selected non-PTB64 conversion direction."
+      },
+      "negative_axes": [
+        "layout-source-precedence-drift",
+        "format-matrix-asymmetry"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_detections_observables_with_dem"
+          },
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_measurements_no_circuit_or_dem"
+          },
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_detections_observables_no_circuit_or_dem"
+          }
+      ]
+      },
+      {
+        "id": "cq2-result-cli-raw-and-wide-convert",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::convert::convert_measurement_records_and_raw_bits_round_trip",
+            "--quiet",
+            "--exact"
+          ]
+        },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Measurement layouts and raw bits-per-shot mode prove every selected non-PTB64 format plus an exact 2048-bit b8 record."
+      },
+      "negative_axes": [
+        "wide-record-truncation",
+        "raw-width-type-injection"
+      ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_bits_per_shot_no_dets"
+          },
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_multiple_bitword_sized_records"
+          }
+        ]
+      },
+      {
+      "id": "cq2-result-cli-convert-failure-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::convert::convert_rejects_layout_and_format_failures",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Exact CLI failures prove circuit types are mandatory and unique, layout information is required, and raw bits cannot be emitted as typed dets."
+        },
+        "negative_axes": [
+          "missing-types",
+          "duplicate-types",
+          "unknown-types",
+          "missing-layout",
+          "untyped-dets-output"
+        ],
+        "upstream_owners": [
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_circuit_fail_without_types"
+          },
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_fail_without_any_information"
+          },
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_fail_with_bits_per_shot_to_dets"
+          },
+          {
+            "path": "src/stim/cmd/command_convert.test.cc",
+            "symbol": "command_convert.convert_invalid_types"
+          }
+        ]
+      },
+    {
+      "id": "cq2-result-cli-typed-duplicate-regression",
+        "feature_id": "CQ-RESULT-FORMATS",
+        "comparator": "exact-bytes",
+        "primary_selector": {
+          "state": "existing",
+          "kind": "cargo-test",
+          "value": [
+            "cargo",
+            "test",
+            "-p",
+            "stab-cli",
+            "tests::convert::convert_sparse_duplicate_tokens_toggle_typed_bits",
+            "--quiet",
+            "--exact"
+          ]
+        },
+        "resource_contract": {
+          "kind": "bounded-materialized",
+          "detail": "Typed CLI dets conversion toggles repeated tokens using the same parity semantics as Stim dense readers."
+        },
+        "negative_axes": [
+          "duplicate-typed-token"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-result-imported-writer-source-matrix",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "result_formats::tests::measure_record_writer_matches_stim_byte_layouts",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "This exact structural selector binds the imported writer coverage row to independently owned exact format, boundary, bit-slice, and table contracts."
+      },
+      "negative_axes": [
+        "coverage-row-without-exact-writer-owner"
+      ],
+      "oracle_fixture_owners": [
+        "coverage-io-measure-record-writer"
+      ]
+    },
+    {
+      "id": "cq2-result-imported-reader-source-matrix",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "result_formats::tests::measure_record_reader_round_trips_writer_output",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "This exact structural selector binds the imported reader coverage row to independently owned exact format, width, malformed-input, typed-layout, and PTB64 contracts."
+      },
+      "negative_axes": [
+        "coverage-row-without-exact-reader-owner"
+      ],
+      "oracle_fixture_owners": [
+        "coverage-io-measure-record-reader"
+      ]
+    },
+    {
+      "id": "cq2-result-imported-measure-record-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "result_formats::tests::measure_record_records_lookback_and_writes_unwritten_results",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "This exact structural selector binds the imported scalar measurement-record row to the independently owned state, lookback, output, and compaction contracts."
+      },
+      "negative_axes": [
+        "coverage-row-without-exact-record-owner"
+      ],
+      "oracle_fixture_owners": [
+        "coverage-io-measure-record"
+      ]
+    },
+    {
+      "id": "cq2-result-imported-batch-record-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "result_formats::tests::measure_record_batch_records_zero_result_to_edit",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "This exact structural selector binds the imported batch-record row to independently owned chunking, reference, lookback, editable-zero, and compaction contracts."
+      },
+      "negative_axes": [
+        "coverage-row-without-exact-batch-owner"
+      ],
+      "oracle_fixture_owners": [
+        "coverage-io-measure-record-batch"
+      ]
+    },
+    {
+      "id": "cq2-result-imported-batch-writer-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "result_formats::tests::measure_record_batch_writes_shot_major_01_records",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "This exact structural selector binds the imported batch-writer row to the independently owned shot-major and PTB64 table contracts."
+      },
+      "negative_axes": [
+        "coverage-row-without-exact-batch-writer-owner"
+      ],
+      "oracle_fixture_owners": [
+        "coverage-io-measure-record-batch-writer"
+      ]
+    },
+    {
+      "id": "cq2-result-imported-sparse-shot-contract",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "result_formats::tests::sparse_shot_matches_upstream_equality_string_and_mask_behavior",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "This exact structural selector binds the imported sparse-shot row to the independently owned value, text, field, and observable-mask contracts."
+      },
+      "negative_axes": [
+        "coverage-row-without-exact-sparse-shot-owner"
+      ],
+      "oracle_fixture_owners": [
+        "coverage-io-sparse-shot"
+      ]
+    },
+    {
+      "id": "cq2-result-imported-convert-source-matrix",
+      "feature_id": "CQ-RESULT-FORMATS",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "tests::convert::convert_ptb64_round_trips_and_interops_with_other_formats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "This exact structural selector binds the imported convert coverage row to independently owned circuit, DEM, explicit-layout, raw-width, PTB64, side-output, and failure contracts."
+      },
+      "negative_axes": [
+        "coverage-row-without-exact-convert-owner"
+      ],
+      "oracle_fixture_owners": [
+        "coverage-command-convert-result-formats"
+      ]
     }
   ]
 }

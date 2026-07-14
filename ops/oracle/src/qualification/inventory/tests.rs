@@ -204,6 +204,100 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         ])
     );
 
+    let result_qualification_cases = manifest
+        .evidence_cases
+        .iter()
+        .filter(|case| case.provenance == EvidenceProvenance::QualificationPlan)
+        .filter(|case| case.source_id.starts_with("cq2-result-"))
+        .collect::<Vec<_>>();
+    assert_eq!(result_qualification_cases.len(), 36);
+    assert!(
+        result_qualification_cases
+            .iter()
+            .all(|case| case.status == EvidenceStatus::Implemented)
+    );
+    assert!(
+        manifest
+            .evidence_cases
+            .iter()
+            .filter(|case| case.feature_id == FeatureId::ResultFormats)
+            .all(|case| case.status == EvidenceStatus::Implemented)
+    );
+
+    let sample_format_parent = result_qualification_cases
+        .iter()
+        .find(|case| case.source_id == "cq2-result-sample-format-value-contract")
+        .expect("SampleFormat qualification parent");
+    let result_api_items = manifest
+        .public_api_items
+        .iter()
+        .filter(|item| item.feature_id == FeatureId::ResultFormats)
+        .collect::<Vec<_>>();
+    assert_eq!(result_api_items.len(), 97);
+    assert!(result_api_items.iter().all(|item| {
+        manifest
+            .evidence_cases
+            .iter()
+            .any(|case| case.id == item.owner_case_id && case.status == EvidenceStatus::Implemented)
+    }));
+    let sample_format = result_api_items
+        .iter()
+        .find(|item| item.path.as_str() == "stab_core::SampleFormat")
+        .expect("SampleFormat API item");
+    assert_eq!(sample_format.owner_case_id, sample_format_parent.id);
+    assert!(result_api_items.iter().any(|item| {
+        item.path
+            .as_str()
+            .starts_with("stab_core::SampleFormat as Clone")
+            && item.owner_case_id == sample_format_parent.id
+    }));
+
+    let duplicate_dense_parent = result_qualification_cases
+        .iter()
+        .find(|case| case.source_id == "cq2-result-reader-duplicate-dense-contract")
+        .expect("duplicate dense qualification parent");
+    let duplicate_dense = manifest
+        .upstream_cases
+        .iter()
+        .find(|case| {
+            case.path.as_path() == Path::new("src/stim/io/measure_record_reader.test.cc")
+                && case.symbol == "MeasureRecordReader.FormatHits_Repeated_Dense_64"
+        })
+        .expect("duplicate dense upstream case");
+    assert_eq!(
+        duplicate_dense
+            .ownerships
+            .iter()
+            .find(|owner| owner.feature_id == FeatureId::ResultFormats)
+            .expect("result-format ownership")
+            .owner_case_id,
+        duplicate_dense_parent.id
+    );
+
+    let imported_reader_parent = result_qualification_cases
+        .iter()
+        .find(|case| case.source_id == "cq2-result-imported-reader-source-matrix")
+        .expect("imported reader qualification parent");
+    assert!(
+        imported_reader_parent
+            .supporting_selectors
+            .iter()
+            .any(|selector| {
+                selector.kind == SelectorKind::OracleFixture
+                    && selector.value.as_slice() == ["coverage-io-measure-record-reader"]
+            })
+    );
+    let direct_convert_fixture = manifest
+        .evidence_cases
+        .iter()
+        .find(|case| case.source_id == "m7-convert-01-to-dets")
+        .expect("direct convert fixture");
+    assert_eq!(direct_convert_fixture.status, EvidenceStatus::Implemented);
+    assert_eq!(
+        direct_convert_fixture.primary_selector.kind,
+        SelectorKind::OracleFixture
+    );
+
     let traversal_owner = manifest
         .evidence_cases
         .iter()

@@ -167,33 +167,100 @@ fn convert_detection_observable_records_with_circuit_and_obs_out() {
 }
 
 #[test]
-fn convert_round_trips_detection_observable_records_from_counts_and_dem() {
-    let zero_one = b"10101\n01010\n00000\n11111\n";
-    let layout = ["--num_detectors", "2", "--num_observables", "3"];
-    for format in ["01", "b8", "r8", "hits", "dets"] {
-        let encoded = convert_between_formats(zero_one, "01", format, &layout);
-        let decoded = convert_between_formats(&encoded, format, "01", &layout);
-        assert_eq!(decoded, zero_one, "{format}");
-    }
-
-    let (_dir, dem_path) = write_fixture(
-        "layout.dem",
-        "detector D0\ndetector D1\nlogical_observable L2\n",
+fn convert_circuit_dl_all_format_matrix_matches_stim() {
+    let (_dir, circuit_path) = write_fixture(
+        "layout.stim",
+        "M 0 1\nDETECTOR rec[-2]\nDETECTOR rec[-1]\nOBSERVABLE_INCLUDE(2) rec[-1]\n",
     );
-    let decoded = run_ok(
+    let zero_one = b"10101\n01010\n00000\n11111\n";
+    let explicit_layout = ["--num_detectors", "2", "--num_observables", "3"];
+    let formats = ["01", "b8", "r8", "hits", "dets"];
+    let encoded = formats
+        .iter()
+        .map(|format| {
+            (
+                *format,
+                convert_between_formats(zero_one, "01", format, &explicit_layout),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    for (in_format, input) in &encoded {
+        for (out_format, expected) in &encoded {
+            let actual = run_ok(
+                &[
+                    "stab",
+                    "convert",
+                    "--in_format",
+                    in_format,
+                    "--out_format",
+                    out_format,
+                    "--circuit",
+                    &circuit_path,
+                    "--types",
+                    "DL",
+                ],
+                input,
+            );
+            assert_eq!(actual, *expected, "{in_format} -> {out_format}");
+        }
+    }
+}
+
+#[test]
+fn convert_dets_keeps_detector_and_large_observable_namespaces_distinct() {
+    let output = run_ok(
         &[
             "stab",
             "convert",
             "--in_format",
             "dets",
             "--out_format",
-            "01",
-            "--dem",
-            &dem_path,
+            "hits",
+            "--num_detectors",
+            "10",
+            "--num_observables",
+            "1501",
         ],
-        b"shot D1 L2\n",
+        b"shot L1000\nshot D2 L999\n",
     );
-    assert_eq!(String::from_utf8(decoded).unwrap(), "01001\n");
+    assert_eq!(output, b"1010\n2,1009\n");
+}
+
+#[test]
+fn convert_round_trips_detection_observable_records_from_counts_and_dem() {
+    let zero_one = b"10101\n01010\n00000\n11111\n";
+    let layout = ["--num_detectors", "2", "--num_observables", "3"];
+    let mut encoded = Vec::new();
+    for format in ["01", "b8", "r8", "hits", "dets"] {
+        let format_data = convert_between_formats(zero_one, "01", format, &layout);
+        let decoded = convert_between_formats(&format_data, format, "01", &layout);
+        assert_eq!(decoded, zero_one, "{format}");
+        encoded.push((format, format_data));
+    }
+
+    let (_dir, dem_path) = write_fixture(
+        "layout.dem",
+        "detector D0\ndetector D1\nlogical_observable L2\n",
+    );
+    for (in_format, input) in &encoded {
+        for (out_format, expected) in &encoded {
+            let actual = run_ok(
+                &[
+                    "stab",
+                    "convert",
+                    "--in_format",
+                    in_format,
+                    "--out_format",
+                    out_format,
+                    "--dem",
+                    &dem_path,
+                ],
+                input,
+            );
+            assert_eq!(actual, *expected, "DEM {in_format} -> {out_format}");
+        }
+    }
 }
 
 #[test]
@@ -281,6 +348,10 @@ fn convert_measurement_records_and_raw_bits_round_trip() {
     let b8 = convert_between_formats(b"10\n01\n", "01", "b8", &["--bits_per_shot", "2"]);
     let decoded = convert_between_formats(&b8, "b8", "01", &["--bits_per_shot", "2"]);
     assert_eq!(decoded, b"10\n01\n");
+
+    let wide = vec![0x6b; 256];
+    let wide_output = convert_between_formats(&wide, "b8", "b8", &["--bits_per_shot", "2048"]);
+    assert_eq!(wide_output, wide);
 }
 
 #[test]
