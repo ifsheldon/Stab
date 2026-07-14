@@ -628,3 +628,138 @@ fn classifications_do_not_promote_broad_all_gate_transform_aggregates() {
         assert!(classified.feature_ids.is_empty());
     }
 }
+
+#[test]
+fn classifications_keep_flow_values_in_algebra_and_flow_engines_separate() {
+    assert_eq!(
+        classify_public_api_source(
+            "stab_core",
+            Path::new("crates/stab-core/src/stabilizers/flow.rs"),
+            "stab_core::Flow::multiply",
+        ),
+        Some(FeatureId::Algebra)
+    );
+
+    let path = Path::new("src/stim/stabilizers/flow_pybind_test.py");
+    assert_eq!(
+        classify_upstream_case(path, "test_flow_multiplication").feature_ids,
+        vec![FeatureId::Algebra]
+    );
+    assert_eq!(
+        classify_upstream_case(path, "test_obs_flows").feature_ids,
+        vec![FeatureId::FlowUtils]
+    );
+    assert_eq!(
+        classify_upstream_case(path, "test_obs_include_pauli_terms_sensitivity").feature_ids,
+        vec![FeatureId::Detection]
+    );
+    let repr = classify_upstream_case(path, "test_repr");
+    assert_eq!(repr.disposition, UpstreamDisposition::DeferredProduct);
+    assert_eq!(repr.feature_ids, vec![FeatureId::Algebra]);
+}
+
+#[test]
+fn classifications_split_pauli_and_clifford_semantics_from_language_helpers() {
+    let pauli = Path::new("src/stim/stabilizers/pauli_string.test.cc");
+    for symbol in [
+        "pauli_string.multiplication_64",
+        "pauli_string.after_tableau_128",
+        "PauliString.pauli_xyz_to_xz",
+    ] {
+        let classified = classify_upstream_case(pauli, symbol);
+        assert_eq!(classified.disposition, UpstreamDisposition::SemanticMining);
+        assert_eq!(classified.feature_ids, vec![FeatureId::Algebra]);
+    }
+    for symbol in [
+        "pauli_string.gather_64",
+        "pauli_string.before_circuit_128",
+        "pauli_string.ensure_num_qubits_256",
+    ] {
+        assert_eq!(
+            classify_upstream_case(pauli, symbol).disposition,
+            UpstreamDisposition::NotApplicable,
+            "symbol={symbol}"
+        );
+    }
+    assert_eq!(
+        classify_upstream_case(pauli, "pauli_string.py_get_slice_64").deferred_product,
+        Some(DeferredProduct::PythonBindings)
+    );
+
+    let clifford = Path::new("src/stim/stabilizers/clifford_string.test.cc");
+    assert_eq!(
+        classify_upstream_case(clifford, "clifford_string.known_identities_64").feature_ids,
+        vec![FeatureId::Algebra]
+    );
+    assert_eq!(
+        classify_upstream_case(clifford, "clifford_string.to_from_circuit_64").disposition,
+        UpstreamDisposition::NotApplicable
+    );
+
+    let iterator = Path::new("src/stim/stabilizers/pauli_string_iter.test.cc");
+    assert_eq!(
+        classify_upstream_case(iterator, "pauli_string_iter.small_cases_64").feature_ids,
+        vec![FeatureId::Algebra]
+    );
+    assert_eq!(
+        classify_upstream_case(iterator, "pauli_string_iter.NestedLooper_simple").disposition,
+        UpstreamDisposition::NotApplicable
+    );
+}
+
+#[test]
+fn classifications_split_tableau_semantics_from_unselected_products() {
+    let tableau = Path::new("src/stim/stabilizers/tableau.test.cc");
+    assert_eq!(
+        classify_upstream_case(tableau, "tableau.inverse_256").feature_ids,
+        vec![FeatureId::Algebra]
+    );
+    assert_eq!(
+        classify_upstream_case(tableau, "tableau.expand_64").disposition,
+        UpstreamDisposition::NotApplicable
+    );
+    let unitary = classify_upstream_case(tableau, "tableau.unitary_big_endian_128");
+    assert_eq!(unitary.disposition, UpstreamDisposition::DeferredProduct);
+    assert_eq!(
+        unitary.deferred_product,
+        Some(DeferredProduct::InteractiveSimulators)
+    );
+
+    let python = Path::new("src/stim/stabilizers/tableau_pybind_test.py");
+    assert_eq!(
+        classify_upstream_case(python, "test_from_unitary_matrix").feature_ids,
+        vec![FeatureId::Algebra]
+    );
+    assert_eq!(
+        classify_upstream_case(python, "test_append").deferred_product,
+        Some(DeferredProduct::PythonBindings)
+    );
+    assert_eq!(
+        classify_upstream_case(python, "test_from_state_vector_fuzz").deferred_product,
+        Some(DeferredProduct::InteractiveSimulators)
+    );
+}
+
+#[test]
+fn classifications_bound_util_top_algebra_to_selected_conversion_direction() {
+    let circuit = Path::new("src/stim/util_top/circuit_vs_tableau.test.cc");
+    assert_eq!(
+        classify_upstream_case(circuit, "conversions.circuit_to_tableau_64").feature_ids,
+        vec![FeatureId::Algebra]
+    );
+    assert_eq!(
+        classify_upstream_case(circuit, "conversions.tableau_to_circuit_64").deferred_product,
+        Some(DeferredProduct::InteractiveSimulators)
+    );
+
+    let amplitudes = Path::new("src/stim/util_top/stabilizers_vs_amplitudes.test.cc");
+    assert_eq!(
+        classify_upstream_case(amplitudes, "conversions.unitary_to_tableau_fail_64").feature_ids,
+        vec![FeatureId::Algebra]
+    );
+    assert_eq!(
+        classify_upstream_case(amplitudes, "conversions.tableau_to_unitary_vs_gate_data_64")
+            .deferred_product,
+        Some(DeferredProduct::InteractiveSimulators)
+    );
+}

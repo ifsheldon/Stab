@@ -2,19 +2,19 @@
 
 ## Status
 
-In progress as of 2026-07-14.
+In progress as of 2026-07-15.
 
 The selected `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation domains are source-complete at exact upstream-symbol and exported-Rust-API granularity. Generation's milestone audit, GPT-5.6/max full-code-review, broad verification, clean current-digest correctness execution, exact preflight, and dependent PQ1 publication are complete with every confirmed finding fixed. This checkpoint does not complete CQ2 because `CQ-ALGEBRA` remains open.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Latest clean correctness evidence revision: `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` with `local_modifications=false`, for the current Generation-refined digest.
+Latest clean correctness evidence revision: `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` with `local_modifications=false`, for the historical Generation-refined digest.
 
-Current correctness inventory digest after Generation reconciliation: `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`.
+Current correctness inventory digest after Algebra disposition reconciliation: `ad4b927cbc8cbbca2b9279b728f76dd72d22f7118cae5f754f025dc0ba4fd519`.
 
-Current dependent performance inventory digest: `44276968d035fbd108fd57096dc96aed1d3967ac07d539a8dbfed8f0d5f16fcb`.
+Current dependent performance inventory digest: `229b4bf24aadfe92b6a576421a63fb795328cca9d3cc89dd03010b20c0dc977f`.
 
-Clean current-digest PR, full, and soak correctness reports and the dependent report-only PQ1 refresh are published from the reviewed committed revision above.
+Clean current-digest PR, full, and soak correctness reports are not yet published. The reports from the reviewed committed revision above are historical because the source-owned Algebra dispositions changed both frozen digests.
 
 ## Delivered Slices
 
@@ -98,14 +98,14 @@ The dependent PQ0 inventory was regenerated because circuit owner ids, upstream 
 | `CQ-BIT-KERNELS` | 12 | 0 | 12 |
 | `CQ-CIRCUIT-API` | 24 | 0 | 24 |
 | `CQ-GENERATION` | 25 | 0 | 25 |
-| `CQ-ALGEBRA` | 1 | 635 | 636 |
-| **CQ2 total** | **217** | **635** | **852** |
+| `CQ-ALGEBRA` | 1 | 453 | 454 |
+| **CQ2 total** | **217** | **453** | **670** |
 
 These counts are evidence owners, not an estimate of required new test functions. Reviewed exact parents may close several owners only when one selector proves their complete common contract.
 
-## Clean Generation-Refined Correctness Evidence
+## Historical Clean Generation-Refined Correctness Evidence
 
-All three reports bind correctness inventory digest `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`, Stim v1.16.0 commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, Stab revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`, and `local_modifications=false`.
+All three reports bind historical correctness inventory digest `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`, Stim v1.16.0 commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, Stab revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`, and `local_modifications=false`. They must not be promoted as evidence for the current Algebra-refined digest.
 
 | Tier | Selected | Passed | Failed | Artifact | Request digest | Report digest | Completion digest |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |
@@ -173,6 +173,6 @@ The clean PR, full, soak, offline-report, exact-preflight, and dependent PQ1 art
 
 ## Remaining Blocker
 
-CQ2 still has 635 planned evidence owners, all in `CQ-ALGEBRA`. Generation source ownership and acceptance are closed at 25 of 25 with clean current-digest PR, full, and soak correctness evidence plus dependent report-only PQ1 publication.
+CQ2 still has 453 planned evidence owners, all in `CQ-ALGEBRA`. Generation source ownership and acceptance remain closed at 25 of 25; its clean PR, full, and soak correctness evidence plus dependent report-only PQ1 publication are historical after the Algebra digest change.
 
-No external dependency or user decision blocks this work. The active implementation blocker is `CQ-ALGEBRA`, where 635 of 636 owners remain planned; final CQ2-wide audit and review remain pending until Algebra is implemented.
+No external dependency or user decision blocks this work. The active implementation blocker is `CQ-ALGEBRA`, where 453 of 454 owners remain planned; final CQ2-wide audit and review remain pending until Algebra is implemented.

@@ -19,7 +19,13 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
-None.
+## 2026-07-15 - CQ2 Algebra Deterministic Materialization Admission
+
+Status: Open
+Revealed by: exact `CQ-ALGEBRA` exported-API ownership reconciliation.
+Current text: the qualification goal requires explicit cap acceptance and first-rejection evidence for materialized and bounded-search APIs, while M6 declares owned Pauli, Clifford, Tableau, iterator, stabilizer-solving, and scoped unitary-conversion APIs complete.
+Gap: `PauliString::identity`, `PauliString::from_bases`, `FlexPauliString::identity`, `CliffordString::identity`, `CliffordString::from_gates`, `Tableau::identity`, and `PauliStringIterator::new` are infallible size-driven constructors. Several paths allocate or perform quadratic or exponential work from caller-supplied sizes, so current APIs cannot provide a deterministic typed first-rejection contract. `CliffordString::repeat` also accepts an empty string with an arbitrarily large repetition count and performs a pointless unbounded loop because its projected length remains zero.
+Proposed amendment: define separate source-owned limits for Pauli and Clifford materialization, dense Tableau materialization, lazy iterator state, stabilizer solving, circuit-to-Tableau conversion, random Tableau construction, and unitary-matrix conversion. Make public materializing constructors fallible or introduce validated typed counts that eliminate invalid states, reject before allocation or output mutation, preserve all pinned selected cases including the 500-qubit Tableau regression and 65,536-qubit sparse Pauli use, and add exact last-accepted or representative accepted plus first-rejected tests for every limit family. Fix zero-length repetition so work is constant regardless of repetition count.
 
 ## Resolved Entries
 

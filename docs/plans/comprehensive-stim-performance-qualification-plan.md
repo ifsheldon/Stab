@@ -364,7 +364,7 @@ Soak catches nonlinear behavior and rare performance instability and does not re
 
 Status: Complete.
 
-Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current CQ2 dependency-regenerated performance digest `44276968d035fbd108fd57096dc96aed1d3967ac07d539a8dbfed8f0d5f16fcb`, bound to correctness digest `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`. Clean dependent schema-version-13 PR, full, and soak execution under these Generation-refined digests is published from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`; it remains diagnostic infrastructure evidence rather than product-performance qualification.
+Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current CQ2 dependency-regenerated performance digest `229b4bf24aadfe92b6a576421a63fb795328cca9d3cc89dd03010b20c0dc977f`, bound to correctness digest `ad4b927cbc8cbbca2b9279b728f76dd72d22f7118cae5f754f025dc0ba4fd519`. The clean dependent schema-version-13 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` binds the previous Generation-refined digests and remains historical diagnostic infrastructure evidence rather than product-performance qualification.
 
 Implementation revision: `abf7cd1bae0de045f62e976a290507238153f976`, verified with `local_modifications=false`.
 

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6",
-  "semantic_digest": "44276968d035fbd108fd57096dc96aed1d3967ac07d539a8dbfed8f0d5f16fcb",
+  "correctness_digest": "ad4b927cbc8cbbca2b9279b728f76dd72d22f7118cae5f754f025dc0ba4fd519",
+  "semantic_digest": "229b4bf24aadfe92b6a576421a63fb795328cca9d3cc89dd03010b20c0dc977f",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -220,23 +220,28 @@
         "PERFQ-API-283e561ab0a7e864",
         "PERFQ-API-29bda517ffb44cfb",
         "PERFQ-API-2a1aa48efe2acbf6",
+        "PERFQ-API-2c246931267e504f",
         "PERFQ-API-2c431832ea37d0d2",
         "PERFQ-API-39dd2d7c44e7dac8",
         "PERFQ-API-3d2db408cc3160d5",
         "PERFQ-API-3d348309dc93d766",
         "PERFQ-API-3da7bfbbb84073c7",
+        "PERFQ-API-474c1a9c03916df2",
         "PERFQ-API-47b6a3de3fb65408",
         "PERFQ-API-4c6c508aaa4dd93b",
         "PERFQ-API-52748fd492ce92b1",
+        "PERFQ-API-54b33d297b618087",
         "PERFQ-API-589f8d87a24ffe73",
         "PERFQ-API-5a076c4bc29796b0",
         "PERFQ-API-5bc94a52c681a039",
         "PERFQ-API-5d415e0c8122dca8",
         "PERFQ-API-5e736bae78e22897",
+        "PERFQ-API-5e7fa8226538df79",
         "PERFQ-API-5f2d52968aea1402",
         "PERFQ-API-63efe14ce80c59fe",
         "PERFQ-API-70ca99c8ccf0f1be",
         "PERFQ-API-7b3b5888e00bfc2c",
+        "PERFQ-API-83ab78420be56fa2",
         "PERFQ-API-86d0a85066fc8857",
         "PERFQ-API-8e517486bf5effec",
         "PERFQ-API-917fdc3ee6dd0f8b",
@@ -257,6 +262,7 @@
         "PERFQ-API-edf7bbeeba971147",
         "PERFQ-API-ef668df4f3a33ec5",
         "PERFQ-API-f47dba26ebdf3c4b",
+        "PERFQ-API-f721814b8e56cb2d",
         "PERFQ-API-fead62947f0bbbbf",
         "PERFQ-CHECKLIST-480241ef68b60fba-STABILIZER-ALGEBRA",
         "PERFQ-CHECKLIST-8ac4d4b2d32da162-STABILIZER-ALGEBRA",
@@ -610,20 +616,15 @@
         "PERFQ-API-25251802376d35db",
         "PERFQ-API-299976c96072e221",
         "PERFQ-API-3fbe9f1c7b242c23",
-        "PERFQ-API-4301cab65ac0fa9e",
-        "PERFQ-API-4b2a85df874983b6",
         "PERFQ-API-4c3f4ea98b0716f3",
         "PERFQ-API-4e68eb0d5a1bccf7",
-        "PERFQ-API-53d723dbc97daad6",
         "PERFQ-API-575733f883adb6e0",
         "PERFQ-API-63d606d41b3abbfe",
         "PERFQ-API-82b010bc9ec38256",
         "PERFQ-API-869bbda54c6fcf5d",
         "PERFQ-API-8f8853bea58f907c",
-        "PERFQ-API-9cfd5d165a6700d0",
         "PERFQ-API-a1354a58409ce996",
         "PERFQ-API-a4bd4816ef4383e6",
-        "PERFQ-API-a5d9bd0e009dae87",
         "PERFQ-API-b049ad001ea1db9c",
         "PERFQ-API-b0f09c013e366d7c",
         "PERFQ-API-b34eb67baf3b582f",
@@ -632,7 +633,6 @@
         "PERFQ-API-e901e85ed712effd",
         "PERFQ-API-f07584d54a6aca31",
         "PERFQ-API-f3018654a03240db",
-        "PERFQ-API-f852c8b296d4b315",
         "PERFQ-CHECKLIST-03468f2932803ac9-FLOWS-AND-DETECTOR-UTILITIES",
         "PERFQ-CHECKLIST-08b4d0f23d652b86-FLOWS-AND-DETECTOR-UTILITIES",
         "PERFQ-CHECKLIST-2daba248ab94a6e8-FLOWS-AND-DETECTOR-UTILITIES",
@@ -13117,7 +13117,7 @@
       "id": "cq-api-item-557732766856c89f",
       "path": "stab_core::Flow",
       "kind": "struct",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-9a271b578bb26004",
       "disposition": "not-performance-relevant",
@@ -13128,12 +13128,12 @@
       "id": "cq-api-item-6e9ac2a16f00c571",
       "path": "stab_core::Flow as Clone for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-9a271b578bb26004",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-f852c8b296d4b315"
+        "PERFQ-API-474c1a9c03916df2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13141,7 +13141,7 @@
       "id": "cq-api-item-10618ad7277a5b61",
       "path": "stab_core::Flow as Debug for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-9a271b578bb26004",
       "disposition": "not-performance-relevant",
@@ -13152,12 +13152,12 @@
       "id": "cq-api-item-6e4b23d7a2f3ccbe",
       "path": "stab_core::Flow as Display for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-9a271b578bb26004",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4b2a85df874983b6"
+        "PERFQ-API-83ab78420be56fa2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13165,7 +13165,7 @@
       "id": "cq-api-item-072054e2eefa7925",
       "path": "stab_core::Flow as Eq for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-9a271b578bb26004",
       "disposition": "not-performance-relevant",
@@ -13176,12 +13176,12 @@
       "id": "cq-api-item-cb10ad36b5a80809",
       "path": "stab_core::Flow as FromStr for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-9a271b578bb26004",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-f852c8b296d4b315"
+        "PERFQ-API-474c1a9c03916df2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13189,12 +13189,12 @@
       "id": "cq-api-item-3871eef96f1229da",
       "path": "stab_core::Flow as Ord for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-9a271b578bb26004",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-f852c8b296d4b315"
+        "PERFQ-API-474c1a9c03916df2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13202,12 +13202,12 @@
       "id": "cq-api-item-53df23129e8e9528",
       "path": "stab_core::Flow as PartialEq for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-9a271b578bb26004",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-f852c8b296d4b315"
+        "PERFQ-API-474c1a9c03916df2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13215,12 +13215,12 @@
       "id": "cq-api-item-c8d1de18dac974a1",
       "path": "stab_core::Flow as PartialOrd for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-9a271b578bb26004",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-f852c8b296d4b315"
+        "PERFQ-API-474c1a9c03916df2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13228,7 +13228,7 @@
       "id": "cq-api-item-001dc70bd5ca3211",
       "path": "stab_core::Flow as StructuralPartialEq for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-9a271b578bb26004",
       "disposition": "not-performance-relevant",
@@ -13239,12 +13239,12 @@
       "id": "cq-api-item-35536258353756bb",
       "path": "stab_core::Flow::input",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-09e0ebcecbc57453",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-f852c8b296d4b315"
+        "PERFQ-API-474c1a9c03916df2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13252,12 +13252,12 @@
       "id": "cq-api-item-fea3d1551631a407",
       "path": "stab_core::Flow::measurements",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-6ad90e7365ddebcb",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-f852c8b296d4b315"
+        "PERFQ-API-474c1a9c03916df2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13265,12 +13265,12 @@
       "id": "cq-api-item-645a9243e0e3cd60",
       "path": "stab_core::Flow::multiply",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-68c73c0b409596e7",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-f852c8b296d4b315"
+        "PERFQ-API-474c1a9c03916df2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13278,12 +13278,12 @@
       "id": "cq-api-item-497b229892b2bd27",
       "path": "stab_core::Flow::new",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-6be4ffb3c9896a2f",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-f852c8b296d4b315"
+        "PERFQ-API-474c1a9c03916df2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13291,12 +13291,12 @@
       "id": "cq-api-item-832b69faa7f83169",
       "path": "stab_core::Flow::observables",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-c9e11ad7672633d9",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-f852c8b296d4b315"
+        "PERFQ-API-474c1a9c03916df2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13304,12 +13304,12 @@
       "id": "cq-api-item-7a549599efe62dc0",
       "path": "stab_core::Flow::output",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-6002877e28471d3a",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-f852c8b296d4b315"
+        "PERFQ-API-474c1a9c03916df2"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13317,7 +13317,7 @@
       "id": "cq-api-item-bb1706b2f1b9e4b5",
       "path": "stab_core::FlowMeasurementIndex",
       "kind": "struct",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-1df95c4c3501be19",
       "disposition": "not-performance-relevant",
@@ -13328,12 +13328,12 @@
       "id": "cq-api-item-bca9d9eb26ad05e2",
       "path": "stab_core::FlowMeasurementIndex as Clone for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-1df95c4c3501be19",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-a5d9bd0e009dae87"
+        "PERFQ-API-54b33d297b618087"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13341,7 +13341,7 @@
       "id": "cq-api-item-933bc3198a771fcc",
       "path": "stab_core::FlowMeasurementIndex as Copy for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-1df95c4c3501be19",
       "disposition": "not-performance-relevant",
@@ -13352,7 +13352,7 @@
       "id": "cq-api-item-ca7de41dcd2363f7",
       "path": "stab_core::FlowMeasurementIndex as Debug for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-1df95c4c3501be19",
       "disposition": "not-performance-relevant",
@@ -13363,7 +13363,7 @@
       "id": "cq-api-item-33b403d665eba35e",
       "path": "stab_core::FlowMeasurementIndex as Eq for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-1df95c4c3501be19",
       "disposition": "not-performance-relevant",
@@ -13374,12 +13374,12 @@
       "id": "cq-api-item-3401c34ec4a77204",
       "path": "stab_core::FlowMeasurementIndex as Ord for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-1df95c4c3501be19",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-a5d9bd0e009dae87"
+        "PERFQ-API-54b33d297b618087"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13387,12 +13387,12 @@
       "id": "cq-api-item-b6ff83d39d311025",
       "path": "stab_core::FlowMeasurementIndex as PartialEq for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-1df95c4c3501be19",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-a5d9bd0e009dae87"
+        "PERFQ-API-54b33d297b618087"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13400,12 +13400,12 @@
       "id": "cq-api-item-99c04d53d3c790f7",
       "path": "stab_core::FlowMeasurementIndex as PartialOrd for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-1df95c4c3501be19",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-a5d9bd0e009dae87"
+        "PERFQ-API-54b33d297b618087"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13413,7 +13413,7 @@
       "id": "cq-api-item-90a87b72ab739b2d",
       "path": "stab_core::FlowMeasurementIndex as StructuralPartialEq for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-1df95c4c3501be19",
       "disposition": "not-performance-relevant",
@@ -13424,12 +13424,12 @@
       "id": "cq-api-item-bd9cfb0c503d1169",
       "path": "stab_core::FlowMeasurementIndex::get",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-136ec8989834c58c",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-a5d9bd0e009dae87"
+        "PERFQ-API-54b33d297b618087"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -13437,12 +13437,12 @@
       "id": "cq-api-item-1ab6519e640475ee",
       "path": "stab_core::FlowMeasurementIndex::new",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-1880d9c527b36c77",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-a5d9bd0e009dae87"
+        "PERFQ-API-54b33d297b618087"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26340,7 +26340,7 @@
       "id": "cq-api-item-be57acb3d00ff192",
       "path": "stab_core::stabilizers::Flow",
       "kind": "struct",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-71a540ce1dab10f8",
       "disposition": "not-performance-relevant",
@@ -26351,12 +26351,12 @@
       "id": "cq-api-item-a223f9799e88d3ac",
       "path": "stab_core::stabilizers::Flow as Clone for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-71a540ce1dab10f8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4301cab65ac0fa9e"
+        "PERFQ-API-5e7fa8226538df79"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26364,7 +26364,7 @@
       "id": "cq-api-item-abcd74724c0c240b",
       "path": "stab_core::stabilizers::Flow as Debug for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-71a540ce1dab10f8",
       "disposition": "not-performance-relevant",
@@ -26375,12 +26375,12 @@
       "id": "cq-api-item-10c5d44bf72f970f",
       "path": "stab_core::stabilizers::Flow as Display for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-71a540ce1dab10f8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-9cfd5d165a6700d0"
+        "PERFQ-API-2c246931267e504f"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26388,7 +26388,7 @@
       "id": "cq-api-item-cd3c3e4ceabc329c",
       "path": "stab_core::stabilizers::Flow as Eq for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-71a540ce1dab10f8",
       "disposition": "not-performance-relevant",
@@ -26399,12 +26399,12 @@
       "id": "cq-api-item-e8a15995e45c4829",
       "path": "stab_core::stabilizers::Flow as FromStr for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-71a540ce1dab10f8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4301cab65ac0fa9e"
+        "PERFQ-API-5e7fa8226538df79"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26412,12 +26412,12 @@
       "id": "cq-api-item-e53b6336a6f5c7a5",
       "path": "stab_core::stabilizers::Flow as Ord for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-71a540ce1dab10f8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4301cab65ac0fa9e"
+        "PERFQ-API-5e7fa8226538df79"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26425,12 +26425,12 @@
       "id": "cq-api-item-22530d02bdd33588",
       "path": "stab_core::stabilizers::Flow as PartialEq for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-71a540ce1dab10f8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4301cab65ac0fa9e"
+        "PERFQ-API-5e7fa8226538df79"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26438,12 +26438,12 @@
       "id": "cq-api-item-02cdcae009324036",
       "path": "stab_core::stabilizers::Flow as PartialOrd for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-71a540ce1dab10f8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4301cab65ac0fa9e"
+        "PERFQ-API-5e7fa8226538df79"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26451,7 +26451,7 @@
       "id": "cq-api-item-ba1b39db371ac174",
       "path": "stab_core::stabilizers::Flow as StructuralPartialEq for@612fa9f7795c",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-71a540ce1dab10f8",
       "disposition": "not-performance-relevant",
@@ -26462,12 +26462,12 @@
       "id": "cq-api-item-b70fc286b7e615b2",
       "path": "stab_core::stabilizers::Flow::input",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-093b812da3a4bf66",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4301cab65ac0fa9e"
+        "PERFQ-API-5e7fa8226538df79"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26475,12 +26475,12 @@
       "id": "cq-api-item-d72ef6f6563d80d3",
       "path": "stab_core::stabilizers::Flow::measurements",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-ca10ae92aee16ef8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4301cab65ac0fa9e"
+        "PERFQ-API-5e7fa8226538df79"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26488,12 +26488,12 @@
       "id": "cq-api-item-2306a2a1de53babd",
       "path": "stab_core::stabilizers::Flow::multiply",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-754d6d8a87b3599a",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4301cab65ac0fa9e"
+        "PERFQ-API-5e7fa8226538df79"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26501,12 +26501,12 @@
       "id": "cq-api-item-351f4e19651cda16",
       "path": "stab_core::stabilizers::Flow::new",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-186d33515ab16d9d",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4301cab65ac0fa9e"
+        "PERFQ-API-5e7fa8226538df79"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26514,12 +26514,12 @@
       "id": "cq-api-item-ffbd0b5b7fcfc3b8",
       "path": "stab_core::stabilizers::Flow::observables",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-28378088b32ddc61",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4301cab65ac0fa9e"
+        "PERFQ-API-5e7fa8226538df79"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26527,12 +26527,12 @@
       "id": "cq-api-item-697d4be6f6eb8134",
       "path": "stab_core::stabilizers::Flow::output",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-cc59984ebf85f442",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-4301cab65ac0fa9e"
+        "PERFQ-API-5e7fa8226538df79"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26540,7 +26540,7 @@
       "id": "cq-api-item-ccf21fe2b599252c",
       "path": "stab_core::stabilizers::FlowMeasurementIndex",
       "kind": "struct",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-c00377dc88d45fd6",
       "disposition": "not-performance-relevant",
@@ -26551,12 +26551,12 @@
       "id": "cq-api-item-2f8b8183f63cf54c",
       "path": "stab_core::stabilizers::FlowMeasurementIndex as Clone for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-c00377dc88d45fd6",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-53d723dbc97daad6"
+        "PERFQ-API-f721814b8e56cb2d"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26564,7 +26564,7 @@
       "id": "cq-api-item-cf047734b63667d0",
       "path": "stab_core::stabilizers::FlowMeasurementIndex as Copy for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-c00377dc88d45fd6",
       "disposition": "not-performance-relevant",
@@ -26575,7 +26575,7 @@
       "id": "cq-api-item-ad2f59a2b2fa0b9d",
       "path": "stab_core::stabilizers::FlowMeasurementIndex as Debug for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-c00377dc88d45fd6",
       "disposition": "not-performance-relevant",
@@ -26586,7 +26586,7 @@
       "id": "cq-api-item-f46cfc289b4f4ab3",
       "path": "stab_core::stabilizers::FlowMeasurementIndex as Eq for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-c00377dc88d45fd6",
       "disposition": "not-performance-relevant",
@@ -26597,12 +26597,12 @@
       "id": "cq-api-item-309540bb43debe1e",
       "path": "stab_core::stabilizers::FlowMeasurementIndex as Ord for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-c00377dc88d45fd6",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-53d723dbc97daad6"
+        "PERFQ-API-f721814b8e56cb2d"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26610,12 +26610,12 @@
       "id": "cq-api-item-45146b3190855a05",
       "path": "stab_core::stabilizers::FlowMeasurementIndex as PartialEq for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-c00377dc88d45fd6",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-53d723dbc97daad6"
+        "PERFQ-API-f721814b8e56cb2d"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26623,12 +26623,12 @@
       "id": "cq-api-item-d71ce8757b1e7650",
       "path": "stab_core::stabilizers::FlowMeasurementIndex as PartialOrd for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-c00377dc88d45fd6",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-53d723dbc97daad6"
+        "PERFQ-API-f721814b8e56cb2d"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26636,7 +26636,7 @@
       "id": "cq-api-item-fc36f88cf708736b",
       "path": "stab_core::stabilizers::FlowMeasurementIndex as StructuralPartialEq for@7127296ff5dc",
       "kind": "trait-impl",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-c00377dc88d45fd6",
       "disposition": "not-performance-relevant",
@@ -26647,12 +26647,12 @@
       "id": "cq-api-item-49b0dff076c2572d",
       "path": "stab_core::stabilizers::FlowMeasurementIndex::get",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-46da7f7403881d8f",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-53d723dbc97daad6"
+        "PERFQ-API-f721814b8e56cb2d"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -26660,12 +26660,12 @@
       "id": "cq-api-item-ee165709a775648a",
       "path": "stab_core::stabilizers::FlowMeasurementIndex::new",
       "kind": "method",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "supporting_performance_features": [],
       "correctness_case_id": "cq-evidence-api-7587ac88f9060ff6",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-53d723dbc97daad6"
+        "PERFQ-API-f721814b8e56cb2d"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -32362,6 +32362,83 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-API-2c246931267e504f",
+      "manifest_row": "perfq-api-2c246931267e504f",
+      "row_origin": "planned",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::stabilizers::Flow as Display for@612fa9f7795c"
+      ],
+      "disposition": "measured",
+      "phase": "serialize",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-api-71a540ce1dab10f8"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-2c246931267e504f"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-10c5d44bf72f970f",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-10c5d44bf72f970f",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-10c5d44bf72f970f",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "qubits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::stabilizers::Flow with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::stabilizers::Flow in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-API-2c431832ea37d0d2",
       "manifest_row": "perfq-api-2c431832ea37d0d2",
       "row_origin": "planned",
@@ -34299,99 +34376,6 @@
       "status": "planned"
     },
     {
-      "id": "PERFQ-API-4301cab65ac0fa9e",
-      "manifest_row": "perfq-api-4301cab65ac0fa9e",
-      "row_origin": "planned",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
-      "checklist_anchors": [],
-      "checklist_child_ids": [],
-      "public_api_items": [
-        "stab_core::stabilizers::Flow as Clone for@612fa9f7795c",
-        "stab_core::stabilizers::Flow as FromStr for@612fa9f7795c",
-        "stab_core::stabilizers::Flow as Ord for@612fa9f7795c",
-        "stab_core::stabilizers::Flow as PartialEq for@612fa9f7795c",
-        "stab_core::stabilizers::Flow as PartialOrd for@612fa9f7795c",
-        "stab_core::stabilizers::Flow::input",
-        "stab_core::stabilizers::Flow::measurements",
-        "stab_core::stabilizers::Flow::multiply",
-        "stab_core::stabilizers::Flow::new",
-        "stab_core::stabilizers::Flow::observables",
-        "stab_core::stabilizers::Flow::output"
-      ],
-      "disposition": "measured",
-      "phase": "execute",
-      "runner_fidelity": "adapter-library",
-      "correctness_cases": [
-        "cq-evidence-api-093b812da3a4bf66",
-        "cq-evidence-api-186d33515ab16d9d",
-        "cq-evidence-api-28378088b32ddc61",
-        "cq-evidence-api-71a540ce1dab10f8",
-        "cq-evidence-api-754d6d8a87b3599a",
-        "cq-evidence-api-ca10ae92aee16ef8",
-        "cq-evidence-api-cc59984ebf85f442"
-      ],
-      "correctness_binding": "exact-api-owners",
-      "planned_correctness_case_id": null,
-      "workload_family": {
-        "fixture": {
-          "kind": "generated",
-          "id": "api-small-medium-large-17-PERFQ-API-4301cab65ac0fa9e"
-        },
-        "source": "oracle/qualification-manifest.json",
-        "deterministic_seed": "17",
-        "scales": [
-          {
-            "id": "small",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-02cdcae009324036",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          },
-          {
-            "id": "medium",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-02cdcae009324036",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          },
-          {
-            "id": "large",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-02cdcae009324036",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          }
-        ]
-      },
-      "work_unit": "flows",
-      "output_contract": {
-        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::stabilizers::Flow with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
-        "digest_state": "planned",
-        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
-      },
-      "timing_policy": {
-        "calibration_min_ms": 250,
-        "calibration_max_ms": 2000,
-        "warmup_batches": 3,
-        "full_pairs": 9,
-        "timeout_seconds": 600,
-        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
-      },
-      "memory_policy": {
-        "method": "stab-allocations",
-        "scale_ids": [
-          "small",
-          "medium",
-          "large"
-        ],
-        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
-      },
-      "threshold_policy": "report-only",
-      "reason": "Behavioral API paths owned by stab_core::stabilizers::Flow in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
-      "owner": "stab-core/flow-utils",
-      "status": "planned"
-    },
-    {
       "id": "PERFQ-API-4465a93389401847",
       "manifest_row": "perfq-api-4465a93389401847",
       "row_origin": "planned",
@@ -34709,6 +34693,99 @@
       "threshold_policy": "report-only",
       "reason": "Behavioral API paths owned by stab_core::result_formats in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
       "owner": "stab-cli",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-API-474c1a9c03916df2",
+      "manifest_row": "perfq-api-474c1a9c03916df2",
+      "row_origin": "planned",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::Flow as Clone for@612fa9f7795c",
+        "stab_core::Flow as FromStr for@612fa9f7795c",
+        "stab_core::Flow as Ord for@612fa9f7795c",
+        "stab_core::Flow as PartialEq for@612fa9f7795c",
+        "stab_core::Flow as PartialOrd for@612fa9f7795c",
+        "stab_core::Flow::input",
+        "stab_core::Flow::measurements",
+        "stab_core::Flow::multiply",
+        "stab_core::Flow::new",
+        "stab_core::Flow::observables",
+        "stab_core::Flow::output"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-api-09e0ebcecbc57453",
+        "cq-evidence-api-6002877e28471d3a",
+        "cq-evidence-api-68c73c0b409596e7",
+        "cq-evidence-api-6ad90e7365ddebcb",
+        "cq-evidence-api-6be4ffb3c9896a2f",
+        "cq-evidence-api-9a271b578bb26004",
+        "cq-evidence-api-c9e11ad7672633d9"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-474c1a9c03916df2"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-35536258353756bb",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-35536258353756bb",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-35536258353756bb",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "qubits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::Flow with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::Flow in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core",
       "status": "planned"
     },
     {
@@ -35292,83 +35369,6 @@
       "threshold_policy": "report-only",
       "reason": "Behavioral API paths owned by stab_core::Target in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
       "owner": "stab-core/analyzer",
-      "status": "planned"
-    },
-    {
-      "id": "PERFQ-API-4b2a85df874983b6",
-      "manifest_row": "perfq-api-4b2a85df874983b6",
-      "row_origin": "planned",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
-      "checklist_anchors": [],
-      "checklist_child_ids": [],
-      "public_api_items": [
-        "stab_core::Flow as Display for@612fa9f7795c"
-      ],
-      "disposition": "measured",
-      "phase": "serialize",
-      "runner_fidelity": "adapter-library",
-      "correctness_cases": [
-        "cq-evidence-api-9a271b578bb26004"
-      ],
-      "correctness_binding": "exact-api-owners",
-      "planned_correctness_case_id": null,
-      "workload_family": {
-        "fixture": {
-          "kind": "generated",
-          "id": "api-small-medium-large-17-PERFQ-API-4b2a85df874983b6"
-        },
-        "source": "oracle/qualification-manifest.json",
-        "deterministic_seed": "17",
-        "scales": [
-          {
-            "id": "small",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-6e4b23d7a2f3ccbe",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          },
-          {
-            "id": "medium",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-6e4b23d7a2f3ccbe",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          },
-          {
-            "id": "large",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-6e4b23d7a2f3ccbe",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          }
-        ]
-      },
-      "work_unit": "flows",
-      "output_contract": {
-        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::Flow with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
-        "digest_state": "planned",
-        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
-      },
-      "timing_policy": {
-        "calibration_min_ms": 250,
-        "calibration_max_ms": 2000,
-        "warmup_batches": 3,
-        "full_pairs": 9,
-        "timeout_seconds": 600,
-        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
-      },
-      "memory_policy": {
-        "method": "stab-allocations",
-        "scale_ids": [
-          "small",
-          "medium",
-          "large"
-        ],
-        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
-      },
-      "threshold_policy": "report-only",
-      "reason": "Behavioral API paths owned by stab_core::Flow in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
-      "owner": "stab-core/flow-utils",
       "status": "planned"
     },
     {
@@ -36379,64 +36379,64 @@
       "status": "planned"
     },
     {
-      "id": "PERFQ-API-53d723dbc97daad6",
-      "manifest_row": "perfq-api-53d723dbc97daad6",
+      "id": "PERFQ-API-54b33d297b618087",
+      "manifest_row": "perfq-api-54b33d297b618087",
       "row_origin": "planned",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "checklist_anchors": [],
       "checklist_child_ids": [],
       "public_api_items": [
-        "stab_core::stabilizers::FlowMeasurementIndex as Clone for@7127296ff5dc",
-        "stab_core::stabilizers::FlowMeasurementIndex as Ord for@7127296ff5dc",
-        "stab_core::stabilizers::FlowMeasurementIndex as PartialEq for@7127296ff5dc",
-        "stab_core::stabilizers::FlowMeasurementIndex as PartialOrd for@7127296ff5dc",
-        "stab_core::stabilizers::FlowMeasurementIndex::get",
-        "stab_core::stabilizers::FlowMeasurementIndex::new"
+        "stab_core::FlowMeasurementIndex as Clone for@7127296ff5dc",
+        "stab_core::FlowMeasurementIndex as Ord for@7127296ff5dc",
+        "stab_core::FlowMeasurementIndex as PartialEq for@7127296ff5dc",
+        "stab_core::FlowMeasurementIndex as PartialOrd for@7127296ff5dc",
+        "stab_core::FlowMeasurementIndex::get",
+        "stab_core::FlowMeasurementIndex::new"
       ],
       "disposition": "measured",
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-46da7f7403881d8f",
-        "cq-evidence-api-7587ac88f9060ff6",
-        "cq-evidence-api-c00377dc88d45fd6"
+        "cq-evidence-api-136ec8989834c58c",
+        "cq-evidence-api-1880d9c527b36c77",
+        "cq-evidence-api-1df95c4c3501be19"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
           "kind": "generated",
-          "id": "api-small-medium-large-17-PERFQ-API-53d723dbc97daad6"
+          "id": "api-small-medium-large-17-PERFQ-API-54b33d297b618087"
         },
         "source": "oracle/qualification-manifest.json",
         "deterministic_seed": "17",
         "scales": [
           {
             "id": "small",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-2f8b8183f63cf54c",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-1ab6519e640475ee",
             "input_bytes": {
               "kind": "not-applicable"
             }
           },
           {
             "id": "medium",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-2f8b8183f63cf54c",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-1ab6519e640475ee",
             "input_bytes": {
               "kind": "not-applicable"
             }
           },
           {
             "id": "large",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-2f8b8183f63cf54c",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-1ab6519e640475ee",
             "input_bytes": {
               "kind": "not-applicable"
             }
           }
         ]
       },
-      "work_unit": "flows",
+      "work_unit": "qubits",
       "output_contract": {
-        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::stabilizers::FlowMeasurementIndex with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::FlowMeasurementIndex with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
         "digest_state": "planned",
         "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
       },
@@ -36458,8 +36458,8 @@
         "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
       },
       "threshold_policy": "report-only",
-      "reason": "Behavioral API paths owned by stab_core::stabilizers::FlowMeasurementIndex in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
-      "owner": "stab-core/flow-utils",
+      "reason": "Behavioral API paths owned by stab_core::FlowMeasurementIndex in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core",
       "status": "planned"
     },
     {
@@ -37420,6 +37420,99 @@
       },
       "threshold_policy": "report-only",
       "reason": "Behavioral API paths owned by stab_core::stabilizers::FlexPauliString in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-API-5e7fa8226538df79",
+      "manifest_row": "perfq-api-5e7fa8226538df79",
+      "row_origin": "planned",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::stabilizers::Flow as Clone for@612fa9f7795c",
+        "stab_core::stabilizers::Flow as FromStr for@612fa9f7795c",
+        "stab_core::stabilizers::Flow as Ord for@612fa9f7795c",
+        "stab_core::stabilizers::Flow as PartialEq for@612fa9f7795c",
+        "stab_core::stabilizers::Flow as PartialOrd for@612fa9f7795c",
+        "stab_core::stabilizers::Flow::input",
+        "stab_core::stabilizers::Flow::measurements",
+        "stab_core::stabilizers::Flow::multiply",
+        "stab_core::stabilizers::Flow::new",
+        "stab_core::stabilizers::Flow::observables",
+        "stab_core::stabilizers::Flow::output"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-api-093b812da3a4bf66",
+        "cq-evidence-api-186d33515ab16d9d",
+        "cq-evidence-api-28378088b32ddc61",
+        "cq-evidence-api-71a540ce1dab10f8",
+        "cq-evidence-api-754d6d8a87b3599a",
+        "cq-evidence-api-ca10ae92aee16ef8",
+        "cq-evidence-api-cc59984ebf85f442"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-5e7fa8226538df79"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-02cdcae009324036",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-02cdcae009324036",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-02cdcae009324036",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "qubits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::stabilizers::Flow with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::stabilizers::Flow in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
       "owner": "stab-core",
       "status": "planned"
     },
@@ -39628,6 +39721,83 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-API-83ab78420be56fa2",
+      "manifest_row": "perfq-api-83ab78420be56fa2",
+      "row_origin": "planned",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::Flow as Display for@612fa9f7795c"
+      ],
+      "disposition": "measured",
+      "phase": "serialize",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-api-9a271b578bb26004"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-83ab78420be56fa2"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-6e4b23d7a2f3ccbe",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-6e4b23d7a2f3ccbe",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-6e4b23d7a2f3ccbe",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "qubits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::Flow with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::Flow in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-API-862aa4e4f9d97076",
       "manifest_row": "perfq-api-862aa4e4f9d97076",
       "row_origin": "planned",
@@ -41128,83 +41298,6 @@
       "status": "planned"
     },
     {
-      "id": "PERFQ-API-9cfd5d165a6700d0",
-      "manifest_row": "perfq-api-9cfd5d165a6700d0",
-      "row_origin": "planned",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
-      "checklist_anchors": [],
-      "checklist_child_ids": [],
-      "public_api_items": [
-        "stab_core::stabilizers::Flow as Display for@612fa9f7795c"
-      ],
-      "disposition": "measured",
-      "phase": "serialize",
-      "runner_fidelity": "adapter-library",
-      "correctness_cases": [
-        "cq-evidence-api-71a540ce1dab10f8"
-      ],
-      "correctness_binding": "exact-api-owners",
-      "planned_correctness_case_id": null,
-      "workload_family": {
-        "fixture": {
-          "kind": "generated",
-          "id": "api-small-medium-large-17-PERFQ-API-9cfd5d165a6700d0"
-        },
-        "source": "oracle/qualification-manifest.json",
-        "deterministic_seed": "17",
-        "scales": [
-          {
-            "id": "small",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-10c5d44bf72f970f",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          },
-          {
-            "id": "medium",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-10c5d44bf72f970f",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          },
-          {
-            "id": "large",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-10c5d44bf72f970f",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          }
-        ]
-      },
-      "work_unit": "flows",
-      "output_contract": {
-        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::stabilizers::Flow with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
-        "digest_state": "planned",
-        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
-      },
-      "timing_policy": {
-        "calibration_min_ms": 250,
-        "calibration_max_ms": 2000,
-        "warmup_batches": 3,
-        "full_pairs": 9,
-        "timeout_seconds": 600,
-        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
-      },
-      "memory_policy": {
-        "method": "stab-allocations",
-        "scale_ids": [
-          "small",
-          "medium",
-          "large"
-        ],
-        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
-      },
-      "threshold_policy": "report-only",
-      "reason": "Behavioral API paths owned by stab_core::stabilizers::Flow in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
-      "owner": "stab-core/flow-utils",
-      "status": "planned"
-    },
-    {
       "id": "PERFQ-API-9dc7263331869aaa",
       "manifest_row": "perfq-api-9dc7263331869aaa",
       "row_origin": "planned",
@@ -41973,90 +42066,6 @@
       "threshold_policy": "report-only",
       "reason": "Behavioral API paths owned by stab_core::stabilizers in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
       "owner": "stab-core",
-      "status": "planned"
-    },
-    {
-      "id": "PERFQ-API-a5d9bd0e009dae87",
-      "manifest_row": "perfq-api-a5d9bd0e009dae87",
-      "row_origin": "planned",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
-      "checklist_anchors": [],
-      "checklist_child_ids": [],
-      "public_api_items": [
-        "stab_core::FlowMeasurementIndex as Clone for@7127296ff5dc",
-        "stab_core::FlowMeasurementIndex as Ord for@7127296ff5dc",
-        "stab_core::FlowMeasurementIndex as PartialEq for@7127296ff5dc",
-        "stab_core::FlowMeasurementIndex as PartialOrd for@7127296ff5dc",
-        "stab_core::FlowMeasurementIndex::get",
-        "stab_core::FlowMeasurementIndex::new"
-      ],
-      "disposition": "measured",
-      "phase": "execute",
-      "runner_fidelity": "adapter-library",
-      "correctness_cases": [
-        "cq-evidence-api-136ec8989834c58c",
-        "cq-evidence-api-1880d9c527b36c77",
-        "cq-evidence-api-1df95c4c3501be19"
-      ],
-      "correctness_binding": "exact-api-owners",
-      "planned_correctness_case_id": null,
-      "workload_family": {
-        "fixture": {
-          "kind": "generated",
-          "id": "api-small-medium-large-17-PERFQ-API-a5d9bd0e009dae87"
-        },
-        "source": "oracle/qualification-manifest.json",
-        "deterministic_seed": "17",
-        "scales": [
-          {
-            "id": "small",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-1ab6519e640475ee",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          },
-          {
-            "id": "medium",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-1ab6519e640475ee",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          },
-          {
-            "id": "large",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-1ab6519e640475ee",
-            "input_bytes": {
-              "kind": "not-applicable"
-            }
-          }
-        ]
-      },
-      "work_unit": "flows",
-      "output_contract": {
-        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::FlowMeasurementIndex with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
-        "digest_state": "planned",
-        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
-      },
-      "timing_policy": {
-        "calibration_min_ms": 250,
-        "calibration_max_ms": 2000,
-        "warmup_batches": 3,
-        "full_pairs": 9,
-        "timeout_seconds": 600,
-        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
-      },
-      "memory_policy": {
-        "method": "stab-allocations",
-        "scale_ids": [
-          "small",
-          "medium",
-          "large"
-        ],
-        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
-      },
-      "threshold_policy": "report-only",
-      "reason": "Behavioral API paths owned by stab_core::FlowMeasurementIndex in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
-      "owner": "stab-core/flow-utils",
       "status": "planned"
     },
     {
@@ -48698,73 +48707,64 @@
       "status": "planned"
     },
     {
-      "id": "PERFQ-API-f852c8b296d4b315",
-      "manifest_row": "perfq-api-f852c8b296d4b315",
+      "id": "PERFQ-API-f721814b8e56cb2d",
+      "manifest_row": "perfq-api-f721814b8e56cb2d",
       "row_origin": "planned",
-      "performance_feature": "PERF-FLOWS-AND-DETECTOR-UTILITIES",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "checklist_anchors": [],
       "checklist_child_ids": [],
       "public_api_items": [
-        "stab_core::Flow as Clone for@612fa9f7795c",
-        "stab_core::Flow as FromStr for@612fa9f7795c",
-        "stab_core::Flow as Ord for@612fa9f7795c",
-        "stab_core::Flow as PartialEq for@612fa9f7795c",
-        "stab_core::Flow as PartialOrd for@612fa9f7795c",
-        "stab_core::Flow::input",
-        "stab_core::Flow::measurements",
-        "stab_core::Flow::multiply",
-        "stab_core::Flow::new",
-        "stab_core::Flow::observables",
-        "stab_core::Flow::output"
+        "stab_core::stabilizers::FlowMeasurementIndex as Clone for@7127296ff5dc",
+        "stab_core::stabilizers::FlowMeasurementIndex as Ord for@7127296ff5dc",
+        "stab_core::stabilizers::FlowMeasurementIndex as PartialEq for@7127296ff5dc",
+        "stab_core::stabilizers::FlowMeasurementIndex as PartialOrd for@7127296ff5dc",
+        "stab_core::stabilizers::FlowMeasurementIndex::get",
+        "stab_core::stabilizers::FlowMeasurementIndex::new"
       ],
       "disposition": "measured",
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-09e0ebcecbc57453",
-        "cq-evidence-api-6002877e28471d3a",
-        "cq-evidence-api-68c73c0b409596e7",
-        "cq-evidence-api-6ad90e7365ddebcb",
-        "cq-evidence-api-6be4ffb3c9896a2f",
-        "cq-evidence-api-9a271b578bb26004",
-        "cq-evidence-api-c9e11ad7672633d9"
+        "cq-evidence-api-46da7f7403881d8f",
+        "cq-evidence-api-7587ac88f9060ff6",
+        "cq-evidence-api-c00377dc88d45fd6"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
           "kind": "generated",
-          "id": "api-small-medium-large-17-PERFQ-API-f852c8b296d4b315"
+          "id": "api-small-medium-large-17-PERFQ-API-f721814b8e56cb2d"
         },
         "source": "oracle/qualification-manifest.json",
         "deterministic_seed": "17",
         "scales": [
           {
             "id": "small",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-35536258353756bb",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-2f8b8183f63cf54c",
             "input_bytes": {
               "kind": "not-applicable"
             }
           },
           {
             "id": "medium",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-35536258353756bb",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-2f8b8183f63cf54c",
             "input_bytes": {
               "kind": "not-applicable"
             }
           },
           {
             "id": "large",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-35536258353756bb",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-2f8b8183f63cf54c",
             "input_bytes": {
               "kind": "not-applicable"
             }
           }
         ]
       },
-      "work_unit": "flows",
+      "work_unit": "qubits",
       "output_contract": {
-        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::Flow with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::stabilizers::FlowMeasurementIndex with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
         "digest_state": "planned",
         "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
       },
@@ -48786,8 +48786,8 @@
         "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
       },
       "threshold_policy": "report-only",
-      "reason": "Behavioral API paths owned by stab_core::Flow in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
-      "owner": "stab-core/flow-utils",
+      "reason": "Behavioral API paths owned by stab_core::stabilizers::FlowMeasurementIndex in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core",
       "status": "planned"
     },
     {

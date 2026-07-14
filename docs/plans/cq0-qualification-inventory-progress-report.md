@@ -1,6 +1,6 @@
 # CQ0 Qualification Inventory Progress Report
 
-> Source-current note, 2026-07-14: this report retains CQ0 completion-era counts and evidence below. Later selected CQ2 ownership changes set the source-current schema-version-3 digest to `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`, with 524 implemented, 17 evidence-close, and 1,800 planned owners. The clean reports cited below are historical; current Generation-refined PR, full, and soak evidence is published from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Source-current note, 2026-07-15: this report retains CQ0 completion-era counts and evidence below. Later selected CQ2 ownership changes set the source-current schema-version-3 digest to `ad4b927cbc8cbbca2b9279b728f76dd72d22f7118cae5f754f025dc0ba4fd519`, with 524 implemented, 17 evidence-close, and 1,600 planned owners. The clean reports cited below, including the Generation-refined reports from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`, are historical under the current Algebra-refined digest. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 

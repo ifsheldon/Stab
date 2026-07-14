@@ -1,6 +1,6 @@
 # PQ1 Paired Performance Harness Progress Report
 
-> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation source slices set correctness inventory digest `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6` and dependent performance inventory digest `44276968d035fbd108fd57096dc96aed1d3967ac07d539a8dbfed8f0d5f16fcb`. Clean schema-version-13 PR, full, and soak dependent reports from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` validate these digests with diagnostic median ratios 1.014015, 1.015160, and 1.015225. These ratios remain report-only infrastructure evidence, not product performance; see `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Current-evidence note, 2026-07-15: the Algebra disposition reconciliation set correctness inventory digest `ad4b927cbc8cbbca2b9279b728f76dd72d22f7118cae5f754f025dc0ba4fd519` and dependent performance inventory digest `229b4bf24aadfe92b6a576421a63fb795328cca9d3cc89dd03010b20c0dc977f`. The clean schema-version-13 PR, full, and soak dependent reports from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` bind the previous Generation-refined digests and are historical. Their diagnostic median ratios 1.014015, 1.015160, and 1.015225 remain report-only infrastructure evidence, not product performance; see `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 

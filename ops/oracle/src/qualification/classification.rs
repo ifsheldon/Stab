@@ -2,6 +2,8 @@ use std::path::Path;
 
 use super::model::{Comparator, DeferredProduct, FeatureId, UpstreamDisposition};
 
+mod stabilizer;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct UpstreamClassification {
     pub(super) feature_ids: Vec<FeatureId>,
@@ -242,7 +244,7 @@ pub(super) fn classify_upstream_case(path: &Path, symbol: &str) -> UpstreamClass
         return classify_simulator(&value, symbol);
     }
     if value.contains("/stabilizers/") {
-        return UpstreamClassification::selected(FeatureId::Algebra);
+        return stabilizer::classify(&value, symbol);
     }
     if value.contains("/util_bot/") {
         return classify_util_bot(&value);
@@ -371,9 +373,6 @@ pub(super) fn classify_public_api_source(
     }
     if value.starts_with("crates/stab-core/src/gate") || value == "crates/stab-core/src/target.rs" {
         return Some(FeatureId::GateContract);
-    }
-    if value == "crates/stab-core/src/stabilizers/flow.rs" {
-        return Some(FeatureId::FlowUtils);
     }
     if value.starts_with("crates/stab-core/src/stabilizers/")
         || value == "crates/stab-core/src/circuit_tableau.rs"
@@ -1044,8 +1043,6 @@ fn python_binding_domains(value: &str) -> Vec<FeatureId> {
         }
     } else if value.contains("/dem/") {
         vec![FeatureId::DemFormat]
-    } else if value.contains("/stabilizers/flow") {
-        vec![FeatureId::FlowUtils]
     } else if value.contains("/stabilizers/") {
         vec![FeatureId::Algebra]
     } else {
@@ -1085,12 +1082,42 @@ fn classify_util_top(value: &str, symbol: &str) -> UpstreamClassification {
         UpstreamClassification::selected(FeatureId::FlowUtils)
     } else if value.contains("reference_sample") || value.contains("count_determined") {
         UpstreamClassification::selected(FeatureId::Sampling)
-    } else if value.contains("stabilizers_to_tableau")
-        || value.contains("stabilizers_vs_amplitudes")
-        || value.contains("circuit_vs_amplitudes")
-        || value.contains("circuit_vs_tableau")
-    {
+    } else if value.contains("stabilizers_to_tableau") {
         UpstreamClassification::selected(FeatureId::Algebra)
+    } else if value.contains("circuit_vs_amplitudes") {
+        stabilizer::deferred_interactive(
+            "State-vector-to-Circuit and Circuit-to-state-vector conversions are explicitly deferred interactive simulator products.",
+        )
+    } else if value.contains("circuit_vs_tableau") {
+        let leaf = strip_stim_word_size_suffix(symbol)
+            .rsplit('.')
+            .next()
+            .unwrap_or(symbol);
+        if matches!(
+            leaf,
+            "circuit_to_tableau" | "circuit_to_tableau_ignoring_gates"
+        ) {
+            UpstreamClassification::selected(FeatureId::Algebra)
+        } else {
+            stabilizer::deferred_interactive(
+                "Tableau-to-Circuit synthesis and state-vector-backed MPP circuit checks are explicitly deferred interactive simulator products.",
+            )
+        }
+    } else if value.contains("stabilizers_vs_amplitudes") {
+        let leaf = strip_stim_word_size_suffix(symbol)
+            .rsplit('.')
+            .next()
+            .unwrap_or(symbol);
+        if matches!(
+            leaf,
+            "unitary_to_tableau_fail" | "unitary_to_tableau_vs_gate_data"
+        ) {
+            UpstreamClassification::selected(FeatureId::Algebra)
+        } else {
+            stabilizer::deferred_interactive(
+                "Tableau-to-unitary and state-vector round trips are explicitly deferred interactive simulator products.",
+            )
+        }
     } else {
         UpstreamClassification::selected(FeatureId::CircuitApi)
     }
