@@ -159,8 +159,10 @@ Generated artifacts belong below `target/benchmarks/qualification/` and must nev
 ### Host Validity
 
 - Add a source-owned `benchmarks/qualification-host-policy.json` schema describing required affinity support, minimum free memory, maximum pre-run load, swap-activity policy, and optional frequency-governor or thermal checks for promotable full evidence.
+- Acquire an exclusive profile-and-selected-CPU qualification lease before initial host capture or private builds, retain it through final host capture and atomic publication, and fail closed when another qualification run holds the lease.
 - Pin both workers or CLI processes in a pair to the same configured CPU set when the host policy requires affinity.
 - Sample load, available memory, swap counters, frequency state, and thermal or throttling indicators before and after a group when the platform exposes them.
+- Make offline report, preflight, and regression validation reload the exact source-owned policy, bind the recorded host identity and affinity to the validating host, and reconstruct the complete sorted violation set and `verified` outcome from recorded probes.
 - Refuse source-owned promotion when a required host check fails or cannot be observed; local probes may continue only with an explicit `environment-unverified` status.
 - Never combine samples across reboots, host fingerprints, CPU sets, power modes, or concurrent benchmark jobs into one ratio distribution.
 - Record background-load and host-policy failures as environment failures instead of benchmark slowdowns.
@@ -408,7 +410,7 @@ Turn the checklist and current 161-row manifest into a finite, reviewable invent
 
 Implementation note: `pq1-adapter-protocol-smoke` is a synthetic diagnostic group used only to prove the harness. It cannot accept product correctness evidence, enter a threshold baseline, or support a Stab-versus-Stim product speed claim.
 
-Audit note: the parent must independently derive `iterations * work_items`, keep calibration probes work-bound and outside ratio evidence, perform semantic preflight at the exact common calibrated batch shape, bind every subsequent validation, warmup, sample, and memory receipt to that digest, and inspect the clean revision through a config-free private Git view tied to an exact captured commit. Both qualification workers must be rebuilt from materialized committed source in fresh private targets, bind canonical tool, argument, environment, input, fingerprint, and binary identities into reconstructable receipts, and execute from sealed copies. Controlled host evidence requires stable thermal-zone identity and readings no higher than the profile limit whenever the platform exposes the required probes.
+Audit note: the parent must independently derive `iterations * work_items`, keep calibration probes work-bound and outside ratio evidence, perform semantic preflight at the exact common calibrated batch shape, bind every subsequent validation, warmup, sample, and memory receipt to that digest, and inspect the clean revision through a config-free private Git view tied to an exact captured commit. Both qualification workers must be rebuilt from materialized committed source in fresh private targets, bind canonical tool, argument, environment, input, fingerprint, and binary identities into reconstructable receipts, and execute from sealed copies. Controlled host evidence requires an exclusive full-run profile-and-CPU lease, stable thermal-zone identity and readings no higher than the profile limit whenever the platform exposes the required probes, and offline replay of the source-owned policy instead of trusting serialized `verified` or violation fields.
 
 ### Objective
 
@@ -434,7 +436,7 @@ Make faithful comparison, calibration, statistics, and reporting reusable before
 - Integration-test process success, nonzero exit, signal termination, timeout, stdout or stderr overflow, writer failure, missing binary, and child cleanup.
 - Integration-test adapter commit mismatch, source digest mismatch, stale binary fingerprint, malformed JSON, extra rows, missing fields, non-finite values, and oversized output.
 - Integration-test Stab worker fingerprint mismatch, protocol drift, setup-memory ordering, worker panic, and parent-child work or digest disagreement.
-- Integration-test host-policy pass, affinity failure, excessive load, insufficient memory, active swap, unavailable required probes, and environment-unverified local mode.
+- Integration-test host-policy pass, affinity failure, excessive load, insufficient memory, active swap, unavailable required probes, environment-unverified local mode, exclusive-lease contention and release, source-policy digest drift, and hostile report mutations that hide or fabricate violations.
 - Test that a memory-instrumented run cannot be consumed as timing-gate evidence.
 - Test that a dirty worktree report cannot be promoted as source-owned final evidence.
 

@@ -62,7 +62,7 @@ pub(super) fn run(
     let report_bytes = super::artifact::read_artifact(root, &args.input, "report.json")?;
     let report: QualificationReport =
         serde_json::from_slice(&report_bytes).map_err(RegressionError::ReportJson)?;
-    super::report::validate_report(&report)?;
+    super::report::validate_report(root, &report)?;
     if baseline.performance_inventory_sha256 != report.performance_inventory_sha256 {
         return Err(RegressionError::InventoryMismatch {
             baseline: baseline.performance_inventory_sha256,

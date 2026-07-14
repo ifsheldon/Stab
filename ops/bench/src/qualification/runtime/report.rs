@@ -49,7 +49,10 @@ pub(super) struct PerformancePreflightArtifact {
     promotable: bool,
 }
 
-pub(super) fn validate_report(report: &QualificationReport) -> Result<(), ReportError> {
+pub(super) fn validate_report(
+    root: &crate::root::RepoRoot,
+    report: &QualificationReport,
+) -> Result<(), ReportError> {
     if report.schema_version != REPORT_SCHEMA_VERSION {
         return Err(ReportError::SchemaVersion {
             actual: report.schema_version,
@@ -160,6 +163,7 @@ pub(super) fn validate_report(report: &QualificationReport) -> Result<(), Report
     {
         return Err(ReportError::HostEvidence);
     }
+    report.host.validate_against_policy(root)?;
     validate_all_worker_receipts(report)?;
     validate_correctness_evidence(report)?;
     validate_pair_execution(&report.semantic_preflight, EvidenceMode::Timing)?;
@@ -396,11 +400,11 @@ pub(super) fn run(root: &crate::root::RepoRoot, args: ReportArgs) -> Result<Path
     }
     let report: QualificationReport =
         serde_json::from_slice(&report_json).map_err(ReportError::Json)?;
-    validate_report(&report)?;
+    validate_report(root, &report)?;
     if std::path::Path::new(&report.command.output) != args.input {
         return Err(ReportError::OutputBinding);
     }
-    let preflight = preflight_artifact(&report, &report_json)?;
+    let preflight = preflight_artifact(root, &report, &report_json)?;
     let mut preflight_json = serde_json::to_vec_pretty(&preflight).map_err(ReportError::Json)?;
     preflight_json.push(b'\n');
     let markdown = render_markdown(&report, &sha256_hex(&report_json));
@@ -649,10 +653,11 @@ fn thermal_zone_keys(readings: &[super::host::ThermalReading]) -> BTreeSet<(&str
 }
 
 pub(super) fn preflight_artifact(
+    root: &crate::root::RepoRoot,
     report: &QualificationReport,
     report_json: &[u8],
 ) -> Result<PerformancePreflightArtifact, ReportError> {
-    validate_report(report)?;
+    validate_report(root, report)?;
     Ok(PerformancePreflightArtifact {
         schema_version: PREFLIGHT_SCHEMA_VERSION,
         report_sha256: sha256_hex(report_json),
@@ -783,6 +788,8 @@ pub(super) enum ReportError {
     Statistics(#[from] super::statistics::StatisticsError),
     #[error(transparent)]
     Protocol(#[from] super::protocol::ProtocolError),
+    #[error(transparent)]
+    Host(#[from] super::host::HostError),
     #[error(transparent)]
     Artifact(#[from] super::artifact::ArtifactError),
     #[error("qualification report JSON must be nonempty and newline terminated")]

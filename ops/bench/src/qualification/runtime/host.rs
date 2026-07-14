@@ -4,6 +4,9 @@ use thiserror::Error;
 
 use crate::root::RepoRoot;
 
+#[path = "host/lease.rs"]
+mod lease;
+
 const HOST_POLICY_PATH: &str = "benchmarks/qualification-host-policy.json";
 const HOST_POLICY_SCHEMA_VERSION: u32 = 2;
 const MAX_HOST_POLICY_BYTES: usize = 1 << 20;
@@ -80,11 +83,105 @@ pub(super) struct ThermalReading {
     pub(super) millidegrees_celsius: i64,
 }
 
+impl HostEvidence {
+    pub(super) fn validate_against_policy(&self, root: &RepoRoot) -> Result<(), HostError> {
+        let (policy, bytes) = load_policy(root)?;
+        validate_policy(&policy)?;
+        let profile = policy
+            .profiles
+            .into_iter()
+            .find(|profile| profile.id == self.profile_id)
+            .ok_or_else(|| HostError::EvidenceProfile(self.profile_id.clone()))?;
+        let expected_maximum_load = parse_positive_finite(
+            "max_load_per_allowed_cpu",
+            &profile.max_load_per_allowed_cpu,
+        )? * self.allowed_cpus.len() as f64;
+        let current_allowed_cpus = allowed_cpus()?;
+        let current_cpu_identity = cpu_identity()?;
+        if self.policy_sha256 != sha256_hex(&bytes)
+            || self.operating_system != profile.operating_system
+            || self.architecture != profile.architecture
+            || self.operating_system != std::env::consts::OS
+            || self.architecture != std::env::consts::ARCH
+            || self.allowed_cpus.is_empty()
+            || self
+                .allowed_cpus
+                .windows(2)
+                .any(|pair| matches!(pair, [left, right] if left >= right))
+            || self.logical_cpu_count != self.allowed_cpus.len()
+            || self.allowed_cpus != current_allowed_cpus
+            || self.allowed_cpus.first().copied() != Some(self.selected_cpu)
+            || self.cpu_identity.is_empty()
+            || self.cpu_identity.len() > 1024
+            || !self.cpu_identity.is_ascii()
+            || self.cpu_identity != current_cpu_identity
+            || self.maximum_load_one.to_bits() != expected_maximum_load.to_bits()
+            || self.minimum_available_memory_bytes != profile.minimum_available_memory_bytes
+            || self.maximum_temperature_millidegrees_celsius
+                != profile.maximum_temperature_millidegrees_celsius
+            || !valid_host_number(self.load_one_before)
+            || !valid_host_number(self.load_one_after)
+            || self.available_memory_before_bytes == 0
+            || self.available_memory_after_bytes == 0
+            || self.swap_in_after < self.swap_in_before
+            || self.swap_out_after < self.swap_out_before
+            || self.frequency_khz_before == Some(0)
+            || self.frequency_khz_after == Some(0)
+            || !valid_thermal_readings(&self.thermal_readings_before)
+            || !valid_thermal_readings(&self.thermal_readings_after)
+            || self.thermal_probe_available
+                != (!self.thermal_readings_before.is_empty()
+                    && !self.thermal_readings_after.is_empty())
+        {
+            return Err(HostError::EvidenceMismatch);
+        }
+        let before = HostSnapshot {
+            load_one: self.load_one_before,
+            available_memory_bytes: self.available_memory_before_bytes,
+            swap_in: self.swap_in_before,
+            swap_out: self.swap_out_before,
+            frequency_governor: self.frequency_governor_before.clone(),
+            frequency_khz: self.frequency_khz_before,
+            thermal_readings: self.thermal_readings_before.clone(),
+        };
+        let after = HostSnapshot {
+            load_one: self.load_one_after,
+            available_memory_bytes: self.available_memory_after_bytes,
+            swap_in: self.swap_in_after,
+            swap_out: self.swap_out_after,
+            frequency_governor: self.frequency_governor_after.clone(),
+            frequency_khz: self.frequency_khz_after,
+            thermal_readings: self.thermal_readings_after.clone(),
+        };
+        let mut reconstructed = self.clone();
+        reconstructed.violations.clear();
+        reconstructed.verified = true;
+        append_snapshot_violations(&profile, &mut reconstructed, &before, true);
+        append_snapshot_violations(&profile, &mut reconstructed, &after, false);
+        append_swap_violation(&profile, &mut reconstructed, &after);
+        if reconstructed.frequency_governor_before != reconstructed.frequency_governor_after {
+            reconstructed.violations.push(format!(
+                "frequency governor changed during the run: {:?} -> {:?}",
+                reconstructed.frequency_governor_before, reconstructed.frequency_governor_after
+            ));
+        }
+        reconstructed.violations.sort();
+        reconstructed.violations.dedup();
+        reconstructed.verified = reconstructed.violations.is_empty();
+        if self.violations != reconstructed.violations || self.verified != reconstructed.verified {
+            return Err(HostError::EvidenceMismatch);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct HostGuard {
     profile: HostProfile,
     allow_unverified: bool,
     evidence: HostEvidence,
+    _lease: lease::RunLease,
+    finished: bool,
 }
 
 impl HostGuard {
@@ -104,6 +201,7 @@ impl HostGuard {
             "max_load_per_allowed_cpu",
             &profile.max_load_per_allowed_cpu,
         )? * allowed_cpus.len() as f64;
+        let lease = lease::RunLease::acquire(&profile.id, selected_cpu)?;
         let before = HostSnapshot::read(selected_cpu)?;
         let policy_sha256 = sha256_hex(&bytes);
         let mut evidence = HostEvidence {
@@ -143,6 +241,8 @@ impl HostGuard {
             profile,
             allow_unverified,
             evidence,
+            _lease: lease,
+            finished: false,
         })
     }
 
@@ -150,7 +250,10 @@ impl HostGuard {
         self.evidence.selected_cpu
     }
 
-    pub(crate) fn finish(mut self) -> Result<HostEvidence, HostError> {
+    pub(crate) fn finish(&mut self) -> Result<HostEvidence, HostError> {
+        if self.finished {
+            return Err(HostError::AlreadyFinished);
+        }
         let after = HostSnapshot::read(self.evidence.selected_cpu)?;
         self.evidence.load_one_after = after.load_one;
         self.evidence.available_memory_after_bytes = after.available_memory_bytes;
@@ -170,7 +273,8 @@ impl HostGuard {
             ));
         }
         enforce_or_mark_unverified(&mut self.evidence, self.allow_unverified)?;
-        Ok(self.evidence)
+        self.finished = true;
+        Ok(self.evidence.clone())
     }
 }
 
@@ -396,6 +500,29 @@ fn append_swap_violation(profile: &HostProfile, evidence: &mut HostEvidence, aft
             evidence.swap_in_before, after.swap_in, evidence.swap_out_before, after.swap_out
         ));
     }
+}
+
+fn valid_host_number(value: f64) -> bool {
+    value.is_finite() && value >= 0.0
+}
+
+fn valid_thermal_readings(readings: &[ThermalReading]) -> bool {
+    readings.len() <= MAX_THERMAL_ZONES
+        && readings.iter().all(|reading| {
+            !reading.zone.is_empty()
+                && reading.zone.len() <= 256
+                && reading.zone.is_ascii()
+                && !reading.kind.is_empty()
+                && reading.kind.len() <= 256
+                && reading.kind.is_ascii()
+                && (-273_150..=300_000).contains(&reading.millidegrees_celsius)
+        })
+        && readings
+            .iter()
+            .map(|reading| (&reading.zone, &reading.kind))
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            == readings.len()
 }
 
 fn enforce_or_mark_unverified(
@@ -702,7 +829,19 @@ pub(crate) enum HostError {
     ProbeOverflow(&'static str),
     #[error("host policy rejected the qualification run: {0}")]
     PolicyViolation(String),
+    #[error("qualification host guard was finished more than once")]
+    AlreadyFinished,
+    #[error("qualification report names an unknown host-policy profile: {0}")]
+    EvidenceProfile(String),
+    #[error("qualification report host evidence does not replay under the source-owned policy")]
+    EvidenceMismatch,
+    #[error(transparent)]
+    Lease(#[from] lease::LeaseError),
 }
+
+#[cfg(test)]
+#[path = "host/policy_tests.rs"]
+mod policy_tests;
 
 #[cfg(test)]
 mod tests {
