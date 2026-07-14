@@ -95,6 +95,26 @@ fn convert_measurements_with_circuit_types_m_to_dets() {
 }
 
 #[test]
+fn convert_sparse_duplicate_tokens_toggle_typed_bits() {
+    assert_eq!(
+        run_ok(
+            &[
+                "stab",
+                "convert",
+                "--in_format",
+                "dets",
+                "--out_format",
+                "01",
+                "--num_measurements",
+                "2",
+            ],
+            b"shot M1 M1\n",
+        ),
+        b"00\n"
+    );
+}
+
+#[test]
 fn convert_detection_observable_records_with_circuit_and_obs_out() {
     let (_dir, circuit_path) = write_fixture(
         "layout.stim",

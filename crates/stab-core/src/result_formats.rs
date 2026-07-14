@@ -157,7 +157,7 @@ impl MeasureRecord {
     }
 
     pub fn lookback(&self, lookback: usize) -> Option<bool> {
-        if lookback == 0 || lookback > self.storage.len() {
+        if lookback == 0 || lookback > self.max_lookback || lookback > self.storage.len() {
             return None;
         }
         self.storage.get(self.storage.len() - lookback).copied()
@@ -197,6 +197,7 @@ impl MeasureRecord {
 pub struct MeasureRecordBatch {
     records: Vec<Vec<bool>>,
     unwritten_start: usize,
+    written_count: usize,
     max_lookback: usize,
     shot_count: usize,
 }
@@ -206,6 +207,7 @@ impl MeasureRecordBatch {
         Self {
             records: Vec::new(),
             unwritten_start: 0,
+            written_count: 0,
             max_lookback,
             shot_count,
         }
@@ -240,7 +242,7 @@ impl MeasureRecordBatch {
     }
 
     pub fn lookback(&self, lookback: usize) -> Option<&[bool]> {
-        if lookback == 0 || lookback > self.records.len() {
+        if lookback == 0 || lookback > self.max_lookback || lookback > self.records.len() {
             return None;
         }
         self.records
@@ -249,18 +251,28 @@ impl MeasureRecordBatch {
     }
 
     pub fn intermediate_write_unwritten_results_to(
-        &self,
+        &mut self,
         writer: &mut MeasureRecordBatchWriter,
         reference_sample: &[bool],
     ) -> CircuitResult<()> {
-        let unwritten = self.records.get(self.unwritten_start..).ok_or_else(|| {
-            CircuitError::invalid_result_format(
-                "measure record batch unwritten cursor is out of range",
-            )
-        })?;
-        for record in unwritten {
-            writer.batch_write_bit(&xor_reference(record, reference_sample)?)?;
+        const WRITE_SIZE: usize = 256;
+        self.validate_unwritten_cursor()?;
+        while self.unwritten() >= WRITE_SIZE {
+            let end = self
+                .unwritten_start
+                .checked_add(WRITE_SIZE)
+                .ok_or_else(|| {
+                    CircuitError::invalid_result_format(
+                        "measure record batch write range overflowed",
+                    )
+                })?;
+            self.write_range(writer, reference_sample, self.unwritten_start, end)?;
+            self.unwritten_start = end;
+            self.written_count = self.written_count.checked_add(WRITE_SIZE).ok_or_else(|| {
+                CircuitError::invalid_result_format("measure record batch written count overflowed")
+            })?;
         }
+        self.compact_written_prefix();
         Ok(())
     }
 
@@ -269,14 +281,69 @@ impl MeasureRecordBatch {
         writer: &mut MeasureRecordBatchWriter,
         reference_sample: &[bool],
     ) -> CircuitResult<()> {
-        self.intermediate_write_unwritten_results_to(writer, reference_sample)?;
+        self.validate_unwritten_cursor()?;
+        let unwritten = self.unwritten();
+        self.write_range(
+            writer,
+            reference_sample,
+            self.unwritten_start,
+            self.records.len(),
+        )?;
+        self.written_count = self.written_count.checked_add(unwritten).ok_or_else(|| {
+            CircuitError::invalid_result_format("measure record batch written count overflowed")
+        })?;
         self.unwritten_start = self.records.len();
         self.compact_written_prefix();
         Ok(())
     }
 
+    fn validate_unwritten_cursor(&self) -> CircuitResult<()> {
+        if self.unwritten_start > self.records.len() {
+            return Err(CircuitError::invalid_result_format(
+                "measure record batch unwritten cursor is out of range",
+            ));
+        }
+        Ok(())
+    }
+
+    fn write_range(
+        &self,
+        writer: &mut MeasureRecordBatchWriter,
+        reference_sample: &[bool],
+        start: usize,
+        end: usize,
+    ) -> CircuitResult<()> {
+        let records = self.records.get(start..end).ok_or_else(|| {
+            CircuitError::invalid_result_format("measure record batch write range is out of bounds")
+        })?;
+        let mut inverted = vec![false; self.shot_count];
+        for (offset, record) in records.iter().enumerate() {
+            let measurement_index = self.written_count.checked_add(offset).ok_or_else(|| {
+                CircuitError::invalid_result_format(
+                    "measure record batch reference index overflowed",
+                )
+            })?;
+            if reference_sample
+                .get(measurement_index)
+                .copied()
+                .unwrap_or(false)
+            {
+                for (output, bit) in inverted.iter_mut().zip(record) {
+                    *output = !*bit;
+                }
+                writer.batch_write_bit(&inverted)?;
+            } else {
+                writer.batch_write_bit(record)?;
+            }
+        }
+        Ok(())
+    }
+
     fn compact_written_prefix(&mut self) {
-        let keep = self.max_lookback.min(self.records.len());
+        let keep = self
+            .max_lookback
+            .max(self.unwritten())
+            .min(self.records.len());
         let remove = self.records.len() - keep;
         if remove == 0 {
             return;
@@ -733,7 +800,7 @@ fn read_sparse_index_line(
                 "sparse index {index} exceeds record width {bits_per_record}"
             )));
         };
-        *bit = true;
+        *bit = !*bit;
     }
     Ok(record)
 }
@@ -765,21 +832,6 @@ fn validate_uniform_record_width(records: &[Vec<bool>], kind: &'static str) -> C
         }
     }
     Ok(())
-}
-
-fn xor_reference(record: &[bool], reference_sample: &[bool]) -> CircuitResult<Vec<bool>> {
-    if record.len() != reference_sample.len() {
-        return Err(CircuitError::invalid_result_format(format!(
-            "reference sample length {} does not match record length {}",
-            reference_sample.len(),
-            record.len()
-        )));
-    }
-    Ok(record
-        .iter()
-        .zip(reference_sample)
-        .map(|(bit, reference)| bit ^ reference)
-        .collect())
 }
 
 #[cfg(test)]

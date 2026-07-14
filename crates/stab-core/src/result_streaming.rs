@@ -609,7 +609,7 @@ fn fill_sparse_index_line(
                 "sparse index {index} exceeds record width {bits_per_record}"
             )));
         };
-        *bit = true;
+        *bit = !*bit;
     }
     Ok(())
 }
@@ -633,7 +633,14 @@ fn fill_sparse_index_line_packed(
         let index = usize::try_from(index).map_err(|_| {
             CircuitError::invalid_result_format(format!("sparse index {index} does not fit usize"))
         })?;
-        record.set(index, true).map_err(bit_error_to_format_error)?;
+        let value = record.get(index).ok_or_else(|| {
+            CircuitError::invalid_result_format(format!(
+                "sparse index {index} exceeds record width {bits_per_record}"
+            ))
+        })?;
+        record
+            .set(index, !value)
+            .map_err(bit_error_to_format_error)?;
         Ok(())
     })?;
     Ok(())
@@ -653,7 +660,6 @@ fn parse_sparse_index_line(
         hits.push(index);
         Ok(())
     })?;
-    normalize_sparse_hits(hits);
     Ok(())
 }
 
@@ -827,16 +833,6 @@ fn collect_b8_chunk_hits(
         }
     }
     Ok(())
-}
-
-fn normalize_sparse_hits(hits: &mut Vec<u64>) {
-    let already_strictly_ordered = hits
-        .windows(2)
-        .all(|window| matches!(window, [left, right] if left < right));
-    if !already_strictly_ordered {
-        hits.sort_unstable();
-        hits.dedup();
-    }
 }
 
 fn strip_trailing_cr(line: &str) -> &str {

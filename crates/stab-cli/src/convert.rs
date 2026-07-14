@@ -574,7 +574,7 @@ fn parse_typed_dets_tokens(
                 record.len()
             )));
         };
-        *bit = true;
+        *bit = !*bit;
     }
     Ok(())
 }
