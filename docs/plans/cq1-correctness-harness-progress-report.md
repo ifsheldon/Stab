@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, result-format, and gate-contract slices change the correctness inventory digest to `4ee9686104c0d537073a823986cb71b8bc092c7a9f09fbdbee75c4af7d2c6b70` and raise implemented-or-closed ownership from the original CQ1 410 to 501. Clean global evidence from revision `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` passes PR 331/331, full 493/493, and soak 493/493 for the preceding result-format digest, but it is historical rather than promotable evidence for the current gate-refined digest. Clean current-digest PR, full, soak, report, and exact gate-parent preflight execution remain required; see `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, result-format, and gate-contract slices change the correctness inventory digest to `4ee9686104c0d537073a823986cb71b8bc092c7a9f09fbdbee75c4af7d2c6b70` and raise implemented-or-closed ownership from the original CQ1 410 to 501. Clean global current-digest evidence from revision `c6ca93945ad7e94e758e2cdea745a9b2a62c401a` passes PR 336/336, full 501/501, and soak 501/501 with offline report regeneration and exact PR/full/soak preflight for the noisy X measurement and measure-reset parent; see `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 
