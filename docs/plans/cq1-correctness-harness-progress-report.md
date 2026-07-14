@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, and bit-kernel slices change the correctness inventory digest to `2b2f0456e568b86a973d4b9077b9688ab9f7748af1bd9cd349e2a2abf217d638` and raise implemented-or-closed ownership from the original CQ1 410 to 509. Clean global evidence from revision `c6ca93945ad7e94e758e2cdea745a9b2a62c401a` passes PR 336/336, full 501/501, and soak 501/501 for the preceding gate-refined digest; a committed clean current-digest refresh is required before the bit checkpoint is promoted. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, and bit-kernel slices change the correctness inventory digest to `2b2f0456e568b86a973d4b9077b9688ab9f7748af1bd9cd349e2a2abf217d638` and raise implemented-or-closed ownership from the original CQ1 410 to 509. Clean global evidence from revision `d4301cc1085680ff650f9e0474e075998c14c4bd` passes PR 338/338, full 509/509, and soak 509/509 with offline report regeneration and exact bit-owner preflight. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 
