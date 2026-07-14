@@ -268,11 +268,11 @@ pub(super) fn apply(
                     matches.len()
                 ));
             };
-            claim_planned_evidence(
+            claim_oracle_fixture_evidence(
                 &spec.id,
                 spec.feature_id,
                 old_owner,
-                EvidenceProvenance::OracleFixture,
+                &spec.primary_selector,
                 evidence_cases,
                 &mut claimed_evidence,
             )?;
@@ -782,6 +782,57 @@ fn claim_planned_evidence(
     Ok(())
 }
 
+fn claim_oracle_fixture_evidence(
+    mapping_id: &str,
+    feature_id: FeatureId,
+    evidence_id: &CaseId,
+    primary_selector: &EvidenceSelector,
+    evidence_cases: &[EvidenceCase],
+    claimed: &mut BTreeSet<CaseId>,
+) -> Result<(), InventoryError> {
+    let case = evidence_cases
+        .iter()
+        .find(|case| case.id == *evidence_id)
+        .ok_or_else(|| {
+            InventoryError::InvalidQualificationCases(format!(
+                "qualification case {:?} references missing oracle evidence {}",
+                mapping_id, evidence_id
+            ))
+        })?;
+    if case.status == EvidenceStatus::Planned {
+        return claim_planned_evidence(
+            mapping_id,
+            feature_id,
+            evidence_id,
+            EvidenceProvenance::OracleFixture,
+            evidence_cases,
+            claimed,
+        );
+    }
+    if case.status != EvidenceStatus::Implemented
+        || case.provenance != EvidenceProvenance::OracleFixture
+        || case.feature_id != feature_id
+        || case.primary_selector != *primary_selector
+    {
+        return invalid(format!(
+            "qualification case {:?} cannot absorb exact oracle evidence {} with {:?}/{:?}/{:?}/{:?}",
+            mapping_id,
+            evidence_id,
+            case.status,
+            case.provenance,
+            case.feature_id,
+            case.primary_selector
+        ));
+    }
+    if !claimed.insert(evidence_id.clone()) {
+        return invalid(format!(
+            "qualification case {:?} repeats or steals oracle evidence {}",
+            mapping_id, evidence_id
+        ));
+    }
+    Ok(())
+}
+
 fn property_plan(
     root: &RepoRoot,
     spec: &QualificationCaseSpec,
@@ -959,6 +1010,70 @@ mod tests {
                 &id,
                 EvidenceProvenance::UpstreamSemanticCase,
                 &evidence,
+                &mut BTreeSet::new(),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn claiming_exact_oracle_fixture_requires_the_same_primary_selector() {
+        let spec = test_spec();
+        let id = CaseId::try_new("cq-evidence-oracle-test".to_string()).expect("case id");
+        let evidence = EvidenceCase {
+            id: id.clone(),
+            feature_id: spec.feature_id,
+            behavioral_surface: crate::qualification::model::BehavioralSurface::FileFormat,
+            provenance: EvidenceProvenance::OracleFixture,
+            source_id: "fixture".to_string(),
+            comparator: Comparator::Structural,
+            execution: super::super::super::execution_contract::for_status(
+                EvidenceStatus::Implemented,
+            ),
+            statistical_plan: None,
+            property_plan: None,
+            primary_selector: spec.primary_selector.clone(),
+            supporting_selectors: Vec::new(),
+            resource_contract: super::super::evidence::semantic_only_resource_contract(),
+            negative_axes: Vec::new(),
+            performance_groups: vec!["PERF-CIRCUIT-MODEL".to_string()],
+            deferred_product: None,
+            status: EvidenceStatus::Implemented,
+        };
+        let mut claimed = BTreeSet::new();
+        claim_oracle_fixture_evidence(
+            &spec.id,
+            spec.feature_id,
+            &id,
+            &spec.primary_selector,
+            std::slice::from_ref(&evidence),
+            &mut claimed,
+        )
+        .expect("matching exact fixture claim");
+        assert!(
+            claim_oracle_fixture_evidence(
+                &spec.id,
+                spec.feature_id,
+                &id,
+                &spec.primary_selector,
+                std::slice::from_ref(&evidence),
+                &mut claimed,
+            )
+            .is_err()
+        );
+
+        let mut mismatched = evidence;
+        mismatched.primary_selector.value.insert(
+            mismatched.primary_selector.value.len().saturating_sub(2),
+            "different-test".to_string(),
+        );
+        assert!(
+            claim_oracle_fixture_evidence(
+                &spec.id,
+                spec.feature_id,
+                &id,
+                &spec.primary_selector,
+                std::slice::from_ref(&mismatched),
                 &mut BTreeSet::new(),
             )
             .is_err()

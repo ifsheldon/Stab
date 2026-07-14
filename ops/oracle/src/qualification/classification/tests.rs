@@ -81,6 +81,17 @@ fn classifications_split_mixed_python_cases_by_exact_symbol() {
     assert_eq!(repr.disposition, UpstreamDisposition::DeferredProduct);
     assert_eq!(repr.deferred_product, Some(DeferredProduct::PythonBindings));
 
+    let generation_errors = classify_upstream_case(path, "test_circuit_generation_errors");
+    assert_eq!(
+        generation_errors.disposition,
+        UpstreamDisposition::DeferredProduct
+    );
+    assert_eq!(generation_errors.feature_ids, vec![FeatureId::Generation]);
+    assert_eq!(
+        generation_errors.deferred_product,
+        Some(DeferredProduct::PythonBindings)
+    );
+
     let instruction_path = Path::new("src/stim/circuit/circuit_instruction_pybind_test.py");
     let string_constructor = classify_upstream_case(instruction_path, "test_init_from_str");
     assert_eq!(
@@ -108,6 +119,16 @@ fn classifications_split_mixed_python_cases_by_exact_symbol() {
     let gate_target_path = Path::new("src/stim/circuit/gate_target_pybind_test.py");
     let gate_target_value = classify_upstream_case(gate_target_path, "test_init_and_equality");
     assert_eq!(gate_target_value.feature_ids, vec![FeatureId::GateContract]);
+}
+
+#[test]
+fn classifications_split_generation_cli_dispatch_from_core_semantics() {
+    let path = Path::new("src/stim/cmd/command_gen.test.cc");
+    let execute = classify_upstream_case(path, "command_gen.execute");
+    assert_eq!(execute.feature_ids, vec![FeatureId::Cli]);
+
+    let no_noise = classify_upstream_case(path, "command_gen.no_noise_no_detections_256");
+    assert_eq!(no_noise.feature_ids, vec![FeatureId::Generation]);
 }
 
 #[test]

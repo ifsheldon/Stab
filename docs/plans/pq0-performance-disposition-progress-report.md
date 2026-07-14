@@ -6,9 +6,9 @@ Completed: 2026-07-13.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Current correctness dependency after the completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, and bit-kernel slices: schema-version-3 CQ0 semantic digest `2b2f0456e568b86a973d4b9077b9688ab9f7748af1bd9cd349e2a2abf217d638`.
+Current correctness dependency after the completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation source slices: schema-version-3 CQ0 semantic digest `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`.
 
-Current performance inventory digest after dependent CQ2 regeneration: `4e31a348b0c796ae4c4400369c70019eff8fa991592f201c80e7fee7d8718f7a`.
+Current performance inventory digest after dependent CQ2 regeneration: `44276968d035fbd108fd57096dc96aed1d3967ac07d539a8dbfed8f0d5f16fcb`.
 
 Implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
@@ -16,7 +16,7 @@ Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca3258
 
 The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
-The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, and bit-kernel slices changed correctness owner ids, exact classifications, and acceptance state, so PQ0 was regenerated without changing those performance classifications. The bit refresh preserves all 536 runtime groups and all inherited disposition, threshold, waiver, and unresolved counts while rebinding exact correctness ownership. Clean current-digest PQ1 PR, full, and soak execution from revision `d4301cc1085680ff650f9e0474e075998c14c4bd` passes offline report validation and report-only regression replay.
+The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation source slices changed correctness owner ids, exact classifications, and acceptance state, so PQ0 was regenerated without changing those performance classifications. The current refresh preserves all 536 runtime groups and all inherited disposition, threshold, waiver, and unresolved counts while rebinding exact correctness ownership. The last clean PQ1 PR, full, and soak execution from revision `d4301cc1085680ff650f9e0474e075998c14c4bd` predates the current Generation-refined digests and is historical; current-digest dependent execution remains pending.
 
 PQ0 freezes inventory and migration decisions only.
 It does not claim that inherited timing ratios satisfy the comprehensive runner, preflight, scaling, memory, or statistical contract.

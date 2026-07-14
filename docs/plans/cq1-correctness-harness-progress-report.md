@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, and bit-kernel slices change the correctness inventory digest to `2b2f0456e568b86a973d4b9077b9688ab9f7748af1bd9cd349e2a2abf217d638` and raise implemented-or-closed ownership from the original CQ1 410 to 509. Clean global evidence from revision `d4301cc1085680ff650f9e0474e075998c14c4bd` passes PR 338/338, full 509/509, and soak 509/509 with offline report regeneration and exact bit-owner preflight. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Source-current note, 2026-07-14: this report records CQ1 harness completion and historical evidence. Later selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation ownership changes set the source-current correctness digest to `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`, with 524 implemented and 17 evidence-close owners. Clean Generation-refined evidence remains pending; do not promote the older CQ1, bit-kernel, or circuit checkpoint reports under this digest. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 
@@ -10,7 +10,7 @@ The executable harness landed in `f957ac9aa671fa404d6717267f2f9d4dc78bb19d`, the
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Correctness inventory: schema version 3 at digest `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`.
+CQ1 completion inventory: schema version 3 at digest `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`.
 
 Evidence platform: Linux AArch64, target `aarch64-unknown-linux-gnu`, Rust `1.98.0-nightly`.
 

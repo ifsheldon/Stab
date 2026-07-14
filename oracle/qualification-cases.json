@@ -5456,6 +5456,460 @@
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::floor_lg2" },
         { "crate_name": "stab_core", "owner_path": "stab_core::bits::is_power_of_2" }
       ]
+    },
+    {
+      "id": "cq2-generation-parameter-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "circuit_generation",
+          "cq2_generation_parameter_contract_covers_typed_values_and_noise_builders",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The typed distance and round constructors validate scalar domains without allocation; task values and immutable noise builders operate on fixed-size parameter values."
+      },
+      "negative_axes": [
+        "distance-zero",
+        "distance-one",
+        "distance-above-stim-cli-domain",
+        "zero-rounds",
+        "maximum-round-count",
+        "all-task-variants",
+        "all-noise-builders"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::CodeDistance" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::CodeDistance::try_new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::CodeDistance::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RoundCount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RoundCount::try_new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RoundCount::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeTask" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeTask" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeTask" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::rounds" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::distance" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::task" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::before_round_data_depolarization" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::before_measure_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::after_reset_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::after_clifford_depolarization" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::with_before_round_data_depolarization" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::with_before_measure_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::with_after_reset_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::RepetitionCodeParams::with_after_clifford_depolarization" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::rounds" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::distance" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::task" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::before_round_data_depolarization" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::before_measure_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::after_reset_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::after_clifford_depolarization" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::with_before_round_data_depolarization" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::with_before_measure_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::with_after_reset_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SurfaceCodeParams::with_after_clifford_depolarization" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::rounds" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::distance" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::task" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::before_round_data_depolarization" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::before_measure_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::after_reset_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::after_clifford_depolarization" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::with_before_round_data_depolarization" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::with_before_measure_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::with_after_reset_flip_probability" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::ColorCodeParams::with_after_clifford_depolarization" }
+      ]
+    },
+    {
+      "id": "cq2-generation-repetition-exact-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "circuit_generation",
+          "cq2_generation_repetition_matches_complete_pinned_stim_case",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact noisy distance-four case proves layout, hint, folded 5,000-round circuit bytes, generated-value semantics, and accessors; the independent resource case owns the maximum distance and round boundaries."
+      },
+      "negative_axes": [
+        "all-four-noise-knobs",
+        "folded-rounds",
+        "layout-spacing",
+        "generated-value-clone"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/gen/gen_rep_code.test.cc",
+          "symbol": "gen_rep_code.rep_code"
+        }
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::GeneratedCircuit" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::GeneratedCircuit::circuit" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::GeneratedCircuit::layout_text" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::GeneratedCircuit::hint_text" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::generate_repetition_code_circuit" }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-gen-gen-rep-code-structural"
+      ]
+    },
+    {
+      "id": "cq2-generation-surface-exact-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "circuit_generation",
+          "cq2_generation_surface_matches_complete_pinned_stim_cases",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The complete pinned cases prove exact noisy unrotated Z and one-round X circuits, exact noisy rotated distance-two bytes, and exact rotated distance-four and distance-five layouts; the independent resource case owns quadratic admission."
+      },
+      "negative_axes": [
+        "rotated-and-unrotated",
+        "memory-x-and-memory-z",
+        "one-round-no-repeat",
+        "all-four-noise-knobs",
+        "even-and-odd-layouts"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/gen/gen_surface_code.test.cc",
+          "symbol": "gen_surface_code.unrotated_surface_code_hard_coded_comparison"
+        },
+        {
+          "path": "src/stim/gen/gen_surface_code.test.cc",
+          "symbol": "gen_surface_code.rotated_surface_code_hard_coded_comparison"
+        }
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::generate_surface_code_circuit" }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-gen-gen-surface-code-structural"
+      ]
+    },
+    {
+      "id": "cq2-generation-color-exact-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "exact-bytes",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "circuit_generation",
+          "cq2_generation_color_matches_complete_pinned_stim_case",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The complete pinned case proves the exact distance-five layout plus exact noisy distance-three circuit, layout, and hint; the independent resource case owns quadratic admission."
+      },
+      "negative_axes": [
+        "distance-three",
+        "distance-five",
+        "all-four-noise-knobs",
+        "three-color-layout",
+        "folded-rounds"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/gen/gen_color_code.test.cc",
+          "symbol": "gen_color_code.color_code_hard_coded_comparison"
+        }
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::generate_color_code_circuit" }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-gen-gen-color-code-structural"
+      ]
+    },
+    {
+      "id": "cq2-generation-color-domain-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "circuit_generation",
+          "cq2_generation_color_rejects_invalid_family_parameters",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Round and parity checks reject before color-code coordinate allocation, while the minimum valid two-round distance-three circuit is materialized as the acceptance boundary."
+      },
+      "negative_axes": [
+        "one-round",
+        "distance-two",
+        "even-distance",
+        "minimum-valid-shape"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-generation-no-noise-detection-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "circuit_generation",
+          "cq2_generation_no_noise_matrix_has_no_detection_or_observable_events",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The complete seven-distance by seven-round task matrix materializes circuits only through distance fifteen, checks exact detector counts, one observable, and absence of noise instructions, and deterministically analyzes every circuit into an error-free detector error model. One semantic sample per task, one 256-shot portable batch, and the exact Python five-shot dimensions retain execution-path and multiword evidence without claiming C++ SIMD word-size identity."
+      },
+      "negative_axes": [
+        "all-code-families",
+        "all-six-tasks",
+        "distance-two-through-fifteen",
+        "round-one-through-twenty",
+        "color-domain-skips",
+        "asymmetric-even-surface-boundaries",
+        "portable-256-shot-batch"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/circuit_pybind_test.py",
+          "symbol": "test_circuit_generation"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/cmd/command_gen.test.cc",
+          "symbol_base": "command_gen.no_noise_no_detections",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-generation-resource-admission-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "circuit_generation",
+          "resource::cq2_generation_resource_admission_checks_family_boundaries_before_materialization",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Generation preflights a 131,072 physical-qubit limit before allocating quadratic coordinate maps, target vectors, circuits, layouts, or CLI text. Repetition accepts the nominal domain maximum 2047 and the typed constructor rejects 2048; the nearest family-valid accepted and first resource-rejected distances are rotated surface 256/257, unrotated surface 181/182, and color 341/343. Accepted materialized coordinate cardinalities must equal their projections, rejected calls have constant allocation bounds, and maximum u64 rounds remain folded."
+      },
+      "negative_axes": [
+        "repetition-domain-maximum",
+        "rotated-first-over-limit",
+        "unrotated-first-over-limit",
+        "color-first-valid-over-limit",
+        "maximum-u64-folded-rounds",
+        "preallocation-rejection"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq3-generation-cli-resource-admission-contract",
+      "feature_id": "CQ-CLI",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-cli",
+          "--lib",
+          "tests::generation::gen_rejects_quadratic_outputs_before_writing",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The public gen command propagates rotated, unrotated, and color projection failures with empty stdout; an oversized color request with --out rejects before the output path is created."
+      },
+      "negative_axes": [
+        "rotated-first-over-limit",
+        "unrotated-first-over-limit",
+        "color-first-valid-over-limit",
+        "empty-stdout-on-rejection",
+        "output-file-not-created"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-generation-helper-begin-round-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_begin_round_tick_matches_stim", "--quiet", "--exact"]
+      },
+      "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
+      "upstream_owners": [
+        { "path": "src/stim/gen/circuit_gen_params.test.cc", "symbol": "circuit_gen_params.append_begin_round_tick" }
+      ],
+      "oracle_fixture_owners": ["coverage-gen-param-begin-round"]
+    },
+    {
+      "id": "cq2-generation-helper-unitary-one-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_unitary_1_matches_stim", "--quiet", "--exact"]
+      },
+      "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
+      "upstream_owners": [
+        { "path": "src/stim/gen/circuit_gen_params.test.cc", "symbol": "circuit_gen_params.append_unitary_1" }
+      ],
+      "oracle_fixture_owners": ["coverage-gen-param-unitary-one"]
+    },
+    {
+      "id": "cq2-generation-helper-unitary-two-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_unitary_2_matches_stim", "--quiet", "--exact"]
+      },
+      "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
+      "upstream_owners": [
+        { "path": "src/stim/gen/circuit_gen_params.test.cc", "symbol": "circuit_gen_params.append_unitary_2" }
+      ],
+      "oracle_fixture_owners": ["coverage-gen-param-unitary-two"]
+    },
+    {
+      "id": "cq2-generation-helper-reset-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_reset_matches_stim", "--quiet", "--exact"]
+      },
+      "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
+      "upstream_owners": [
+        { "path": "src/stim/gen/circuit_gen_params.test.cc", "symbol": "circuit_gen_params.append_reset" }
+      ],
+      "oracle_fixture_owners": ["coverage-gen-param-reset"]
+    },
+    {
+      "id": "cq2-generation-helper-measure-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_measure_matches_stim", "--quiet", "--exact"]
+      },
+      "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
+      "upstream_owners": [
+        { "path": "src/stim/gen/circuit_gen_params.test.cc", "symbol": "circuit_gen_params.append_measure" }
+      ],
+      "oracle_fixture_owners": ["coverage-gen-param-measure"]
+    },
+    {
+      "id": "cq2-generation-helper-measure-reset-contract",
+      "feature_id": "CQ-GENERATION",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": ["cargo", "test", "-p", "stab-core", "--lib", "circuit_generation::tests::append_measure_reset_matches_stim", "--quiet", "--exact"]
+      },
+      "resource_contract": { "kind": "not-applicable", "detail": "This private fixed-target semantic case makes no independent resource claim; the public generator admission parent owns materialization limits." },
+      "upstream_owners": [
+        { "path": "src/stim/gen/circuit_gen_params.test.cc", "symbol": "circuit_gen_params.append_measure_reset" }
+      ],
+      "oracle_fixture_owners": ["coverage-gen-param-measure-reset"]
     }
   ],
   "existing_parent_mappings": [

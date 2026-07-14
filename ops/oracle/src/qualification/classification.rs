@@ -196,6 +196,24 @@ pub(super) fn classify_upstream_case(path: &Path, symbol: &str) -> UpstreamClass
         return UpstreamClassification::selected(FeatureId::Detection);
     }
 
+    if value.ends_with("src/stim/circuit/circuit_pybind_test.py")
+        && symbol == "test_circuit_generation_errors"
+    {
+        return UpstreamClassification::deferred_for(
+            [FeatureId::Generation],
+            DeferredProduct::PythonBindings,
+            "This mixed case enters through Python Circuit.generated string dispatch; Stab owns the portable Generation distance, round, task, and family constraints independently, while Probability value validation remains in its own qualification domain. The complete upstream symbol is deferred until Python bindings exist.",
+        );
+    }
+
+    if value.ends_with("src/stim/cmd/command_gen.test.cc") {
+        return if symbol == "command_gen.execute" {
+            UpstreamClassification::selected(FeatureId::Cli)
+        } else {
+            UpstreamClassification::selected(FeatureId::Generation)
+        };
+    }
+
     if value.contains("/cmd/") {
         return classify_command(&value);
     }

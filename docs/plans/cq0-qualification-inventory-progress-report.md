@@ -1,18 +1,20 @@
 # CQ0 Qualification Inventory Progress Report
 
+> Source-current note, 2026-07-14: this report retains CQ0 completion-era counts and evidence below. Later selected CQ2 ownership changes set the source-current schema-version-3 digest to `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`, with 524 implemented, 17 evidence-close, and 1,800 planned owners. The clean reports cited below are historical; clean Generation-refined evidence remains pending. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+
 ## Status
 
-CQ0 is complete after CQ1-driven exact-selector and canonical-owner corrections plus the completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, and bit-kernel ownership slices.
+CQ0 is complete after CQ1-driven exact-selector and canonical-owner corrections. The detailed counts below describe its completion-era checkpoint and are retained as historical evidence.
 
 Original source-owned evidence revision: `02c93c19566bdc465ad9c795f35e956e1ff85440` with `local_modifications=false`.
 
 Corrected inventory execution evidence revision: `e7ba513822c26859a2b5c70c94d406e1c6adb6b6` with `local_modifications=false`.
 
-Latest clean execution evidence revision: `d4301cc1085680ff650f9e0474e075998c14c4bd` with `local_modifications=false`, for the current bit-refined digest.
+Latest clean execution evidence recorded by this report: `d4301cc1085680ff650f9e0474e075998c14c4bd` with `local_modifications=false`, for the historical bit-refined digest.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Current corrected schema-version-3 manifest digest: `2b2f0456e568b86a973d4b9077b9688ab9f7748af1bd9cd349e2a2abf217d638`.
+Historical corrected schema-version-3 manifest digest at this report's checkpoint: `2b2f0456e568b86a973d4b9077b9688ab9f7748af1bd9cd349e2a2abf217d638`.
 
 Pinned isolated Python AST version: 3.14.6.
 

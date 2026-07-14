@@ -4,17 +4,17 @@
 
 In progress as of 2026-07-14.
 
-The selected `.stim`, `.dem`, result-format, gate-contract, bit-kernel, and circuit-API domains are complete at exact upstream-symbol and exported-Rust-API granularity. This checkpoint does not complete CQ2.
+The selected `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation domains are source-complete at exact upstream-symbol and exported-Rust-API granularity. Generation's milestone audit, GPT-5.6/max full-code-review, and broad verification are complete with every confirmed finding fixed; clean current-digest execution evidence remains required before its checkpoint is accepted. This checkpoint does not complete CQ2.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Latest clean correctness evidence revision: `1eaf3740c5819271be30a37ce4b6f69e2010a2ba` with `local_modifications=false`, for the current circuit-refined digest.
+Latest clean correctness evidence revision: `1eaf3740c5819271be30a37ce4b6f69e2010a2ba` with `local_modifications=false`, for the preceding circuit-refined digest. Those reports are historical and are not promotable for the current Generation-refined inventory.
 
-Current correctness inventory digest after circuit-API reconciliation: `f30a56853dbc9334d1ba91a400da3a40c108d4ee2aa748d4edc9a5662093ba11`.
+Current correctness inventory digest after Generation reconciliation: `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`.
 
-Current dependent performance inventory digest: `4ebbf8bc85ebeb722fcf3e9eefa4796b57ba61b2773fa64eef37e70dca41a744`.
+Current dependent performance inventory digest: `44276968d035fbd108fd57096dc96aed1d3967ac07d539a8dbfed8f0d5f16fcb`.
 
-Clean current-digest CQ1 and dependent PQ1 reports are published at the artifact paths below.
+Clean current-digest CQ1 and dependent PQ1 reports remain to be published from a reviewed committed revision. The prior artifact paths below are retained only as historical Circuit checkpoint evidence.
 
 ## Delivered Slices
 
@@ -75,6 +75,18 @@ The dependent PQ0 inventory was regenerated because the correctness digest, owne
 
 The dependent PQ0 inventory was regenerated because circuit owner ids, upstream dispositions, and acceptance state changed. No performance disposition, threshold, waiver, comparator classification, or runtime group was relaxed.
 
+### Generation
+
+- Thirteen focused qualification parents plus twelve retained exact fixture and prior-owner parents produce 25 implemented Generation evidence parents and zero planned owners.
+- The ownership partition assigns all 107 selected exported Rust API items and all 15 relevant pinned-upstream records. Fourteen portable records have direct focused ownership or semantic-mining bindings; `circuit_pybind_test.py::test_circuit_generation_errors` remains one explicit `deferred-product` symbol because its complete contract enters through Python `Circuit.generated` string dispatch. Generation independently owns its typed distance, round, task, and family constraints; `Probability` value validation remains in its own qualification domain and is not claimed by this slice.
+- Focused exact tests cover `CodeDistance`, `RoundCount`, every task enum and generation parameter object, immutable noise builders, generated-circuit value semantics and accessors, complete noisy repetition, rotated and unrotated surface, and color-code circuits and layouts, larger pinned layouts, invalid color-family combinations, and all six selected helper semantics.
+- The complete upstream no-noise family, task, distance, and round matrix checks exact detector-count formulas, one observable, absence of noise instructions, and deterministic conversion of every circuit into an error-free detector error model. Representative sampled execution covers every task, a portable 256-shot multiword batch, and the pinned d5/r10 five-shot 240-detector shape without relying on probabilistic per-cell sampling to prove a deterministic invariant.
+- Materializing generators preflight an exact projected physical-qubit count against 131,072 before coordinate maps, instruction vectors, layout text, or CLI output are allocated. Repetition distance 2047, rotated surface distance 256, unrotated surface distance 181, and valid color distance 341 are accepted; the first valid rejected boundaries project 132,097, 131,769, and 132,355 qubits respectively. CLI evidence proves rejection happens before `--out` is created, and maximum round counts remain folded.
+- Pinned Stim's nominal generator distance domain extends through 2047, so the surface and color cap is documented as deliberate bounded-materialization behavior rather than exact acceptance parity. No performance threshold, waiver, comparator classification, or runtime group was changed while regenerating the dependent inventory.
+- Milestone audit found that typed and family rejection tests checked only generic errors or message fragments and that six private helper parents overclaimed constant-scratch resource behavior. The corrected tests match `CircuitError::InvalidDomainValue` plus exact `kind` and `value` fields, while the private fixed-target helper parents make no independent resource claim and point to the public generator admission parent.
+- Review also found that one broad generator-helper fixture could not remain an atomic primary. It is split into six exact independently runnable fixture rows, and qualification validation permits an imported exact fixture to become supporting provenance only when its normalized exact Cargo selector is identical to the reviewed qualification primary. Duplicate terminal primaries remain rejected.
+- Three earlier GPT-5.6/max full-code-review passes and the final focused GPT-5.6/max inventory review found incomplete deterministic matrix evidence, weak pre-allocation proof, stale fixture selectors, incorrect command documentation, Python probability overclaim, missing CLI resource ownership, stale dependent digests, stale CQ0/CQ1 current-evidence wording, and one owner-count drift. Every confirmed finding is fixed; no Generation implementation, audit, or review finding remains before clean committed-head execution.
+
 ## Current CQ2 Inventory
 
 | Feature | Implemented | Planned | Total |
@@ -85,13 +97,15 @@ The dependent PQ0 inventory was regenerated because circuit owner ids, upstream 
 | `CQ-GATE-CONTRACT` | 59 | 0 | 59 |
 | `CQ-BIT-KERNELS` | 12 | 0 | 12 |
 | `CQ-CIRCUIT-API` | 24 | 0 | 24 |
-| `CQ-GENERATION` | 12 | 75 | 87 |
+| `CQ-GENERATION` | 25 | 0 | 25 |
 | `CQ-ALGEBRA` | 1 | 635 | 636 |
-| **CQ2 total** | **204** | **710** | **914** |
+| **CQ2 total** | **217** | **635** | **852** |
 
 These counts are evidence owners, not an estimate of required new test functions. Reviewed exact parents may close several owners only when one selector proves their complete common contract.
 
-## Clean Correctness Evidence
+## Previous Clean Correctness Evidence
+
+The following reports predate Generation reconciliation. They prove the preceding Circuit checkpoint, but their inventory digest is stale and they cannot satisfy current-digest Generation acceptance.
 
 | Tier | Selected | Passed | Failed | Artifact | Request digest | Completion digest |
 | --- | ---: | ---: | ---: | --- | --- | --- |
@@ -122,8 +136,14 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --quiet
 cargo test -p stab-core --test cq2_circuit_api --test circuit_api --test circuit_transforms --test circuit_simplify --test mbqc_decomposition --quiet
+cargo test -p stab-core --test circuit_generation --quiet
+cargo test -p stab-core --lib circuit_generation::tests:: --quiet
+cargo test -p stab-cli --lib tests::generation::gen_rejects_quadratic_outputs_before_writing --quiet -- --exact
 cargo test -p stab-oracle qualification::classification::tests --quiet
 cargo test -p stab-oracle qualification::inventory::tests:: --quiet
+cargo test -p stab-oracle qualification::inventory::qualification_cases::tests:: --quiet
+just oracle::run --milestone M7
+just oracle::run --implemented-only
 just qualification::correctness-regenerate --check
 just qualification::correctness-check
 just bench::qualification-regenerate --check
@@ -149,10 +169,10 @@ just bench::qualification-regression --input target/benchmarks/qualification/pq1
 just maintenance::pre-commit
 ```
 
-The clean PR, full, soak, offline-report, exact-preflight, and dependent PQ1 artifacts above are authoritative for the current circuit-refined digests.
+The clean PR, full, soak, offline-report, exact-preflight, and dependent PQ1 artifacts above are authoritative only for the preceding circuit-refined digests. Current Generation-refined evidence must come from a clean committed revision after the now-closed audit and review.
 
 ## Remaining Blocker
 
-CQ2 still has 710 planned evidence owners. The active implementation blocker is `CQ-GENERATION`, where 75 of 87 owners remain planned; `CQ-ALGEBRA` then has 635 of 636 owners planned.
+CQ2 still has 635 planned evidence owners, all in `CQ-ALGEBRA`. Generation source ownership is closed at 25 of 25, audit and review have no unresolved finding, and broad verification passes; its only remaining acceptance work is clean current-digest PR/full/soak correctness evidence plus dependent report publication.
 
-No external dependency or user decision blocks this work. The Circuit API slice passed milestone audit and GPT-5.6/max full-code-review with every confirmed finding closed; the final CQ2-wide audit and review remain pending until Generation and Algebra are implemented.
+No external dependency or user decision blocks this work. After Generation acceptance evidence is published, the active implementation blocker becomes `CQ-ALGEBRA`, where 635 of 636 owners remain planned; final CQ2-wide audit and review remain pending until Algebra is implemented.
