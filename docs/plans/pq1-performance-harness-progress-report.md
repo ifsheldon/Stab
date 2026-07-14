@@ -1,6 +1,6 @@
 # PQ1 Paired Performance Harness Progress Report
 
-> Current-evidence note, 2026-07-14: the first CQ2 exact-parent mapping refresh changes the correctness inventory digest to `5d1fc9d21e511e13bef5ceb476dbcf9dd20ed067339edd2891013992fb06ced5` and the dependent performance inventory digest to `a7177e298b5e1f05979b871704514fdf2650070a7c48e5d72c6fb48bb80d13bf`. The schema-version-13 runs below remain valid historical PQ1 harness acceptance, but they are not current promotable evidence until CQ1 and PQ1 PR, full, and soak tiers are rerun from a clean committed revision.
+> Current-evidence note, 2026-07-14: the first CQ2 exact-parent mapping refresh changes the correctness inventory digest to `5d1fc9d21e511e13bef5ceb476dbcf9dd20ed067339edd2891013992fb06ced5` and the dependent performance inventory digest to `a7177e298b5e1f05979b871704514fdf2650070a7c48e5d72c6fb48bb80d13bf`. Clean current-digest schema-version-13 PR, full, and soak reports from revision `add37ccb6dc52b0ac96b37397f6b012de0bcd6a4` are host-verified and pass offline validation; see `docs/plans/cq2-deterministic-qualification-progress-report.md`. They remain diagnostic infrastructure evidence, not product performance.
 
 ## Status
 

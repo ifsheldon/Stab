@@ -16,7 +16,7 @@ Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca3258
 
 The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
-The first CQ2 exact-parent mapping refresh changed only correctness owner ids and acceptance state, so PQ0 was regenerated again without changing those performance classifications; clean PQ1 execution against the prior digest is now historical until rerun against the current inventories.
+The first CQ2 exact-parent mapping refresh changed only correctness owner ids and acceptance state, so PQ0 was regenerated again without changing those performance classifications. Clean current-digest PQ1 PR, full, and soak execution from revision `add37ccb6dc52b0ac96b37397f6b012de0bcd6a4` is host-verified and passes offline report and report-only regression validation.
 
 PQ0 freezes inventory and migration decisions only.
 It does not claim that inherited timing ratios satisfy the comprehensive runner, preflight, scaling, memory, or statistical contract.

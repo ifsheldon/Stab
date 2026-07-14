@@ -176,7 +176,7 @@ just qualification::correctness-check
 The corrected focused qualification run executes the CQ0 inventory tests plus the CQ1 selector and property-plan validation tests with no failures.
 The workspace test run passed with only the repository's pre-existing documented long-running parser fuzz smoke ignored.
 `just maintenance::pre-commit` passed before the implementation commit.
-The original `just qualification::correctness-check` passed from committed revision `02c93c19566bdc465ad9c795f35e956e1ff85440` with a clean worktree. The previous corrected digest then passed clean CQ1 PR, full, and soak execution from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; the full and soak tiers each passed all 410 then-current implemented or evidence-close owners. The CQ2 exact-parent refresh changes the digest and raises that count to 429, so those runs remain historical harness evidence until clean PR, full, and soak execution is repeated from the committed refresh.
+The original `just qualification::correctness-check` passed from committed revision `02c93c19566bdc465ad9c795f35e956e1ff85440` with a clean worktree. The previous corrected digest then passed clean CQ1 PR, full, and soak execution from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; the full and soak tiers each passed all 410 then-current implemented or evidence-close owners. The CQ2 exact-parent refresh raises that count to 429, and clean current-digest execution from revision `add37ccb6dc52b0ac96b37397f6b012de0bcd6a4` passes PR 300/300, full 429/429, and soak 429/429 with offline regeneration and exact parent preflight.
 
 ## Remaining Program Work
 
