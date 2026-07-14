@@ -1,14 +1,16 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 use clap::Args;
 use serde::Deserialize;
 use thiserror::Error;
 
+use super::group::BaselineEligibility;
 use super::run::{ClaimClass, QualificationReport};
 use super::statistics::GateOutcome;
 use crate::root::RepoRoot;
 
-const BASELINE_SCHEMA_VERSION: u32 = 1;
+const BASELINE_SCHEMA_VERSION: u32 = 2;
 const MAX_BASELINE_BYTES: usize = 4 << 20;
 
 #[derive(Clone, Debug, Args)]
@@ -27,13 +29,20 @@ pub(crate) struct RegressionArgs {
 struct RegressionBaseline {
     schema_version: u32,
     performance_inventory_sha256: String,
-    groups: Vec<RegressionRule>,
+    groups: Vec<RegressionGroup>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RegressionGroup {
+    group_id: String,
+    baseline_eligibility: BaselineEligibility,
+    measurements: Vec<RegressionRule>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RegressionRule {
-    group_id: String,
     measurement_id: String,
     max_median_ratio: String,
     max_confidence_interval_upper: String,
@@ -59,7 +68,8 @@ pub(super) fn run(
     .map_err(|error| RegressionError::BaselineRead(error.to_string()))?;
     let baseline: RegressionBaseline =
         serde_json::from_slice(&baseline_bytes).map_err(RegressionError::BaselineJson)?;
-    validate_baseline(&baseline)?;
+    let contracts = super::group::load_groups(root, &baseline.performance_inventory_sha256)?;
+    validate_baseline(&baseline, &contracts)?;
     let report_bytes = super::artifact::read_artifact(root, &args.input, "report.json")?;
     let report: QualificationReport =
         serde_json::from_slice(&report_bytes).map_err(RegressionError::ReportJson)?;
@@ -73,12 +83,12 @@ pub(super) fn run(
     let selected = baseline
         .groups
         .iter()
-        .filter(|rule| rule.group_id == report.group_id)
-        .collect::<Vec<_>>();
+        .find(|group| group.group_id == report.group_id)
+        .ok_or_else(|| RegressionError::MissingGroup(report.group_id.clone()))?;
     match rule_disposition(
         report.claim_class,
         report.promotable,
-        selected.is_empty(),
+        selected.baseline_eligibility,
         &report.group_id,
     )? {
         RuleDisposition::ReportOnly => {
@@ -92,7 +102,7 @@ pub(super) fn run(
     }
     let authoritative = super::report::authoritative_timing_attempt(&report)?;
     let mut checked = 0;
-    for rule in selected {
+    for rule in &selected.measurements {
         let summary = authoritative
             .statistics
             .iter()
@@ -147,7 +157,8 @@ pub(super) fn check_baseline(
         .map_err(|error| RegressionError::BaselineRead(error.to_string()))?;
     let baseline: RegressionBaseline =
         serde_json::from_slice(&bytes).map_err(RegressionError::BaselineJson)?;
-    validate_baseline(&baseline)?;
+    let contracts = super::group::load_groups(root, expected_inventory_sha256)?;
+    validate_baseline(&baseline, &contracts)?;
     if baseline.performance_inventory_sha256 != expected_inventory_sha256 {
         return Err(RegressionError::InventoryMismatch {
             baseline: baseline.performance_inventory_sha256,
@@ -166,28 +177,24 @@ enum RuleDisposition {
 fn rule_disposition(
     claim_class: ClaimClass,
     promotable: bool,
-    rules_empty: bool,
+    baseline_eligibility: BaselineEligibility,
     group_id: &str,
 ) -> Result<RuleDisposition, RegressionError> {
-    match (claim_class, promotable, rules_empty) {
-        (ClaimClass::DiagnosticInfrastructure, false, true) => Ok(RuleDisposition::ReportOnly),
-        (ClaimClass::DiagnosticInfrastructure, _, false) => Err(
-            RegressionError::DiagnosticCannotBeGated(group_id.to_string()),
-        ),
-        (ClaimClass::PromotablePerformance, true, false) => Ok(RuleDisposition::Gated),
-        (ClaimClass::PromotablePerformance, _, true) => {
-            Err(RegressionError::MissingRule(group_id.to_string()))
+    match (claim_class, promotable, baseline_eligibility) {
+        (ClaimClass::DiagnosticInfrastructure, false, BaselineEligibility::ReportOnly) => {
+            Ok(RuleDisposition::ReportOnly)
         }
-        (ClaimClass::PromotablePerformance, false, false) => Err(
-            RegressionError::DiagnosticCannotBeGated(group_id.to_string()),
-        ),
-        (ClaimClass::DiagnosticInfrastructure, true, true) => Err(
-            RegressionError::DiagnosticCannotBeGated(group_id.to_string()),
-        ),
+        (ClaimClass::PromotablePerformance, true, BaselineEligibility::ThresholdEligible) => {
+            Ok(RuleDisposition::Gated)
+        }
+        _ => Err(RegressionError::DispositionMismatch(group_id.to_string())),
     }
 }
 
-fn validate_baseline(baseline: &RegressionBaseline) -> Result<(), RegressionError> {
+fn validate_baseline(
+    baseline: &RegressionBaseline,
+    contracts: &[super::group::GroupContract],
+) -> Result<(), RegressionError> {
     if baseline.schema_version != BASELINE_SCHEMA_VERSION {
         return Err(RegressionError::SchemaVersion {
             actual: baseline.schema_version,
@@ -197,19 +204,47 @@ fn validate_baseline(baseline: &RegressionBaseline) -> Result<(), RegressionErro
     if !valid_sha256(&baseline.performance_inventory_sha256) {
         return Err(RegressionError::InvalidInventoryDigest);
     }
-    let mut keys = std::collections::BTreeSet::new();
-    for rule in &baseline.groups {
-        if rule.group_id.is_empty()
-            || rule.measurement_id.is_empty()
-            || !keys.insert((&rule.group_id, &rule.measurement_id))
+    let contract_by_id = contracts
+        .iter()
+        .map(|contract| (contract.id.to_string(), contract))
+        .collect::<BTreeMap<_, _>>();
+    if baseline.groups.len() != contract_by_id.len() {
+        return Err(RegressionError::BaselineContractMismatch);
+    }
+    let mut group_ids = BTreeSet::new();
+    for group in &baseline.groups {
+        let contract = contract_by_id
+            .get(&group.group_id)
+            .ok_or(RegressionError::BaselineContractMismatch)?;
+        if !group_ids.insert(&group.group_id)
+            || group.baseline_eligibility != contract.baseline_eligibility
         {
-            return Err(RegressionError::DuplicateOrInvalidRule);
+            return Err(RegressionError::BaselineContractMismatch);
         }
-        parse_ratio("max_median_ratio", &rule.max_median_ratio)?;
-        parse_ratio(
-            "max_confidence_interval_upper",
-            &rule.max_confidence_interval_upper,
-        )?;
+        let expected_measurements = contract
+            .measurement_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<BTreeSet<_>>();
+        let mut observed_measurements = BTreeSet::new();
+        for rule in &group.measurements {
+            if rule.measurement_id.is_empty()
+                || !observed_measurements.insert(rule.measurement_id.clone())
+            {
+                return Err(RegressionError::DuplicateOrInvalidRule);
+            }
+            parse_ratio("max_median_ratio", &rule.max_median_ratio)?;
+            parse_ratio(
+                "max_confidence_interval_upper",
+                &rule.max_confidence_interval_upper,
+            )?;
+        }
+        match group.baseline_eligibility {
+            BaselineEligibility::ReportOnly if group.measurements.is_empty() => {}
+            BaselineEligibility::ThresholdEligible
+                if observed_measurements == expected_measurements => {}
+            _ => return Err(RegressionError::BaselineContractMismatch),
+        }
     }
     Ok(())
 }
@@ -252,14 +287,16 @@ pub(super) enum RegressionError {
     InvalidInventoryDigest,
     #[error("qualification baseline repeats or invalidates a group measurement rule")]
     DuplicateOrInvalidRule,
+    #[error("qualification baseline does not exactly match the runtime group contract")]
+    BaselineContractMismatch,
     #[error("qualification baseline field {field} has invalid ratio {value:?}")]
     InvalidRatio { field: &'static str, value: String },
     #[error("qualification baseline inventory {baseline} differs from report inventory {report}")]
     InventoryMismatch { baseline: String, report: String },
-    #[error("promotable qualification group {0} has no regression rule")]
-    MissingRule(String),
-    #[error("diagnostic qualification group {0} cannot be consumed as timing-gate evidence")]
-    DiagnosticCannotBeGated(String),
+    #[error("qualification baseline omits runtime group {0}")]
+    MissingGroup(String),
+    #[error("qualification group {0} has an incompatible claim and baseline disposition")]
+    DispositionMismatch(String),
     #[error("qualification report omits threshold measurement {0}")]
     MissingMeasurement(String),
     #[error("qualification measurement {measurement_id} has non-passing outcome {outcome:?}")]
@@ -281,16 +318,29 @@ pub(super) enum RegressionError {
     Artifact(#[from] super::artifact::ArtifactError),
     #[error(transparent)]
     Report(#[from] super::report::ReportError),
+    #[error(transparent)]
+    Group(#[from] super::group::GroupError),
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::protocol::ProtocolId;
     use super::*;
+
+    fn diagnostic_contract() -> super::super::group::GroupContract {
+        super::super::group::GroupContract {
+            id: ProtocolId::try_new("group").expect("group id"),
+            claim_class: ClaimClass::DiagnosticInfrastructure,
+            baseline_eligibility: BaselineEligibility::ReportOnly,
+            workload_id: ProtocolId::try_new("workload").expect("workload id"),
+            measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
+            correctness_case_ids: Vec::new(),
+        }
+    }
 
     #[test]
     fn baseline_rejects_duplicate_rules_and_invalid_ratios() {
         let rule = RegressionRule {
-            group_id: "group".to_string(),
             measurement_id: "main".to_string(),
             max_median_ratio: "1.25".to_string(),
             max_confidence_interval_upper: "1.25".to_string(),
@@ -298,9 +348,13 @@ mod tests {
         let baseline = RegressionBaseline {
             schema_version: BASELINE_SCHEMA_VERSION,
             performance_inventory_sha256: "a".repeat(64),
-            groups: vec![rule.clone(), rule],
+            groups: vec![RegressionGroup {
+                group_id: "group".to_string(),
+                baseline_eligibility: BaselineEligibility::ReportOnly,
+                measurements: vec![rule.clone(), rule],
+            }],
         };
-        assert!(validate_baseline(&baseline).is_err());
+        assert!(validate_baseline(&baseline, &[diagnostic_contract()]).is_err());
         assert!(parse_ratio("ratio", "NaN").is_err());
         assert!(parse_ratio("ratio", "0").is_err());
     }
@@ -308,16 +362,67 @@ mod tests {
     #[test]
     fn diagnostic_evidence_can_be_report_only_but_never_thresholded() {
         assert_eq!(
-            rule_disposition(ClaimClass::DiagnosticInfrastructure, false, true, "group")
-                .expect("diagnostic report-only disposition"),
+            rule_disposition(
+                ClaimClass::DiagnosticInfrastructure,
+                false,
+                BaselineEligibility::ReportOnly,
+                "group"
+            )
+            .expect("diagnostic report-only disposition"),
             RuleDisposition::ReportOnly
         );
         assert!(
-            rule_disposition(ClaimClass::DiagnosticInfrastructure, false, false, "group").is_err()
+            rule_disposition(
+                ClaimClass::DiagnosticInfrastructure,
+                false,
+                BaselineEligibility::ThresholdEligible,
+                "group"
+            )
+            .is_err()
         );
         assert!(
-            rule_disposition(ClaimClass::PromotablePerformance, false, false, "group").is_err()
+            rule_disposition(
+                ClaimClass::PromotablePerformance,
+                false,
+                BaselineEligibility::ThresholdEligible,
+                "group"
+            )
+            .is_err()
         );
+    }
+
+    #[test]
+    fn baseline_requires_one_exact_report_only_entry_for_diagnostics() {
+        let contract = diagnostic_contract();
+        let valid = RegressionBaseline {
+            schema_version: BASELINE_SCHEMA_VERSION,
+            performance_inventory_sha256: "a".repeat(64),
+            groups: vec![RegressionGroup {
+                group_id: "group".to_string(),
+                baseline_eligibility: BaselineEligibility::ReportOnly,
+                measurements: Vec::new(),
+            }],
+        };
+        validate_baseline(&valid, std::slice::from_ref(&contract))
+            .expect("complete report-only baseline");
+
+        let mut missing = valid.clone();
+        missing.groups.clear();
+        assert!(matches!(
+            validate_baseline(&missing, std::slice::from_ref(&contract)),
+            Err(RegressionError::BaselineContractMismatch)
+        ));
+
+        let mut thresholded = valid;
+        thresholded
+            .groups
+            .first_mut()
+            .expect("group")
+            .baseline_eligibility = BaselineEligibility::ThresholdEligible;
+        assert!(matches!(
+            validate_baseline(&thresholded, &[contract]),
+            Err(RegressionError::BaselineContractMismatch)
+        ));
     }
 
     #[test]

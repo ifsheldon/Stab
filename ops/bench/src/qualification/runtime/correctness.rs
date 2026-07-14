@@ -17,7 +17,7 @@ pub(super) enum CorrectnessPreflightStatus {
     Passed,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct CorrectnessPreflightEvidence {
     pub(super) status: CorrectnessPreflightStatus,
@@ -40,6 +40,8 @@ pub(super) enum CorrectnessRequirement<'a> {
         case_ids: &'a [String],
         expected_manifest_sha256: &'a str,
         expected_stab_commit: &'a str,
+        expected_request_sha256: &'a str,
+        expected_completion_sha256: &'a str,
     },
 }
 
@@ -69,12 +71,16 @@ pub(super) fn validate(
             case_ids,
             expected_manifest_sha256,
             expected_stab_commit,
+            expected_request_sha256,
+            expected_completion_sha256,
         } => validate_required(
             root,
             output,
             case_ids,
             expected_manifest_sha256,
             expected_stab_commit,
+            expected_request_sha256,
+            expected_completion_sha256,
         ),
     }
 }
@@ -85,9 +91,15 @@ fn validate_required(
     case_ids: &[String],
     expected_manifest_sha256: &str,
     expected_stab_commit: &str,
+    expected_request_sha256: &str,
+    expected_completion_sha256: &str,
 ) -> Result<CorrectnessPreflightEvidence, CorrectnessError> {
     validate_output_path(output)?;
-    if !valid_sha256(expected_manifest_sha256) || !valid_git_commit(expected_stab_commit) {
+    if !valid_sha256(expected_manifest_sha256)
+        || !valid_git_commit(expected_stab_commit)
+        || !valid_sha256(expected_request_sha256)
+        || !valid_sha256(expected_completion_sha256)
+    {
         return Err(CorrectnessError::InvalidExpectation);
     }
     let required = case_ids.iter().collect::<BTreeSet<_>>();
@@ -104,7 +116,9 @@ fn validate_required(
     let request_sha256 = super::run::sha256_hex(&request);
     let completion_sha256 = super::run::sha256_hex(&completion);
     let report_sha256 = super::run::sha256_hex(&report);
-    if preflight.schema_version != CORRECTNESS_PREFLIGHT_SCHEMA_VERSION
+    if request_sha256 != expected_request_sha256
+        || completion_sha256 != expected_completion_sha256
+        || preflight.schema_version != CORRECTNESS_PREFLIGHT_SCHEMA_VERSION
         || preflight.qualification_manifest_digest != expected_manifest_sha256
         || preflight.run_request_sha256 != request_sha256
         || preflight.completion_sha256 != completion_sha256
@@ -272,12 +286,14 @@ mod tests {
         let manifest = "a".repeat(64);
         let commit = "b".repeat(40);
         let receipt_digest = "c".repeat(64);
+        let request_sha256 = crate::qualification::runtime::run::sha256_hex(request);
+        let completion_sha256 = crate::qualification::runtime::run::sha256_hex(completion);
         let preflight = serde_json::json!({
             "schema_version": CORRECTNESS_PREFLIGHT_SCHEMA_VERSION,
             "report_sha256": crate::qualification::runtime::run::sha256_hex(report),
-            "completion_sha256": crate::qualification::runtime::run::sha256_hex(completion),
+            "completion_sha256": completion_sha256,
             "qualification_manifest_digest": manifest,
-            "run_request_sha256": crate::qualification::runtime::run::sha256_hex(request),
+            "run_request_sha256": request_sha256,
             "stab_commit": commit,
             "local_modifications": false,
             "stim_commit": STIM_COMMIT,
@@ -308,10 +324,27 @@ mod tests {
                 case_ids: &["cq-case".to_string()],
                 expected_manifest_sha256: &"a".repeat(64),
                 expected_stab_commit: &"b".repeat(40),
+                expected_request_sha256: &request_sha256,
+                expected_completion_sha256: &completion_sha256,
             },
         )
         .expect("bound correctness preflight");
         assert_eq!(evidence.status, CorrectnessPreflightStatus::Passed);
+
+        assert!(
+            validate(
+                &root,
+                CorrectnessRequirement::Required {
+                    output: relative,
+                    case_ids: &["cq-case".to_string()],
+                    expected_manifest_sha256: &"a".repeat(64),
+                    expected_stab_commit: &"b".repeat(40),
+                    expected_request_sha256: &"0".repeat(64),
+                    expected_completion_sha256: &completion_sha256,
+                },
+            )
+            .is_err()
+        );
 
         let mut stale = preflight;
         stale
@@ -334,6 +367,8 @@ mod tests {
                     case_ids: &["cq-case".to_string()],
                     expected_manifest_sha256: &"a".repeat(64),
                     expected_stab_commit: &"b".repeat(40),
+                    expected_request_sha256: &request_sha256,
+                    expected_completion_sha256: &completion_sha256,
                 },
             )
             .is_err()

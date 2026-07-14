@@ -7,7 +7,6 @@ use thiserror::Error;
 
 use super::calibration::{CalibrationProbe, calibrate};
 use super::correctness::CorrectnessPreflightStatus;
-use super::invocation::protocol_ids;
 use super::protocol::{EvidenceMode, Implementation, ProtocolId, SemanticDigest};
 use super::run::{
     ClaimClass, PairExecution, QualificationReport, QualificationTier, REPORT_SCHEMA_VERSION,
@@ -16,7 +15,7 @@ use super::run::{
 use super::statistics::{PairOrder, PairedSample, pair_measurements, summarize};
 use crate::config::{STIM_COMMIT, STIM_TAG};
 
-const PREFLIGHT_SCHEMA_VERSION: u32 = 3;
+const PREFLIGHT_SCHEMA_VERSION: u32 = 4;
 const EXPECTED_WARMUPS: usize = 3;
 const EXPECTED_MAXIMUM_TIMING_ATTEMPTS: usize = 2;
 const EXPECTED_THRESHOLD: f64 = 1.25;
@@ -34,7 +33,9 @@ pub(super) struct PerformancePreflightArtifact {
     schema_version: u32,
     report_sha256: String,
     group_id: String,
+    group_contract_sha256: String,
     claim_class: ClaimClass,
+    baseline_eligibility: super::group::BaselineEligibility,
     tier: QualificationTier,
     performance_inventory_sha256: String,
     correctness_inventory_sha256: String,
@@ -64,10 +65,7 @@ pub(super) fn validate_report(
             expected: REPORT_SCHEMA_VERSION,
         });
     }
-    if report.group_id != "pq1-adapter-protocol-smoke"
-        || report.stim_tag != STIM_TAG
-        || report.stim_commit != STIM_COMMIT
-    {
+    if report.stim_tag != STIM_TAG || report.stim_commit != STIM_COMMIT {
         return Err(ReportError::Identity);
     }
     if report.command.output.is_empty()
@@ -89,6 +87,15 @@ pub(super) fn validate_report(
         "correctness_inventory_sha256",
         &report.correctness_inventory_sha256,
     )?;
+    validate_sha256("group_contract_sha256", &report.group_contract_sha256)?;
+    let resolved_group =
+        super::group::load_group(root, &report.performance_inventory_sha256, &report.group_id)?;
+    if report.group_contract_sha256 != resolved_group.source_sha256
+        || report.claim_class != resolved_group.contract.claim_class
+        || report.baseline_eligibility != resolved_group.contract.baseline_eligibility
+    {
+        return Err(ReportError::GroupEvidence);
+    }
     validate_sha256("host_policy_sha256", &report.host.policy_sha256)?;
     validate_sha256("stim_source_sha256", &report.workers.stim_source_sha256)?;
     validate_sha256(
@@ -170,13 +177,13 @@ pub(super) fn validate_report(
         return Err(ReportError::HostEvidence);
     }
     report.host.validate_against_policy(root)?;
-    validate_all_worker_receipts(report)?;
-    validate_correctness_evidence(report)?;
+    validate_all_worker_receipts(report, &resolved_group.contract)?;
+    validate_correctness_evidence(root, report, &resolved_group.contract)?;
     validate_pair_execution(&report.semantic_preflight, EvidenceMode::Timing)?;
     validate_calibration(report)?;
     validate_timing_attempts(report)?;
     validate_memory(report)?;
-    validate_claim(report)?;
+    validate_claim(report, &resolved_group.contract)?;
     Ok(())
 }
 
@@ -314,7 +321,11 @@ fn statistics_equivalent(
         })
 }
 
-fn validate_correctness_evidence(report: &QualificationReport) -> Result<(), ReportError> {
+fn validate_correctness_evidence(
+    root: &crate::root::RepoRoot,
+    report: &QualificationReport,
+    group: &super::group::GroupContract,
+) -> Result<(), ReportError> {
     let evidence = &report.correctness_preflight;
     match evidence.status {
         CorrectnessPreflightStatus::NotApplicable => {
@@ -326,12 +337,15 @@ fn validate_correctness_evidence(report: &QualificationReport) -> Result<(), Rep
                 || evidence.completion_sha256.is_some()
                 || evidence.report_sha256.is_some()
                 || evidence.preflight_sha256.is_some()
+                || report.command.correctness_output.is_some()
+                || report.command.correctness_request_sha256.is_some()
+                || report.command.correctness_completion_sha256.is_some()
             {
                 return Err(ReportError::CorrectnessEvidence);
             }
         }
         CorrectnessPreflightStatus::Passed => {
-            if evidence.case_ids.is_empty()
+            if evidence.case_ids != group.correctness_case_ids
                 || evidence.reason.trim().is_empty()
                 || evidence
                     .source_directory
@@ -350,13 +364,52 @@ fn validate_correctness_evidence(report: &QualificationReport) -> Result<(), Rep
             {
                 return Err(ReportError::CorrectnessEvidence);
             }
+            let output = report
+                .command
+                .correctness_output
+                .as_deref()
+                .ok_or(ReportError::CorrectnessEvidence)?;
+            let request_sha256 = report
+                .command
+                .correctness_request_sha256
+                .as_deref()
+                .ok_or(ReportError::CorrectnessEvidence)?;
+            let completion_sha256 = report
+                .command
+                .correctness_completion_sha256
+                .as_deref()
+                .ok_or(ReportError::CorrectnessEvidence)?;
+            if evidence.source_directory.as_deref() != Some(output)
+                || evidence.request_sha256.as_deref() != Some(request_sha256)
+                || evidence.completion_sha256.as_deref() != Some(completion_sha256)
+            {
+                return Err(ReportError::CorrectnessEvidence);
+            }
+            let reconstructed = super::correctness::validate(
+                root,
+                super::correctness::CorrectnessRequirement::Required {
+                    output: std::path::Path::new(output),
+                    case_ids: &group.correctness_case_ids,
+                    expected_manifest_sha256: &report.correctness_inventory_sha256,
+                    expected_stab_commit: &report.repository.commit_before,
+                    expected_request_sha256: request_sha256,
+                    expected_completion_sha256: completion_sha256,
+                },
+            )?;
+            if *evidence != reconstructed {
+                return Err(ReportError::CorrectnessEvidence);
+            }
         }
     }
     Ok(())
 }
 
-fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), ReportError> {
-    let (workload_id, measurement_id) = protocol_ids()?;
+fn validate_all_worker_receipts(
+    report: &QualificationReport,
+    group: &super::group::GroupContract,
+) -> Result<(), ReportError> {
+    let workload_id = &group.workload_id;
+    let measurement_id = group.single_measurement()?;
     let identity = ReceiptIdentity::from_report(report)?;
     let preflight_stim = only_row(&report.semantic_preflight.stim.rows)?;
     let preflight_stab = only_row(&report.semantic_preflight.stab.rows)?;
@@ -373,8 +426,8 @@ fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), Repo
     let common_timing = PhaseExpectation {
         evidence_mode: EvidenceMode::Timing,
         iterations: report.calibration.common_iterations,
-        workload_id: &workload_id,
-        measurement_id: &measurement_id,
+        workload_id,
+        measurement_id,
         output_digest: Some(expected_output_digest),
     };
     validate_pair_receipts(&identity, &report.semantic_preflight, &common_timing)?;
@@ -382,8 +435,8 @@ fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), Repo
         let phase = PhaseExpectation {
             evidence_mode: EvidenceMode::Timing,
             iterations: probe.iterations,
-            workload_id: &workload_id,
-            measurement_id: &measurement_id,
+            workload_id,
+            measurement_id,
             output_digest: None,
         };
         validate_invocation_receipt(&identity, &probe.invocation, Implementation::Stim, &phase)?;
@@ -392,8 +445,8 @@ fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), Repo
         let phase = PhaseExpectation {
             evidence_mode: EvidenceMode::Timing,
             iterations: probe.iterations,
-            workload_id: &workload_id,
-            measurement_id: &measurement_id,
+            workload_id,
+            measurement_id,
             output_digest: None,
         };
         validate_invocation_receipt(&identity, &probe.invocation, Implementation::Stab, &phase)?;
@@ -657,26 +710,34 @@ fn memory_receipts_match(
         && memory.stab_peak_rss_bytes >= memory.stab_setup_rss_bytes
 }
 
-fn validate_claim(report: &QualificationReport) -> Result<(), ReportError> {
+fn validate_claim(
+    report: &QualificationReport,
+    group: &super::group::GroupContract,
+) -> Result<(), ReportError> {
     match report.claim_class {
         ClaimClass::DiagnosticInfrastructure => {
             if report.promotable
+                || group.baseline_eligibility != super::group::BaselineEligibility::ReportOnly
                 || report.correctness_preflight.status != CorrectnessPreflightStatus::NotApplicable
                 || !report.correctness_preflight.case_ids.is_empty()
+                || !group.correctness_case_ids.is_empty()
             {
                 return Err(ReportError::Claim);
             }
         }
         ClaimClass::PromotablePerformance => {
-            if !promotable_claim_requirements(
-                report.promotable,
-                report.tier,
-                report.repository.local_modifications_before,
-                report.repository.local_modifications_after,
-                report.host.verified,
-                report.correctness_preflight.status,
-                report.correctness_preflight.case_ids.len(),
-            ) {
+            if group.baseline_eligibility != super::group::BaselineEligibility::ThresholdEligible
+                || report.correctness_preflight.case_ids != group.correctness_case_ids
+                || !promotable_claim_requirements(
+                    report.promotable,
+                    report.tier,
+                    report.repository.local_modifications_before,
+                    report.repository.local_modifications_after,
+                    report.host.verified,
+                    report.correctness_preflight.status,
+                    report.correctness_preflight.case_ids.len(),
+                )
+            {
                 return Err(ReportError::Claim);
             }
         }
@@ -814,7 +875,9 @@ pub(super) fn preflight_artifact(
         schema_version: PREFLIGHT_SCHEMA_VERSION,
         report_sha256: sha256_hex(report_json),
         group_id: report.group_id.clone(),
+        group_contract_sha256: report.group_contract_sha256.clone(),
         claim_class: report.claim_class,
+        baseline_eligibility: report.baseline_eligibility,
         tier: report.tier,
         performance_inventory_sha256: report.performance_inventory_sha256.clone(),
         correctness_inventory_sha256: report.correctness_inventory_sha256.clone(),
@@ -865,8 +928,11 @@ pub(super) fn render_markdown(report: &QualificationReport, report_sha256: &str)
             .map_or("unavailable".to_string(), |value| value.to_string())
     };
     format!(
-        "# PQ1 Qualification Harness Report\n\n- Group: `{}`\n- Claim class: diagnostic infrastructure\n- Tier: `{:?}`\n- Stim: `{}` (`{}`)\n- Stab commit: `{}`\n- Local modifications: `{}`\n- Host profile: `{}`\n- Host verified: `{}`\n- CPU: `{}` on `{}`\n- Frequency governor: `{:?}`\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: `{}`\n- Target: `{}`\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median diagnostic ratio: `{}`\n- Upper bootstrap bound: `{}`\n- Diagnostic 1.25 outcome: `{}`\n- Process memory evidence: separate from timing\n- Promotable product claim: `false`\n- Report SHA-256: `{}`\n",
+        "# PQ1 Qualification Harness Report\n\n- Group: `{}`\n- Group contract SHA-256: `{}`\n- Claim class: `{:?}`\n- Baseline eligibility: `{:?}`\n- Tier: `{:?}`\n- Stim: `{}` (`{}`)\n- Stab commit: `{}`\n- Local modifications: `{}`\n- Host profile: `{}`\n- Host verified: `{}`\n- CPU: `{}` on `{}`\n- Frequency governor: `{:?}`\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: `{}`\n- Target: `{}`\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median diagnostic ratio: `{}`\n- Upper bootstrap bound: `{}`\n- Diagnostic 1.25 outcome: `{}`\n- Process memory evidence: separate from timing\n- Promotable product claim: `{}`\n- Report SHA-256: `{}`\n",
         report.group_id,
+        report.group_contract_sha256,
+        report.claim_class,
+        report.baseline_eligibility,
         report.tier,
         report.stim_tag,
         report.stim_commit,
@@ -892,6 +958,7 @@ pub(super) fn render_markdown(report: &QualificationReport, report_sha256: &str)
         median,
         upper,
         outcome,
+        report.promotable,
         report_sha256,
     )
 }
@@ -902,6 +969,8 @@ pub(super) enum ReportError {
     SchemaVersion { actual: u32, expected: u32 },
     #[error("qualification report has stale group or Stim identity")]
     Identity,
+    #[error("qualification report group contract evidence is stale or inconsistent")]
+    GroupEvidence,
     #[error("qualification report command evidence is invalid")]
     CommandEvidence,
     #[error("qualification report field {0} is not a lowercase SHA-256 digest")]
@@ -961,7 +1030,11 @@ pub(super) enum ReportError {
     #[error(transparent)]
     Protocol(#[from] super::protocol::ProtocolError),
     #[error(transparent)]
+    Correctness(#[from] super::correctness::CorrectnessError),
+    #[error(transparent)]
     Host(#[from] super::host::HostError),
+    #[error(transparent)]
+    Group(#[from] super::group::GroupError),
     #[error(transparent)]
     Artifact(#[from] super::artifact::ArtifactError),
     #[error("qualification report JSON must be nonempty and newline terminated")]

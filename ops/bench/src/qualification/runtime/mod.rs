@@ -4,6 +4,7 @@ mod calibration;
 mod correctness;
 mod executable;
 mod git;
+mod group;
 mod host;
 mod invocation;
 mod probe;
@@ -59,5 +60,6 @@ pub(crate) fn check_contracts(
     inventory_digest: &str,
 ) -> Result<(), String> {
     host::check_policy(root).map_err(|error| error.to_string())?;
+    group::check(root, inventory_digest).map_err(|error| error.to_string())?;
     regression::check_baseline(root, inventory_digest).map_err(|error| error.to_string())
 }

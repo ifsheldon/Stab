@@ -19,7 +19,8 @@ use super::statistics::{
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 11;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 12;
+const PQ1_GROUP_ID: &str = "pq1-adapter-protocol-smoke";
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
@@ -70,9 +71,19 @@ pub(crate) struct RunArgs {
     #[arg(long)]
     correctness_out: Option<PathBuf>,
 
-    /// Exact CQ1 case required by a future promotable product group.
-    #[arg(long, requires = "correctness_out")]
-    correctness_case: Vec<String>,
+    /// Controller-approved SHA-256 of the CQ1 request artifact.
+    #[arg(
+        long,
+        requires_all = ["correctness_out", "correctness_completion_sha256"]
+    )]
+    correctness_request_sha256: Option<String>,
+
+    /// Controller-approved SHA-256 of the CQ1 completion artifact.
+    #[arg(
+        long,
+        requires_all = ["correctness_out", "correctness_request_sha256"]
+    )]
+    correctness_completion_sha256: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -87,7 +98,9 @@ pub(super) enum ClaimClass {
 pub(super) struct QualificationReport {
     pub(super) schema_version: u32,
     pub(super) group_id: String,
+    pub(super) group_contract_sha256: String,
     pub(super) claim_class: ClaimClass,
+    pub(super) baseline_eligibility: super::group::BaselineEligibility,
     pub(super) tier: QualificationTier,
     pub(super) command: RunCommandEvidence,
     pub(super) generated_unix_epoch_seconds: u64,
@@ -119,6 +132,9 @@ pub(super) struct RunCommandEvidence {
     pub(super) paired_samples: usize,
     pub(super) maximum_timing_attempts: usize,
     pub(super) invocation_timeout_seconds: u64,
+    pub(super) correctness_output: Option<String>,
+    pub(super) correctness_request_sha256: Option<String>,
+    pub(super) correctness_completion_sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -216,10 +232,16 @@ pub(super) fn run(
     args: RunArgs,
 ) -> Result<PathBuf, RunError> {
     let repository_before = super::git::repository_state(root)?;
-    let claim_class = ClaimClass::DiagnosticInfrastructure;
+    let resolved_group =
+        super::group::load_group(root, performance_inventory_sha256, PQ1_GROUP_ID)?;
+    let (workload_id, measurement_id) = protocol_ids()?;
+    resolved_group
+        .contract
+        .validate_worker_shape(&workload_id, &measurement_id)?;
+    let claim_class = resolved_group.contract.claim_class;
     let correctness_preflight = correctness_preflight(
         root,
-        claim_class,
+        &resolved_group.contract,
         &args,
         correctness_inventory_sha256,
         &repository_before.commit,
@@ -317,8 +339,10 @@ pub(super) fn run(
     };
     let report = QualificationReport {
         schema_version: REPORT_SCHEMA_VERSION,
-        group_id: "pq1-adapter-protocol-smoke".to_string(),
+        group_id: resolved_group.contract.id.to_string(),
+        group_contract_sha256: resolved_group.source_sha256,
         claim_class,
+        baseline_eligibility: resolved_group.contract.baseline_eligibility,
         tier: args.tier,
         command: RunCommandEvidence {
             output: args.out.to_string_lossy().into_owned(),
@@ -328,6 +352,12 @@ pub(super) fn run(
             paired_samples: args.tier.pair_count(),
             maximum_timing_attempts: MAXIMUM_TIMING_ATTEMPTS,
             invocation_timeout_seconds: INVOCATION_TIMEOUT.as_secs(),
+            correctness_output: args
+                .correctness_out
+                .as_ref()
+                .map(|path| path.to_string_lossy().into_owned()),
+            correctness_request_sha256: args.correctness_request_sha256.clone(),
+            correctness_completion_sha256: args.correctness_completion_sha256.clone(),
         },
         generated_unix_epoch_seconds: unix_epoch_seconds()?,
         stim_tag: STIM_TAG.to_string(),
@@ -363,14 +393,17 @@ pub(super) fn run(
 
 fn correctness_preflight(
     root: &RepoRoot,
-    claim_class: ClaimClass,
+    group: &super::group::GroupContract,
     args: &RunArgs,
     correctness_inventory_sha256: &str,
     stab_commit: &str,
 ) -> Result<CorrectnessPreflightEvidence, RunError> {
-    let requirement = match claim_class {
+    let requirement = match group.claim_class {
         ClaimClass::DiagnosticInfrastructure => {
-            if args.correctness_out.is_some() || !args.correctness_case.is_empty() {
+            if args.correctness_out.is_some()
+                || args.correctness_request_sha256.is_some()
+                || args.correctness_completion_sha256.is_some()
+            {
                 return Err(RunError::UnexpectedCorrectnessInput);
             }
             CorrectnessRequirement::NotApplicable {
@@ -382,9 +415,17 @@ fn correctness_preflight(
                 .correctness_out
                 .as_deref()
                 .ok_or(RunError::MissingCorrectnessInput)?,
-            case_ids: &args.correctness_case,
+            case_ids: &group.correctness_case_ids,
             expected_manifest_sha256: correctness_inventory_sha256,
             expected_stab_commit: stab_commit,
+            expected_request_sha256: args
+                .correctness_request_sha256
+                .as_deref()
+                .ok_or(RunError::MissingCorrectnessInput)?,
+            expected_completion_sha256: args
+                .correctness_completion_sha256
+                .as_deref()
+                .ok_or(RunError::MissingCorrectnessInput)?,
         },
     };
     Ok(super::correctness::validate(root, requirement)?)
@@ -661,12 +702,16 @@ pub(super) enum RunError {
     #[error(transparent)]
     Git(#[from] super::git::GitError),
     #[error(transparent)]
+    Group(#[from] super::group::GroupError),
+    #[error(transparent)]
     Report(#[from] super::report::ReportError),
     #[error("qualification maximum iteration cap must be positive")]
     InvalidIterationCap,
     #[error("diagnostic PQ1 protocol-smoke does not accept product correctness evidence")]
     UnexpectedCorrectnessInput,
-    #[error("promotable performance evidence requires a CQ1 report directory and exact cases")]
+    #[error(
+        "promotable performance evidence requires a CQ1 report directory plus controller-approved request and completion digests"
+    )]
     MissingCorrectnessInput,
     #[error(
         "common calibrated batch measured {measured:?} for {implementation}, outside the source-owned bounds"

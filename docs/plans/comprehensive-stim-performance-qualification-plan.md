@@ -146,6 +146,7 @@ Every JSON and Markdown report must record:
 - Stim tag, commit, source digest, binary digest, and adapter digest when used.
 - Rust and C++ compiler versions, build profiles, relevant flags, target triple, operating system, architecture, CPU model, logical CPU count, available memory, and CPU-affinity or governor status when observable.
 - Tier, group filters, fixture digests, correctness preflight result, timeout policy, warmup count, sample count, calibration decisions, and run order.
+- Runtime-group contract digest, immutable claim class, baseline eligibility, exact workload and measurement IDs, exact group-owned correctness cases, and controller-approved correctness request and completion digests for promotable groups.
 - Raw sample durations, work counts, normalized rates, paired ratios, median paired ratio, relative median absolute deviation, and deterministic bootstrap confidence interval.
 - Peak resident memory, allocation counts and bytes where available, memory-growth classification, and scaling slopes where required.
 - Passed, failed, noisy, report-only, covered-by-parent, not-performance-relevant, and no-faithful-comparator counts by domain.
@@ -425,7 +426,7 @@ Make faithful comparison, calibration, statistics, and reporting reusable before
 3. Implement the pinned-Stim adapter and Stab qualification worker, including build or binary fingerprints, their shared JSON Lines protocol, and the bounded parent parser.
 4. Implement deterministic batch calibration, three warmups, interleaved paired order, raw sample retention, normalized work rates, median paired ratios, relative median absolute deviation, and fixed-seed bootstrap intervals.
 5. Implement exact submeasurement pairing and worst-upper-bound group summaries.
-6. Implement correctness and output-digest preflight before timing.
+6. Implement correctness and output-digest preflight before timing, with exact correctness cases owned by a source runtime-group contract and externally approved CQ request and completion digests.
 7. Implement host-policy validation, process peak-RSS and setup-baseline sampling, and existing Stab allocation tracking as separate evidence.
 8. Add `qualification-list`, `qualification-check`, `qualification-probe`, `qualification-run`, `qualification-report`, and `qualification-regression` commands.
 
@@ -441,6 +442,7 @@ Make faithful comparison, calibration, statistics, and reporting reusable before
 - Integration-test adapter commit mismatch, source digest mismatch, stale binary fingerprint, malformed JSON, extra rows, missing fields, non-finite values, and oversized output.
 - Integration-test Stab worker fingerprint mismatch, protocol drift, setup-memory ordering, worker panic, and parent-child work or digest disagreement.
 - Integration-test host-policy pass, affinity failure, excessive load, insufficient memory, active swap, unavailable required probes, environment-unverified local mode, exclusive-lease contention and release, source-policy digest drift, and hostile report mutations that hide or fabricate violations.
+- Test runtime-group duplicate, claim-class, baseline-eligibility, worker-shape, and correctness-case validation; baseline missing, unknown, stale, diagnostic-threshold, and incomplete-rule rejection; and externally approved CQ request and completion digest mismatch.
 - Test that a memory-instrumented run cannot be consumed as timing-gate evidence.
 - Test that a dirty worktree report cannot be promoted as source-owned final evidence.
 
