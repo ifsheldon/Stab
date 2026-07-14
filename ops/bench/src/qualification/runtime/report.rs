@@ -5,8 +5,10 @@ use clap::Args;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use super::calibration::{CalibrationProbe, calibrate};
 use super::correctness::CorrectnessPreflightStatus;
-use super::protocol::{EvidenceMode, Implementation};
+use super::invocation::protocol_ids;
+use super::protocol::{EvidenceMode, Implementation, ProtocolId, SemanticDigest};
 use super::run::{
     ClaimClass, PairExecution, QualificationReport, QualificationTier, REPORT_SCHEMA_VERSION,
     sha256_hex,
@@ -315,82 +317,154 @@ fn validate_correctness_evidence(report: &QualificationReport) -> Result<(), Rep
 }
 
 fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), ReportError> {
+    let (workload_id, measurement_id) = protocol_ids()?;
+    let identity = ReceiptIdentity::from_report(report)?;
     let preflight_stim = only_row(&report.semantic_preflight.stim.rows)?;
     let preflight_stab = only_row(&report.semantic_preflight.stab.rows)?;
     if preflight_stim.output_digest != preflight_stab.output_digest {
         return Err(ReportError::WorkerReceipt);
     }
-    if preflight_stim.iteration_count != report.calibration.common_iterations
-        || preflight_stab.iteration_count != report.calibration.common_iterations
+    if report.semantic_preflight.pair_index != 0
+        || report.calibration.common_validation.pair_index != 0
+        || report.memory.execution.pair_index != 0
     {
-        return Err(ReportError::WorkerReceipt);
+        return Err(ReportError::PairIndex);
     }
     let expected_output_digest = &preflight_stim.output_digest;
-    let mut invocations = Vec::new();
-    push_pair_invocations(&mut invocations, &report.semantic_preflight, true);
+    let common_timing = PhaseExpectation {
+        evidence_mode: EvidenceMode::Timing,
+        iterations: report.calibration.common_iterations,
+        workload_id: &workload_id,
+        measurement_id: &measurement_id,
+        output_digest: Some(expected_output_digest),
+    };
+    validate_pair_receipts(&identity, &report.semantic_preflight, &common_timing)?;
     for probe in &report.calibration.stim.probes {
-        invocations.push((&probe.invocation, false));
+        let phase = PhaseExpectation {
+            evidence_mode: EvidenceMode::Timing,
+            iterations: probe.iterations,
+            workload_id: &workload_id,
+            measurement_id: &measurement_id,
+            output_digest: None,
+        };
+        validate_invocation_receipt(&identity, &probe.invocation, Implementation::Stim, &phase)?;
     }
     for probe in &report.calibration.stab.probes {
-        invocations.push((&probe.invocation, false));
+        let phase = PhaseExpectation {
+            evidence_mode: EvidenceMode::Timing,
+            iterations: probe.iterations,
+            workload_id: &workload_id,
+            measurement_id: &measurement_id,
+            output_digest: None,
+        };
+        validate_invocation_receipt(&identity, &probe.invocation, Implementation::Stab, &phase)?;
     }
-    push_pair_invocations(
-        &mut invocations,
+    validate_pair_receipts(
+        &identity,
         &report.calibration.common_validation,
-        true,
-    );
+        &common_timing,
+    )?;
     for pair in &report.warmups {
-        push_pair_invocations(&mut invocations, pair, true);
+        validate_pair_receipts(&identity, pair, &common_timing)?;
     }
     for pair in &report.samples {
-        push_pair_invocations(&mut invocations, pair, true);
+        validate_pair_receipts(&identity, pair, &common_timing)?;
     }
-    push_pair_invocations(&mut invocations, &report.memory.execution, true);
-    let expected_cpu =
-        u32::try_from(report.host.selected_cpu).map_err(|_| ReportError::HostEvidence)?;
-    for (invocation, bind_output_digest) in invocations {
-        if invocation.rows.len() != 1 {
-            return Err(ReportError::MeasurementCount(invocation.rows.len()));
-        }
-        for row in &invocation.rows {
-            row.validate_values()?;
-            let expected_work_count = row
-                .iteration_count
-                .checked_mul(report.command.work_items)
-                .ok_or(ReportError::WorkOverflow)?;
-            let (source, build) = match invocation.implementation {
-                Implementation::Stim => (
-                    &report.workers.stim_source_sha256,
-                    &report.workers.stim_build_fingerprint,
-                ),
-                Implementation::Stab => (
-                    &report.workers.stab_source_sha256,
-                    &report.workers.stab_build_fingerprint,
-                ),
-            };
-            if row.implementation != invocation.implementation
-                || row.evidence_mode != invocation.evidence_mode
-                || row.affinity_cpu != Some(expected_cpu)
-                || row.stim_commit.as_str() != report.stim_commit
-                || row.work_count != expected_work_count
-                || bind_output_digest && row.output_digest != *expected_output_digest
-                || row.source_digest.as_str() != source
-                || row.build_fingerprint.as_str() != build
-            {
-                return Err(ReportError::WorkerReceipt);
-            }
-        }
-    }
+    let common_memory = PhaseExpectation {
+        evidence_mode: EvidenceMode::Memory,
+        ..common_timing
+    };
+    validate_pair_receipts(&identity, &report.memory.execution, &common_memory)?;
     Ok(())
 }
 
-fn push_pair_invocations<'a>(
-    invocations: &mut Vec<(&'a super::invocation::InvocationRecord, bool)>,
-    pair: &'a PairExecution,
-    bind_output_digest: bool,
-) {
-    invocations.push((&pair.stim, bind_output_digest));
-    invocations.push((&pair.stab, bind_output_digest));
+struct ReceiptIdentity<'a> {
+    work_items: u64,
+    expected_cpu: u32,
+    stim_commit: &'a str,
+    stim_source: &'a str,
+    stim_build: &'a str,
+    stab_source: &'a str,
+    stab_build: &'a str,
+}
+
+impl<'a> ReceiptIdentity<'a> {
+    fn from_report(report: &'a QualificationReport) -> Result<Self, ReportError> {
+        Ok(Self {
+            work_items: report.command.work_items,
+            expected_cpu: u32::try_from(report.host.selected_cpu)
+                .map_err(|_| ReportError::HostEvidence)?,
+            stim_commit: &report.stim_commit,
+            stim_source: &report.workers.stim_source_sha256,
+            stim_build: &report.workers.stim_build_fingerprint,
+            stab_source: &report.workers.stab_source_sha256,
+            stab_build: &report.workers.stab_build_fingerprint,
+        })
+    }
+
+    fn source_and_build(&self, implementation: Implementation) -> (&str, &str) {
+        match implementation {
+            Implementation::Stim => (self.stim_source, self.stim_build),
+            Implementation::Stab => (self.stab_source, self.stab_build),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct PhaseExpectation<'a> {
+    evidence_mode: EvidenceMode,
+    iterations: u64,
+    workload_id: &'a ProtocolId,
+    measurement_id: &'a ProtocolId,
+    output_digest: Option<&'a SemanticDigest>,
+}
+
+fn validate_pair_receipts(
+    identity: &ReceiptIdentity<'_>,
+    pair: &PairExecution,
+    phase: &PhaseExpectation<'_>,
+) -> Result<(), ReportError> {
+    validate_invocation_receipt(identity, &pair.stim, Implementation::Stim, phase)?;
+    validate_invocation_receipt(identity, &pair.stab, Implementation::Stab, phase)
+}
+
+fn validate_invocation_receipt(
+    identity: &ReceiptIdentity<'_>,
+    invocation: &super::invocation::InvocationRecord,
+    implementation: Implementation,
+    phase: &PhaseExpectation<'_>,
+) -> Result<(), ReportError> {
+    let [row] = invocation.rows.as_slice() else {
+        return Err(ReportError::MeasurementCount(invocation.rows.len()));
+    };
+    row.validate_values()?;
+    let expected_work_count = phase
+        .iterations
+        .checked_mul(identity.work_items)
+        .ok_or(ReportError::WorkOverflow)?;
+    let (source, build) = identity.source_and_build(implementation);
+    if invocation.implementation != implementation
+        || invocation.evidence_mode != phase.evidence_mode
+        || !invocation.process_wall_seconds.is_finite()
+        || invocation.process_wall_seconds <= 0.0
+        || invocation.process_wall_seconds < row.elapsed_seconds
+        || row.implementation != implementation
+        || row.evidence_mode != phase.evidence_mode
+        || row.workload_id != *phase.workload_id
+        || row.measurement_id != *phase.measurement_id
+        || row.iteration_count != phase.iterations
+        || row.affinity_cpu != Some(identity.expected_cpu)
+        || row.stim_commit.as_str() != identity.stim_commit
+        || row.work_count != expected_work_count
+        || phase
+            .output_digest
+            .is_some_and(|expected| row.output_digest != *expected)
+        || row.source_digest.as_str() != source
+        || row.build_fingerprint.as_str() != build
+    {
+        return Err(ReportError::WorkerReceipt);
+    }
+    Ok(())
 }
 
 pub(super) fn run(root: &crate::root::RepoRoot, args: ReportArgs) -> Result<PathBuf, ReportError> {
@@ -437,25 +511,7 @@ fn validate_calibration(report: &QualificationReport) -> Result<(), ReportError>
         {
             return Err(ReportError::Calibration);
         }
-        let selected = implementation
-            .probes
-            .last()
-            .ok_or(ReportError::Calibration)?;
-        if selected.iterations != implementation.selected_iterations
-            || selected.invocation.implementation != expected
-            || selected.invocation.evidence_mode != EvidenceMode::Timing
-            || selected.invocation.measured_duration()?.as_secs_f64()
-                != implementation.selected_measured_seconds
-            || implementation.selected_measured_seconds < calibration.target_minimum_seconds
-            || implementation.selected_measured_seconds > calibration.maximum_seconds
-        {
-            return Err(ReportError::Calibration);
-        }
-        for probe in &implementation.probes {
-            if probe.iterations == 0 || probe.invocation.implementation != expected {
-                return Err(ReportError::Calibration);
-            }
-        }
+        replay_calibration(implementation)?;
     }
     if calibration.common_iterations
         != calibration
@@ -480,6 +536,49 @@ fn validate_calibration(report: &QualificationReport) -> Result<(), ReportError>
     Ok(())
 }
 
+fn replay_calibration(
+    implementation: &super::run::ImplementationCalibration,
+) -> Result<(), ReportError> {
+    let policy = super::run::calibration_policy().map_err(|_| ReportError::Calibration)?;
+    let mut probes = implementation.probes.iter();
+    let decision = calibrate(policy, |expected_iterations| {
+        let probe = probes
+            .next()
+            .ok_or_else(|| "calibration evidence ended before the decision".to_string())?;
+        let [row] = probe.invocation.rows.as_slice() else {
+            return Err("calibration invocation must contain exactly one row".to_string());
+        };
+        if probe.iterations != expected_iterations.get()
+            || row.iteration_count != probe.iterations
+            || probe.invocation.implementation != implementation.implementation
+            || probe.invocation.evidence_mode != EvidenceMode::Timing
+        {
+            return Err("calibration phase identity or iterations do not replay".to_string());
+        }
+        let measured = probe
+            .invocation
+            .measured_duration()
+            .map_err(|error| error.to_string())?;
+        let wall = probe
+            .invocation
+            .wall_duration()
+            .map_err(|error| error.to_string())?;
+        Ok(CalibrationProbe { measured, wall })
+    })
+    .map_err(|_| ReportError::Calibration)?;
+    if probes.next().is_some()
+        || decision.probes.len() != implementation.probes.len()
+        || decision.iterations.get() != implementation.selected_iterations
+        || !approximately_equal(
+            decision.measured.as_secs_f64(),
+            implementation.selected_measured_seconds,
+        )
+    {
+        return Err(ReportError::Calibration);
+    }
+    Ok(())
+}
+
 fn validate_memory(report: &QualificationReport) -> Result<(), ReportError> {
     let memory = &report.memory;
     if memory.evidence_mode != EvidenceMode::Memory
@@ -491,19 +590,30 @@ fn validate_memory(report: &QualificationReport) -> Result<(), ReportError> {
     validate_pair_shape(&memory.execution, EvidenceMode::Memory)?;
     let stim = only_row(&memory.execution.stim.rows)?;
     let stab = only_row(&memory.execution.stab.rows)?;
-    if stim.work_count != memory.work_count
-        || stim.work_count != stab.work_count
-        || stim.output_digest != stab.output_digest
-        || stim.setup_rss_bytes != Some(memory.stim_setup_rss_bytes)
-        || stim.peak_rss_bytes != Some(memory.stim_peak_rss_bytes)
-        || stab.setup_rss_bytes != Some(memory.stab_setup_rss_bytes)
-        || stab.peak_rss_bytes != Some(memory.stab_peak_rss_bytes)
-        || memory.stim_peak_rss_bytes < memory.stim_setup_rss_bytes
-        || memory.stab_peak_rss_bytes < memory.stab_setup_rss_bytes
-    {
+    if !memory_receipts_match(memory, stim, stab) {
         return Err(ReportError::Memory);
     }
     Ok(())
+}
+
+fn memory_receipts_match(
+    memory: &super::run::MemoryEvidence,
+    stim: &super::protocol::WorkerMeasurement,
+    stab: &super::protocol::WorkerMeasurement,
+) -> bool {
+    stim.work_count == memory.work_count
+        && stim.work_count == stab.work_count
+        && stim.output_digest == stab.output_digest
+        && stim.setup_rss_bytes == Some(memory.stim_setup_rss_bytes)
+        && stim.peak_rss_bytes == Some(memory.stim_peak_rss_bytes)
+        && stab.setup_rss_bytes == Some(memory.stab_setup_rss_bytes)
+        && stab.peak_rss_bytes == Some(memory.stab_peak_rss_bytes)
+        && memory.stim_parent_observed_peak_rss_bytes
+            == memory.execution.stim.parent_observed_peak_rss_bytes
+        && memory.stab_parent_observed_peak_rss_bytes
+            == memory.execution.stab.parent_observed_peak_rss_bytes
+        && memory.stim_peak_rss_bytes >= memory.stim_setup_rss_bytes
+        && memory.stab_peak_rss_bytes >= memory.stab_setup_rss_bytes
 }
 
 fn validate_claim(report: &QualificationReport) -> Result<(), ReportError> {
@@ -799,6 +909,10 @@ pub(super) enum ReportError {
     #[error("qualification report JSON is invalid: {0}")]
     Json(serde_json::Error),
 }
+
+#[cfg(test)]
+#[path = "report/adversarial_tests.rs"]
+mod adversarial_tests;
 
 #[cfg(test)]
 mod tests {

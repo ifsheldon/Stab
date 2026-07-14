@@ -17,7 +17,7 @@ use super::statistics::{PairOrder, PairedSample, StatisticsSummary, pair_measure
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 9;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 10;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
@@ -415,7 +415,7 @@ fn calibrate_worker(
     Ok((decision, evidence))
 }
 
-fn calibration_policy() -> Result<CalibrationPolicy, RunError> {
+pub(super) fn calibration_policy() -> Result<CalibrationPolicy, RunError> {
     Ok(CalibrationPolicy {
         minimum: CALIBRATION_TARGET_MINIMUM,
         maximum: CALIBRATION_MAXIMUM,
