@@ -53,7 +53,15 @@ pub(super) fn materialize_repository_commit(
     expected_commit: &str,
     destination: &Path,
 ) -> Result<(), GitError> {
-    let view = GitView::open(&root.path)?;
+    materialize_worktree_commit(&root.path, expected_commit, destination)
+}
+
+pub(super) fn materialize_worktree_commit(
+    worktree: &Path,
+    expected_commit: &str,
+    destination: &Path,
+) -> Result<(), GitError> {
+    let view = GitView::open(worktree)?;
     if view.commit != expected_commit {
         return Err(GitError::RepositoryCommitChanged {
             actual: view.commit,

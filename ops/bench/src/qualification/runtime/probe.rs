@@ -130,7 +130,8 @@ fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
 }
 
 fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
-    let adapter = prepare_adapter(root)?;
+    let repository = super::git::repository_state(root)?;
+    let adapter = prepare_adapter(root, &repository.commit)?;
     let worker_identity = worker::current_identity()?;
     let current_exe = std::env::current_exe().map_err(ProbeError::CurrentExecutable)?;
     let common_arguments = [
@@ -315,6 +316,8 @@ fn display_rss(value: Option<u64>) -> String {
 pub(super) enum ProbeError {
     #[error(transparent)]
     Adapter(#[from] super::adapter::AdapterError),
+    #[error(transparent)]
+    Git(#[from] super::git::GitError),
     #[error(transparent)]
     Worker(#[from] super::worker::WorkerError),
     #[error(transparent)]

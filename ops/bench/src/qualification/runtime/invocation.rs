@@ -47,7 +47,7 @@ impl PreparedWorkers {
         repository_commit: &str,
         toolchain: &super::toolchain::ToolchainEvidence,
     ) -> Result<Self, InvocationError> {
-        let adapter = prepare_adapter(root)?;
+        let adapter = prepare_adapter(root, repository_commit)?;
         let worker =
             super::stab_build::StabWorkerExecutable::prepare(root, repository_commit, toolchain)?;
         let workers = Self {

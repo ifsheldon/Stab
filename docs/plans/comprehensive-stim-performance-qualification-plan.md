@@ -105,7 +105,7 @@ It may include pinned Stim internal headers only inside the adapter executable a
 The Rust ops binary must:
 
 - Verify the exact submodule commit before building or running the adapter.
-- Build the adapter under `target/benchmarks/stim-adapter/` without modifying `vendor/stim`.
+- Materialize the exact pinned Stim commit and exact committed adapter source into a fresh private build runtime for every qualification run without modifying `vendor/stim` or reusing a CMake cache.
 - Use CMake or direct compiler invocations from Rust process APIs, with every command and relevant flag recorded in report metadata.
 - Reject unsupported compilers, stale binaries, mismatched source digests, missing symbols, malformed protocol output, and nonzero adapter exits.
 - Pass fixtures through validated repository-relative paths or bounded stdin, never through shell interpolation.
@@ -408,7 +408,7 @@ Turn the checklist and current 161-row manifest into a finite, reviewable invent
 
 Implementation note: `pq1-adapter-protocol-smoke` is a synthetic diagnostic group used only to prove the harness. It cannot accept product correctness evidence, enter a threshold baseline, or support a Stab-versus-Stim product speed claim.
 
-Audit note: the parent must independently derive `iterations * work_items`, keep calibration probes work-bound and outside ratio evidence, perform semantic preflight at the exact common calibrated batch shape, bind every subsequent validation, warmup, sample, and memory receipt to that digest, recompute the adapter build fingerprint from the receipt's canonical build inputs, and inspect the clean revision through a private index reconstructed from `HEAD`. Controlled host evidence requires stable thermal-zone identity and readings no higher than the profile limit whenever the platform exposes the required probes.
+Audit note: the parent must independently derive `iterations * work_items`, keep calibration probes work-bound and outside ratio evidence, perform semantic preflight at the exact common calibrated batch shape, bind every subsequent validation, warmup, sample, and memory receipt to that digest, and inspect the clean revision through a config-free private Git view tied to an exact captured commit. Both qualification workers must be rebuilt from materialized committed source in fresh private targets, bind canonical tool, argument, environment, input, fingerprint, and binary identities into reconstructable receipts, and execute from sealed copies. Controlled host evidence requires stable thermal-zone identity and readings no higher than the profile limit whenever the platform exposes the required probes.
 
 ### Objective
 

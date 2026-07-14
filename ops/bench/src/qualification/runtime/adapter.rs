@@ -1,4 +1,4 @@
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsString;
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -7,57 +7,56 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 
+use super::executable::SealedExecutable;
 use super::process::{ProcessLimits, ProcessRequest, run_bounded_process};
 use super::protocol::Sha256Digest;
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
 const ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
-const ADAPTER_OUTPUT: &str = "target/benchmarks/stim-adapter";
-const RECEIPT_SCHEMA_VERSION: u32 = 1;
-const MAX_SOURCE_BYTES: usize = 1 << 20;
+const RECEIPT_SCHEMA_VERSION: u32 = 2;
+const MAX_SOURCE_BYTES: u64 = 1 << 20;
 const MAX_TOOL_BYTES: u64 = 512 << 20;
 const MAX_LIBRARY_BYTES: u64 = 1 << 30;
-const MAX_RECEIPT_BYTES: usize = 1 << 20;
 const BUILD_OUTPUT_BYTES: usize = 16 << 20;
-const BUILD_TIMEOUT: Duration = Duration::from_secs(900);
+const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
+const TOOL_TIMEOUT: Duration = Duration::from_secs(30);
+const RUNTIME_PARENT: &str = "/tmp";
 const BUILD_FINGERPRINT_DEFINE: &str = "-DSTAB_ADAPTER_BUILD_FINGERPRINT=";
+const FINGERPRINT_PENDING: &str = "PENDING";
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct AdapterExecutable {
     pub(crate) path: PathBuf,
     pub(crate) source_digest: Sha256Digest,
     pub(crate) build_fingerprint: Sha256Digest,
     pub(crate) binary_digest: Sha256Digest,
     pub(crate) receipt: AdapterBuildReceipt,
+    _runtime: tempfile::TempDir,
+    executable: SealedExecutable,
     source_path: PathBuf,
     library_path: PathBuf,
 }
 
 impl AdapterExecutable {
     pub(crate) fn verify(&self) -> Result<(), AdapterError> {
-        let binary = sha256_regular_file(&self.path, MAX_TOOL_BYTES)?;
-        let source = sha256_regular_file(&self.source_path, MAX_SOURCE_BYTES as u64)?;
+        self.executable.verify()?;
+        let source = sha256_regular_file(&self.source_path, MAX_SOURCE_BYTES)?;
         let library = sha256_regular_file(&self.library_path, MAX_LIBRARY_BYTES)?;
-        let cmake = sha256_regular_file(Path::new(&self.receipt.cmake.path), MAX_TOOL_BYTES)?;
-        let cxx = sha256_regular_file(Path::new(&self.receipt.cxx.path), MAX_TOOL_BYTES)?;
-        if binary != self.binary_digest.as_str()
+        if self.path != self.executable.program()
+            || self.executable.sha256() != self.binary_digest.as_str()
             || self.receipt.binary_sha256 != self.binary_digest.as_str()
             || self.receipt.adapter_source_sha256 != self.source_digest.as_str()
             || self.receipt.build_fingerprint != self.build_fingerprint.as_str()
             || source != self.receipt.adapter_source_sha256
             || library != self.receipt.stim_library_sha256
-            || cmake != self.receipt.cmake.sha256
-            || cxx != self.receipt.cxx.sha256
             || !self.receipt.validates_report_identity(
                 self.source_digest.as_str(),
                 self.build_fingerprint.as_str(),
                 self.binary_digest.as_str(),
             )
         {
-            return Err(AdapterError::StaleBuild(
-                "adapter identity changed after preparation".to_string(),
-            ));
+            return Err(AdapterError::StaleBuild);
         }
         Ok(())
     }
@@ -72,8 +71,13 @@ pub(crate) struct AdapterBuildReceipt {
     adapter_source_sha256: String,
     stim_library_sha256: String,
     cmake: ToolIdentity,
+    cc: ToolIdentity,
     cxx: ToolIdentity,
+    make: ToolIdentity,
+    configure_arguments: Vec<String>,
+    library_build_arguments: Vec<String>,
     compile_arguments: Vec<String>,
+    build_environment: Vec<BuildEnvironmentEntry>,
     build_fingerprint: String,
     binary_sha256: String,
 }
@@ -92,39 +96,46 @@ impl AdapterBuildReceipt {
             && self.build_fingerprint == build_fingerprint
             && self.binary_sha256 == binary_sha256
             && valid_digest(&self.stim_library_sha256)
-            && valid_tool_identity(&self.cmake)
-            && valid_tool_identity(&self.cxx)
-            && !self.compile_arguments.is_empty()
-            && self.recomputed_build_fingerprint().as_deref() == Some(build_fingerprint)
+            && valid_digest(binary_sha256)
+            && tool_matches("cmake", &self.cmake)
+            && tool_matches("cc", &self.cc)
+            && tool_matches("c++", &self.cxx)
+            && tool_matches("make", &self.make)
+            && self.configure_arguments
+                == normalized_configure_arguments(&self.cc, &self.cxx, &self.make)
+            && self.library_build_arguments == normalized_library_build_arguments()
+            && self.compile_arguments
+                == normalized_compile_arguments(source_sha256, build_fingerprint)
+            && self.build_environment == normalized_build_environment(&self.cc, &self.cxx)
+            && self
+                .recomputed_build_fingerprint()
+                .is_ok_and(|actual| actual == build_fingerprint)
     }
 
-    fn recomputed_build_fingerprint(&self) -> Option<String> {
-        let expected_argument = format!("{BUILD_FINGERPRINT_DEFINE}\"{}\"", self.build_fingerprint);
-        let pending_argument = format!("{BUILD_FINGERPRINT_DEFINE}\"PENDING\"");
-        let mut found = false;
-        let mut arguments = Vec::with_capacity(self.compile_arguments.len());
-        for argument in &self.compile_arguments {
-            if argument.starts_with(BUILD_FINGERPRINT_DEFINE) {
-                if found || argument != &expected_argument {
-                    return None;
-                }
-                found = true;
-                arguments.push(OsString::from(&pending_argument));
-            } else {
-                arguments.push(OsString::from(argument));
-            }
+    fn recomputed_build_fingerprint(&self) -> Result<String, AdapterError> {
+        if self.compile_arguments
+            != normalized_compile_arguments(&self.adapter_source_sha256, &self.build_fingerprint)
+        {
+            return Err(AdapterError::ReceiptShape);
         }
-        if !found {
-            return None;
-        }
-        build_fingerprint(
-            &self.adapter_source_sha256,
-            &self.stim_library_sha256,
-            &self.cmake,
-            &self.cxx,
-            &arguments,
-        )
-        .ok()
+        let pending_arguments =
+            normalized_compile_arguments(&self.adapter_source_sha256, FINGERPRINT_PENDING);
+        let material = serde_json::to_vec(&serde_json::json!({
+            "schema_version": self.schema_version,
+            "stim_tag": self.stim_tag,
+            "stim_commit": self.stim_commit,
+            "adapter_source_sha256": self.adapter_source_sha256,
+            "stim_library_sha256": self.stim_library_sha256,
+            "cmake": self.cmake,
+            "cc": self.cc,
+            "cxx": self.cxx,
+            "make": self.make,
+            "configure_arguments": self.configure_arguments,
+            "library_build_arguments": self.library_build_arguments,
+            "compile_arguments": pending_arguments,
+            "build_environment": self.build_environment,
+        }))?;
+        sha256_bytes(&material)
     }
 }
 
@@ -136,306 +147,305 @@ struct ToolIdentity {
     version: String,
 }
 
-fn valid_tool_identity(identity: &ToolIdentity) -> bool {
-    !identity.path.is_empty() && !identity.version.is_empty() && valid_digest(&identity.sha256)
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(deny_unknown_fields)]
+struct BuildEnvironmentEntry {
+    name: String,
+    value: String,
 }
 
-fn valid_digest(value: &str) -> bool {
-    value.len() == 64
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
-
-pub(crate) fn prepare_adapter(root: &RepoRoot) -> Result<AdapterExecutable, AdapterError> {
+pub(crate) fn prepare_adapter(
+    root: &RepoRoot,
+    repository_commit: &str,
+) -> Result<AdapterExecutable, AdapterError> {
     ensure_linux()?;
-    super::git::validate_pinned_stim(root)
-        .map_err(|error| AdapterError::Stim(error.to_string()))?;
-    let output = root
-        .create_benchmark_output_dir(Path::new(ADAPTER_OUTPUT))
-        .map_err(|error| AdapterError::Output(error.to_string()))?;
-    let home = ensure_directory(&output.join("home"))?;
-    let cmake = tool_identity(root, "cmake", &home)?;
-    let cxx = tool_identity(root, "c++", &home)?;
-    configure_and_build_stim_library(root, &cmake, &home)?;
-    let library = root.stim_library();
-    let library_digest = sha256_regular_file(&library, MAX_LIBRARY_BYTES)?;
-    let source_path = root.path.join(ADAPTER_SOURCE);
-    let source_bytes =
-        crate::source_file::read_repo_regular_file_bounded(root, &source_path, MAX_SOURCE_BYTES)
-            .map_err(|error| AdapterError::Source(error.to_string()))?;
-    let source_digest = sha256_bytes(&source_bytes)?;
-    let binary = output.join(format!(
-        "stim-qualification-adapter{}",
-        std::env::consts::EXE_SUFFIX
-    ));
-    let receipt_path = output.join("build-receipt.json");
-    let fingerprint_arguments =
-        compile_arguments(root, &library, &binary, &source_digest, "PENDING");
-    let build_fingerprint = build_fingerprint(
-        &source_digest,
-        &library_digest,
-        &cmake,
-        &cxx,
-        &fingerprint_arguments,
+    super::git::validate_pinned_stim(root)?;
+    let runtime = tempfile::Builder::new()
+        .prefix("stab-pq1-stim-build-")
+        .tempdir_in(RUNTIME_PARENT)
+        .map_err(AdapterError::Runtime)?;
+    let stab_source = runtime.path().join("stab-source");
+    let stim_source = runtime.path().join("stim-source");
+    let stim_build = runtime.path().join("stim-build");
+    let home = runtime.path().join("home");
+    let scratch = runtime.path().join("tmp");
+    let xdg = runtime.path().join("xdg");
+    for path in [
+        &stab_source,
+        &stim_source,
+        &stim_build,
+        &home,
+        &scratch,
+        &xdg,
+    ] {
+        create_private_directory(path)?;
+    }
+    super::git::materialize_repository_commit(root, repository_commit, &stab_source)?;
+    super::git::materialize_worktree_commit(
+        &root.default_stim_source(),
+        STIM_COMMIT,
+        &stim_source,
     )?;
-    let compile_arguments =
-        compile_arguments(root, &library, &binary, &source_digest, &build_fingerprint);
-    let expected = AdapterBuildReceipt {
+
+    let environment_paths = RuntimePaths {
+        runtime: runtime.path(),
+        stab_source: &stab_source,
+        stim_source: &stim_source,
+        stim_build: &stim_build,
+    };
+    let cmake = tool_identity("cmake", &scratch, runtime.path())?;
+    let cc = tool_identity("cc", &scratch, runtime.path())?;
+    let cxx = tool_identity("c++", &scratch, runtime.path())?;
+    let make = tool_identity("make", &scratch, runtime.path())?;
+    let build_environment = normalized_build_environment(&cc, &cxx);
+    let environment = expand_environment(&build_environment, &environment_paths)?;
+    let configure_arguments = normalized_configure_arguments(&cc, &cxx, &make);
+    run_build_command(
+        Path::new(&cmake.path),
+        expand_values(&configure_arguments, &environment_paths)?,
+        &scratch,
+        &environment,
+        BUILD_TIMEOUT,
+    )?;
+    let library_build_arguments = normalized_library_build_arguments();
+    run_build_command(
+        Path::new(&cmake.path),
+        expand_values(&library_build_arguments, &environment_paths)?,
+        &scratch,
+        &environment,
+        BUILD_TIMEOUT,
+    )?;
+    let library_path = stim_build.join("out/libstim.a");
+    let library_digest = sha256_regular_file(&library_path, MAX_LIBRARY_BYTES)?;
+    let source_path = stab_source.join(ADAPTER_SOURCE);
+    let source_digest = sha256_regular_file(&source_path, MAX_SOURCE_BYTES)?;
+    let mut receipt = AdapterBuildReceipt {
         schema_version: RECEIPT_SCHEMA_VERSION,
         stim_tag: STIM_TAG.to_string(),
         stim_commit: STIM_COMMIT.to_string(),
         adapter_source_sha256: source_digest.clone(),
         stim_library_sha256: library_digest,
-        cmake: cmake.clone(),
-        cxx: cxx.clone(),
-        compile_arguments: compile_arguments
-            .iter()
-            .map(|argument| argument.to_string_lossy().into_owned())
-            .collect(),
-        build_fingerprint: build_fingerprint.clone(),
+        cmake,
+        cc,
+        cxx,
+        make,
+        configure_arguments,
+        library_build_arguments,
+        compile_arguments: normalized_compile_arguments(&source_digest, FINGERPRINT_PENDING),
+        build_environment,
+        build_fingerprint: FINGERPRINT_PENDING.to_string(),
         binary_sha256: String::new(),
     };
-
-    if let Some(receipt) = reusable_receipt(root, &receipt_path, &binary, &expected)? {
-        return executable(binary, source_path, library, receipt);
-    }
-    build_adapter(root, &home, &cxx, &source_path, &binary, &compile_arguments)?;
-    let binary_digest = sha256_regular_file(&binary, MAX_TOOL_BYTES)?;
-    let receipt = AdapterBuildReceipt {
-        binary_sha256: binary_digest,
-        ..expected
-    };
-    let mut bytes = serde_json::to_vec_pretty(&receipt).map_err(AdapterError::Json)?;
-    bytes.push(b'\n');
-    crate::source_file::atomic_write_repo_regular_file(root, &receipt_path, &bytes)
-        .map_err(|error| AdapterError::Output(error.to_string()))?;
-    executable(binary, source_path, library, receipt)
-}
-
-fn executable(
-    binary: PathBuf,
-    source_path: PathBuf,
-    library_path: PathBuf,
-    receipt: AdapterBuildReceipt,
-) -> Result<AdapterExecutable, AdapterError> {
-    Ok(AdapterExecutable {
-        path: binary,
-        source_digest: Sha256Digest::try_new(receipt.adapter_source_sha256.clone())?,
+    receipt.build_fingerprint = receipt.recomputed_build_fingerprint()?;
+    receipt.compile_arguments =
+        normalized_compile_arguments(&source_digest, &receipt.build_fingerprint);
+    let binary = runtime.path().join("stim-qualification-adapter");
+    run_build_command(
+        Path::new(&receipt.cxx.path),
+        expand_values(&receipt.compile_arguments, &environment_paths)?,
+        &scratch,
+        &environment,
+        BUILD_TIMEOUT,
+    )?;
+    let executable = SealedExecutable::open("stim-adapter", &binary)?;
+    receipt.binary_sha256 = executable.sha256().to_string();
+    let adapter = AdapterExecutable {
+        path: executable.program(),
+        source_digest: Sha256Digest::try_new(source_digest)?,
         build_fingerprint: Sha256Digest::try_new(receipt.build_fingerprint.clone())?,
         binary_digest: Sha256Digest::try_new(receipt.binary_sha256.clone())?,
         receipt,
+        _runtime: runtime,
+        executable,
         source_path,
         library_path,
-    })
+    };
+    adapter.verify()?;
+    Ok(adapter)
 }
 
-fn reusable_receipt(
-    root: &RepoRoot,
-    receipt_path: &Path,
-    binary: &Path,
-    expected: &AdapterBuildReceipt,
-) -> Result<Option<AdapterBuildReceipt>, AdapterError> {
-    if !receipt_path.exists() && !binary.exists() {
-        return Ok(None);
-    }
-    if !receipt_path.is_file() || !binary.is_file() {
-        return Err(AdapterError::StaleBuild(
-            "adapter binary and receipt must both be regular files".to_string(),
-        ));
-    }
-    let bytes =
-        crate::source_file::read_repo_regular_file_bounded(root, receipt_path, MAX_RECEIPT_BYTES)
-            .map_err(|error| AdapterError::StaleBuild(error.to_string()))?;
-    let receipt: AdapterBuildReceipt =
-        serde_json::from_slice(&bytes).map_err(AdapterError::Json)?;
-    let mut comparable = receipt.clone();
-    comparable.binary_sha256.clear();
-    if &comparable != expected {
-        return Ok(None);
-    }
-    let actual_binary = sha256_regular_file(binary, MAX_TOOL_BYTES)?;
-    if actual_binary != receipt.binary_sha256 {
-        return Err(AdapterError::StaleBuild(
-            "adapter binary digest disagrees with its build receipt".to_string(),
-        ));
-    }
-    Ok(Some(receipt))
-}
-
-fn configure_and_build_stim_library(
-    root: &RepoRoot,
-    cmake: &ToolIdentity,
-    home: &Path,
-) -> Result<(), AdapterError> {
-    std::fs::create_dir_all(root.build_dir()).map_err(|source| AdapterError::CreateDirectory {
-        path: root.build_dir(),
-        source,
-    })?;
-    run_build_command(
-        root,
-        Path::new(&cmake.path),
-        vec![
-            OsString::from("-S"),
-            root.default_stim_source().into_os_string(),
-            OsString::from("-B"),
-            root.build_dir().into_os_string(),
-            OsString::from("-DCMAKE_BUILD_TYPE=Release"),
-        ],
-        home,
-    )?;
-    run_build_command(
-        root,
-        Path::new(&cmake.path),
-        vec![
-            OsString::from("--build"),
-            root.build_dir().into_os_string(),
-            OsString::from("--target"),
-            OsString::from("libstim"),
-            OsString::from("--parallel"),
-        ],
-        home,
-    )?;
-    if !root.stim_library().is_file() {
-        return Err(AdapterError::MissingLibrary(root.stim_library()));
-    }
-    Ok(())
-}
-
-fn build_adapter(
-    root: &RepoRoot,
-    home: &Path,
+fn normalized_configure_arguments(
+    cc: &ToolIdentity,
     cxx: &ToolIdentity,
-    _source: &Path,
-    binary: &Path,
-    compile_arguments: &[OsString],
-) -> Result<(), AdapterError> {
-    let temporary = binary.with_extension(format!("building-{}", std::process::id()));
-    if temporary.exists() {
-        return Err(AdapterError::StaleBuild(format!(
-            "temporary adapter output {} already exists",
-            temporary.display()
-        )));
-    }
-    let mut arguments = compile_arguments.to_vec();
-    let output_index = arguments
-        .iter()
-        .position(|argument| argument == OsStr::new("-o"))
-        .ok_or_else(|| AdapterError::Build("compile arguments omit -o".to_string()))?;
-    let output = arguments
-        .get_mut(output_index + 1)
-        .ok_or_else(|| AdapterError::Build("compile arguments omit the output path".to_string()))?;
-    *output = temporary.as_os_str().to_owned();
-    let result = run_build_command(root, Path::new(&cxx.path), arguments, home);
-    if result.is_err() {
-        drop(std::fs::remove_file(&temporary));
-        return result;
-    }
-    let metadata = std::fs::symlink_metadata(&temporary).map_err(|source| AdapterError::Io {
-        path: temporary.clone(),
-        source,
-    })?;
-    if !metadata.file_type().is_file() {
-        return Err(AdapterError::Build(format!(
-            "compiler output {} is not a regular file",
-            temporary.display()
-        )));
-    }
-    if binary.exists()
-        && !std::fs::symlink_metadata(binary)
-            .map_err(|source| AdapterError::Io {
-                path: binary.to_path_buf(),
-                source,
-            })?
-            .file_type()
-            .is_file()
-    {
-        return Err(AdapterError::StaleBuild(format!(
-            "adapter destination {} is not a regular file",
-            binary.display()
-        )));
-    }
-    std::fs::rename(&temporary, binary).map_err(|source| AdapterError::Io {
-        path: binary.to_path_buf(),
-        source,
-    })?;
-    Ok(())
-}
-
-fn compile_arguments(
-    root: &RepoRoot,
-    library: &Path,
-    binary: &Path,
-    source_digest: &str,
-    build_fingerprint: &str,
-) -> Vec<OsString> {
+    make: &ToolIdentity,
+) -> Vec<String> {
     vec![
-        OsString::from("-std=c++20"),
-        OsString::from("-O3"),
-        OsString::from("-DNDEBUG"),
-        OsString::from("-Wall"),
-        OsString::from("-Wextra"),
-        OsString::from("-Wpedantic"),
-        OsString::from("-Werror"),
-        OsString::from("-fno-strict-aliasing"),
-        OsString::from("-I"),
-        root.default_stim_source().join("src").into_os_string(),
-        OsString::from(format!("-DSTAB_STIM_COMMIT=\"{STIM_COMMIT}\"")),
-        OsString::from(format!("-DSTAB_ADAPTER_SOURCE_DIGEST=\"{source_digest}\"")),
-        OsString::from(format!(
-            "-DSTAB_ADAPTER_BUILD_FINGERPRINT=\"{build_fingerprint}\""
-        )),
-        root.path.join(ADAPTER_SOURCE).into_os_string(),
-        library.as_os_str().to_owned(),
-        OsString::from("-o"),
-        binary.as_os_str().to_owned(),
+        "-S".to_string(),
+        "$STIM_SOURCE".to_string(),
+        "-B".to_string(),
+        "$STIM_BUILD".to_string(),
+        "-G".to_string(),
+        "Unix Makefiles".to_string(),
+        "-DCMAKE_BUILD_TYPE=Release".to_string(),
+        format!("-DCMAKE_MAKE_PROGRAM={}", make.path),
+        format!("-DCMAKE_C_COMPILER={}", cc.path),
+        format!("-DCMAKE_CXX_COMPILER={}", cxx.path),
     ]
 }
 
-fn build_fingerprint(
-    source_digest: &str,
-    library_digest: &str,
-    cmake: &ToolIdentity,
-    cxx: &ToolIdentity,
-    arguments: &[OsString],
-) -> Result<String, AdapterError> {
-    let material = serde_json::to_vec(&serde_json::json!({
-        "schema_version": RECEIPT_SCHEMA_VERSION,
-        "stim_commit": STIM_COMMIT,
-        "source_digest": source_digest,
-        "library_digest": library_digest,
-        "cmake": cmake,
-        "cxx": cxx,
-        "arguments": arguments.iter().map(|value| value.to_string_lossy()).collect::<Vec<_>>(),
-    }))
-    .map_err(AdapterError::Json)?;
-    sha256_bytes(&material)
+fn normalized_library_build_arguments() -> Vec<String> {
+    [
+        "--build",
+        "$STIM_BUILD",
+        "--target",
+        "libstim",
+        "--parallel",
+        "1",
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect()
 }
 
-fn tool_identity(root: &RepoRoot, name: &str, home: &Path) -> Result<ToolIdentity, AdapterError> {
+fn normalized_compile_arguments(source_digest: &str, fingerprint: &str) -> Vec<String> {
+    vec![
+        "-std=c++20".to_string(),
+        "-O3".to_string(),
+        "-DNDEBUG".to_string(),
+        "-Wall".to_string(),
+        "-Wextra".to_string(),
+        "-Wpedantic".to_string(),
+        "-Werror".to_string(),
+        "-fno-strict-aliasing".to_string(),
+        "-I".to_string(),
+        "$STIM_SOURCE/src".to_string(),
+        format!("-DSTAB_STIM_COMMIT=\"{STIM_COMMIT}\""),
+        format!("-DSTAB_ADAPTER_SOURCE_DIGEST=\"{source_digest}\""),
+        format!("{BUILD_FINGERPRINT_DEFINE}\"{fingerprint}\""),
+        format!("$STAB_SOURCE/{ADAPTER_SOURCE}"),
+        "$STIM_BUILD/out/libstim.a".to_string(),
+        "-o".to_string(),
+        "$RUNTIME/stim-qualification-adapter".to_string(),
+    ]
+}
+
+fn normalized_build_environment(
+    cc: &ToolIdentity,
+    cxx: &ToolIdentity,
+) -> Vec<BuildEnvironmentEntry> {
+    let mut entries = vec![
+        environment_entry("CC", &cc.path),
+        environment_entry("CXX", &cxx.path),
+        environment_entry("HOME", "$RUNTIME/home"),
+        environment_entry("LANG", "C"),
+        environment_entry("LC_ALL", "C"),
+        environment_entry("PATH", "/usr/bin:/bin"),
+        environment_entry("TMPDIR", "$RUNTIME/tmp"),
+        environment_entry("TZ", "UTC"),
+        environment_entry("XDG_CONFIG_HOME", "$RUNTIME/xdg"),
+    ];
+    entries.sort();
+    entries
+}
+
+fn environment_entry(name: &str, value: &str) -> BuildEnvironmentEntry {
+    BuildEnvironmentEntry {
+        name: name.to_string(),
+        value: value.to_string(),
+    }
+}
+
+struct RuntimePaths<'a> {
+    runtime: &'a Path,
+    stab_source: &'a Path,
+    stim_source: &'a Path,
+    stim_build: &'a Path,
+}
+
+fn expand_environment(
+    entries: &[BuildEnvironmentEntry],
+    paths: &RuntimePaths<'_>,
+) -> Result<Vec<(OsString, OsString)>, AdapterError> {
+    entries
+        .iter()
+        .map(|entry| {
+            Ok((
+                OsString::from(&entry.name),
+                OsString::from(expand_value(&entry.value, paths)?),
+            ))
+        })
+        .collect()
+}
+
+fn expand_values(
+    values: &[String],
+    paths: &RuntimePaths<'_>,
+) -> Result<Vec<OsString>, AdapterError> {
+    values
+        .iter()
+        .map(|value| expand_value(value, paths).map(OsString::from))
+        .collect()
+}
+
+fn expand_value(value: &str, paths: &RuntimePaths<'_>) -> Result<String, AdapterError> {
+    let runtime = path_text(paths.runtime)?;
+    let stab_source = path_text(paths.stab_source)?;
+    let stim_source = path_text(paths.stim_source)?;
+    let stim_build = path_text(paths.stim_build)?;
+    Ok(value
+        .replace("$STAB_SOURCE", stab_source)
+        .replace("$STIM_SOURCE", stim_source)
+        .replace("$STIM_BUILD", stim_build)
+        .replace("$RUNTIME", runtime))
+}
+
+fn path_text(path: &Path) -> Result<&str, AdapterError> {
+    path.to_str()
+        .ok_or_else(|| AdapterError::NonUtf8Path(path.to_path_buf()))
+}
+
+fn tool_identity(
+    name: &'static str,
+    working_directory: &Path,
+    runtime: &Path,
+) -> Result<ToolIdentity, AdapterError> {
     let path = resolve_tool(name)?;
     let sha256 = sha256_regular_file(&path, MAX_TOOL_BYTES)?;
-    let output = run_build_process(
-        root,
-        &path,
-        vec![OsString::from("--version")],
-        home,
-        Duration::from_secs(30),
+    let environment = expand_environment(
+        &[
+            environment_entry("HOME", "$RUNTIME/home"),
+            environment_entry("LANG", "C"),
+            environment_entry("LC_ALL", "C"),
+            environment_entry("PATH", "/usr/bin:/bin"),
+            environment_entry("TMPDIR", "$RUNTIME/tmp"),
+            environment_entry("TZ", "UTC"),
+            environment_entry("XDG_CONFIG_HOME", "$RUNTIME/xdg"),
+        ],
+        &RuntimePaths {
+            runtime,
+            stab_source: runtime,
+            stim_source: runtime,
+            stim_build: runtime,
+        },
     )?;
-    if output.status != Some(0) {
-        return Err(AdapterError::Build(format!(
-            "{name} --version failed with status {:?}",
-            output.status
-        )));
+    let output = run_bounded_process(&ProcessRequest {
+        program: path.clone(),
+        args: vec![OsString::from("--version")],
+        stdin: Vec::new(),
+        working_directory: working_directory.to_path_buf(),
+        environment,
+        affinity_cpu: None,
+        limits: ProcessLimits {
+            stdin_bytes: 0,
+            stdout_bytes: 64 << 10,
+            stderr_bytes: 64 << 10,
+            regular_file_bytes: None,
+            timeout: TOOL_TIMEOUT,
+        },
+    })?;
+    if output.status != Some(0) || !output.stderr.is_empty() {
+        return Err(AdapterError::ToolVersion {
+            name,
+            status: output.status,
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
     }
     let version = std::str::from_utf8(&output.stdout)
-        .map_err(|_| AdapterError::Build(format!("{name} --version is not UTF-8")))?
+        .map_err(|_| AdapterError::ToolVersionUtf8(name))?
         .trim()
         .to_string();
-    if version.is_empty() || version.len() > 16 << 10 {
-        return Err(AdapterError::Build(format!(
-            "{name} --version has an invalid length"
-        )));
+    if version.is_empty() || version.len() > 64 << 10 {
+        return Err(AdapterError::ToolVersionShape(name));
     }
     Ok(ToolIdentity {
         path: path.to_string_lossy().into_owned(),
@@ -445,9 +455,7 @@ fn tool_identity(root: &RepoRoot, name: &str, home: &Path) -> Result<ToolIdentit
 }
 
 fn resolve_tool(name: &str) -> Result<PathBuf, AdapterError> {
-    let path =
-        std::env::var_os("PATH").ok_or_else(|| AdapterError::MissingTool(name.to_string()))?;
-    for directory in std::env::split_paths(&path) {
+    for directory in [Path::new("/usr/bin"), Path::new("/bin")] {
         let candidate = directory.join(name);
         if !candidate.is_file() {
             continue;
@@ -463,39 +471,27 @@ fn resolve_tool(name: &str) -> Result<PathBuf, AdapterError> {
     Err(AdapterError::MissingTool(name.to_string()))
 }
 
-fn run_build_command(
-    root: &RepoRoot,
-    program: &Path,
-    arguments: Vec<OsString>,
-    home: &Path,
-) -> Result<(), AdapterError> {
-    let output = run_build_process(root, program, arguments, home, BUILD_TIMEOUT)?;
-    if output.status == Some(0) {
-        Ok(())
-    } else {
-        Err(AdapterError::Build(format!(
-            "{} failed with status {:?}\nstdout:\n{}\nstderr:\n{}",
-            program.display(),
-            output.status,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        )))
-    }
+fn tool_matches(name: &str, identity: &ToolIdentity) -> bool {
+    !identity.version.is_empty()
+        && valid_digest(&identity.sha256)
+        && resolve_tool(name).is_ok_and(|path| path == Path::new(&identity.path))
+        && sha256_regular_file(Path::new(&identity.path), MAX_TOOL_BYTES)
+            .is_ok_and(|digest| digest == identity.sha256)
 }
 
-fn run_build_process(
-    root: &RepoRoot,
+fn run_build_command(
     program: &Path,
     arguments: Vec<OsString>,
-    home: &Path,
+    working_directory: &Path,
+    environment: &[(OsString, OsString)],
     timeout: Duration,
-) -> Result<super::process::ProcessResult, AdapterError> {
-    run_bounded_process(&ProcessRequest {
+) -> Result<(), AdapterError> {
+    let output = run_bounded_process(&ProcessRequest {
         program: program.to_path_buf(),
         args: arguments,
         stdin: Vec::new(),
-        working_directory: root.path.clone(),
-        environment: controlled_environment(home)?,
+        working_directory: working_directory.to_path_buf(),
+        environment: environment.to_vec(),
         affinity_cpu: None,
         limits: ProcessLimits {
             stdin_bytes: 0,
@@ -504,46 +500,24 @@ fn run_build_process(
             regular_file_bytes: None,
             timeout,
         },
-    })
-    .map_err(|error| AdapterError::Process(error.to_string()))
-}
-
-fn controlled_environment(home: &Path) -> Result<Vec<(OsString, OsString)>, AdapterError> {
-    Ok(vec![
-        (OsString::from("HOME"), home.as_os_str().to_owned()),
-        (OsString::from("LANG"), OsString::from("C")),
-        (OsString::from("LC_ALL"), OsString::from("C")),
-        (
-            OsString::from("PATH"),
-            std::env::join_paths([Path::new("/usr/bin"), Path::new("/bin")])
-                .map_err(|error| AdapterError::Build(error.to_string()))?,
-        ),
-        (OsString::from("TZ"), OsString::from("UTC")),
-    ])
-}
-
-fn ensure_directory(path: &Path) -> Result<PathBuf, AdapterError> {
-    match std::fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_dir() => return Ok(path.to_path_buf()),
-        Ok(_) => {
-            return Err(AdapterError::CreateDirectory {
-                path: path.to_path_buf(),
-                source: std::io::Error::other("existing path is not a nonsymlink directory"),
-            });
-        }
-        Err(source) if source.kind() == std::io::ErrorKind::NotFound => {}
-        Err(source) => {
-            return Err(AdapterError::CreateDirectory {
-                path: path.to_path_buf(),
-                source,
-            });
-        }
+    })?;
+    if output.status == Some(0) {
+        Ok(())
+    } else {
+        Err(AdapterError::Build {
+            program: program.to_path_buf(),
+            status: output.status,
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        })
     }
-    std::fs::create_dir(path).map_err(|source| AdapterError::CreateDirectory {
+}
+
+fn create_private_directory(path: &Path) -> Result<(), AdapterError> {
+    std::fs::create_dir(path).map_err(|source| AdapterError::Io {
         path: path.to_path_buf(),
         source,
-    })?;
-    Ok(path.to_path_buf())
+    })
 }
 
 pub(super) fn sha256_regular_file(path: &Path, maximum: u64) -> Result<String, AdapterError> {
@@ -589,6 +563,13 @@ fn hex_digest(bytes: &[u8]) -> Result<String, AdapterError> {
     Ok(output)
 }
 
+fn valid_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn ensure_linux() -> Result<(), AdapterError> {
     if cfg!(target_os = "linux") {
         Ok(())
@@ -601,27 +582,35 @@ fn ensure_linux() -> Result<(), AdapterError> {
 pub(crate) enum AdapterError {
     #[error("pinned Stim qualification adapters require Linux")]
     UnsupportedHost,
-    #[error("pinned Stim source validation failed: {0}")]
-    Stim(String),
-    #[error("adapter output path validation failed: {0}")]
-    Output(String),
-    #[error("adapter source validation failed: {0}")]
-    Source(String),
-    #[error("failed to create adapter directory {path}: {source}")]
-    CreateDirectory {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-    #[error("required build tool {0:?} was not found on PATH")]
+    #[error("failed to create a private Stim build runtime: {0}")]
+    Runtime(std::io::Error),
+    #[error("required build tool {0:?} was not found on the controlled system PATH")]
     MissingTool(String),
-    #[error("pinned Stim library is missing after build: {0}")]
-    MissingLibrary(PathBuf),
-    #[error("adapter build failed: {0}")]
-    Build(String),
-    #[error("adapter process failed: {0}")]
-    Process(String),
-    #[error("stale adapter build: {0}")]
-    StaleBuild(String),
+    #[error("build tool {name} --version failed with status {status:?}: {stderr}")]
+    ToolVersion {
+        name: &'static str,
+        status: Option<i32>,
+        stderr: String,
+    },
+    #[error("build tool {0} --version output is not UTF-8")]
+    ToolVersionUtf8(&'static str),
+    #[error("build tool {0} --version output is empty or oversized")]
+    ToolVersionShape(&'static str),
+    #[error(
+        "adapter build command {program} failed with status {status:?}; stdout={stdout:?}; stderr={stderr:?}"
+    )]
+    Build {
+        program: PathBuf,
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
+    #[error("adapter build receipt has an invalid source-owned shape")]
+    ReceiptShape,
+    #[error("adapter identity changed after preparation")]
+    StaleBuild,
+    #[error("adapter path is not UTF-8: {0}")]
+    NonUtf8Path(PathBuf),
     #[error("failed to access adapter file {path}: {source}")]
     Io {
         path: PathBuf,
@@ -635,238 +624,140 @@ pub(crate) enum AdapterError {
     SizeOverflow,
     #[error("failed to encode adapter SHA-256 digest")]
     DigestEncoding,
-    #[error("adapter JSON is invalid: {0}")]
-    Json(serde_json::Error),
+    #[error(transparent)]
+    Git(#[from] super::git::GitError),
+    #[error(transparent)]
+    Executable(#[from] super::executable::ExecutableError),
+    #[error(transparent)]
+    Process(#[from] super::process::ProcessError),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
     #[error(transparent)]
     Protocol(#[from] super::protocol::ProtocolError),
 }
 
 #[cfg(test)]
 mod tests {
+    use std::os::unix::fs::PermissionsExt as _;
+
     use super::*;
 
-    #[test]
-    fn build_fingerprint_changes_with_source_library_and_flags() {
-        let tool = ToolIdentity {
-            path: "/usr/bin/tool".to_string(),
-            sha256: "a".repeat(64),
-            version: "tool 1".to_string(),
-        };
-        let base = build_fingerprint(
-            &"b".repeat(64),
-            &"c".repeat(64),
-            &tool,
-            &tool,
-            &[OsString::from("-O3")],
-        )
-        .expect("base fingerprint");
-        let changed = build_fingerprint(
-            &"d".repeat(64),
-            &"c".repeat(64),
-            &tool,
-            &tool,
-            &[OsString::from("-O3")],
-        )
-        .expect("changed fingerprint");
-        assert_ne!(base, changed);
-        let changed_library = build_fingerprint(
-            &"b".repeat(64),
-            &"e".repeat(64),
-            &tool,
-            &tool,
-            &[OsString::from("-O3")],
-        )
-        .expect("changed library fingerprint");
-        let changed_flags = build_fingerprint(
-            &"b".repeat(64),
-            &"c".repeat(64),
-            &tool,
-            &tool,
-            &[OsString::from("-O2")],
-        )
-        .expect("changed flags fingerprint");
-        assert_ne!(base, changed_library);
-        assert_ne!(base, changed_flags);
+    fn actual_tool(name: &'static str) -> ToolIdentity {
+        let path = resolve_tool(name).expect("resolve test tool");
+        ToolIdentity {
+            sha256: sha256_regular_file(&path, MAX_TOOL_BYTES).expect("tool digest"),
+            path: path.to_string_lossy().into_owned(),
+            version: format!("{name} test version"),
+        }
     }
 
-    #[test]
-    fn reusable_receipt_rejects_commit_drift_and_stale_binary_digest() {
-        let repository = tempfile::tempdir().expect("temporary repository");
-        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
-        let output = repository.path().join("target/benchmarks/stim-adapter");
-        std::fs::create_dir_all(&output).expect("create adapter output");
-        let binary = output.join("stim-adapter");
-        let receipt_path = output.join("build-receipt.json");
-        std::fs::write(&binary, b"adapter").expect("write adapter binary");
-        let tool = ToolIdentity {
-            path: "/usr/bin/tool".to_string(),
-            sha256: "a".repeat(64),
-            version: "tool 1".to_string(),
-        };
-        let expected = AdapterBuildReceipt {
+    fn test_receipt(source: &str, library: &str, binary: &str) -> AdapterBuildReceipt {
+        let cmake = actual_tool("cmake");
+        let cc = actual_tool("cc");
+        let cxx = actual_tool("c++");
+        let make = actual_tool("make");
+        let mut receipt = AdapterBuildReceipt {
             schema_version: RECEIPT_SCHEMA_VERSION,
             stim_tag: STIM_TAG.to_string(),
             stim_commit: STIM_COMMIT.to_string(),
-            adapter_source_sha256: "b".repeat(64),
-            stim_library_sha256: "c".repeat(64),
-            cmake: tool.clone(),
-            cxx: tool,
-            compile_arguments: vec!["-O3".to_string()],
-            build_fingerprint: "d".repeat(64),
-            binary_sha256: String::new(),
+            adapter_source_sha256: source.to_string(),
+            stim_library_sha256: library.to_string(),
+            configure_arguments: normalized_configure_arguments(&cc, &cxx, &make),
+            library_build_arguments: normalized_library_build_arguments(),
+            compile_arguments: normalized_compile_arguments(source, FINGERPRINT_PENDING),
+            build_environment: normalized_build_environment(&cc, &cxx),
+            cmake,
+            cc,
+            cxx,
+            make,
+            build_fingerprint: FINGERPRINT_PENDING.to_string(),
+            binary_sha256: binary.to_string(),
         };
-        let mut drifted = expected.clone();
-        drifted.stim_commit = "f".repeat(40);
-        drifted.binary_sha256 = "e".repeat(64);
-        std::fs::write(
-            &receipt_path,
-            serde_json::to_vec(&drifted).expect("serialize drifted receipt"),
-        )
-        .expect("write drifted receipt");
-        assert!(
-            reusable_receipt(&root, &receipt_path, &binary, &expected)
-                .expect("drift is a rebuild decision")
-                .is_none()
-        );
+        receipt.build_fingerprint = receipt
+            .recomputed_build_fingerprint()
+            .expect("build fingerprint");
+        receipt.compile_arguments =
+            normalized_compile_arguments(source, &receipt.build_fingerprint);
+        receipt
+    }
 
-        let mut stale = expected.clone();
-        stale.binary_sha256 = "e".repeat(64);
-        std::fs::write(
-            &receipt_path,
-            serde_json::to_vec(&stale).expect("serialize stale receipt"),
-        )
-        .expect("write stale receipt");
-        assert!(matches!(
-            reusable_receipt(&root, &receipt_path, &binary, &expected),
-            Err(AdapterError::StaleBuild(_))
+    #[test]
+    fn report_identity_rejects_tampered_tools_arguments_and_fingerprint() {
+        let source = "a".repeat(64);
+        let library = "b".repeat(64);
+        let binary = "c".repeat(64);
+        let receipt = test_receipt(&source, &library, &binary);
+        assert!(receipt.validates_report_identity(&source, &receipt.build_fingerprint, &binary));
+
+        let mut changed_tool = receipt.clone();
+        changed_tool.cxx.sha256 = "d".repeat(64);
+        assert!(!changed_tool.validates_report_identity(
+            &source,
+            &receipt.build_fingerprint,
+            &binary
+        ));
+        let mut changed_configure = receipt.clone();
+        changed_configure
+            .configure_arguments
+            .push("-DUNREVIEWED=1".to_string());
+        assert!(!changed_configure.validates_report_identity(
+            &source,
+            &receipt.build_fingerprint,
+            &binary
+        ));
+        let mut changed_compile = receipt.clone();
+        *changed_compile
+            .compile_arguments
+            .get_mut(1)
+            .expect("compile optimization flag") = "-O2".to_string();
+        assert!(!changed_compile.validates_report_identity(
+            &source,
+            &receipt.build_fingerprint,
+            &binary
+        ));
+        let mut duplicate_define = receipt.clone();
+        duplicate_define.compile_arguments.push(format!(
+            "{BUILD_FINGERPRINT_DEFINE}\"{}\"",
+            receipt.build_fingerprint
+        ));
+        assert!(!duplicate_define.validates_report_identity(
+            &source,
+            &receipt.build_fingerprint,
+            &binary
         ));
     }
 
     #[test]
-    fn executable_verification_rejects_source_digest_drift() {
-        let directory = tempfile::tempdir().expect("temporary adapter files");
-        let source = directory.path().join("main.cc");
-        let library = directory.path().join("libstim.a");
-        let binary = directory.path().join("adapter");
-        let cmake = directory.path().join("cmake");
-        let cxx = directory.path().join("cxx");
-        for (path, bytes) in [
-            (&source, b"source".as_slice()),
-            (&library, b"library".as_slice()),
-            (&binary, b"binary".as_slice()),
-            (&cmake, b"cmake".as_slice()),
-            (&cxx, b"cxx".as_slice()),
-        ] {
-            std::fs::write(path, bytes).expect("write adapter identity file");
-        }
-        let source_digest =
-            sha256_regular_file(&source, MAX_SOURCE_BYTES as u64).expect("source digest");
-        let binary_digest = sha256_regular_file(&binary, MAX_TOOL_BYTES).expect("binary digest");
-        let receipt = AdapterBuildReceipt {
-            schema_version: RECEIPT_SCHEMA_VERSION,
-            stim_tag: STIM_TAG.to_string(),
-            stim_commit: STIM_COMMIT.to_string(),
-            adapter_source_sha256: source_digest.clone(),
-            stim_library_sha256: sha256_regular_file(&library, MAX_LIBRARY_BYTES)
-                .expect("library digest"),
-            cmake: ToolIdentity {
-                path: cmake.to_string_lossy().into_owned(),
-                sha256: sha256_regular_file(&cmake, MAX_TOOL_BYTES).expect("cmake digest"),
-                version: "cmake test".to_string(),
-            },
-            cxx: ToolIdentity {
-                path: cxx.to_string_lossy().into_owned(),
-                sha256: sha256_regular_file(&cxx, MAX_TOOL_BYTES).expect("cxx digest"),
-                version: "cxx test".to_string(),
-            },
-            compile_arguments: Vec::new(),
-            build_fingerprint: String::new(),
-            binary_sha256: binary_digest.clone(),
-        };
-        let fingerprint_arguments = vec![
-            OsString::from("-O3"),
-            OsString::from(format!("{BUILD_FINGERPRINT_DEFINE}\"PENDING\"")),
-        ];
-        let fingerprint = build_fingerprint(
-            &receipt.adapter_source_sha256,
-            &receipt.stim_library_sha256,
-            &receipt.cmake,
-            &receipt.cxx,
-            &fingerprint_arguments,
-        )
-        .expect("build fingerprint");
-        let receipt = AdapterBuildReceipt {
-            compile_arguments: vec![
-                "-O3".to_string(),
-                format!("{BUILD_FINGERPRINT_DEFINE}\"{fingerprint}\""),
-            ],
-            build_fingerprint: fingerprint.clone(),
-            ..receipt
-        };
-        let executable = AdapterExecutable {
-            path: binary,
+    fn executable_verification_rejects_materialized_source_drift() {
+        let runtime = tempfile::tempdir().expect("adapter runtime");
+        let source = runtime.path().join("main.cc");
+        let library = runtime.path().join("libstim.a");
+        let binary = runtime.path().join("adapter");
+        std::fs::write(&source, b"source").expect("write source");
+        std::fs::write(&library, b"library").expect("write library");
+        std::fs::write(&binary, b"binary").expect("write binary");
+        std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700))
+            .expect("make binary executable");
+        let executable = SealedExecutable::open("test-adapter", &binary).expect("seal binary");
+        let source_digest = sha256_regular_file(&source, MAX_SOURCE_BYTES).expect("source digest");
+        let library_digest =
+            sha256_regular_file(&library, MAX_LIBRARY_BYTES).expect("library digest");
+        let receipt = test_receipt(&source_digest, &library_digest, executable.sha256());
+        let adapter = AdapterExecutable {
+            path: executable.program(),
             source_digest: Sha256Digest::try_new(source_digest).expect("source identity"),
-            build_fingerprint: Sha256Digest::try_new(fingerprint).expect("build fingerprint"),
-            binary_digest: Sha256Digest::try_new(binary_digest).expect("binary identity"),
+            build_fingerprint: Sha256Digest::try_new(receipt.build_fingerprint.clone())
+                .expect("build fingerprint"),
+            binary_digest: Sha256Digest::try_new(receipt.binary_sha256.clone())
+                .expect("binary identity"),
             receipt,
+            _runtime: runtime,
+            executable,
             source_path: source.clone(),
             library_path: library,
         };
-        executable.verify().expect("unchanged identity verifies");
+        adapter.verify().expect("unchanged adapter verifies");
         std::fs::write(source, b"drifted source").expect("drift source");
-        assert!(matches!(
-            executable.verify(),
-            Err(AdapterError::StaleBuild(_))
-        ));
-    }
-
-    #[test]
-    fn report_identity_rejects_tampered_compile_arguments_and_fingerprint_define() {
-        let tool = ToolIdentity {
-            path: "/usr/bin/tool".to_string(),
-            sha256: "a".repeat(64),
-            version: "tool 1".to_string(),
-        };
-        let source = "b".repeat(64);
-        let library = "c".repeat(64);
-        let pending = vec![
-            OsString::from("-O3"),
-            OsString::from(format!("{BUILD_FINGERPRINT_DEFINE}\"PENDING\"")),
-        ];
-        let fingerprint = build_fingerprint(&source, &library, &tool, &tool, &pending)
-            .expect("build fingerprint");
-        let receipt = AdapterBuildReceipt {
-            schema_version: RECEIPT_SCHEMA_VERSION,
-            stim_tag: STIM_TAG.to_string(),
-            stim_commit: STIM_COMMIT.to_string(),
-            adapter_source_sha256: source.clone(),
-            stim_library_sha256: library,
-            cmake: tool.clone(),
-            cxx: tool,
-            compile_arguments: vec![
-                "-O3".to_string(),
-                format!("{BUILD_FINGERPRINT_DEFINE}\"{fingerprint}\""),
-            ],
-            build_fingerprint: fingerprint.clone(),
-            binary_sha256: "d".repeat(64),
-        };
-        assert!(receipt.validates_report_identity(&source, &fingerprint, &"d".repeat(64)));
-
-        let mut tampered_flags = receipt.clone();
-        *tampered_flags
-            .compile_arguments
-            .first_mut()
-            .expect("receipt has a compiler flag") = "-O2".to_string();
-        assert!(!tampered_flags.validates_report_identity(&source, &fingerprint, &"d".repeat(64)));
-
-        let mut duplicate_define = receipt;
-        duplicate_define
-            .compile_arguments
-            .push(format!("{BUILD_FINGERPRINT_DEFINE}\"{}\"", fingerprint));
-        assert!(!duplicate_define.validates_report_identity(
-            &source,
-            &fingerprint,
-            &"d".repeat(64)
-        ));
+        assert!(matches!(adapter.verify(), Err(AdapterError::StaleBuild)));
     }
 }
