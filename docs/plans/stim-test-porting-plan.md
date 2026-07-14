@@ -371,7 +371,7 @@ Source: all `*_test.py` files under `vendor/stim`.
 
 ### Stim Python Binding Tests
 
-Action: P2 before Python bindings exist, then P3-to-P0 when the Python API milestone starts.
+Action: P2 for Python object shape and binding mechanics before Python bindings exist, then P3-to-P0 when the Python API milestone starts. Portable semantic subcases that map to selected Rust APIs may be promoted earlier only through independently selectable Rust parents with exact Python source-symbol provenance; this does not claim Python binding parity.
 
 ```text
 src/stim/circuit/circuit_instruction_pybind_test.py

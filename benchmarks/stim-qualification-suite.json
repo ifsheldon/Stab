@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "f30a56853dbc9334d1ba91a400da3a40c108d4ee2aa748d4edc9a5662093ba11",
-  "semantic_digest": "3c49ecdfde72eca0a331b9949f2bee4dd6f300ebfa015d779b4f5cbb7ac91355",
+  "semantic_digest": "4ebbf8bc85ebeb722fcf3e9eefa4796b57ba61b2773fa64eef37e70dca41a744",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -3533,7 +3533,7 @@
     {
       "id": "PERFC-ad2012543fb57e70",
       "source_line": 78,
-      "anchor_digest": "ccc4a6cc28a12e05deef4e65a5d45b2be20b17e15ea70f02070be5c55bf4393a",
+      "anchor_digest": "1989e81e9d47de3f53ba902fb6d317064183658f23681fc2ca12c8c666604685",
       "section": "4. Core Circuit Features",
       "feature": "Core introspection",
       "raw_status": "Done for current Rust API surface",

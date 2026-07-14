@@ -23,6 +23,15 @@ None.
 
 ## Resolved Entries
 
+## 2026-07-14 - CQ2: Mixed Aggregate Count Semantics And Overflow
+
+Status: Resolved
+Revealed by: milestone audit and exact-symbol review of `CQ-CIRCUIT-API`.
+Current text: CQ2 required exact upstream-symbol dispositions, focused parent ownership, overflow negatives, and splitting aggregated tests at distinct behavioral anchors.
+Gap: Pinned C++ aggregate count symbols combine portable ordinary and folded-count behavior with `UINT64_MAX` saturation, while Stab's selected Rust count methods return checked `Result` errors. The inventory schema addresses complete upstream symbols rather than individual assertions, so mapping the aggregate to a Rust parent would falsely claim saturation parity, but dropping the aggregate would hide a reviewed incompatibility and could also obscure the shared portable behavior.
+Proposed amendment: When a complete upstream symbol mixes selected portable semantics with incompatible language-specific or API-specific behavior and has no independently addressable subcase, disposition the complete symbol according to its complete contract and own the shared portable semantics through an independent exact Rust parent. Require the selected Rust overflow contract to be explicit in qualification evidence and the feature checklist.
+Resolution: The CQ2 plan now states that rule. The mixed C++ count aggregates are `not-applicable` with precise checked-overflow reasons, focused Circuit count and repetition parents prove ordinary, folded, huge-count, cap, and first-overflow behavior, and `docs/stab-feature-checklist.md` records checked `Result` overflow as an intentional Rust API divergence instead of an unfinished Stim parity surface.
+
 ## 2026-07-14 - CQ2: Portable Bit Semantics Versus C++ Storage Helpers
 
 Status: Resolved
