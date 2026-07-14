@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Current-evidence note, 2026-07-14: the first CQ2 exact-parent mapping refresh changes the correctness inventory digest to `5d1fc9d21e511e13bef5ceb476dbcf9dd20ed067339edd2891013992fb06ced5` and raises implemented-or-closed ownership from 410 to 429. Clean current-digest evidence from revision `add37ccb6dc52b0ac96b37397f6b012de0bcd6a4` passes PR 300/300, full 429/429, and soak 429/429 with offline report regeneration and exact full/soak preflight for the new canonical `.stim` parent; see `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim` slice changes the correctness inventory digest to `1152e9fa36d55c8a5a2282638fbc8ad79a39e7b4456161fba868a15c45cfb16e` and raises implemented-or-closed ownership from the original CQ1 410 to 441. Clean current-digest evidence from revision `ec1ae89e1ae42be92f87d13cbe15cc3aacdfcb77` passes PR 302/302, full 441/441, and soak 441/441 with offline report regeneration and exact full/soak preflight for the canonical `.stim` parent; see `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 

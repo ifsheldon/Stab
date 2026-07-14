@@ -23,6 +23,15 @@ None.
 
 ## Resolved Entries
 
+## 2026-07-14 - CQ2: Exact-Symbol Classification And Complete Parent Credit
+
+Status: Resolved
+Revealed by: semantic review of the first `.stim` exact-parent slice after its initial source mappings regenerated cleanly.
+Current text: CQ2 had an exact-parent ledger, but file-level relevance still assigned all of mixed `circuit.test.cc` to both format and circuit-API domains, and nearby or name-similar tests could be proposed as evidence for broader upstream symbols.
+Gap: File-level relevance and test-name proximity could promote contracts that the selected test did not prove. The review found examples involving a nominal `qubit_coords` case that actually tests `TICK` rejection, broad `from_text` ownership, tag escaping through nested repeats, probability-list validation, target text and accessor matrices, gate-target ordering, Python-only instruction construction, and circuit measurement-count overflow behavior that differs from Stim.
+Proposed amendment: Classify mixed source files and overloaded semantic families by exact upstream symbol, require focused tests to exercise every claimed contract edge, split gate equality and instruction value/count ownership into their actual domains, and leave incompatible or untested API contracts planned.
+Resolution: Exact-symbol classification now distinguishes circuit format, gate-target equality, instruction value/count, and Python-only constructor cases. Focused `.stim` tests cover full target, tag, validation, fusion, repeat, coordinate, and instruction-print contracts; two focused instruction tests cover only the exact value and per-instruction count methods they exercise. `Circuit::count_measurements` and untested derived traits remain planned, and semantic review fixed inverted Pauli-target admission for `CORRELATED_ERROR` and `ELSE_CORRELATED_ERROR` instead of granting evidence over the defect.
+
 ## 2026-07-14 - CQ2: Exact Parent Mapping Ownership
 
 Status: Resolved
@@ -30,7 +39,7 @@ Revealed by: CQ2 inventory audit before deterministic format implementation.
 Current text: CQ2 required every deterministic upstream case and exported API item to have an exact selector or parent-contract mapping, but CQ0 generated one planned evidence owner per source anchor and provided promotion paths only through blocker-ledger and oracle-fixture records.
 Gap: The plan did not define a source-owned, reviewable way to map several exact upstream or public-API owners onto one independently selectable Rust test, nor did it require validation against stale owners, duplicate claims, cross-feature claims, comparator mismatches, broad selectors, or reused terminal primaries. Implementing thousands of wrapper tests would obscure contracts, while silently deleting generated owners would make the inventory unauditable.
 Proposed amendment: Add a bounded exact-parent ledger whose entries name every claimed source owner, one feature and comparator, and one exact primary selector; require deterministic generation to replace only matching planned owners and fail closed on stale, duplicated, cross-domain, comparator-mismatched, or shared-primary mappings.
-Resolution: `oracle/qualification-cases.json` and its validator now own this contract, the CQ2 plan requires semantic review and focused test splitting before promotion, and the first `.stim`-format slice maps 41 exact owners onto 19 exact parents. A duplicate selector and an under-proven typed-offset mapping were caught and corrected during the first use of the mechanism.
+Resolution: `oracle/qualification-cases.json` and its validator now own this contract, the CQ2 plan requires semantic review and focused test splitting before promotion, and the completed selected `.stim` slice uses 24 qualification parents to map 44 exact upstream owners and nine exported-API owners, with eight direct oracle-fixture parents completing the domain. A duplicate selector and an under-proven typed-offset mapping were caught and corrected during the first use of the mechanism.
 
 ## 2026-07-14 - PQ1: Legacy M12 Backward Compatibility
 

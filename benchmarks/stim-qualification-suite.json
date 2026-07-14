@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "1152e9fa36d55c8a5a2282638fbc8ad79a39e7b4456161fba868a15c45cfb16e",
-  "semantic_digest": "f544245174195b0b8343aa26e3feb75f430d10d498effa2cac2c8883238475c3",
+  "semantic_digest": "3b762ed4bcd44157fb5c7410912a30fb6fc7abb4ff69ab95a38ef9892c72bec6",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -2085,7 +2085,7 @@
     {
       "id": "PERFC-55676fc3004b7fd2",
       "source_line": 223,
-      "anchor_digest": "eab6b56cd64f8e09957a4f09d3204b372fc3e2e3927fa6d53482f784d2be31a7",
+      "anchor_digest": "75afa897b7d0770d03f24da0280ddceddfe4174bfd7f3492eb84accbbf76c869",
       "section": "16. Test And Benchmark Surface",
       "feature": "Upstream test inventory and porting plan",
       "raw_status": "Done as a file-level hierarchy and CQ0 frozen case inventory",
@@ -2247,7 +2247,7 @@
     {
       "id": "PERFC-5f2145ca0e3328b5",
       "source_line": 224,
-      "anchor_digest": "9639358b32d721c46f93addf206a7fa5469c36a7f43b002bd20766272bd5a6a4",
+      "anchor_digest": "3bcf6a12492a775dfdbeaabe921df031178aa6d5e9a5ce4a47e602210ef9c1b0",
       "section": "16. Test And Benchmark Surface",
       "feature": "Oracle fixture matrix",
       "raw_status": "Done for current implemented surfaces and CQ1 harness acceptance",
@@ -3841,7 +3841,7 @@
     {
       "id": "PERFC-cccae489f6a07220",
       "source_line": 225,
-      "anchor_digest": "2db73c40c1194c58f5a02d930d5bd910a3cc879fbf0c4af83f899f03b69631c4",
+      "anchor_digest": "9490cf90accfeb0da45f8b85de13647ba8661cf34461a22e255d4cb1a7ee1cde",
       "section": "16. Test And Benchmark Surface",
       "feature": "Benchmark manifest and primary beta gate",
       "raw_status": "Done for current performance infrastructure; PQ0 inventory complete",

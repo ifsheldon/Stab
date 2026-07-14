@@ -6,9 +6,9 @@ Completed: 2026-07-13.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Current correctness dependency after the first CQ2 exact-parent refresh: schema-version-3 CQ0 semantic digest `5d1fc9d21e511e13bef5ceb476dbcf9dd20ed067339edd2891013992fb06ced5`.
+Current correctness dependency after the completed selected CQ2 `.stim` slice: schema-version-3 CQ0 semantic digest `1152e9fa36d55c8a5a2282638fbc8ad79a39e7b4456161fba868a15c45cfb16e`.
 
-Current performance inventory digest after dependent CQ2 regeneration: `a7177e298b5e1f05979b871704514fdf2650070a7c48e5d72c6fb48bb80d13bf`.
+Current performance inventory digest after dependent CQ2 regeneration: `3b762ed4bcd44157fb5c7410912a30fb6fc7abb4ff69ab95a38ef9892c72bec6`.
 
 Implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
@@ -16,7 +16,7 @@ Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca3258
 
 The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
-The first CQ2 exact-parent mapping refresh changed only correctness owner ids and acceptance state, so PQ0 was regenerated again without changing those performance classifications. Clean current-digest PQ1 PR, full, and soak execution from revision `add37ccb6dc52b0ac96b37397f6b012de0bcd6a4` is host-verified and passes offline report and report-only regression validation.
+The completed selected CQ2 `.stim` slice changed correctness owner ids, exact classifications, and acceptance state, so PQ0 was regenerated without changing those performance classifications. Correcting the source-owned checklist summary then changed only the checked source digest and produced the current performance digest above. Clean PQ1 PR, full, and soak execution from revision `ec1ae89e1ae42be92f87d13cbe15cc3aacdfcb77` remains historical evidence for the preceding digest; the current digest requires a clean rerun after this checkpoint is committed.
 
 PQ0 freezes inventory and migration decisions only.
 It does not claim that inherited timing ratios satisfy the comprehensive runner, preflight, scaling, memory, or statistical contract.

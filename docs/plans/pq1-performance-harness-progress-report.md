@@ -1,6 +1,6 @@
 # PQ1 Paired Performance Harness Progress Report
 
-> Current-evidence note, 2026-07-14: the first CQ2 exact-parent mapping refresh changes the correctness inventory digest to `5d1fc9d21e511e13bef5ceb476dbcf9dd20ed067339edd2891013992fb06ced5` and the dependent performance inventory digest to `a7177e298b5e1f05979b871704514fdf2650070a7c48e5d72c6fb48bb80d13bf`. Clean current-digest schema-version-13 PR, full, and soak reports from revision `add37ccb6dc52b0ac96b37397f6b012de0bcd6a4` are host-verified and pass offline validation; see `docs/plans/cq2-deterministic-qualification-progress-report.md`. They remain diagnostic infrastructure evidence, not product performance.
+> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim` slice changes the correctness inventory digest to `1152e9fa36d55c8a5a2282638fbc8ad79a39e7b4456161fba868a15c45cfb16e`, and the corrected source-owned checklist changes the dependent performance inventory digest to `3b762ed4bcd44157fb5c7410912a30fb6fc7abb4ff69ab95a38ef9892c72bec6`. Clean schema-version-13 PR, full, and soak reports from revision `ec1ae89e1ae42be92f87d13cbe15cc3aacdfcb77` bind the preceding performance digest and remain historical diagnostic evidence. The current digest requires a clean rerun after the documentation checkpoint is committed; see `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 
