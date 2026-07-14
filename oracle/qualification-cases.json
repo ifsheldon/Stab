@@ -26,16 +26,6 @@
         "kind": "not-applicable",
         "detail": "This case proves canonical parse-print-parse behavior; parser admission and resource limits have independent CQ owners."
       },
-      "upstream_owners": [
-        {
-          "path": "src/stim/circuit/circuit.test.cc",
-          "symbol": "circuit.from_text"
-        },
-        {
-          "path": "src/stim/circuit/circuit.test.cc",
-          "symbol": "circuit.str"
-        }
-      ],
       "public_api_owners": [
         {
           "crate_name": "stab_core",
@@ -48,7 +38,7 @@
       ]
     },
     {
-      "id": "cq2-stim-format-targets-tags-repeats",
+      "id": "cq2-stim-format-from-text-contract",
       "feature_id": "CQ-STIM-FORMAT",
       "comparator": "canonical",
       "primary_selector": {
@@ -60,29 +50,33 @@
           "-p",
           "stab-core",
           "--test",
-          "stim_format",
-          "parses_targets_tags_arguments_comments_and_repeat_blocks",
+          "cq2_stim_format",
+          "cq2_stim_format_from_text_contract_matches_stim",
           "--quiet",
           "--exact"
         ]
       },
       "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This case proves canonical mixed target, tag, argument, comment, and repeat syntax; nesting limits are owned separately."
+        "kind": "bounded-materialized",
+        "detail": "A fixed corpus proves accepted whitespace, aliases, comments, fusion, repeats, record and Pauli targets plus malformed gate, argument, target, and record forms; parser-wide admission limits have independent CQ owners."
       },
+      "negative_axes": [
+        "malformed-gate",
+        "malformed-argument",
+        "malformed-target",
+        "invalid-record-offset",
+        "invalid-pair",
+        "invalid-observable-argument"
+      ],
       "upstream_owners": [
         {
           "path": "src/stim/circuit/circuit.test.cc",
-          "symbol": "circuit.parse_sweep_bits"
-        },
-        {
-          "path": "src/stim/circuit/circuit.test.cc",
-          "symbol": "circuit.qubit_coords"
+          "symbol": "circuit.from_text"
         }
       ]
     },
     {
-      "id": "cq2-stim-format-tagged-repeat-printing",
+      "id": "cq2-stim-format-canonical-printer-contract",
       "feature_id": "CQ-STIM-FORMAT",
       "comparator": "canonical",
       "primary_selector": {
@@ -94,15 +88,78 @@
           "-p",
           "stab-core",
           "--test",
-          "stim_format",
-          "parses_and_prints_repeat_tags_like_stim",
+          "cq2_stim_format",
+          "cq2_stim_format_canonical_printer_contract_matches_stim",
           "--quiet",
           "--exact"
         ]
       },
       "resource_contract": {
         "kind": "not-applicable",
-        "detail": "This case proves tag parsing, empty tags, fusion boundaries, and tagged repeat canonical printing without a resource claim."
+        "detail": "This case proves canonical printing of aliases, plain and classical pair targets, measurement targets, detector and observable records, probabilities, and Pauli lists."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.str"
+        }
+      ]
+    },
+    {
+      "id": "cq2-stim-format-sweep-target-roles",
+      "feature_id": "CQ-STIM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_stim_format",
+          "cq2_stim_format_sweep_target_roles_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Fixed-size instructions prove sweep controls are accepted in the controlled position and rejected by single-qubit gates."
+      },
+      "negative_axes": [
+        "invalid-sweep-target-role"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.parse_sweep_bits"
+        }
+      ]
+    },
+    {
+      "id": "cq2-stim-format-tag-escape-repeat-structure",
+      "feature_id": "CQ-STIM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_stim_format",
+          "cq2_stim_format_tag_escape_and_repeat_contract_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This case proves simple, empty, escaped, and canonical tags plus preservation of nested repeat-block structure without a resource claim."
       },
       "upstream_owners": [
         {
@@ -324,8 +381,8 @@
           "-p",
           "stab-core",
           "--test",
-          "stim_format",
-          "target_from_str_matches_stim_surface_forms",
+          "cq2_stim_format",
+          "cq2_stim_format_target_text_round_trip_matches_stim",
           "--quiet",
           "--exact"
         ]
@@ -358,8 +415,8 @@
           "-p",
           "stab-core",
           "--test",
-          "stim_format",
-          "target_typed_accessors_match_stim_gate_target_boundaries",
+          "cq2_stim_format",
+          "cq2_stim_format_target_accessors_match_stim",
           "--quiet",
           "--exact"
         ]
@@ -412,8 +469,8 @@
           "-p",
           "stab-core",
           "--test",
-          "stim_format",
-          "target_inversion_matches_stim_gate_target",
+          "cq2_stim_format",
+          "cq2_stim_format_target_inversion_matches_stim",
           "--quiet",
           "--exact"
         ]
@@ -442,8 +499,8 @@
           "-p",
           "stab-core",
           "--test",
-          "stim_format",
-          "target_classification_matches_stim_gate_target",
+          "cq2_stim_format",
+          "cq2_stim_format_target_classification_matches_stim",
           "--quiet",
           "--exact"
         ]
@@ -468,7 +525,7 @@
       ]
     },
     {
-      "id": "cq2-stim-format-validation-errors",
+      "id": "cq2-stim-format-repeat-validation",
       "feature_id": "CQ-STIM-FORMAT",
       "comparator": "canonical",
       "primary_selector": {
@@ -480,28 +537,25 @@
           "-p",
           "stab-core",
           "--test",
-          "stim_format",
-          "parser_reports_invalid_gate_target_and_repeat_errors",
+          "cq2_stim_format",
+          "cq2_stim_format_repeat_validation_matches_stim",
           "--quiet",
           "--exact"
         ]
       },
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "Malformed gate, target, detector, repeat-count, unclosed-block, and stray-close input is rejected before a circuit is returned."
+        "detail": "Fixed-size malformed repeat grammar is rejected without mutating an existing circuit, including zero counts, missing counts, extra braces, and non-repeat braces."
       },
       "negative_axes": [
-        "unknown-gate",
-        "wrong-target-role",
         "zero-repeat",
+        "missing-repeat-count",
         "unclosed-repeat",
-        "stray-close"
+        "extra-repeat-brace",
+        "non-repeat-brace",
+        "failed-append-atomicity"
       ],
       "upstream_owners": [
-        {
-          "path": "src/stim/circuit/circuit.test.cc",
-          "symbol": "circuit.detector_validation"
-        },
         {
           "path": "src/stim/circuit/circuit.test.cc",
           "symbol": "circuit.repeat_validation"
@@ -513,7 +567,7 @@
       ]
     },
     {
-      "id": "cq2-stim-format-inverted-target-validation",
+      "id": "cq2-stim-format-instruction-validation",
       "feature_id": "CQ-STIM-FORMAT",
       "comparator": "canonical",
       "primary_selector": {
@@ -525,50 +579,28 @@
           "-p",
           "stab-core",
           "--test",
-          "stim_format",
-          "parser_rejects_inverted_targets_except_result_gates_like_stim",
+          "cq2_stim_format",
+          "cq2_stim_format_instruction_validation_matches_stim",
           "--quiet",
           "--exact"
         ]
       },
       "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This case proves the exact gate-role boundary where inverted qubit targets are accepted or rejected."
+        "kind": "bounded-materialized",
+        "detail": "Fixed-size typed argument and target vectors prove pair cardinality, duplicate-target, Pauli-role, inversion, and probability validation before instruction construction."
       },
+      "negative_axes": [
+        "odd-pair-target-count",
+        "duplicate-pair-target",
+        "invalid-pauli-target-role",
+        "invalid-inverted-target-role",
+        "argument-domain",
+        "argument-arity"
+      ],
       "upstream_owners": [
         {
           "path": "src/stim/circuit/circuit.test.cc",
           "symbol": "circuit.append_op_validation"
-        }
-      ]
-    },
-    {
-      "id": "cq2-stim-format-pair-target-validation",
-      "feature_id": "CQ-STIM-FORMAT",
-      "comparator": "canonical",
-      "primary_selector": {
-        "state": "existing",
-        "kind": "cargo-test",
-        "value": [
-          "cargo",
-          "test",
-          "-p",
-          "stab-core",
-          "--test",
-          "stim_format",
-          "parser_validates_pair_targets_like_stim",
-          "--quiet",
-          "--exact"
-        ]
-      },
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This case proves pair cardinality, duplicate-qubit, inversion, and classical-control target-role validation."
-      },
-      "upstream_owners": [
-        {
-          "path": "src/stim/circuit/circuit.test.cc",
-          "symbol": "circuit.pauli_err_2_validation"
         }
       ]
     },
@@ -585,20 +617,31 @@
           "-p",
           "stab-core",
           "--test",
-          "stim_format",
-          "parser_rejects_probability_lists_that_are_not_disjoint_like_stim",
+          "cq2_stim_format",
+          "cq2_stim_format_probability_list_validation_matches_stim",
           "--quiet",
           "--exact"
         ]
       },
       "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This case proves disjoint probability-list acceptance boundaries for one- and two-qubit Pauli channels."
+        "kind": "bounded-materialized",
+        "detail": "Fixed-size one- and two-qubit Pauli-channel inputs prove exact list arity, closed-unit entries, disjoint sums, pair cardinality, and typed NaN rejection."
       },
+      "negative_axes": [
+        "probability-list-arity",
+        "probability-domain",
+        "probability-sum",
+        "pair-target-cardinality",
+        "nan-probability"
+      ],
       "upstream_owners": [
         {
           "path": "src/stim/circuit/circuit.test.cc",
           "symbol": "circuit.pauli_err_1_validation"
+        },
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.pauli_err_2_validation"
         },
         {
           "path": "src/stim/circuit/circuit.test.cc",
@@ -649,16 +692,20 @@
           "-p",
           "stab-core",
           "--test",
-          "stim_format",
-          "fuses_compatible_adjacent_instructions_like_stim",
+          "cq2_stim_format",
+          "cq2_stim_format_instruction_and_concatenation_fusion_match_stim",
           "--quiet",
           "--exact"
         ]
       },
       "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This case proves canonical fusion and non-fusion boundaries for singleton, pair, tagged, empty, and result instructions."
+        "kind": "bounded-materialized",
+        "detail": "Fixed-size circuits prove canonical fusion, non-fusion, invalid append rejection, and fusion across a concatenation boundary."
       },
+      "negative_axes": [
+        "invalid-pair-append",
+        "invalid-argument-append"
+      ],
       "upstream_owners": [
         {
           "path": "src/stim/circuit/circuit.test.cc",
@@ -667,6 +714,269 @@
         {
           "path": "src/stim/circuit/circuit.test.cc",
           "symbol": "circuit.concat_fuse"
+        }
+      ]
+    },
+    {
+      "id": "cq2-stim-format-validation-edges",
+      "feature_id": "CQ-STIM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_stim_format",
+          "cq2_stim_format_validation_edges_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Each fixed-size syntax record is parsed into a bounded materialized circuit or rejected before a circuit is returned; parser-wide size and nesting limits have independent CQ owners."
+      },
+      "negative_axes": [
+        "unexpected-target",
+        "missing-probability",
+        "probability-domain",
+        "probability-arity",
+        "invalid-measurement-pad",
+        "invalid-classical-control-role"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.classical_controls"
+        },
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.tick_validation"
+        },
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.detector_validation"
+        },
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.qubit_coords"
+        },
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.validate_mpad"
+        },
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.x_error_validation"
+        }
+      ]
+    },
+    {
+      "id": "cq2-stim-format-repeat-coordinate-newline-edges",
+      "feature_id": "CQ-STIM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_stim_format",
+          "cq2_stim_format_repeat_coordinate_and_newline_edges_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The fixed-size input remains compact while proving large-repeat parsing, finite signed coordinates, exponent rejection, and CRLF equivalence without expanding the repeat."
+      },
+      "negative_axes": [
+        "nonfinite-coordinate",
+        "negative-probability"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.big_rep_count"
+        },
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.negative_float_coordinates"
+        },
+        {
+          "path": "src/stim/circuit/circuit.test.cc",
+          "symbol": "circuit.parse_windows_newlines"
+        }
+      ]
+    },
+    {
+      "id": "cq2-stim-format-instruction-target-groups",
+      "feature_id": "CQ-STIM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_stim_format",
+          "cq2_stim_format_target_groups_cover_stim_gate_shapes",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This case proves empty, singleton, pair, Pauli-product, measurement-pad, and coordinate target grouping and constructs every non-REPEAT gate shape."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/circuit_instruction.test.cc",
+          "symbol": "circuit_instruction.for_combined_targets"
+        },
+        {
+          "path": "src/stim/circuit/circuit_instruction.test.cc",
+          "symbol": "circuit_instruction.for_combined_targets_works_on_all"
+        },
+        {
+          "path": "src/stim/circuit/circuit_instruction_pybind_test.py",
+          "symbol": "test_target_groups"
+        }
+      ]
+    },
+    {
+      "id": "cq2-stim-format-instruction-print-validation",
+      "feature_id": "CQ-STIM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_stim_format",
+          "cq2_stim_format_instruction_print_and_eager_validation_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A fixed-size typed instruction proves canonical printing and eager pair-target cardinality validation."
+      },
+      "negative_axes": [
+        "odd-pair-target-count"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/circuit_instruction_pybind_test.py",
+          "symbol": "test_eager_validate"
+        },
+        {
+          "path": "src/stim/circuit/circuit_instruction_pybind_test.py",
+          "symbol": "test_str"
+        }
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-instruction-value",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_circuit_api",
+          "cq2_circuit_api_instruction_value_contract_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This fixed corpus proves typed instruction construction, accessors, cloning, and value equality across differing gates, arguments, and targets."
+      },
+      "static_property_plan": {
+        "generator_domain": "fixed CircuitInstruction constructor, accessor, clone, and equality variants",
+        "case_count": 4,
+        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/circuit_instruction_pybind_test.py",
+          "symbol": "test_init_and_equality"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::gate"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::args"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CircuitInstruction::targets"
+        }
+      ]
+    },
+    {
+      "id": "cq2-circuit-api-instruction-measurement-counts",
+      "feature_id": "CQ-CIRCUIT-API",
+      "comparator": "property",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_circuit_api",
+          "cq2_circuit_api_instruction_measurement_counts_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "This fixed corpus proves zero, pair-measurement, per-target measurement, and measurement-pad count semantics."
+      },
+      "static_property_plan": {
+        "generator_domain": "fixed instruction measurement-count gate and target-shape variants",
+        "case_count": 4,
+        "corpus_path": "crates/stab-core/tests/cq2_circuit_api.rs"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/circuit_instruction_pybind_test.py",
+          "symbol": "test_num_measurements"
         }
       ]
     }

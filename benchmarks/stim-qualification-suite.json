@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "5d1fc9d21e511e13bef5ceb476dbcf9dd20ed067339edd2891013992fb06ced5",
-  "semantic_digest": "a7177e298b5e1f05979b871704514fdf2650070a7c48e5d72c6fb48bb80d13bf",
+  "correctness_digest": "1152e9fa36d55c8a5a2282638fbc8ad79a39e7b4456161fba868a15c45cfb16e",
+  "semantic_digest": "f544245174195b0b8343aa26e3feb75f430d10d498effa2cac2c8883238475c3",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -8229,7 +8229,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-a0305a7c2ca0a903",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8293,7 +8293,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-1283bb3a88514fff",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8309,7 +8309,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-483ecb08c8264281",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -8405,7 +8405,7 @@
       "supporting_performance_features": [
         "PERF-FLOWS-AND-DETECTOR-UTILITIES"
       ],
-      "correctness_case_id": "cq-evidence-api-12aaaac58251f312",
+      "correctness_case_id": "cq-evidence-qualification-7d805260941fd248",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2d2996c2fb64137c",
@@ -30097,19 +30097,16 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-1283bb3a88514fff",
-        "cq-evidence-api-12aaaac58251f312",
         "cq-evidence-api-46f60688c0f56e6e",
         "cq-evidence-api-47836b88708f3b28",
-        "cq-evidence-api-483ecb08c8264281",
         "cq-evidence-api-4d6556455aab263d",
         "cq-evidence-api-553e257e74d2f82b",
         "cq-evidence-api-7083f3358c4fb75b",
         "cq-evidence-api-8c91ed4dff656d57",
         "cq-evidence-api-943e4f79903b15bb",
-        "cq-evidence-api-a0305a7c2ca0a903",
         "cq-evidence-api-a0fed4cee38d1b20",
-        "cq-evidence-api-f02d17fd6f393ced"
+        "cq-evidence-api-f02d17fd6f393ced",
+        "cq-evidence-qualification-7d805260941fd248"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -32566,19 +32563,16 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-1283bb3a88514fff",
-        "cq-evidence-api-12aaaac58251f312",
         "cq-evidence-api-46f60688c0f56e6e",
         "cq-evidence-api-47836b88708f3b28",
-        "cq-evidence-api-483ecb08c8264281",
         "cq-evidence-api-4d6556455aab263d",
         "cq-evidence-api-553e257e74d2f82b",
         "cq-evidence-api-7083f3358c4fb75b",
         "cq-evidence-api-8c91ed4dff656d57",
         "cq-evidence-api-943e4f79903b15bb",
-        "cq-evidence-api-a0305a7c2ca0a903",
         "cq-evidence-api-a0fed4cee38d1b20",
-        "cq-evidence-api-f02d17fd6f393ced"
+        "cq-evidence-api-f02d17fd6f393ced",
+        "cq-evidence-qualification-7d805260941fd248"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,

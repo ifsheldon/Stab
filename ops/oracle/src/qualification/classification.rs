@@ -179,6 +179,15 @@ pub(super) fn classify_upstream_case(path: &Path, symbol: &str) -> UpstreamClass
             "This case tests Python binding object shape instead of a selected Rust semantic contract.",
         );
     }
+    if value.ends_with("circuit_instruction_pybind_test.py")
+        && symbol.rsplit('.').next() == Some("test_init_from_str")
+    {
+        return UpstreamClassification::deferred_for(
+            [FeatureId::StimFormat],
+            DeferredProduct::PythonBindings,
+            "The overloaded Python CircuitInstruction string constructor is deferred with Python bindings; Stab exposes circuit-level Stim parsing instead.",
+        );
+    }
 
     if value.ends_with("src/stim/py/compiled_measurement_sampler_pybind_test.py") {
         return UpstreamClassification::selected(FeatureId::Sampling);
@@ -400,7 +409,14 @@ fn classify_command(value: &str) -> UpstreamClassification {
 }
 
 fn classify_circuit(value: &str, symbol: &str) -> UpstreamClassification {
-    if value.contains("gate_target") || value.contains("circuit_instruction") {
+    let leaf = symbol.rsplit('.').next().unwrap_or(symbol);
+    if value.contains("gate_target") && matches!(leaf, "equality" | "test_init_and_equality") {
+        UpstreamClassification::selected(FeatureId::GateContract)
+    } else if value.contains("circuit_instruction")
+        && matches!(leaf, "test_init_and_equality" | "test_num_measurements")
+    {
+        UpstreamClassification::selected(FeatureId::CircuitApi)
+    } else if value.contains("gate_target") || value.contains("circuit_instruction") {
         UpstreamClassification::selected(FeatureId::StimFormat)
     } else if value.contains("gate_decomposition") {
         UpstreamClassification::selected(FeatureId::GateContract)
@@ -443,10 +459,36 @@ fn classify_circuit(value: &str, symbol: &str) -> UpstreamClassification {
                 .flatten(),
         )
     } else if value.ends_with("circuit.test.cc") {
-        UpstreamClassification::selected_many([FeatureId::StimFormat, FeatureId::CircuitApi])
+        if symbol.is_empty() || circuit_case_has_stim_format_contract(symbol) {
+            UpstreamClassification::selected_many([FeatureId::StimFormat, FeatureId::CircuitApi])
+        } else {
+            UpstreamClassification::selected(FeatureId::CircuitApi)
+        }
     } else {
         UpstreamClassification::selected(FeatureId::CircuitApi)
     }
+}
+
+fn circuit_case_has_stim_format_contract(symbol: &str) -> bool {
+    let leaf = symbol.strip_prefix("circuit.").unwrap_or(symbol);
+    leaf.starts_with("parse_")
+        || leaf.ends_with("_validation")
+        || leaf.starts_with("validate_")
+        || matches!(
+            leaf,
+            "append_op_fuse"
+                | "big_rep_count"
+                | "classical_controls"
+                | "concat_fuse"
+                | "from_text"
+                | "negative_float_coordinates"
+                | "parse_windows_newlines"
+                | "preserves_repetition_blocks"
+                | "qubit_coords"
+                | "str"
+                | "without_tags"
+                | "zero_repetitions_not_allowed"
+        )
 }
 
 fn classify_dem(value: &str, symbol: &str) -> UpstreamClassification {
@@ -671,6 +713,34 @@ mod tests {
         let repr = classify_upstream_case(path, "test_circuit_repr");
         assert_eq!(repr.disposition, UpstreamDisposition::DeferredProduct);
         assert_eq!(repr.deferred_product, Some(DeferredProduct::PythonBindings));
+
+        let instruction_path = Path::new("src/stim/circuit/circuit_instruction_pybind_test.py");
+        let string_constructor = classify_upstream_case(instruction_path, "test_init_from_str");
+        assert_eq!(
+            string_constructor.disposition,
+            UpstreamDisposition::DeferredProduct
+        );
+        assert_eq!(
+            string_constructor.deferred_product,
+            Some(DeferredProduct::PythonBindings)
+        );
+        assert_eq!(string_constructor.feature_ids, vec![FeatureId::StimFormat]);
+
+        let instruction_printer = classify_upstream_case(instruction_path, "test_str");
+        assert_eq!(
+            instruction_printer.disposition,
+            UpstreamDisposition::SemanticMining
+        );
+        assert_eq!(instruction_printer.feature_ids, vec![FeatureId::StimFormat]);
+
+        let instruction_value = classify_upstream_case(instruction_path, "test_init_and_equality");
+        assert_eq!(instruction_value.feature_ids, vec![FeatureId::CircuitApi]);
+        let instruction_count = classify_upstream_case(instruction_path, "test_num_measurements");
+        assert_eq!(instruction_count.feature_ids, vec![FeatureId::CircuitApi]);
+
+        let gate_target_path = Path::new("src/stim/circuit/gate_target_pybind_test.py");
+        let gate_target_value = classify_upstream_case(gate_target_path, "test_init_and_equality");
+        assert_eq!(gate_target_value.feature_ids, vec![FeatureId::GateContract]);
     }
 
     #[test]
@@ -683,6 +753,27 @@ mod tests {
             circuit.feature_ids,
             vec![FeatureId::StimFormat, FeatureId::CircuitApi]
         );
+
+        let count = classify_upstream_case(
+            Path::new("src/stim/circuit/circuit.test.cc"),
+            "circuit.count_qubits",
+        );
+        assert_eq!(count.feature_ids, vec![FeatureId::CircuitApi]);
+
+        let windows = classify_upstream_case(
+            Path::new("src/stim/circuit/circuit.test.cc"),
+            "circuit.parse_windows_newlines",
+        );
+        assert_eq!(
+            windows.feature_ids,
+            vec![FeatureId::StimFormat, FeatureId::CircuitApi]
+        );
+
+        let approximate = classify_upstream_case(
+            Path::new("src/stim/circuit/circuit.test.cc"),
+            "circuit.approx_equals",
+        );
+        assert_eq!(approximate.feature_ids, vec![FeatureId::CircuitApi]);
 
         let frame = classify_upstream_case(
             Path::new("src/stim/simulators/frame_simulator.test.cc"),

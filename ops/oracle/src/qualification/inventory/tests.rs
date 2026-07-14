@@ -98,7 +98,7 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         .filter(|case| case.provenance == EvidenceProvenance::QualificationPlan)
         .filter(|case| case.source_id.starts_with("cq2-stim-format-"))
         .collect::<Vec<_>>();
-    assert_eq!(qualification_cases.len(), 19);
+    assert_eq!(qualification_cases.len(), 24);
     assert!(
         qualification_cases
             .iter()
@@ -109,6 +109,10 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         .iter()
         .find(|case| case.source_id == "cq2-stim-format-canonical-round-trip")
         .expect("canonical qualification parent");
+    let from_text_parent = qualification_cases
+        .iter()
+        .find(|case| case.source_id == "cq2-stim-format-from-text-contract")
+        .expect("from_text qualification parent");
     let from_text = manifest
         .upstream_cases
         .iter()
@@ -124,7 +128,7 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
             .find(|owner| owner.feature_id == FeatureId::StimFormat)
             .expect("format ownership")
             .owner_case_id,
-        canonical.id
+        from_text_parent.id
     );
     let from_stim_str = manifest
         .public_api_items
