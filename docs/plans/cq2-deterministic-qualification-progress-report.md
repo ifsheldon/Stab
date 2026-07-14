@@ -8,7 +8,7 @@ The selected `.stim`, `.dem`, and result-format domains are complete at exact up
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Clean result-format evidence revision: `2f7e456b43415303eef19c3d2850811fa9b2526d` with `local_modifications=false`.
+Clean global evidence revision: `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` with `local_modifications=false`.
 
 Correctness inventory digest: `adcc3d19605e4fc7bd9e1b3f3373ddf38d81301430d891f062baaab0c6fdc8f6`.
 
@@ -62,23 +62,23 @@ These counts are evidence owners, not an estimate of required new test functions
 
 | Tier | Selected | Passed | Failed | Artifact | Request digest | Completion digest |
 | --- | ---: | ---: | ---: | --- | --- | --- |
-| PR | 31 | 31 | 0 | `target/qualification/correctness/cq2-result-formats-pr` | `fd6670d0a54af3eb8e071f0d796e2421d542ba0fd817944095825438dc4d8382` | `be4cfd4b117ffe8dec0ac6c1cff2edc84d90d2456fb8b5df12cb95c583b54a3b` |
-| Full | 39 | 39 | 0 | `target/qualification/correctness/cq2-result-formats-full` | `d2f1fa31f29a3c236330a5e5fea58ea391657fed02a5b722dd5fa1dde856cb28` | `d9543566f5fc9648dbe0baf9acd510a7a5e5d2f587adbb6c4cfe3fec80a4b614` |
-| Soak | 39 | 39 | 0 | `target/qualification/correctness/cq2-result-formats-soak` | `23fccd1aebc8d5e030896a724a63564db5364cfc13af94f183120e5ff07e5118` | `7282928fa577afe7b26573ce4e0ec9164d700c0c51258d7148f42b8d14455f29` |
+| PR | 331 | 331 | 0 | `target/qualification/correctness/cq2-result-formats-global-pr` | `74b0f96d4174ff5f202dadb7e97894ca3747fd1b5286625939390283089bea67` | `3d6cbc0fac61671ca4ebbbf3d5c16bacdadca76b17d03499afb1f97f402dabff` |
+| Full | 493 | 493 | 0 | `target/qualification/correctness/cq2-result-formats-global-full` | `ea5f5f9db3d97d505280d21d7268835d7c242cc72c3b08cc0beaaf3846883b2b` | `2b1365b1cbd165c4a028e2df7ae81e3e260828f7c8672f00d23b263150b38952` |
+| Soak | 493 | 493 | 0 | `target/qualification/correctness/cq2-result-formats-global-soak` | `6605d7aefa6eb12ae493609dc73c436d662efbb4832a2b8fa66c3d5fc867f206` | `45226c10f2a6aca6328a3d807a8590de83459f2bb7a97cb540e4233d165cd0b0` |
 
-Offline report regeneration passed for every tier. Exact full preflight passed for `cq-evidence-qualification-db7d4cd87fe69099`, the multi-width result-reader round-trip parent, against the controller-approved request and completion receipts.
+Offline report regeneration passed for every tier. Exact full and soak preflight passed for `cq-evidence-qualification-db7d4cd87fe69099`, the multi-width result-reader round-trip parent, against the controller-approved request and completion receipts.
 
 ## Dependent PQ1 Refresh
 
-The PQ1 group remains diagnostic infrastructure with `promotable=false`, `report-only` baseline eligibility, and zero checked product thresholds. The table below preserves the last clean pre-result-format evidence; a current `3b55089...` digest refresh is required before it can be cited as current harness evidence.
+The PQ1 group remains diagnostic infrastructure with `promotable=false`, `report-only` baseline eligibility, and zero checked product thresholds.
 
 | Tier | Pairs | Median ratio | Bootstrap 95% interval | Ratio rMAD | Host | Artifact |
 | --- | ---: | ---: | --- | ---: | --- | --- |
-| PR | 3 | 1.015166 | [1.014561, 1.015270] | 0.000102 | Verified | `target/benchmarks/qualification/pq1-cq2-dem-doc-sync-pr` |
-| Full | 9 | 1.015492 | [1.014614, 1.016164] | 0.000482 | Verified | `target/benchmarks/qualification/pq1-cq2-dem-doc-sync-full` |
-| Soak | 15 | 1.015130 | [1.014543, 1.015421] | 0.000546 | Verified | `target/benchmarks/qualification/pq1-cq2-dem-doc-sync-soak` |
+| PR | 3 | 1.014689 | [1.012763, 1.016830] | 0.001899 | Verified | `target/benchmarks/qualification/pq1-cq2-result-formats-pr` |
+| Full | 9 | 1.014584 | [1.014173, 1.016281] | 0.000405 | Verified | `target/benchmarks/qualification/pq1-cq2-result-formats-full` |
+| Soak | 15 | 1.015166 | [1.014050, 1.015688] | 0.000576 | Verified | `target/benchmarks/qualification/pq1-cq2-result-formats-soak` |
 
-All reports use schema version 13, the current correctness and performance digests, `local_modifications=false` before and after execution, and commit `389a1cc7e3227c30485e14d8c3ee95315150e6b7`. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. These ratios describe only the synthetic adapter protocol and must not be reported as Stab product performance.
+All reports use schema version 13, the current correctness and performance digests, `local_modifications=false` before and after execution, and commit `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c`. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. These ratios describe only the synthetic adapter protocol and must not be reported as Stab product performance.
 
 ## Verification
 
@@ -97,12 +97,12 @@ just qualification::correctness-regenerate --check
 just qualification::correctness-check
 just bench::qualification-regenerate --check
 just bench::qualification-check
-just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-pr
-just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-full
-just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-soak
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-pr
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-full
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-soak
+just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-result-formats-pr
+just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-result-formats-full
+just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-result-formats-soak
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-result-formats-pr
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-result-formats-full
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-result-formats-soak
 just maintenance::pre-commit
 ```
 

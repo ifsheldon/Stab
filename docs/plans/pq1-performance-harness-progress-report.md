@@ -1,6 +1,6 @@
 # PQ1 Paired Performance Harness Progress Report
 
-> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, and result-format slices change the correctness inventory digest to `adcc3d19605e4fc7bd9e1b3f3373ddf38d81301430d891f062baaab0c6fdc8f6`, and source-owned checklist synchronization changes the dependent performance inventory digest to `3b55089bc331b115912818ba04b584c741a8c9a56e13d8b06d85cc829b6256a1`. The clean schema-version-13 reports from revision `389a1cc7e3227c30485e14d8c3ee95315150e6b7` remain historical harness evidence because they bind the prior digest; rerun PR, full, and soak before citing current PQ1 evidence. The PQ1 group remains diagnostic infrastructure, not product performance.
+> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, and result-format slices change the correctness inventory digest to `adcc3d19605e4fc7bd9e1b3f3373ddf38d81301430d891f062baaab0c6fdc8f6`, and source-owned checklist synchronization changes the dependent performance inventory digest to `3b55089bc331b115912818ba04b584c741a8c9a56e13d8b06d85cc829b6256a1`. Clean current-digest schema-version-13 PR, full, and soak reports from revision `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` are host-verified and pass offline validation; their diagnostic ratios are 1.014689, 1.014584, and 1.015166 respectively. See `docs/plans/cq2-deterministic-qualification-progress-report.md`. They remain diagnostic infrastructure evidence, not product performance.
 
 ## Status
 
