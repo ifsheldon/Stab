@@ -23,6 +23,24 @@ None.
 
 ## Resolved Entries
 
+## 2026-07-14 - CQ2: Mixed Language-Specific Upstream Contracts
+
+Status: Resolved
+Revealed by: exact-symbol review of the selected `.dem` upstream tests.
+Current text: CQ2 required exact upstream provenance and selected Rust API ownership, but it did not state how to classify one upstream symbol that combines portable semantic behavior with Python object shape or C++ convenience behavior outside Stab's selected Rust surface.
+Gap: Treating the entire symbol as selected would silently add Python copying, indexing, operators, file helpers, or C++ moved-from and convenience-operator behavior to the Rust contract. Deferring the entire symbol would also hide portable target, instruction, model, coordinate, traversal, or transform semantics that Stab does select.
+Proposed amendment: Disposition each exact upstream symbol according to the contract actually expressed by that symbol, defer or mark non-applicable language-specific symbols honestly, and give the selected Rust API an independent qualification parent when the portable semantic contract is not independently selectable upstream.
+Resolution: `.dem` classification now defers Python-only object-shape and file-helper symbols with Python bindings, marks C++ convenience and moved-from behavior not applicable, moves shortest-graphlike Python symbols to `CQ-SEARCH`, and maps selected Rust target, instruction, model, traversal, coordinate, and transform APIs through exact independent parents.
+
+## 2026-07-14 - CQ2: Broad Imported Fixtures As Supporting Provenance
+
+Status: Resolved
+Revealed by: exact-parent ownership review for imported `.dem` structural fixtures.
+Current text: CQ2 allowed qualification parents to replace planned owners and CQ0 retained broad fixture filters as supporting evidence, but it did not explicitly define how an imported broad fixture row should attach to a new exact qualification parent.
+Gap: Promoting the broad fixture row would make a file-level or multi-case filter look atomic. Keeping both the fixture and qualification parent as terminal primaries could duplicate completion credit or violate the shared-primary prohibition.
+Proposed amendment: Require broad imported fixture rows to remain supporting-only provenance and name their exact qualification owner through `oracle_fixture_owners`; reject missing fixture ownership, shared terminal primaries, and broad selectors promoted as atomic evidence.
+Resolution: The `.dem` qualification ledger claims the affected fixture ids through `oracle_fixture_owners`, generation removes their standalone planned evidence rows, and inventory tests prove that the broad folded-traversal fixture remains supporting provenance rather than an atomic primary.
+
 ## 2026-07-14 - CQ2: Exact-Symbol Classification And Complete Parent Credit
 
 Status: Resolved

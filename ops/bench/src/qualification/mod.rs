@@ -20,7 +20,7 @@ mod validation;
 pub(crate) use runtime::{ProbeArgs, RegressionArgs, ReportArgs, RunArgs, WorkerArgs};
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "86d76e78bef628fd9722eba5f79ae1d8960d7bf16f9e571203babe4701a64999";
+    "2cd3f0cd44f2450297dc87abec98156eb717127483a051f8dd48ee29bdc39fcd";
 const MAX_SUITE_BYTES: usize = 32 << 20;
 
 pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
