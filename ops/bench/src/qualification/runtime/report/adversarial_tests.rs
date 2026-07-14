@@ -1,5 +1,6 @@
 use super::super::protocol::{GitCommit, PROTOCOL_SCHEMA_VERSION, Sha256Digest, WorkerMeasurement};
 use super::super::run::{CalibrationProbeEvidence, ImplementationCalibration, MemoryEvidence};
+use super::super::statistics::{GateOutcome, StatisticsSummary};
 use super::*;
 
 const WORK_ITEMS: u64 = 4;
@@ -70,6 +71,79 @@ fn calibration(implementation: Implementation) -> ImplementationCalibration {
             },
         ],
     }
+}
+
+fn timing_attempt(
+    attempt_index: usize,
+    kind: TimingAttemptKind,
+    outcome: GateOutcome,
+) -> TimingAttempt {
+    TimingAttempt {
+        attempt_index,
+        kind,
+        warmups: Vec::new(),
+        samples: Vec::new(),
+        paired_samples: Vec::new(),
+        statistics: vec![StatisticsSummary {
+            measurement_id: ProtocolId::try_new("main").expect("measurement id"),
+            pair_count: 9,
+            median_ratio: 1.0,
+            confidence_interval_lower: 1.0,
+            confidence_interval_upper: 1.0,
+            stim_relative_mad: 0.0,
+            stab_relative_mad: 0.0,
+            ratio_relative_mad: if outcome == GateOutcome::Noisy {
+                0.11
+            } else {
+                0.0
+            },
+            threshold: 1.25,
+            outcome,
+        }],
+        worst_confidence_interval_upper: 1.0,
+    }
+}
+
+#[test]
+fn noisy_attempt_gets_exactly_one_complete_rerun_slot() {
+    let passed = timing_attempt(0, TimingAttemptKind::Initial, GateOutcome::Passed);
+    validate_timing_attempt_policy(std::slice::from_ref(&passed))
+        .expect("non-noisy initial attempt is final");
+    let untriggered = vec![
+        passed,
+        timing_attempt(
+            1,
+            TimingAttemptKind::PairedRatioNoiseRerun,
+            GateOutcome::Passed,
+        ),
+    ];
+    assert!(matches!(
+        validate_timing_attempt_policy(&untriggered),
+        Err(ReportError::TimingAttemptCount(2))
+    ));
+
+    let noisy = timing_attempt(0, TimingAttemptKind::Initial, GateOutcome::Noisy);
+    assert!(matches!(
+        validate_timing_attempt_policy(std::slice::from_ref(&noisy)),
+        Err(ReportError::TimingAttemptCount(1))
+    ));
+    let retained = vec![
+        noisy,
+        timing_attempt(
+            1,
+            TimingAttemptKind::PairedRatioNoiseRerun,
+            GateOutcome::Failed,
+        ),
+    ];
+    validate_timing_attempt_policy(&retained)
+        .expect("one complete rerun is retained regardless of its result");
+
+    let mut wrong_reason = retained;
+    wrong_reason.last_mut().expect("rerun").kind = TimingAttemptKind::Initial;
+    assert!(matches!(
+        validate_timing_attempt_policy(&wrong_reason),
+        Err(ReportError::TimingAttemptIdentity)
+    ));
 }
 
 #[test]

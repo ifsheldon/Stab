@@ -126,7 +126,7 @@ When a commit is requested, use focused commits and run the repository's require
 - PQ1 targets 350-millisecond calibration batches and independently rejects a common retained batch below the contractual 250-millisecond floor or above the 2-second ceiling; do not retry only a below-floor validation without fixing or recording the calibration policy.
 - A primary row passes 1.25x only when both its median paired ratio and upper confidence bound are at most `1.25`.
 - A slow comparable row cannot be waived.
-- A noisy row may receive one complete group rerun, with both attempts retained; never discard only an unfavorable sample.
+- Noise classification must use paired-ratio relative MAD, not separate implementation-rate MAD. An initial noisy row receives exactly one complete group rerun with fresh warmups and the full sample count; retain both attempts and make the second authoritative regardless of outcome. Never rerun a non-noisy result or continue until favorable.
 - A no-ratio disposition is allowed only when the validator proves that pinned Stim has no faithful comparator at the claimed surface and the reason names the condition that would retire it.
 - Memory instrumentation cannot supply timing evidence.
 - Process RSS comparisons, Stab allocation regressions, and scaling classifications must remain separate claims.

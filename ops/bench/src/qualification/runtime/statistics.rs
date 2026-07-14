@@ -193,9 +193,7 @@ pub(crate) fn summarize(
     let stim_relative_mad = relative_mad(&stim)?;
     let stab_relative_mad = relative_mad(&stab)?;
     let ratio_relative_mad = relative_mad(&ratios)?;
-    let noisy = stim_relative_mad > NOISY_RELATIVE_MAD
-        || stab_relative_mad > NOISY_RELATIVE_MAD
-        || ratio_relative_mad > NOISY_RELATIVE_MAD;
+    let noisy = ratio_relative_mad > NOISY_RELATIVE_MAD;
     let outcome = if noisy {
         GateOutcome::Noisy
     } else if median_ratio <= threshold && confidence_interval_upper <= threshold {
@@ -513,6 +511,34 @@ mod tests {
         )
         .expect("statistics");
         assert_eq!(summary.outcome, GateOutcome::Noisy);
+    }
+
+    #[test]
+    fn common_mode_rate_variation_does_not_make_paired_ratios_noisy() {
+        let samples = [0.5, 0.6, 0.8, 1.0, 1.3, 1.7, 2.0, 2.5, 3.0]
+            .into_iter()
+            .enumerate()
+            .flat_map(|(pair_index, elapsed)| {
+                pair_measurements(
+                    pair_index,
+                    PairOrder::for_pair(pair_index),
+                    &[row(Implementation::Stim, elapsed)],
+                    &[row(Implementation::Stab, elapsed)],
+                )
+                .expect("paired common-mode measurements")
+            })
+            .collect::<Vec<_>>();
+        let summary = summarize(
+            ProtocolId::try_new("main").expect("measurement id"),
+            &samples,
+            1.25,
+        )
+        .expect("common-mode statistics");
+
+        assert!(summary.stim_relative_mad > NOISY_RELATIVE_MAD);
+        assert!(summary.stab_relative_mad > NOISY_RELATIVE_MAD);
+        assert_eq!(summary.ratio_relative_mad, 0.0);
+        assert_eq!(summary.outcome, GateOutcome::Passed);
     }
 
     #[test]

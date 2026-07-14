@@ -200,7 +200,7 @@ Generated artifacts belong below `target/benchmarks/qualification/` and must nev
 
 - Calibrate each timed batch to at least 250 milliseconds and at most 2 seconds without exceeding the workload's declared iteration or memory cap.
 - Controllers may target a higher source-owned calibration duration to absorb ordinary run-to-run jitter, but must record that target separately and independently reject the retained common batch when it falls below 250 milliseconds or exceeds 2 seconds. PQ1 uses a 350-millisecond target and retains the 250-millisecond acceptance floor.
-- Use three untimed or unreported warmup batches before a full qualification measurement.
+- Use three unreported warmup batches before each complete qualification timing attempt.
 - Use nine interleaved paired Stim and Stab samples for full qualification and fifteen for soak evidence.
 - Alternate deterministic `Stim, Stab` and `Stab, Stim` order across pairs to reduce drift bias.
 - Compute each pair as Stab seconds per work unit divided by Stim seconds per work unit.
@@ -208,7 +208,9 @@ Generated artifacts belong below `target/benchmarks/qualification/` and must nev
 - A primary 1.25x row passes only when both the median paired ratio and upper confidence bound are at most `1.25`.
 - Report relative median absolute deviation for each implementation and for paired ratios.
 - Do not delete outliers.
-- If paired relative median absolute deviation exceeds 10 percent, mark the row noisy and permit one complete group rerun; retain both attempts and never replace only an unfavorable measurement.
+- If paired relative median absolute deviation exceeds 10 percent, mark the row noisy and require exactly one complete group rerun containing fresh warmups and the full pair count. Retain both attempts, make the second attempt authoritative regardless of its outcome, and never rerun a non-noisy result or continue rerunning until favorable.
+- Keep per-implementation relative median absolute deviations as diagnostics, but do not use their common-mode rate variation to classify a paired ratio as noisy.
+- Reject failed or noisy authoritative outcomes before applying source-owned numeric regression thresholds.
 - Timeout, signal, malformed output, zero work, inconsistent digest, or incomplete sample evidence is a failed row, not a slow or waived row.
 
 The PR tier may use three paired samples for smoke and regression direction, but it cannot mint a new qualification or threshold.
@@ -432,6 +434,7 @@ Make faithful comparison, calibration, statistics, and reporting reusable before
 - Unit-test calibration lower and upper bounds, zero-duration handling, overflow, timeouts, and maximum iterations.
 - Unit-test deterministic `Stim, Stab` or `Stab, Stim` alternation and preserve all raw samples.
 - Unit-test paired ratio, median, relative median absolute deviation, bootstrap interval, threshold boundary, and noisy-row classification against hand-computed fixtures.
+- Unit-test common-mode Stim and Stab rate variation, noisy-rerun triggering, missing and untriggered reruns, wrong attempt reasons, second-attempt failure retention, and rejection of noisy authoritative regression evidence.
 - Unit-test exact measurement pairing, stale ids, duplicate pairs, missing work, zero work, inconsistent work, inconsistent digest, and heterogeneous aggregate rejection.
 - Unit-test hostile report mutations of calibration progression, wrapper and row iteration counts, phase workload or measurement ids, implementation and evidence mode, derived work, affinity, output digest, build identity, impossible wall duration, and repeated parent-RSS summaries.
 - Integration-test process success, nonzero exit, signal termination, timeout, stdout or stderr overflow, writer failure, missing binary, and child cleanup.

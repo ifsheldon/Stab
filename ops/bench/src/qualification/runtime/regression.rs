@@ -5,6 +5,7 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use super::run::{ClaimClass, QualificationReport};
+use super::statistics::GateOutcome;
 use crate::root::RepoRoot;
 
 const BASELINE_SCHEMA_VERSION: u32 = 1;
@@ -89,13 +90,15 @@ pub(super) fn run(
         }
         RuleDisposition::Gated => {}
     }
+    let authoritative = super::report::authoritative_timing_attempt(&report)?;
     let mut checked = 0;
     for rule in selected {
-        let summary = report
+        let summary = authoritative
             .statistics
             .iter()
             .find(|summary| summary.measurement_id.to_string() == rule.measurement_id)
             .ok_or_else(|| RegressionError::MissingMeasurement(rule.measurement_id.clone()))?;
+        require_passed_outcome(&rule.measurement_id, summary.outcome)?;
         let maximum_median = parse_ratio("max_median_ratio", &rule.max_median_ratio)?;
         let maximum_upper = parse_ratio(
             "max_confidence_interval_upper",
@@ -119,6 +122,20 @@ pub(super) fn run(
         checked_measurements: checked,
         report_only: false,
     })
+}
+
+fn require_passed_outcome(
+    measurement_id: &str,
+    outcome: GateOutcome,
+) -> Result<(), RegressionError> {
+    if outcome == GateOutcome::Passed {
+        Ok(())
+    } else {
+        Err(RegressionError::UnacceptableOutcome {
+            measurement_id: measurement_id.to_string(),
+            outcome,
+        })
+    }
 }
 
 pub(super) fn check_baseline(
@@ -245,6 +262,11 @@ pub(super) enum RegressionError {
     DiagnosticCannotBeGated(String),
     #[error("qualification report omits threshold measurement {0}")]
     MissingMeasurement(String),
+    #[error("qualification measurement {measurement_id} has non-passing outcome {outcome:?}")]
+    UnacceptableOutcome {
+        measurement_id: String,
+        outcome: GateOutcome,
+    },
     #[error(
         "qualification measurement {measurement_id} exceeded regression limits: median {median:.6} > {maximum_median:.6} or upper {upper:.6} > {maximum_upper:.6}"
     )]
@@ -296,5 +318,18 @@ mod tests {
         assert!(
             rule_disposition(ClaimClass::PromotablePerformance, false, false, "group").is_err()
         );
+    }
+
+    #[test]
+    fn gated_evidence_rejects_failed_and_noisy_authoritative_outcomes() {
+        require_passed_outcome("main", GateOutcome::Passed).expect("passed outcome");
+        assert!(matches!(
+            require_passed_outcome("main", GateOutcome::Failed),
+            Err(RegressionError::UnacceptableOutcome { .. })
+        ));
+        assert!(matches!(
+            require_passed_outcome("main", GateOutcome::Noisy),
+            Err(RegressionError::UnacceptableOutcome { .. })
+        ));
     }
 }

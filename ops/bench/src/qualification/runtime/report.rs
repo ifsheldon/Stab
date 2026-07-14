@@ -11,13 +11,14 @@ use super::invocation::protocol_ids;
 use super::protocol::{EvidenceMode, Implementation, ProtocolId, SemanticDigest};
 use super::run::{
     ClaimClass, PairExecution, QualificationReport, QualificationTier, REPORT_SCHEMA_VERSION,
-    sha256_hex,
+    TimingAttempt, TimingAttemptKind, sha256_hex,
 };
 use super::statistics::{PairOrder, PairedSample, pair_measurements, summarize};
 use crate::config::{STIM_COMMIT, STIM_TAG};
 
-const PREFLIGHT_SCHEMA_VERSION: u32 = 2;
+const PREFLIGHT_SCHEMA_VERSION: u32 = 3;
 const EXPECTED_WARMUPS: usize = 3;
+const EXPECTED_MAXIMUM_TIMING_ATTEMPTS: usize = 2;
 const EXPECTED_THRESHOLD: f64 = 1.25;
 
 #[derive(Clone, Debug, Args)]
@@ -47,6 +48,8 @@ pub(super) struct PerformancePreflightArtifact {
     correctness_status: CorrectnessPreflightStatus,
     correctness_case_ids: Vec<String>,
     semantic_preflight_passed: bool,
+    timing_attempts: usize,
+    authoritative_attempt_index: usize,
     sample_pairs: usize,
     promotable: bool,
 }
@@ -72,6 +75,7 @@ pub(super) fn validate_report(
         || report.command.work_items == 0
         || report.command.warmup_batches != EXPECTED_WARMUPS
         || report.command.paired_samples != expected_pair_count(report.tier)
+        || report.command.maximum_timing_attempts != EXPECTED_MAXIMUM_TIMING_ATTEMPTS
         || report.command.invocation_timeout_seconds != 30
         || !report.host.verified && !report.command.allow_unverified_host
     {
@@ -170,39 +174,76 @@ pub(super) fn validate_report(
     validate_correctness_evidence(report)?;
     validate_pair_execution(&report.semantic_preflight, EvidenceMode::Timing)?;
     validate_calibration(report)?;
-    if report.warmups.len() != EXPECTED_WARMUPS {
-        return Err(ReportError::WarmupCount(report.warmups.len()));
+    validate_timing_attempts(report)?;
+    validate_memory(report)?;
+    validate_claim(report)?;
+    Ok(())
+}
+
+fn validate_timing_attempts(report: &QualificationReport) -> Result<(), ReportError> {
+    validate_timing_attempt_policy(&report.timing_attempts)?;
+    for attempt in &report.timing_attempts {
+        validate_timing_attempt(report, attempt)?;
     }
-    for (index, warmup) in report.warmups.iter().enumerate() {
+    Ok(())
+}
+
+fn validate_timing_attempt_policy(attempts: &[TimingAttempt]) -> Result<(), ReportError> {
+    let initial = attempts.first().ok_or(ReportError::TimingAttemptCount(0))?;
+    let expected_attempts = if initial.requires_noisy_rerun() { 2 } else { 1 };
+    if attempts.len() != expected_attempts {
+        return Err(ReportError::TimingAttemptCount(attempts.len()));
+    }
+    for (attempt_index, attempt) in attempts.iter().enumerate() {
+        let expected_kind = if attempt_index == 0 {
+            TimingAttemptKind::Initial
+        } else {
+            TimingAttemptKind::PairedRatioNoiseRerun
+        };
+        if attempt.attempt_index != attempt_index || attempt.kind != expected_kind {
+            return Err(ReportError::TimingAttemptIdentity);
+        }
+    }
+    Ok(())
+}
+
+fn validate_timing_attempt(
+    report: &QualificationReport,
+    attempt: &TimingAttempt,
+) -> Result<(), ReportError> {
+    if attempt.warmups.len() != EXPECTED_WARMUPS {
+        return Err(ReportError::WarmupCount(attempt.warmups.len()));
+    }
+    for (index, warmup) in attempt.warmups.iter().enumerate() {
         if warmup.pair_index != index {
             return Err(ReportError::PairIndex);
         }
         validate_pair_execution(warmup, EvidenceMode::Timing)?;
     }
-    if report.samples.len() != expected_pair_count(report.tier) {
-        return Err(ReportError::SampleCount(report.samples.len()));
+    if attempt.samples.len() != expected_pair_count(report.tier) {
+        return Err(ReportError::SampleCount(attempt.samples.len()));
     }
     let mut reconstructed = Vec::new();
-    for (index, sample) in report.samples.iter().enumerate() {
+    for (index, sample) in attempt.samples.iter().enumerate() {
         if sample.pair_index != index {
             return Err(ReportError::PairIndex);
         }
         reconstructed.extend(validate_pair_execution(sample, EvidenceMode::Timing)?);
     }
-    if !paired_samples_equivalent(&reconstructed, &report.paired_samples) {
+    if !paired_samples_equivalent(&reconstructed, &attempt.paired_samples) {
         return Err(ReportError::PairedSamples);
     }
-    let measurement_ids = report
+    let measurement_ids = attempt
         .paired_samples
         .iter()
         .map(|sample| sample.measurement_id.clone())
         .collect::<BTreeSet<_>>();
-    if measurement_ids.len() != report.statistics.len() || measurement_ids.is_empty() {
+    if measurement_ids.len() != attempt.statistics.len() || measurement_ids.is_empty() {
         return Err(ReportError::StatisticsSet);
     }
     let mut reconstructed_statistics = Vec::new();
     for measurement_id in measurement_ids {
-        let selected = report
+        let selected = attempt
             .paired_samples
             .iter()
             .filter(|sample| sample.measurement_id == measurement_id)
@@ -210,10 +251,10 @@ pub(super) fn validate_report(
             .collect::<Vec<PairedSample>>();
         reconstructed_statistics.push(summarize(measurement_id, &selected, EXPECTED_THRESHOLD)?);
     }
-    if !statistics_equivalent(&reconstructed_statistics, &report.statistics) {
+    if !statistics_equivalent(&reconstructed_statistics, &attempt.statistics) {
         return Err(ReportError::StatisticsMismatch {
             expected: format!("{reconstructed_statistics:?}"),
-            actual: format!("{:?}", report.statistics),
+            actual: format!("{:?}", attempt.statistics),
         });
     }
     let worst = reconstructed_statistics
@@ -221,11 +262,9 @@ pub(super) fn validate_report(
         .map(|summary| summary.confidence_interval_upper)
         .reduce(f64::max)
         .ok_or(ReportError::StatisticsSet)?;
-    if !approximately_equal(worst, report.worst_confidence_interval_upper) {
+    if !approximately_equal(worst, attempt.worst_confidence_interval_upper) {
         return Err(ReportError::WorstUpperBound);
     }
-    validate_memory(report)?;
-    validate_claim(report)?;
     Ok(())
 }
 
@@ -364,11 +403,13 @@ fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), Repo
         &report.calibration.common_validation,
         &common_timing,
     )?;
-    for pair in &report.warmups {
-        validate_pair_receipts(&identity, pair, &common_timing)?;
-    }
-    for pair in &report.samples {
-        validate_pair_receipts(&identity, pair, &common_timing)?;
+    for attempt in &report.timing_attempts {
+        for pair in &attempt.warmups {
+            validate_pair_receipts(&identity, pair, &common_timing)?;
+        }
+        for pair in &attempt.samples {
+            validate_pair_receipts(&identity, pair, &common_timing)?;
+        }
     }
     let common_memory = PhaseExpectation {
         evidence_mode: EvidenceMode::Memory,
@@ -768,6 +809,7 @@ pub(super) fn preflight_artifact(
     report_json: &[u8],
 ) -> Result<PerformancePreflightArtifact, ReportError> {
     validate_report(root, report)?;
+    let authoritative = authoritative_timing_attempt(report)?;
     Ok(PerformancePreflightArtifact {
         schema_version: PREFLIGHT_SCHEMA_VERSION,
         report_sha256: sha256_hex(report_json),
@@ -787,13 +829,25 @@ pub(super) fn preflight_artifact(
         correctness_status: report.correctness_preflight.status,
         correctness_case_ids: report.correctness_preflight.case_ids.clone(),
         semantic_preflight_passed: true,
-        sample_pairs: report.samples.len(),
+        timing_attempts: report.timing_attempts.len(),
+        authoritative_attempt_index: authoritative.attempt_index,
+        sample_pairs: authoritative.samples.len(),
         promotable: report.promotable,
     })
 }
 
+pub(super) fn authoritative_timing_attempt(
+    report: &QualificationReport,
+) -> Result<&TimingAttempt, ReportError> {
+    report
+        .timing_attempts
+        .last()
+        .ok_or(ReportError::TimingAttemptCount(0))
+}
+
 pub(super) fn render_markdown(report: &QualificationReport, report_sha256: &str) -> String {
-    let summary = report.statistics.first();
+    let authoritative = report.timing_attempts.last();
+    let summary = authoritative.and_then(|attempt| attempt.statistics.first());
     let median = summary.map_or("n/a".to_string(), |value| {
         format!("{:.6}", value.median_ratio)
     });
@@ -811,7 +865,7 @@ pub(super) fn render_markdown(report: &QualificationReport, report_sha256: &str)
             .map_or("unavailable".to_string(), |value| value.to_string())
     };
     format!(
-        "# PQ1 Qualification Harness Report\n\n- Group: `{}`\n- Claim class: diagnostic infrastructure\n- Tier: `{:?}`\n- Stim: `{}` (`{}`)\n- Stab commit: `{}`\n- Local modifications: `{}`\n- Host profile: `{}`\n- Host verified: `{}`\n- CPU: `{}` on `{}`\n- Frequency governor: `{:?}`\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: `{}`\n- Target: `{}`\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Warmups: `{}`\n- Paired samples: `{}`\n- Median diagnostic ratio: `{}`\n- Upper bootstrap bound: `{}`\n- Diagnostic 1.25 outcome: `{}`\n- Process memory evidence: separate from timing\n- Promotable product claim: `false`\n- Report SHA-256: `{}`\n",
+        "# PQ1 Qualification Harness Report\n\n- Group: `{}`\n- Claim class: diagnostic infrastructure\n- Tier: `{:?}`\n- Stim: `{}` (`{}`)\n- Stab commit: `{}`\n- Local modifications: `{}`\n- Host profile: `{}`\n- Host verified: `{}`\n- CPU: `{}` on `{}`\n- Frequency governor: `{:?}`\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: `{}`\n- Target: `{}`\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median diagnostic ratio: `{}`\n- Upper bootstrap bound: `{}`\n- Diagnostic 1.25 outcome: `{}`\n- Process memory evidence: separate from timing\n- Promotable product claim: `false`\n- Report SHA-256: `{}`\n",
         report.group_id,
         report.tier,
         report.stim_tag,
@@ -829,8 +883,12 @@ pub(super) fn render_markdown(report: &QualificationReport, report_sha256: &str)
         report.toolchain.target_triple,
         report.calibration.target_minimum_seconds,
         report.calibration.acceptance_minimum_seconds,
-        report.warmups.len(),
-        report.samples.len(),
+        report.timing_attempts.len(),
+        authoritative.map_or("n/a".to_string(), |attempt| attempt
+            .attempt_index
+            .to_string()),
+        authoritative.map_or(0, |attempt| attempt.warmups.len()),
+        authoritative.map_or(0, |attempt| attempt.samples.len()),
         median,
         upper,
         outcome,
@@ -870,6 +928,10 @@ pub(super) enum ReportError {
     WarmupCount(usize),
     #[error("qualification report has {0} samples for its selected tier")]
     SampleCount(usize),
+    #[error("qualification report has an invalid timing-attempt count: {0}")]
+    TimingAttemptCount(usize),
+    #[error("qualification report timing-attempt indices or reasons are invalid")]
+    TimingAttemptIdentity,
     #[error("qualification report pair indices or order are invalid")]
     PairIndex,
     #[error("qualification report pair shape is invalid")]

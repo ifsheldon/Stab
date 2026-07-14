@@ -13,11 +13,13 @@ use super::correctness::{CorrectnessPreflightEvidence, CorrectnessRequirement};
 use super::host::{HostEvidence, HostGuard};
 use super::invocation::{InvocationRecord, PreparedWorkers, WorkerIdentityEvidence, protocol_ids};
 use super::protocol::{EvidenceMode, Implementation, SemanticDigest, WorkerMeasurement};
-use super::statistics::{PairOrder, PairedSample, StatisticsSummary, pair_measurements, summarize};
+use super::statistics::{
+    GateOutcome, PairOrder, PairedSample, StatisticsSummary, pair_measurements, summarize,
+};
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 10;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 11;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
@@ -25,6 +27,7 @@ const CALIBRATION_MAXIMUM: Duration = Duration::from_secs(2);
 const INVOCATION_TIMEOUT: Duration = Duration::from_secs(30);
 const MAXIMUM_ITERATIONS: u64 = 1_000_000_000;
 const WARMUP_BATCHES: usize = 3;
+const MAXIMUM_TIMING_ATTEMPTS: usize = 2;
 const PRIMARY_THRESHOLD: f64 = 1.25;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, ValueEnum)]
@@ -101,11 +104,7 @@ pub(super) struct QualificationReport {
     pub(super) correctness_preflight: CorrectnessPreflightEvidence,
     pub(super) semantic_preflight: PairExecution,
     pub(super) calibration: CalibrationEvidence,
-    pub(super) warmups: Vec<PairExecution>,
-    pub(super) samples: Vec<PairExecution>,
-    pub(super) paired_samples: Vec<PairedSample>,
-    pub(super) statistics: Vec<StatisticsSummary>,
-    pub(super) worst_confidence_interval_upper: f64,
+    pub(super) timing_attempts: Vec<TimingAttempt>,
     pub(super) memory: MemoryEvidence,
     pub(super) promotable: bool,
 }
@@ -118,6 +117,7 @@ pub(super) struct RunCommandEvidence {
     pub(super) allow_unverified_host: bool,
     pub(super) warmup_batches: usize,
     pub(super) paired_samples: usize,
+    pub(super) maximum_timing_attempts: usize,
     pub(super) invocation_timeout_seconds: u64,
 }
 
@@ -165,6 +165,33 @@ pub(super) struct CalibrationEvidence {
     pub(super) stab: ImplementationCalibration,
     pub(super) common_iterations: u64,
     pub(super) common_validation: PairExecution,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum TimingAttemptKind {
+    Initial,
+    PairedRatioNoiseRerun,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct TimingAttempt {
+    pub(super) attempt_index: usize,
+    pub(super) kind: TimingAttemptKind,
+    pub(super) warmups: Vec<PairExecution>,
+    pub(super) samples: Vec<PairExecution>,
+    pub(super) paired_samples: Vec<PairedSample>,
+    pub(super) statistics: Vec<StatisticsSummary>,
+    pub(super) worst_confidence_interval_upper: f64,
+}
+
+impl TimingAttempt {
+    pub(super) fn requires_noisy_rerun(&self) -> bool {
+        self.statistics
+            .iter()
+            .any(|summary| summary.outcome == GateOutcome::Noisy)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -240,45 +267,29 @@ pub(super) fn run(
         common_validation,
     };
 
-    let mut warmups = Vec::with_capacity(WARMUP_BATCHES);
-    for pair_index in 0..WARMUP_BATCHES {
-        let execution = execute_pair(
-            &workers,
-            pair_index,
-            common_iterations,
-            args.work_items,
-            EvidenceMode::Timing,
-            Some(&expected_output_digest),
-        )?;
-        pair_execution(&execution)?;
-        warmups.push(execution);
-    }
-
-    let mut samples = Vec::with_capacity(args.tier.pair_count());
-    let mut paired_samples = Vec::with_capacity(args.tier.pair_count());
-    for pair_index in 0..args.tier.pair_count() {
-        let execution = execute_pair(
-            &workers,
-            pair_index,
-            common_iterations,
-            args.work_items,
-            EvidenceMode::Timing,
-            Some(&expected_output_digest),
-        )?;
-        paired_samples.extend(pair_execution(&execution)?);
-        samples.push(execution);
-    }
-    let (_, measurement_id) = protocol_ids()?;
-    let statistics = vec![summarize(
-        measurement_id,
-        &paired_samples,
-        PRIMARY_THRESHOLD,
+    let mut timing_attempts = vec![execute_timing_attempt(
+        &workers,
+        0,
+        TimingAttemptKind::Initial,
+        args.tier,
+        common_iterations,
+        args.work_items,
+        &expected_output_digest,
     )?];
-    let worst_confidence_interval_upper = statistics
-        .iter()
-        .map(|summary| summary.confidence_interval_upper)
-        .reduce(f64::max)
-        .ok_or(RunError::MissingStatistics)?;
+    if timing_attempts
+        .first()
+        .is_some_and(TimingAttempt::requires_noisy_rerun)
+    {
+        timing_attempts.push(execute_timing_attempt(
+            &workers,
+            1,
+            TimingAttemptKind::PairedRatioNoiseRerun,
+            args.tier,
+            common_iterations,
+            args.work_items,
+            &expected_output_digest,
+        )?);
+    }
 
     let memory_execution = execute_pair(
         &workers,
@@ -315,6 +326,7 @@ pub(super) fn run(
             allow_unverified_host: args.allow_unverified_host,
             warmup_batches: WARMUP_BATCHES,
             paired_samples: args.tier.pair_count(),
+            maximum_timing_attempts: MAXIMUM_TIMING_ATTEMPTS,
             invocation_timeout_seconds: INVOCATION_TIMEOUT.as_secs(),
         },
         generated_unix_epoch_seconds: unix_epoch_seconds()?,
@@ -331,11 +343,7 @@ pub(super) fn run(
         correctness_preflight,
         semantic_preflight,
         calibration,
-        warmups,
-        samples,
-        paired_samples,
-        statistics,
-        worst_confidence_interval_upper,
+        timing_attempts,
         memory,
         promotable: false,
     };
@@ -436,6 +444,65 @@ fn calibration_evidence(
         selected_measured_seconds: decision.measured.as_secs_f64(),
         probes,
     }
+}
+
+fn execute_timing_attempt(
+    workers: &PreparedWorkers,
+    attempt_index: usize,
+    kind: TimingAttemptKind,
+    tier: QualificationTier,
+    iterations: NonZeroU64,
+    work_items: NonZeroU64,
+    expected_output_digest: &SemanticDigest,
+) -> Result<TimingAttempt, RunError> {
+    let mut warmups = Vec::with_capacity(WARMUP_BATCHES);
+    for pair_index in 0..WARMUP_BATCHES {
+        let execution = execute_pair(
+            workers,
+            pair_index,
+            iterations,
+            work_items,
+            EvidenceMode::Timing,
+            Some(expected_output_digest),
+        )?;
+        pair_execution(&execution)?;
+        warmups.push(execution);
+    }
+
+    let mut samples = Vec::with_capacity(tier.pair_count());
+    let mut paired_samples = Vec::with_capacity(tier.pair_count());
+    for pair_index in 0..tier.pair_count() {
+        let execution = execute_pair(
+            workers,
+            pair_index,
+            iterations,
+            work_items,
+            EvidenceMode::Timing,
+            Some(expected_output_digest),
+        )?;
+        paired_samples.extend(pair_execution(&execution)?);
+        samples.push(execution);
+    }
+    let (_, measurement_id) = protocol_ids()?;
+    let statistics = vec![summarize(
+        measurement_id,
+        &paired_samples,
+        PRIMARY_THRESHOLD,
+    )?];
+    let worst_confidence_interval_upper = statistics
+        .iter()
+        .map(|summary| summary.confidence_interval_upper)
+        .reduce(f64::max)
+        .ok_or(RunError::MissingStatistics)?;
+    Ok(TimingAttempt {
+        attempt_index,
+        kind,
+        warmups,
+        samples,
+        paired_samples,
+        statistics,
+        worst_confidence_interval_upper,
+    })
 }
 
 fn execute_pair(
