@@ -6,7 +6,7 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use super::group::BaselineEligibility;
-use super::run::{ClaimClass, QualificationReport};
+use super::run::ClaimClass;
 use super::statistics::GateOutcome;
 use crate::root::RepoRoot;
 
@@ -57,6 +57,8 @@ pub(crate) struct RegressionSummary {
 
 pub(super) fn run(
     root: &RepoRoot,
+    expected_performance_inventory_sha256: &str,
+    expected_correctness_inventory_sha256: &str,
     args: RegressionArgs,
 ) -> Result<RegressionSummary, RegressionError> {
     let baseline_path = root.resolve_relative(&args.baseline);
@@ -68,12 +70,20 @@ pub(super) fn run(
     .map_err(|error| RegressionError::BaselineRead(error.to_string()))?;
     let baseline: RegressionBaseline =
         serde_json::from_slice(&baseline_bytes).map_err(RegressionError::BaselineJson)?;
-    let contracts = super::group::load_groups(root, &baseline.performance_inventory_sha256)?;
+    let contracts = super::group::load_groups(root, expected_performance_inventory_sha256)?;
     validate_baseline(&baseline, &contracts)?;
-    let report_bytes = super::artifact::read_artifact(root, &args.input, "report.json")?;
-    let report: QualificationReport =
-        serde_json::from_slice(&report_bytes).map_err(RegressionError::ReportJson)?;
-    super::report::validate_report(root, &report)?;
+    if baseline.performance_inventory_sha256 != expected_performance_inventory_sha256 {
+        return Err(RegressionError::InventoryMismatch {
+            baseline: baseline.performance_inventory_sha256,
+            report: expected_performance_inventory_sha256.to_string(),
+        });
+    }
+    let report = super::report::load_validated_published_report(
+        root,
+        &args.input,
+        expected_performance_inventory_sha256,
+        expected_correctness_inventory_sha256,
+    )?;
     if baseline.performance_inventory_sha256 != report.performance_inventory_sha256 {
         return Err(RegressionError::InventoryMismatch {
             baseline: baseline.performance_inventory_sha256,
@@ -279,8 +289,6 @@ pub(super) enum RegressionError {
     BaselineRead(String),
     #[error("qualification baseline JSON is invalid: {0}")]
     BaselineJson(serde_json::Error),
-    #[error("qualification report JSON is invalid: {0}")]
-    ReportJson(serde_json::Error),
     #[error("qualification baseline schema is {actual}, expected {expected}")]
     SchemaVersion { actual: u32, expected: u32 },
     #[error("qualification baseline inventory digest is invalid")]

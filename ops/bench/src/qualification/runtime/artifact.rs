@@ -130,6 +130,24 @@ impl QualificationOutput {
     pub(crate) fn relative(&self) -> &Path {
         &self.relative
     }
+
+    pub(crate) fn require_current_artifact(
+        &self,
+        name: &'static str,
+        expected: &[u8],
+    ) -> Result<(), ArtifactError> {
+        if !ARTIFACT_NAMES.contains(&name) {
+            return Err(ArtifactError::InvalidArtifactName(name));
+        }
+        let target =
+            open_directory_at(&self.parent, &self.target_name).map_err(ArtifactError::Io)?;
+        let current = read_artifact_from_directory(&target, name)?;
+        if current == expected {
+            Ok(())
+        } else {
+            Err(ArtifactError::ConcurrentReplacement(name))
+        }
+    }
 }
 
 pub(crate) fn read_artifact(
@@ -159,8 +177,15 @@ pub(crate) fn read_artifact(
     .map_err(ArtifactError::Io)?;
     rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockShared).map_err(ArtifactError::Io)?;
     let target = open_directory_at(&parent, target_name).map_err(ArtifactError::Io)?;
+    read_artifact_from_directory(&target, name)
+}
+
+fn read_artifact_from_directory(
+    directory: &OwnedFd,
+    name: &'static str,
+) -> Result<Vec<u8>, ArtifactError> {
     let descriptor = rustix::fs::openat(
-        &target,
+        directory,
         name,
         rustix::fs::OFlags::RDONLY
             | rustix::fs::OFlags::CLOEXEC
@@ -420,6 +445,8 @@ pub(crate) enum ArtifactError {
     Write(std::io::Error),
     #[error("qualification artifact is not a bounded regular file: {0}")]
     UnsafeArtifact(&'static str),
+    #[error("qualification artifact {0} changed while its derived report was being validated")]
+    ConcurrentReplacement(&'static str),
     #[error("qualification artifact size cannot be represented on this host")]
     SizeOverflow,
 }
@@ -493,6 +520,37 @@ mod tests {
         assert_eq!(
             read_artifact(&root, output, "report.json").expect("read preserved report"),
             b"first\n"
+        );
+    }
+
+    #[test]
+    fn stale_refresh_cannot_replace_newer_published_evidence() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let output = Path::new("target/benchmarks/qualification/test-run");
+
+        let first = QualificationOutput::begin(&root, output).expect("begin first publication");
+        first
+            .write("report.json", b"first\n")
+            .expect("write first report");
+        first.commit().expect("publish first report");
+        let stale = read_artifact(&root, output, "report.json").expect("read stale report");
+
+        let second = QualificationOutput::begin(&root, output).expect("begin newer publication");
+        second
+            .write("report.json", b"second\n")
+            .expect("write newer report");
+        second.commit().expect("publish newer report");
+
+        let refresh = QualificationOutput::begin(&root, output).expect("begin stale refresh");
+        assert!(matches!(
+            refresh.require_current_artifact("report.json", &stale),
+            Err(ArtifactError::ConcurrentReplacement("report.json"))
+        ));
+        drop(refresh);
+        assert_eq!(
+            read_artifact(&root, output, "report.json").expect("read newer report"),
+            b"second\n"
         );
     }
 }

@@ -19,8 +19,7 @@ use super::statistics::{
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 12;
-const PQ1_GROUP_ID: &str = "pq1-adapter-protocol-smoke";
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 13;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
@@ -232,8 +231,11 @@ pub(super) fn run(
     args: RunArgs,
 ) -> Result<PathBuf, RunError> {
     let repository_before = super::git::repository_state(root)?;
-    let resolved_group =
-        super::group::load_group(root, performance_inventory_sha256, PQ1_GROUP_ID)?;
+    let resolved_group = super::group::load_group(
+        root,
+        performance_inventory_sha256,
+        super::invocation::PQ1_GROUP_ID,
+    )?;
     let (workload_id, measurement_id) = protocol_ids()?;
     resolved_group
         .contract
@@ -377,9 +379,14 @@ pub(super) fn run(
         memory,
         promotable: false,
     };
-    super::report::validate_report(root, &report)?;
+    super::report::validate_report(
+        root,
+        &report,
+        performance_inventory_sha256,
+        correctness_inventory_sha256,
+    )?;
     let report_json = render_json(&report)?;
-    let preflight = super::report::preflight_artifact(root, &report, &report_json)?;
+    let preflight = super::report::preflight_artifact(&report, &report_json)?;
     let preflight_json = render_json(&preflight)?;
     let markdown = super::report::render_markdown(&report, &sha256_hex(&report_json));
     let output = QualificationOutput::begin(root, &args.out)?;

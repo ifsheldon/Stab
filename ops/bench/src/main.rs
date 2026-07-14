@@ -258,10 +258,10 @@ fn run(cli: Cli) -> Result<(), BenchError> {
             qualification::run_qualification(&root, &manifest, args)?;
         }
         Command::QualificationReport(args) => {
-            qualification::report(&root, args)?;
+            qualification::report(&root, &manifest, args)?;
         }
         Command::QualificationRegression(args) => {
-            qualification::regression(&root, args)?;
+            qualification::regression(&root, &manifest, args)?;
         }
         Command::Baseline {
             stim,

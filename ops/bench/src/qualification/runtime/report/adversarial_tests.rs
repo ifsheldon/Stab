@@ -202,6 +202,7 @@ fn invocation_receipt_binds_phase_and_worker_identity() {
     let build = repeated(b'b');
     let identity = ReceiptIdentity {
         work_items: WORK_ITEMS,
+        invocation_timeout_seconds: 30.0,
         expected_cpu: CPU,
         stim_commit: STIM_COMMIT,
         stim_source: &source,

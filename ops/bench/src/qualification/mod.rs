@@ -52,8 +52,20 @@ pub(crate) fn run_qualification(
     Ok(())
 }
 
-pub(crate) fn report(root: &RepoRoot, args: ReportArgs) -> Result<(), BenchError> {
-    let output = runtime::run_report(root, args).map_err(BenchError::Qualification)?;
+pub(crate) fn report(
+    root: &RepoRoot,
+    manifest: &BenchmarkManifest,
+    args: ReportArgs,
+) -> Result<(), BenchError> {
+    check(root, manifest)?;
+    let checked = read(root)?;
+    let output = runtime::run_report(
+        root,
+        EXPECTED_FROZEN_DIGEST,
+        &checked.correctness_digest,
+        args,
+    )
+    .map_err(BenchError::Qualification)?;
     println!(
         "[{PREFIX}] validated PQ1 qualification evidence at {}",
         output.display()
@@ -61,8 +73,20 @@ pub(crate) fn report(root: &RepoRoot, args: ReportArgs) -> Result<(), BenchError
     Ok(())
 }
 
-pub(crate) fn regression(root: &RepoRoot, args: RegressionArgs) -> Result<(), BenchError> {
-    let summary = runtime::run_regression(root, args).map_err(BenchError::Qualification)?;
+pub(crate) fn regression(
+    root: &RepoRoot,
+    manifest: &BenchmarkManifest,
+    args: RegressionArgs,
+) -> Result<(), BenchError> {
+    check(root, manifest)?;
+    let checked = read(root)?;
+    let summary = runtime::run_regression(
+        root,
+        EXPECTED_FROZEN_DIGEST,
+        &checked.correctness_digest,
+        args,
+    )
+    .map_err(BenchError::Qualification)?;
     println!(
         "[{PREFIX}] qualification regression group={} checked={} report_only={}",
         summary.group_id, summary.checked_measurements, summary.report_only

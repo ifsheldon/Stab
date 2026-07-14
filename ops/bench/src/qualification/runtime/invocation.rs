@@ -17,8 +17,23 @@ use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
+pub(super) const PQ1_GROUP_ID: &str = "pq1-adapter-protocol-smoke";
 const WORKLOAD_ID: &str = "protocol-smoke";
 const MEASUREMENT_ID: &str = "main";
+
+pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
+    contract.id.to_string() == PQ1_GROUP_ID
+        && contract.workload_id.to_string() == WORKLOAD_ID
+        && contract.measurement_ids.len() == 1
+        && contract
+            .measurement_ids
+            .first()
+            .is_some_and(|measurement| measurement.to_string() == MEASUREMENT_ID)
+}
+
+pub(super) const fn registered_group_count() -> usize {
+    1
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

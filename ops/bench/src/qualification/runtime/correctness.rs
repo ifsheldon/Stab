@@ -1,14 +1,20 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::config::STIM_COMMIT;
+use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
+const RUN_REQUEST_SCHEMA_VERSION: u32 = 3;
+const CORRECTNESS_REPORT_SCHEMA_VERSION: u32 = 6;
+const RUN_COMPLETION_SCHEMA_VERSION: u32 = 1;
+const EXECUTION_RECEIPT_SCHEMA_VERSION: u32 = 3;
 const CORRECTNESS_PREFLIGHT_SCHEMA_VERSION: u32 = 6;
 const MAX_CORRECTNESS_ARTIFACT_BYTES: usize = 64 << 20;
+const MAX_EXECUTION_RECEIPT_BYTES: usize = 256 << 10;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -75,25 +81,39 @@ pub(super) fn validate(
             expected_completion_sha256,
         } => validate_required(
             root,
-            output,
-            case_ids,
-            expected_manifest_sha256,
-            expected_stab_commit,
-            expected_request_sha256,
-            expected_completion_sha256,
+            RequiredValidation {
+                output,
+                case_ids,
+                expected_manifest_sha256,
+                expected_stab_commit,
+                expected_request_sha256,
+                expected_completion_sha256,
+            },
         ),
     }
 }
 
+struct RequiredValidation<'a> {
+    output: &'a Path,
+    case_ids: &'a [String],
+    expected_manifest_sha256: &'a str,
+    expected_stab_commit: &'a str,
+    expected_request_sha256: &'a str,
+    expected_completion_sha256: &'a str,
+}
+
 fn validate_required(
     root: &RepoRoot,
-    output: &Path,
-    case_ids: &[String],
-    expected_manifest_sha256: &str,
-    expected_stab_commit: &str,
-    expected_request_sha256: &str,
-    expected_completion_sha256: &str,
+    validation: RequiredValidation<'_>,
 ) -> Result<CorrectnessPreflightEvidence, CorrectnessError> {
+    let RequiredValidation {
+        output,
+        case_ids,
+        expected_manifest_sha256,
+        expected_stab_commit,
+        expected_request_sha256,
+        expected_completion_sha256,
+    } = validation;
     validate_output_path(output)?;
     if !valid_sha256(expected_manifest_sha256)
         || !valid_git_commit(expected_stab_commit)
@@ -103,56 +123,55 @@ fn validate_required(
         return Err(CorrectnessError::InvalidExpectation);
     }
     let required = case_ids.iter().collect::<BTreeSet<_>>();
-    if required.is_empty() || required.len() != case_ids.len() {
+    if required.is_empty()
+        || required.len() != case_ids.len()
+        || required.iter().any(|case_id| !valid_case_id(case_id))
+    {
         return Err(CorrectnessError::InvalidCases);
     }
+
     let absolute = root.path.join(output);
-    let request = read_artifact(root, &absolute.join("request.json"))?;
-    let completion = read_artifact(root, &absolute.join("completion.json"))?;
-    let report = read_artifact(root, &absolute.join("report.json"))?;
+    let request_bytes = read_artifact(root, &absolute.join("request.json"))?;
+    let completion_bytes = read_artifact(root, &absolute.join("completion.json"))?;
+    let report_bytes = read_artifact(root, &absolute.join("report.json"))?;
     let preflight_bytes = read_artifact(root, &absolute.join("preflight.json"))?;
-    let preflight: CorrectnessPreflight =
-        serde_json::from_slice(&preflight_bytes).map_err(CorrectnessError::Json)?;
-    let request_sha256 = super::run::sha256_hex(&request);
-    let completion_sha256 = super::run::sha256_hex(&completion);
-    let report_sha256 = super::run::sha256_hex(&report);
-    if request_sha256 != expected_request_sha256
-        || completion_sha256 != expected_completion_sha256
-        || preflight.schema_version != CORRECTNESS_PREFLIGHT_SCHEMA_VERSION
-        || preflight.qualification_manifest_digest != expected_manifest_sha256
-        || preflight.run_request_sha256 != request_sha256
-        || preflight.completion_sha256 != completion_sha256
-        || preflight.report_sha256 != report_sha256
-        || preflight.stab_commit != expected_stab_commit
-        || preflight.stim_commit != STIM_COMMIT
-        || preflight.local_modifications
-        || preflight.allow_deferred
-        || !preflight.selection_complete
-        || preflight.deferred_count != 0
-        || !matches!(preflight.tier.as_str(), "full" | "soak")
+    let request: RunRequest = parse_canonical("request.json", &request_bytes)?;
+    let completion: RunCompletion = parse_canonical("completion.json", &completion_bytes)?;
+    let report: CorrectnessReport = parse_canonical("report.json", &report_bytes)?;
+    let preflight: CorrectnessPreflight = parse_canonical("preflight.json", &preflight_bytes)?;
+
+    let request_sha256 = super::run::sha256_hex(&request_bytes);
+    let completion_sha256 = super::run::sha256_hex(&completion_bytes);
+    let report_sha256 = super::run::sha256_hex(&report_bytes);
+    if request_sha256 != expected_request_sha256 || completion_sha256 != expected_completion_sha256
     {
-        return Err(CorrectnessError::StalePreflight);
+        return Err(CorrectnessError::ControllerBinding);
     }
+
+    let requested = validate_request(&request, expected_manifest_sha256, expected_stab_commit)?;
+    let results = validate_report(&report, &request, &request_sha256, &requested)?;
+    validate_completion(&completion, &request_sha256, &report_sha256, &results)?;
+    validate_execution_receipts(root, &absolute, &request, &request_sha256, &results)?;
+    validate_preflight(
+        &preflight,
+        &report,
+        &request_sha256,
+        &report_sha256,
+        &completion_sha256,
+        &results,
+    )?;
     for case_id in &required {
-        let receipt = preflight
-            .cases
-            .get(*case_id)
-            .ok_or_else(|| CorrectnessError::MissingCase((*case_id).clone()))?;
-        if receipt.outcome != "passed"
-            || !valid_sha256(&receipt.selector_sha256)
-            || !valid_sha256(&receipt.execution_receipt_sha256)
-            || !valid_sha256(&receipt.stdout_sha256)
-            || !valid_sha256(&receipt.stderr_sha256)
-        {
-            return Err(CorrectnessError::FailedCase((*case_id).clone()));
+        if !results.contains_key(case_id.as_str()) {
+            return Err(CorrectnessError::MissingCase((*case_id).clone()));
         }
     }
+
     let mut case_ids = case_ids.to_vec();
     case_ids.sort();
     Ok(CorrectnessPreflightEvidence {
         status: CorrectnessPreflightStatus::Passed,
         case_ids,
-        reason: "exact CQ1 artifacts and passing case receipts validated before timing".to_string(),
+        reason: "canonical CQ request, report, completion, preflight, and passing execution receipts independently reconstructed before timing".to_string(),
         source_directory: Some(output.to_string_lossy().into_owned()),
         qualification_manifest_sha256: Some(expected_manifest_sha256.to_string()),
         request_sha256: Some(request_sha256),
@@ -162,8 +181,259 @@ fn validate_required(
     })
 }
 
+fn validate_request<'a>(
+    request: &'a RunRequest,
+    expected_manifest_sha256: &str,
+    expected_stab_commit: &str,
+) -> Result<BTreeMap<&'a str, &'a RequestedCase>, CorrectnessError> {
+    if request.schema_version != RUN_REQUEST_SCHEMA_VERSION
+        || request.qualification_manifest_digest != expected_manifest_sha256
+        || request.stab_commit != expected_stab_commit
+        || !request.worktree_was_clean
+        || request.stim_tag != STIM_TAG
+        || request.stim_commit != STIM_COMMIT
+        || !matches!(request.tier.as_str(), "full" | "soak")
+        || request.allow_deferred
+        || !request.deferred_case_ids.is_empty()
+        || !valid_sha256(&request.execution_environment_sha256)
+        || request.executables.is_empty()
+    {
+        return Err(CorrectnessError::RequestContract);
+    }
+    if !unique_valid_case_ids(&request.planned_case_ids)
+        || !unique_valid_case_ids(&request.deferred_case_ids)
+    {
+        return Err(CorrectnessError::RequestContract);
+    }
+    for executable in &request.executables {
+        if executable.role.is_empty() || executable.bytes == 0 || !valid_sha256(&executable.sha256)
+        {
+            return Err(CorrectnessError::RequestContract);
+        }
+    }
+    let mut requested = BTreeMap::new();
+    for case in &request.selected_cases {
+        if !valid_case_id(&case.case_id)
+            || !valid_sha256(&case.selector_sha256)
+            || !valid_sha256(&case.case_contract_sha256)
+            || requested.insert(case.case_id.as_str(), case).is_some()
+        {
+            return Err(CorrectnessError::RequestContract);
+        }
+    }
+    if requested.is_empty() {
+        return Err(CorrectnessError::RequestContract);
+    }
+    Ok(requested)
+}
+
+fn validate_report<'a>(
+    report: &'a CorrectnessReport,
+    request: &RunRequest,
+    request_sha256: &str,
+    requested: &BTreeMap<&str, &RequestedCase>,
+) -> Result<BTreeMap<&'a str, &'a CaseResult>, CorrectnessError> {
+    if report.schema_version != CORRECTNESS_REPORT_SCHEMA_VERSION
+        || report.qualification_manifest_digest != request.qualification_manifest_digest
+        || report.run_request_sha256 != request_sha256
+        || report.stab_commit != request.stab_commit
+        || report.local_modifications
+        || report.stim_tag != request.stim_tag
+        || report.stim_commit != request.stim_commit
+        || report.tier != request.tier
+        || report.feature_filters != request.feature_filters
+        || report.case_filters != request.case_filters
+        || report.allow_deferred
+        || report.selected_count != request.selected_cases.len()
+        || report.selected_count != report.results.len()
+        || report.planned_count != request.planned_case_ids.len()
+        || report.deferred_count != request.deferred_case_ids.len()
+        || report.passed_count != report.results.len()
+        || report.failed_count != 0
+        || !report.selection_complete
+    {
+        return Err(CorrectnessError::ReportContract);
+    }
+    let mut results = BTreeMap::new();
+    for result in &report.results {
+        let Some(expected) = requested.get(result.case_id.as_str()) else {
+            return Err(CorrectnessError::ReportContract);
+        };
+        let selector_bytes =
+            serde_json::to_vec(&result.selector).map_err(CorrectnessError::Json)?;
+        if result.outcome != "passed"
+            || result.selector_sha256 != expected.selector_sha256
+            || result.selector_sha256 != super::run::sha256_hex(&selector_bytes)
+            || !valid_sha256(&result.execution_receipt_sha256)
+            || !optional_sha256(&result.stdout_sha256)
+            || !optional_sha256(&result.stderr_sha256)
+            || result
+                .artifacts
+                .iter()
+                .any(|artifact| !valid_report_artifact(artifact))
+            || results.insert(result.case_id.as_str(), result).is_some()
+        {
+            return Err(CorrectnessError::ReportContract);
+        }
+    }
+    if results.len() != requested.len() {
+        return Err(CorrectnessError::ReportContract);
+    }
+    Ok(results)
+}
+
+fn validate_completion(
+    completion: &RunCompletion,
+    request_sha256: &str,
+    report_sha256: &str,
+    results: &BTreeMap<&str, &CaseResult>,
+) -> Result<(), CorrectnessError> {
+    let expected_cases = results
+        .values()
+        .map(|result| {
+            (
+                result.case_id.clone(),
+                result.execution_receipt_sha256.clone(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut actual_cases = BTreeMap::new();
+    for case in &completion.cases {
+        if !valid_case_id(&case.case_id)
+            || !valid_sha256(&case.execution_receipt_sha256)
+            || actual_cases
+                .insert(case.case_id.clone(), case.execution_receipt_sha256.clone())
+                .is_some()
+        {
+            return Err(CorrectnessError::CompletionContract);
+        }
+    }
+    if completion.schema_version != RUN_COMPLETION_SCHEMA_VERSION
+        || completion.run_request_sha256 != request_sha256
+        || completion.report_sha256 != report_sha256
+        || actual_cases != expected_cases
+    {
+        return Err(CorrectnessError::CompletionContract);
+    }
+    Ok(())
+}
+
+fn validate_execution_receipts(
+    root: &RepoRoot,
+    output: &Path,
+    request: &RunRequest,
+    request_sha256: &str,
+    results: &BTreeMap<&str, &CaseResult>,
+) -> Result<(), CorrectnessError> {
+    for result in results.values() {
+        let path = output
+            .join("cases")
+            .join(&result.case_id)
+            .join("execution-receipt.json");
+        let bytes = read_artifact_bounded(root, &path, MAX_EXECUTION_RECEIPT_BYTES)?;
+        if super::run::sha256_hex(&bytes) != result.execution_receipt_sha256 {
+            return Err(CorrectnessError::ExecutionReceipt(result.case_id.clone()));
+        }
+        let receipt: ExecutionReceipt = parse_canonical("execution-receipt.json", &bytes)?;
+        let stdout_sha256 = receipt.stdout.as_ref().map(|stream| stream.sha256.as_str());
+        let stderr_sha256 = receipt.stderr.as_ref().map(|stream| stream.sha256.as_str());
+        if receipt.schema_version != EXECUTION_RECEIPT_SCHEMA_VERSION
+            || receipt.run_request_sha256 != request_sha256
+            || receipt.case_id != result.case_id
+            || receipt.selector_sha256 != result.selector_sha256
+            || receipt.executables != request.executables
+            || receipt.execution_environment_sha256 != request.execution_environment_sha256
+            || receipt.verdict != "accepted"
+            || receipt.exact_test_count != result.exact_test_count
+            || stdout_sha256 != result.stdout_sha256.as_deref()
+            || stderr_sha256 != result.stderr_sha256.as_deref()
+            || receipt.auxiliary_outputs != result.artifacts
+            || receipt
+                .stdout
+                .iter()
+                .chain(&receipt.stderr)
+                .any(|stream| !stream.complete || !valid_sha256(&stream.sha256))
+            || receipt
+                .statistical_attempts
+                .iter()
+                .any(|attempt| attempt.verdict != "passed")
+        {
+            return Err(CorrectnessError::ExecutionReceipt(result.case_id.clone()));
+        }
+    }
+    Ok(())
+}
+
+fn validate_preflight(
+    preflight: &CorrectnessPreflight,
+    report: &CorrectnessReport,
+    request_sha256: &str,
+    report_sha256: &str,
+    completion_sha256: &str,
+    results: &BTreeMap<&str, &CaseResult>,
+) -> Result<(), CorrectnessError> {
+    let expected_cases = results
+        .values()
+        .map(|result| {
+            (
+                result.case_id.clone(),
+                CorrectnessCaseReceipt {
+                    outcome: result.outcome.clone(),
+                    selector_sha256: result.selector_sha256.clone(),
+                    execution_receipt_sha256: result.execution_receipt_sha256.clone(),
+                    stdout_sha256: result.stdout_sha256.clone(),
+                    stderr_sha256: result.stderr_sha256.clone(),
+                },
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let expected = CorrectnessPreflight {
+        schema_version: CORRECTNESS_PREFLIGHT_SCHEMA_VERSION,
+        report_sha256: report_sha256.to_string(),
+        completion_sha256: completion_sha256.to_string(),
+        qualification_manifest_digest: report.qualification_manifest_digest.clone(),
+        run_request_sha256: request_sha256.to_string(),
+        stab_commit: report.stab_commit.clone(),
+        local_modifications: report.local_modifications,
+        stim_commit: report.stim_commit.clone(),
+        tier: report.tier.clone(),
+        allow_deferred: report.allow_deferred,
+        selection_complete: report.selection_complete,
+        deferred_count: report.deferred_count,
+        cases: expected_cases,
+    };
+    if *preflight != expected {
+        return Err(CorrectnessError::PreflightContract);
+    }
+    Ok(())
+}
+
+fn parse_canonical<T>(name: &'static str, bytes: &[u8]) -> Result<T, CorrectnessError>
+where
+    T: DeserializeOwned + Serialize,
+{
+    if bytes.is_empty() || !bytes.ends_with(b"\n") {
+        return Err(CorrectnessError::ArtifactBoundary(name));
+    }
+    let value: T = serde_json::from_slice(bytes).map_err(CorrectnessError::Json)?;
+    let mut canonical = serde_json::to_vec_pretty(&value).map_err(CorrectnessError::Json)?;
+    canonical.push(b'\n');
+    if canonical != bytes {
+        return Err(CorrectnessError::NonCanonical(name));
+    }
+    Ok(value)
+}
+
 fn read_artifact(root: &RepoRoot, path: &Path) -> Result<Vec<u8>, CorrectnessError> {
-    crate::source_file::read_repo_regular_file_bounded(root, path, MAX_CORRECTNESS_ARTIFACT_BYTES)
+    read_artifact_bounded(root, path, MAX_CORRECTNESS_ARTIFACT_BYTES)
+}
+
+fn read_artifact_bounded(
+    root: &RepoRoot,
+    path: &Path,
+    maximum: usize,
+) -> Result<Vec<u8>, CorrectnessError> {
+    crate::source_file::read_repo_regular_file_bounded(root, path, maximum)
         .map_err(|error| CorrectnessError::Read(error.to_string()))
 }
 
@@ -194,11 +464,244 @@ fn valid_sha256(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn optional_sha256(value: &Option<String>) -> bool {
+    value.as_deref().is_none_or(valid_sha256)
+}
+
 fn valid_git_commit(value: &str) -> bool {
     value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-#[derive(Debug, Deserialize)]
+fn valid_case_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && !value.starts_with('-')
+        && !value.ends_with('-')
+        && !value.contains("--")
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
+fn unique_valid_case_ids(values: &[String]) -> bool {
+    values.iter().all(|value| valid_case_id(value))
+        && values.iter().collect::<BTreeSet<_>>().len() == values.len()
+}
+
+fn valid_report_artifact(artifact: &ReportArtifact) -> bool {
+    !artifact.path.as_os_str().is_empty()
+        && !artifact.path.is_absolute()
+        && artifact
+            .path
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+        && valid_sha256(&artifact.sha256)
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct RunRequest {
+    schema_version: u32,
+    qualification_manifest_digest: String,
+    stab_commit: String,
+    worktree_was_clean: bool,
+    stim_tag: String,
+    stim_commit: String,
+    tier: String,
+    feature_filters: Vec<String>,
+    case_filters: Vec<String>,
+    allow_deferred: bool,
+    executables: Vec<ExecutableIdentity>,
+    execution_environment_sha256: String,
+    selected_cases: Vec<RequestedCase>,
+    planned_case_ids: Vec<String>,
+    deferred_case_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct RequestedCase {
+    case_id: String,
+    selector_sha256: String,
+    case_contract_sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ExecutableIdentity {
+    role: String,
+    bytes: u64,
+    sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CorrectnessReport {
+    schema_version: u32,
+    qualification_manifest_digest: String,
+    run_request_sha256: String,
+    stab_commit: String,
+    local_modifications: bool,
+    stim_tag: String,
+    stim_commit: String,
+    rust_toolchain: String,
+    target_triple: String,
+    operating_system: String,
+    architecture: String,
+    tier: String,
+    feature_filters: Vec<String>,
+    case_filters: Vec<String>,
+    allow_deferred: bool,
+    selected_count: usize,
+    planned_count: usize,
+    deferred_count: usize,
+    passed_count: usize,
+    failed_count: usize,
+    selection_complete: bool,
+    statistical_declared_budget: String,
+    statistical_consumed_bound: String,
+    statistical_planned_shots: u64,
+    statistical_planned_seeds: BTreeMap<String, Vec<u64>>,
+    statistical_shots: u64,
+    statistical_seeds: BTreeMap<String, Vec<u64>>,
+    statistical_attempts: Vec<StatisticalAttempt>,
+    property_corpus_ids: Vec<String>,
+    resource_case_count: usize,
+    upstream_dispositions: Vec<DomainDispositionCount>,
+    deferred_products: BTreeMap<String, usize>,
+    case_counts: Vec<DomainComparatorCount>,
+    resource_contracts: Vec<ResourceExecution>,
+    results: Vec<CaseResult>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct StatisticalAttempt {
+    case_id: String,
+    seed: u64,
+    completed_shots: u64,
+    completed_comparisons: u32,
+    completed_batches: u32,
+    outcome: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct DomainDispositionCount {
+    feature_id: String,
+    disposition: String,
+    count: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct DomainComparatorCount {
+    feature_id: String,
+    comparator: String,
+    passed: usize,
+    failed: usize,
+    planned: usize,
+    deferred: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ResourceExecution {
+    case_id: String,
+    kind: String,
+    detail: String,
+    negative_axes: Vec<String>,
+    timeout_ms: u64,
+    stdout_limit_bytes: usize,
+    stderr_limit_bytes: usize,
+    artifact_limit_bytes: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CaseResult {
+    case_id: String,
+    feature_id: String,
+    comparator: String,
+    selector: EvidenceSelector,
+    selector_sha256: String,
+    execution_receipt_sha256: String,
+    outcome: String,
+    exact_test_count: Option<usize>,
+    stdout_sha256: Option<String>,
+    stderr_sha256: Option<String>,
+    artifacts: Vec<ReportArtifact>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct EvidenceSelector {
+    state: String,
+    kind: String,
+    value: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ReportArtifact {
+    path: PathBuf,
+    bytes: usize,
+    sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct RunCompletion {
+    schema_version: u32,
+    run_request_sha256: String,
+    report_sha256: String,
+    cases: Vec<CompletedCase>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct CompletedCase {
+    case_id: String,
+    execution_receipt_sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ExecutionReceipt {
+    schema_version: u32,
+    run_request_sha256: String,
+    case_id: String,
+    selector_sha256: String,
+    executables: Vec<ExecutableIdentity>,
+    execution_environment_sha256: String,
+    verdict: String,
+    exit_status: Option<i32>,
+    exact_test_count: Option<usize>,
+    stdout: Option<StreamReceipt>,
+    stderr: Option<StreamReceipt>,
+    statistical_attempts: Vec<StatisticalAttemptReceipt>,
+    auxiliary_outputs: Vec<ReportArtifact>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct StreamReceipt {
+    bytes: u64,
+    sha256: String,
+    complete: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct StatisticalAttemptReceipt {
+    seed: u64,
+    verdict: String,
+    completed_shots: u64,
+    completed_comparisons: u32,
+    completed_batches: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct CorrectnessPreflight {
     schema_version: u32,
@@ -212,18 +715,18 @@ struct CorrectnessPreflight {
     tier: String,
     allow_deferred: bool,
     selection_complete: bool,
-    deferred_count: u64,
+    deferred_count: usize,
     cases: BTreeMap<String, CorrectnessCaseReceipt>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct CorrectnessCaseReceipt {
     outcome: String,
     selector_sha256: String,
     execution_receipt_sha256: String,
-    stdout_sha256: String,
-    stderr_sha256: String,
+    stdout_sha256: Option<String>,
+    stderr_sha256: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -240,19 +743,39 @@ pub(super) enum CorrectnessError {
     InvalidCases,
     #[error("failed to read correctness evidence: {0}")]
     Read(String),
-    #[error("correctness preflight JSON is invalid: {0}")]
+    #[error("correctness artifact {0} must be nonempty and newline terminated")]
+    ArtifactBoundary(&'static str),
+    #[error("correctness artifact {0} is not in canonical generated form")]
+    NonCanonical(&'static str),
+    #[error("correctness artifact JSON is invalid: {0}")]
     Json(serde_json::Error),
-    #[error("correctness preflight is stale, dirty, deferred, incomplete, or artifact-unbound")]
-    StalePreflight,
+    #[error("correctness request or completion differs from its controller-approved digest")]
+    ControllerBinding,
+    #[error("correctness request violates the required clean full-or-soak contract")]
+    RequestContract,
+    #[error("correctness report does not reconstruct from request.json and passing results")]
+    ReportContract,
+    #[error("correctness completion does not reconstruct from report.json")]
+    CompletionContract,
+    #[error("correctness preflight does not reconstruct from report.json and completion.json")]
+    PreflightContract,
+    #[error("correctness execution receipt for case {0} is stale or inconsistent")]
+    ExecutionReceipt(String),
     #[error("correctness preflight omits required case {0}")]
     MissingCase(String),
-    #[error("correctness preflight case {0} did not pass with complete receipt digests")]
-    FailedCase(String),
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[derive(Clone, Copy)]
+    enum FixtureMutation {
+        None,
+        FabricatedPreflightPass,
+        FailedReport,
+        MismatchedCompletion,
+    }
 
     #[test]
     fn diagnostic_evidence_is_explicitly_nonapplicable() {
@@ -271,107 +794,265 @@ mod tests {
     }
 
     #[test]
-    fn required_preflight_binds_all_artifacts_and_selected_case_receipts() {
-        let repository = tempfile::tempdir().expect("temporary repository");
-        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
-        let relative = Path::new("target/qualification/correctness/full");
-        let output = repository.path().join(relative);
-        std::fs::create_dir_all(&output).expect("create correctness output");
-        let request = b"request\n";
-        let completion = b"completion\n";
-        let report = b"report\n";
-        std::fs::write(output.join("request.json"), request).expect("write request");
-        std::fs::write(output.join("completion.json"), completion).expect("write completion");
-        std::fs::write(output.join("report.json"), report).expect("write report");
-        let manifest = "a".repeat(64);
-        let commit = "b".repeat(40);
-        let receipt_digest = "c".repeat(64);
-        let request_sha256 = crate::qualification::runtime::run::sha256_hex(request);
-        let completion_sha256 = crate::qualification::runtime::run::sha256_hex(completion);
-        let preflight = serde_json::json!({
-            "schema_version": CORRECTNESS_PREFLIGHT_SCHEMA_VERSION,
-            "report_sha256": crate::qualification::runtime::run::sha256_hex(report),
-            "completion_sha256": completion_sha256,
-            "qualification_manifest_digest": manifest,
-            "run_request_sha256": request_sha256,
-            "stab_commit": commit,
-            "local_modifications": false,
-            "stim_commit": STIM_COMMIT,
-            "tier": "full",
-            "allow_deferred": false,
-            "selection_complete": true,
-            "deferred_count": 0,
-            "cases": {
-                "cq-case": {
-                    "outcome": "passed",
-                    "selector_sha256": receipt_digest,
-                    "execution_receipt_sha256": "d".repeat(64),
-                    "stdout_sha256": "e".repeat(64),
-                    "stderr_sha256": "f".repeat(64)
-                }
-            }
-        });
-        std::fs::write(
-            output.join("preflight.json"),
-            serde_json::to_vec(&preflight).expect("serialize preflight"),
-        )
-        .expect("write preflight");
-
+    fn required_preflight_reconstructs_canonical_cq_artifacts() {
+        let fixture = fixture(FixtureMutation::None);
         let evidence = validate(
-            &root,
+            &fixture.root,
             CorrectnessRequirement::Required {
-                output: relative,
+                output: &fixture.relative,
                 case_ids: &["cq-case".to_string()],
-                expected_manifest_sha256: &"a".repeat(64),
-                expected_stab_commit: &"b".repeat(40),
-                expected_request_sha256: &request_sha256,
-                expected_completion_sha256: &completion_sha256,
+                expected_manifest_sha256: &fixture.manifest,
+                expected_stab_commit: &fixture.commit,
+                expected_request_sha256: &fixture.request_sha256,
+                expected_completion_sha256: &fixture.completion_sha256,
             },
         )
         .expect("bound correctness preflight");
         assert_eq!(evidence.status, CorrectnessPreflightStatus::Passed);
+    }
 
+    #[test]
+    fn edited_preflight_cannot_invent_a_passing_case() {
+        let fixture = fixture(FixtureMutation::FabricatedPreflightPass);
+        assert_fixture_rejected(&fixture);
+    }
+
+    #[test]
+    fn failed_report_is_rejected_even_when_dependent_hashes_are_refreshed() {
+        let fixture = fixture(FixtureMutation::FailedReport);
+        assert_fixture_rejected(&fixture);
+    }
+
+    #[test]
+    fn completion_must_exactly_reconstruct_report_results() {
+        let fixture = fixture(FixtureMutation::MismatchedCompletion);
+        assert_fixture_rejected(&fixture);
+    }
+
+    struct Fixture {
+        _repository: tempfile::TempDir,
+        root: RepoRoot,
+        relative: PathBuf,
+        manifest: String,
+        commit: String,
+        request_sha256: String,
+        completion_sha256: String,
+    }
+
+    fn assert_fixture_rejected(fixture: &Fixture) {
         assert!(
             validate(
-                &root,
+                &fixture.root,
                 CorrectnessRequirement::Required {
-                    output: relative,
+                    output: &fixture.relative,
                     case_ids: &["cq-case".to_string()],
-                    expected_manifest_sha256: &"a".repeat(64),
-                    expected_stab_commit: &"b".repeat(40),
-                    expected_request_sha256: &"0".repeat(64),
-                    expected_completion_sha256: &completion_sha256,
+                    expected_manifest_sha256: &fixture.manifest,
+                    expected_stab_commit: &fixture.commit,
+                    expected_request_sha256: &fixture.request_sha256,
+                    expected_completion_sha256: &fixture.completion_sha256,
                 },
             )
             .is_err()
         );
+    }
 
-        let mut stale = preflight;
-        stale
-            .as_object_mut()
-            .expect("preflight fixture is an object")
-            .insert(
-                "run_request_sha256".to_string(),
-                serde_json::Value::String("0".repeat(64)),
-            );
+    fn fixture(mutation: FixtureMutation) -> Fixture {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let relative = PathBuf::from("target/qualification/correctness/full");
+        let output = repository.path().join(&relative);
+        std::fs::create_dir_all(output.join("cases/cq-case")).expect("create correctness output");
+        let manifest = "a".repeat(64);
+        let commit = "b".repeat(40);
+        let selector = EvidenceSelector {
+            state: "existing".to_string(),
+            kind: "cargo-test".to_string(),
+            value: vec!["cargo".to_string(), "test".to_string()],
+        };
+        let selector_sha256 = super::super::run::sha256_hex(
+            &serde_json::to_vec(&selector).expect("serialize selector"),
+        );
+        let executable = ExecutableIdentity {
+            role: "cargo".to_string(),
+            bytes: 1,
+            sha256: "c".repeat(64),
+        };
+        let request = RunRequest {
+            schema_version: RUN_REQUEST_SCHEMA_VERSION,
+            qualification_manifest_digest: manifest.clone(),
+            stab_commit: commit.clone(),
+            worktree_was_clean: true,
+            stim_tag: STIM_TAG.to_string(),
+            stim_commit: STIM_COMMIT.to_string(),
+            tier: "full".to_string(),
+            feature_filters: Vec::new(),
+            case_filters: Vec::new(),
+            allow_deferred: false,
+            executables: vec![executable.clone()],
+            execution_environment_sha256: "d".repeat(64),
+            selected_cases: vec![RequestedCase {
+                case_id: "cq-case".to_string(),
+                selector_sha256: selector_sha256.clone(),
+                case_contract_sha256: "e".repeat(64),
+            }],
+            planned_case_ids: Vec::new(),
+            deferred_case_ids: Vec::new(),
+        };
+        let request_bytes = canonical(&request);
+        let request_sha256 = super::super::run::sha256_hex(&request_bytes);
+        std::fs::write(output.join("request.json"), &request_bytes).expect("write request");
+
+        let receipt = ExecutionReceipt {
+            schema_version: EXECUTION_RECEIPT_SCHEMA_VERSION,
+            run_request_sha256: request_sha256.clone(),
+            case_id: "cq-case".to_string(),
+            selector_sha256: selector_sha256.clone(),
+            executables: vec![executable],
+            execution_environment_sha256: "d".repeat(64),
+            verdict: "accepted".to_string(),
+            exit_status: Some(0),
+            exact_test_count: Some(1),
+            stdout: Some(StreamReceipt {
+                bytes: 0,
+                sha256: "f".repeat(64),
+                complete: true,
+            }),
+            stderr: None,
+            statistical_attempts: Vec::new(),
+            auxiliary_outputs: Vec::new(),
+        };
+        let receipt_bytes = canonical(&receipt);
+        let receipt_sha256 = super::super::run::sha256_hex(&receipt_bytes);
         std::fs::write(
-            output.join("preflight.json"),
-            serde_json::to_vec(&stale).expect("serialize stale preflight"),
+            output.join("cases/cq-case/execution-receipt.json"),
+            receipt_bytes,
         )
-        .expect("write stale preflight");
-        assert!(
-            validate(
-                &root,
-                CorrectnessRequirement::Required {
-                    output: relative,
-                    case_ids: &["cq-case".to_string()],
-                    expected_manifest_sha256: &"a".repeat(64),
-                    expected_stab_commit: &"b".repeat(40),
-                    expected_request_sha256: &request_sha256,
-                    expected_completion_sha256: &completion_sha256,
+        .expect("write execution receipt");
+
+        let outcome = if matches!(mutation, FixtureMutation::FailedReport) {
+            "failed"
+        } else {
+            "passed"
+        };
+        let report = CorrectnessReport {
+            schema_version: CORRECTNESS_REPORT_SCHEMA_VERSION,
+            qualification_manifest_digest: manifest.clone(),
+            run_request_sha256: request_sha256.clone(),
+            stab_commit: commit.clone(),
+            local_modifications: false,
+            stim_tag: STIM_TAG.to_string(),
+            stim_commit: STIM_COMMIT.to_string(),
+            rust_toolchain: "nightly".to_string(),
+            target_triple: "x86_64-unknown-linux-gnu".to_string(),
+            operating_system: "linux".to_string(),
+            architecture: "x86_64".to_string(),
+            tier: "full".to_string(),
+            feature_filters: Vec::new(),
+            case_filters: Vec::new(),
+            allow_deferred: false,
+            selected_count: 1,
+            planned_count: 0,
+            deferred_count: 0,
+            passed_count: usize::from(outcome == "passed"),
+            failed_count: usize::from(outcome == "failed"),
+            selection_complete: true,
+            statistical_declared_budget: "0.00000000000000000e0".to_string(),
+            statistical_consumed_bound: "0.00000000000000000e0".to_string(),
+            statistical_planned_shots: 0,
+            statistical_planned_seeds: BTreeMap::new(),
+            statistical_shots: 0,
+            statistical_seeds: BTreeMap::new(),
+            statistical_attempts: Vec::new(),
+            property_corpus_ids: Vec::new(),
+            resource_case_count: 0,
+            upstream_dispositions: Vec::new(),
+            deferred_products: BTreeMap::new(),
+            case_counts: Vec::new(),
+            resource_contracts: Vec::new(),
+            results: vec![CaseResult {
+                case_id: "cq-case".to_string(),
+                feature_id: "CQ-CASE".to_string(),
+                comparator: "exact-value".to_string(),
+                selector,
+                selector_sha256,
+                execution_receipt_sha256: receipt_sha256,
+                outcome: outcome.to_string(),
+                exact_test_count: Some(1),
+                stdout_sha256: Some("f".repeat(64)),
+                stderr_sha256: None,
+                artifacts: Vec::new(),
+            }],
+        };
+        let report_bytes = canonical(&report);
+        let report_sha256 = super::super::run::sha256_hex(&report_bytes);
+        std::fs::write(output.join("report.json"), &report_bytes).expect("write report");
+
+        let result = report.results.first().expect("single report result");
+        let completion_digest = if matches!(mutation, FixtureMutation::MismatchedCompletion) {
+            "0".repeat(64)
+        } else {
+            result.execution_receipt_sha256.clone()
+        };
+        let completion = RunCompletion {
+            schema_version: RUN_COMPLETION_SCHEMA_VERSION,
+            run_request_sha256: request_sha256.clone(),
+            report_sha256: report_sha256.clone(),
+            cases: vec![CompletedCase {
+                case_id: "cq-case".to_string(),
+                execution_receipt_sha256: completion_digest,
+            }],
+        };
+        let completion_bytes = canonical(&completion);
+        let completion_sha256 = super::super::run::sha256_hex(&completion_bytes);
+        std::fs::write(output.join("completion.json"), &completion_bytes)
+            .expect("write completion");
+
+        let preflight_outcome = if matches!(mutation, FixtureMutation::FabricatedPreflightPass) {
+            "failed"
+        } else {
+            outcome
+        };
+        let preflight = CorrectnessPreflight {
+            schema_version: CORRECTNESS_PREFLIGHT_SCHEMA_VERSION,
+            report_sha256,
+            completion_sha256: completion_sha256.clone(),
+            qualification_manifest_digest: manifest.clone(),
+            run_request_sha256: request_sha256.clone(),
+            stab_commit: commit.clone(),
+            local_modifications: false,
+            stim_commit: STIM_COMMIT.to_string(),
+            tier: "full".to_string(),
+            allow_deferred: false,
+            selection_complete: true,
+            deferred_count: 0,
+            cases: BTreeMap::from([(
+                "cq-case".to_string(),
+                CorrectnessCaseReceipt {
+                    outcome: preflight_outcome.to_string(),
+                    selector_sha256: result.selector_sha256.clone(),
+                    execution_receipt_sha256: result.execution_receipt_sha256.clone(),
+                    stdout_sha256: result.stdout_sha256.clone(),
+                    stderr_sha256: None,
                 },
-            )
-            .is_err()
-        );
+            )]),
+        };
+        std::fs::write(output.join("preflight.json"), canonical(&preflight))
+            .expect("write preflight");
+
+        Fixture {
+            _repository: repository,
+            root,
+            relative,
+            manifest,
+            commit,
+            request_sha256,
+            completion_sha256,
+        }
+    }
+
+    fn canonical<T: Serialize>(value: &T) -> Vec<u8> {
+        let mut bytes = serde_json::to_vec_pretty(value).expect("serialize canonical fixture");
+        bytes.push(b'\n');
+        bytes
     }
 }

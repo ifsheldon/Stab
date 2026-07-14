@@ -43,16 +43,21 @@ pub(crate) fn run_qualification(
 
 pub(crate) fn run_report(
     root: &crate::root::RepoRoot,
+    inventory_digest: &str,
+    correctness_digest: &str,
     args: ReportArgs,
 ) -> Result<std::path::PathBuf, String> {
-    report::run(root, args).map_err(|error| error.to_string())
+    report::run(root, inventory_digest, correctness_digest, args).map_err(|error| error.to_string())
 }
 
 pub(crate) fn run_regression(
     root: &crate::root::RepoRoot,
+    inventory_digest: &str,
+    correctness_digest: &str,
     args: RegressionArgs,
 ) -> Result<regression::RegressionSummary, String> {
-    regression::run(root, args).map_err(|error| error.to_string())
+    regression::run(root, inventory_digest, correctness_digest, args)
+        .map_err(|error| error.to_string())
 }
 
 pub(crate) fn check_contracts(

@@ -154,6 +154,16 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
             _ => return Err(GroupError::InvalidGroup(group.id.to_string())),
         }
     }
+    if file.groups.len() != super::invocation::registered_group_count() {
+        return Err(GroupError::ExecutableRegistration);
+    }
+    if let Some(group) = file
+        .groups
+        .iter()
+        .find(|group| !super::invocation::supports_group(group))
+    {
+        return Err(GroupError::UnsupportedRuntimeShape(group.id.to_string()));
+    }
     Ok(())
 }
 
@@ -190,6 +200,8 @@ pub(super) enum GroupError {
     UnknownGroup(String),
     #[error("runtime group {0} does not match the implemented worker shape")]
     UnsupportedRuntimeShape(String),
+    #[error("runtime group contract does not exactly match the executable group registry")]
+    ExecutableRegistration,
 }
 
 #[cfg(test)]
@@ -202,10 +214,10 @@ mod tests {
             schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
             performance_inventory_sha256: "a".repeat(64),
             groups: vec![GroupContract {
-                id: ProtocolId::try_new("diagnostic").expect("group id"),
+                id: ProtocolId::try_new(super::super::invocation::PQ1_GROUP_ID).expect("group id"),
                 claim_class: ClaimClass::DiagnosticInfrastructure,
                 baseline_eligibility: BaselineEligibility::ReportOnly,
-                workload_id: ProtocolId::try_new("workload").expect("workload id"),
+                workload_id: ProtocolId::try_new("protocol-smoke").expect("workload id"),
                 measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
                 correctness_case_ids: Vec::new(),
             }],
@@ -221,6 +233,26 @@ mod tests {
         assert!(matches!(
             validate(&thresholded, &"a".repeat(64)),
             Err(GroupError::InvalidGroup(_))
+        ));
+    }
+
+    #[test]
+    fn source_contract_rejects_unregistered_groups() {
+        let unsupported = GroupContractFile {
+            schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
+            performance_inventory_sha256: "a".repeat(64),
+            groups: vec![GroupContract {
+                id: ProtocolId::try_new("unregistered").expect("group id"),
+                claim_class: ClaimClass::DiagnosticInfrastructure,
+                baseline_eligibility: BaselineEligibility::ReportOnly,
+                workload_id: ProtocolId::try_new("protocol-smoke").expect("workload id"),
+                measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
+                correctness_case_ids: Vec::new(),
+            }],
+        };
+        assert!(matches!(
+            validate(&unsupported, &"a".repeat(64)),
+            Err(GroupError::UnsupportedRuntimeShape(group)) if group == "unregistered"
         ));
     }
 }

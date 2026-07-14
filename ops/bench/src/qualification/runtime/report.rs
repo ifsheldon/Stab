@@ -15,6 +15,10 @@ use super::run::{
 use super::statistics::{PairOrder, PairedSample, pair_measurements, summarize};
 use crate::config::{STIM_COMMIT, STIM_TAG};
 
+mod published;
+
+pub(super) use published::{load_validated_published_report, run};
+
 const PREFLIGHT_SCHEMA_VERSION: u32 = 4;
 const EXPECTED_WARMUPS: usize = 3;
 const EXPECTED_MAXIMUM_TIMING_ATTEMPTS: usize = 2;
@@ -58,6 +62,8 @@ pub(super) struct PerformancePreflightArtifact {
 pub(super) fn validate_report(
     root: &crate::root::RepoRoot,
     report: &QualificationReport,
+    expected_performance_inventory_sha256: &str,
+    expected_correctness_inventory_sha256: &str,
 ) -> Result<(), ReportError> {
     if report.schema_version != REPORT_SCHEMA_VERSION {
         return Err(ReportError::SchemaVersion {
@@ -87,9 +93,17 @@ pub(super) fn validate_report(
         "correctness_inventory_sha256",
         &report.correctness_inventory_sha256,
     )?;
+    if report.performance_inventory_sha256 != expected_performance_inventory_sha256
+        || report.correctness_inventory_sha256 != expected_correctness_inventory_sha256
+    {
+        return Err(ReportError::InventoryEvidence);
+    }
     validate_sha256("group_contract_sha256", &report.group_contract_sha256)?;
-    let resolved_group =
-        super::group::load_group(root, &report.performance_inventory_sha256, &report.group_id)?;
+    let resolved_group = super::group::load_group(
+        root,
+        expected_performance_inventory_sha256,
+        &report.group_id,
+    )?;
     if report.group_contract_sha256 != resolved_group.source_sha256
         || report.claim_class != resolved_group.contract.claim_class
         || report.baseline_eligibility != resolved_group.contract.baseline_eligibility
@@ -147,6 +161,7 @@ pub(super) fn validate_report(
     {
         return Err(ReportError::ToolchainEvidence);
     }
+    report.toolchain.validate_current(root)?;
     if report.host.allowed_cpus.is_empty()
         || report.host.logical_cpu_count != report.host.allowed_cpus.len()
         || report.host.cpu_identity.is_empty()
@@ -474,6 +489,7 @@ fn validate_all_worker_receipts(
 
 struct ReceiptIdentity<'a> {
     work_items: u64,
+    invocation_timeout_seconds: f64,
     expected_cpu: u32,
     stim_commit: &'a str,
     stim_source: &'a str,
@@ -486,6 +502,7 @@ impl<'a> ReceiptIdentity<'a> {
     fn from_report(report: &'a QualificationReport) -> Result<Self, ReportError> {
         Ok(Self {
             work_items: report.command.work_items,
+            invocation_timeout_seconds: report.command.invocation_timeout_seconds as f64,
             expected_cpu: u32::try_from(report.host.selected_cpu)
                 .map_err(|_| ReportError::HostEvidence)?,
             stim_commit: &report.stim_commit,
@@ -541,6 +558,7 @@ fn validate_invocation_receipt(
         || invocation.evidence_mode != phase.evidence_mode
         || !invocation.process_wall_seconds.is_finite()
         || invocation.process_wall_seconds <= 0.0
+        || invocation.process_wall_seconds > identity.invocation_timeout_seconds
         || invocation.process_wall_seconds < row.elapsed_seconds
         || row.implementation != implementation
         || row.evidence_mode != phase.evidence_mode
@@ -559,30 +577,6 @@ fn validate_invocation_receipt(
         return Err(ReportError::WorkerReceipt);
     }
     Ok(())
-}
-
-pub(super) fn run(root: &crate::root::RepoRoot, args: ReportArgs) -> Result<PathBuf, ReportError> {
-    let report_json = super::artifact::read_artifact(root, &args.input, "report.json")?;
-    if report_json.is_empty() || !report_json.ends_with(b"\n") {
-        return Err(ReportError::ReportBoundary);
-    }
-    let report: QualificationReport =
-        serde_json::from_slice(&report_json).map_err(ReportError::Json)?;
-    validate_report(root, &report)?;
-    if std::path::Path::new(&report.command.output) != args.input {
-        return Err(ReportError::OutputBinding);
-    }
-    let preflight = preflight_artifact(root, &report, &report_json)?;
-    let mut preflight_json = serde_json::to_vec_pretty(&preflight).map_err(ReportError::Json)?;
-    preflight_json.push(b'\n');
-    let markdown = render_markdown(&report, &sha256_hex(&report_json));
-    let output = super::artifact::QualificationOutput::begin(root, &args.input)?;
-    output.write("report.json", &report_json)?;
-    output.write("preflight.json", &preflight_json)?;
-    output.write("report.md", markdown.as_bytes())?;
-    let relative = output.relative().to_path_buf();
-    output.commit()?;
-    Ok(relative)
 }
 
 fn validate_calibration(report: &QualificationReport) -> Result<(), ReportError> {
@@ -728,15 +722,16 @@ fn validate_claim(
         ClaimClass::PromotablePerformance => {
             if group.baseline_eligibility != super::group::BaselineEligibility::ThresholdEligible
                 || report.correctness_preflight.case_ids != group.correctness_case_ids
-                || !promotable_claim_requirements(
-                    report.promotable,
-                    report.tier,
-                    report.repository.local_modifications_before,
-                    report.repository.local_modifications_after,
-                    report.host.verified,
-                    report.correctness_preflight.status,
-                    report.correctness_preflight.case_ids.len(),
-                )
+                || !promotable_claim_requirements(PromotionEvidence {
+                    promotable: report.promotable,
+                    allow_unverified_host: report.command.allow_unverified_host,
+                    tier: report.tier,
+                    local_modifications_before: report.repository.local_modifications_before,
+                    local_modifications_after: report.repository.local_modifications_after,
+                    host_verified: report.host.verified,
+                    correctness_status: report.correctness_preflight.status,
+                    correctness_case_count: report.correctness_preflight.case_ids.len(),
+                })
             {
                 return Err(ReportError::Claim);
             }
@@ -745,22 +740,30 @@ fn validate_claim(
     Ok(())
 }
 
-fn promotable_claim_requirements(
+#[derive(Clone, Copy)]
+struct PromotionEvidence {
     promotable: bool,
+    allow_unverified_host: bool,
     tier: QualificationTier,
     local_modifications_before: bool,
     local_modifications_after: bool,
     host_verified: bool,
     correctness_status: CorrectnessPreflightStatus,
     correctness_case_count: usize,
-) -> bool {
-    promotable
-        && matches!(tier, QualificationTier::Full | QualificationTier::Soak)
-        && !local_modifications_before
-        && !local_modifications_after
-        && host_verified
-        && correctness_status == CorrectnessPreflightStatus::Passed
-        && correctness_case_count > 0
+}
+
+fn promotable_claim_requirements(evidence: PromotionEvidence) -> bool {
+    evidence.promotable
+        && !evidence.allow_unverified_host
+        && matches!(
+            evidence.tier,
+            QualificationTier::Full | QualificationTier::Soak
+        )
+        && !evidence.local_modifications_before
+        && !evidence.local_modifications_after
+        && evidence.host_verified
+        && evidence.correctness_status == CorrectnessPreflightStatus::Passed
+        && evidence.correctness_case_count > 0
 }
 
 fn validate_pair_execution(
@@ -865,11 +868,9 @@ fn thermal_zone_keys(readings: &[super::host::ThermalReading]) -> BTreeSet<(&str
 }
 
 pub(super) fn preflight_artifact(
-    root: &crate::root::RepoRoot,
     report: &QualificationReport,
     report_json: &[u8],
 ) -> Result<PerformancePreflightArtifact, ReportError> {
-    validate_report(root, report)?;
     let authoritative = authoritative_timing_attempt(report)?;
     Ok(PerformancePreflightArtifact {
         schema_version: PREFLIGHT_SCHEMA_VERSION,
@@ -971,6 +972,8 @@ pub(super) enum ReportError {
     Identity,
     #[error("qualification report group contract evidence is stale or inconsistent")]
     GroupEvidence,
+    #[error("qualification report inventory evidence differs from the checked inventories")]
+    InventoryEvidence,
     #[error("qualification report command evidence is invalid")]
     CommandEvidence,
     #[error("qualification report field {0} is not a lowercase SHA-256 digest")]
@@ -1036,11 +1039,15 @@ pub(super) enum ReportError {
     #[error(transparent)]
     Group(#[from] super::group::GroupError),
     #[error(transparent)]
+    Toolchain(#[from] super::toolchain::ToolchainError),
+    #[error(transparent)]
     Artifact(#[from] super::artifact::ArtifactError),
     #[error("qualification report JSON must be nonempty and newline terminated")]
     ReportBoundary,
     #[error("qualification report output path does not match the validated directory")]
     OutputBinding,
+    #[error("qualification preflight does not exactly reproduce from report.json")]
+    PreflightBinding,
     #[error("qualification report JSON is invalid: {0}")]
     Json(serde_json::Error),
 }
@@ -1055,10 +1062,20 @@ mod tests {
 
     #[test]
     fn dirty_or_unverified_evidence_cannot_be_promoted() {
-        let accepted = |tier, before, after, host, status, cases| {
-            promotable_claim_requirements(true, tier, before, after, host, status, cases)
+        let accepted = |allow_unverified_host, tier, before, after, host, status, cases| {
+            promotable_claim_requirements(PromotionEvidence {
+                promotable: true,
+                allow_unverified_host,
+                tier,
+                local_modifications_before: before,
+                local_modifications_after: after,
+                host_verified: host,
+                correctness_status: status,
+                correctness_case_count: cases,
+            })
         };
         assert!(accepted(
+            false,
             QualificationTier::Full,
             false,
             false,
@@ -1067,6 +1084,16 @@ mod tests {
             1,
         ));
         assert!(!accepted(
+            true,
+            QualificationTier::Full,
+            false,
+            false,
+            true,
+            CorrectnessPreflightStatus::Passed,
+            1,
+        ));
+        assert!(!accepted(
+            false,
             QualificationTier::Full,
             true,
             false,
@@ -1075,6 +1102,7 @@ mod tests {
             1,
         ));
         assert!(!accepted(
+            false,
             QualificationTier::Pr,
             false,
             false,
@@ -1083,6 +1111,7 @@ mod tests {
             1,
         ));
         assert!(!accepted(
+            false,
             QualificationTier::Soak,
             false,
             false,
@@ -1091,6 +1120,7 @@ mod tests {
             1,
         ));
         assert!(!accepted(
+            false,
             QualificationTier::Soak,
             false,
             false,

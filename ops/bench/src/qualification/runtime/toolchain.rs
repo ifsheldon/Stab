@@ -12,7 +12,7 @@ const RUST_TOOLCHAIN: &str = "nightly-2026-06-20";
 const RUSTUP_PATH: &str = "/usr/bin/rustup";
 const MAX_TOOL_BYTES: u64 = 512 << 20;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ToolchainEvidence {
     pub(super) rust_toolchain: String,
@@ -26,6 +26,23 @@ pub(super) struct ToolchainEvidence {
     pub(super) rustc_sha256: String,
     pub(super) rustc_verbose_version: String,
     pub(super) target_triple: String,
+}
+
+impl ToolchainEvidence {
+    pub(super) fn validate_current(&self, root: &RepoRoot) -> Result<(), ToolchainError> {
+        validate_replayed(self, &collect(root)?)
+    }
+}
+
+fn validate_replayed(
+    expected: &ToolchainEvidence,
+    actual: &ToolchainEvidence,
+) -> Result<(), ToolchainError> {
+    if expected == actual {
+        Ok(())
+    } else {
+        Err(ToolchainError::StaleEvidence)
+    }
 }
 
 pub(super) fn collect(root: &RepoRoot) -> Result<ToolchainEvidence, ToolchainError> {
@@ -227,6 +244,8 @@ pub(super) enum ToolchainError {
     InvalidHome(PathBuf),
     #[error("RUSTUP_HOME is not an absolute path: {0}")]
     InvalidRustupHome(PathBuf),
+    #[error("recorded Rust toolchain evidence differs from the current pinned toolchain")]
+    StaleEvidence,
 }
 
 #[cfg(test)]
@@ -237,5 +256,44 @@ mod tests {
     fn rustc_path_parser_rejects_relative_and_multiline_values() {
         assert!(parse_single_line_path(b"relative/rustc\n").is_err());
         assert!(parse_single_line_path(b"/one\n/two\n").is_err());
+    }
+
+    #[test]
+    fn toolchain_replay_rejects_mutated_executable_and_version_identity() {
+        let evidence = ToolchainEvidence {
+            rust_toolchain: RUST_TOOLCHAIN.to_string(),
+            cargo_profile: "release".to_string(),
+            rustup_path: RUSTUP_PATH.to_string(),
+            rustup_sha256: "a".repeat(64),
+            cargo_path: "/toolchain/cargo".to_string(),
+            cargo_sha256: "b".repeat(64),
+            cargo_verbose_version: "cargo 1.0".to_string(),
+            rustc_path: "/toolchain/rustc".to_string(),
+            rustc_sha256: "c".repeat(64),
+            rustc_verbose_version: "rustc 1.0\nhost: aarch64-unknown-linux-gnu".to_string(),
+            target_triple: "aarch64-unknown-linux-gnu".to_string(),
+        };
+        assert!(validate_replayed(&evidence, &evidence).is_ok());
+
+        let mut changed_hash = evidence.clone();
+        changed_hash.cargo_sha256 = "d".repeat(64);
+        assert!(matches!(
+            validate_replayed(&evidence, &changed_hash),
+            Err(ToolchainError::StaleEvidence)
+        ));
+
+        let mut changed_version = evidence.clone();
+        changed_version.rustc_verbose_version.push_str("-changed");
+        assert!(matches!(
+            validate_replayed(&evidence, &changed_version),
+            Err(ToolchainError::StaleEvidence)
+        ));
+
+        let mut changed_path = evidence.clone();
+        changed_path.rustup_path = "/replacement/rustup".to_string();
+        assert!(matches!(
+            validate_replayed(&evidence, &changed_path),
+            Err(ToolchainError::StaleEvidence)
+        ));
     }
 }
