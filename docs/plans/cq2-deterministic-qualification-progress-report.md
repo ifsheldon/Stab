@@ -8,13 +8,13 @@ The selected `.stim`, `.dem`, result-format, gate-contract, bit-kernel, and circ
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Latest clean global evidence revision: `1eaf3740c5819271be30a37ce4b6f69e2010a2ba` with `local_modifications=false`, for the current circuit-refined digest.
+Latest clean correctness evidence revision: `1eaf3740c5819271be30a37ce4b6f69e2010a2ba` with `local_modifications=false`, for the current circuit-refined digest.
 
 Current correctness inventory digest after circuit-API reconciliation: `f30a56853dbc9334d1ba91a400da3a40c108d4ee2aa748d4edc9a5662093ba11`.
 
 Current dependent performance inventory digest: `4ebbf8bc85ebeb722fcf3e9eefa4796b57ba61b2773fa64eef37e70dca41a744`.
 
-Clean current-digest CQ1 reports are published at the artifact paths below. The dependent PQ1 refresh awaits the clean documentation-and-inventory commit because the checklist clarification changed the performance digest without changing correctness.
+Clean current-digest CQ1 and dependent PQ1 reports are published at the artifact paths below.
 
 ## Delivered Slices
 
@@ -103,7 +103,15 @@ Offline report regeneration passed for every tier. Exact PR, full, and soak pref
 
 ## Dependent PQ1 Refresh
 
-The PQ1 group remains diagnostic infrastructure with `promotable=false`, `report-only` baseline eligibility, and zero checked product thresholds. The earlier `3c49ecdfde72eca0a331b9949f2bee4dd6f300ebfa015d779b4f5cbb7ac91355` reports validated successfully but became stale when the checklist evidence note changed the dependent digest. Run PR, full, and soak from the clean commit containing `4ebbf8bc85ebeb722fcf3e9eefa4796b57ba61b2773fa64eef37e70dca41a744`, then publish their exact ratios and artifact paths in a follow-up evidence commit.
+The PQ1 group remains diagnostic infrastructure with `promotable=false`, `report-only` baseline eligibility, and zero checked product thresholds.
+
+| Tier | Pairs | Median ratio | Bootstrap 95% interval | Ratio rMAD | Host | Artifact |
+| --- | ---: | ---: | --- | ---: | --- | --- |
+| PR | 3 | 1.015723 | [1.015313, 1.022859] | 0.000404 | Verified AArch64 | `target/benchmarks/qualification/pq1-circuit-pr-schema13` |
+| Full | 9 | 1.014777 | [1.014040, 1.016155] | 0.000929 | Verified AArch64 | `target/benchmarks/qualification/pq1-circuit-full-schema13` |
+| Soak | 15 | 1.015273 | [1.014637, 1.015942] | 0.000659 | Verified AArch64 | `target/benchmarks/qualification/pq1-circuit-soak-schema13` |
+
+All reports use schema version 13, the current correctness and performance digests, `local_modifications=false` before and after execution, and commit `eb6a6df8f48504239fbe7f640f924748b63617f2`. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. These ratios describe only the synthetic adapter protocol and must not be reported as Stab product performance.
 
 ## Verification
 
@@ -129,10 +137,19 @@ just qualification::correctness-report --out target/qualification/correctness/so
 just qualification::correctness-preflight --out target/qualification/correctness/latest --case cq-evidence-qualification-0bd1d8d0ab37a23d --request-sha256 33c6cdb706124de39c959583af18d9f83cb57b0199ed5437ab756f35a39ea0bd --completion-sha256 a85eaf987a356f309252fc4d0286ea8424954a6026f72835181741b035026d1f
 just qualification::correctness-preflight --out target/qualification/correctness/full --case cq-evidence-qualification-0bd1d8d0ab37a23d --request-sha256 5b59782b51b506bad886e5793de02d9c57eefa907af2b9d7c9b64b13aa5eb186 --completion-sha256 939dcaa30e2b6a1663345a039b069a57f4202cd356b4b0e14f1ffb9b92d42c59
 just qualification::correctness-preflight --out target/qualification/correctness/soak --case cq-evidence-qualification-0bd1d8d0ab37a23d --request-sha256 b677425b10cba61bd0d49aa387284494a5a015e18bda8d8ad32d68304e3d7f20 --completion-sha256 d113dde05b51a1f055b101e15fbeea6f1d03aad7820b51d0a09df733d6c6233b
+just bench::qualification-run --tier pr --out target/benchmarks/qualification/pq1-circuit-pr-schema13
+just bench::qualification-run --tier full --out target/benchmarks/qualification/pq1-circuit-full-schema13
+just bench::qualification-run --tier soak --out target/benchmarks/qualification/pq1-circuit-soak-schema13
+just bench::qualification-report --input target/benchmarks/qualification/pq1-circuit-pr-schema13
+just bench::qualification-report --input target/benchmarks/qualification/pq1-circuit-full-schema13
+just bench::qualification-report --input target/benchmarks/qualification/pq1-circuit-soak-schema13
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-circuit-pr-schema13
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-circuit-full-schema13
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-circuit-soak-schema13
 just maintenance::pre-commit
 ```
 
-The clean PR, full, soak, offline-report, and exact-preflight artifacts above are authoritative for the current correctness digest. Current-digest dependent PQ1 artifacts remain pending until the clean documentation-and-inventory commit exists.
+The clean PR, full, soak, offline-report, exact-preflight, and dependent PQ1 artifacts above are authoritative for the current circuit-refined digests.
 
 ## Remaining Blocker
 
