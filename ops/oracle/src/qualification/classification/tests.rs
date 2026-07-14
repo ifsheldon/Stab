@@ -347,3 +347,70 @@ fn classifications_reconcile_domain_matrix_sources() {
     );
     assert_eq!(compiled.feature_ids, vec![FeatureId::Sampling]);
 }
+
+#[test]
+fn classifications_split_portable_bit_contracts_from_cpp_storage_helpers() {
+    let bits = Path::new("src/stim/mem/simd_bits.test.cc");
+    for symbol in [
+        "simd_bits.assignment_64",
+        "simd_bits.xor_assignment_128",
+        "simd_bits.mask_assignment_and_256",
+        "simd_bits.popcnt_64",
+    ] {
+        let classified = classify_upstream_case(bits, symbol);
+        assert_eq!(classified.disposition, UpstreamDisposition::SemanticMining);
+        assert_eq!(classified.feature_ids, vec![FeatureId::BitKernels]);
+    }
+    for symbol in [
+        "simd_bits.randomize_64",
+        "simd_bits.destructive_resize_128",
+        "simd_bits.fuzz_left_shift_assignment_256",
+        "simd_bits.move_64",
+        "simd_bits.prefix_ref_256",
+        "simd_bits.truncated_overwrite_from_64",
+    ] {
+        let classified = classify_upstream_case(bits, symbol);
+        assert_eq!(classified.disposition, UpstreamDisposition::NotApplicable);
+        assert!(classified.feature_ids.is_empty());
+    }
+
+    let range = Path::new("src/stim/mem/simd_bits_range_ref.test.cc");
+    assert_eq!(
+        classify_upstream_case(range, "simd_bits_range_ref.xor_assignment_256").feature_ids,
+        vec![FeatureId::BitKernels]
+    );
+    assert_eq!(
+        classify_upstream_case(range, "simd_bits_range_ref.intersects_256").disposition,
+        UpstreamDisposition::NotApplicable
+    );
+
+    let table = Path::new("src/stim/mem/simd_bit_table.test.cc");
+    assert_eq!(
+        classify_upstream_case(table, "simd_bit_table.transposed_128").feature_ids,
+        vec![FeatureId::BitKernels]
+    );
+    assert_eq!(
+        classify_upstream_case(table, "simd_bit_table.from_quadrants_128").disposition,
+        UpstreamDisposition::NotApplicable
+    );
+
+    let word = Path::new("src/stim/mem/simd_word.test.cc");
+    assert_eq!(
+        classify_upstream_case(word, "simd_word_pick.popcount_64").feature_ids,
+        vec![FeatureId::BitKernels]
+    );
+    assert_eq!(
+        classify_upstream_case(word, "simd_word.shifting_64").disposition,
+        UpstreamDisposition::NotApplicable
+    );
+
+    let sparse = Path::new("src/stim/mem/sparse_xor_vec.test.cc");
+    assert_eq!(
+        classify_upstream_case(sparse, "sparse_xor_vec.inplace_xor_sort").feature_ids,
+        vec![FeatureId::BitKernels]
+    );
+    assert_eq!(
+        classify_upstream_case(sparse, "sparse_xor_table.inplace_xor").disposition,
+        UpstreamDisposition::NotApplicable
+    );
+}

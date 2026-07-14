@@ -4391,6 +4391,595 @@
           "owner_path": "stab_core::Target::is_pauli_target"
         }
       ]
+    },
+    {
+      "id": "cq2-bit-len-slice-access-contract",
+      "feature_id": "CQ-BIT-KERNELS",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_bit_kernels",
+          "cq2_bit_len_slice_and_access_contract",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Owned storage is exactly ceil(width/64) words and borrowed views allocate nothing; the deterministic corpus spans empty, unaligned, word, SIMD-lane, multi-lane, and 65,537-bit widths."
+      },
+      "negative_axes": [
+        "empty-width",
+        "unaligned-tail",
+        "word-count-mismatch",
+        "bit-index-out-of-range",
+        "clone-aliasing"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/mem/bit_ref.test.cc",
+          "symbol": "bit_ref.get"
+        },
+        {
+          "path": "src/stim/mem/bit_ref.test.cc",
+          "symbol": "bit_ref.set"
+        }
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitLen" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitLen::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitLen::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitLen::word_count" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::is_empty" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::len" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::as_bitslice" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::from_words_truncated" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::is_empty" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::len" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::set" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::word_count" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::zeros" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitLen::word_count" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::is_empty" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::len" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::as_bitslice" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::from_words_truncated" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::is_empty" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::len" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::set" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::word_count" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::zeros" }
+      ]
+    },
+    {
+      "id": "cq2-bit-vec-logical-contract",
+      "feature_id": "CQ-BIT-KERNELS",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_bit_kernels",
+          "cq2_bit_vec_logical_ops_match_scalar_across_boundaries",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Each in-place logical operation traverses the preallocated ceil(width/64) words with constant SIMD scratch and canonicalizes the logical tail without allocating output storage."
+      },
+      "negative_axes": [
+        "length-mismatch",
+        "dirty-tail",
+        "zero-vector",
+        "unaligned-simd-tail"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/mem/bit_ref.test.cc",
+          "symbol": "bit_ref.bit_xor"
+        },
+        {
+          "path": "src/stim/mem/bit_ref.test.cc",
+          "symbol": "bit_ref.bit_andr"
+        },
+        {
+          "path": "src/stim/mem/bit_ref.test.cc",
+          "symbol": "bit_ref.bit_or"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/mem/simd_bits.test.cc",
+          "symbol_base": "simd_bits.assignment",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits.test.cc",
+          "symbol_base": "simd_bits.clear",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits.test.cc",
+          "symbol_base": "simd_bits.equality",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits.test.cc",
+          "symbol_base": "simd_bits.mask_assignment_and",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits.test.cc",
+          "symbol_base": "simd_bits.mask_assignment_or",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits.test.cc",
+          "symbol_base": "simd_bits.not_zero",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits.test.cc",
+          "symbol_base": "simd_bits.popcnt",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits.test.cc",
+          "symbol_base": "simd_bits.xor_assignment",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits_range_ref.test.cc",
+          "symbol_base": "simd_bits_range_ref.assignment",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits_range_ref.test.cc",
+          "symbol_base": "simd_bits_range_ref.clear",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits_range_ref.test.cc",
+          "symbol_base": "simd_bits_range_ref.equality",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits_range_ref.test.cc",
+          "symbol_base": "simd_bits_range_ref.not_zero256",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits_range_ref.test.cc",
+          "symbol_base": "simd_bits_range_ref.popcnt",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bits_range_ref.test.cc",
+          "symbol_base": "simd_bits_range_ref.xor_assignment",
+          "word_sizes": [64, 128, 256]
+        }
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitSlice::popcount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::and_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::clear" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::masked_xor_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::not_zero" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::or_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::popcount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::xor_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitSlice::popcount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::and_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::clear" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::masked_xor_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::not_zero" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::or_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::popcount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::xor_assign" }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-mem-simd-bits"
+      ]
+    },
+    {
+      "id": "cq2-bit-vec-copy-range-tail-contract",
+      "feature_id": "CQ-BIT-KERNELS",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_bit_kernels",
+          "cq2_bit_vec_copy_range_and_tail_contract",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Copy and range-XOR mutate existing destination storage, validate both checked ranges before mutation, use constant word scratch, and clear padding beyond the logical width."
+      },
+      "negative_axes": [
+        "target-range-overflow",
+        "source-range-overflow",
+        "usize-add-overflow",
+        "copy-length-mismatch",
+        "dirty-source-tail"
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitError" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitResult" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::copy_from_bitslice" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitVec::xor_range_from" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitError" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitResult" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::copy_from_bitslice" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitVec::xor_range_from" }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-mem-simd-bits-range-ref"
+      ]
+    },
+    {
+      "id": "cq2-bit-block-word-contract",
+      "feature_id": "CQ-BIT-KERNELS",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_bit_kernels",
+          "cq2_bit_block_contract_matches_scalar_words",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "A BitBlock is exactly four u64 lanes; constructors, accessors, Boolean kernels, and popcount use fixed-size values with no input-sized allocation."
+      },
+      "negative_axes": [
+        "all-zero",
+        "all-one",
+        "alternating-lanes",
+        "overflowing-pattern-seed"
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/mem/simd_word.test.cc",
+          "symbol_base": "simd_word.equality",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_word.test.cc",
+          "symbol_base": "simd_word.from_u64_array",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_word.test.cc",
+          "symbol_base": "simd_word.masking",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_word.test.cc",
+          "symbol_base": "simd_word_pick.popcount",
+          "word_sizes": [64, 128, 256]
+        }
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::and" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::from_words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::or" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::popcount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::xor" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitBlock::zero" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BIT_BLOCK_WORDS" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::and" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::from_words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::or" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::popcount" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::words" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::xor" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitBlock::zero" }
+      ]
+    },
+    {
+      "id": "cq2-bit-matrix-row-contract",
+      "feature_id": "CQ-BIT-KERNELS",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_bit_kernels",
+          "cq2_bit_matrix_row_contract_matches_scalar_reference",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Construction checks rows times words-per-row before allocation; row access and mutation stay within the preallocated matrix, and row kernels use constant SIMD scratch."
+      },
+      "negative_axes": [
+        "matrix-size-overflow",
+        "row-out-of-range",
+        "column-out-of-range",
+        "mask-length-mismatch",
+        "self-row-overlap",
+        "zero-column-matrix"
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/mem/simd_bit_table.test.cc",
+          "symbol_base": "simd_bit_table.equality",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_bit_table.test.cc",
+          "symbol_base": "simd_bit_table.xor_row_into",
+          "word_sizes": [64, 128, 256]
+        }
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::cols" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::identity" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::masked_xor_row_into" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::row" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::rows" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::set" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::swap_rows" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::xor_row_into" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::zeros" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::cols" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::get" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::identity" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::masked_xor_row_into" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::row" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::rows" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::set" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::swap_rows" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::xor_row_into" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::zeros" }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-mem-simd-bit-table"
+      ]
+    },
+    {
+      "id": "cq2-bit-matrix-transpose-contract",
+      "feature_id": "CQ-BIT-KERNELS",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_bit_kernels",
+          "cq2_bit_matrix_transpose_contract_matches_scalar_reference",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Out-of-place transpose allocates exactly the checked transposed shape; in-place square transpose replaces the matrix with that bounded result and rejects rectangular shapes before mutation."
+      },
+      "negative_axes": [
+        "rectangular-in-place",
+        "zero-dimension",
+        "word-boundary-shape",
+        "simd-lane-boundary-shape",
+        "double-transpose"
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/mem/simd_bit_table.test.cc",
+          "symbol_base": "simd_bit_table.transposed",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_util.test.cc",
+          "symbol_base": "simd_util.inplace_transpose",
+          "word_sizes": [64, 128, 256]
+        },
+        {
+          "path": "src/stim/mem/simd_util.test.cc",
+          "symbol_base": "simd_util.simd_bit_table_transpose",
+          "word_sizes": [64, 128, 256]
+        }
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/mem/simd_util.test.cc",
+          "symbol": "simd_util.inplace_transpose_64x64"
+        }
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::transpose" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::BitMatrix::transpose_square_in_place" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::transpose" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::BitMatrix::transpose_square_in_place" }
+      ]
+    },
+    {
+      "id": "cq2-sparse-xor-dense-differential-contract",
+      "feature_id": "CQ-BIT-KERNELS",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_bit_kernels",
+          "cq2_sparse_xor_matches_dense_across_density_transitions",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Sparse construction and XOR allocate at most the combined input cardinality; the deterministic corpus crosses stack and heap merge thresholds and compares every result with a dense bit-vector reference."
+      },
+      "negative_axes": [
+        "empty-vectors",
+        "duplicate-cancellation",
+        "stack-heap-threshold",
+        "dense-crossover",
+        "missing-subset-item"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/mem/sparse_xor_vec.test.cc",
+          "symbol": "sparse_xor_vec.contains"
+        },
+        {
+          "path": "src/stim/mem/sparse_xor_vec.test.cc",
+          "symbol": "sparse_xor_vec.inplace_xor_sort"
+        },
+        {
+          "path": "src/stim/mem/sparse_xor_vec.test.cc",
+          "symbol": "sparse_xor_vec.is_subset_of_sorted"
+        },
+        {
+          "path": "src/stim/mem/sparse_xor_vec.test.cc",
+          "symbol": "sparse_xor_vec.is_superset_of"
+        }
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::contains" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::from_sorted_items" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::is_empty" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::is_superset_of" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::items" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::xor_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::SparseXorVec::xor_item" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::contains" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::from_sorted_items" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::is_empty" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::is_superset_of" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::items" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::new" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::xor_assign" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::SparseXorVec::xor_item" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::inplace_xor_sort" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::is_subset_of_sorted" }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-mem-sparse-xor-vec"
+      ]
+    },
+    {
+      "id": "cq2-bit-twiddle-contract",
+      "feature_id": "CQ-BIT-KERNELS",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_bit_kernels",
+          "cq2_twiddle_helpers_match_integer_reference",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "Each integer helper performs one bounded machine-word calculation with no allocation; the qualification corpus exhausts 0 through 65,536 and checks upper-word boundaries."
+      },
+      "negative_axes": [
+        "zero-input",
+        "start-at-word-width",
+        "start-above-word-width",
+        "maximum-u64"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/util_bot/twiddle.test.cc",
+          "symbol": "twiddle.first_set_bit"
+        },
+        {
+          "path": "src/stim/util_bot/twiddle.test.cc",
+          "symbol": "twiddle.floor_lg2"
+        },
+        {
+          "path": "src/stim/util_bot/twiddle.test.cc",
+          "symbol": "twiddle.is_power_of_2"
+        }
+      ],
+      "public_api_owners": [
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::first_set_bit" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::floor_lg2" },
+        { "crate_name": "stab_core", "owner_path": "stab_core::bits::is_power_of_2" }
+      ]
     }
   ],
   "existing_parent_mappings": [

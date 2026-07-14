@@ -4,17 +4,17 @@
 
 In progress as of 2026-07-14.
 
-The selected `.stim`, `.dem`, result-format, and gate-contract domains are complete at exact upstream-symbol and exported-Rust-API granularity. This checkpoint does not complete CQ2.
+The selected `.stim`, `.dem`, result-format, gate-contract, and bit-kernel domains are complete at exact upstream-symbol and exported-Rust-API granularity. This checkpoint does not complete CQ2.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Clean current-digest global evidence revision: `c6ca93945ad7e94e758e2cdea745a9b2a62c401a` with `local_modifications=false`.
+Latest clean global evidence revision: `c6ca93945ad7e94e758e2cdea745a9b2a62c401a` with `local_modifications=false`, for the preceding gate-refined digest. A clean refresh for the bit-kernel digest is required before current-digest execution claims are promoted.
 
-Current correctness inventory digest after gate-contract reconciliation: `4ee9686104c0d537073a823986cb71b8bc092c7a9f09fbdbee75c4af7d2c6b70`.
+Current correctness inventory digest after bit-kernel reconciliation: `2b2f0456e568b86a973d4b9077b9688ab9f7748af1bd9cd349e2a2abf217d638`.
 
-Current dependent performance inventory digest: `9ae9b79c172c27f2a33475d856cca97c668c6608781cb81b8a8861f46cd13966`.
+Current dependent performance inventory digest: `4e31a348b0c796ae4c4400369c70019eff8fa991592f201c80e7fee7d8718f7a`.
 
-Clean current-digest CQ1 and PQ1 reports are published at the artifact paths below. The preceding result-format reports remain historical evidence and are superseded for current-digest claims.
+The clean gate-digest CQ1 and PQ1 reports are published at the artifact paths below as historical evidence. They are superseded for current-digest claims until the bit-kernel refresh completes.
 
 ## Delivered Slices
 
@@ -54,6 +54,17 @@ Clean current-digest CQ1 and PQ1 reports are published at the artifact paths bel
 
 The dependent PQ0 inventory was regenerated because correctness owner ids and acceptance state changed. No performance disposition, threshold, waiver, or comparator classification was relaxed.
 
+### Bit Kernels
+
+- Eight focused qualification parents plus four independently selected exact M5 oracle-fixture parents produce 12 implemented bit-kernel evidence parents and zero planned owners.
+- The exact partition assigns all 274 selected exported Rust API items and all 82 selected upstream semantic records: five `bit_ref`, nine bit-table, 24 owned-bit-vector, 18 range-view, seven transpose-helper, 12 SIMD-word, four sparse-vector, and three integer-twiddle records.
+- Deterministic tests span zero width, unaligned tails, 64-bit word boundaries, 256-bit portable-SIMD lane boundaries, multi-lane widths through 65,537 bits, dirty padding, checked range overflow, clone independence, matrix self-overlap, rectangular transpose rejection, sparse stack-to-heap transitions, and dense-versus-sparse symmetric-difference agreement.
+- Domain audit found that self-masked matrix row XOR copied the complete row before applying `value &= !mask`, contradicting the constant-scratch resource contract. The path now uses an in-place portable-SIMD AND-NOT kernel, and direct allocation-counter checks prove that repeated preallocated vector and matrix mutation performs zero allocations.
+- The 168 pinned C++ cases for move state, mutable aliasing and range views, destructive or preserving resize, padded lane layout, arithmetic, shifts, raw random fill, table parsing, gather, concatenation or quadrants, triangular inverse, table-only sparse storage, and unexposed predicates are explicitly `not-applicable`; Stab exposes no corresponding selected Rust bit contract, and safe Rust excludes the C++ mutable-aliasing shape by construction.
+- Raw random generation remains owned by typed `CQ-ALGEBRA` APIs that accept caller-owned `rand::Rng`; no raw bit-vector random-fill API was added merely to mirror an internal C++ helper. Four broad imported M5 fixtures are retained as supporting provenance on the new exact parents, while four already-exact M5 fixtures remain independent evidence.
+
+The dependent PQ0 inventory was regenerated because the correctness digest, owner ids, and selected bit-kernel dispositions changed. No performance disposition, threshold, waiver, comparator classification, or runtime group was relaxed.
+
 ## Current CQ2 Inventory
 
 | Feature | Implemented | Planned | Total |
@@ -62,11 +73,11 @@ The dependent PQ0 inventory was regenerated because correctness owner ids and ac
 | `CQ-DEM-FORMAT` | 28 | 0 | 28 |
 | `CQ-RESULT-FORMATS` | 39 | 0 | 39 |
 | `CQ-GATE-CONTRACT` | 59 | 0 | 59 |
-| `CQ-BIT-KERNELS` | 4 | 384 | 388 |
+| `CQ-BIT-KERNELS` | 12 | 0 | 12 |
 | `CQ-CIRCUIT-API` | 37 | 325 | 362 |
 | `CQ-GENERATION` | 15 | 75 | 90 |
 | `CQ-ALGEBRA` | 1 | 635 | 636 |
-| **CQ2 total** | **215** | **1,419** | **1,634** |
+| **CQ2 total** | **223** | **1,035** | **1,258** |
 
 These counts are evidence owners, not an estimate of required new test functions. Reviewed exact parents may close several owners only when one selector proves their complete common contract.
 
@@ -101,6 +112,7 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --quiet
 cargo test -p stab-core --test cq2_gate_contract --quiet
+cargo test -p stab-core --test cq2_bit_kernels --quiet
 cargo test -p stab-core gate_surface_contract_measure_reset_ --quiet
 cargo test -p stab-core gate_surface_contract_annotations --quiet
 cargo test -p stab-core gate_surface_contract_ --quiet
@@ -136,10 +148,10 @@ just bench::qualification-regression --input target/benchmarks/qualification/pq1
 just maintenance::pre-commit
 ```
 
-The clean PR, full, soak, offline-report, exact-preflight, and dependent PQ1 artifacts are identified above.
+The clean PR, full, soak, offline-report, exact-preflight, and dependent PQ1 artifacts above remain authoritative only for the preceding gate-refined digest until the current bit-kernel refresh is published.
 
 ## Remaining Blocker
 
-CQ2 still has 1,419 planned evidence owners. The next implementation blocker is `CQ-BIT-KERNELS`, where 384 of 388 owners remain planned across dense and sparse bit vectors, matrices, SIMD/scalar differential behavior, transposition, randomization, parsing, arithmetic, and boundary/resource contracts.
+CQ2 still has 1,035 planned evidence owners. The next implementation blocker after the current-digest clean evidence refresh is `CQ-CIRCUIT-API`, where 325 of 362 owners remain planned across construction, mutation, introspection, coordinates, repeat handling, and selected transforms.
 
 No external dependency or user decision blocks this work. CQ2 milestone audit and GPT-5.6/max full-code-review remain pending until all selected CQ2 domains are implemented.

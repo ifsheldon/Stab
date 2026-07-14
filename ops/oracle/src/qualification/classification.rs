@@ -215,7 +215,7 @@ pub(super) fn classify_upstream_case(path: &Path, symbol: &str) -> UpstreamClass
         return UpstreamClassification::selected(FeatureId::ResultFormats);
     }
     if value.contains("/mem/") {
-        return UpstreamClassification::selected(FeatureId::BitKernels);
+        return classify_mem(&value, symbol);
     }
     if value.contains("/search/") {
         return UpstreamClassification::selected(FeatureId::Search);
@@ -510,6 +510,65 @@ fn classify_gates(value: &str, symbol: &str) -> UpstreamClassification {
     } else {
         UpstreamClassification::selected(FeatureId::GateContract)
     }
+}
+
+fn classify_mem(value: &str, symbol: &str) -> UpstreamClassification {
+    if symbol.is_empty() {
+        return UpstreamClassification::selected(FeatureId::BitKernels);
+    }
+    let leaf = symbol.rsplit('.').next().unwrap_or(symbol);
+    let base = strip_stim_word_size_suffix(leaf);
+
+    let selected = if value.ends_with("bit_ref.test.cc") {
+        matches!(base, "get" | "set" | "bit_xor" | "bit_andr" | "bit_or")
+    } else if value.ends_with("simd_bit_table.test.cc") {
+        matches!(base, "equality" | "transposed" | "xor_row_into")
+    } else if value.ends_with("simd_bits_range_ref.test.cc") {
+        matches!(
+            base,
+            "assignment" | "clear" | "equality" | "not_zero256" | "popcnt" | "xor_assignment"
+        )
+    } else if value.ends_with("simd_bits.test.cc") {
+        matches!(
+            base,
+            "assignment"
+                | "clear"
+                | "equality"
+                | "mask_assignment_and"
+                | "mask_assignment_or"
+                | "not_zero"
+                | "popcnt"
+                | "xor_assignment"
+        )
+    } else if value.ends_with("simd_util.test.cc") {
+        matches!(
+            base,
+            "inplace_transpose" | "inplace_transpose_64x64" | "simd_bit_table_transpose"
+        )
+    } else if value.ends_with("simd_word.test.cc") {
+        matches!(base, "equality" | "from_u64_array" | "masking" | "popcount")
+    } else if value.ends_with("sparse_xor_vec.test.cc") {
+        symbol.starts_with("sparse_xor_vec.")
+    } else {
+        return UpstreamClassification::selected(FeatureId::BitKernels);
+    };
+
+    if selected {
+        UpstreamClassification::selected(FeatureId::BitKernels)
+    } else {
+        UpstreamClassification::not_applicable(
+            "This case exercises a C++-specific SIMD storage, ownership, aliasing, resizing, lane-layout, arithmetic, shift, or raw-randomization helper with no selected Stab Rust bit-kernel contract.",
+        )
+    }
+}
+
+fn strip_stim_word_size_suffix(symbol: &str) -> &str {
+    for suffix in ["_64", "_128", "_256"] {
+        if let Some(base) = symbol.strip_suffix(suffix) {
+            return base;
+        }
+    }
+    symbol
 }
 
 fn circuit_case_has_stim_format_contract(symbol: &str) -> bool {

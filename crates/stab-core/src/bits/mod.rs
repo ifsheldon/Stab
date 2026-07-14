@@ -422,9 +422,9 @@ impl BitMatrix {
         self.ensure_row(target)?;
         ensure_same_bit_len(self.cols(), mask.len())?;
         if source == target {
-            let source_words = self.row(source)?.words().to_vec();
             let target_words = self.row_words_mut(target)?;
-            simd::masked_xor_assign_words(target_words, &source_words, mask.words());
+            let mask_words = mask.words();
+            simd::and_not_assign_words(target_words, mask_words);
         } else {
             let (source_words, target_words) = self.row_pair_words_mut(source, target)?;
             simd::masked_xor_assign_words(target_words, source_words, mask.words());

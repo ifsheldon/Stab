@@ -23,6 +23,15 @@ None.
 
 ## Resolved Entries
 
+## 2026-07-14 - CQ2: Portable Bit Semantics Versus C++ Storage Helpers
+
+Status: Resolved
+Revealed by: implementation and exact-symbol audit of `CQ-BIT-KERNELS`.
+Current text: CQ2 named dense bits, bit tables, transposition, parity, random fill, and sparse XOR, and required every relevant upstream case to receive an exact disposition.
+Gap: The pinned memory tests mix portable Boolean, tail, row, transpose, and sparse-XOR semantics with C++ moved-from state, mutable aliasing, destructive and preserving resize, padded lane layout, arithmetic, shifts, raw random fill, table concatenation, triangular inverse, and predicates that Stab neither exposes nor uses. The plan did not say whether qualification must invent public Rust APIs for those C++ internals, mark them deferred, or classify them as language-specific implementation details. Treating the whole files as selected would recreate C++ storage design in Rust and inflate parity claims; dropping the rows silently would make the inventory incomplete.
+Proposed amendment: Select only portable upstream semantics that map to an existing Stab Rust API or selected engine contract, give every remaining exact symbol a reviewed `not-applicable` reason, and keep typed caller-owned randomization with the Pauli, Clifford, and Tableau APIs that expose it. Require deterministic scalar and dense-versus-sparse corpora to span zero width, unaligned tails, word and portable-SIMD lane boundaries, large widths, overlap policy, and allocation or mutation boundaries.
+Resolution: Exact memory classification now selects 82 portable upstream records and marks 168 C++-specific records not applicable. Eight focused qualification parents assign every selected record and all 274 exported Rust API items, four exact M5 fixture parents remain independent evidence, and four broad M5 fixtures attach as supporting provenance. Deterministic scalar, dense-versus-sparse, self-overlap, and allocation-counter checks cover the selected Rust mutation contracts, including a fixed self-masked-row allocation defect. `docs/plans/comprehensive-correctness-qualification-plan.md` and the performance plan now state the same boundary; typed randomization remains in `CQ-ALGEBRA` and `PERF-STABILIZER-ALGEBRA`.
+
 ## 2026-07-14 - CQ2: Gate Ownership, Comparator Refinement, And Word-Size Families
 
 Status: Resolved

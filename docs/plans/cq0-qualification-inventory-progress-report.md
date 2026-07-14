@@ -2,21 +2,21 @@
 
 ## Status
 
-CQ0 is complete after CQ1-driven exact-selector and canonical-owner corrections plus the completed selected CQ2 `.stim`, `.dem`, result-format, and gate-contract ownership slices.
+CQ0 is complete after CQ1-driven exact-selector and canonical-owner corrections plus the completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, and bit-kernel ownership slices.
 
 Original source-owned evidence revision: `02c93c19566bdc465ad9c795f35e956e1ff85440` with `local_modifications=false`.
 
 Corrected inventory execution evidence revision: `e7ba513822c26859a2b5c70c94d406e1c6adb6b6` with `local_modifications=false`.
 
-Current gate-refined execution evidence revision: `c6ca93945ad7e94e758e2cdea745a9b2a62c401a` with `local_modifications=false`.
+Latest clean execution evidence revision: `c6ca93945ad7e94e758e2cdea745a9b2a62c401a` with `local_modifications=false`, for the preceding gate-refined digest. Current bit-refined execution evidence is pending a committed clean refresh.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Current corrected schema-version-3 manifest digest: `4ee9686104c0d537073a823986cb71b8bc092c7a9f09fbdbee75c4af7d2c6b70`.
+Current corrected schema-version-3 manifest digest: `2b2f0456e568b86a973d4b9077b9688ab9f7748af1bd9cd349e2a2abf217d638`.
 
 Pinned isolated Python AST version: 3.14.6.
 
-This milestone freezes a finite source and API inventory; it does not claim that the 2,497 planned CQ2 through CQ5 evidence owners already pass.
+This milestone freezes a finite source and API inventory; it does not claim that the 2,113 planned CQ2 through CQ5 evidence owners already pass.
 
 ## Inventory
 
@@ -31,16 +31,16 @@ This milestone freezes a finite source and API inventory; it does not claim that
 | Multi-domain relevance records | 651 | Primarily command plus engine behavior and mixed semantic methods; relevance does not itself confer passing evidence. |
 | Dynamic parameter families in executable scope | 0 | All 23 dynamic families are content-addressed, visible, and non-executable. |
 | Default-feature public API items | 1,922 | Includes re-exports, variants, enum payload fields, public struct fields, inherent methods, trait methods, and explicit non-synthetic, non-blanket trait implementations. |
-| Evidence owners | 2,998 | 1,730 upstream semantic owners, 621 public Rust API owners, 380 oracle-fixture owners, 165 blocker cases, 101 qualification-plan owners, and one hostile-path regression; 60 oracle fixtures are retained as supporting provenance on canonical blocker or qualification parents instead of duplicating terminal selectors. |
+| Evidence owners | 2,622 | 1,480 upstream semantic owners, 491 public Rust API owners, 376 oracle-fixture owners, 165 blocker cases, 109 qualification-plan owners, and one hostile-path regression; 64 oracle fixtures are retained as supporting provenance on canonical blocker or qualification parents instead of duplicating terminal selectors. |
 
 ### Upstream Dispositions
 
 | Disposition | Count |
 | --- | ---: |
 | `ported-rust` | 456 |
-| `semantic-mining` | 1,622 |
+| `semantic-mining` | 1,454 |
 | `deferred-product` | 784 |
-| `not-applicable` | 24 |
+| `not-applicable` | 192 |
 | `exact-oracle` | 0 |
 | `superseded` | 0 |
 
@@ -51,13 +51,13 @@ Of those deferred records, 307 remain relevant to at least one CQ domain summary
 
 | Status | Count |
 | --- | ---: |
-| `implemented` | 484 |
+| `implemented` | 492 |
 | `evidence-close` | 17 |
-| `planned` | 2,497 |
+| `planned` | 2,113 |
 | `deferred` | 0 |
 
-The 501 implemented or evidence-close owners establish that every CQ domain has at least one exact primary case; they do not close the remaining planned owners.
-All 440 implemented fixture-manifest rows are represented: 247 own exact existing oracle-fixture primary cases, 133 retain broad inherited Cargo filters only as supporting evidence behind planned atomic oracle-fixture selectors, and 60 are supporting provenance on canonical blocker-ledger or qualification parents.
+The 509 implemented or evidence-close owners establish that every CQ domain has at least one exact primary case; they do not close the remaining planned owners.
+All 440 implemented fixture-manifest rows are represented: 247 own exact existing oracle-fixture primary cases, 129 retain broad inherited Cargo filters only as supporting evidence behind planned atomic oracle-fixture selectors, and 64 are supporting provenance on canonical blocker-ledger or qualification parents.
 
 ### Comparator Inventory
 
@@ -66,10 +66,10 @@ All 440 implemented fixture-manifest rows are represented: 247 own exact existin
 | `canonical` | 37 |
 | `error-class` | 19 |
 | `exact-bytes` | 283 |
-| `exact-value` | 100 |
-| `property` | 1,319 |
+| `exact-value` | 101 |
+| `property` | 935 |
 | `resource` | 14 |
-| `semantic-invariant` | 478 |
+| `semantic-invariant` | 485 |
 | `state-equivalence` | 11 |
 | `statistical` | 419 |
 | `structural` | 318 |
@@ -119,6 +119,7 @@ The completed selected `.stim`-format slice has 32 implemented evidence parents 
 The completed selected `.dem`-format slice has 28 implemented evidence parents and zero planned owners: 17 qualification parents, eight direct oracle-fixture parents, and three blocker-ledger parents close all selected exact upstream and exported Rust API contracts while retaining broad imported fixtures as supporting-only provenance.
 The completed selected result-format slice has 39 implemented evidence parents and zero planned owners: 36 exact qualification parents and three direct oracle-fixture parents close all 156 selected upstream records and all 97 selected exported Rust API items while retaining seven broad imported fixtures as supporting-only provenance.
 The completed selected gate-contract slice has 59 implemented evidence parents and zero planned owners: 37 canonical blocker-ledger parents, 14 direct oracle-fixture parents, and eight focused qualification parents close every non-deferred exact gate owner while retaining nine broad imported fixtures as supporting-only provenance. Of 540 relevant upstream gate records, 328 are ported through exact Rust ownership, 12 remain visible semantic-mining references, and 200 are deferred with Python bindings or explicitly deferred interactive simulator products; all 178 selected gate and target API items are assigned.
+The completed selected bit-kernel slice has 12 implemented evidence parents and zero planned owners: eight focused qualification parents assign all 274 selected exported API items and all 82 selected portable semantic records, while four already-exact M5 oracle fixtures remain independent evidence and four broad M5 fixtures become supporting provenance. Exact-symbol classification marks 168 C++-specific move, mutable-view, resize, lane-layout, arithmetic, shift, random-fill, table-only, gather, and unexposed helper cases not applicable instead of inventing Rust contracts to absorb them.
 Two additional instruction-semantic parents map two exact upstream cases and four exact Rust methods without claiming untested derived traits or Stim-incompatible circuit measurement-count overflow behavior.
 Semantic review classifies mixed `circuit.test.cc`, gate-target equality, instruction value/count, and Python-only constructor ownership by exact symbol; it also found and fixed inverted Pauli-target admission for `CORRELATED_ERROR` and `ELSE_CORRELATED_ERROR`.
 One initially proposed mapping was rejected because its Cargo selector was already the canonical primary of an implemented oracle fixture, and the `MeasureRecordOffset` mapping received a new focused positive-and-boundary test instead of claiming broad mixed evidence.
@@ -186,7 +187,7 @@ just qualification::correctness-check
 The corrected focused qualification run executes the CQ0 inventory tests plus the CQ1 selector and property-plan validation tests with no failures.
 The workspace test run passed with only the repository's pre-existing documented long-running parser fuzz smoke ignored.
 `just maintenance::pre-commit` passed before the implementation commit.
-The original `just qualification::correctness-check` passed from committed revision `02c93c19566bdc465ad9c795f35e956e1ff85440` with a clean worktree. The previous corrected digest then passed clean CQ1 PR, full, and soak execution from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; the full and soak tiers each passed all 410 then-current implemented or evidence-close owners. The completed selected `.stim` and `.dem` slices raised that count to 441 and 457. The completed result-format slice raised it to 493, and clean global execution from revision `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` passes PR 331/331, full 493/493, and soak 493/493 for that preceding digest. The gate-contract reconciliation raises the current implemented-or-closed count to 501 at digest `4ee9686104c0d537073a823986cb71b8bc092c7a9f09fbdbee75c4af7d2c6b70`; clean current-digest execution from revision `c6ca93945ad7e94e758e2cdea745a9b2a62c401a` passes PR 336/336, full 501/501, and soak 501/501 with offline regeneration and exact gate-parent preflight in every tier.
+The original `just qualification::correctness-check` passed from committed revision `02c93c19566bdc465ad9c795f35e956e1ff85440` with a clean worktree. The previous corrected digest then passed clean CQ1 PR, full, and soak execution from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; the full and soak tiers each passed all 410 then-current implemented or evidence-close owners. The completed selected `.stim` and `.dem` slices raised that count to 441 and 457. The completed result-format slice raised it to 493, and clean global execution from revision `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` passes PR 331/331, full 493/493, and soak 493/493 for that preceding digest. The gate-contract reconciliation raised the implemented-or-closed count to 501 at digest `4ee9686104c0d537073a823986cb71b8bc092c7a9f09fbdbee75c4af7d2c6b70`; clean execution from revision `c6ca93945ad7e94e758e2cdea745a9b2a62c401a` passes PR 336/336, full 501/501, and soak 501/501 with offline regeneration and exact gate-parent preflight in every tier. The bit-kernel reconciliation now raises the current count to 509 at digest `2b2f0456e568b86a973d4b9077b9688ab9f7748af1bd9cd349e2a2abf217d638`; its clean committed execution refresh is pending.
 
 ## Remaining Program Work
 

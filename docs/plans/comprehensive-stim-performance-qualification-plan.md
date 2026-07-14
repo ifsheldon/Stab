@@ -289,7 +289,7 @@ Soak catches nonlinear behavior and rare performance instability and does not re
 
 ### PERF-BIT-KERNELS
 
-- Compare XOR, AND, OR, clear, popcount, parity, random fill, indexed gather or scatter used by Stab, 64-by-64 transpose, and sparse XOR kernels against equivalent pinned Stim operations.
+- Compare XOR, AND, OR, clear, popcount, indexed gather or scatter used by Stab, 64-by-64 transpose, and sparse XOR kernels against equivalent pinned Stim operations. Add parity or raw random-fill rows only when a selected Stab bit-kernel API or engine hot path performs that exact work; typed Pauli, Clifford, and Tableau randomization belongs to `PERF-STABILIZER-ALGEBRA`.
 - Exercise unaligned tails, word boundaries, 64-bit boundaries, sparse densities, dense crossover points, and portable-SIMD lane multiples.
 - Keep scalar reference checks outside timing and record dispatch or feature selection once per run.
 
@@ -364,7 +364,7 @@ Soak catches nonlinear behavior and rare performance instability and does not re
 
 Status: Complete.
 
-Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current CQ2 dependency-regenerated semantic digest `9ae9b79c172c27f2a33475d856cca97c668c6608781cb81b8a8861f46cd13966`.
+Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current CQ2 dependency-regenerated semantic digest `4e31a348b0c796ae4c4400369c70019eff8fa991592f201c80e7fee7d8718f7a`.
 
 Implementation revision: `abf7cd1bae0de045f62e976a290507238153f976`, verified with `local_modifications=false`.
 

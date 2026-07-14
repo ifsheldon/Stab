@@ -64,3 +64,12 @@ pub(super) fn masked_xor_assign_words(lhs: &mut [u64], rhs: &[u64], mask: &[u64]
     }
     scalar::masked_xor_assign_words(lhs_tail, rhs_tail, mask_tail);
 }
+
+pub(super) fn and_not_assign_words(lhs: &mut [u64], rhs: &[u64]) {
+    let (lhs_blocks, lhs_tail) = lhs.as_chunks_mut::<BIT_BLOCK_WORDS>();
+    let (rhs_blocks, rhs_tail) = rhs.as_chunks::<BIT_BLOCK_WORDS>();
+    for (left, right) in lhs_blocks.iter_mut().zip(rhs_blocks) {
+        *left = (WordBlock::from_array(*left) & !WordBlock::from_array(*right)).to_array();
+    }
+    scalar::and_not_assign_words(lhs_tail, rhs_tail);
+}

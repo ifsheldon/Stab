@@ -22,6 +22,12 @@ pub(super) fn masked_xor_assign_words(lhs: &mut [u64], rhs: &[u64], mask: &[u64]
     }
 }
 
+pub(super) fn and_not_assign_words(lhs: &mut [u64], rhs: &[u64]) {
+    for (left, right) in lhs.iter_mut().zip(rhs) {
+        *left &= !*right;
+    }
+}
+
 pub(super) fn popcount_words(words: &[u64]) -> usize {
     words.iter().map(|word| popcount_word(*word)).sum()
 }
