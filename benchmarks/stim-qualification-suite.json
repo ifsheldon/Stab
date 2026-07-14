@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "1152e9fa36d55c8a5a2282638fbc8ad79a39e7b4456161fba868a15c45cfb16e",
-  "semantic_digest": "3b762ed4bcd44157fb5c7410912a30fb6fc7abb4ff69ab95a38ef9892c72bec6",
+  "correctness_digest": "cd82f99bd3f02446187b55c873e396e08c234f86693ba5f5734882fbe4814b56",
+  "semantic_digest": "86d76e78bef628fd9722eba5f79ae1d8960d7bf16f9e571203babe4701a64999",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -10132,7 +10132,7 @@
       "kind": "struct",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-4c9797b7903ed187",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10143,7 +10143,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-4c9797b7903ed187",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-46cbadc59b96c15e"
@@ -10156,7 +10156,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-4c9797b7903ed187",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10167,7 +10167,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-4c9797b7903ed187",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10178,7 +10178,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-4c9797b7903ed187",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10189,7 +10189,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-4c9797b7903ed187",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-46cbadc59b96c15e"
@@ -10202,7 +10202,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-4c9797b7903ed187",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-46cbadc59b96c15e"
@@ -10215,7 +10215,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-4c9797b7903ed187",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-46cbadc59b96c15e"
@@ -10228,7 +10228,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-4c9797b7903ed187",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-46cbadc59b96c15e"
@@ -10241,7 +10241,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-4c9797b7903ed187",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10252,7 +10252,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-d8c4808dde55a79a",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-46cbadc59b96c15e"
@@ -10265,7 +10265,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-5cfc8e3b4d90ab33",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-46cbadc59b96c15e"
@@ -10278,7 +10278,7 @@
       "kind": "struct",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-c1ee5c8344151be9",
+      "correctness_case_id": "cq-evidence-qualification-459deaaad2f535c2",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10289,7 +10289,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-c1ee5c8344151be9",
+      "correctness_case_id": "cq-evidence-qualification-459deaaad2f535c2",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2b0c17dbb1de8dd9"
@@ -10302,7 +10302,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-c1ee5c8344151be9",
+      "correctness_case_id": "cq-evidence-qualification-459deaaad2f535c2",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10313,7 +10313,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-c1ee5c8344151be9",
+      "correctness_case_id": "cq-evidence-qualification-459deaaad2f535c2",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-2b0c17dbb1de8dd9"
@@ -10326,7 +10326,7 @@
       "kind": "struct",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a11a2918d3c0d4d6",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10337,7 +10337,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a11a2918d3c0d4d6",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10350,7 +10350,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a11a2918d3c0d4d6",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10361,7 +10361,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a11a2918d3c0d4d6",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10374,7 +10374,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a11a2918d3c0d4d6",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10385,7 +10385,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-6a0b6c664fbf2da6",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10398,7 +10398,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-75474e4c8aaa3c02",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10411,7 +10411,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-513fc8c4d692b56b",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10424,7 +10424,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-b869f1b4af76a952",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10437,7 +10437,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-6e4495e4e5d945c7",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10450,7 +10450,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-52318f537aec5f65",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10463,7 +10463,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-972c4d9dd802eb5e",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10476,7 +10476,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-addc076fa226fc8e",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10489,7 +10489,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-3e17e10bbe570861",
+      "correctness_case_id": "cq-evidence-qualification-b011a360db96ca78",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10502,7 +10502,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-3ac847317331a8c9",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-402378677d743ddf"
@@ -10515,7 +10515,7 @@
       "kind": "enum",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2be599c519f3f0db",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10526,7 +10526,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2be599c519f3f0db",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-222d43d1a001a6b5"
@@ -10539,7 +10539,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2be599c519f3f0db",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10550,7 +10550,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2be599c519f3f0db",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10561,7 +10561,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2be599c519f3f0db",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10572,7 +10572,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2be599c519f3f0db",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-222d43d1a001a6b5"
@@ -10585,7 +10585,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2be599c519f3f0db",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10596,7 +10596,7 @@
       "kind": "variant",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2be599c519f3f0db",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10607,7 +10607,7 @@
       "kind": "variant",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2be599c519f3f0db",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10618,7 +10618,7 @@
       "kind": "variant",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2be599c519f3f0db",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10629,7 +10629,7 @@
       "kind": "variant",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-2be599c519f3f0db",
+      "correctness_case_id": "cq-evidence-qualification-cb53089d317a4eab",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10640,7 +10640,7 @@
       "kind": "enum",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-016da54482a5f171",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10651,7 +10651,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-016da54482a5f171",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-066d2baccbaa4e7b"
@@ -10664,7 +10664,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-016da54482a5f171",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10675,7 +10675,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-016da54482a5f171",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-066d2baccbaa4e7b"
@@ -10688,7 +10688,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-016da54482a5f171",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10699,7 +10699,7 @@
       "kind": "variant",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-016da54482a5f171",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10710,7 +10710,7 @@
       "kind": "field",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-016da54482a5f171",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10721,7 +10721,7 @@
       "kind": "variant",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-016da54482a5f171",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10732,7 +10732,7 @@
       "kind": "field",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-016da54482a5f171",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10743,7 +10743,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-ed37e38df5c01d72",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-066d2baccbaa4e7b"
@@ -10756,7 +10756,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-702ef5725482f3b3",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-066d2baccbaa4e7b"
@@ -10769,7 +10769,7 @@
       "kind": "struct",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a05602c78b510c81",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10780,7 +10780,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a05602c78b510c81",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-fb5715e77df0dfbd"
@@ -10793,7 +10793,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a05602c78b510c81",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10804,7 +10804,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a05602c78b510c81",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10815,7 +10815,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a05602c78b510c81",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10826,7 +10826,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a05602c78b510c81",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-fb5715e77df0dfbd"
@@ -10839,7 +10839,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a05602c78b510c81",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-fb5715e77df0dfbd"
@@ -10852,7 +10852,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a05602c78b510c81",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-fb5715e77df0dfbd"
@@ -10865,7 +10865,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a05602c78b510c81",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-fb5715e77df0dfbd"
@@ -10878,7 +10878,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a05602c78b510c81",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10889,7 +10889,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-14eea35f4db4d952",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-fb5715e77df0dfbd"
@@ -10902,7 +10902,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-8950fa971f61b518",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-fb5715e77df0dfbd"
@@ -10915,7 +10915,7 @@
       "kind": "struct",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0920259b42f96b21",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10926,7 +10926,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0920259b42f96b21",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-77f24db3b8563a95"
@@ -10939,7 +10939,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0920259b42f96b21",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10950,7 +10950,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0920259b42f96b21",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-77f24db3b8563a95"
@@ -10963,7 +10963,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0920259b42f96b21",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -10974,7 +10974,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-b84b62ba36323151",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-77f24db3b8563a95"
@@ -10987,7 +10987,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-197d994fb41e8304",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-77f24db3b8563a95"
@@ -11000,7 +11000,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-9255d234ac38c735",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-77f24db3b8563a95"
@@ -11013,7 +11013,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-728319649b13f9e8",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-77f24db3b8563a95"
@@ -11026,7 +11026,7 @@
       "kind": "enum",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11037,7 +11037,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-df50b4d1a515cc24"
@@ -11050,7 +11050,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11061,7 +11061,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11072,7 +11072,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-fb10f43d98fa89fc"
@@ -11085,7 +11085,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11096,7 +11096,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-df50b4d1a515cc24"
@@ -11109,7 +11109,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-df50b4d1a515cc24"
@@ -11122,7 +11122,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-df50b4d1a515cc24"
@@ -11135,7 +11135,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-df50b4d1a515cc24"
@@ -11148,7 +11148,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11159,7 +11159,7 @@
       "kind": "variant",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11170,7 +11170,7 @@
       "kind": "field",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11181,7 +11181,7 @@
       "kind": "variant",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11192,7 +11192,7 @@
       "kind": "field",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11203,7 +11203,7 @@
       "kind": "variant",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11214,7 +11214,7 @@
       "kind": "field",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11225,7 +11225,7 @@
       "kind": "variant",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0510707a5083e9c0",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -11236,7 +11236,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-afb09b5b8358bc2b",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-df50b4d1a515cc24"
@@ -11249,7 +11249,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-964563f6b9d0fe24",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-df50b4d1a515cc24"
@@ -11262,7 +11262,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-ba789f42fd2e64cd",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-df50b4d1a515cc24"
@@ -11275,7 +11275,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-b6ba51493b84645e",
+      "correctness_case_id": "cq-evidence-qualification-67684d9d50a82c67",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-df50b4d1a515cc24"
@@ -12011,7 +12011,7 @@
       "kind": "struct",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-5f61ceff01ead16a",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -12022,7 +12022,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-5f61ceff01ead16a",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12035,7 +12035,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-5f61ceff01ead16a",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -12046,7 +12046,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-5f61ceff01ead16a",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12059,7 +12059,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-5f61ceff01ead16a",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-86eac8a8048fdf10"
@@ -12072,7 +12072,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-5f61ceff01ead16a",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12085,7 +12085,7 @@
       "kind": "trait-impl",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-5f61ceff01ead16a",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
@@ -12096,7 +12096,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0dac54280b74bebb",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12109,7 +12109,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-fa224b176d098ea9",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12122,7 +12122,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-d1d7d96b6bc59ea7",
+      "correctness_case_id": "cq-evidence-qualification-66d745cb68dfb5b9",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12135,7 +12135,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-cbefe5e5b95fe604",
+      "correctness_case_id": "cq-evidence-qualification-059d303438c3f849",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12148,7 +12148,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-1edf33bc17566272",
+      "correctness_case_id": "cq-evidence-qualification-059d303438c3f849",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12161,7 +12161,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-82e922632b22447a",
+      "correctness_case_id": "cq-evidence-qualification-059d303438c3f849",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12174,7 +12174,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-44a6b8451c4c5e65",
+      "correctness_case_id": "cq-evidence-qualification-66d745cb68dfb5b9",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12187,7 +12187,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-6e1eb022f9629bb3",
+      "correctness_case_id": "cq-evidence-qualification-66d745cb68dfb5b9",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12200,7 +12200,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-fa3767fca4bca77b",
+      "correctness_case_id": "cq-evidence-qualification-059d303438c3f849",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12213,7 +12213,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-e7c7554eb8329195",
+      "correctness_case_id": "cq-evidence-qualification-459deaaad2f535c2",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-04662b5f4b0a412f"
@@ -12226,7 +12226,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0c4a702607a3d9e9",
+      "correctness_case_id": "cq-evidence-qualification-0908c21b917526e3",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12239,7 +12239,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-c387f5084243aa32",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12252,7 +12252,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-7a3318c3c2100a92",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12265,7 +12265,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-e61f2a812f37007e",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12278,7 +12278,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f0495418d9f9cabb",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12291,7 +12291,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-f67f9327b069ed8c",
+      "correctness_case_id": "cq-evidence-qualification-459deaaad2f535c2",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-04662b5f4b0a412f"
@@ -12304,7 +12304,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-1592bdad08050b88",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12317,7 +12317,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-6f04c5b5b54db5bd",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12330,7 +12330,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-a47fe4b75248ecc0",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12343,7 +12343,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-1a2f96ef640e5c29",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12356,7 +12356,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-0d9e368c7a09c22e",
+      "correctness_case_id": "cq-evidence-qualification-32f10fbc68a55fe8",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12369,7 +12369,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-78b9c2075916c79d",
+      "correctness_case_id": "cq-evidence-qualification-c59c6eb734c2fd26",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-04662b5f4b0a412f"
@@ -12382,7 +12382,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-7055ac9b342ca97f",
+      "correctness_case_id": "cq-evidence-qualification-0908c21b917526e3",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-86eac8a8048fdf10"
@@ -12395,7 +12395,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-77125a31270adc84",
+      "correctness_case_id": "cq-evidence-qualification-059d303438c3f849",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-db06439f597db9cc"
@@ -12408,7 +12408,7 @@
       "kind": "method",
       "performance_feature": "PERF-DEM-MODEL",
       "supporting_performance_features": [],
-      "correctness_case_id": "cq-evidence-api-b0f4f23975763c69",
+      "correctness_case_id": "cq-evidence-qualification-c59c6eb734c2fd26",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
         "PERFQ-API-04662b5f4b0a412f"
@@ -29768,10 +29768,8 @@
       "phase": "transform",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-78b9c2075916c79d",
-        "cq-evidence-api-b0f4f23975763c69",
-        "cq-evidence-api-e7c7554eb8329195",
-        "cq-evidence-api-f67f9327b069ed8c"
+        "cq-evidence-qualification-459deaaad2f535c2",
+        "cq-evidence-qualification-c59c6eb734c2fd26"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -29928,9 +29926,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-016da54482a5f171",
-        "cq-evidence-api-702ef5725482f3b3",
-        "cq-evidence-api-ed37e38df5c01d72"
+        "cq-evidence-qualification-32f10fbc68a55fe8"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -31529,7 +31525,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-2be599c519f3f0db"
+        "cq-evidence-qualification-cb53089d317a4eab"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -32264,7 +32260,7 @@
       "phase": "transform",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-c1ee5c8344151be9"
+        "cq-evidence-qualification-459deaaad2f535c2"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -33963,17 +33959,8 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-3ac847317331a8c9",
-        "cq-evidence-api-3e17e10bbe570861",
-        "cq-evidence-api-513fc8c4d692b56b",
-        "cq-evidence-api-52318f537aec5f65",
-        "cq-evidence-api-6a0b6c664fbf2da6",
-        "cq-evidence-api-6e4495e4e5d945c7",
-        "cq-evidence-api-75474e4c8aaa3c02",
-        "cq-evidence-api-972c4d9dd802eb5e",
-        "cq-evidence-api-a11a2918d3c0d4d6",
-        "cq-evidence-api-addc076fa226fc8e",
-        "cq-evidence-api-b869f1b4af76a952"
+        "cq-evidence-qualification-b011a360db96ca78",
+        "cq-evidence-qualification-cb53089d317a4eab"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -34730,9 +34717,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-4c9797b7903ed187",
-        "cq-evidence-api-5cfc8e3b4d90ab33",
-        "cq-evidence-api-d8c4808dde55a79a"
+        "cq-evidence-qualification-67684d9d50a82c67"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -39168,11 +39153,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-0920259b42f96b21",
-        "cq-evidence-api-197d994fb41e8304",
-        "cq-evidence-api-728319649b13f9e8",
-        "cq-evidence-api-9255d234ac38c735",
-        "cq-evidence-api-b84b62ba36323151"
+        "cq-evidence-qualification-32f10fbc68a55fe8"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -40224,8 +40205,8 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-5f61ceff01ead16a",
-        "cq-evidence-api-7055ac9b342ca97f"
+        "cq-evidence-qualification-0908c21b917526e3",
+        "cq-evidence-qualification-32f10fbc68a55fe8"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -46290,27 +46271,10 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-0c4a702607a3d9e9",
-        "cq-evidence-api-0d9e368c7a09c22e",
-        "cq-evidence-api-0dac54280b74bebb",
-        "cq-evidence-api-1592bdad08050b88",
-        "cq-evidence-api-1a2f96ef640e5c29",
-        "cq-evidence-api-1edf33bc17566272",
-        "cq-evidence-api-44a6b8451c4c5e65",
-        "cq-evidence-api-5f61ceff01ead16a",
-        "cq-evidence-api-6e1eb022f9629bb3",
-        "cq-evidence-api-6f04c5b5b54db5bd",
-        "cq-evidence-api-77125a31270adc84",
-        "cq-evidence-api-7a3318c3c2100a92",
-        "cq-evidence-api-82e922632b22447a",
-        "cq-evidence-api-a47fe4b75248ecc0",
-        "cq-evidence-api-c387f5084243aa32",
-        "cq-evidence-api-cbefe5e5b95fe604",
-        "cq-evidence-api-d1d7d96b6bc59ea7",
-        "cq-evidence-api-e61f2a812f37007e",
-        "cq-evidence-api-f0495418d9f9cabb",
-        "cq-evidence-api-fa224b176d098ea9",
-        "cq-evidence-api-fa3767fca4bca77b"
+        "cq-evidence-qualification-059d303438c3f849",
+        "cq-evidence-qualification-0908c21b917526e3",
+        "cq-evidence-qualification-32f10fbc68a55fe8",
+        "cq-evidence-qualification-66d745cb68dfb5b9"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -47027,11 +46991,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-0510707a5083e9c0",
-        "cq-evidence-api-964563f6b9d0fe24",
-        "cq-evidence-api-afb09b5b8358bc2b",
-        "cq-evidence-api-b6ba51493b84645e",
-        "cq-evidence-api-ba789f42fd2e64cd"
+        "cq-evidence-qualification-67684d9d50a82c67"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -49543,7 +49503,7 @@
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-0510707a5083e9c0"
+        "cq-evidence-qualification-67684d9d50a82c67"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,
@@ -49626,9 +49586,7 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-api-14eea35f4db4d952",
-        "cq-evidence-api-8950fa971f61b518",
-        "cq-evidence-api-a05602c78b510c81"
+        "cq-evidence-qualification-67684d9d50a82c67"
       ],
       "correctness_binding": "exact-api-owners",
       "planned_correctness_case_id": null,

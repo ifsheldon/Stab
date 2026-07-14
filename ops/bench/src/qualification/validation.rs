@@ -22,7 +22,7 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "1152e9fa36d55c8a5a2282638fbc8ad79a39e7b4456161fba868a15c45cfb16e";
+const CORRECTNESS_DIGEST: &str = "cd82f99bd3f02446187b55c873e396e08c234f86693ba5f5734882fbe4814b56";
 const EXPECTED_CHECKLIST_ROWS: usize = 126;
 const EXPECTED_PUBLIC_API_ITEMS: usize = 1_922;
 const EXPECTED_MANIFEST_ROWS: usize = 161;

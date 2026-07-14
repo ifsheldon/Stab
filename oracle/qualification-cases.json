@@ -4,6 +4,942 @@
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "cases": [
     {
+      "id": "cq2-dem-target-value-and-parse-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_target_value_and_parse_contract_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A fixed corpus proves typed detector and observable limits, target construction, value semantics, canonical text, standalone parsing, and the explicit numeric shift-target boundary."
+      },
+      "negative_axes": [
+        "malformed-target",
+        "detector-id-overflow",
+        "observable-id-overflow",
+        "standalone-numeric-target"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/dem/dem_instruction.test.cc",
+          "symbol": "dem_instruction.from_str"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "dem_target.general"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_target_pybind_test.py",
+          "symbol": "test_equality"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_target_pybind_test.py",
+          "symbol": "test_str"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_target_pybind_test.py",
+          "symbol": "test_properties"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_target_pybind_test.py",
+          "symbol": "test_static_constructors"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_target_pybind_test.py",
+          "symbol": "test_init"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemDetectorId"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemDetectorId::try_new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemDetectorId::get"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemObservableId"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemObservableId::try_new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemObservableId::get"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemTarget"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemTarget::relative_detector"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemTarget::logical_observable"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemTarget::separator"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemTarget::numeric"
+        }
+      ]
+    },
+    {
+      "id": "cq2-dem-instruction-value-validation-print-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_instruction_value_validation_and_print_contract_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Fixed-size instructions prove every selected kind, constructor, accessor, value contract, canonical rendering, tag, probability, coordinate, target-role, separator, and exact-target-count rule."
+      },
+      "negative_axes": [
+        "invalid-probability",
+        "invalid-argument-count",
+        "invalid-target-role",
+        "invalid-target-count",
+        "invalid-separator-placement",
+        "non-finite-coordinate"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/dem/dem_instruction_pybind_test.py",
+          "symbol": "test_equality"
+        },
+        {
+          "path": "src/stim/dem/dem_instruction_pybind_test.py",
+          "symbol": "test_validation"
+        },
+        {
+          "path": "src/stim/dem/dem_instruction_pybind_test.py",
+          "symbol": "test_str"
+        },
+        {
+          "path": "src/stim/dem/dem_instruction_pybind_test.py",
+          "symbol": "test_tag"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.append_shift_detectors_instruction"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.append_detector_instruction"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.append_logical_observable_instruction"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.append_error_instruction"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstructionKind"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstruction"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstruction::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstruction::error"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstruction::detector"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstruction::logical_observable"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstruction::shift_detectors"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstruction::kind"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstruction::args"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstruction::targets"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstruction::tag"
+        }
+      ]
+    },
+    {
+      "id": "cq2-dem-instruction-target-groups",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_instruction_target_groups_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "not-applicable",
+        "detail": "Fixed-size empty, single, and separator-delimited target lists prove grouping semantics without a resource claim."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/dem/dem_instruction.test.cc",
+          "symbol": "dem_instruction.for_separated_targets"
+        },
+        {
+          "path": "src/stim/dem/dem_instruction_pybind_test.py",
+          "symbol": "test_target_groups"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemInstruction::target_groups"
+        }
+      ]
+    },
+    {
+      "id": "cq2-dem-model-parse-print-tag-newline-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_model_parse_print_tag_and_newline_contract_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A fixed corpus proves comments, case normalization, whitespace, CRLF input, tags, escaped tags, repeats, every instruction kind, canonical printing, parse-print-parse equality, and representative malformed syntax."
+      },
+      "negative_axes": [
+        "unknown-instruction",
+        "missing-probability",
+        "raw-numeric-error-target",
+        "invalid-repeat-count",
+        "unterminated-tag",
+        "unmatched-brace"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.round_trip_str"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.parse"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.parse_tag"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.parse_windows_newlines"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::from_dem_str"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::to_dem_string"
+        }
+      ]
+    },
+    {
+      "id": "cq2-dem-model-value-mutation-repeat-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_model_value_mutation_and_repeat_contract_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A three-item model proves default and explicit construction, value semantics, instruction and repeat insertion, item access and ranges, atomic text append, clear, repeat accessors, and canonical rendering."
+      },
+      "negative_axes": [
+        "non-atomic-append",
+        "repeat-in-instruction-range"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.init_equality"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.append_block"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_pybind_test.py",
+          "symbol": "test_equality"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_repeat_block_pybind_test.py",
+          "symbol": "test_init_vs_properties"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_repeat_block_pybind_test.py",
+          "symbol": "test_equality"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::items"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::push_instruction"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::push_repeat_block"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::append_from_dem_text"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::len"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::is_empty"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::clear"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::iter_items"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::item_range"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::instruction_range"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemItem"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemItem::as_instruction"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemItem::as_repeat_block"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemRepeatBlock"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemRepeatBlock::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemRepeatBlock::repeat_count"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemRepeatBlock::body"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemRepeatBlock::tag"
+        }
+      ]
+    },
+    {
+      "id": "cq2-dem-counts-and-shifts-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_counts_and_shift_contract_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A compact repeated model proves detector shift, detector count, observable count, error count, coordinate shift, and checked detector-shift overflow without flattening."
+      },
+      "negative_axes": [
+        "detector-shift-overflow"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.total_detector_shift"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.count_detectors"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.count_observables"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.final_detector_and_coord_shift"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_pybind_test.py",
+          "symbol": "test_count_errors"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::total_detector_shift"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::count_detectors"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::count_observables"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::count_errors"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::final_coordinate_shift"
+        }
+      ]
+    },
+    {
+      "id": "cq2-dem-coordinate-query-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_coordinate_query_contract_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A fixed repeated model proves all-detector, selected-detector, and single-detector coordinate queries plus shifted coordinate accumulation and out-of-range rejection."
+      },
+      "negative_axes": [
+        "out-of-range-detector"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.get_detector_coordinates_nested_loops"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.get_detector_coordinates_trivial"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::detector_coordinates"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::detector_coordinates_for"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::coordinates_of_detector"
+        }
+      ]
+    },
+    {
+      "id": "cq2-dem-generated-coordinate-resource-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--features",
+          "ops-contracts",
+          "--test",
+          "dem_api",
+          "pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The generated distance-five, seven-round surface-code case proves folded DEM coordinates terminate and exactly match independently queried circuit coordinates."
+      },
+      "negative_axes": [
+        "folded-coordinate-nontermination"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.surface_code_coords_dont_infinite_loop"
+        }
+      ]
+    },
+    {
+      "id": "cq2-dem-flattened-iteration-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_flattened_iteration_contract_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A small repeated model proves adjusted detector and coordinate shifts for lazy and materialized flattening; a trillion-repeat model proves bounded lazy prefixes while materialized expansion fails closed."
+      },
+      "negative_axes": [
+        "materialized-repeat-expansion-limit"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.iter_flatten_error_instructions"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.flattened"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_pybind_test.py",
+          "symbol": "test_flattened"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DemFlattenedInstructionIter"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::iter_flattened_instructions"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::flattened"
+        }
+      ]
+    },
+    {
+      "id": "cq2-dem-compact-transform-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_compact_transform_contract_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A compact nested model proves probability-only rounding, zero retention, recursive tag removal, repeat preservation, and source immutability."
+      },
+      "negative_axes": [
+        "round-to-zero-probability",
+        "nested-tag-removal"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/dem/detector_error_model.test.cc",
+          "symbol": "detector_error_model.rounded"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_pybind_test.py",
+          "symbol": "test_rounded"
+        },
+        {
+          "path": "src/stim/dem/detector_error_model_pybind_test.py",
+          "symbol": "test_without_tags"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::rounded"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::DetectorErrorModel::without_tags"
+        }
+      ]
+    },
+    {
+      "id": "cq2-dem-imported-model-source-matrix",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_model_source_matrix_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "One exact structural selector binds the imported basic, repeat, and selected Rust model API rows to the independently owned model value and mutation contract."
+      },
+      "negative_axes": [
+        "non-atomic-append",
+        "repeat-in-instruction-range"
+      ],
+      "oracle_fixture_owners": [
+        "coverage-py-dem-repeat",
+        "pf1-dem-rust-api",
+        "pf1-dem-basic-rust-api"
+      ]
+    },
+    {
+      "id": "cq2-dem-imported-generated-coordinate-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--features",
+          "ops-contracts",
+          "--test",
+          "dem_api",
+          "cq2_dem_generated_coordinate_fixture_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact structural selector binds the imported generated surface-code coordinate row while the independent canonical parent owns the upstream nontermination regression."
+      },
+      "negative_axes": [
+        "folded-coordinate-nontermination"
+      ],
+      "oracle_fixture_owners": [
+        "pf6-analyzer-generated-fold-loop-coordinates-rust"
+      ]
+    },
+    {
+      "id": "cq2-dem-imported-instruction-source-matrix",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_instruction_source_matrix_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "One exact aggregate selector binds the imported C++ and Python DEM-instruction fixture rows to the independently owned target, validation, print, and grouping contracts."
+      },
+      "negative_axes": [
+        "malformed-target",
+        "invalid-instruction",
+        "invalid-target-group"
+      ],
+      "oracle_fixture_owners": [
+        "coverage-dem-dem-instruction",
+        "coverage-py-dem-instruction"
+      ]
+    },
+    {
+      "id": "cq2-dem-imported-count-coordinate-matrix",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "dem_api",
+          "pf1_dem_counts_errors_and_coordinates_through_repeats",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact imported PF1 selector proves repeated error counting plus all, selected, and single-detector coordinate queries with empty defaults and out-of-range rejection."
+      },
+      "negative_axes": [
+        "out-of-range-detector"
+      ],
+      "oracle_fixture_owners": [
+        "pf1-dem-counts-coordinates"
+      ]
+    },
+    {
+      "id": "cq2-dem-imported-materialized-transform-matrix",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_materialized_transform_matrix_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "One exact aggregate selector binds the imported transform row to independent flattening, rounding, zero-retention, tag-removal, repeat-preservation, and expansion-limit contracts."
+      },
+      "negative_axes": [
+        "materialized-repeat-expansion-limit",
+        "round-to-zero-probability"
+      ],
+      "oracle_fixture_owners": [
+        "pf4-dem-materialized-transforms-rust"
+      ]
+    },
+    {
+      "id": "cq2-dem-imported-validation-matrix",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_dem_format",
+          "cq2_dem_validation_matrix_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "One exact aggregate selector binds the imported validation row to typed-id, target, instruction, parser, repeat, tag, and non-finite-coordinate rejection contracts."
+      },
+      "negative_axes": [
+        "typed-id-overflow",
+        "malformed-target",
+        "invalid-instruction",
+        "malformed-model"
+      ],
+      "oracle_fixture_owners": [
+        "pf4-dem-validation-negative-rust"
+      ]
+    },
+    {
+      "id": "cq2-dem-imported-coordinate-resource-contract",
+      "feature_id": "CQ-DEM-FORMAT",
+      "comparator": "structural",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "dem_api",
+          "pf4_dem_coordinates_reject_huge_all_map_but_allow_selected_queries",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact imported resource selector proves a full coordinate map rejects more than one million materialized detectors while selected and single-detector queries fold through the same repeat."
+      },
+      "negative_axes": [
+        "full-coordinate-map-materialization-limit"
+      ],
+      "oracle_fixture_owners": [
+        "pf4-dem-coordinate-resource-rust"
+      ]
+    },
+    {
       "id": "cq2-stim-format-canonical-round-trip",
       "feature_id": "CQ-STIM-FORMAT",
       "comparator": "canonical",

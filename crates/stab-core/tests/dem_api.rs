@@ -681,6 +681,11 @@ fn pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit() {
 }
 
 #[test]
+fn cq2_dem_generated_coordinate_fixture_matches_stim() {
+    pf6_dem_generated_surface_code_fold_loop_coordinates_match_circuit();
+}
+
+#[test]
 fn pf4_dem_coordinates_fold_nested_sparse_repeat_without_candidate_cap() {
     let dem = DetectorErrorModel::from_dem_str(
         "repeat 4000000 {\n\

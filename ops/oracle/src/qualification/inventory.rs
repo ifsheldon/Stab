@@ -824,6 +824,11 @@ fn oracle_feature_override(id: &str) -> Option<FeatureId> {
 
 fn supporting_only_oracle_fixture(id: &str) -> Option<(FeatureId, &'static str, &'static str)> {
     match id {
+        "pf4-dem-folded-traversal" => Some((
+            FeatureId::DemFormat,
+            "pfm4-traversal-counts",
+            "The broad folded-traversal filter is aggregation provenance only; independently selectable child cases own counts, coordinates, transforms, sampling, search, SAT, and ErrorMatcher contracts.",
+        )),
         "pf5-detecting-regions-clifford-rust" => Some((
             FeatureId::FlowUtils,
             "pfm5-detecting-regions-simple",

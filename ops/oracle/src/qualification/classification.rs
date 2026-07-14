@@ -492,13 +492,67 @@ fn circuit_case_has_stim_format_contract(symbol: &str) -> bool {
 }
 
 fn classify_dem(value: &str, symbol: &str) -> UpstreamClassification {
-    if value.ends_with("detector_error_model_pybind_test.py")
-        && symbol.to_ascii_lowercase().contains("shortest_graphlike")
+    let leaf = symbol
+        .rsplit('.')
+        .next()
+        .unwrap_or(symbol)
+        .to_ascii_lowercase();
+
+    if value.ends_with("detector_error_model_pybind_test.py") && leaf.contains("shortest_graphlike")
     {
-        UpstreamClassification::selected_many([FeatureId::DemFormat, FeatureId::Search])
-    } else {
-        UpstreamClassification::selected(FeatureId::DemFormat)
+        return UpstreamClassification::selected(FeatureId::Search);
     }
+
+    let binding_only_python_case = if value.ends_with("dem_instruction_pybind_test.py") {
+        matches!(
+            leaf.as_str(),
+            "test_args_copy" | "test_targets_copy" | "test_init_from_str"
+        )
+    } else if value.ends_with("detector_error_model_pybind_test.py") {
+        matches!(
+            leaf.as_str(),
+            "test_init_get"
+                | "test_approx_equals"
+                | "test_append"
+                | "test_append_bad"
+                | "test_coords"
+                | "test_dem_from_file"
+                | "test_dem_to_file"
+                | "test_append_dem_to_dem"
+                | "test_init_parse"
+        )
+    } else {
+        false
+    };
+    let deferred_convenience_case = value.ends_with("detector_error_model.test.cc")
+        && matches!(
+            leaf.as_str(),
+            "from_file" | "py_get_slice" | "mul" | "imul" | "add" | "iadd"
+        );
+    if binding_only_python_case || deferred_convenience_case {
+        return UpstreamClassification::deferred_for(
+            [FeatureId::DemFormat],
+            DeferredProduct::PythonBindings,
+            "Python-style DEM copying, indexing, operators, overloaded append, and file helpers are deferred with Python bindings; selected Rust APIs own their semantic contracts independently.",
+        );
+    }
+
+    if value.ends_with("detector_error_model.test.cc") && leaf == "movement" {
+        return UpstreamClassification::not_applicable(
+            "C++ moved-from object state has no Rust value-semantic compatibility contract.",
+        );
+    }
+
+    if value.ends_with("detector_error_model.test.cc")
+        && leaf == "general"
+        && symbol.to_ascii_lowercase().starts_with("dem_instruction.")
+    {
+        return UpstreamClassification::not_applicable(
+            "This mixed C++ utility case includes DemInstruction::approx_equals, which is not part of the selected Rust API; exact Rust instruction equality, validation, and canonical printing have independent API and semantic owners.",
+        );
+    }
+
+    UpstreamClassification::selected(FeatureId::DemFormat)
 }
 
 fn classify_simulator(value: &str) -> UpstreamClassification {
@@ -741,6 +795,74 @@ mod tests {
         let gate_target_path = Path::new("src/stim/circuit/gate_target_pybind_test.py");
         let gate_target_value = classify_upstream_case(gate_target_path, "test_init_and_equality");
         assert_eq!(gate_target_value.feature_ids, vec![FeatureId::GateContract]);
+    }
+
+    #[test]
+    fn classifications_split_dem_binding_search_and_value_cases_by_exact_symbol() {
+        let model_python = Path::new("src/stim/dem/detector_error_model_pybind_test.py");
+        let search = classify_upstream_case(model_python, "test_shortest_graphlike_error_line");
+        assert_eq!(search.feature_ids, vec![FeatureId::Search]);
+        assert_eq!(search.disposition, UpstreamDisposition::SemanticMining);
+
+        let binding_append = classify_upstream_case(model_python, "test_append_bad");
+        assert_eq!(
+            binding_append.disposition,
+            UpstreamDisposition::DeferredProduct
+        );
+        assert_eq!(
+            binding_append.deferred_product,
+            Some(DeferredProduct::PythonBindings)
+        );
+        assert_eq!(binding_append.feature_ids, vec![FeatureId::DemFormat]);
+
+        let shared_transform = classify_upstream_case(model_python, "test_rounded");
+        assert_eq!(
+            shared_transform.disposition,
+            UpstreamDisposition::SemanticMining
+        );
+        assert_eq!(shared_transform.feature_ids, vec![FeatureId::DemFormat]);
+
+        let binding_coordinate_shapes = classify_upstream_case(model_python, "test_coords");
+        assert_eq!(
+            binding_coordinate_shapes.disposition,
+            UpstreamDisposition::DeferredProduct
+        );
+        assert_eq!(
+            binding_coordinate_shapes.deferred_product,
+            Some(DeferredProduct::PythonBindings)
+        );
+
+        let instruction_python = Path::new("src/stim/dem/dem_instruction_pybind_test.py");
+        let copied_args = classify_upstream_case(instruction_python, "test_args_copy");
+        assert_eq!(
+            copied_args.disposition,
+            UpstreamDisposition::DeferredProduct
+        );
+        let instruction_validation = classify_upstream_case(instruction_python, "test_validation");
+        assert_eq!(
+            instruction_validation.disposition,
+            UpstreamDisposition::SemanticMining
+        );
+
+        let model_cpp = Path::new("src/stim/dem/detector_error_model.test.cc");
+        let operator = classify_upstream_case(model_cpp, "detector_error_model.mul");
+        assert_eq!(operator.disposition, UpstreamDisposition::DeferredProduct);
+        assert_eq!(operator.feature_ids, vec![FeatureId::DemFormat]);
+
+        let moved_from = classify_upstream_case(model_cpp, "detector_error_model.movement");
+        assert_eq!(moved_from.disposition, UpstreamDisposition::NotApplicable);
+        assert!(moved_from.feature_ids.is_empty());
+
+        let mixed_instruction = classify_upstream_case(model_cpp, "dem_instruction.general");
+        assert_eq!(
+            mixed_instruction.disposition,
+            UpstreamDisposition::NotApplicable
+        );
+        assert!(mixed_instruction.feature_ids.is_empty());
+
+        let parser = classify_upstream_case(model_cpp, "detector_error_model.parse");
+        assert_eq!(parser.disposition, UpstreamDisposition::SemanticMining);
+        assert_eq!(parser.feature_ids, vec![FeatureId::DemFormat]);
     }
 
     #[test]

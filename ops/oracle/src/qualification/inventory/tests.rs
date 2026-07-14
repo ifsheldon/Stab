@@ -136,4 +136,81 @@ fn every_implemented_oracle_fixture_has_primary_or_supporting_ownership() {
         .find(|item| item.path.as_str() == "stab_core::Circuit::from_stim_str")
         .expect("from_stim_str API item");
     assert_eq!(from_stim_str.owner_case_id, canonical.id);
+
+    let dem_qualification_cases = manifest
+        .evidence_cases
+        .iter()
+        .filter(|case| case.provenance == EvidenceProvenance::QualificationPlan)
+        .filter(|case| case.source_id.starts_with("cq2-dem-"))
+        .collect::<Vec<_>>();
+    assert_eq!(dem_qualification_cases.len(), 17);
+    assert!(
+        dem_qualification_cases
+            .iter()
+            .all(|case| case.status == EvidenceStatus::Implemented)
+    );
+    assert!(
+        manifest
+            .evidence_cases
+            .iter()
+            .filter(|case| case.feature_id == FeatureId::DemFormat)
+            .all(|case| case.status == EvidenceStatus::Implemented)
+    );
+
+    let target_parent = dem_qualification_cases
+        .iter()
+        .find(|case| case.source_id == "cq2-dem-target-value-and-parse-contract")
+        .expect("DEM target qualification parent");
+    let dem_target = manifest
+        .public_api_items
+        .iter()
+        .find(|item| item.path.as_str() == "stab_core::DemTarget")
+        .expect("DemTarget API item");
+    assert_eq!(dem_target.owner_case_id, target_parent.id);
+    let target_parser = manifest
+        .upstream_cases
+        .iter()
+        .find(|case| {
+            case.path.as_path() == Path::new("src/stim/dem/dem_instruction.test.cc")
+                && case.symbol == "dem_instruction.from_str"
+        })
+        .expect("DEM target parser upstream case");
+    assert_eq!(
+        target_parser
+            .ownerships
+            .iter()
+            .find(|owner| owner.feature_id == FeatureId::DemFormat)
+            .expect("DEM ownership")
+            .owner_case_id,
+        target_parent.id
+    );
+
+    let model_fixture_parent = dem_qualification_cases
+        .iter()
+        .find(|case| case.source_id == "cq2-dem-imported-model-source-matrix")
+        .expect("imported DEM model parent");
+    let model_fixture_ids = model_fixture_parent
+        .supporting_selectors
+        .iter()
+        .filter(|selector| selector.kind == SelectorKind::OracleFixture)
+        .flat_map(|selector| selector.value.iter().map(String::as_str))
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        model_fixture_ids,
+        BTreeSet::from([
+            "coverage-py-dem-repeat",
+            "pf1-dem-basic-rust-api",
+            "pf1-dem-rust-api",
+        ])
+    );
+
+    let traversal_owner = manifest
+        .evidence_cases
+        .iter()
+        .find(|case| case.source_id == "pfm4-traversal-counts")
+        .expect("folded traversal source owner");
+    assert!(traversal_owner.supporting_selectors.iter().any(|selector| {
+        selector.kind == SelectorKind::OracleFixture
+            && selector.value.as_slice() == ["pf4-dem-folded-traversal"]
+    }));
 }
