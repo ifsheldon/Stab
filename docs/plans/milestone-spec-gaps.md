@@ -23,6 +23,15 @@ None.
 
 ## Resolved Entries
 
+## 2026-07-14 - CQ2: Exact Parent Mapping Ownership
+
+Status: Resolved
+Revealed by: CQ2 inventory audit before deterministic format implementation.
+Current text: CQ2 required every deterministic upstream case and exported API item to have an exact selector or parent-contract mapping, but CQ0 generated one planned evidence owner per source anchor and provided promotion paths only through blocker-ledger and oracle-fixture records.
+Gap: The plan did not define a source-owned, reviewable way to map several exact upstream or public-API owners onto one independently selectable Rust test, nor did it require validation against stale owners, duplicate claims, cross-feature claims, comparator mismatches, broad selectors, or reused terminal primaries. Implementing thousands of wrapper tests would obscure contracts, while silently deleting generated owners would make the inventory unauditable.
+Proposed amendment: Add a bounded exact-parent ledger whose entries name every claimed source owner, one feature and comparator, and one exact primary selector; require deterministic generation to replace only matching planned owners and fail closed on stale, duplicated, cross-domain, comparator-mismatched, or shared-primary mappings.
+Resolution: `oracle/qualification-cases.json` and its validator now own this contract, the CQ2 plan requires semantic review and focused test splitting before promotion, and the first `.stim`-format slice maps 41 exact owners onto 19 exact parents. A duplicate selector and an under-proven typed-offset mapping were caught and corrected during the first use of the mechanism.
+
 ## 2026-07-14 - PQ1: Legacy M12 Backward Compatibility
 
 Status: Resolved

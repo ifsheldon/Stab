@@ -1,5 +1,7 @@
 # PQ1 Paired Performance Harness Progress Report
 
+> Current-evidence note, 2026-07-14: the first CQ2 exact-parent mapping refresh changes the correctness inventory digest to `5d1fc9d21e511e13bef5ceb476dbcf9dd20ed067339edd2891013992fb06ced5` and the dependent performance inventory digest to `a7177e298b5e1f05979b871704514fdf2650070a7c48e5d72c6fb48bb80d13bf`. The schema-version-13 runs below remain valid historical PQ1 harness acceptance, but they are not current promotable evidence until CQ1 and PQ1 PR, full, and soak tiers are rerun from a clean committed revision.
+
 ## Status
 
 PQ1 is complete as of 2026-07-14.
@@ -45,6 +47,8 @@ The audit maps every PQ1 task, test family, acceptance criterion, command, and e
 The GPT-5.6/max full-code-review lanes found evidence-trust, publication-race, worker-symmetry, timeout, host-override, toolchain-replay, inventory-binding, and runtime-dispatch issues.
 The final remediation is recorded in focused commits `8946e22`, `22898b4`, and `bfef511`.
 The post-fix review found no remaining confirmed PQ1 correctness, security, lifecycle, statistics, performance-fidelity, or documentation blocker.
+
+The CQ2 inventory refresh later exposed a post-spawn affinity race under parallel workspace tests: the child leader could be pinned after its test-harness worker already inherited the broad parent mask. The bounded process runner now pins the leader first, enumerates and pins at most 4,096 existing child tasks through `/proc/<pid>/task`, verifies a singleton mask, and fails after eight nonconvergent passes; a focused multithreaded child regression and the full parallel workspace suite pass. Because this changes runner behavior, the older clean PQ1 reports remain historical until the current-digest rerun described above.
 
 The audit also exposed one specification loophole: "existing M12 commands remain backward compatible" did not say whether inherited gate failures blocked PQ1.
 The performance plan now defines command compatibility as preserved parsing, execution, report shape, and unchanged source-owned gates; inherited product-row failures remain visible work for PQ2 through PQ6 and do not invalidate the independently scoped PQ1 diagnostic harness.

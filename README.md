@@ -111,7 +111,8 @@ just qualification::correctness-check
 just qualification::correctness-regenerate --check
 ```
 
-These commands validate or deterministically regenerate `oracle/qualification-manifest.json` from the pinned C++ and Python test tree, default-feature rustdoc JSON, and current implemented oracle rows.
+These commands validate or deterministically regenerate `oracle/qualification-manifest.json` from the pinned C++ and Python test tree, default-feature rustdoc JSON, current implemented oracle rows, and the reviewed exact-parent mappings in `oracle/qualification-cases.json`.
+The qualification-case ledger may bind several exact upstream or exported-API owners to one independently selectable test only when they share one feature and comparator and that test proves the complete parent contract; regeneration rejects stale, duplicate, cross-feature, comparator-mismatched, and shared-primary mappings.
 CQ1 correctness execution and report commands are implemented through:
 
 ```sh

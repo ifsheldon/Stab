@@ -304,6 +304,8 @@ Complete deterministic and property coverage for `CQ-STIM-FORMAT`, `CQ-DEM-FORMA
 
 ### Tasks
 
+- Maintain `oracle/qualification-cases.json` as the source-owned exact-parent ledger. Each entry must bind complete upstream anchors and exported-API owners to one independently selectable case with the same feature and comparator; validation must reject stale owners, duplicate claims, cross-feature claims, comparator mismatches, broad Cargo filters, and reused primary selectors.
+- Review parent mappings semantically instead of collapsing owners by file, module, or name similarity. Add or split focused tests whenever an existing selector does not exercise every mapped constructor, accessor, accepted value, rejection boundary, canonical output, or property named by the owners.
 - Port every relevant deterministic upstream subcase, splitting aggregated tests at distinct behavioral anchors.
 - Generate accepted result-format conversion matrices and explicit rejected matrices from typed format capabilities.
 - Add bounded parser and printer differential corpora covering empty, minimal, representative, nested, wide, sparse, tagged, shifted, malformed, and overflow shapes.
@@ -323,6 +325,7 @@ Complete deterministic and property coverage for `CQ-STIM-FORMAT`, `CQ-DEM-FORMA
 ### Acceptance Criteria
 
 - Every owned deterministic upstream case has an exact disposition and selector.
+- Every selected exported Rust API item has a direct exact case or a reviewed exact-parent mapping, and deterministic regeneration proves that no planned owner disappeared without such a mapping.
 - All accepted format pairs round trip and all rejected pairs fail with the owned error class.
 - Gate metadata and semantics have no unknown state.
 - Property corpora are deterministic and minimized regressions are persisted.

@@ -1,5 +1,7 @@
 # CQ1 Correctness Harness Progress Report
 
+> Current-evidence note, 2026-07-14: the first CQ2 exact-parent mapping refresh changes the correctness inventory digest to `5d1fc9d21e511e13bef5ceb476dbcf9dd20ed067339edd2891013992fb06ced5` and raises implemented-or-closed ownership from 410 to 429. The clean runs below remain valid historical CQ1 harness acceptance, but they are not current promotable case evidence until PR, full, and soak tiers are rerun from the committed refreshed inventory.
+
 ## Status
 
 CQ1 is complete as of 2026-07-14.

@@ -6,9 +6,9 @@ Completed: 2026-07-13.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Correctness dependency: corrected schema-version-3 CQ0 semantic digest `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`.
+Current correctness dependency after the first CQ2 exact-parent refresh: schema-version-3 CQ0 semantic digest `5d1fc9d21e511e13bef5ceb476dbcf9dd20ed067339edd2891013992fb06ced5`.
 
-Performance inventory digest after final CQ1 acceptance-status synchronization: `cc9f6cabfb9a3245d9c52000e82c8f1bec76aed605f3563d1a15244d327c3fbd`.
+Current performance inventory digest after dependent CQ2 regeneration: `a7177e298b5e1f05979b871704514fdf2650070a7c48e5d72c6fb48bb80d13bf`.
 
 Implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
@@ -16,6 +16,7 @@ Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca3258
 
 The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
+The first CQ2 exact-parent mapping refresh changed only correctness owner ids and acceptance state, so PQ0 was regenerated again without changing those performance classifications; clean PQ1 execution against the prior digest is now historical until rerun against the current inventories.
 
 PQ0 freezes inventory and migration decisions only.
 It does not claim that inherited timing ratios satisfy the comprehensive runner, preflight, scaling, memory, or statistical contract.
