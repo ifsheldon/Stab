@@ -991,6 +991,28 @@ fn pf1_circuit_detector_coords_reject_missing_detector_id() {
     assert!(error.to_string().contains("Detector index 1 is too big"));
 }
 
+#[test]
+fn cq2_stim_format_circuit_iterator_fixture_contract() {
+    pf1_circuit_iterators_top_level_range_views_are_typed();
+    pf1_circuit_iterators_flatten_nested_repeats_in_stim_order();
+}
+
+#[test]
+fn cq2_stim_format_circuit_insert_pop_fixture_contract() {
+    pf1_circuit_insert_pop_insert_instruction_fuses_boundaries();
+    pf1_circuit_insert_pop_insert_circuit_fuses_both_boundaries();
+    pf1_circuit_insert_pop_insert_repeat_block_and_reject_bad_index();
+    pf1_circuit_insert_pop_pop_item_removes_without_fusing_neighbors();
+}
+
+#[test]
+fn cq2_stim_format_circuit_detector_coordinate_fixture_contract() {
+    pf1_circuit_detector_coords_include_empty_and_shifted_coordinates();
+    pf1_circuit_detector_coords_fold_nested_repeat_queries();
+    pf1_circuit_detector_coords_skip_detector_free_repeat_shift();
+    pf1_circuit_detector_coords_reject_missing_detector_id();
+}
+
 fn detector(id: u64) -> CircuitDetectorId {
     CircuitDetectorId::new(id)
 }

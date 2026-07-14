@@ -451,6 +451,12 @@ fn convert_stim_reads_and_writes_paths() {
 }
 
 #[test]
+fn cq2_stim_format_convert_canonical_fixture_contract() {
+    convert_stim_from_stdin_to_canonical_output();
+    convert_stim_reads_and_writes_paths();
+}
+
+#[test]
 fn cli_rejects_unknown_arguments_like_arg_parse_test() {
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();

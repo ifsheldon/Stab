@@ -314,7 +314,13 @@ impl TargetRule {
                 validate_combiners(gate, targets)
             }
             Self::PauliList => validate_targets(gate, targets, |target| {
-                matches!(target, Target::Pauli { .. })
+                matches!(
+                    target,
+                    Target::Pauli {
+                        inverted: false,
+                        ..
+                    }
+                )
             }),
         }
     }

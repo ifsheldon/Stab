@@ -1148,6 +1148,15 @@ fn target_classification_matches_stim_gate_target() {
     assert_eq!(qubit.pauli_type(), None);
 }
 
+#[test]
+fn cq2_stim_format_gate_target_fixture_contract() {
+    parser_matches_stim_target_text_boundaries();
+    target_from_str_matches_stim_surface_forms();
+    target_typed_accessors_match_stim_gate_target_boundaries();
+    target_inversion_matches_stim_gate_target();
+    target_classification_matches_stim_gate_target();
+}
+
 trait CircuitItemExt {
     fn as_instruction(&self) -> Option<&stab_core::CircuitInstruction>;
     fn as_repeat_block(&self) -> Option<&stab_core::RepeatBlock>;
