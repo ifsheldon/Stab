@@ -22,6 +22,7 @@ The plans were written to prevent the specific failures recorded there: file-lev
 - Correctness execution and acceptance: `docs/plans/comprehensive-correctness-qualification-plan.md`.
 - Completed CQ1 harness evidence: `docs/plans/cq1-correctness-harness-progress-report.md`.
 - Performance execution and acceptance: `docs/plans/comprehensive-stim-performance-qualification-plan.md`.
+- Completed PQ1 harness evidence: `docs/plans/pq1-performance-harness-progress-report.md`.
 - Implemented and deferred feature boundary: `docs/stab-feature-checklist.md`.
 - Upstream feature inventory: `docs/stim-feature-list.md`.
 - Historical upstream test hierarchy: `docs/plans/stim-test-porting-plan.md`.
@@ -45,9 +46,9 @@ Do not expand product scope while building qualification infrastructure.
 
 ## Program Order
 
-Program checkpoint: CQ0 is complete at corrected correctness inventory digest `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`; PQ0 is dependency-regenerated after CQ1 acceptance at performance digest `cc9f6cabfb9a3245d9c52000e82c8f1bec76aed605f3563d1a15244d327c3fbd`; and CQ1 is complete with clean PR, full, and soak evidence from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`.
-The active milestone is PQ1: finish acceptance of the symmetric paired benchmark harness, pinned-Stim adapter, Stab worker, preflight, host policy, statistics, memory evidence, and report commands against CQ1's executable correctness dependencies.
-PQ1 implementation is present locally, including audit-driven parent work and digest binding, canonical adapter-receipt recomputation, private-index clean-revision auditing, and required thermal evidence. Earlier PR/full/soak reports predate those changes and are stale. PQ1 is not accepted until both thin probes, fresh clean PR/full/soak runs, independent report and regression validation, the completed milestone audit, and the GPT-5.6/max full code review all pass. Its `pq1-adapter-protocol-smoke` ratio is permanently diagnostic and must never be reported as product speed evidence.
+Program checkpoint: CQ0 is complete at corrected correctness inventory digest `b2909c677a66e2b034c8ab26e8dc1b2ad78e63900b2d83f938a8c4e725852141`; PQ0 is dependency-regenerated after CQ1 acceptance at performance digest `cc9f6cabfb9a3245d9c52000e82c8f1bec76aed605f3563d1a15244d327c3fbd`; CQ1 is complete with clean PR, full, and soak evidence from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; and PQ1 is complete with clean schema-version-13 PR, full, and soak evidence from revision `bfef511ccaa57c61cbe209c41d89d77ba8f52eee`.
+The active milestone is CQ2: qualify deterministic models, formats, gates, bit kernels, and stabilizer algebra at exact case and exported-API granularity before PQ2 times those surfaces.
+Keep PQ1's `pq1-adapter-protocol-smoke` ratio permanently diagnostic and never report it as product speed evidence.
 Do not reopen CQ0 or PQ0 inventory semantics unless pinned-source drift, a newly exported default-feature API, a stale referenced id, a changed checklist or benchmark source of truth, or a confirmed inventory defect changes a frozen digest.
 Do not treat PQ0's 15 retained rows as qualified evidence: all 159 active inherited rows still record missing correctness preflight and output-digest evidence, 58 CLI rows remain asymmetric, 73 rows lack a current comparator, 124 lack required scale families, and 21 select heterogeneous upstream measurements.
 
@@ -55,7 +56,7 @@ Execute the milestones in this dependency order:
 
 1. Complete CQ0 to freeze case-level correctness ids and upstream dispositions.
 2. Complete PQ0 using the frozen CQ0 feature and correctness ids.
-3. Keep completed CQ1 evidence valid and complete PQ1 to build the validated paired benchmark harness.
+3. Keep completed CQ1 and PQ1 evidence valid while adding product cases and runtime groups.
 4. Complete CQ2, then PQ2 for deterministic models, formats, gates, kernels, and algebra.
 5. Complete CQ3, then PQ3 for public CLI, generation, conversion, and startup.
 6. Complete CQ4, then PQ4 for sampling, detection, conversion, and DEM sampling.

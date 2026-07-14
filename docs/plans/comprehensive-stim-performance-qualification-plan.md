@@ -6,9 +6,9 @@ Planned: 2026-07-13.
 
 PQ0 completed: 2026-07-13, with source-owned evidence in [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md).
 
-PQ1 implementation in progress: 2026-07-14. The bounded process runner, independent process and adapter probes, symmetric protocol-smoke workers, calibration, paired statistics, correctness-preflight seam, host policy, process-memory evidence, atomic reports, and report-only regression dispatch are implemented. The milestone audit exposed missing parent work and digest binding plus missing thermal evidence; those contracts, canonical adapter-receipt recomputation, and private-index clean-revision auditing are now implemented locally. Earlier clean PR/full/soak reports predate this hardening and are not current evidence; fresh clean reports, completion of the milestone audit, and the GPT-5.6/max full code review remain required before PQ1 acceptance.
+PQ1 completed: 2026-07-14, with clean schema-version-13 PR, full, and soak evidence from commit `bfef511ccaa57c61cbe209c41d89d77ba8f52eee` recorded in [pq1-performance-harness-progress-report.md](pq1-performance-harness-progress-report.md). The bounded process runner, independent process and adapter probes, symmetric protocol-smoke workers, calibration, paired statistics, canonical CQ preflight reconstruction, host and current-toolchain policy, process-memory evidence, atomic reports, and report-only regression dispatch passed milestone audit and GPT-5.6/max review.
 
-PQ2 through PQ7 remain planned.
+PQ2 through PQ7 remain planned, and PQ2 waits for the exact CQ2 correctness prerequisites.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07` in `vendor/stim`.
 
@@ -411,6 +411,8 @@ Turn the checklist and current 161-row manifest into a finite, reviewable invent
 
 ## PQ1: Build The Paired Qualification Harness And Stim Adapter
 
+Completion evidence: [pq1-performance-harness-progress-report.md](pq1-performance-harness-progress-report.md) records the clean revision, final reports, pair counts, diagnostic ratios, commands, audit, review closure, and inherited M12 state.
+
 Implementation note: `pq1-adapter-protocol-smoke` is a synthetic diagnostic group used only to prove the harness. It cannot accept product correctness evidence, enter a threshold baseline, or support a Stab-versus-Stim product speed claim.
 
 Audit note: the parent must independently derive `iterations * work_items`, keep calibration probes work-bound and outside ratio evidence, perform semantic preflight at the exact common calibrated batch shape, bind every subsequent validation, warmup, sample, and memory receipt to that digest, and inspect the clean revision through a config-free private Git view tied to an exact captured commit. Offline validation must replay the calibration algorithm from raw measured and process-wall durations, bind wrapper and row iterations, enforce the exact workload and measurement identities for every phase, and reproduce repeated memory fields from raw invocation receipts. Both qualification workers must be rebuilt from materialized committed source in fresh private targets, bind canonical tool, argument, environment, input, fingerprint, and binary identities into reconstructable receipts, and execute from sealed copies. Controlled host evidence requires an exclusive full-run profile-and-CPU lease, stable thermal-zone identity and readings no higher than the profile limit whenever the platform exposes the required probes, and offline replay of the source-owned policy instead of trusting serialized `verified` or violation fields.
@@ -452,7 +454,8 @@ Make faithful comparison, calibration, statistics, and reporting reusable before
 - Synthetic 1.30x workloads fail the 1.25x gate without waiver support.
 - Deliberately mismatched work or output never produces a ratio.
 - Process CLI and adapter probes reproduce from one thin `just` command each.
-- `just bench::smoke` and existing M12 commands remain backward compatible.
+- `just bench::smoke` succeeds, and existing M12 commands preserve their parsing, execution, report shapes, threshold files, waiver files, and failure semantics.
+- Inherited M12 product-row failures do not fail PQ1 when the commands execute faithfully and leave those failures visible; PQ2 through PQ6 own replacing or graduating those rows with exact correctness prerequisites and equivalent-work evidence.
 
 ## PQ2: Qualify Models, Formats, Gates, Kernels, And Algebra
 

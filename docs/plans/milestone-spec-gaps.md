@@ -23,6 +23,15 @@ None.
 
 ## Resolved Entries
 
+## 2026-07-14 - PQ1: Legacy M12 Backward Compatibility
+
+Status: Resolved
+Revealed by: PQ1 milestone audit and fresh execution of the 89-row M12 beta, timing-regression, and memory-regression commands.
+Current text: PQ1 required `just bench::smoke` and existing M12 commands to remain backward compatible.
+Gap: The criterion did not distinguish command, schema, and gate compatibility from an expectation that every inherited product row must pass before the independent diagnostic harness could be accepted. Fresh evidence had six non-comparable timing blockers, four unconfigured timing rows, four missing memory baselines, and two memory failures even though PQ1 did not change their product runners or gates.
+Proposed amendment: Define PQ1 compatibility as preserved command parsing, execution, report shapes, threshold and waiver files, and failure semantics. Require inherited failures to remain visible and assign their replacement or graduation to PQ2 through PQ6 instead of treating them as either PQ1 harness defects or ignorable successes.
+Resolution: The PQ1 acceptance criteria and `docs/plans/pq1-performance-harness-progress-report.md` now define that boundary and record the exact 89-row outcomes. No inherited threshold, waiver, missing baseline, or memory failure was removed to make PQ1 pass.
+
 ## 2026-07-13 - CQ1: Executable Provenance And Build Isolation
 
 Status: Resolved
@@ -459,7 +468,7 @@ Revealed by: milestone audit of M12 memory-gate evidence.
 Current text: M12 says no primary workload may regress peak allocations or resident memory by more than 25 percent relative to the first complete Stab benchmark report.
 Gap: the previous memory gate tracked Stab-side allocation counts and maximum live allocated bytes, but it did not measure resident set size.
 Proposed amendment: either narrow the done criterion to allocation counts and maximum live allocated bytes, or add RSS measurement to the benchmark report and memory gate before M12 completion.
-Resolution: `stab-bench compare --track-allocations` now samples Stab-side resident memory with `memory-stats`, records both `resident_bytes` and `resident_delta_bytes` on measurements, promotes `stab_resident_bytes_max` and `stab_resident_delta_bytes_max` to compare rows, and `--require-memory-gate` requires allocation evidence plus the schema-selected resident-memory evidence. The historical M12 completion run passed with all 71 rows in `memory_gate_status=pass`, and the current post-beta `benchmarks/m12-primary-memory-baseline.json` uses schema version 2 with `stab_allocation_bytes_max`, `stab_resident_bytes_max`, and `stab_resident_delta_bytes_max` for the expanded 85-row primary matrix.
+Resolution: `stab-bench compare --track-allocations` now samples Stab-side resident memory with `memory-stats`, records both `resident_bytes` and `resident_delta_bytes` on measurements, promotes `stab_resident_bytes_max` and `stab_resident_delta_bytes_max` to compare rows, and `--require-memory-gate` requires allocation evidence plus the schema-selected resident-memory evidence. The historical M12 completion run passed with all 71 rows in `memory_gate_status=pass`, and the then-current post-beta `benchmarks/m12-primary-memory-baseline.json` used schema version 2 with `stab_allocation_bytes_max`, `stab_resident_bytes_max`, and `stab_resident_delta_bytes_max` for the expanded 85-row primary matrix.
 
 ## 2026-06-28 - M12: Regression Threshold Automation
 
