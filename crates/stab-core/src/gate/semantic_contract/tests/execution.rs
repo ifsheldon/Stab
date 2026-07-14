@@ -843,6 +843,14 @@ fn assert_noisy_measure_reset_basis(
     measure_reset_gate: &str,
 ) {
     let plan = statistical_plan(case_id);
+    assert_eq!(
+        plan.independent_comparisons_per_attempt, 2,
+        "{case_id} must budget measurement-only and measure-reset comparisons"
+    );
+    assert_eq!(
+        plan.shot_batches_per_attempt, 2,
+        "{case_id} must budget one shot batch for each comparison"
+    );
     let text = format!("{prepare}\n{measurement_gate}(0.05) !0\n");
     let samples = CompiledSampler::compile(&circuit(&text))
         .expect("compile noisy measurement circuit")

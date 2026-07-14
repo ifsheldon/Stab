@@ -10,9 +10,9 @@ Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4
 
 Most recent clean global evidence revision for the preceding result-format digest: `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` with `local_modifications=false`.
 
-Current correctness inventory digest after gate-contract reconciliation: `d4e35f2cd834ea51a67c2ef5229d1788ae03a7c8607a9424c900fae073ab8a56`.
+Current correctness inventory digest after gate-contract reconciliation: `4ee9686104c0d537073a823986cb71b8bc092c7a9f09fbdbee75c4af7d2c6b70`.
 
-Current dependent performance inventory digest: `2be8a478a5767e7be46881b01473600d456a9af52c6078b14abdc4fc09773243`.
+Current dependent performance inventory digest: `9ae9b79c172c27f2a33475d856cca97c668c6608781cb81b8a8861f46cd13966`.
 
 Clean current-digest CQ1 and PQ1 reports remain pending until this gate checkpoint is committed. The earlier clean reports below are retained as historical evidence and must not be promoted against the current digests.
 
@@ -50,6 +50,7 @@ Clean current-digest CQ1 and PQ1 reports remain pending until this gate checkpoi
 - Focused qualification tests cover the 81-gate registry, exact name lookup and rejection, unitary and decomposition metadata, gate-target text and values, target accessors, inversion, and target classification. Canonical gate semantic tests cover deterministic and noisy measurement-only and measure-reset gates, pair and product measurements, Pauli channels, depolarization, correlated and heralded errors, annotations, classical controls, SPP families, rejection contracts, and reset postconditions.
 - Nine broad imported gate fixtures remain supporting provenance on exact canonical parents instead of becoming atomic primary evidence. C++ storage-layout and helper-only tests are not applicable, Python object-shape behavior remains deferred with Python bindings, and public graph and vector simulator tests remain deferred with those explicitly excluded products.
 - Review exposed two evidence loopholes and closed them in focused tests: noisy X/Y/Z evidence now exercises both measurement-only and measure-reset gates, and annotation evidence now exercises Pauli-target observable semantics in all three bases.
+- The first clean PR execution correctly rejected those broadened noisy X/Y/Z tests because the blocker ledger and core plan still declared one 100,000-shot comparison while each selector emitted two. Both source-owned plans now declare two independent comparisons and two shot batches, the helper asserts that contract locally, and no controller relaxation was made.
 
 The dependent PQ0 inventory was regenerated because correctness owner ids and acceptance state changed. No performance disposition, threshold, waiver, or comparator classification was relaxed.
 

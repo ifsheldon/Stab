@@ -2266,13 +2266,14 @@
             "flow-generator"
           ],
           "gate_families": [
+            "measurement",
             "measure-reset"
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.noisy_measurement_reset_x",
-            "subcase": "MRX noise rate and X-basis reset postcondition",
+            "subcase": "MX and MRX noise rates plus the X-basis reset postcondition",
             "gate_markers": ["MRX"]
           },
           "comparator": "statistical",
@@ -2282,8 +2283,8 @@
             "sigma_multiplier": 6,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
-            "independent_comparisons_per_attempt": 1,
-            "shot_batches_per_attempt": 1,
+            "independent_comparisons_per_attempt": 2,
+            "shot_batches_per_attempt": 2,
             "buckets": [
               {
                 "name": "measurement-zero",
@@ -2324,7 +2325,7 @@
             "value": "pf3-gate-semantic-wide",
             "classification": "report-only"
           },
-          "resource_contract": "Reuse per-shot measurement and reset state while sampling the declared MRX flip probability."
+          "resource_contract": "Reuse per-shot measurement and reset state while independently sampling the declared MX and MRX flip probabilities."
         },
         {
           "id": "pfm3-contract-measure-reset-y",
@@ -2340,13 +2341,14 @@
             "flow-generator"
           ],
           "gate_families": [
+            "measurement",
             "measure-reset"
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.noisy_measurement_reset_y",
-            "subcase": "MRY noise rate and Y-basis reset postcondition",
+            "subcase": "MY and MRY noise rates plus the Y-basis reset postcondition",
             "gate_markers": ["MRY"]
           },
           "comparator": "statistical",
@@ -2356,8 +2358,8 @@
             "sigma_multiplier": 6,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
-            "independent_comparisons_per_attempt": 1,
-            "shot_batches_per_attempt": 1,
+            "independent_comparisons_per_attempt": 2,
+            "shot_batches_per_attempt": 2,
             "buckets": [
               {
                 "name": "measurement-zero",
@@ -2398,7 +2400,7 @@
             "value": "pf3-gate-semantic-wide",
             "classification": "report-only"
           },
-          "resource_contract": "Reuse per-shot measurement and reset state while sampling the declared MRY flip probability."
+          "resource_contract": "Reuse per-shot measurement and reset state while independently sampling the declared MY and MRY flip probabilities."
         },
         {
           "id": "pfm3-contract-measure-reset-z",
@@ -2414,13 +2416,14 @@
             "flow-generator"
           ],
           "gate_families": [
+            "measurement",
             "measure-reset"
           ],
           "upstream": {
             "path": "src/stim/simulators/frame_simulator.test.cc",
             "kind": "gtest-case",
             "test": "FrameSimulator.noisy_measurement_reset_z",
-            "subcase": "MR noise rate and Z-basis reset postcondition",
+            "subcase": "M and MR noise rates plus the Z-basis reset postcondition",
             "gate_markers": ["MRZ"]
           },
           "comparator": "statistical",
@@ -2430,8 +2433,8 @@
             "sigma_multiplier": 6,
             "absolute_probability_floor": 0.01,
             "familywise_false_positive_budget": 0.000001,
-            "independent_comparisons_per_attempt": 1,
-            "shot_batches_per_attempt": 1,
+            "independent_comparisons_per_attempt": 2,
+            "shot_batches_per_attempt": 2,
             "buckets": [
               {
                 "name": "measurement-zero",
@@ -2472,7 +2475,7 @@
             "value": "pf3-gate-semantic-wide",
             "classification": "report-only"
           },
-          "resource_contract": "Reuse per-shot measurement and reset state while sampling the declared MR flip probability."
+          "resource_contract": "Reuse per-shot measurement and reset state while independently sampling the declared M and MR flip probabilities."
         },
         {
           "id": "pfm3-contract-pair-measurement-inversion",

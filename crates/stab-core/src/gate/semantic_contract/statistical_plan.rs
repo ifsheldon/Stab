@@ -176,22 +176,22 @@ const GATE_CONTRACT_STATISTICAL_PLANS: &[GateContractStatisticalPlan] = &[
         "pfm3-contract-measure-reset-x",
         12_648_440,
         MEASURE_RESET_BUCKETS,
-        1,
-        1,
+        2,
+        2,
     ),
     statistical_plan(
         "pfm3-contract-measure-reset-y",
         12_648_441,
         MEASURE_RESET_BUCKETS,
-        1,
-        1,
+        2,
+        2,
     ),
     statistical_plan(
         "pfm3-contract-measure-reset-z",
         12_648_442,
         MEASURE_RESET_BUCKETS,
-        1,
-        1,
+        2,
+        2,
     ),
 ];
 

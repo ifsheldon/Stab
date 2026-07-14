@@ -6,9 +6,9 @@ Completed: 2026-07-13.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Current correctness dependency after the completed selected CQ2 `.stim`, `.dem`, result-format, and gate-contract slices: schema-version-3 CQ0 semantic digest `d4e35f2cd834ea51a67c2ef5229d1788ae03a7c8607a9424c900fae073ab8a56`.
+Current correctness dependency after the completed selected CQ2 `.stim`, `.dem`, result-format, and gate-contract slices: schema-version-3 CQ0 semantic digest `4ee9686104c0d537073a823986cb71b8bc092c7a9f09fbdbee75c4af7d2c6b70`.
 
-Current performance inventory digest after dependent CQ2 regeneration: `2be8a478a5767e7be46881b01473600d456a9af52c6078b14abdc4fc09773243`.
+Current performance inventory digest after dependent CQ2 regeneration: `9ae9b79c172c27f2a33475d856cca97c668c6608781cb81b8a8861f46cd13966`.
 
 Implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
