@@ -16,7 +16,7 @@ Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca3258
 
 The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
-The completed selected CQ2 `.stim` and `.dem` slices changed correctness owner ids, exact classifications, and acceptance state, so PQ0 was regenerated without changing those performance classifications. Synchronizing the source-owned checklist then changed only the checked source digest and produced the current performance digest above. A clean current-digest PQ1 report-only refresh must run from the committed synchronization revision before it becomes current evidence.
+The completed selected CQ2 `.stim` and `.dem` slices changed correctness owner ids, exact classifications, and acceptance state, so PQ0 was regenerated without changing those performance classifications. Synchronizing the source-owned checklist then changed only the checked source digest and produced the current performance digest above. Clean current-digest PQ1 PR, full, and soak execution from revision `389a1cc7e3227c30485e14d8c3ee95315150e6b7` is host-verified and passes offline report and report-only regression validation.
 
 PQ0 freezes inventory and migration decisions only.
 It does not claim that inherited timing ratios satisfy the comprehensive runner, preflight, scaling, memory, or statistical contract.

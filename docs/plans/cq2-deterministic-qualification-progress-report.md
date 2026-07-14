@@ -65,11 +65,11 @@ The PQ1 group remains diagnostic infrastructure with `promotable=false`, `report
 
 | Tier | Pairs | Median ratio | Bootstrap 95% interval | Ratio rMAD | Host | Artifact |
 | --- | ---: | ---: | --- | ---: | --- | --- |
-| PR | 3 | 1.015708 | [1.015588, 1.016151] | 0.000118 | Verified | `target/benchmarks/qualification/pq1-cq2-dem-format-pr` |
-| Full | 9 | 1.015081 | [1.014852, 1.015586] | 0.000225 | Verified | `target/benchmarks/qualification/pq1-cq2-dem-format-full` |
-| Soak | 15 | 1.015031 | [1.012913, 1.015604] | 0.001265 | Verified | `target/benchmarks/qualification/pq1-cq2-dem-format-soak` |
+| PR | 3 | 1.015166 | [1.014561, 1.015270] | 0.000102 | Verified | `target/benchmarks/qualification/pq1-cq2-dem-doc-sync-pr` |
+| Full | 9 | 1.015492 | [1.014614, 1.016164] | 0.000482 | Verified | `target/benchmarks/qualification/pq1-cq2-dem-doc-sync-full` |
+| Soak | 15 | 1.015130 | [1.014543, 1.015421] | 0.000546 | Verified | `target/benchmarks/qualification/pq1-cq2-dem-doc-sync-soak` |
 
-The table records the last clean dependent refresh, which used the pre-documentation-sync performance digest at commit `f62cdf135f6804419809e74d9e68c66551adf6e3`. Updating the source-owned checklist changed the current performance digest above, so a new clean report-only refresh is required before these values can be described as current. The ratios describe only the synthetic adapter protocol and must not be reported as Stab product performance.
+All reports use schema version 13, the current correctness and performance digests, `local_modifications=false` before and after execution, and commit `389a1cc7e3227c30485e14d8c3ee95315150e6b7`. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. These ratios describe only the synthetic adapter protocol and must not be reported as Stab product performance.
 
 ## Verification
 
@@ -86,12 +86,12 @@ just qualification::correctness-regenerate --check
 just qualification::correctness-check
 just bench::qualification-regenerate --check
 just bench::qualification-check
-just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-dem-format-pr
-just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-dem-format-full
-just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-dem-format-soak
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-dem-format-pr
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-dem-format-full
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-dem-format-soak
+just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-pr
+just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-full
+just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-soak
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-pr
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-full
+just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-dem-doc-sync-soak
 just maintenance::pre-commit
 ```
 
