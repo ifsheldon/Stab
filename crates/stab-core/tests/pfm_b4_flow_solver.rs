@@ -101,11 +101,11 @@ fn pfm_b4_flow_solver_treats_mpad_values_as_non_qubit_records() {
 #[test]
 fn pfm_b4_flow_solver_uses_implicit_sparse_query_identity_rows() {
     const HIGH_QUBIT: usize = 65_535;
-    let mut high_x = PauliString::identity(HIGH_QUBIT + 1);
+    let mut high_x = PauliString::identity(HIGH_QUBIT + 1).expect("wide Pauli identity");
     high_x
         .set(HIGH_QUBIT, PauliBasis::X)
         .expect("set high sparse query term");
-    let identity = PauliString::identity(HIGH_QUBIT + 1);
+    let identity = PauliString::identity(HIGH_QUBIT + 1).expect("wide Pauli identity");
     let queries = [
         Flow::new(high_x.clone(), high_x.clone(), [], []),
         Flow::new(identity, high_x, [], []),
@@ -207,9 +207,9 @@ fn pfm_b4_flow_solver_rank_deficient_inconsistent_and_underdetermined() {
 #[test]
 fn pfm_b4_flow_solver_handles_sparse_high_qubits_and_uses_pauli_projection() {
     let circuit = circuit("M 1023\n");
-    let mut z = PauliString::identity(1024);
+    let mut z = PauliString::identity(1024).expect("Pauli identity");
     z.set(1023, PauliBasis::Z).expect("set sparse Z term");
-    let identity = PauliString::identity(1024);
+    let identity = PauliString::identity(1024).expect("Pauli identity");
     let queries = [
         Flow::new(identity.clone(), z.clone(), [], []),
         Flow::new(identity.clone(), z.clone(), [], [7]),
@@ -314,7 +314,9 @@ fn two_qubit_unsigned_queries() -> Vec<Flow> {
     let mut paulis = Vec::with_capacity(16);
     for left in bases {
         for right in bases {
-            paulis.push(PauliString::from_bases(PauliSign::Plus, [left, right]));
+            paulis.push(
+                PauliString::from_bases(PauliSign::Plus, [left, right]).expect("two-qubit Pauli"),
+            );
         }
     }
     let mut queries = Vec::with_capacity(255);

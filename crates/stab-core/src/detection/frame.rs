@@ -724,7 +724,7 @@ impl ScalarDetectionFrame {
             .iter()
             .map(|qubit| self.qubit_basis(*qubit))
             .collect::<CircuitResult<Vec<_>>>()?;
-        let input = PauliString::from_bases(PauliSign::Plus, bases);
+        let input = PauliString::from_bases_unchecked(PauliSign::Plus, bases);
         let output = tableau
             .apply(&input)
             .map_err(|error| CircuitError::invalid_sampler_compilation(error.to_string()))?;

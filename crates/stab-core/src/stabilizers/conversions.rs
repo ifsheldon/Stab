@@ -1,10 +1,15 @@
-use super::{PauliBasis, PauliSign, PauliString, StabilizerError, StabilizerResult, Tableau};
+use super::{
+    PauliBasis, PauliSign, PauliString, StabilizerError, StabilizerResource, StabilizerResult,
+    Tableau,
+};
 
 /// Synthesizes a tableau from a deterministic set of commuting stabilizer generators.
 ///
 /// This M6 helper validates redundancy, underconstraint, and anticommutation according
 /// to the flags. Random generator distributions and the full upstream fuzz matrix are
 /// tracked as milestone follow-up scope rather than part of this function contract.
+/// The current dense solver rejects inputs wider than
+/// [`StabilizerResource::StabilizerSolveQubits`] before allocating solver state.
 pub fn stabilizers_to_tableau(
     stabilizers: &[PauliString],
     allow_redundant: bool,
@@ -12,6 +17,7 @@ pub fn stabilizers_to_tableau(
     inverse: bool,
 ) -> StabilizerResult<Tableau> {
     let num_qubits = stabilizers.iter().map(PauliString::len).max().unwrap_or(0);
+    StabilizerResource::StabilizerSolveQubits.ensure(num_qubits)?;
     let mut selected = StabilizerSelection::new(num_qubits);
     for stabilizer in stabilizers {
         selected.add_input(stabilizer, allow_redundant)?;
@@ -218,7 +224,7 @@ fn commuting_nullspace_basis(
 }
 
 fn normalize_pauli(pauli: &PauliString, num_qubits: usize) -> PauliString {
-    PauliString::from_bases(
+    PauliString::from_bases_unchecked(
         pauli.sign(),
         (0..num_qubits).map(|index| pauli.get(index).unwrap_or(PauliBasis::I)),
     )
@@ -426,7 +432,7 @@ impl BinaryVector {
 }
 
 fn vector_to_pauli(vector: &BinaryVector, num_qubits: usize) -> PauliString {
-    PauliString::from_bases(
+    PauliString::from_bases_unchecked(
         PauliSign::Plus,
         (0..num_qubits)
             .map(|index| PauliBasis::from_xz(vector.get(index), vector.get(num_qubits + index))),

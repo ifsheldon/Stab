@@ -26,7 +26,12 @@ fn stabilizers_pauli_string_dense_text_round_trips_follow_stim() {
         PauliString::from_str("-XZ").expect("parse").to_string(),
         "-XZ"
     );
-    assert_eq!(PauliString::identity(5).to_string(), "+_____");
+    assert_eq!(
+        PauliString::identity(5)
+            .expect("Pauli identity")
+            .to_string(),
+        "+_____"
+    );
     assert_eq!(PauliString::from_str("").expect("parse").to_string(), "+");
     assert_eq!(PauliString::from_str("-").expect("parse").to_string(), "-");
     assert_ne!(
@@ -308,7 +313,7 @@ fn stabilizers_pauli_string_iter_empty_and_restart_cases_match_stim() {
         Vec::<String>::new()
     );
 
-    let mut iter = PauliStringIterator::new(2, 1, 1, true, false, false);
+    let mut iter = PauliStringIterator::new(2, 1, 1, true, false, false).expect("Pauli iterator");
     assert_eq!(
         iter.by_ref()
             .map(|pauli| pauli.to_string())
@@ -324,7 +329,7 @@ fn stabilizers_pauli_string_iter_empty_and_restart_cases_match_stim() {
 
 #[test]
 fn stabilizers_pauli_string_iter_borrowed_result_matches_stim_order() {
-    let mut iter = PauliStringIterator::new(3, 1, 2, true, false, true);
+    let mut iter = PauliStringIterator::new(3, 1, 2, true, false, true).expect("Pauli iterator");
     let mut results = Vec::new();
     while iter.iter_next() {
         results.push(iter.result().to_string());
@@ -403,7 +408,7 @@ fn stabilizers_flex_pauli_multiplication_matches_stim() {
 fn stabilizers_clifford_string_set_gate_at_vs_str_vs_gate_at_matches_stim() {
     // Adapted from Stim v1.16.0 src/stim/stabilizers/clifford_string.test.cc.
     let gates = upstream_clifford_gate_order();
-    let mut cliffords = CliffordString::identity(gates.len());
+    let mut cliffords = CliffordString::identity(gates.len()).expect("Clifford identity");
     for (index, gate) in gates.iter().copied().enumerate() {
         cliffords
             .set_gate_at(index, gate)
@@ -435,25 +440,30 @@ fn stabilizers_single_qubit_clifford_gate_conversion_matches_stim() {
 #[test]
 fn stabilizers_clifford_string_known_identities_match_stim() {
     // Adapted from Stim v1.16.0 src/stim/stabilizers/clifford_string.test.cc known_identities.
-    let h = CliffordString::from_gates([SingleQubitClifford::H]);
-    let s = CliffordString::from_gates([SingleQubitClifford::S]);
-    let s_dag = CliffordString::from_gates([SingleQubitClifford::SDag]);
+    let h = CliffordString::from_gates([SingleQubitClifford::H]).expect("H Clifford");
+    let s = CliffordString::from_gates([SingleQubitClifford::S]).expect("S Clifford");
+    let s_dag = CliffordString::from_gates([SingleQubitClifford::SDag]).expect("S_DAG Clifford");
 
-    assert_eq!(h.multiply(&h).expect("H*H"), CliffordString::identity(1));
+    assert_eq!(
+        h.multiply(&h).expect("H*H"),
+        CliffordString::identity(1).expect("Clifford identity")
+    );
     assert_eq!(
         s.multiply(&s).expect("S*S"),
-        CliffordString::from_gates([SingleQubitClifford::Z])
+        CliffordString::from_gates([SingleQubitClifford::Z]).expect("Z Clifford")
     );
     assert_eq!(
         h.multiply(&s_dag).expect("H*S_DAG"),
-        CliffordString::from_gates([SingleQubitClifford::Cxyz])
+        CliffordString::from_gates([SingleQubitClifford::Cxyz]).expect("C_XYZ Clifford")
     );
 }
 
 #[test]
 fn stabilizers_clifford_string_concat_repeat_and_padding_are_stim_like() {
-    let left = CliffordString::from_gates([SingleQubitClifford::H, SingleQubitClifford::S]);
-    let right = CliffordString::from_gates([SingleQubitClifford::X]);
+    let left = CliffordString::from_gates([SingleQubitClifford::H, SingleQubitClifford::S])
+        .expect("left Clifford string");
+    let right =
+        CliffordString::from_gates([SingleQubitClifford::X]).expect("right Clifford string");
 
     assert_eq!(left.concat(&right).expect("concat").to_string(), "HI SI _X");
     assert_eq!(right.repeat(3).expect("repeat").to_string(), "_X _X _X");
@@ -485,8 +495,8 @@ fn stabilizers_pauli_random_hook_is_seeded_and_well_formed() {
     // Adapted from Stim v1.16.0 PauliString::random semantics without requiring C++ RNG stream parity.
     let mut first_rng = SmallRng::seed_from_u64(0x5a17);
     let mut second_rng = SmallRng::seed_from_u64(0x5a17);
-    let first = PauliString::random(64, &mut first_rng);
-    let second = PauliString::random(64, &mut second_rng);
+    let first = PauliString::random(64, &mut first_rng).expect("random Pauli");
+    let second = PauliString::random(64, &mut second_rng).expect("random Pauli");
 
     assert_eq!(first, second);
     assert_eq!(first.len(), 64);
@@ -497,7 +507,7 @@ fn stabilizers_pauli_random_hook_is_seeded_and_well_formed() {
     let mut empty_plus = false;
     let mut empty_minus = false;
     for _ in 0..64 {
-        let empty = PauliString::random(0, &mut zero_rng);
+        let empty = PauliString::random(0, &mut zero_rng).expect("empty random Pauli");
         assert_eq!(empty.len(), 0);
         empty_plus |= !empty.sign().is_negative();
         empty_minus |= empty.sign().is_negative();
@@ -508,7 +518,7 @@ fn stabilizers_pauli_random_hook_is_seeded_and_well_formed() {
     let mut distribution_rng = SmallRng::seed_from_u64(0x0bad_5eed);
     let mut counts = [0usize; 4];
     for _ in 0..64 {
-        let pauli = PauliString::random(64, &mut distribution_rng);
+        let pauli = PauliString::random(64, &mut distribution_rng).expect("random Pauli");
         for index in 0..pauli.len() {
             let count_index = match pauli.get(index).expect("random Pauli basis") {
                 PauliBasis::I => 0,
@@ -533,7 +543,7 @@ fn stabilizers_clifford_random_hook_covers_single_qubit_cliffords() {
     // Adapted from Stim v1.16.0 src/stim/stabilizers/clifford_string.test.cc random.
     let gates = upstream_clifford_gate_order();
     let mut rng = SmallRng::seed_from_u64(0xc11f_f07d);
-    let mut cliffords = CliffordString::random(128, &mut rng);
+    let mut cliffords = CliffordString::random(128, &mut rng).expect("random Clifford string");
     let mut counts = vec![0usize; gates.len()];
 
     for _ in 0..128 {
@@ -578,11 +588,11 @@ fn stabilizers_tableau_random_hook_is_seeded_and_preserves_invariants() {
         );
         assert_eq!(
             first.then(&inverse).expect("tableau then inverse"),
-            Tableau::identity(num_qubits)
+            Tableau::identity(num_qubits).expect("Tableau identity")
         );
         assert_eq!(
             inverse.then(&first).expect("inverse then tableau"),
-            Tableau::identity(num_qubits)
+            Tableau::identity(num_qubits).expect("Tableau identity")
         );
     }
 
@@ -600,7 +610,7 @@ fn stabilizers_tableau_random_hook_is_seeded_and_preserves_invariants() {
 #[test]
 fn stabilizers_tableau_identity_and_string_format_match_stim() {
     // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc identity and str.
-    let identity = Tableau::identity(4);
+    let identity = Tableau::identity(4).expect("Tableau identity");
     assert_eq!(
         identity.to_string(),
         "+-xz-xz-xz-xz-\n\
@@ -664,7 +674,10 @@ fn stabilizers_tableau_eval_matches_stim_examples() {
 fn stabilizers_tableau_then_and_pauli_product_round_trip_match_stim() {
     // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc then and from_pauli_string.
     let cnot = cnot_tableau();
-    assert_eq!(cnot.then(&cnot).expect("cnot twice"), Tableau::identity(2));
+    assert_eq!(
+        cnot.then(&cnot).expect("cnot twice"),
+        Tableau::identity(2).expect("Tableau identity")
+    );
 
     let pauli_string_empty = pauli("");
     let tableau_empty =
@@ -697,7 +710,7 @@ fn stabilizers_tableau_inverse_matches_stim_identities() {
     assert_eq!(
         s.then(&s.inverse().expect("inverse"))
             .expect("S then inverse"),
-        Tableau::identity(1)
+        Tableau::identity(1).expect("Tableau identity")
     );
 
     let cnot = cnot_tableau();
@@ -705,7 +718,7 @@ fn stabilizers_tableau_inverse_matches_stim_identities() {
     assert_eq!(
         cnot.then(&cnot.inverse().expect("inverse"))
             .expect("CNOT then inverse"),
-        Tableau::identity(2)
+        Tableau::identity(2).expect("Tableau identity")
     );
 }
 
@@ -725,11 +738,11 @@ fn stabilizers_tableau_inverse_round_trips_composed_tableau() {
     assert!(inverse.satisfies_invariants().expect("inverse invariants"));
     assert_eq!(
         tableau.then(&inverse).expect("then inverse"),
-        Tableau::identity(2)
+        Tableau::identity(2).expect("Tableau identity")
     );
     assert_eq!(
         inverse.then(&tableau).expect("inverse then"),
-        Tableau::identity(2)
+        Tableau::identity(2).expect("Tableau identity")
     );
 
     let unsigned_inverse = tableau
@@ -857,7 +870,7 @@ proptest! {
     #[test]
     fn stabilizers_tableau_identity_preserves_dense_pauli_strings(body in bare_pauli_body_strategy(10)) {
         let pauli = pauli(&body);
-        let identity = Tableau::identity(pauli.len());
+        let identity = Tableau::identity(pauli.len()).expect("Tableau identity");
         prop_assert_eq!(identity.apply(&pauli).expect("identity eval"), pauli);
     }
 }
@@ -913,6 +926,7 @@ fn collect_pauli_iter(
     PauliStringIterator::new(
         num_qubits, min_weight, max_weight, allow_x, allow_y, allow_z,
     )
+    .expect("Pauli iterator")
     .map(|pauli| pauli.to_string())
     .collect()
 }

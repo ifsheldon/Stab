@@ -22,9 +22,9 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "ad4b927cbc8cbbca2b9279b728f76dd72d22f7118cae5f754f025dc0ba4fd519";
-const EXPECTED_CHECKLIST_ROWS: usize = 126;
-const EXPECTED_PUBLIC_API_ITEMS: usize = 1_922;
+const CORRECTNESS_DIGEST: &str = "7e42ddddd662593b56f0bd67885b74babf9a96319de990e4f2cb6218638edea5";
+const EXPECTED_CHECKLIST_ROWS: usize = 127;
+const EXPECTED_PUBLIC_API_ITEMS: usize = 1_968;
 const EXPECTED_MANIFEST_ROWS: usize = 161;
 const EXPECTED_PERF_SOURCES: usize = 23;
 const EXPECTED_PERF_SYMBOLS: usize = 74;
@@ -392,9 +392,9 @@ fn validate_checklist(suite: &QualificationSuite, issues: &mut Issues) {
             issues,
         );
     }
-    if (done, partial, deferred) != (73, 7, 46) {
+    if (done, partial, deferred) != (74, 7, 46) {
         issues.push(format!(
-            "checklist status counts are done={done} partial={partial} deferred={deferred}, expected 73/7/46"
+            "checklist status counts are done={done} partial={partial} deferred={deferred}, expected 74/7/46"
         ));
     }
 }
@@ -508,14 +508,14 @@ fn validate_apis(suite: &QualificationSuite, references: &SourceReferences, issu
     }
     let expected = BTreeMap::from([
         ("constant", 1),
-        ("enum", 31),
-        ("field", 190),
+        ("enum", 33),
+        ("field", 202),
         ("function", 70),
-        ("method", 612),
+        ("method", 614),
         ("struct", 83),
-        ("trait-impl", 694),
+        ("trait-impl", 708),
         ("type-alias", 7),
-        ("variant", 234),
+        ("variant", 250),
     ]);
     if kinds != expected {
         issues.push(format!("public API kind counts are stale: {kinds:?}"));

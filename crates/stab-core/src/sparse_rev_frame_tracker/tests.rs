@@ -141,7 +141,10 @@ fn sparse_rev_frame_tracker_undo_single_qubit_cliffords_match_tableau() {
             let mut actual = tracker_from_pauli_text(input_text);
             actual.undo_instruction(&instruction).unwrap();
             let expected = expected_tableau
-                .apply(&PauliString::from_bases(PauliSign::Plus, [input_basis]))
+                .apply(&PauliString::from_bases_unchecked(
+                    PauliSign::Plus,
+                    [input_basis],
+                ))
                 .unwrap()
                 .get(0)
                 .unwrap();
@@ -189,7 +192,7 @@ fn sparse_rev_frame_tracker_undo_fixed_two_qubit_gates_match_tableau() {
                 let mut actual = tracker_from_pauli_text(&input_text);
                 actual.undo_instruction(&instruction).unwrap();
                 let expected = expected_tableau
-                    .apply(&PauliString::from_bases(
+                    .apply(&PauliString::from_bases_unchecked(
                         PauliSign::Plus,
                         [left_basis, right_basis],
                     ))
@@ -228,7 +231,7 @@ fn pf6_sparse_rev_spp_matches_decomposed_tableau_unsigned() {
                     let mut actual = tracker_from_pauli_text(&input_text);
                     actual.undo_instruction(&instruction).unwrap();
                     let expected = expected_tableau
-                        .apply(&PauliString::from_bases(
+                        .apply(&PauliString::from_bases_unchecked(
                             PauliSign::Plus,
                             [left_basis, middle_basis, right_basis],
                         ))
@@ -262,7 +265,7 @@ fn pf6_sparse_rev_spp_handles_multiple_groups_and_inverted_products() {
     actual.undo_instruction(&instruction).unwrap();
 
     let expected = expected_tableau
-        .apply(&PauliString::from_bases(
+        .apply(&PauliString::from_bases_unchecked(
             PauliSign::Plus,
             [PauliBasis::Z, PauliBasis::Y, PauliBasis::X],
         ))

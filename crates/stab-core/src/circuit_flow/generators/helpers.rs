@@ -7,6 +7,30 @@ use crate::{
 
 use super::single_pauli;
 
+// Two rows per qubit, two Pauli strings per row, and two bit planes per string.
+const MAX_IGNORED_ONLY_FLOW_GENERATOR_PAULI_BITS: usize = 8 * 4096 * 4096;
+
+pub(super) fn validate_ignored_only_flow_generator_work(qubit_count: usize) -> CircuitResult<()> {
+    let pauli_bits = qubit_count
+        .checked_mul(qubit_count)
+        .and_then(|bits| bits.checked_mul(8))
+        .ok_or_else(|| {
+            CircuitError::invalid_domain_value(
+                "ignored-only flow-generator Pauli bits",
+                "overflowed",
+            )
+        })?;
+    if pauli_bits > MAX_IGNORED_ONLY_FLOW_GENERATOR_PAULI_BITS {
+        return Err(CircuitError::invalid_domain_value(
+            "ignored-only flow-generator Pauli bits",
+            format!(
+                "{pauli_bits} exceeds current limit {MAX_IGNORED_ONLY_FLOW_GENERATOR_PAULI_BITS}"
+            ),
+        ));
+    }
+    Ok(())
+}
+
 pub(super) fn plain_tableau_targets(targets: &[Target]) -> Option<Vec<usize>> {
     let mut qubits = Vec::with_capacity(targets.len());
     for target in targets {
@@ -25,7 +49,7 @@ pub(super) fn apply_local_tableau_to_global_pauli(
     local_tableau: &crate::Tableau,
     qubit_count: usize,
 ) -> CircuitResult<PauliString> {
-    let local = PauliString::from_bases(
+    let local = PauliString::from_bases_unchecked(
         input.sign(),
         targets
             .iter()
@@ -48,7 +72,7 @@ pub(super) fn apply_local_tableau_to_global_pauli(
         };
         *slot = basis;
     }
-    Ok(PauliString::from_bases(transformed.sign(), bases))
+    Ok(PauliString::from_bases_unchecked(transformed.sign(), bases))
 }
 
 pub(super) fn instruction_qubit_count(instruction: &CircuitInstruction) -> usize {
@@ -171,7 +195,7 @@ pub(super) fn input_measurement_flow(
 ) -> CircuitResult<Flow> {
     Ok(Flow::new(
         single_pauli(qubit_count, qubit, basis),
-        PauliString::from_bases(record_sign, []),
+        PauliString::from_bases_unchecked(record_sign, []),
         [record_index_i32(record_index)?],
         [],
     ))
@@ -179,8 +203,8 @@ pub(super) fn input_measurement_flow(
 
 pub(super) fn positive_record_flow(record_index: usize) -> CircuitResult<Flow> {
     Ok(Flow::new(
-        PauliString::identity(0),
-        PauliString::identity(0),
+        PauliString::identity_unchecked(0),
+        PauliString::identity_unchecked(0),
         [record_index_i32(record_index)?],
         [],
     ))
@@ -188,8 +212,8 @@ pub(super) fn positive_record_flow(record_index: usize) -> CircuitResult<Flow> {
 
 pub(super) fn negative_record_flow(record_index: usize) -> CircuitResult<Flow> {
     Ok(Flow::new(
-        PauliString::identity(0),
-        PauliString::from_bases(PauliSign::Minus, []),
+        PauliString::identity_unchecked(0),
+        PauliString::from_bases_unchecked(PauliSign::Minus, []),
         [record_index_i32(record_index)?],
         [],
     ))

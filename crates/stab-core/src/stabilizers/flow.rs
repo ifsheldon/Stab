@@ -155,7 +155,7 @@ impl FromStr for Flow {
         let mut tokens = output_text.split_whitespace();
         let first_output = tokens.next().ok_or_else(|| invalid_flow_text(text))?;
 
-        let mut output = PauliString::identity(0);
+        let mut output = PauliString::identity_unchecked(0);
         let mut output_is_imaginary = false;
         let mut measurements = Vec::new();
         let mut observables = Vec::new();
@@ -261,10 +261,16 @@ fn parse_classical_output_term(
 
 fn parse_flow_pauli(text: &str, original_text: &str) -> StabilizerResult<(PauliString, bool)> {
     match text {
-        "1" | "+1" => Ok((PauliString::identity(0), false)),
-        "-1" => Ok((PauliString::from_bases(PauliSign::Minus, []), false)),
-        "i" | "+i" => Ok((PauliString::identity(0), true)),
-        "-i" => Ok((PauliString::from_bases(PauliSign::Minus, []), true)),
+        "1" | "+1" => Ok((PauliString::identity_unchecked(0), false)),
+        "-1" => Ok((
+            PauliString::from_bases_unchecked(PauliSign::Minus, []),
+            false,
+        )),
+        "i" | "+i" => Ok((PauliString::identity_unchecked(0), true)),
+        "-i" => Ok((
+            PauliString::from_bases_unchecked(PauliSign::Minus, []),
+            true,
+        )),
         "" => Err(invalid_flow_text(original_text)),
         _ => {
             let flex = text
@@ -384,7 +390,7 @@ fn inverse_phase(phase: PauliPhase) -> PauliPhase {
 
 fn unsigned_pauli_from_flex(flex: &FlexPauliString) -> PauliString {
     let bases = (0..flex.len()).map(|index| flex.get(index).unwrap_or(PauliBasis::I));
-    PauliString::from_bases(PauliSign::Plus, bases)
+    PauliString::from_bases_unchecked(PauliSign::Plus, bases)
 }
 
 fn xor_sort<T: Copy + Ord>(values: &mut Vec<T>) {

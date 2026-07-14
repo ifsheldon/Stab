@@ -1,11 +1,12 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, CompiledSampler,
     DemTarget, Flow, FlowMeasurementIndex, Gate, MeasureRecordOffset, PauliBasis, PauliSign,
-    PauliString, QubitId, RepeatBlock, Target, sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    PauliString, QubitId, RepeatBlock, StabilizerResource, Target,
+    sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
 const SAMPLED_FLOW_SAMPLE_WORD_WIDTH: usize = 256;
-const MAX_BATCH_FLOW_TABLEAU_QUBITS: usize = 8_192;
+const MAX_BATCH_FLOW_TABLEAU_QUBITS: usize = StabilizerResource::TableauQubits.limit();
 
 /// Checks unsigned stabilizer flows against the supported unitary and sparse-tracker subsets.
 pub fn check_if_circuit_has_unsigned_stabilizer_flows(
@@ -299,7 +300,7 @@ fn diagnose_unsigned_flows_with_sparse_tracker(
                 &mut bases,
                 tracker.compact_region_for_target(tracked_target)?.value(),
             );
-            let actual = PauliString::from_bases(PauliSign::Plus, bases);
+            let actual = PauliString::from_bases_unchecked(PauliSign::Plus, bases);
             if paulis_match_unsigned(&actual, flow.input()) {
                 Ok(UnsignedStabilizerFlowCheck::passed())
             } else {

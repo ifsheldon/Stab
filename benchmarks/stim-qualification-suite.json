@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "ad4b927cbc8cbbca2b9279b728f76dd72d22f7118cae5f754f025dc0ba4fd519",
-  "semantic_digest": "229b4bf24aadfe92b6a576421a63fb795328cca9d3cc89dd03010b20c0dc977f",
+  "correctness_digest": "7e42ddddd662593b56f0bd67885b74babf9a96319de990e4f2cb6218638edea5",
+  "semantic_digest": "67bcbfcf2d991c883b6d889bf48b4d9b8c09bcb52bdbd6dc1e041b6162a30193",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -231,10 +231,12 @@
         "PERFQ-API-4c6c508aaa4dd93b",
         "PERFQ-API-52748fd492ce92b1",
         "PERFQ-API-54b33d297b618087",
+        "PERFQ-API-55fe9b2f0ec60c9e",
         "PERFQ-API-589f8d87a24ffe73",
         "PERFQ-API-5a076c4bc29796b0",
         "PERFQ-API-5bc94a52c681a039",
         "PERFQ-API-5d415e0c8122dca8",
+        "PERFQ-API-5db2ecfcd32498e3",
         "PERFQ-API-5e736bae78e22897",
         "PERFQ-API-5e7fa8226538df79",
         "PERFQ-API-5f2d52968aea1402",
@@ -247,7 +249,9 @@
         "PERFQ-API-917fdc3ee6dd0f8b",
         "PERFQ-API-99082a4a8359d4c8",
         "PERFQ-API-a5c3ce0b2fb24c2c",
+        "PERFQ-API-a5f8af44ffa1bef9",
         "PERFQ-API-ae8729fa623dce16",
+        "PERFQ-API-b4440bdf0f4128f3",
         "PERFQ-API-c45a159f33a04d54",
         "PERFQ-API-c4bd3379abfea8b9",
         "PERFQ-API-cbbff45d08223758",
@@ -269,6 +273,7 @@
         "PERFQ-CHECKLIST-a8cae7083ce5c6f0-STABILIZER-ALGEBRA",
         "PERFQ-CHECKLIST-c6e68a57b705e397-STABILIZER-ALGEBRA",
         "PERFQ-CHECKLIST-ca86e3c10de8ab0e-STABILIZER-ALGEBRA",
+        "PERFQ-CHECKLIST-cfa671aed2cf20dc-STABILIZER-ALGEBRA",
         "PERFQ-CHECKLIST-d2d203c23e3ef634-STABILIZER-ALGEBRA",
         "PERFQ-CHECKLIST-ec64113cdae0cd99-STABILIZER-ALGEBRA",
         "PERFQ-M6-CLIFFORD-STRING",
@@ -709,7 +714,7 @@
     {
       "id": "PERFC-03468f2932803ac9",
       "source_line": 81,
-      "anchor_digest": "3314765113adaddd401389dcca48ffe69fe89664cc255bf174966fd544ec75ad",
+      "anchor_digest": "5f621685fa7f080b46760b965319c6705e42b9a6c9efc4d5e78b287a743fea14",
       "section": "4. Core Circuit Features",
       "feature": "Circuit transforms",
       "raw_status": "Done for selected Rust API scope",
@@ -740,7 +745,7 @@
     },
     {
       "id": "PERFC-03d7d6a50d2629d8",
-      "source_line": 172,
+      "source_line": 173,
       "anchor_digest": "3e058d65ddac267c048f82e210a979c40a7a1c5a1b772c4553f0a557e166a6d1",
       "section": "11. Command-Line API",
       "feature": "Legacy top-level command flags",
@@ -772,7 +777,7 @@
     },
     {
       "id": "PERFC-08246ed23f9cca9b",
-      "source_line": 226,
+      "source_line": 227,
       "anchor_digest": "cbbc566e294631e3a912d202cac37d6fc73c19d447bc647c03e799d2051d5fad",
       "section": "16. Test And Benchmark Surface",
       "feature": "Current beta performance gate",
@@ -1124,7 +1129,7 @@
     },
     {
       "id": "PERFC-1ff33ed84805b2cc",
-      "source_line": 168,
+      "source_line": 169,
       "anchor_digest": "5d8c064325ef0d448833457b5973a7377bb799e9acd454e25c43c5971a5e534e",
       "section": "11. Command-Line API",
       "feature": "`stim diagram`",
@@ -1177,7 +1182,7 @@
     },
     {
       "id": "PERFC-29677000e90bf328",
-      "source_line": 144,
+      "source_line": 145,
       "anchor_digest": "6e791c95fe34c5086facb1a4ccd82a1e7ad5d45c43aeb18700940e5aa3f02c7a",
       "section": "9. Diagrams And Visualization",
       "feature": "Interactive HTML and Crumble diagram surfaces",
@@ -1297,7 +1302,7 @@
     },
     {
       "id": "PERFC-31c3e098ded9689f",
-      "source_line": 242,
+      "source_line": 243,
       "anchor_digest": "2ae94fe1fc5a88c26f90ec4b2cb2c6ce55028682cb9da9ee518c504d80e25a77",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Python bindings",
@@ -1318,7 +1323,7 @@
     },
     {
       "id": "PERFC-32f5951f3b880cdf",
-      "source_line": 164,
+      "source_line": 165,
       "anchor_digest": "3b3c663f266690c6d499924297aee84f03dfb2efe46df07f86bede24cca1e1f5",
       "section": "11. Command-Line API",
       "feature": "`stim detect`",
@@ -1417,7 +1422,7 @@
     },
     {
       "id": "PERFC-3883f38fcee402eb",
-      "source_line": 211,
+      "source_line": 212,
       "anchor_digest": "f84c9addf8a8601d0b0ec81f1bdd9da56c7d8f74b1721825c583081088912730",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "JS packaging",
@@ -1438,7 +1443,7 @@
     },
     {
       "id": "PERFC-399173601ec6dbac",
-      "source_line": 208,
+      "source_line": 209,
       "anchor_digest": "76bf69678f23d972b931021fd00e27c0a106f5e815f710ea0a1ab3691b8f4182",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Cargo workspace",
@@ -1618,7 +1623,7 @@
     },
     {
       "id": "PERFC-44abd4394a5490a8",
-      "source_line": 243,
+      "source_line": 244,
       "anchor_digest": "019f0faab5604daf0884149e7546e852432ca4a8d85a56d834b51071e5df4654",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "JS/WASM and ecosystem packages",
@@ -1660,7 +1665,7 @@
     },
     {
       "id": "PERFC-45e92e84c9cb919e",
-      "source_line": 166,
+      "source_line": 167,
       "anchor_digest": "03c57b01eebbe9e617955c2103826ef9ad1d92e2817b9939e51c381f9a0309c1",
       "section": "11. Command-Line API",
       "feature": "`stim analyze_errors`",
@@ -1904,7 +1909,7 @@
     },
     {
       "id": "PERFC-498524e36d0f0bbd",
-      "source_line": 191,
+      "source_line": 192,
       "anchor_digest": "b4d5f7a06100269c40e7b434c3c3edfc793ec3fe89bc2382995a5379fad05117",
       "section": "13. JavaScript And WASM API",
       "feature": "Crumble browser editor",
@@ -1925,7 +1930,7 @@
     },
     {
       "id": "PERFC-4a1660948ea63fb7",
-      "source_line": 178,
+      "source_line": 179,
       "anchor_digest": "ca670a7512f6696ff8eccf2bcd9b014b1bcf9efab90515034aaa224af0e27310",
       "section": "12. Python API",
       "feature": "Top-level `stim` functions",
@@ -1946,7 +1951,7 @@
     },
     {
       "id": "PERFC-4b8adb25ed1ec85c",
-      "source_line": 180,
+      "source_line": 181,
       "anchor_digest": "2a843b83de3177149573c07f221423b6f6f8ceecd432f62ae6b75f81c0554113",
       "section": "12. Python API",
       "feature": "`stim.DetectorErrorModel` class",
@@ -2020,7 +2025,7 @@
     },
     {
       "id": "PERFC-51cbbc11754eceb4",
-      "source_line": 235,
+      "source_line": 236,
       "anchor_digest": "dafdaa9dd08e317abb39c24602a80b9f4300ecf2a0eb4c1ab73ed3afb46be058",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full circuit transform API parity",
@@ -2084,8 +2089,8 @@
     },
     {
       "id": "PERFC-55676fc3004b7fd2",
-      "source_line": 223,
-      "anchor_digest": "6b8833529625c2450c314e1d6e7e96a45a791eb06cea80f19996dee30bf07091",
+      "source_line": 224,
+      "anchor_digest": "610ad84e0203dfb635527592f58897c6c520b3d96469be52fd43d926ca38e1f8",
       "section": "16. Test And Benchmark Surface",
       "feature": "Upstream test inventory and porting plan",
       "raw_status": "Done as a file-level hierarchy and CQ0 frozen case inventory",
@@ -2105,7 +2110,7 @@
     },
     {
       "id": "PERFC-56ceb30ebbb1ac8e",
-      "source_line": 155,
+      "source_line": 156,
       "anchor_digest": "5bdcc44a3b4d77fdc4c623ea28b789056f40b0d36ddc5df9b4c038a89dae82cf",
       "section": "10. Built-In Circuit Generation",
       "feature": "Python `stim.Circuit.generated`",
@@ -2126,7 +2131,7 @@
     },
     {
       "id": "PERFC-5ce01b23bf3372ce",
-      "source_line": 154,
+      "source_line": 155,
       "anchor_digest": "35f5317f5867d2d1535defa44d6d8922a6c1e8116f0cbd218456d752eabad1d7",
       "section": "10. Built-In Circuit Generation",
       "feature": "Generator parameters and noise knobs",
@@ -2158,7 +2163,7 @@
     },
     {
       "id": "PERFC-5d7bb0d4dff1956c",
-      "source_line": 238,
+      "source_line": 239,
       "anchor_digest": "14da4dbce62718afca1fa6dfb0d90c015ff5ab44c77d9bba5611444bacb96b03",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full feedback-inlining transform parity",
@@ -2246,8 +2251,8 @@
     },
     {
       "id": "PERFC-5f2145ca0e3328b5",
-      "source_line": 224,
-      "anchor_digest": "cf97a54dac1e09d704301f3bf3e5a1bd04f897c6e9a21cda48728f0e1d0c9a7e",
+      "source_line": 225,
+      "anchor_digest": "759f7c2af001becb68bebf3047699380df8bcc31c1f2a3cfdbf5a2740ef7fec2",
       "section": "16. Test And Benchmark Surface",
       "feature": "Oracle fixture matrix",
       "raw_status": "Done for current implemented surfaces and CQ1 harness acceptance",
@@ -2419,7 +2424,7 @@
     },
     {
       "id": "PERFC-655f504f7896dbf0",
-      "source_line": 197,
+      "source_line": 198,
       "anchor_digest": "e9a8a5b2bc8f57fbb63ca07ec9cc7dee923b23f9920749a05ab494ffa6f90093",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`stimcirq`",
@@ -2472,7 +2477,7 @@
     },
     {
       "id": "PERFC-675e4e7fa68ba3b9",
-      "source_line": 212,
+      "source_line": 213,
       "anchor_digest": "d39e9219f8f102da3a787224400dd8a2b01f2ab2dd6adf2b979e8cb26aad9f36",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Generated API docs",
@@ -2514,7 +2519,7 @@
     },
     {
       "id": "PERFC-68d7456b8df6bd93",
-      "source_line": 199,
+      "source_line": 200,
       "anchor_digest": "becd68d7ad621a12610737b1e0109bfff8240f162984b4b694769b8572d7881e",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "Crumble",
@@ -2535,7 +2540,7 @@
     },
     {
       "id": "PERFC-6931d59b7e752dfd",
-      "source_line": 153,
+      "source_line": 154,
       "anchor_digest": "63ff548e2d05dd3890100100cffcdd3597ac9d8406664109195879d82a086f72",
       "section": "10. Built-In Circuit Generation",
       "feature": "`color_code:memory_xyz`",
@@ -2631,7 +2636,7 @@
     },
     {
       "id": "PERFC-7cc38b462a082718",
-      "source_line": 133,
+      "source_line": 134,
       "anchor_digest": "a73f79a4a46eb2a8984f4473e6d39fb1a8e8cfe7b083cc46bb58797e6c728970",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Public borrowed Pauli string refs",
@@ -2652,7 +2657,7 @@
     },
     {
       "id": "PERFC-7d5dca89c9553856",
-      "source_line": 227,
+      "source_line": 228,
       "anchor_digest": "4f2dce9c57383122510c2cbb567c447fcccedfea2085f18cec2086486f7514fe",
       "section": "16. Test And Benchmark Surface",
       "feature": "Tests for deferred Python, JS, diagrams, and ecosystem packages",
@@ -2737,7 +2742,7 @@
     },
     {
       "id": "PERFC-884dc647874f360d",
-      "source_line": 150,
+      "source_line": 151,
       "anchor_digest": "e0f7771e5a457271c32c91256f6ff382a9571e47357baf7fa304f37532533768",
       "section": "10. Built-In Circuit Generation",
       "feature": "`repetition_code:memory`",
@@ -2769,7 +2774,7 @@
     },
     {
       "id": "PERFC-88ab8542a3bfd441",
-      "source_line": 239,
+      "source_line": 240,
       "anchor_digest": "fefd53b8075742c0802e5ecf8224d54ca72bd47d79ef2f44bc310f4c2a98390f",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full ErrorMatcher provenance and `explain_errors` CLI",
@@ -2822,7 +2827,7 @@
     },
     {
       "id": "PERFC-89a73d0b1559b081",
-      "source_line": 134,
+      "source_line": 135,
       "anchor_digest": "213b9d2cac77703a110739618fdd05e687f568a4b4a3c936e6307608a2c5338d",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Conversion to or from numpy, state vectors, and arbitrary unitaries",
@@ -2844,7 +2849,7 @@
     {
       "id": "PERFC-8ac4d4b2d32da162",
       "source_line": 128,
-      "anchor_digest": "389bd7b6b25d3b9c38cf1290f8d5b56e4f08f8127ad54c4106216cbb07b04d29",
+      "anchor_digest": "66e8e733c22cf201a7a5c3950b89ebe1609499b0181275d09c2b1ec92f79febc",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Owned Pauli strings",
       "raw_status": "Done for scoped Rust algebra surface",
@@ -2907,7 +2912,7 @@
     },
     {
       "id": "PERFC-8c644079a9eeab7f",
-      "source_line": 135,
+      "source_line": 136,
       "anchor_digest": "c97e076e51e4a2c866d7606fa1da12e6a7b915bb76335afb77502bf4a6d00fe4",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Graph simulator and vector simulator public APIs",
@@ -2928,7 +2933,7 @@
     },
     {
       "id": "PERFC-90e17eacafaae97d",
-      "source_line": 209,
+      "source_line": 210,
       "anchor_digest": "f56f07472f2fddca5ebd8e8bee606fc67d10823fa7897293b56dc4ce9642cd76",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Operational command surface",
@@ -2949,7 +2954,7 @@
     },
     {
       "id": "PERFC-91a871904dcf3356",
-      "source_line": 182,
+      "source_line": 183,
       "anchor_digest": "4e62e2ddc4565ec4314aaf87d35f894fc1d4ec3bcba7ef04e3512445aac51e97",
       "section": "12. Python API",
       "feature": "Error explanation classes",
@@ -2970,7 +2975,7 @@
     },
     {
       "id": "PERFC-933e7f6e900d13cb",
-      "source_line": 190,
+      "source_line": 191,
       "anchor_digest": "9fbe18a00ddbe3ee924c7fd70535eabfc04dfb11210c2430908a80c95c70ec55",
       "section": "13. JavaScript And WASM API",
       "feature": "JS `Circuit`, `Tableau`, `PauliString`, and `TableauSimulator`",
@@ -2991,7 +2996,7 @@
     },
     {
       "id": "PERFC-93fad12b1d302b96",
-      "source_line": 183,
+      "source_line": 184,
       "anchor_digest": "69b1964ab6695fb116bb49de092e1547e96d9db996fe7f1dbb5e790ab2753ccf",
       "section": "12. Python API",
       "feature": "Stabilizer, gate metadata, and simulator classes",
@@ -3012,7 +3017,7 @@
     },
     {
       "id": "PERFC-94bd1a1c7045a109",
-      "source_line": 162,
+      "source_line": 163,
       "anchor_digest": "c24fa789e9603f7ee8a77a5eba3dfaf22d0f351ca7954632789fd2364de7bf1e",
       "section": "11. Command-Line API",
       "feature": "`stim convert`",
@@ -3111,7 +3116,7 @@
     },
     {
       "id": "PERFC-9de448bddb421bc8",
-      "source_line": 152,
+      "source_line": 153,
       "anchor_digest": "41d795b9f5a2fb8a9ce32fed2ea0331ff3b1d179f6f162742040443f4af1178d",
       "section": "10. Built-In Circuit Generation",
       "feature": "`surface_code:unrotated_memory_x` and `surface_code:unrotated_memory_z`",
@@ -3143,7 +3148,7 @@
     },
     {
       "id": "PERFC-9ecb45672878e7e2",
-      "source_line": 213,
+      "source_line": 214,
       "anchor_digest": "30a2f1b90e44f809c415661d92b95ed655ae16afa144df8cf223cae76a643f9b",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Feature and roadmap docs",
@@ -3206,7 +3211,7 @@
     },
     {
       "id": "PERFC-a1d4bc5bbe9a861d",
-      "source_line": 237,
+      "source_line": 238,
       "anchor_digest": "697a3d78b0167639ec7df4bd620b99ebad8bd2a4f0f2caecee02c760bbb43e00",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Broader sweep-conditioned simulator and analysis parity",
@@ -3281,7 +3286,7 @@
     },
     {
       "id": "PERFC-a4e48e46d463de4c",
-      "source_line": 189,
+      "source_line": 190,
       "anchor_digest": "098c0dfb3b771f85bd3a3559e5a50b34f17c5dd022aad2363bedae390ffda347",
       "section": "13. JavaScript And WASM API",
       "feature": "WASM build and JS package",
@@ -3302,7 +3307,7 @@
     },
     {
       "id": "PERFC-a650fd6ccb22f00f",
-      "source_line": 169,
+      "source_line": 170,
       "anchor_digest": "14816f986478ef1961dc0622a8061c021e471e4bc1529f5a439ef4ae26d516cf",
       "section": "11. Command-Line API",
       "feature": "`stim explain_errors`",
@@ -3323,7 +3328,7 @@
     },
     {
       "id": "PERFC-a8a7e6dd54bc6357",
-      "source_line": 165,
+      "source_line": 166,
       "anchor_digest": "9549f38c3bb427aaa2c9871dc1dbd3737eccf461549c502d65ab0152df91b387",
       "section": "11. Command-Line API",
       "feature": "`stim m2d`",
@@ -3564,7 +3569,7 @@
     },
     {
       "id": "PERFC-b3ff07112043c802",
-      "source_line": 236,
+      "source_line": 237,
       "anchor_digest": "b1a1b176338715f7f3dd0ca49217153faf93e5815062e770acd30b0483346bfa",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Full DEM public API parity",
@@ -3628,7 +3633,7 @@
     },
     {
       "id": "PERFC-badcbed4e03681fa",
-      "source_line": 170,
+      "source_line": 171,
       "anchor_digest": "a9b9071eb4875805acf98f24656efd51c8e0bd5825e4f2c9ab150ed9f1a9eaf8",
       "section": "11. Command-Line API",
       "feature": "`stim repl`",
@@ -3649,7 +3654,7 @@
     },
     {
       "id": "PERFC-bcb7981e583f0db1",
-      "source_line": 241,
+      "source_line": 242,
       "anchor_digest": "c79d4f690b38795ca8fee657cab68b6ff4999201499823fa8e3ca57ec9d6fcb5",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Diagrams and visualization",
@@ -3670,7 +3675,7 @@
     },
     {
       "id": "PERFC-bee7b774029de282",
-      "source_line": 201,
+      "source_line": 202,
       "anchor_digest": "37e720e4dc4a712855c554d0992f2466e2cf1b05ee51beaf332c53422154fffe",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "ZX and lattice-surgery glue",
@@ -3691,7 +3696,7 @@
     },
     {
       "id": "PERFC-c6090c35e680bc21",
-      "source_line": 240,
+      "source_line": 241,
       "anchor_digest": "5b0f5a032b3b8e5c3ebe116d0d0b06701d13fc5c46f4ab38cb6c84b3d4d32f5e",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Public interactive `TableauSimulator` and `FlipSimulator` APIs",
@@ -3713,7 +3718,7 @@
     {
       "id": "PERFC-c6e68a57b705e397",
       "source_line": 130,
-      "anchor_digest": "99c79a08a6c88581a3ef7ad476ed9c3faca6cdc503544778a6c6a62835ef96a5",
+      "anchor_digest": "2f7e587f777002623057e0931ab78814b1ddd3ce7867764b1a04f993934221cb",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Clifford strings",
       "raw_status": "Done for scoped Rust algebra surface",
@@ -3777,7 +3782,7 @@
     {
       "id": "PERFC-ca86e3c10de8ab0e",
       "source_line": 131,
-      "anchor_digest": "db9633f01151da0a7e7f9c85a7d7097645e83a12734e91d18f8162d9fe788c12",
+      "anchor_digest": "59a4dcb7ab1d0f03fd5c8938a0d442b7a9b58c344734a53f177abccf9aa7f730",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Tableaux and tableau iterators",
       "raw_status": "Done for scoped Rust algebra surface",
@@ -3808,7 +3813,7 @@
     },
     {
       "id": "PERFC-cbba6f2c91904807",
-      "source_line": 151,
+      "source_line": 152,
       "anchor_digest": "00d5e51dbd4be28240923aacdc8e18f11692ee694747db03148a84351de59a57",
       "section": "10. Built-In Circuit Generation",
       "feature": "`surface_code:rotated_memory_x` and `surface_code:rotated_memory_z`",
@@ -3840,8 +3845,8 @@
     },
     {
       "id": "PERFC-cccae489f6a07220",
-      "source_line": 225,
-      "anchor_digest": "9490cf90accfeb0da45f8b85de13647ba8661cf34461a22e255d4cb1a7ee1cde",
+      "source_line": 226,
+      "anchor_digest": "a5a4755de2cff0cae5d6376cc82c010e32667b487d99a790231d637e01731f1f",
       "section": "16. Test And Benchmark Surface",
       "feature": "Benchmark manifest and primary beta gate",
       "raw_status": "Done for current performance infrastructure; PQ0 inventory complete",
@@ -3858,6 +3863,38 @@
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "This row describes packaging, documentation, or evidence infrastructure instead of product runtime work."
+    },
+    {
+      "id": "PERFC-cfa671aed2cf20dc",
+      "source_line": 132,
+      "anchor_digest": "329699eff0f28a99f8c00be4bf529803bcc6b1865257459c7689a162e8e6c719",
+      "section": "8. Stabilizer Algebra Features",
+      "feature": "Algebra resource admission",
+      "raw_status": "Done for current Rust algebra surface",
+      "scope": "selected",
+      "deferred_remainder": false,
+      "selected_child": "The implemented row exactly as bounded by its checklist evidence column.",
+      "deferred_child": null,
+      "selected_child_ids": [
+        "PERFC-cfa671aed2cf20dc-IMPLEMENTED"
+      ],
+      "deferred_child_ids": [],
+      "selected_child_ownership": [
+        {
+          "child_id": "PERFC-cfa671aed2cf20dc-IMPLEMENTED",
+          "performance_features": [
+            "PERF-STABILIZER-ALGEBRA"
+          ]
+        }
+      ],
+      "performance_features": [
+        "PERF-STABILIZER-ALGEBRA"
+      ],
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-CHECKLIST-cfa671aed2cf20dc-STABILIZER-ALGEBRA"
+      ],
+      "reason": "The implemented child is assigned to the listed measured workload families; any deferred remainder stays outside executable qualification."
     },
     {
       "id": "PERFC-d2900a60b520f035",
@@ -3967,7 +4004,7 @@
     },
     {
       "id": "PERFC-d454e10c3855a359",
-      "source_line": 171,
+      "source_line": 172,
       "anchor_digest": "e40a238928d8825251b816ed39227cbaba0c103e66ee3e5e64f9e7838d2aa25a",
       "section": "11. Command-Line API",
       "feature": "`stim help` command",
@@ -4031,7 +4068,7 @@
     },
     {
       "id": "PERFC-d4b49459a03a9bb6",
-      "source_line": 179,
+      "source_line": 180,
       "anchor_digest": "d29b211ab65358154d7c3e28b537c3b1d12547c772f7caec92b324efe98e383a",
       "section": "12. Python API",
       "feature": "`stim.Circuit` class",
@@ -4052,7 +4089,7 @@
     },
     {
       "id": "PERFC-d5c4a8400325bab2",
-      "source_line": 202,
+      "source_line": 203,
       "anchor_digest": "2d79363cc5ab1c29e346ab4d5b1846cca0a74090376b36acd99151734084c713",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "QASM and Quirk exports",
@@ -4073,7 +4110,7 @@
     },
     {
       "id": "PERFC-d96593c4523940ed",
-      "source_line": 244,
+      "source_line": 245,
       "anchor_digest": "7b5c77801a6717cb5fc8a86f94d45a1f3ed9572665da58c1aa96cd77a4bda73e",
       "section": "17. Highest-Priority Remaining Feature Gaps",
       "feature": "Generated feature/status matrix tooling",
@@ -4158,7 +4195,7 @@
     },
     {
       "id": "PERFC-dbdd023fd3d2ad04",
-      "source_line": 167,
+      "source_line": 168,
       "anchor_digest": "ed73f693ec55c7e66fac46078602910437bdb1bc4875c82b3616f248c07c1bad",
       "section": "11. Command-Line API",
       "feature": "`stim sample_dem`",
@@ -4214,7 +4251,7 @@
     },
     {
       "id": "PERFC-df6a905ca1763242",
-      "source_line": 132,
+      "source_line": 133,
       "anchor_digest": "5584a1ffa593dddefac2177bc9fceb6046200a00f327bd6f67e43f4b2796e328",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Flows",
@@ -4246,7 +4283,7 @@
     },
     {
       "id": "PERFC-df75e03063fd3fc3",
-      "source_line": 198,
+      "source_line": 199,
       "anchor_digest": "2f9725f6bf654cee8c7ddd4041daa4b1e7c20ebc96f2dc262e4f7271883deb11",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`sinter`",
@@ -4267,7 +4304,7 @@
     },
     {
       "id": "PERFC-e298c35e6daabf7c",
-      "source_line": 141,
+      "source_line": 142,
       "anchor_digest": "0bac94c5b0ee4195af813b45f607c8a6193335dfeba74c941dd66e86b61d82de",
       "section": "9. Diagrams And Visualization",
       "feature": "Circuit timeline diagrams",
@@ -4320,7 +4357,7 @@
     },
     {
       "id": "PERFC-e78daef9f77f3f2a",
-      "source_line": 163,
+      "source_line": 164,
       "anchor_digest": "5e57a3460a4437b641bbf4fd0d1f46846151c9b5b1ad034169973254c1e2ed32",
       "section": "11. Command-Line API",
       "feature": "`stim sample`",
@@ -4355,7 +4392,7 @@
     },
     {
       "id": "PERFC-e9ea7ae3015ccb24",
-      "source_line": 161,
+      "source_line": 162,
       "anchor_digest": "d315a6f3374c95dbe937e2192167f620583dc216bf860f180ef0ead2530f76be",
       "section": "11. Command-Line API",
       "feature": "`stim gen`",
@@ -4391,7 +4428,7 @@
     {
       "id": "PERFC-ec64113cdae0cd99",
       "source_line": 129,
-      "anchor_digest": "b834e53ccfd17c01ef281a0281eed95401ce57851bee0b828117ea2cbf6b5a46",
+      "anchor_digest": "1536b5d7e0c2104c100f62b2234aec61d5a765f0beb6a3e043c73efca03d5e1a",
       "section": "8. Stabilizer Algebra Features",
       "feature": "Flexible Pauli strings",
       "raw_status": "Done for scoped Rust algebra surface",
@@ -4518,7 +4555,7 @@
     },
     {
       "id": "PERFC-f652be46399d9e30",
-      "source_line": 200,
+      "source_line": 201,
       "anchor_digest": "779160519301ef8ae83b5a77954e6d74bf4d24b39ab9d4c6022bff4b7cac324c",
       "section": "14. Ecosystem And Glue Packages",
       "feature": "`stimflow`",
@@ -4539,7 +4576,7 @@
     },
     {
       "id": "PERFC-f94f299efef1806b",
-      "source_line": 181,
+      "source_line": 182,
       "anchor_digest": "b00da9477657a5bd0d4d3ad651d2b2ffd32d25e5333955aec9ca06f2d256aa49",
       "section": "12. Python API",
       "feature": "Sampler and converter classes",
@@ -4592,7 +4629,7 @@
     },
     {
       "id": "PERFC-fdf0cb5af29e8578",
-      "source_line": 210,
+      "source_line": 211,
       "anchor_digest": "6a946fbf8d724cdea3a1c887fa120e737c155899b2c51ee35568142f79711cad",
       "section": "15. Packaging, Build, And Documentation Surfaces",
       "feature": "Python packaging",
@@ -4613,7 +4650,7 @@
     },
     {
       "id": "PERFC-fe506130e24c0ab7",
-      "source_line": 142,
+      "source_line": 143,
       "anchor_digest": "309e7a33382302c4634c6b3b8e122af8df5ea2712dd3aacb778d48da6fa18d27",
       "section": "9. Diagrams And Visualization",
       "feature": "Detector-slice diagrams",
@@ -4634,7 +4671,7 @@
     },
     {
       "id": "PERFC-ff83372101a84615",
-      "source_line": 143,
+      "source_line": 144,
       "anchor_digest": "91cd6e00076f404b397929b4d2ff1b823ba4ef51d875826fa85802d773c7df2c",
       "section": "9. Diagrams And Visualization",
       "feature": "DEM match-graph diagrams",
@@ -20223,6 +20260,94 @@
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
     },
     {
+      "id": "cq-api-item-34f30cb7d980bb37",
+      "path": "stab_core::StabilizerError::ResourceLimitExceeded",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-6ff71afc59ec4465",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-9801d5d1ac984f1c",
+      "path": "stab_core::StabilizerError::ResourceLimitExceeded::limit",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-6ff71afc59ec4465",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-0b14aca6cc76ad51",
+      "path": "stab_core::StabilizerError::ResourceLimitExceeded::requested",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-6ff71afc59ec4465",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-f54243667cc30297",
+      "path": "stab_core::StabilizerError::ResourceLimitExceeded::resource",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-6ff71afc59ec4465",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-2672dfc41878bcd6",
+      "path": "stab_core::StabilizerError::ResourceSizeOverflow",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-6ff71afc59ec4465",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-6a07ab65996d75f0",
+      "path": "stab_core::StabilizerError::ResourceSizeOverflow::item_count",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-6ff71afc59ec4465",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-9d2fba1689d7a04b",
+      "path": "stab_core::StabilizerError::ResourceSizeOverflow::repetitions",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-6ff71afc59ec4465",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-987f08680bacbd9c",
+      "path": "stab_core::StabilizerError::ResourceSizeOverflow::resource",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-6ff71afc59ec4465",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
       "id": "cq-api-item-255d4d6f7b4cc019",
       "path": "stab_core::StabilizerError::TableauIndexOutOfRange",
       "kind": "variant",
@@ -20364,6 +20489,179 @@
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-d0acdd8a698df221",
+      "path": "stab_core::StabilizerResource",
+      "kind": "enum",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-d148a680bb60c9e5",
+      "path": "stab_core::StabilizerResource as Clone for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-a5f8af44ffa1bef9"
+      ],
+      "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
+    },
+    {
+      "id": "cq-api-item-ee3f6a16766220a9",
+      "path": "stab_core::StabilizerResource as Copy for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-277edee386a7d827",
+      "path": "stab_core::StabilizerResource as Debug for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-21ebcca12ce354fd",
+      "path": "stab_core::StabilizerResource as Display for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-b4440bdf0f4128f3"
+      ],
+      "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
+    },
+    {
+      "id": "cq-api-item-cbc9f495be817e2c",
+      "path": "stab_core::StabilizerResource as Eq for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-1c46df0910627d9c",
+      "path": "stab_core::StabilizerResource as PartialEq for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-a5f8af44ffa1bef9"
+      ],
+      "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
+    },
+    {
+      "id": "cq-api-item-e4a6579a67e892bf",
+      "path": "stab_core::StabilizerResource as StructuralPartialEq for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-d01f5c5cc61ad773",
+      "path": "stab_core::StabilizerResource::CliffordQubits",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-731fcb5ec5ecc7ba",
+      "path": "stab_core::StabilizerResource::PauliQubits",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-932d257203b1e6f9",
+      "path": "stab_core::StabilizerResource::RandomTableauQubits",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-3f6f2395026dacc9",
+      "path": "stab_core::StabilizerResource::StabilizerSolveQubits",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-8c03c463ed5787a0",
+      "path": "stab_core::StabilizerResource::TableauQubits",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-9ff784a3d2c7d03d",
+      "path": "stab_core::StabilizerResource::UnitaryMatrixDimension",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-1968fd5393ff6cfd",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-c08aef0ab644f2ef",
+      "path": "stab_core::StabilizerResource::limit",
+      "kind": "method",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-24bd287f6572aa6b",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-a5f8af44ffa1bef9"
+      ],
+      "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
     {
       "id": "cq-api-item-e59dd1c04e1955d0",
@@ -28749,6 +29047,94 @@
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
     },
     {
+      "id": "cq-api-item-f219d5b619401ab2",
+      "path": "stab_core::stabilizers::StabilizerError::ResourceLimitExceeded",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-e05afac726d81bd6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-0b05c204f8a8dcb0",
+      "path": "stab_core::stabilizers::StabilizerError::ResourceLimitExceeded::limit",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-e05afac726d81bd6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-f8b732c49f5ecaa3",
+      "path": "stab_core::stabilizers::StabilizerError::ResourceLimitExceeded::requested",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-e05afac726d81bd6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-01cec21a86939358",
+      "path": "stab_core::stabilizers::StabilizerError::ResourceLimitExceeded::resource",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-e05afac726d81bd6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-ec23f4ab1acf2c71",
+      "path": "stab_core::stabilizers::StabilizerError::ResourceSizeOverflow",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-e05afac726d81bd6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-d4775692152d7049",
+      "path": "stab_core::stabilizers::StabilizerError::ResourceSizeOverflow::item_count",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-e05afac726d81bd6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-3c6abae569a20c7b",
+      "path": "stab_core::stabilizers::StabilizerError::ResourceSizeOverflow::repetitions",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-e05afac726d81bd6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-76e63777ca84fb63",
+      "path": "stab_core::stabilizers::StabilizerError::ResourceSizeOverflow::resource",
+      "kind": "field",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-e05afac726d81bd6",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
       "id": "cq-api-item-2ec81926d1d06573",
       "path": "stab_core::stabilizers::StabilizerError::TableauIndexOutOfRange",
       "kind": "variant",
@@ -28890,6 +29276,179 @@
       "disposition": "not-performance-relevant",
       "parent_group_ids": [],
       "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-516be42746e0cce1",
+      "path": "stab_core::stabilizers::StabilizerResource",
+      "kind": "enum",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-4217f0a1f3615a7c",
+      "path": "stab_core::stabilizers::StabilizerResource as Clone for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-55fe9b2f0ec60c9e"
+      ],
+      "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
+    },
+    {
+      "id": "cq-api-item-467e4cdc9ee9e585",
+      "path": "stab_core::stabilizers::StabilizerResource as Copy for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-ef03a0b2d274a97b",
+      "path": "stab_core::stabilizers::StabilizerResource as Debug for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-36de4da2861764ee",
+      "path": "stab_core::stabilizers::StabilizerResource as Display for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-5db2ecfcd32498e3"
+      ],
+      "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
+    },
+    {
+      "id": "cq-api-item-680786853fc5626c",
+      "path": "stab_core::stabilizers::StabilizerResource as Eq for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-dcc693d26b14ebf5",
+      "path": "stab_core::stabilizers::StabilizerResource as PartialEq for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-55fe9b2f0ec60c9e"
+      ],
+      "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
+    },
+    {
+      "id": "cq-api-item-450b11237f4cbe0a",
+      "path": "stab_core::stabilizers::StabilizerResource as StructuralPartialEq for@52dba6e742bb",
+      "kind": "trait-impl",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-506eea760e30ace4",
+      "path": "stab_core::stabilizers::StabilizerResource::CliffordQubits",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-c0da2598e617a1c4",
+      "path": "stab_core::stabilizers::StabilizerResource::PauliQubits",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-8bd362d78b81ad25",
+      "path": "stab_core::stabilizers::StabilizerResource::RandomTableauQubits",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-85b2573ea463bb9c",
+      "path": "stab_core::stabilizers::StabilizerResource::StabilizerSolveQubits",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-311a404bfd126e49",
+      "path": "stab_core::stabilizers::StabilizerResource::TableauQubits",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-b395f69e792302af",
+      "path": "stab_core::stabilizers::StabilizerResource::UnitaryMatrixDimension",
+      "kind": "variant",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-dc8eaac6c9da43db",
+      "disposition": "not-performance-relevant",
+      "parent_group_ids": [],
+      "reason": "Declaration-only, marker, or diagnostic trait shape has no independent runtime workload; behavioral operations are inventoried separately."
+    },
+    {
+      "id": "cq-api-item-8a43700ac08464fe",
+      "path": "stab_core::stabilizers::StabilizerResource::limit",
+      "kind": "method",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "supporting_performance_features": [],
+      "correctness_case_id": "cq-evidence-api-b02f039a28ba19e4",
+      "disposition": "covered-by-parent",
+      "parent_group_ids": [
+        "PERFQ-API-55fe9b2f0ec60c9e"
+      ],
+      "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
     {
       "id": "cq-api-item-4eae65f46d9d45fb",
@@ -36463,6 +37022,86 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-API-55fe9b2f0ec60c9e",
+      "manifest_row": "perfq-api-55fe9b2f0ec60c9e",
+      "row_origin": "planned",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::stabilizers::StabilizerResource as Clone for@52dba6e742bb",
+        "stab_core::stabilizers::StabilizerResource as PartialEq for@52dba6e742bb",
+        "stab_core::stabilizers::StabilizerResource::limit"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-api-b02f039a28ba19e4",
+        "cq-evidence-api-dc8eaac6c9da43db"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-55fe9b2f0ec60c9e"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-4217f0a1f3615a7c",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-4217f0a1f3615a7c",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-4217f0a1f3615a7c",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "qubits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::stabilizers::StabilizerResource with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::stabilizers::StabilizerResource in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-API-5695a959c6fc638b",
       "manifest_row": "perfq-api-5695a959c6fc638b",
       "row_origin": "planned",
@@ -37343,6 +37982,83 @@
       },
       "threshold_policy": "report-only",
       "reason": "Behavioral API paths owned by stab_core::stabilizers::PauliSign in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-API-5db2ecfcd32498e3",
+      "manifest_row": "perfq-api-5db2ecfcd32498e3",
+      "row_origin": "planned",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::stabilizers::StabilizerResource as Display for@52dba6e742bb"
+      ],
+      "disposition": "measured",
+      "phase": "serialize",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-api-dc8eaac6c9da43db"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-5db2ecfcd32498e3"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-36de4da2861764ee",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-36de4da2861764ee",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-36de4da2861764ee",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "qubits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::stabilizers::StabilizerResource with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::stabilizers::StabilizerResource in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
       "owner": "stab-core",
       "status": "planned"
     },
@@ -42069,6 +42785,86 @@
       "status": "planned"
     },
     {
+      "id": "PERFQ-API-a5f8af44ffa1bef9",
+      "manifest_row": "perfq-api-a5f8af44ffa1bef9",
+      "row_origin": "planned",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::StabilizerResource as Clone for@52dba6e742bb",
+        "stab_core::StabilizerResource as PartialEq for@52dba6e742bb",
+        "stab_core::StabilizerResource::limit"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-api-1968fd5393ff6cfd",
+        "cq-evidence-api-24bd287f6572aa6b"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-a5f8af44ffa1bef9"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-1c46df0910627d9c",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-1c46df0910627d9c",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-1c46df0910627d9c",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "qubits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::StabilizerResource with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::StabilizerResource in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core",
+      "status": "planned"
+    },
+    {
       "id": "PERFQ-API-a646e7a052de6926",
       "manifest_row": "perfq-api-a646e7a052de6926",
       "row_origin": "planned",
@@ -43297,6 +44093,83 @@
       },
       "threshold_policy": "report-only",
       "reason": "Behavioral API paths owned by stab_core::Gate in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-API-b4440bdf0f4128f3",
+      "manifest_row": "perfq-api-b4440bdf0f4128f3",
+      "row_origin": "planned",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::StabilizerResource as Display for@52dba6e742bb"
+      ],
+      "disposition": "measured",
+      "phase": "serialize",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-api-1968fd5393ff6cfd"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-API-b4440bdf0f4128f3"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-21ebcca12ce354fd",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-21ebcca12ce354fd",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-21ebcca12ce354fd",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "qubits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::StabilizerResource with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic_items unless the exact API contract declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::StabilizerResource in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
       "owner": "stab-core",
       "status": "planned"
     },
@@ -57407,6 +58280,83 @@
       "threshold_policy": "report-only",
       "reason": "This exact selected checklist child has no truthful inherited parent for every promised operation; the owning PQ milestone must implement every named submeasurement or explicitly narrow the child.",
       "owner": "stab-core/generation",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-CHECKLIST-cfa671aed2cf20dc-STABILIZER-ALGEBRA",
+      "manifest_row": "perfq-checklist-cfa671aed2cf20dc-stabilizer-algebra",
+      "row_origin": "planned",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "checklist_anchors": [
+        "PERFC-cfa671aed2cf20dc"
+      ],
+      "checklist_child_ids": [
+        "PERFC-cfa671aed2cf20dc-IMPLEMENTED"
+      ],
+      "public_api_items": [],
+      "disposition": "measured",
+      "phase": "end-to-end",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [],
+      "correctness_binding": "unresolved",
+      "planned_correctness_case_id": "CQPLANNED-PERFQ-CHECKLIST-cfa671aed2cf20dc-STABILIZER-ALGEBRA",
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "checklist-small-medium-large-17-PERFQ-CHECKLIST-cfa671aed2cf20dc-STABILIZER-ALGEBRA"
+        },
+        "source": "docs/stab-feature-checklist.md",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=checklist-child-v1; qubits=1; seed=17; fixture_group=PERFQ-CHECKLIST-cfa671aed2cf20dc-STABILIZER-ALGEBRA",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=checklist-child-v1; qubits=64; seed=17; fixture_group=PERFQ-CHECKLIST-cfa671aed2cf20dc-STABILIZER-ALGEBRA",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=checklist-child-v1; qubits=4096; seed=17; fixture_group=PERFQ-CHECKLIST-cfa671aed2cf20dc-STABILIZER-ALGEBRA",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "qubits",
+      "output_contract": {
+        "expected_shape": "Exact named submeasurements for selected checklist child ids [PERFC-cfa671aed2cf20dc-IMPLEMENTED] (\"The implemented row exactly as bounded by its checklist evidence column.\") in PERF-STABILIZER-ALGEBRA; unlike phases or operations must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in semantic work unless the selected checklist child declares bounded materialization"
+      },
+      "threshold_policy": "report-only",
+      "reason": "This exact selected checklist child has no truthful inherited parent for every promised operation; the owning PQ milestone must implement every named submeasurement or explicitly narrow the child.",
+      "owner": "stab-core",
       "status": "planned"
     },
     {

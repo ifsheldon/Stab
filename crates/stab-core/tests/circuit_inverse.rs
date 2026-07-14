@@ -52,7 +52,7 @@ fn circuit_inverse_unitary_composes_to_identity_tableau() {
         input_tableau
             .then(&inverse_tableau)
             .expect("compose inverse"),
-        Tableau::identity(2)
+        Tableau::identity(2).expect("Tableau identity")
     );
 }
 

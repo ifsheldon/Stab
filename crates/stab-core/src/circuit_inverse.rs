@@ -1,14 +1,14 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Flow, GateCategory,
-    PauliBasis, PauliSign, PauliString, RepeatBlock, SingleQubitClifford, Tableau, Target,
-    circuit_flow::check_unsigned_flows_with_sparse_tracker,
+    PauliBasis, PauliSign, PauliString, RepeatBlock, SingleQubitClifford, StabilizerResource,
+    Tableau, Target, circuit_flow::check_unsigned_flows_with_sparse_tracker,
 };
 
 mod qec;
 mod reverse_flow;
 
 const MAX_TIME_REVERSE_TABLEAU_EXPANDED_INSTRUCTIONS: u64 = 1_000_000;
-const MAX_TIME_REVERSE_TABLEAU_QUBITS: usize = 8_192;
+const MAX_TIME_REVERSE_TABLEAU_QUBITS: usize = StabilizerResource::TableauQubits.limit();
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct InverseQecOptions {
@@ -347,5 +347,5 @@ fn unitary_flow_is_satisfied_by_tableau(tableau: &Tableau, flow: &Flow) -> Circu
 
 fn pauli_prefix(pauli: &PauliString, len: usize) -> PauliString {
     let bases = (0..len).map(|index| pauli.get(index).unwrap_or(PauliBasis::I));
-    PauliString::from_bases(PauliSign::Plus, bases)
+    PauliString::from_bases_unchecked(PauliSign::Plus, bases)
 }

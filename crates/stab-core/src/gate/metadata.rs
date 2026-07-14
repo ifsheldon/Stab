@@ -371,7 +371,7 @@ impl Gate {
 }
 
 fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> PauliString {
-    PauliString::from_bases(
+    PauliString::from_bases_unchecked(
         PauliSign::Plus,
         (0..len).map(|candidate| {
             if candidate == index {

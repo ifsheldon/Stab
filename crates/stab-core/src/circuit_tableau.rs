@@ -1,15 +1,21 @@
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, GateCategory,
-    PauliBasis, PauliSign, PauliString, QubitId, SingleQubitClifford, Tableau, Target,
+    PauliBasis, PauliSign, PauliString, QubitId, SingleQubitClifford, StabilizerResource, Tableau,
+    Target,
 };
 
+/// Converts a circuit after checking its dense Tableau width before materialization.
 pub fn circuit_to_tableau(
     circuit: &Circuit,
     ignore_noise: bool,
     ignore_measurement: bool,
     ignore_reset: bool,
 ) -> CircuitResult<Tableau> {
-    let mut result = Tableau::identity(circuit.count_qubits());
+    let num_qubits = circuit.count_qubits();
+    StabilizerResource::TableauQubits
+        .ensure(num_qubits)
+        .map_err(|error| CircuitError::invalid_tableau_conversion(error.to_string()))?;
+    let mut result = Tableau::identity_unchecked(num_qubits);
     apply_circuit_to_tableau(
         circuit,
         ignore_noise,
@@ -250,7 +256,7 @@ fn expand_pauli(
             )));
         }
     }
-    Ok(PauliString::from_bases(local.sign(), bases))
+    Ok(PauliString::from_bases_unchecked(local.sign(), bases))
 }
 
 fn local_index_for_global(targets: &[QubitId], global_index: usize) -> Option<usize> {
@@ -260,7 +266,7 @@ fn local_index_for_global(targets: &[QubitId], global_index: usize) -> Option<us
 }
 
 fn single_pauli(len: usize, index: usize, basis: PauliBasis, sign: PauliSign) -> PauliString {
-    PauliString::from_bases(
+    PauliString::from_bases_unchecked(
         sign,
         (0..len).map(|candidate| {
             if candidate == index {

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use super::PauliPhase;
+use super::{PauliPhase, StabilizerResource};
 use crate::BitError;
 
 pub type StabilizerResult<T> = Result<T, StabilizerError>;
@@ -12,6 +12,22 @@ pub enum StabilizerError {
 
     #[error("Pauli string length mismatch: left={left} right={right}")]
     LengthMismatch { left: usize, right: usize },
+
+    #[error("{resource} request {requested} exceeds limit {limit}")]
+    ResourceLimitExceeded {
+        resource: StabilizerResource,
+        requested: usize,
+        limit: usize,
+    },
+
+    #[error(
+        "{resource} size overflowed while repeating {item_count} item(s) {repetitions} time(s)"
+    )]
+    ResourceSizeOverflow {
+        resource: StabilizerResource,
+        item_count: usize,
+        repetitions: usize,
+    },
 
     #[error("unrecognized Pauli character {character:?} at offset {offset}")]
     InvalidPauliCharacter { character: char, offset: usize },

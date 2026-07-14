@@ -45,7 +45,7 @@ fn circuit_to_tableau_ignores_or_rejects_non_unitary_gate_classes_like_stim() {
     assert!(noise.to_tableau(false, false, false).is_err());
     assert_eq!(
         noise.to_tableau(true, false, false).expect("ignored noise"),
-        Tableau::identity(1)
+        Tableau::identity(1).expect("Tableau identity")
     );
 
     let measure = circuit("M 0\nMX 0\nMY 0\n");
@@ -54,7 +54,7 @@ fn circuit_to_tableau_ignores_or_rejects_non_unitary_gate_classes_like_stim() {
         measure
             .to_tableau(false, true, false)
             .expect("ignored measurements"),
-        Tableau::identity(1)
+        Tableau::identity(1).expect("Tableau identity")
     );
 
     let reset = circuit("R 0\nRX 0\nRY 0\n");
@@ -63,7 +63,7 @@ fn circuit_to_tableau_ignores_or_rejects_non_unitary_gate_classes_like_stim() {
         reset
             .to_tableau(false, false, true)
             .expect("ignored resets"),
-        Tableau::identity(1)
+        Tableau::identity(1).expect("Tableau identity")
     );
 
     let annotations = circuit(
@@ -82,7 +82,7 @@ fn circuit_to_tableau_ignores_or_rejects_non_unitary_gate_classes_like_stim() {
         annotations
             .to_tableau(false, false, false)
             .expect("annotations ignored"),
-        Tableau::identity(1)
+        Tableau::identity(1).expect("Tableau identity")
     );
 }
 
@@ -90,7 +90,7 @@ fn circuit_to_tableau_ignores_or_rejects_non_unitary_gate_classes_like_stim() {
 fn circuit_to_tableau_matches_stim_basic_examples() {
     assert_eq!(
         circuit("").to_tableau(false, false, false).expect("empty"),
-        Tableau::identity(0)
+        Tableau::identity(0).expect("Tableau identity")
     );
 
     assert_eq!(
@@ -104,7 +104,7 @@ fn circuit_to_tableau_matches_stim_basic_examples() {
         )
         .to_tableau(false, false, false)
         .expect("even X repeat"),
-        Tableau::identity(1)
+        Tableau::identity(1).expect("Tableau identity")
     );
 
     assert_eq!(

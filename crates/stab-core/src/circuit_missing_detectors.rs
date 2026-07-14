@@ -869,7 +869,7 @@ impl TrackedGenerator {
         tableau: &Tableau,
         targets: &[usize],
     ) -> CircuitResult<()> {
-        let input = PauliString::from_bases(
+        let input = PauliString::from_bases_unchecked(
             PauliSign::Plus,
             targets.iter().map(|target| self.basis(*target)),
         );

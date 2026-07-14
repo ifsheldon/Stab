@@ -18,7 +18,7 @@ The selected implementation boundary is:
 - Pure unitary repeats remain folded through the existing sparse cycle validation path.
 - Measurement-rich repeats use generic flattened reverse traversal after a checked one-million-instruction work calculation; larger expansions fail before traversal.
 - Recursively instruction-empty repeat bodies are skipped without iterating their repeat count.
-- Pure-unitary tableau validation is limited to 8,192 qubits and falls back to sparse folded validation above that memory budget; empty-flow unitary reversal bypasses validation entirely.
+- Pure-unitary dense Tableau validation now follows the CQ2 source-owned 512-qubit `StabilizerResource` limit and falls back to sparse folded validation above that memory budget; empty-flow unitary reversal bypasses validation entirely. The focused 513-qubit regression proves both time-reversal and unsigned-checker fallback after this post-PFM hardening.
 - Returned flows share one sparse reverse traversal with a distinct synthetic target per flow instead of multiplying circuit work by flow count.
 - Distinct absolute and relative measurement terms that resolve to one record reject before tracker XOR cancellation, matching pinned Stim v1.16.0.
 - Measurement-record feedback and heralded record reversal remain fail-closed.

@@ -522,7 +522,7 @@ fn shortest_single_qubit_base_sequence(clifford: SingleQubitClifford) -> Circuit
             .map_err(stabilizer_to_simplify_error)?
             .tableau(),
     );
-    let mut queue = VecDeque::from([(Tableau::identity(1), Vec::<Gate>::new())]);
+    let mut queue = VecDeque::from([(Tableau::identity_unchecked(1), Vec::<Gate>::new())]);
     let mut seen = BTreeSet::new();
     while let Some((tableau, sequence)) = queue.pop_front() {
         if tableau == target {

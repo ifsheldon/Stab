@@ -752,7 +752,7 @@ impl SparseReverseFrameTracker {
         let mut new_right_xs = BTreeSet::new();
         let mut new_right_zs = BTreeSet::new();
         for target in tracked_targets {
-            let input = PauliString::from_bases(
+            let input = PauliString::from_bases_unchecked(
                 PauliSign::Plus,
                 [
                     basis_from_sets(&old_left_xs, &old_left_zs, target),

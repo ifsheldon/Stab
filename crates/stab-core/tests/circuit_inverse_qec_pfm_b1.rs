@@ -423,6 +423,20 @@ fn pfm_b1_high_qubit_unitary_validation_uses_sparse_memory() {
 }
 
 #[test]
+fn pfm_b1_tableau_resource_boundary_falls_back_to_sparse_validation() {
+    let input = circuit("H 512\n");
+    let idle_flow = flow("Z0 -> Z0");
+
+    let (inverse, flows) =
+        circuit_time_reversed_for_flows(&input, std::slice::from_ref(&idle_flow))
+            .expect("reverse above the dense Tableau cap through sparse validation");
+
+    assert_eq!(inverse, input);
+    assert_eq!(flows, vec![idle_flow]);
+    assert!(circuit_has_all_unsigned_stabilizer_flows(&inverse, &flows));
+}
+
+#[test]
 fn pfm_b1_output_flow_validation_batches_many_flows() {
     let input = circuit("M 0\n");
     let input_flows = std::iter::repeat_with(|| flow("1 -> Z0 xor rec[-1]"))

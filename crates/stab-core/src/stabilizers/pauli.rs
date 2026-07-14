@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use rand::{Rng, RngExt as _};
 
-use super::{StabilizerError, StabilizerResult};
+use super::{StabilizerError, StabilizerResource, StabilizerResult};
 use crate::{BitError, BitVec};
 
 const WORD_BITS: usize = 64;
@@ -210,7 +210,14 @@ pub struct PauliString {
 }
 
 impl PauliString {
-    pub fn identity(num_qubits: usize) -> Self {
+    /// Creates an all-identity string within the [`StabilizerResource::PauliQubits`] limit.
+    pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
+        StabilizerResource::PauliQubits.ensure(num_qubits)?;
+        Ok(Self::identity_unchecked(num_qubits))
+    }
+
+    pub(crate) fn identity_unchecked(num_qubits: usize) -> Self {
+        debug_assert!(num_qubits <= StabilizerResource::PauliQubits.limit());
         Self {
             sign: PauliSign::Plus,
             xs: BitVec::zeros(num_qubits),
@@ -224,17 +231,41 @@ impl PauliString {
     /// Passing a seeded `rand` RNG gives deterministic Stab output. The sign and each Pauli basis
     /// are independently uniform, but the generated stream is not intended to match Stim's C++ RNG
     /// stream.
-    pub fn random<R>(num_qubits: usize, rng: &mut R) -> Self
+    pub fn random<R>(num_qubits: usize, rng: &mut R) -> StabilizerResult<Self>
     where
         R: Rng + ?Sized,
     {
-        let mut result = Self::identity(num_qubits);
+        let mut result = Self::identity(num_qubits)?;
         result.randomize(rng);
-        result
+        Ok(result)
     }
 
-    pub fn from_bases(sign: PauliSign, bases: impl IntoIterator<Item = PauliBasis>) -> Self {
+    /// Collects Pauli bases, rejecting the first item beyond the Pauli-qubit limit.
+    pub fn from_bases(
+        sign: PauliSign,
+        bases: impl IntoIterator<Item = PauliBasis>,
+    ) -> StabilizerResult<Self> {
+        let limit = StabilizerResource::PauliQubits.limit();
+        let mut collected = Vec::new();
+        for basis in bases {
+            if collected.len() == limit {
+                return Err(StabilizerError::ResourceLimitExceeded {
+                    resource: StabilizerResource::PauliQubits,
+                    requested: limit.saturating_add(1),
+                    limit,
+                });
+            }
+            collected.push(basis);
+        }
+        Ok(Self::from_bases_unchecked(sign, collected))
+    }
+
+    pub(crate) fn from_bases_unchecked(
+        sign: PauliSign,
+        bases: impl IntoIterator<Item = PauliBasis>,
+    ) -> Self {
         let bases = bases.into_iter().collect::<Vec<_>>();
+        debug_assert!(bases.len() <= StabilizerResource::PauliQubits.limit());
         let mut x_words = vec![0_u64; bases.len().div_ceil(WORD_BITS)];
         let mut z_words = vec![0_u64; bases.len().div_ceil(WORD_BITS)];
         let mut has_terms = false;
@@ -500,7 +531,7 @@ impl PauliString {
 
     fn parse_dense(text: &str, allow_lowercase: bool) -> StabilizerResult<Self> {
         let (sign, body) = parse_real_prefix(text);
-        let mut result = Self::identity(body.chars().count());
+        let mut result = Self::identity(body.chars().count())?;
         result.sign = sign;
         for (offset, character) in body.chars().enumerate() {
             result.set(
@@ -518,6 +549,7 @@ impl PauliString {
                 right: zs.len(),
             });
         }
+        StabilizerResource::PauliQubits.ensure(xs.len())?;
         let has_terms = bits_have_terms(&xs, &zs);
         Ok(Self {
             sign,
@@ -586,11 +618,12 @@ pub struct FlexPauliString {
 }
 
 impl FlexPauliString {
-    pub fn identity(num_qubits: usize) -> Self {
-        Self {
-            value: PauliString::identity(num_qubits),
+    /// Creates an all-identity value within the [`StabilizerResource::PauliQubits`] limit.
+    pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
+        Ok(Self {
+            value: PauliString::identity(num_qubits)?,
             imaginary: false,
-        }
+        })
     }
 
     pub fn value(&self) -> &PauliString {
@@ -637,7 +670,7 @@ impl FlexPauliString {
         bases: impl IntoIterator<Item = PauliBasis>,
     ) -> StabilizerResult<Self> {
         let imaginary = phase.is_imaginary();
-        let value = PauliString::from_bases(phase.sign(), bases);
+        let value = PauliString::from_bases(phase.sign(), bases)?;
         Ok(Self { value, imaginary })
     }
 
@@ -681,6 +714,7 @@ impl FlexPauliString {
         num_qubits: usize,
         original_text: &str,
     ) -> StabilizerResult<Self> {
+        StabilizerResource::PauliQubits.ensure(num_qubits)?;
         let mut result = Self::from_phase_and_bases(phase, vec![PauliBasis::I; num_qubits])?;
         let mut current_basis = None;
         let mut current_index = None;
@@ -871,11 +905,11 @@ mod tests {
 
     #[test]
     fn right_multiply_in_place_returns_missing_i_scalar() {
-        let mut left = PauliString::from_bases(
+        let mut left = PauliString::from_bases_unchecked(
             PauliSign::Plus,
             [PauliBasis::X, PauliBasis::Y, PauliBasis::Z, PauliBasis::I],
         );
-        let right = PauliString::from_bases(
+        let right = PauliString::from_bases_unchecked(
             PauliSign::Plus,
             [PauliBasis::Y, PauliBasis::Z, PauliBasis::X, PauliBasis::Z],
         );
@@ -890,11 +924,11 @@ mod tests {
 
     #[test]
     fn multiply_uses_in_place_core_without_losing_phase() {
-        let left = PauliString::from_bases(
+        let left = PauliString::from_bases_unchecked(
             PauliSign::Plus,
             [PauliBasis::X, PauliBasis::Y, PauliBasis::Z, PauliBasis::I],
         );
-        let right = PauliString::from_bases(
+        let right = PauliString::from_bases_unchecked(
             PauliSign::Plus,
             [PauliBasis::Y, PauliBasis::Z, PauliBasis::X, PauliBasis::Z],
         );
@@ -906,9 +940,11 @@ mod tests {
 
     #[test]
     fn negative_identity_contributes_minus_one_scalar() {
-        let mut left = PauliString::identity(4);
-        let right =
-            PauliString::from_bases(PauliSign::Minus, std::iter::repeat_n(PauliBasis::I, 4));
+        let mut left = PauliString::identity_unchecked(4);
+        let right = PauliString::from_bases_unchecked(
+            PauliSign::Minus,
+            std::iter::repeat_n(PauliBasis::I, 4),
+        );
 
         let log_i = left
             .right_multiply_in_place_returning_log_i_scalar(&right)
@@ -920,8 +956,8 @@ mod tests {
 
     #[test]
     fn right_multiply_in_place_extends_for_longer_identity_rhs() {
-        let mut left = PauliString::from_bases(PauliSign::Plus, [PauliBasis::X]);
-        let right = PauliString::identity(3);
+        let mut left = PauliString::from_bases_unchecked(PauliSign::Plus, [PauliBasis::X]);
+        let right = PauliString::identity_unchecked(3);
 
         let log_i = left
             .right_multiply_in_place_returning_log_i_scalar(&right)

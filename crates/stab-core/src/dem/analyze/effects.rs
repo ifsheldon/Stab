@@ -609,7 +609,7 @@ fn apply_two_qubit_tableau_to_masks(
     right_mask: u8,
     tableau: &Tableau,
 ) -> CircuitResult<[u8; 2]> {
-    let input = PauliString::from_bases(
+    let input = PauliString::from_bases_unchecked(
         PauliSign::Plus,
         [
             pauli_basis_from_mask(left_mask, gate_name)?,

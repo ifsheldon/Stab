@@ -13,6 +13,8 @@ Complete against the clarified M6 stabilizer-algebra contract.
 M6 implements owned Pauli, flexible Pauli, Clifford string, flow, tableau, tableau iterator, circuit-to-tableau, inverse-circuit, simplified-circuit, MBQC decomposition, stabilizers-to-tableau, and unitary-to-tableau subsets needed by the Rust core and later CLI workflows.
 Python binding APIs, exact C++ random-stream parity, public borrowed Pauli-string views, full state-vector round trips, full all-gate decomposition, measurement-rich flow semantics, and exact random 10k-qubit performance parity remain deferred by the roadmap.
 
+CQ2 qualification later hardened caller-sized Algebra APIs without expanding the selected product surface. `PauliString`, `FlexPauliString`, `CliffordString`, `Tableau`, and `PauliStringIterator` construction now returns typed resource errors; Clifford growth, dense Tableau and circuit conversion, stabilizer solving, random Tableau construction, unitary conversion, and annotation-only identity-flow output have explicit pre-work admission contracts documented in the roadmap and checked by `crates/stab-core/tests/cq2_algebra_resources.rs`.
+
 ## Tests Ported Or Created
 
 - Ported or adapted property tests from `src/stim/stabilizers/clifford_string.test.cc`, `flex_pauli_string.test.cc`, `pauli_string.test.cc`, `pauli_string_iter.test.cc`, `pauli_string_ref.test.cc`, `tableau.test.cc`, and `tableau_iter.test.cc`.
@@ -45,6 +47,7 @@ Python binding APIs, exact C++ random-stream parity, public borrowed Pauli-strin
 | `just oracle::list --milestone M6` shows implemented M6 rows, and the fixture manifest names owned and deferred util-top subcases | Satisfied | `just oracle::list --milestone M6` lists all M6 rows as implemented with property or structural grouping; `oracle/fixtures/manifest.csv` contains the owned and deferred subcase notes |
 | `just bench::compare --milestone M6` reports Pauli, Clifford, tableau, tableau-iterator, and stabilizers-to-tableau workloads with normalized rates and compare notes | Satisfied | `target/benchmarks/m6-completion-compare/compare.json`; strict compare passed all six M6 rows |
 | Public algebra APIs avoid Python-hostile lifetime or generic shapes unless documented | Satisfied | M6 public API uses owned `PauliString`, `FlexPauliString`, `CliffordString`, and `Tableau`; public borrowed view parity is explicitly deferred |
+| Caller-sized Algebra APIs reject deterministically before unbounded materialization or later algorithmic work | Satisfied by CQ2 hardening | `crates/stab-core/src/stabilizers/limits.rs`; `cargo test -p stab-core --test cq2_algebra_resources --quiet` |
 
 ## Oracle And Benchmark Evidence
 
@@ -71,6 +74,7 @@ Python binding APIs, exact C++ random-stream parity, public borrowed Pauli-strin
 ## Verification Commands
 
 - `cargo test -p stab-core stabilizers --quiet`
+- `cargo test -p stab-core --test cq2_algebra_resources --quiet`
 - `cargo test -p stab-core --test stabilizers_vs_amplitudes --quiet`
 - `just oracle::matrix --milestone M6`
 - `just oracle::list --milestone M6`

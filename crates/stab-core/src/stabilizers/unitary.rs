@@ -1,6 +1,9 @@
 use num_complex::Complex32;
 
-use super::{PauliBasis, PauliSign, PauliString, StabilizerError, StabilizerResult, Tableau};
+use super::{
+    PauliBasis, PauliSign, PauliString, StabilizerError, StabilizerResource, StabilizerResult,
+    Tableau,
+};
 
 const UNITARITY_EPSILON: f32 = 1e-4;
 const STIM_SNAP_DISTANCE_SQUARED: f32 = 0.125;
@@ -11,7 +14,8 @@ const STIM_SNAP_DISTANCE_SQUARED: f32 = 0.125;
 /// true, qubit 0 corresponds to the least significant amplitude bit. When it is false, qubit 0
 /// corresponds to the most significant amplitude bit, matching Stim's `unitary_to_tableau`
 /// convention. Matrix entries that should be Pauli phases are snapped using Stim's v1.16.0
-/// stabilizer-state smoothing threshold.
+/// stabilizer-state smoothing threshold. The matrix dimension is checked against
+/// [`StabilizerResource::UnitaryMatrixDimension`] before row-shape or numerical work.
 pub fn unitary_to_tableau(
     matrix: &[Vec<Complex32>],
     little_endian: bool,
@@ -51,6 +55,7 @@ fn validate_matrix_shape(matrix: &[Vec<Complex32>]) -> StabilizerResult<usize> {
     if height == 0 || !height.is_power_of_two() {
         return Err(StabilizerError::UnitaryMatrixHeightNotPowerOfTwo { height });
     }
+    StabilizerResource::UnitaryMatrixDimension.ensure(height)?;
     for (row, values) in matrix.iter().enumerate() {
         if values.len() != height {
             return Err(StabilizerError::UnitaryMatrixRowWidthMismatch {
@@ -206,7 +211,7 @@ fn pauli_from_masks(
     num_qubits: usize,
     little_endian: bool,
 ) -> PauliString {
-    PauliString::from_bases(
+    PauliString::from_bases_unchecked(
         sign,
         (0..num_qubits).map(|qubit| {
             let bit = amplitude_bit(qubit, num_qubits, little_endian);

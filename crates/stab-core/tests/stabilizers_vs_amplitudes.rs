@@ -273,7 +273,7 @@ fn unitary_to_tableau_snaps_near_clifford_phases_like_stim() {
     ]);
     assert_eq!(
         unitary_to_tableau(&near_identity_phase, true).expect("near identity phase"),
-        Tableau::identity(1)
+        Tableau::identity(1).expect("Tableau identity")
     );
 
     let theta = 0.5_f32;

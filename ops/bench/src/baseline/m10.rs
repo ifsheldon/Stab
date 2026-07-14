@@ -392,7 +392,8 @@ fn run_sparse_reverse_frame_loop_row(row: &BenchmarkRow) -> Result<Vec<Measureme
         ];
     let high_idle_circuit = Circuit::from_stim_str(&sparse_reverse_high_idle_frame_loop_fixture())
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let mut high_x = PauliString::identity(SPARSE_REVERSE_HIGH_IDLE_QUBITS);
+    let mut high_x = PauliString::identity(SPARSE_REVERSE_HIGH_IDLE_QUBITS)
+        .map_err(|error| stab_runner_error(&row.id, error))?;
     high_x
         .set(SPARSE_REVERSE_HIGH_IDLE_QUBITS - 1, PauliBasis::X)
         .map_err(|error| stab_runner_error(&row.id, error))?;

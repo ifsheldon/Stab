@@ -118,7 +118,7 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
 #[test]
 fn stabilizers_to_tableau_empty_input_is_empty_identity() {
     let actual = stabilizers_to_tableau(&[], false, false, false).expect("empty conversion");
-    assert_eq!(actual, Tableau::identity(0));
+    assert_eq!(actual, Tableau::identity(0).expect("Tableau identity"));
 }
 
 #[test]
@@ -155,4 +155,5 @@ fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> PauliString {
             }
         }),
     )
+    .expect("single Pauli")
 }

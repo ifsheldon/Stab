@@ -298,6 +298,7 @@ Soak catches nonlinear behavior and rare performance instability and does not re
 - Measure Pauli string multiplication, commutation, sign handling, sparse and dense application, tableau composition, inverse, gate append, tableau-to-Pauli conversions, flow multiplication, and flow validation for implemented Rust APIs.
 - Use qubit widths spanning tiny latency, cache-resident throughput, and memory-bandwidth regimes.
 - Require nontrivial separating inputs so identity cancellation cannot turn a benchmark into no work.
+- Keep fallible constructor admission outside operation timing unless construction itself is the named workload. Every scale must stay within its source-owned `StabilizerResource` cap, cite exact CQ-ALGEBRA resource prerequisites, and distinguish value-size limits from tighter random-Tableau, solver, unitary-conversion, and aggregate flow-output algorithmic limits.
 
 ### PERF-GENERATION
 
@@ -364,7 +365,7 @@ Soak catches nonlinear behavior and rare performance instability and does not re
 
 Status: Complete.
 
-Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current CQ2 dependency-regenerated performance digest `229b4bf24aadfe92b6a576421a63fb795328cca9d3cc89dd03010b20c0dc977f`, bound to correctness digest `ad4b927cbc8cbbca2b9279b728f76dd72d22f7118cae5f754f025dc0ba4fd519`. The clean dependent schema-version-13 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` binds the previous Generation-refined digests and remains historical diagnostic infrastructure evidence rather than product-performance qualification.
+Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current CQ2 dependency-regenerated performance digest `67bcbfcf2d991c883b6d889bf48b4d9b8c09bcb52bdbd6dc1e041b6162a30193`, bound to correctness digest `7e42ddddd662593b56f0bd67885b74babf9a96319de990e4f2cb6218638edea5`. The clean dependent schema-version-13 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` binds the previous Generation-refined digests and remains historical diagnostic infrastructure evidence rather than product-performance qualification.
 
 Implementation revision: `abf7cd1bae0de045f62e976a290507238153f976`, verified with `local_modifications=false`.
 

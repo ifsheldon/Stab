@@ -110,7 +110,7 @@ pub use sampling::{CompiledSampler, count_determined_measurements};
 pub use stabilizers::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow, FlowMeasurementIndex,
     PauliBasis, PauliPhase, PauliSign, PauliString, PauliStringIterator, SingleQubitClifford,
-    StabilizerError, StabilizerResult, Tableau, TableauIterator, stabilizers_to_tableau,
-    unitary_to_tableau,
+    StabilizerError, StabilizerResource, StabilizerResult, Tableau, TableauIterator,
+    stabilizers_to_tableau, unitary_to_tableau,
 };
 pub use target::{Pauli, Target};

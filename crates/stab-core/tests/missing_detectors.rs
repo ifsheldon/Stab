@@ -137,7 +137,8 @@ fn pf5_missing_detectors_clifford_covers_all_single_qubit_cliffords()
         let gate = Gate::from_name(clifford.canonical_name())?;
         let tableau = gate.tableau()?;
         for input_basis in input_bases {
-            let output = tableau.apply(&PauliString::from_bases(PauliSign::Plus, [input_basis]))?;
+            let input = PauliString::from_bases(PauliSign::Plus, [input_basis])?;
+            let output = tableau.apply(&input)?;
             let output_basis = output
                 .get(0)
                 .ok_or_else(|| std::io::Error::other("missing single-qubit tableau output"))?;
@@ -199,10 +200,8 @@ fn pf5_missing_detectors_clifford_covers_all_fixed_two_qubit_tableau_gates()
                 if left_basis == PauliBasis::I && right_basis == PauliBasis::I {
                     continue;
                 }
-                let output = tableau.apply(&PauliString::from_bases(
-                    PauliSign::Plus,
-                    [left_basis, right_basis],
-                ))?;
+                let input = PauliString::from_bases(PauliSign::Plus, [left_basis, right_basis])?;
+                let output = tableau.apply(&input)?;
                 let output_bases = [
                     output
                         .get(0)

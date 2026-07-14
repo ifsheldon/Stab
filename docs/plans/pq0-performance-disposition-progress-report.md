@@ -6,9 +6,9 @@ Completed: 2026-07-13.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Current correctness dependency after the Algebra disposition reconciliation: schema-version-3 CQ0 semantic digest `ad4b927cbc8cbbca2b9279b728f76dd72d22f7118cae5f754f025dc0ba4fd519`.
+Current correctness dependency after Algebra resource-admission regeneration: schema-version-3 CQ0 semantic digest `7e42ddddd662593b56f0bd67885b74babf9a96319de990e4f2cb6218638edea5`.
 
-Current performance inventory digest after dependent CQ2 regeneration: `229b4bf24aadfe92b6a576421a63fb795328cca9d3cc89dd03010b20c0dc977f`.
+Current performance inventory digest after dependent CQ2 regeneration: `67bcbfcf2d991c883b6d889bf48b4d9b8c09bcb52bdbd6dc1e041b6162a30193`.
 
 Implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
@@ -16,7 +16,7 @@ Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca3258
 
 The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
-The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation source slices changed correctness owner ids, exact classifications, and acceptance state, so PQ0 was regenerated without changing those performance classifications. The current refresh preserves all 536 runtime groups and all inherited disposition, threshold, waiver, and unresolved counts while rebinding exact correctness ownership. Clean schema-version-13 PR, full, and soak dependent execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` validates the current Generation-refined digests; the synthetic adapter ratios remain report-only infrastructure evidence.
+The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, Generation, and Algebra resource-admission source slices changed correctness owner ids, exact classifications, checklist rows, and public API shape, so PQ0 was regenerated without relaxing any performance classification. The current refresh has 541 runtime groups and preserves all inherited disposition, threshold, waiver, and unresolved counts while rebinding exact correctness ownership. Clean schema-version-13 PR, full, and soak dependent execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` binds the previous Generation-refined digests and is historical; the synthetic adapter ratios remain report-only infrastructure evidence.
 
 PQ0 freezes inventory and migration decisions only.
 It does not claim that inherited timing ratios satisfy the comprehensive runner, preflight, scaling, memory, or statistical contract.
@@ -34,37 +34,37 @@ It does not claim that inherited timing ratios satisfy the comprehensive runner,
 | Inventory | Count |
 | --- | ---: |
 | Performance domains | 16 |
-| Checklist rows | 126 |
-| Done checklist rows | 73 |
+| Checklist rows | 127 |
+| Done checklist rows | 74 |
 | Partial checklist rows with explicit selected and deferred children | 7 |
 | Deferred checklist rows | 46 |
-| Default-feature public Rust API items | 1,922 |
-| Public API items covered by a measured parent | 1,013 |
-| Public API items classified as not independently performance relevant | 909 |
-| Qualification groups | 536 |
-| Measured or planned measured groups | 534 |
+| Default-feature public Rust API items | 1,968 |
+| Public API items covered by a measured parent | 1,021 |
+| Public API items classified as not independently performance relevant | 947 |
+| Qualification groups | 541 |
+| Measured or planned measured groups | 539 |
 | Non-performance metadata groups | 2 |
 | Inherited benchmark rows | 161 |
 | Upstream perf files | 23 |
 | Upstream `BENCHMARK(...)` symbols | 74 |
 | Current primary waiver rows with adapter retirement mappings | 5 |
-| Groups bound to exact CQ0 API owners | 242 |
-| Groups with stable planned CQ preflight ids | 294 |
+| Groups bound to exact CQ0 API owners | 246 |
+| Groups with stable planned CQ preflight ids | 295 |
 | Exact inherited threshold measurement pairs | 24 |
-| Exact checklist row-and-domain parent groups | 132 |
-| Exact checklist child claims across those parents | 180 |
+| Exact checklist row-and-domain parent groups | 133 |
+| Exact checklist child claims across those parents | 181 |
 | Partial-row child ownership entries | 50 |
-| Typed generated fixture families | 375 |
+| Typed generated fixture families | 380 |
 | Typed repository fixture families with SHA-256 | 35 |
 | Typed inline fixture families | 126 |
 | Scale points with exact input byte counts | 122 |
-| Scale points explicitly not byte-sized | 1,164 |
+| Scale points explicitly not byte-sized | 1,179 |
 
-The API inventory preserves the CQ0 primary performance ownership counts: 274 bit-kernel, 202 circuit, 1 CLI, 128 DEM, 15 DEM-sampling, 62 detection, 105 error-analysis, 150 flow and detector-utility, 178 gate, 107 generation, 97 result-IO, 49 sampling, 4 search, and 550 stabilizer-algebra items.
+The API inventory preserves the CQ0 primary performance ownership counts: 274 bit-kernel, 202 circuit, 1 CLI, 128 DEM, 15 DEM-sampling, 62 detection, 105 error-analysis, 96 flow and detector-utility, 178 gate, 107 generation, 97 result-IO, 49 sampling, 4 search, and 650 stabilizer-algebra items.
 Declaration-only kinds and marker or diagnostic trait implementations do not receive independent runtime claims.
-Each function, method, and behavioral trait implementation is assigned to one or more of 242 planned measured API parents grouped only by canonical owner, phase, and performance domain, with every exact API path and CQ0 `owner_case_id` listed as required evidence, three concrete scale ids, a work unit, and a no-aggregation output contract; the validator rejects absent, non-measured, cross-domain, path-omitting, or owner-omitting parents.
+Each function, method, and behavioral trait implementation is assigned to one or more of 246 planned measured API parents grouped only by canonical owner, phase, and performance domain, with every exact API path and CQ0 `owner_case_id` listed as required evidence, three concrete scale ids, a work unit, and a no-aggregation output contract; the validator rejects absent, non-measured, cross-domain, path-omitting, or owner-omitting parents.
 All 460 multi-domain API items preserve their secondary performance domains instead of silently retaining only the first CQ0 domain.
-The 72 performance-relevant selected checklist rows map to 132 exact row-and-domain parent groups, while inherited and API groups carry no checklist ownership, so a shared domain cannot make an unrelated benchmark claim the row.
+The 73 performance-relevant selected checklist rows map to 133 exact row-and-domain parent groups, while inherited and API groups carry no checklist ownership, so a shared domain cannot make an unrelated benchmark claim the row.
 The seven partial rows carry explicit stable selected and deferred child ids plus 50 machine-readable child-to-domain ownership entries; their parent groups carry only the 180 exact child claims selected for that domain, and no `(child_id, performance_feature)` pair has more than one primary owner.
 The broad `.stim`, `.dem`, and result-format row, for example, assigns only the result-format child to `PERF-CONVERT-CLI`; gate, DEM, flow, and analysis children remain with their own domains.
 

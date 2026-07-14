@@ -10,9 +10,9 @@ Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4
 
 Latest clean correctness evidence revision: `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` with `local_modifications=false`, for the historical Generation-refined digest.
 
-Current correctness inventory digest after Algebra disposition reconciliation: `ad4b927cbc8cbbca2b9279b728f76dd72d22f7118cae5f754f025dc0ba4fd519`.
+Current correctness inventory digest after Algebra resource-admission regeneration: `7e42ddddd662593b56f0bd67885b74babf9a96319de990e4f2cb6218638edea5`.
 
-Current dependent performance inventory digest: `229b4bf24aadfe92b6a576421a63fb795328cca9d3cc89dd03010b20c0dc977f`.
+Current dependent performance inventory digest: `67bcbfcf2d991c883b6d889bf48b4d9b8c09bcb52bdbd6dc1e041b6162a30193`.
 
 Clean current-digest PR, full, and soak correctness reports are not yet published. The reports from the reviewed committed revision above are historical because the source-owned Algebra dispositions changed both frozen digests.
 
@@ -87,6 +87,16 @@ The dependent PQ0 inventory was regenerated because circuit owner ids, upstream 
 - Review also found that one broad generator-helper fixture could not remain an atomic primary. It is split into six exact independently runnable fixture rows, and qualification validation permits an imported exact fixture to become supporting provenance only when its normalized exact Cargo selector is identical to the reviewed qualification primary. Duplicate terminal primaries remain rejected.
 - Three earlier GPT-5.6/max full-code-review passes and the final focused GPT-5.6/max inventory review found incomplete deterministic matrix evidence, weak pre-allocation proof, stale fixture selectors, incorrect command documentation, Python probability overclaim, missing CLI resource ownership, stale dependent digests, stale CQ0/CQ1 current-evidence wording, and one owner-count drift. Every confirmed finding is fixed, and clean committed-head execution closed the final Generation acceptance requirement.
 
+### Algebra Resource Admission
+
+- CQ2 ownership reconciliation revealed that several public caller-size-driven Algebra constructors were infallible despite allocating dense state or initiating expensive work. The resolved contract exposes typed limits through `StabilizerResource` and makes Pauli, flexible-Pauli, Clifford, Tableau, random-Tableau, and reusable Pauli-iterator construction fallible.
+- Pauli and Clifford values accept at most 1,048,576 qubits or entries; dense Tableau construction, circuit-to-Tableau conversion, and stabilizer solving accept at most 512 qubits; random-Tableau construction accepts at most 64 qubits; and unitary conversion accepts matrices through dimension 64. Clifford concatenation and repetition check projected size, repetition overflow has a resource-specific error, and empty repetition is constant-work.
+- Annotation-only identity-flow generation uses a separate 134,217,728 aggregate Pauli-bit budget. This preserves the established 2,049-qubit high-index annotation regression while rejecting larger quadratic output before constructing unchecked internal Pauli rows.
+- `crates/stab-core/tests/cq2_algebra_resources.rs` proves representative accepted boundaries, first rejection, first-extra-item collection, RNG non-consumption, circuit-derived rejection, solver and iterator limits, unitary-limit precedence, aggregate flow-output admission, and constant-work empty repetition. The complete `stab-core` suite and targeted `stab-core` plus `stab-bench` Clippy checks pass.
+- The focused milestone audit found that flow checking and time-reversal validation still selected their former 8,192-qubit dense path above the new 512-qubit Tableau cap, that iterable-constructor documentation overclaimed allocation-free rejection, and that one public Rustdoc link was broken. Dispatch now falls back to sparse validation at 513 qubits with a direct regression, documentation distinguishes explicit-size and unknown-length iterable admission, and Rustdoc passes with warnings denied.
+- Resource rejection is correctness evidence rather than a timed workload. Existing M6 benchmark setup now propagates constructor errors outside measured closures, and the performance plan requires accepted benchmark scales to cite the exact resource prerequisites without timing rejection paths.
+- This closes the deterministic-materialization spec gap but does not close the Algebra qualification slice. Exact semantic parents, public-API assignments, regenerated CQ0 and PQ0 inventories, clean evidence, milestone audit, and GPT-5.6/max review remain required.
+
 ## Current CQ2 Inventory
 
 | Feature | Implemented | Planned | Total |
@@ -98,8 +108,8 @@ The dependent PQ0 inventory was regenerated because circuit owner ids, upstream 
 | `CQ-BIT-KERNELS` | 12 | 0 | 12 |
 | `CQ-CIRCUIT-API` | 24 | 0 | 24 |
 | `CQ-GENERATION` | 25 | 0 | 25 |
-| `CQ-ALGEBRA` | 1 | 453 | 454 |
-| **CQ2 total** | **217** | **453** | **670** |
+| `CQ-ALGEBRA` | 1 | 457 | 458 |
+| **CQ2 total** | **217** | **457** | **674** |
 
 These counts are evidence owners, not an estimate of required new test functions. Reviewed exact parents may close several owners only when one selector proves their complete common contract.
 
@@ -137,6 +147,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --quiet
 cargo test -p stab-core --test cq2_circuit_api --test circuit_api --test circuit_transforms --test circuit_simplify --test mbqc_decomposition --quiet
 cargo test -p stab-core --test circuit_generation --quiet
+cargo test -p stab-core --test cq2_algebra_resources --quiet
 cargo test -p stab-core --lib circuit_generation::tests:: --quiet
 cargo test -p stab-cli --lib tests::generation::gen_rejects_quadratic_outputs_before_writing --quiet -- --exact
 cargo test -p stab-oracle qualification::classification::tests --quiet
@@ -173,6 +184,6 @@ The clean PR, full, soak, offline-report, exact-preflight, and dependent PQ1 art
 
 ## Remaining Blocker
 
-CQ2 still has 453 planned evidence owners, all in `CQ-ALGEBRA`. Generation source ownership and acceptance remain closed at 25 of 25; its clean PR, full, and soak correctness evidence plus dependent report-only PQ1 publication are historical after the Algebra digest change.
+CQ2 still has 457 planned evidence owners, all in `CQ-ALGEBRA`. Generation source ownership and acceptance remain closed at 25 of 25; its clean PR, full, and soak correctness evidence plus dependent report-only PQ1 publication are historical after the Algebra digest change.
 
-No external dependency or user decision blocks this work. The active implementation blocker is `CQ-ALGEBRA`, where 453 of 454 owners remain planned; final CQ2-wide audit and review remain pending until Algebra is implemented.
+No external dependency or user decision blocks this work. The active implementation blocker is `CQ-ALGEBRA`, where 457 of 458 owners remain planned; final CQ2-wide audit and review remain pending until Algebra is implemented.

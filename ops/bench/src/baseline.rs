@@ -398,8 +398,10 @@ pub(crate) fn run_stab_compare_row(
             ]))
         }
         "m6-clifford-string" => {
-            let mut left = CliffordString::identity(M6_CLIFFORD_QUBITS);
-            let right = CliffordString::identity(M6_CLIFFORD_QUBITS);
+            let mut left = CliffordString::identity(M6_CLIFFORD_QUBITS)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
+            let right = CliffordString::identity(M6_CLIFFORD_QUBITS)
+                .map_err(|error| stab_runner_error(&row.id, error))?;
             Ok(Some(vec![measure_stab(
                 "stab_clifford_string_multiplication_10K",
                 || {
@@ -413,8 +415,10 @@ pub(crate) fn run_stab_compare_row(
         "m6-pauli-string" => {
             let mut measurements = Vec::with_capacity(M6_PAULI_CASES.len());
             for (name, num_qubits) in M6_PAULI_CASES {
-                let mut left = PauliString::identity(num_qubits);
-                let right = PauliString::identity(num_qubits);
+                let mut left = PauliString::identity(num_qubits)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
+                let right = PauliString::identity(num_qubits)
+                    .map_err(|error| stab_runner_error(&row.id, error))?;
                 measurements.push(measure_stab(name, || {
                     let log_i = left
                         .right_multiply_in_place_returning_log_i_scalar(&right)
@@ -442,7 +446,7 @@ pub(crate) fn run_stab_compare_row(
             let tableau = circuit
                 .to_tableau(false, false, false)
                 .map_err(|error| stab_runner_error(&row.id, error))?;
-            let pauli = m6_pauli_string(M6_TABLEAU_QUBITS, 0x07ab_1ea7);
+            let pauli = m6_pauli_string(&row.id, M6_TABLEAU_QUBITS, 0x07ab_1ea7)?;
             Ok(Some(vec![
                 measure_stab("stab_tableau_from_circuit_32q", || {
                     let result = circuit
@@ -482,7 +486,7 @@ pub(crate) fn run_stab_compare_row(
             },
         )?])),
         "m6-stabilizers-to-tableau" => {
-            let stabilizers = m6_z_stabilizers(M6_STABILIZER_QUBITS);
+            let stabilizers = m6_z_stabilizers(&row.id, M6_STABILIZER_QUBITS)?;
             Ok(Some(vec![
                 measure_stab("stab_stabilizers_to_tableau_16q", || {
                     let tableau = stabilizers_to_tableau(&stabilizers, false, false, false)
@@ -633,13 +637,14 @@ fn run_sparse_xor_item_batch(buf: &mut SparseXorVec, xor_items: &[u32]) {
     black_box(buf.items().len());
 }
 
-fn m6_pauli_string(num_qubits: usize, seed: u64) -> PauliString {
+fn m6_pauli_string(row_id: &str, num_qubits: usize, seed: u64) -> Result<PauliString, BenchError> {
     let mut state = seed;
     let bases = (0..num_qubits).map(|_| {
         state = splitmix64(state);
         PauliBasis::from_xz((state & 1) != 0, (state & 2) != 0)
     });
     PauliString::from_bases(PauliSign::Plus, bases)
+        .map_err(|error| stab_runner_error(row_id, error))
 }
 
 fn m6_tableau_circuit(row_id: &str) -> Result<Circuit, BenchError> {
@@ -659,7 +664,7 @@ fn m6_tableau_circuit(row_id: &str) -> Result<Circuit, BenchError> {
     Circuit::from_stim_str(&text).map_err(|error| stab_runner_error(row_id, error))
 }
 
-fn m6_z_stabilizers(num_qubits: usize) -> Vec<PauliString> {
+fn m6_z_stabilizers(row_id: &str, num_qubits: usize) -> Result<Vec<PauliString>, BenchError> {
     (0..num_qubits)
         .map(|target| {
             PauliString::from_bases(
@@ -673,7 +678,8 @@ fn m6_z_stabilizers(num_qubits: usize) -> Vec<PauliString> {
                 }),
             )
         })
-        .collect()
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| stab_runner_error(row_id, error))
 }
 
 fn words_for_bits(bit_len: usize) -> usize {
@@ -711,7 +717,8 @@ fn measure_pauli_iter(
         let mut total_len = 0_usize;
         let mut iter = PauliStringIterator::new(
             num_qubits, min_weight, max_weight, allow_x, allow_y, allow_z,
-        );
+        )
+        .map_err(|error| stab_runner_error(name, error))?;
         while iter.iter_next() {
             count += 1;
             total_len += iter.result().len();

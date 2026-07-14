@@ -359,15 +359,44 @@ pub struct CliffordString {
 }
 
 impl CliffordString {
-    pub fn identity(num_qubits: usize) -> Self {
+    /// Creates an identity string within the [`crate::StabilizerResource::CliffordQubits`] limit.
+    pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
+        super::StabilizerResource::CliffordQubits.ensure(num_qubits)?;
+        Ok(Self::identity_unchecked(num_qubits))
+    }
+
+    pub(crate) fn identity_unchecked(num_qubits: usize) -> Self {
+        debug_assert!(num_qubits <= super::StabilizerResource::CliffordQubits.limit());
         Self {
             gates: vec![SingleQubitClifford::I; num_qubits],
             non_identity_count: 0,
         }
     }
 
-    pub fn from_gates(gates: impl IntoIterator<Item = SingleQubitClifford>) -> Self {
+    /// Collects Clifford gates, rejecting the first item beyond the Clifford-qubit limit.
+    pub fn from_gates(
+        gates: impl IntoIterator<Item = SingleQubitClifford>,
+    ) -> StabilizerResult<Self> {
+        let limit = super::StabilizerResource::CliffordQubits.limit();
+        let mut collected = Vec::new();
+        for gate in gates {
+            if collected.len() == limit {
+                return Err(StabilizerError::ResourceLimitExceeded {
+                    resource: super::StabilizerResource::CliffordQubits,
+                    requested: limit.saturating_add(1),
+                    limit,
+                });
+            }
+            collected.push(gate);
+        }
+        Ok(Self::from_gates_unchecked(collected))
+    }
+
+    pub(crate) fn from_gates_unchecked(
+        gates: impl IntoIterator<Item = SingleQubitClifford>,
+    ) -> Self {
         let gates = gates.into_iter().collect::<Vec<_>>();
+        debug_assert!(gates.len() <= super::StabilizerResource::CliffordQubits.limit());
         let non_identity_count = gates
             .iter()
             .filter(|gate| **gate != SingleQubitClifford::I)
@@ -382,13 +411,13 @@ impl CliffordString {
     ///
     /// Passing a seeded `rand` RNG gives deterministic Stab output. The generated stream is not
     /// intended to match Stim's C++ RNG stream.
-    pub fn random<R>(num_qubits: usize, rng: &mut R) -> Self
+    pub fn random<R>(num_qubits: usize, rng: &mut R) -> StabilizerResult<Self>
     where
         R: Rng + ?Sized,
     {
-        let mut result = Self::identity(num_qubits);
+        let mut result = Self::identity(num_qubits)?;
         result.randomize(rng);
-        result
+        Ok(result)
     }
 
     pub fn len(&self) -> usize {
@@ -437,6 +466,7 @@ impl CliffordString {
                 left: self.len(),
                 right: rhs.len(),
             })?;
+        super::StabilizerResource::CliffordQubits.ensure(new_len)?;
         let mut gates = Vec::with_capacity(new_len);
         gates.extend_from_slice(&self.gates);
         gates.extend_from_slice(&rhs.gates);
@@ -446,14 +476,20 @@ impl CliffordString {
         })
     }
 
+    /// Repeats this string after checking multiplication overflow and the resulting size.
     pub fn repeat(&self, repetitions: usize) -> StabilizerResult<Self> {
+        if repetitions == 0 || self.is_empty() {
+            return Ok(Self::identity_unchecked(0));
+        }
         let new_len =
             self.len()
                 .checked_mul(repetitions)
-                .ok_or(StabilizerError::LengthMismatch {
-                    left: self.len(),
-                    right: repetitions,
+                .ok_or(StabilizerError::ResourceSizeOverflow {
+                    resource: super::StabilizerResource::CliffordQubits,
+                    item_count: self.len(),
+                    repetitions,
                 })?;
+        super::StabilizerResource::CliffordQubits.ensure(new_len)?;
         let mut gates = Vec::with_capacity(new_len);
         for _ in 0..repetitions {
             gates.extend_from_slice(&self.gates);
@@ -475,7 +511,7 @@ impl CliffordString {
     /// If `rhs` is longer than this string, this string is extended with identity rotations before
     /// multiplication.
     pub fn right_multiply_in_place(&mut self, rhs: &Self) -> StabilizerResult<()> {
-        self.ensure_len(rhs.len());
+        self.ensure_len(rhs.len())?;
         if rhs.non_identity_count == 0 {
             return Ok(());
         }
@@ -489,10 +525,12 @@ impl CliffordString {
         Ok(())
     }
 
-    fn ensure_len(&mut self, len: usize) {
+    fn ensure_len(&mut self, len: usize) -> StabilizerResult<()> {
         if len > self.len() {
+            super::StabilizerResource::CliffordQubits.ensure(len)?;
             self.gates.resize(len, SingleQubitClifford::I);
         }
+        Ok(())
     }
 }
 
@@ -532,7 +570,7 @@ fn sign_from_bit(negative: bool) -> PauliSign {
 }
 
 fn signed_pauli_string(pauli: SignedPauli) -> PauliString {
-    PauliString::from_bases(pauli.sign, [pauli.basis])
+    PauliString::from_bases_unchecked(pauli.sign, [pauli.basis])
 }
 
 #[cfg(test)]
@@ -546,17 +584,17 @@ mod tests {
 
     #[test]
     fn right_multiply_in_place_matches_per_gate_products() {
-        let mut left = CliffordString::from_gates([
+        let mut left = CliffordString::from_gates_unchecked([
             SingleQubitClifford::H,
             SingleQubitClifford::S,
             SingleQubitClifford::I,
         ]);
-        let right = CliffordString::from_gates([
+        let right = CliffordString::from_gates_unchecked([
             SingleQubitClifford::S,
             SingleQubitClifford::H,
             SingleQubitClifford::SqrtX,
         ]);
-        let expected = CliffordString::from_gates([
+        let expected = CliffordString::from_gates_unchecked([
             SingleQubitClifford::H
                 .multiply(SingleQubitClifford::S)
                 .unwrap(),
@@ -575,8 +613,9 @@ mod tests {
 
     #[test]
     fn right_multiply_in_place_extends_shorter_left_side() {
-        let mut left = CliffordString::from_gates([SingleQubitClifford::H]);
-        let right = CliffordString::from_gates([SingleQubitClifford::I, SingleQubitClifford::S]);
+        let mut left = CliffordString::from_gates_unchecked([SingleQubitClifford::H]);
+        let right =
+            CliffordString::from_gates_unchecked([SingleQubitClifford::I, SingleQubitClifford::S]);
 
         left.right_multiply_in_place(&right).unwrap();
 
@@ -586,8 +625,8 @@ mod tests {
 
     #[test]
     fn right_multiply_in_place_extends_for_longer_identity_rhs() {
-        let mut left = CliffordString::from_gates([SingleQubitClifford::H]);
-        let right = CliffordString::identity(3);
+        let mut left = CliffordString::from_gates_unchecked([SingleQubitClifford::H]);
+        let right = CliffordString::identity_unchecked(3);
 
         left.right_multiply_in_place(&right).unwrap();
 

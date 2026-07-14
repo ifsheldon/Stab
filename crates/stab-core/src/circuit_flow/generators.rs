@@ -13,7 +13,7 @@ use helpers::{
     internal_flow_error, measure_reset_targets, measurement_indices_reversed, negative_record_flow,
     pair_measurement_target_index, pauli_basis, plain_tableau_targets, positive_record_flow,
     record_index_i32, rows_matching, stabilizer_to_circuit_error, unique_measure_reset_qubits,
-    unique_plain_target_indices,
+    unique_plain_target_indices, validate_ignored_only_flow_generator_work,
 };
 
 use super::transitions::{ReverseFlowTransition, reverse_flow_transition};
@@ -22,12 +22,13 @@ const MAX_MEASUREMENT_RICH_FLOW_GENERATOR_ROWS: usize = 4096;
 
 /// Returns unsigned stabilizer-flow generators for the supported tableau and PFM5 measurement subset.
 ///
-/// Repeat-contained measurement-rich circuits use bounded flattened operations plus a flow-row cap; broader semantics fail closed.
+/// Repeat-contained measurement-rich circuits use bounded flattened operations plus a flow-row cap.
+/// Annotation-only identity output is guarded by an aggregate Pauli-bit budget; broader semantics fail closed.
 pub fn circuit_flow_generators(circuit: &Circuit) -> CircuitResult<Vec<Flow>> {
     if circuit_is_ignored_only(circuit) {
-        return Ok(reverse_ordered_identity_flow_rows(
-            circuit.count_simulated_qubits(),
-        ));
+        let qubit_count = circuit.count_simulated_qubits();
+        validate_ignored_only_flow_generator_work(qubit_count)?;
+        return Ok(reverse_ordered_identity_flow_rows(qubit_count));
     }
     if circuit_requires_reverse_flow_solver(circuit) {
         return simple_measurement_rich_flow_generators(circuit)?
@@ -167,7 +168,7 @@ fn simple_measurement_flows(
                     PauliSign::Plus
                 },
             ),
-            PauliString::identity(qubit_count),
+            PauliString::identity_unchecked(qubit_count),
             [record_index],
             [],
         ));
@@ -260,8 +261,8 @@ fn duplicate_measure_reset_flows(
             )?);
         } else {
             flows.push(Flow::new(
-                PauliString::identity(qubit_count),
-                PauliString::from_bases(
+                PauliString::identity_unchecked(qubit_count),
+                PauliString::from_bases_unchecked(
                     if inverted ^ final_inverted {
                         PauliSign::Minus
                     } else {
@@ -317,7 +318,7 @@ fn simple_pair_measurement_flows(
                     PauliSign::Plus
                 },
             ),
-            PauliString::identity(qubit_count),
+            PauliString::identity_unchecked(qubit_count),
             [record_index],
             [],
         ));
@@ -511,7 +512,7 @@ impl MeasurementFeedbackFlowSolver {
                         PauliSign::Plus
                     },
                 ),
-                PauliString::identity(self.qubit_count),
+                PauliString::identity_unchecked(self.qubit_count),
                 [record_index],
                 [],
             ));
@@ -564,7 +565,7 @@ impl MeasurementFeedbackFlowSolver {
             if local_index == final_index {
                 self.flows.push(Flow::new(
                     single_pauli(self.qubit_count, qubit, basis),
-                    PauliString::from_bases(
+                    PauliString::from_bases_unchecked(
                         if inverted {
                             PauliSign::Minus
                         } else {
@@ -577,8 +578,8 @@ impl MeasurementFeedbackFlowSolver {
                 ));
             } else {
                 self.flows.push(Flow::new(
-                    PauliString::identity(self.qubit_count),
-                    PauliString::from_bases(
+                    PauliString::identity_unchecked(self.qubit_count),
+                    PauliString::from_bases_unchecked(
                         if inverted ^ final_inverted {
                             PauliSign::Minus
                         } else {
@@ -629,7 +630,7 @@ impl MeasurementFeedbackFlowSolver {
                         PauliSign::Plus
                     },
                 ),
-                PauliString::identity(self.qubit_count),
+                PauliString::identity_unchecked(self.qubit_count),
                 [record_index],
                 [],
             ));
@@ -673,14 +674,14 @@ impl MeasurementFeedbackFlowSolver {
         for (target, record_index) in instruction.targets().iter().rev().zip(record_indices) {
             match target.qubit_id().map(|id| id.get()) {
                 Some(0) => self.flows.push(Flow::new(
-                    PauliString::identity(self.qubit_count),
-                    PauliString::identity(self.qubit_count),
+                    PauliString::identity_unchecked(self.qubit_count),
+                    PauliString::identity_unchecked(self.qubit_count),
                     [record_index],
                     [],
                 )),
                 Some(1) => self.flows.push(Flow::new(
-                    PauliString::identity(self.qubit_count),
-                    PauliString::from_bases(
+                    PauliString::identity_unchecked(self.qubit_count),
+                    PauliString::from_bases_unchecked(
                         PauliSign::Minus,
                         vec![PauliBasis::I; self.qubit_count],
                     ),
@@ -711,8 +712,8 @@ impl MeasurementFeedbackFlowSolver {
                 return Ok(false);
             }
             self.flows.push(Flow::new(
-                PauliString::identity(self.qubit_count),
-                PauliString::identity(self.qubit_count),
+                PauliString::identity_unchecked(self.qubit_count),
+                PauliString::identity_unchecked(self.qubit_count),
                 [record_index],
                 [],
             ));
@@ -842,7 +843,7 @@ fn measured_pauli_product(
     qubit_count: usize,
     targets: &[Target],
 ) -> CircuitResult<PauliString> {
-    let mut product = PauliString::identity(qubit_count);
+    let mut product = PauliString::identity_unchecked(qubit_count);
     for target in targets {
         if target.is_combiner() {
             continue;
@@ -983,8 +984,11 @@ fn add_pauli_product_measurement_flow(
 ) -> CircuitResult<()> {
     if measured_product.has_no_pauli_terms() {
         flows.push(Flow::new(
-            PauliString::identity(qubit_count),
-            PauliString::from_bases(measured_product.sign(), vec![PauliBasis::I; qubit_count]),
+            PauliString::identity_unchecked(qubit_count),
+            PauliString::from_bases_unchecked(
+                measured_product.sign(),
+                vec![PauliBasis::I; qubit_count],
+            ),
             [record_index],
             [],
         ));
@@ -993,7 +997,7 @@ fn add_pauli_product_measurement_flow(
     remove_pauli_product_anticommutations(flows, measured_product)?;
     flows.push(Flow::new(
         measured_product.clone(),
-        PauliString::identity(qubit_count),
+        PauliString::identity_unchecked(qubit_count),
         [record_index],
         [],
     ));
@@ -1089,7 +1093,7 @@ fn pair_pauli(
     basis: PauliBasis,
     sign: PauliSign,
 ) -> PauliString {
-    PauliString::from_bases(
+    PauliString::from_bases_unchecked(
         sign,
         (0..qubit_count).map(|qubit| {
             if qubit == left || qubit == right {
@@ -1107,7 +1111,7 @@ fn single_pauli_with_sign(
     basis: PauliBasis,
     sign: PauliSign,
 ) -> PauliString {
-    PauliString::from_bases(
+    PauliString::from_bases_unchecked(
         sign,
         (0..len).map(|candidate| {
             if candidate == index {
@@ -1161,7 +1165,7 @@ fn unsupported_flow_generator_error(circuit: &Circuit) -> CircuitError {
 }
 
 pub(super) fn single_pauli(len: usize, index: usize, basis: PauliBasis) -> PauliString {
-    PauliString::from_bases(
+    PauliString::from_bases_unchecked(
         PauliSign::Plus,
         (0..len).map(|candidate| {
             if candidate == index {

@@ -14,7 +14,14 @@ pub struct Tableau {
 }
 
 impl Tableau {
-    pub fn identity(num_qubits: usize) -> Self {
+    /// Creates an identity Tableau within the [`crate::StabilizerResource::TableauQubits`] limit.
+    pub fn identity(num_qubits: usize) -> StabilizerResult<Self> {
+        super::StabilizerResource::TableauQubits.ensure(num_qubits)?;
+        Ok(Self::identity_unchecked(num_qubits))
+    }
+
+    pub(crate) fn identity_unchecked(num_qubits: usize) -> Self {
+        debug_assert!(num_qubits <= super::StabilizerResource::TableauQubits.limit());
         let mut xs = Vec::with_capacity(num_qubits);
         let mut zs = Vec::with_capacity(num_qubits);
         for index in 0..num_qubits {
@@ -38,12 +45,14 @@ impl Tableau {
     ///
     /// Passing a seeded `rand` RNG gives deterministic Stab output. This hook samples from a
     /// random Clifford circuit shape and is not intended to be uniform over the Clifford group or
-    /// to match Stim's C++ RNG stream.
+    /// to match Stim's C++ RNG stream. The current construction has the separate
+    /// [`crate::StabilizerResource::RandomTableauQubits`] algorithmic limit.
     pub fn random<R>(num_qubits: usize, rng: &mut R) -> StabilizerResult<Self>
     where
         R: Rng + ?Sized,
     {
-        let mut result = Self::identity(num_qubits);
+        super::StabilizerResource::RandomTableauQubits.ensure(num_qubits)?;
+        let mut result = Self::identity_unchecked(num_qubits);
         for target in 0..num_qubits {
             let gate =
                 single_qubit_gate_tableau(num_qubits, target, SingleQubitClifford::random(rng))?;
@@ -123,7 +132,8 @@ impl Tableau {
     }
 
     pub fn from_pauli_string(pauli: &PauliString) -> StabilizerResult<Self> {
-        let mut result = Self::identity(pauli.len());
+        super::StabilizerResource::TableauQubits.ensure(pauli.len())?;
+        let mut result = Self::identity_unchecked(pauli.len());
         for index in 0..pauli.len() {
             let basis = pauli
                 .get(index)
@@ -135,8 +145,8 @@ impl Tableau {
             let z_sign = sign_from_bit(basis.x_bit());
             let x_basis = single_basis_row(pauli.len(), index, PauliBasis::X);
             let z_basis = single_basis_row(pauli.len(), index, PauliBasis::Z);
-            let x_output = PauliString::from_bases(x_sign, x_basis);
-            let z_output = PauliString::from_bases(z_sign, z_basis);
+            let x_output = PauliString::from_bases_unchecked(x_sign, x_basis);
+            let z_output = PauliString::from_bases_unchecked(z_sign, z_basis);
             result.set_outputs(index, x_output, z_output)?;
         }
         Ok(result)
@@ -241,7 +251,7 @@ impl Tableau {
                 .unwrap_or(false);
             PauliBasis::from_xz(x, z)
         });
-        Ok(PauliString::from_bases(PauliSign::Plus, bases))
+        Ok(PauliString::from_bases_unchecked(PauliSign::Plus, bases))
     }
 
     pub fn x_output_pauli_xyz(
@@ -307,11 +317,11 @@ impl Tableau {
             let has_z = !target.commutes(self.x_output(index)?)?;
             bases.push(PauliBasis::from_xz(has_x, has_z));
         }
-        let unsigned = PauliString::from_bases(PauliSign::Plus, bases.clone());
+        let unsigned = PauliString::from_bases_unchecked(PauliSign::Plus, bases.clone());
         if !include_sign || self.apply(&unsigned)? == *target {
             return Ok(unsigned);
         }
-        let signed = PauliString::from_bases(PauliSign::Minus, bases);
+        let signed = PauliString::from_bases_unchecked(PauliSign::Minus, bases);
         if self.apply(&signed)? == *target {
             Ok(signed)
         } else {
@@ -401,7 +411,7 @@ fn ensure_pauli_len(pauli: &PauliString, expected: usize) -> StabilizerResult<()
 
 fn single_pauli(len: usize, index: usize, basis: PauliBasis, sign: PauliSign) -> PauliString {
     let bases = single_basis_row(len, index, basis);
-    PauliString::from_bases(sign, bases)
+    PauliString::from_bases_unchecked(sign, bases)
 }
 
 fn single_basis_row(len: usize, index: usize, basis: PauliBasis) -> Vec<PauliBasis> {
@@ -423,7 +433,7 @@ fn single_qubit_gate_tableau(
 ) -> StabilizerResult<Tableau> {
     ensure_tableau_target(num_qubits, target)?;
     let local = clifford.tableau();
-    let mut result = Tableau::identity(num_qubits);
+    let mut result = Tableau::identity_unchecked(num_qubits);
     result.set_outputs(
         target,
         scatter_pauli(local.x_output(0)?, &[target], num_qubits)?,
@@ -444,7 +454,7 @@ fn cnot_gate_tableau(
     }
     let local = Tableau::gate2("+XX", "+Z_", "+_X", "+ZZ")?;
     let targets = [control, target];
-    let mut result = Tableau::identity(num_qubits);
+    let mut result = Tableau::identity_unchecked(num_qubits);
     for (local_index, global_index) in targets.iter().copied().enumerate() {
         result.set_outputs(
             global_index,
@@ -491,7 +501,7 @@ fn scatter_pauli(
                 })?;
         *target = basis;
     }
-    Ok(PauliString::from_bases(local.sign(), bases))
+    Ok(PauliString::from_bases_unchecked(local.sign(), bases))
 }
 
 fn random_distinct_target<R>(num_qubits: usize, first: usize, rng: &mut R) -> usize

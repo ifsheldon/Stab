@@ -194,7 +194,7 @@ No case may exist only in `soak` if it protects deterministic public behavior th
 | `CQ-BIT-KERNELS` | Selected Rust scalar and portable-SIMD dense bits, bit tables, transposition, Boolean and popcount helpers, and sparse XOR helpers used by selected engines | Scalar differential checks, unaligned tails, empty and large widths, safe-Rust overlap policy, sparse-density crossover, allocation and mutation boundaries | Portable semantic subsets of SIMD bit, bit-table, word, sparse-XOR, and integer-twiddle GTests | `PERF-BIT-KERNELS` |
 | `CQ-CIRCUIT-API` | Construction, mutation, introspection, coordinates, repeat handling, and selected transforms | Exact values, round trips, clone and mutation independence, folded-versus-unrolled properties, transform invariants, caps and unsupported shapes | `circuit.test.cc`, `circuit_pybind_test.py`, transform and inverse tests | `PERF-CIRCUIT-MODEL`, `PERF-FLOWS-AND-DETECTOR-UTILITIES` |
 | `CQ-GENERATION` | Repetition, rotated and unrotated surface, color-code generation and noise knobs | Exact small goldens, structural large cases, parameter errors, deterministic output, detector and observable validity | generator C++ tests and `command_gen.test.cc` | `PERF-GENERATION` |
-| `CQ-ALGEBRA` | Pauli, Clifford, Tableau, Flow, iterators, conversions, and stabilizer solving | Exact algebra examples, group laws, commutation, conjugation, inverse, iterator cardinality, scalar cross-checks, invalid shapes | stabilizer GTests and selected util-top tests | `PERF-STABILIZER-ALGEBRA` |
+| `CQ-ALGEBRA` | Pauli, Clifford, Tableau, Flow, iterators, conversions, and stabilizer solving | Exact algebra examples, group laws, commutation, conjugation, inverse, iterator cardinality, scalar cross-checks, invalid shapes, typed materialization and algorithmic limits, first rejection, and side-effect precedence | stabilizer GTests and selected util-top tests | `PERF-STABILIZER-ALGEBRA` |
 | `CQ-SAMPLING` | Compiled measurement sampling, reference samples, frame and tableau paths, supported noise, repeats, herald records | Exact deterministic records, statistical distributions, separating circuits, skip-reference and loop-folding behavior, streaming writers, seed semantics | sampler GTests and `command_sample.test.cc` | `PERF-SAMPLING` |
 | `CQ-DETECTION` | Detection conversion, detector-frame sampling, `detect`, and `m2d` including selected sweep and feedback | Exact detector and observable records, reference subtraction, format matrices, sweep defaults, feedback direction, frame selection, streaming and writer failure | measurement-to-detection, frame simulator, detect, and m2d tests | `PERF-DETECTION` |
 | `CQ-DEM-SAMPLING` | Compiled DEM sampling, replay, sampled-error records, observables, repeats | Exact deterministic cases, statistical noise, replay equivalence, sparse and dense models, folded repeats, streaming, materialized caps | `dem_sampler.test.cc`, `command_sample_dem.test.cc` | `PERF-DEM-SAMPLING` |
@@ -318,13 +318,14 @@ Complete deterministic and property coverage for `CQ-STIM-FORMAT`, `CQ-DEM-FORMA
 - Add circuit and DEM folded-versus-unrolled properties and transform-preservation properties.
 - Add exact small generator goldens and structural larger generated-code checks.
 - Add algebra laws and scalar reference comparisons over boundary sizes around SIMD word widths.
+- Assign every Algebra materialization or bounded-algorithm API to exact accepted and first-rejected resource evidence. Prove collection stops on the first excess item, random rejection consumes no RNG state, circuit-derived conversion rejects before dense allocation, output-size accounting covers annotation-only identity flows, and unitary-dimension rejection precedes row-shape and numerical work.
 
 ### Tests
 
 - Exact pinned fixtures for canonical `.stim`, `.dem`, generated circuits, and each result format.
 - Property cases for parse-print-parse, format round trips, repeat folding, transform idempotence where contractual, Pauli and Tableau laws, and sparse-versus-dense agreement.
 - Negative cases for malformed syntax, invalid probabilities, bad target grouping, non-finite coordinates, count overflow, partial `ptb64` groups, invalid sparse indices, and excessive materialization.
-- Allocation and work-boundary cases for parser lines, nesting, result widths, flattening, coordinate maps, and generator output admission.
+- Allocation and work-boundary cases for parser lines, nesting, result widths, flattening, coordinate maps, generator output admission, Algebra value construction and growth, dense Tableau and solver widths, iterator state, random Tableau work, unitary dimensions, and aggregate flow output.
 
 ### Acceptance Criteria
 

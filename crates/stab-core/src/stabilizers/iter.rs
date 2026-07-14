@@ -67,7 +67,7 @@ impl CommutingPauliStringIterator {
             let mask = 1_u64 << index;
             PauliBasis::from_xz((x_bits & mask) != 0, (z_bits & mask) != 0)
         });
-        PauliString::from_bases(PauliSign::Plus, bases)
+        PauliString::from_bases_unchecked(PauliSign::Plus, bases)
     }
 
     fn candidate_matches_constraints(&self, candidate: &PauliString) -> bool {
@@ -195,7 +195,7 @@ impl TableauIterator {
                 return None;
             }
             self.yielded_empty = true;
-            return Some(Tableau::identity(0));
+            return Some(Tableau::identity_unchecked(0));
         }
 
         while let Some(level) = self.cur_level {
@@ -294,6 +294,7 @@ pub struct PauliStringIterator {
 }
 
 impl PauliStringIterator {
+    /// Creates reusable iterator state within the Pauli-qubit materialization limit.
     pub fn new(
         num_qubits: usize,
         min_weight: usize,
@@ -301,7 +302,8 @@ impl PauliStringIterator {
         allow_x: bool,
         allow_y: bool,
         allow_z: bool,
-    ) -> Self {
+    ) -> StabilizerResult<Self> {
+        super::StabilizerResource::PauliQubits.ensure(num_qubits)?;
         let mut result = Self {
             num_qubits,
             min_weight,
@@ -314,11 +316,11 @@ impl PauliStringIterator {
             current_weight: min_weight,
             positions: Vec::new(),
             active_bases: Vec::new(),
-            result: PauliString::identity(num_qubits),
+            result: PauliString::identity_unchecked(num_qubits),
             state: PauliStringIteratorState::Done,
         };
         result.restart();
-        result
+        Ok(result)
     }
 
     /// Returns the current borrowed iterator result.
