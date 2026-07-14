@@ -92,6 +92,7 @@ pub(super) fn validate_report(report: &QualificationReport) -> Result<(), Report
         "stab_build_fingerprint",
         &report.workers.stab_build_fingerprint,
     )?;
+    validate_sha256("stab_binary_sha256", &report.workers.stab_binary_sha256)?;
     if !report.adapter_receipt.validates_report_identity(
         &report.workers.stim_source_sha256,
         &report.workers.stim_build_fingerprint,
@@ -99,17 +100,29 @@ pub(super) fn validate_report(report: &QualificationReport) -> Result<(), Report
     ) {
         return Err(ReportError::AdapterReceipt);
     }
+    if !report.stab_build_receipt.validates_report_identity(
+        &report.workers.stab_source_sha256,
+        &report.workers.stab_build_fingerprint,
+        &report.workers.stab_binary_sha256,
+        &report.repository.commit_before,
+        &report.toolchain,
+    ) {
+        return Err(ReportError::StabBuildReceipt);
+    }
     if report.repository.commit_before != report.repository.commit_after
         || !valid_git_commit(&report.repository.commit_before)
     {
         return Err(ReportError::RepositoryIdentity);
     }
     validate_sha256("rustup_sha256", &report.toolchain.rustup_sha256)?;
+    validate_sha256("cargo_sha256", &report.toolchain.cargo_sha256)?;
     validate_sha256("rustc_sha256", &report.toolchain.rustc_sha256)?;
     if report.toolchain.rust_toolchain != "nightly-2026-06-20"
         || report.toolchain.cargo_profile != "release"
         || !std::path::Path::new(&report.toolchain.rustup_path).is_absolute()
+        || !std::path::Path::new(&report.toolchain.cargo_path).is_absolute()
         || !std::path::Path::new(&report.toolchain.rustc_path).is_absolute()
+        || report.toolchain.cargo_verbose_version.is_empty()
         || report.toolchain.rustc_verbose_version.is_empty()
         || !report
             .toolchain
@@ -728,6 +741,8 @@ pub(super) enum ReportError {
     HostEvidence,
     #[error("qualification report adapter build receipt is stale or inconsistent")]
     AdapterReceipt,
+    #[error("qualification report Stab build receipt is stale or inconsistent")]
+    StabBuildReceipt,
     #[error("qualification report worker receipt is stale or inconsistent")]
     WorkerReceipt,
     #[error("qualification report semantic work count overflows u64")]

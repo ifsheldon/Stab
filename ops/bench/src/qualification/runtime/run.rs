@@ -17,7 +17,7 @@ use super::statistics::{PairOrder, PairedSample, StatisticsSummary, pair_measure
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 6;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 7;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
@@ -97,6 +97,7 @@ pub(super) struct QualificationReport {
     pub(super) toolchain: super::toolchain::ToolchainEvidence,
     pub(super) workers: WorkerIdentityEvidence,
     pub(super) adapter_receipt: super::adapter::AdapterBuildReceipt,
+    pub(super) stab_build_receipt: super::stab_build::StabBuildReceipt,
     pub(super) correctness_preflight: CorrectnessPreflightEvidence,
     pub(super) semantic_preflight: PairExecution,
     pub(super) calibration: CalibrationEvidence,
@@ -197,7 +198,7 @@ pub(super) fn run(
         &repository_before.commit,
     )?;
     let toolchain = super::toolchain::collect(root)?;
-    let mut workers = PreparedWorkers::prepare(root)?;
+    let mut workers = PreparedWorkers::prepare(root, &repository_before.commit, &toolchain)?;
     let host_guard = HostGuard::prepare(root, args.allow_unverified_host)?;
     workers.pin_to_cpu(host_guard.selected_cpu());
 
@@ -326,6 +327,7 @@ pub(super) fn run(
         toolchain,
         workers: workers.identity_evidence(),
         adapter_receipt: workers.adapter_receipt().clone(),
+        stab_build_receipt: workers.stab_build_receipt().clone(),
         correctness_preflight,
         semantic_preflight,
         calibration,

@@ -13,7 +13,6 @@ use super::protocol::{
     EvidenceMode, GitCommit, Implementation, ProtocolExpectation, ProtocolId, SemanticDigest,
     WorkerMeasurement, parse_worker_json_lines,
 };
-use super::worker;
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
@@ -29,27 +28,34 @@ pub(crate) struct WorkerIdentityEvidence {
     pub(super) stim_binary_sha256: String,
     pub(super) stab_source_sha256: String,
     pub(super) stab_build_fingerprint: String,
+    pub(super) stab_binary_sha256: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct PreparedWorkers {
     root: PathBuf,
     adapter: AdapterExecutable,
-    worker_path: PathBuf,
-    worker_identity: worker::WorkerIdentity,
+    worker: super::stab_build::StabWorkerExecutable,
+    repository_commit: String,
+    toolchain: super::toolchain::ToolchainEvidence,
     cpu: Option<usize>,
 }
 
 impl PreparedWorkers {
-    pub(crate) fn prepare(root: &RepoRoot) -> Result<Self, InvocationError> {
+    pub(crate) fn prepare(
+        root: &RepoRoot,
+        repository_commit: &str,
+        toolchain: &super::toolchain::ToolchainEvidence,
+    ) -> Result<Self, InvocationError> {
         let adapter = prepare_adapter(root)?;
-        let worker_path = std::env::current_exe().map_err(InvocationError::CurrentExecutable)?;
-        let worker_identity = worker::current_identity()?;
+        let worker =
+            super::stab_build::StabWorkerExecutable::prepare(root, repository_commit, toolchain)?;
         let workers = Self {
             root: root.path.clone(),
             adapter,
-            worker_path,
-            worker_identity,
+            worker,
+            repository_commit: repository_commit.to_string(),
+            toolchain: toolchain.clone(),
             cpu: None,
         };
         workers.verify()?;
@@ -65,13 +71,23 @@ impl PreparedWorkers {
             stim_source_sha256: self.adapter.source_digest.as_str().to_string(),
             stim_build_fingerprint: self.adapter.build_fingerprint.as_str().to_string(),
             stim_binary_sha256: self.adapter.binary_digest.as_str().to_string(),
-            stab_source_sha256: self.worker_identity.source_digest.as_str().to_string(),
-            stab_build_fingerprint: self.worker_identity.build_fingerprint.as_str().to_string(),
+            stab_source_sha256: self.worker.identity().source_digest.as_str().to_string(),
+            stab_build_fingerprint: self
+                .worker
+                .identity()
+                .build_fingerprint
+                .as_str()
+                .to_string(),
+            stab_binary_sha256: self.worker.binary_sha256().to_string(),
         }
     }
 
     pub(crate) fn adapter_receipt(&self) -> &super::adapter::AdapterBuildReceipt {
         &self.adapter.receipt
+    }
+
+    pub(crate) fn stab_build_receipt(&self) -> &super::stab_build::StabBuildReceipt {
+        self.worker.receipt()
     }
 
     pub(crate) fn invoke(
@@ -112,9 +128,9 @@ impl PreparedWorkers {
             Implementation::Stab => {
                 arguments.insert(0, OsString::from("qualification-worker"));
                 (
-                    self.worker_path.clone(),
-                    self.worker_identity.source_digest.clone(),
-                    self.worker_identity.build_fingerprint.clone(),
+                    self.worker.program(),
+                    self.worker.identity().source_digest.clone(),
+                    self.worker.identity().build_fingerprint.clone(),
                 )
             }
         };
@@ -160,12 +176,8 @@ impl PreparedWorkers {
 
     pub(crate) fn verify(&self) -> Result<(), InvocationError> {
         self.adapter.verify()?;
-        let current = worker::current_identity()?;
-        if current.source_digest != self.worker_identity.source_digest
-            || current.build_fingerprint != self.worker_identity.build_fingerprint
-        {
-            return Err(InvocationError::WorkerIdentityChanged);
-        }
+        self.worker
+            .verify(&self.toolchain, &self.repository_commit)?;
         Ok(())
     }
 }
@@ -247,21 +259,17 @@ pub(crate) enum InvocationError {
     #[error(transparent)]
     Adapter(#[from] super::adapter::AdapterError),
     #[error(transparent)]
-    Worker(#[from] super::worker::WorkerError),
+    StabBuild(#[from] super::stab_build::StabBuildError),
     #[error(transparent)]
     Process(#[from] super::process::ProcessError),
     #[error(transparent)]
     Protocol(#[from] super::protocol::ProtocolError),
-    #[error("failed to resolve the current Stab qualification worker: {0}")]
-    CurrentExecutable(std::io::Error),
     #[error("qualification CPU {0} exceeds the shared worker protocol")]
     CpuRange(usize),
     #[error("qualification workers were invoked before selecting a host-policy CPU")]
     MissingCpu,
     #[error("qualification parent semantic work count overflows u64")]
     WorkOverflow,
-    #[error("qualification worker identity changed during the run")]
-    WorkerIdentityChanged,
     #[error(
         "{implementation} qualification worker failed with status {status:?}; stdout={stdout:?}; stderr={stderr:?}"
     )]

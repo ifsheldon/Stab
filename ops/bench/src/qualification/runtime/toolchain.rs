@@ -19,6 +19,9 @@ pub(super) struct ToolchainEvidence {
     pub(super) cargo_profile: String,
     pub(super) rustup_path: String,
     pub(super) rustup_sha256: String,
+    pub(super) cargo_path: String,
+    pub(super) cargo_sha256: String,
+    pub(super) cargo_verbose_version: String,
     pub(super) rustc_path: String,
     pub(super) rustc_sha256: String,
     pub(super) rustc_verbose_version: String,
@@ -32,18 +35,16 @@ pub(super) fn collect(root: &RepoRoot) -> Result<ToolchainEvidence, ToolchainErr
     let rustup = PathBuf::from(RUSTUP_PATH);
     let rustup_sha256 = super::adapter::sha256_regular_file(&rustup, MAX_TOOL_BYTES)?;
     let environment = rustup_environment()?;
-    let rustc_path_output = checked_output(
+    let cargo_path = rustup_tool_path(root, &rustup, "cargo", environment.clone())?;
+    let cargo_sha256 = super::adapter::sha256_regular_file(&cargo_path, MAX_TOOL_BYTES)?;
+    let cargo_version = checked_output(
         root,
-        &rustup,
-        vec![
-            OsString::from("which"),
-            OsString::from("rustc"),
-            OsString::from("--toolchain"),
-            OsString::from(RUST_TOOLCHAIN),
-        ],
-        environment,
+        &cargo_path,
+        vec![OsString::from("-Vv")],
+        controlled_environment(),
     )?;
-    let rustc_path = parse_single_line_path(&rustc_path_output)?;
+    let cargo_verbose_version = parse_tool_version("cargo", &cargo_version)?;
+    let rustc_path = rustup_tool_path(root, &rustup, "rustc", environment)?;
     let rustc_sha256 = super::adapter::sha256_regular_file(&rustc_path, MAX_TOOL_BYTES)?;
     let version = checked_output(
         root,
@@ -73,11 +74,44 @@ pub(super) fn collect(root: &RepoRoot) -> Result<ToolchainEvidence, ToolchainErr
         cargo_profile: "release".to_string(),
         rustup_path: rustup.to_string_lossy().into_owned(),
         rustup_sha256,
+        cargo_path: cargo_path.to_string_lossy().into_owned(),
+        cargo_sha256,
+        cargo_verbose_version,
         rustc_path: rustc_path.to_string_lossy().into_owned(),
         rustc_sha256,
         rustc_verbose_version,
         target_triple,
     })
+}
+
+fn rustup_tool_path(
+    root: &RepoRoot,
+    rustup: &Path,
+    tool: &'static str,
+    environment: Vec<(OsString, OsString)>,
+) -> Result<PathBuf, ToolchainError> {
+    let output = checked_output(
+        root,
+        rustup,
+        vec![
+            OsString::from("which"),
+            OsString::from(tool),
+            OsString::from("--toolchain"),
+            OsString::from(RUST_TOOLCHAIN),
+        ],
+        environment,
+    )?;
+    parse_single_line_path(&output)
+}
+
+fn parse_tool_version(tool: &'static str, bytes: &[u8]) -> Result<String, ToolchainError> {
+    let value = std::str::from_utf8(bytes)
+        .map_err(ToolchainError::Utf8)?
+        .trim();
+    if value.is_empty() || value.len() > 64 << 10 {
+        return Err(ToolchainError::MalformedToolVersion(tool));
+    }
+    Ok(value.to_string())
 }
 
 fn checked_output(
@@ -181,6 +215,8 @@ pub(super) enum ToolchainError {
     },
     #[error("rustc -vV output is malformed")]
     MalformedVersion,
+    #[error("{0} verbose version output is malformed")]
+    MalformedToolVersion(&'static str),
     #[error("rustc -vV output omits the host target")]
     MissingTarget,
     #[error("rustc target {0} differs from the running qualification host")]

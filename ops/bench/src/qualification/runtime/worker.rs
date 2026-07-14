@@ -3,7 +3,6 @@ use std::hint::black_box;
 use std::io::Read as _;
 use std::io::Write as _;
 use std::num::NonZeroU64;
-use std::path::Path;
 use std::time::Instant;
 
 use clap::{Args, ValueEnum};
@@ -17,6 +16,8 @@ use super::protocol::{
 use crate::config::STIM_COMMIT;
 
 const WORKER_SOURCE: &[u8] = include_bytes!("worker.rs");
+const DIAGNOSTIC_BUILD_FINGERPRINT: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
 
 #[derive(Clone, Debug)]
 pub(super) struct WorkerIdentity {
@@ -136,11 +137,18 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
 }
 
 pub(super) fn current_identity() -> Result<WorkerIdentity, WorkerError> {
-    let executable = std::env::current_exe().map_err(WorkerError::CurrentExecutable)?;
     Ok(WorkerIdentity {
-        source_digest: sha256_bytes(WORKER_SOURCE)?,
-        build_fingerprint: sha256_file(&executable)?,
+        source_digest: source_digest()?,
+        build_fingerprint: Sha256Digest::try_new(
+            option_env!("STAB_PQ1_BUILD_FINGERPRINT")
+                .unwrap_or(DIAGNOSTIC_BUILD_FINGERPRINT)
+                .to_string(),
+        )?,
     })
+}
+
+pub(super) fn source_digest() -> Result<Sha256Digest, WorkerError> {
+    sha256_bytes(WORKER_SOURCE)
 }
 
 fn protocol_smoke(iterations: u64, work_items: u64) -> String {
@@ -173,27 +181,6 @@ fn protocol_smoke(iterations: u64, work_items: u64) -> String {
 fn sha256_bytes(bytes: &[u8]) -> Result<Sha256Digest, WorkerError> {
     let digest = Sha256::digest(bytes);
     Sha256Digest::try_new(hex_bytes(&digest)?).map_err(WorkerError::Protocol)
-}
-
-fn sha256_file(path: &Path) -> Result<Sha256Digest, WorkerError> {
-    let mut file = crate::source_file::open_regular_file_bounded_descriptor(path, 512 << 20)
-        .map_err(|error| WorkerError::SafeExecutable(error.to_string()))?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 << 10];
-    loop {
-        let count = file
-            .read(&mut buffer)
-            .map_err(|source| WorkerError::ReadExecutable {
-                path: path.to_path_buf(),
-                source,
-            })?;
-        if count == 0 {
-            break;
-        }
-        let chunk = buffer.get(..count).ok_or(WorkerError::DigestEncoding)?;
-        hasher.update(chunk);
-    }
-    Sha256Digest::try_new(hex_bytes(&hasher.finalize())?).map_err(WorkerError::Protocol)
 }
 
 fn hex_bytes(bytes: &[u8]) -> Result<String, WorkerError> {
@@ -287,15 +274,6 @@ pub(super) enum WorkerError {
     UnsupportedHost,
     #[error(transparent)]
     Protocol(#[from] super::protocol::ProtocolError),
-    #[error("failed to resolve the current qualification worker executable: {0}")]
-    CurrentExecutable(std::io::Error),
-    #[error("failed to read qualification worker executable {path}: {source}")]
-    ReadExecutable {
-        path: std::path::PathBuf,
-        source: std::io::Error,
-    },
-    #[error("qualification worker executable failed descriptor-safe validation: {0}")]
-    SafeExecutable(String),
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]

@@ -48,6 +48,44 @@ pub(super) fn validate_pinned_stim(root: &RepoRoot) -> Result<(), GitError> {
     Ok(())
 }
 
+pub(super) fn materialize_repository_commit(
+    root: &RepoRoot,
+    expected_commit: &str,
+    destination: &Path,
+) -> Result<(), GitError> {
+    let view = GitView::open(&root.path)?;
+    if view.commit != expected_commit {
+        return Err(GitError::RepositoryCommitChanged {
+            actual: view.commit,
+            expected: expected_commit.to_string(),
+        });
+    }
+    let destination = std::fs::canonicalize(destination).map_err(|source| GitError::Io {
+        path: destination.to_path_buf(),
+        source,
+    })?;
+    if std::fs::read_dir(&destination)
+        .map_err(|source| GitError::Io {
+            path: destination.clone(),
+            source,
+        })?
+        .next()
+        .is_some()
+    {
+        return Err(GitError::NonemptyMaterialization(destination));
+    }
+    let destination = destination
+        .to_str()
+        .ok_or_else(|| GitError::NonUtf8Materialization(destination.clone()))?;
+    let prefix = format!("--prefix={destination}/");
+    view.command(
+        &["checkout-index", "--all", "--force", &prefix],
+        Some(&view.head_index),
+        false,
+    )?;
+    Ok(())
+}
+
 struct GitView {
     _temporary: tempfile::TempDir,
     worktree: PathBuf,
@@ -507,6 +545,12 @@ pub(super) enum GitError {
     },
     #[error("pinned Stim checkout has local modifications")]
     DirtyStim,
+    #[error("repository commit changed before materialization: {actual}, expected {expected}")]
+    RepositoryCommitChanged { actual: String, expected: String },
+    #[error("repository materialization directory is not empty: {0}")]
+    NonemptyMaterialization(PathBuf),
+    #[error("repository materialization path is not UTF-8: {0}")]
+    NonUtf8Materialization(PathBuf),
     #[error(transparent)]
     Process(#[from] super::process::ProcessError),
 }
