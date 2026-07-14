@@ -364,7 +364,7 @@ Soak catches nonlinear behavior and rare performance instability and does not re
 
 Status: Complete.
 
-Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current CQ2 dependency-regenerated semantic digest `2cd3f0cd44f2450297dc87abec98156eb717127483a051f8dd48ee29bdc39fcd`.
+Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current CQ2 dependency-regenerated semantic digest `3b55089bc331b115912818ba04b584c741a8c9a56e13d8b06d85cc829b6256a1`.
 
 Implementation revision: `abf7cd1bae0de045f62e976a290507238153f976`, verified with `local_modifications=false`.
 
