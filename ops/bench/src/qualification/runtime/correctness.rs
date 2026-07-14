@@ -263,7 +263,7 @@ fn validate_report<'a>(
             serde_json::to_vec(&result.selector).map_err(CorrectnessError::Json)?;
         if result.outcome != "passed"
             || result.selector_sha256 != expected.selector_sha256
-            || result.selector_sha256 != super::run::sha256_hex(&selector_bytes)
+            || !selector_digest_matches_contract(result, &selector_bytes)
             || !valid_sha256(&result.execution_receipt_sha256)
             || !optional_sha256(&result.stdout_sha256)
             || !optional_sha256(&result.stderr_sha256)
@@ -280,6 +280,20 @@ fn validate_report<'a>(
         return Err(CorrectnessError::ReportContract);
     }
     Ok(results)
+}
+
+fn selector_digest_matches_contract(result: &CaseResult, selector_bytes: &[u8]) -> bool {
+    match result.selector.kind.as_str() {
+        "cargo-test" | "property-target" => {
+            result.selector_sha256 == super::run::sha256_hex(selector_bytes)
+        }
+        // CQ resolves these selectors against source-owned blocker or fixture contracts before
+        // freezing the controller-approved request digest. Their display selector is not the
+        // hashed execution contract, so the performance consumer binds the request, report, and
+        // execution receipt instead of hashing the display value.
+        "oracle-fixture" | "ops-check" => true,
+        _ => false,
+    }
 }
 
 fn validate_completion(
@@ -772,6 +786,7 @@ mod tests {
     #[derive(Clone, Copy)]
     enum FixtureMutation {
         None,
+        ResolvedSelectorDigest,
         FabricatedPreflightPass,
         FailedReport,
         MismatchedCompletion,
@@ -808,6 +823,24 @@ mod tests {
             },
         )
         .expect("bound correctness preflight");
+        assert_eq!(evidence.status, CorrectnessPreflightStatus::Passed);
+    }
+
+    #[test]
+    fn resolved_fixture_selector_digest_stays_bound_to_the_approved_request() {
+        let fixture = fixture(FixtureMutation::ResolvedSelectorDigest);
+        let evidence = validate(
+            &fixture.root,
+            CorrectnessRequirement::Required {
+                output: &fixture.relative,
+                case_ids: &["cq-case".to_string()],
+                expected_manifest_sha256: &fixture.manifest,
+                expected_stab_commit: &fixture.commit,
+                expected_request_sha256: &fixture.request_sha256,
+                expected_completion_sha256: &fixture.completion_sha256,
+            },
+        )
+        .expect("resolved fixture selector digest remains request-bound");
         assert_eq!(evidence.status, CorrectnessPreflightStatus::Passed);
     }
 
@@ -864,14 +897,27 @@ mod tests {
         std::fs::create_dir_all(output.join("cases/cq-case")).expect("create correctness output");
         let manifest = "a".repeat(64);
         let commit = "b".repeat(40);
+        let resolved_selector = matches!(mutation, FixtureMutation::ResolvedSelectorDigest);
         let selector = EvidenceSelector {
             state: "existing".to_string(),
-            kind: "cargo-test".to_string(),
-            value: vec!["cargo".to_string(), "test".to_string()],
+            kind: if resolved_selector {
+                "oracle-fixture".to_string()
+            } else {
+                "cargo-test".to_string()
+            },
+            value: if resolved_selector {
+                vec!["fixture-id".to_string()]
+            } else {
+                vec!["cargo".to_string(), "test".to_string()]
+            },
         };
-        let selector_sha256 = super::super::run::sha256_hex(
-            &serde_json::to_vec(&selector).expect("serialize selector"),
-        );
+        let selector_sha256 = if resolved_selector {
+            "9".repeat(64)
+        } else {
+            super::super::run::sha256_hex(
+                &serde_json::to_vec(&selector).expect("serialize selector"),
+            )
+        };
         let executable = ExecutableIdentity {
             role: "cargo".to_string(),
             bytes: 1,
