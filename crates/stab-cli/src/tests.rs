@@ -2,6 +2,7 @@ use super::run_from;
 use tempfile::tempdir;
 
 mod convert;
+mod generation;
 mod help;
 mod legacy;
 mod m10;

@@ -64,11 +64,20 @@ Focused regression tests and M7 oracle rows cover each fixed behavior.
 
 Residual review risk: `crates/stab-cli/src/lib.rs` and `crates/stab-core/src/sampling.rs` are watch-list files near the 1200-line large-file threshold, but neither crosses the project threshold in this slice.
 
+## CQ2 Generation Qualification Addendum
+
+The later CQ2 source-ownership pass replaces M7's broad structural generation evidence with focused exact owners for the complete pinned repetition, surface, and color cases; the generator parameter and value-object contracts; private helper semantics; the complete upstream no-noise detector-count matrix; invalid color-family combinations; and materialization admission. The Python-only `Circuit.generated` string-dispatch error symbol remains deferred with Python bindings, while portable typed Rust constraints are owned independently.
+
+Materializing generator entry points now preflight an exact projected physical-qubit count against a 131,072 limit before building coordinate maps, instruction vectors, layout text, or CLI output. Repetition-code distance 2047 remains accepted; rotated surface distance 256 is the last accepted and 257 projects 132,097 qubits; unrotated surface distance 181 is the last accepted and 182 projects 131,769 qubits; color-code distance 341 is the last valid accepted distance and 343 projects 132,355 qubits. CLI regression coverage proves rejection occurs before `--out` is created. Pinned Stim accepts nominal distances through 2047, so this is an explicit bounded-materialization difference for surface and color families.
+
+The qualification tests also preserve folded maximum-round behavior and deterministically analyze every valid upstream matrix cell into an error-free detector error model. Representative sampled execution for every task, a 256-shot multiword batch, and the pinned Python shape retain the sampler contract without turning a deterministic proof into a multi-minute probabilistic loop.
+
 ## Verification Commands
 
 - `cargo fmt --check --all`
 - `cargo clippy -p stab-core -p stab-cli -p stab-oracle --all-targets -- -D warnings`
-- `cargo test -p stab-core circuit_generation --quiet`
+- `cargo test -p stab-core --test circuit_generation --quiet`
+- `cargo test -p stab-core --lib circuit_generation::tests:: --quiet`
 - `cargo test -p stab-cli --quiet`
 - `cargo test -p stab-cli gen --quiet`
 - `cargo test -p stab-cli convert --quiet`

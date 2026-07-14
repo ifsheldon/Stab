@@ -13,6 +13,8 @@ mod tests;
 pub use color::generate_color_code_circuit;
 pub use surface::generate_surface_code_circuit;
 
+const MAX_GENERATED_PHYSICAL_QUBITS: u64 = 131_072;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CodeDistance(u32);
 
@@ -341,11 +343,15 @@ impl GeneratedCircuit {
 }
 
 /// Generates Stim-compatible repetition-code memory circuits for the M7 generator subset.
+///
+/// Returns an error before materialization if the projected circuit exceeds the generator's
+/// 131,072-physical-qubit resource limit. Every valid repetition-code distance fits this limit.
 pub fn generate_repetition_code_circuit(
     params: &RepetitionCodeParams,
 ) -> CircuitResult<GeneratedCircuit> {
     let RepetitionCodeTask::Memory = params.task;
     let common = params.common();
+    validate_repetition_generation_size(common.distance.get())?;
     let measurement_count = common.distance.get() - 1;
     let qubit_count = measurement_count
         .checked_mul(2)
@@ -406,6 +412,82 @@ pub fn generate_repetition_code_circuit(
         layout_text: repetition_layout(qubit_count),
         hint_text: "# Legend:\n#     d# = data qubit\n#     L# = data qubit with logical observable crossing\n#     Z# = measurement qubit\n",
     })
+}
+
+fn validate_repetition_generation_size(distance: u32) -> CircuitResult<()> {
+    let physical_qubits = u64::from(distance)
+        .checked_mul(2)
+        .and_then(|count| count.checked_sub(1))
+        .ok_or_else(|| generation_size_overflow("repetition code", distance))?;
+    validate_generated_physical_qubits("repetition code", physical_qubits)
+}
+
+pub(super) fn validate_surface_generation_size(distance: u32, rotated: bool) -> CircuitResult<()> {
+    let distance = u64::from(distance);
+    let (family, physical_qubits) = if rotated {
+        let count = distance
+            .checked_mul(distance)
+            .and_then(|count| count.checked_mul(2))
+            .and_then(|count| count.checked_sub(1))
+            .ok_or_else(|| generation_size_overflow("rotated surface code", distance))?;
+        ("rotated surface code", count)
+    } else {
+        let width = distance
+            .checked_mul(2)
+            .and_then(|width| width.checked_sub(1))
+            .ok_or_else(|| generation_size_overflow("unrotated surface code", distance))?;
+        let count = width
+            .checked_mul(width)
+            .ok_or_else(|| generation_size_overflow("unrotated surface code", distance))?;
+        ("unrotated surface code", count)
+    };
+    validate_generated_physical_qubits(family, physical_qubits)
+}
+
+pub(super) fn validate_color_generation_size(distance: u32) -> CircuitResult<()> {
+    let distance = u64::from(distance);
+    let width = distance
+        .checked_add(
+            distance
+                .checked_sub(1)
+                .ok_or_else(|| generation_size_overflow("color code", distance))?
+                / 2,
+        )
+        .ok_or_else(|| generation_size_overflow("color code", distance))?;
+    let physical_qubits = width
+        .checked_mul(
+            width
+                .checked_add(1)
+                .ok_or_else(|| generation_size_overflow("color code", distance))?,
+        )
+        .and_then(|count| count.checked_div(2))
+        .ok_or_else(|| generation_size_overflow("color code", distance))?;
+    validate_generated_physical_qubits("color code", physical_qubits)
+}
+
+fn validate_generated_physical_qubits(
+    family: &'static str,
+    physical_qubits: u64,
+) -> CircuitResult<()> {
+    if physical_qubits > MAX_GENERATED_PHYSICAL_QUBITS {
+        return Err(CircuitError::invalid_domain_value(
+            "generated circuit physical qubit count",
+            format!(
+                "{physical_qubits} for {family}; current limit is {MAX_GENERATED_PHYSICAL_QUBITS}"
+            ),
+        ));
+    }
+    Ok(())
+}
+
+fn generation_size_overflow(
+    family: &'static str,
+    distance: impl std::fmt::Display,
+) -> CircuitError {
+    CircuitError::invalid_domain_value(
+        "generated circuit physical qubit count",
+        format!("overflow for {family} distance {distance}"),
+    )
 }
 
 fn repetition_cycle(
