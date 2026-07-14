@@ -58,6 +58,12 @@ impl RunLease {
     }
 }
 
+impl Drop for RunLease {
+    fn drop(&mut self) {
+        let _ = rustix::fs::flock(&self._file, rustix::fs::FlockOperation::Unlock);
+    }
+}
+
 fn validate_file(file: &std::fs::File, path: &Path, uid: u32) -> Result<(), LeaseError> {
     let metadata = file.metadata().map_err(|source| LeaseError::Metadata {
         path: path.to_path_buf(),
