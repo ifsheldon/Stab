@@ -8,7 +8,7 @@ The first source-owned deterministic slice now closes the selected `.stim` forma
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Clean evidence revision: `ec1ae89e1ae42be92f87d13cbe15cc3aacdfcb77` with `local_modifications=false`.
+Clean evidence revision: `7420a6909dd998b721cd15075361f31e431e4180` with `local_modifications=false`.
 
 Correctness inventory digest: `1152e9fa36d55c8a5a2282638fbc8ad79a39e7b4456161fba868a15c45cfb16e`.
 
@@ -46,23 +46,23 @@ These counts are evidence owners, not an estimate of required new test functions
 
 | Tier | Selected | Passed | Failed | Artifact | Request digest | Completion digest |
 | --- | ---: | ---: | ---: | --- | --- | --- |
-| PR | 302 | 302 | 0 | `target/qualification/correctness/cq2-stim-format-pr` | `54db4665e825646b812ea5f2095db26bbe29dae4df1af30000080a85c30cabc1` | `0b3036eb2d2b7ec37d3f4e13a931ca66f556a6faf528435b6efc273fc990b0ae` |
-| Full | 441 | 441 | 0 | `target/qualification/correctness/cq2-stim-format-full` | `634c68a3daff1a20c611fc62a8fb3243027b8c370c3656baeb987a6a41b51a3e` | `34607f2dad113e6287c626eb8ee1020c217683e495dbd83eb75d7aacd0095815` |
-| Soak | 441 | 441 | 0 | `target/qualification/correctness/cq2-stim-format-soak` | `c769ac43ba7809cd80095b32c7ca009f6c5aafd584efbbc8eac67bbd057386eb` | `20831c5501f7e345bbb3322abe5506beab310b0b4b9fc2dab779c49230a2df71` |
+| PR | 302 | 302 | 0 | `target/qualification/correctness/cq2-stim-format-docs-pr` | `085e11619fc16c1e88b4cdb1cf8d98b92b1023060dfb1dd5fa0e1ba80e2fe251` | `0816d26528c17dc8f181fddd812f41b8d458329c6e45c3c9c44b7d98e7664946` |
+| Full | 441 | 441 | 0 | `target/qualification/correctness/cq2-stim-format-docs-full` | `293f5d1009718b58d5eb38b640f9ebcbfa3a89b00bb3817b2c04290894ef2917` | `57335dfb8b75f38bccc3d7d8af01e526d840c10a63eb379dd537e20fa7647cd7` |
+| Soak | 441 | 441 | 0 | `target/qualification/correctness/cq2-stim-format-docs-soak` | `ff6e916925146673a2c0eedf808db2070362895b9c1b1e3a2c17604373ced49c` | `c5ea28aac1f1879e7fa967db36f6161dc92822c7b86360880ed6807683134dbd` |
 
 Offline report regeneration passed for every tier. Exact preflight for `cq-evidence-qualification-e660819ae9a223c6`, the canonical `.stim` round-trip parent, passed against full and soak receipts. Its PR preflight was intentionally rejected because the source-owned case tiers are full and soak, so the case is correctly absent from the PR selection.
 
-## Prior Dependent PQ1 Refresh
+## Dependent PQ1 Refresh
 
-These PQ1 reports remain diagnostic infrastructure with `promotable=false`, `report-only` baseline eligibility, and zero checked product thresholds. They bind the preceding performance inventory digest `f544245174195b0b8343aa26e3feb75f430d10d498effa2cac2c8883238475c3`; the current digest above requires a clean rerun after this documentation checkpoint is committed.
+The PQ1 group remains diagnostic infrastructure with `promotable=false`, `report-only` baseline eligibility, and zero checked product thresholds.
 
 | Tier | Pairs | Median ratio | Bootstrap 95% interval | Host | Artifact |
 | --- | ---: | ---: | --- | --- | --- |
-| PR | 3 | 1.014723 | [1.014454, 1.015689] | Verified | `target/benchmarks/qualification/pq1-cq2-stim-format-pr` |
-| Full | 9 | 1.015935 | [1.014968, 1.016674] | Verified | `target/benchmarks/qualification/pq1-cq2-stim-format-full` |
-| Soak | 15 | 1.015367 | [1.014833, 1.015559] | Verified | `target/benchmarks/qualification/pq1-cq2-stim-format-soak` |
+| PR | 3 | 1.015929 | [1.014152, 1.017463] | Verified | `target/benchmarks/qualification/pq1-cq2-stim-format-docs-pr` |
+| Full | 9 | 1.015046 | [1.014183, 1.015490] | Verified | `target/benchmarks/qualification/pq1-cq2-stim-format-docs-full` |
+| Soak | 15 | 1.014783 | [1.014632, 1.015155] | Verified | `target/benchmarks/qualification/pq1-cq2-stim-format-docs-soak` |
 
-All reports use schema version 13, correctness digest `1152e9fa36d55c8a5a2282638fbc8ad79a39e7b4456161fba868a15c45cfb16e`, preceding performance digest `f544245174195b0b8343aa26e3feb75f430d10d498effa2cac2c8883238475c3`, `local_modifications=false` before and after execution, and commit `ec1ae89e1ae42be92f87d13cbe15cc3aacdfcb77`. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. These ratios must not be reported as Stab product performance.
+All reports use schema version 13, the current correctness and performance digests, `local_modifications=false` before and after execution, and commit `7420a6909dd998b721cd15075361f31e431e4180`. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. These ratios must not be reported as Stab product performance.
 
 ## Verification
 

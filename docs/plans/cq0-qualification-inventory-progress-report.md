@@ -178,7 +178,7 @@ just qualification::correctness-check
 The corrected focused qualification run executes the CQ0 inventory tests plus the CQ1 selector and property-plan validation tests with no failures.
 The workspace test run passed with only the repository's pre-existing documented long-running parser fuzz smoke ignored.
 `just maintenance::pre-commit` passed before the implementation commit.
-The original `just qualification::correctness-check` passed from committed revision `02c93c19566bdc465ad9c795f35e956e1ff85440` with a clean worktree. The previous corrected digest then passed clean CQ1 PR, full, and soak execution from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; the full and soak tiers each passed all 410 then-current implemented or evidence-close owners. The completed selected `.stim` slice raises that count to 441, and clean current-digest execution from revision `ec1ae89e1ae42be92f87d13cbe15cc3aacdfcb77` passes PR 302/302, full 441/441, and soak 441/441 with offline regeneration and exact full/soak parent preflight.
+The original `just qualification::correctness-check` passed from committed revision `02c93c19566bdc465ad9c795f35e956e1ff85440` with a clean worktree. The previous corrected digest then passed clean CQ1 PR, full, and soak execution from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; the full and soak tiers each passed all 410 then-current implemented or evidence-close owners. The completed selected `.stim` slice raises that count to 441, and clean current-digest execution from revision `7420a6909dd998b721cd15075361f31e431e4180` passes PR 302/302, full 441/441, and soak 441/441 with offline regeneration and exact full/soak parent preflight.
 
 ## Remaining Program Work
 
