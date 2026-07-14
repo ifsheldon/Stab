@@ -303,26 +303,35 @@ fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), Repo
     if preflight_stim.output_digest != preflight_stab.output_digest {
         return Err(ReportError::WorkerReceipt);
     }
+    if preflight_stim.iteration_count != report.calibration.common_iterations
+        || preflight_stab.iteration_count != report.calibration.common_iterations
+    {
+        return Err(ReportError::WorkerReceipt);
+    }
     let expected_output_digest = &preflight_stim.output_digest;
     let mut invocations = Vec::new();
-    push_pair_invocations(&mut invocations, &report.semantic_preflight);
+    push_pair_invocations(&mut invocations, &report.semantic_preflight, true);
     for probe in &report.calibration.stim.probes {
-        invocations.push(&probe.invocation);
+        invocations.push((&probe.invocation, false));
     }
     for probe in &report.calibration.stab.probes {
-        invocations.push(&probe.invocation);
+        invocations.push((&probe.invocation, false));
     }
-    push_pair_invocations(&mut invocations, &report.calibration.common_validation);
+    push_pair_invocations(
+        &mut invocations,
+        &report.calibration.common_validation,
+        true,
+    );
     for pair in &report.warmups {
-        push_pair_invocations(&mut invocations, pair);
+        push_pair_invocations(&mut invocations, pair, true);
     }
     for pair in &report.samples {
-        push_pair_invocations(&mut invocations, pair);
+        push_pair_invocations(&mut invocations, pair, true);
     }
-    push_pair_invocations(&mut invocations, &report.memory.execution);
+    push_pair_invocations(&mut invocations, &report.memory.execution, true);
     let expected_cpu =
         u32::try_from(report.host.selected_cpu).map_err(|_| ReportError::HostEvidence)?;
-    for invocation in invocations {
+    for (invocation, bind_output_digest) in invocations {
         if invocation.rows.len() != 1 {
             return Err(ReportError::MeasurementCount(invocation.rows.len()));
         }
@@ -347,7 +356,7 @@ fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), Repo
                 || row.affinity_cpu != Some(expected_cpu)
                 || row.stim_commit.as_str() != report.stim_commit
                 || row.work_count != expected_work_count
-                || row.output_digest != *expected_output_digest
+                || bind_output_digest && row.output_digest != *expected_output_digest
                 || row.source_digest.as_str() != source
                 || row.build_fingerprint.as_str() != build
             {
@@ -359,11 +368,12 @@ fn validate_all_worker_receipts(report: &QualificationReport) -> Result<(), Repo
 }
 
 fn push_pair_invocations<'a>(
-    invocations: &mut Vec<&'a super::invocation::InvocationRecord>,
+    invocations: &mut Vec<(&'a super::invocation::InvocationRecord, bool)>,
     pair: &'a PairExecution,
+    bind_output_digest: bool,
 ) {
-    invocations.push(&pair.stim);
-    invocations.push(&pair.stab);
+    invocations.push((&pair.stim, bind_output_digest));
+    invocations.push((&pair.stab, bind_output_digest));
 }
 
 pub(super) fn run(root: &crate::root::RepoRoot, args: ReportArgs) -> Result<PathBuf, ReportError> {

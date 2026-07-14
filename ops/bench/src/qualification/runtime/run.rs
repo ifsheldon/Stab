@@ -202,10 +202,17 @@ pub(super) fn run(
     let mut workers = PreparedWorkers::prepare(root)?;
     let host_guard = HostGuard::prepare(root, args.allow_unverified_host)?;
     workers.pin_to_cpu(host_guard.selected_cpu());
+
+    let policy = calibration_policy()?;
+    let (stim_decision, stim_probes) =
+        calibrate_worker(&workers, Implementation::Stim, args.work_items, policy)?;
+    let (stab_decision, stab_probes) =
+        calibrate_worker(&workers, Implementation::Stab, args.work_items, policy)?;
+    let common_iterations = stim_decision.iterations.max(stab_decision.iterations);
     let semantic_preflight = execute_pair(
         &workers,
         0,
-        NonZeroU64::MIN,
+        common_iterations,
         args.work_items,
         EvidenceMode::Timing,
         None,
@@ -214,23 +221,6 @@ pub(super) fn run(
     let expected_output_digest = only_row(&semantic_preflight.stim.rows)?
         .output_digest
         .clone();
-
-    let policy = calibration_policy()?;
-    let (stim_decision, stim_probes) = calibrate_worker(
-        &workers,
-        Implementation::Stim,
-        args.work_items,
-        &expected_output_digest,
-        policy,
-    )?;
-    let (stab_decision, stab_probes) = calibrate_worker(
-        &workers,
-        Implementation::Stab,
-        args.work_items,
-        &expected_output_digest,
-        policy,
-    )?;
-    let common_iterations = stim_decision.iterations.max(stab_decision.iterations);
     let common_validation = execute_pair(
         &workers,
         0,
@@ -396,7 +386,6 @@ fn calibrate_worker(
     workers: &PreparedWorkers,
     implementation: Implementation,
     work_items: NonZeroU64,
-    expected_output_digest: &SemanticDigest,
     policy: CalibrationPolicy,
 ) -> Result<(CalibrationDecision, Vec<CalibrationProbeEvidence>), RunError> {
     let mut evidence = Vec::new();
@@ -407,7 +396,7 @@ fn calibrate_worker(
                 EvidenceMode::Timing,
                 iterations,
                 work_items,
-                Some(expected_output_digest),
+                None,
                 INVOCATION_TIMEOUT,
             )
             .map_err(|error| error.to_string())?;

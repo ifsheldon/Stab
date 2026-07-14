@@ -408,7 +408,7 @@ Turn the checklist and current 161-row manifest into a finite, reviewable invent
 
 Implementation note: `pq1-adapter-protocol-smoke` is a synthetic diagnostic group used only to prove the harness. It cannot accept product correctness evidence, enter a threshold baseline, or support a Stab-versus-Stim product speed claim.
 
-Audit note: the parent must independently derive `iterations * work_items`, bind every timed and memory receipt to the untimed semantic-preflight digest, recompute the adapter build fingerprint from the receipt's canonical build inputs, and inspect the clean revision through a private index reconstructed from `HEAD`. Controlled host evidence requires stable thermal-zone identity and readings no higher than the profile limit whenever the platform exposes the required probes.
+Audit note: the parent must independently derive `iterations * work_items`, keep calibration probes work-bound and outside ratio evidence, perform semantic preflight at the exact common calibrated batch shape, bind every subsequent validation, warmup, sample, and memory receipt to that digest, recompute the adapter build fingerprint from the receipt's canonical build inputs, and inspect the clean revision through a private index reconstructed from `HEAD`. Controlled host evidence requires stable thermal-zone identity and readings no higher than the profile limit whenever the platform exposes the required probes.
 
 ### Objective
 
