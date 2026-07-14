@@ -12,10 +12,10 @@ use crate::qualification::model::{
     EvidenceStatus, FeatureId, PropertyExecutionMode, PropertyExecutionPlan,
     PropertyPersistencePolicy, PropertyPlanRef, PropertyPlanSource, PublicApiItem,
     RelativeSourcePath, ResourceContract, SelectorKind, SemanticDigest, StableCaseDomain,
-    UpstreamCase,
+    UpstreamCase, UpstreamDisposition,
 };
 
-const LEDGER_SCHEMA_VERSION: u32 = 1;
+const LEDGER_SCHEMA_VERSION: u32 = 2;
 const MAX_LEDGER_CASES: usize = 4_096;
 const MAX_OWNERS_PER_CASE: usize = 2_048;
 const MAX_LEDGER_TEXT_BYTES: usize = 2_048;
@@ -27,6 +27,8 @@ struct QualificationCaseLedger {
     stim_version: String,
     stim_commit: String,
     cases: Vec<QualificationCaseSpec>,
+    #[serde(default)]
+    existing_parent_mappings: Vec<ExistingParentMappingSpec>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -41,6 +43,8 @@ struct QualificationCaseSpec {
     negative_axes: Vec<String>,
     #[serde(default)]
     upstream_owners: Vec<UpstreamOwnerSpec>,
+    #[serde(default)]
+    upstream_word_size_families: Vec<UpstreamWordSizeFamilySpec>,
     #[serde(default)]
     public_api_owners: Vec<PublicApiOwnerSpec>,
     #[serde(default)]
@@ -62,9 +66,40 @@ struct UpstreamOwnerSpec {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+struct UpstreamWordSizeFamilySpec {
+    path: RelativeSourcePath,
+    symbol_base: String,
+    word_sizes: Vec<u16>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct PublicApiOwnerSpec {
     crate_name: String,
     owner_path: ApiPath,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExistingParentMappingSpec {
+    id: String,
+    feature_id: FeatureId,
+    parent: ExistingParentSpec,
+    #[serde(default)]
+    upstream_owners: Vec<UpstreamOwnerSpec>,
+    #[serde(default)]
+    upstream_word_size_families: Vec<UpstreamWordSizeFamilySpec>,
+    #[serde(default)]
+    public_api_owners: Vec<PublicApiOwnerSpec>,
+    #[serde(default)]
+    oracle_fixture_owners: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExistingParentSpec {
+    provenance: EvidenceProvenance,
+    source_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -105,7 +140,12 @@ pub(super) fn apply(
         }
 
         let mut owner_count = 0usize;
-        for owner in &spec.upstream_owners {
+        let upstream_owners = expand_upstream_owners(
+            &spec.id,
+            &spec.upstream_owners,
+            &spec.upstream_word_size_families,
+        )?;
+        for owner in &upstream_owners {
             validate_text("upstream symbol", &owner.symbol)?;
             if let Some(subcase) = &owner.subcase {
                 validate_text("upstream subcase", subcase)?;
@@ -152,12 +192,14 @@ pub(super) fn apply(
                 })?;
             let old_owner = ownership.owner_case_id.clone();
             claim_planned_evidence(
-                &spec,
+                &spec.id,
+                spec.feature_id,
                 &old_owner,
                 EvidenceProvenance::UpstreamSemanticCase,
                 evidence_cases,
                 &mut claimed_evidence,
             )?;
+            ownership.comparator = spec.comparator;
             ownership.owner_case_id = qualification_id.clone();
             owner_count = owner_count.saturating_add(1);
         }
@@ -183,7 +225,8 @@ pub(super) fn apply(
                 ));
             };
             claim_planned_evidence(
-                &spec,
+                &spec.id,
+                spec.feature_id,
                 old_owner,
                 EvidenceProvenance::PublicRustApi,
                 evidence_cases,
@@ -226,7 +269,8 @@ pub(super) fn apply(
                 ));
             };
             claim_planned_evidence(
-                &spec,
+                &spec.id,
+                spec.feature_id,
                 old_owner,
                 EvidenceProvenance::OracleFixture,
                 evidence_cases,
@@ -275,6 +319,23 @@ pub(super) fn apply(
             deferred_product: None,
             status: EvidenceStatus::Implemented,
         });
+    }
+
+    for mapping in ledger.existing_parent_mappings {
+        validate_existing_parent_mapping_shape(&mapping)?;
+        if !source_ids.insert(mapping.id.clone()) {
+            return invalid(format!(
+                "qualification mapping source id {:?} is duplicated",
+                mapping.id
+            ));
+        }
+        apply_existing_parent_mapping(
+            &mapping,
+            upstream_cases,
+            public_api_items,
+            evidence_cases,
+            &mut claimed_evidence,
+        )?;
     }
 
     evidence_cases.retain(|case| !claimed_evidence.contains(&case.id));
@@ -400,8 +461,295 @@ fn validate_case_shape(spec: &QualificationCaseSpec) -> Result<(), InventoryErro
     Ok(())
 }
 
+fn validate_existing_parent_mapping_shape(
+    mapping: &ExistingParentMappingSpec,
+) -> Result<(), InventoryError> {
+    CaseId::try_new(mapping.id.clone()).map_err(|reason| {
+        InventoryError::InvalidQualificationCases(format!(
+            "qualification mapping source id {:?} is invalid: {reason}",
+            mapping.id
+        ))
+    })?;
+    validate_text("existing parent source id", &mapping.parent.source_id)?;
+    if !matches!(
+        mapping.parent.provenance,
+        EvidenceProvenance::BlockerLedger
+            | EvidenceProvenance::OracleFixture
+            | EvidenceProvenance::RustRegression
+    ) {
+        return invalid(format!(
+            "qualification mapping {:?} uses unsupported existing parent provenance {:?}",
+            mapping.id, mapping.parent.provenance
+        ));
+    }
+    let upstream_owners = expand_upstream_owners(
+        &mapping.id,
+        &mapping.upstream_owners,
+        &mapping.upstream_word_size_families,
+    )?;
+    let owner_count = upstream_owners
+        .len()
+        .saturating_add(mapping.public_api_owners.len())
+        .saturating_add(mapping.oracle_fixture_owners.len());
+    if owner_count == 0 || owner_count > MAX_OWNERS_PER_CASE {
+        return invalid(format!(
+            "qualification mapping {:?} has {} owners; expected 1..={}",
+            mapping.id, owner_count, MAX_OWNERS_PER_CASE
+        ));
+    }
+    Ok(())
+}
+
+fn apply_existing_parent_mapping(
+    mapping: &ExistingParentMappingSpec,
+    upstream_cases: &mut [UpstreamCase],
+    public_api_items: &mut [PublicApiItem],
+    evidence_cases: &mut [EvidenceCase],
+    claimed_evidence: &mut BTreeSet<CaseId>,
+) -> Result<(), InventoryError> {
+    let parent_matches = evidence_cases
+        .iter()
+        .enumerate()
+        .filter(|(_, case)| {
+            case.feature_id == mapping.feature_id
+                && case.provenance == mapping.parent.provenance
+                && case.source_id == mapping.parent.source_id
+        })
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    let [parent_index] = parent_matches.as_slice() else {
+        return invalid(format!(
+            "qualification mapping {:?} existing parent {:?}/{:?} resolved {} evidence records",
+            mapping.id,
+            mapping.parent.provenance,
+            mapping.parent.source_id,
+            parent_matches.len()
+        ));
+    };
+    let parent = evidence_cases.get(*parent_index).ok_or_else(|| {
+        InventoryError::InvalidQualificationCases(format!(
+            "qualification mapping {:?} resolved an invalid existing parent index",
+            mapping.id
+        ))
+    })?;
+    if !matches!(
+        parent.status,
+        EvidenceStatus::Implemented | EvidenceStatus::EvidenceClose
+    ) || parent.primary_selector.state != EvidenceState::Existing
+    {
+        return invalid(format!(
+            "qualification mapping {:?} parent {} is not executable existing evidence",
+            mapping.id, parent.id
+        ));
+    }
+    let parent_id = parent.id.clone();
+    let parent_comparator = parent.comparator;
+
+    let upstream_owners = expand_upstream_owners(
+        &mapping.id,
+        &mapping.upstream_owners,
+        &mapping.upstream_word_size_families,
+    )?;
+    for owner in &upstream_owners {
+        validate_text("upstream symbol", &owner.symbol)?;
+        if let Some(subcase) = &owner.subcase {
+            validate_text("upstream subcase", subcase)?;
+        }
+        let matches = upstream_cases
+            .iter()
+            .enumerate()
+            .filter(|(_, case)| {
+                case.path == owner.path
+                    && case.symbol == owner.symbol
+                    && case.subcase == owner.subcase
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        let [case_index] = matches.as_slice() else {
+            return invalid(format!(
+                "qualification mapping {:?} upstream owner {}:{}:{:?} resolved {} records",
+                mapping.id,
+                owner.path,
+                owner.symbol,
+                owner.subcase,
+                matches.len()
+            ));
+        };
+        let upstream_case = upstream_cases.get_mut(*case_index).ok_or_else(|| {
+            InventoryError::InvalidQualificationCases(format!(
+                "qualification mapping {:?} resolved an invalid upstream owner index",
+                mapping.id
+            ))
+        })?;
+        let ownership = upstream_case
+            .ownerships
+            .iter_mut()
+            .find(|ownership| ownership.feature_id == mapping.feature_id)
+            .ok_or_else(|| {
+                InventoryError::InvalidQualificationCases(format!(
+                    "qualification mapping {:?} upstream owner {}:{}:{:?} has no {} ownership",
+                    mapping.id,
+                    owner.path,
+                    owner.symbol,
+                    owner.subcase,
+                    mapping.feature_id.as_str()
+                ))
+            })?;
+        let old_owner = ownership.owner_case_id.clone();
+        claim_planned_evidence(
+            &mapping.id,
+            mapping.feature_id,
+            &old_owner,
+            EvidenceProvenance::UpstreamSemanticCase,
+            evidence_cases,
+            claimed_evidence,
+        )?;
+        ownership.comparator = parent_comparator;
+        ownership.owner_case_id = parent_id.clone();
+        upstream_case.disposition = UpstreamDisposition::PortedRust;
+        upstream_case.deferred_product = None;
+        upstream_case.reason = format!(
+            "Qualification mapping {} binds this exact upstream owner to canonical existing Rust evidence.",
+            mapping.id
+        );
+    }
+
+    for owner in &mapping.public_api_owners {
+        validate_text("public API crate", &owner.crate_name)?;
+        let matches = evidence_cases
+            .iter()
+            .filter(|case| {
+                case.provenance == EvidenceProvenance::PublicRustApi
+                    && case.feature_id == mapping.feature_id
+                    && case.source_id == owner.owner_path.as_str()
+            })
+            .map(|case| case.id.clone())
+            .collect::<Vec<_>>();
+        let [old_owner] = matches.as_slice() else {
+            return invalid(format!(
+                "qualification mapping {:?} public API owner {}::{} resolved {} evidence records",
+                mapping.id,
+                owner.crate_name,
+                owner.owner_path,
+                matches.len()
+            ));
+        };
+        claim_planned_evidence(
+            &mapping.id,
+            mapping.feature_id,
+            old_owner,
+            EvidenceProvenance::PublicRustApi,
+            evidence_cases,
+            claimed_evidence,
+        )?;
+        let mut mapped_items = 0usize;
+        for item in public_api_items
+            .iter_mut()
+            .filter(|item| item.crate_name == owner.crate_name && item.owner_case_id == *old_owner)
+        {
+            item.owner_case_id = parent_id.clone();
+            mapped_items = mapped_items.saturating_add(1);
+        }
+        if mapped_items == 0 {
+            return invalid(format!(
+                "qualification mapping {:?} public API owner {}::{} owns no API items",
+                mapping.id, owner.crate_name, owner.owner_path
+            ));
+        }
+    }
+
+    let mut supporting_selectors = Vec::new();
+    for fixture_id in &mapping.oracle_fixture_owners {
+        validate_identifier("oracle fixture", fixture_id)?;
+        let matches = evidence_cases
+            .iter()
+            .filter(|case| {
+                case.provenance == EvidenceProvenance::OracleFixture
+                    && case.feature_id == mapping.feature_id
+                    && case.source_id == *fixture_id
+            })
+            .map(|case| case.id.clone())
+            .collect::<Vec<_>>();
+        let [old_owner] = matches.as_slice() else {
+            return invalid(format!(
+                "qualification mapping {:?} oracle fixture owner {:?} resolved {} evidence records",
+                mapping.id,
+                fixture_id,
+                matches.len()
+            ));
+        };
+        claim_planned_evidence(
+            &mapping.id,
+            mapping.feature_id,
+            old_owner,
+            EvidenceProvenance::OracleFixture,
+            evidence_cases,
+            claimed_evidence,
+        )?;
+        supporting_selectors.push(EvidenceSelector {
+            state: EvidenceState::Existing,
+            kind: SelectorKind::OracleFixture,
+            value: vec![fixture_id.clone()],
+        });
+    }
+    let parent = evidence_cases.get_mut(*parent_index).ok_or_else(|| {
+        InventoryError::InvalidQualificationCases(format!(
+            "qualification mapping {:?} lost its existing parent",
+            mapping.id
+        ))
+    })?;
+    parent.supporting_selectors.extend(supporting_selectors);
+    parent.supporting_selectors.sort();
+    parent.supporting_selectors.dedup();
+    Ok(())
+}
+
+fn expand_upstream_owners(
+    mapping_id: &str,
+    owners: &[UpstreamOwnerSpec],
+    families: &[UpstreamWordSizeFamilySpec],
+) -> Result<Vec<UpstreamOwnerSpec>, InventoryError> {
+    let family_owner_count = families
+        .iter()
+        .map(|family| family.word_sizes.len())
+        .sum::<usize>();
+    let mut expanded = Vec::with_capacity(owners.len().saturating_add(family_owner_count));
+    for owner in owners {
+        expanded.push(UpstreamOwnerSpec {
+            path: owner.path.clone(),
+            symbol: owner.symbol.clone(),
+            subcase: owner.subcase.clone(),
+        });
+    }
+    for family in families {
+        validate_text("upstream word-size symbol base", &family.symbol_base)?;
+        if family.word_sizes.is_empty() {
+            return invalid(format!(
+                "qualification case {:?} has an empty upstream word-size family for {}:{}",
+                mapping_id, family.path, family.symbol_base
+            ));
+        }
+        let mut seen_sizes = BTreeSet::new();
+        for word_size in &family.word_sizes {
+            if !matches!(word_size, 64 | 128 | 256) || !seen_sizes.insert(*word_size) {
+                return invalid(format!(
+                    "qualification case {:?} has invalid or duplicate Stim word size {} for {}:{}",
+                    mapping_id, word_size, family.path, family.symbol_base
+                ));
+            }
+            expanded.push(UpstreamOwnerSpec {
+                path: family.path.clone(),
+                symbol: format!("{}_{}", family.symbol_base, word_size),
+                subcase: Some(format!("W={word_size}")),
+            });
+        }
+    }
+    Ok(expanded)
+}
+
 fn claim_planned_evidence(
-    spec: &QualificationCaseSpec,
+    mapping_id: &str,
+    feature_id: FeatureId,
     evidence_id: &CaseId,
     provenance: EvidenceProvenance,
     evidence_cases: &[EvidenceCase],
@@ -413,23 +761,22 @@ fn claim_planned_evidence(
         .ok_or_else(|| {
             InventoryError::InvalidQualificationCases(format!(
                 "qualification case {:?} references missing evidence {}",
-                spec.id, evidence_id
+                mapping_id, evidence_id
             ))
         })?;
     if case.status != EvidenceStatus::Planned
         || case.provenance != provenance
-        || case.feature_id != spec.feature_id
-        || case.comparator != spec.comparator
+        || case.feature_id != feature_id
     {
         return invalid(format!(
             "qualification case {:?} cannot claim {} with {:?}/{:?}/{:?}/{:?}",
-            spec.id, evidence_id, case.status, case.provenance, case.feature_id, case.comparator
+            mapping_id, evidence_id, case.status, case.provenance, case.feature_id, case.comparator
         ));
     }
     if !claimed.insert(evidence_id.clone()) {
         return invalid(format!(
             "qualification case {:?} repeats or steals evidence {}",
-            spec.id, evidence_id
+            mapping_id, evidence_id
         ));
     }
     Ok(())
@@ -547,7 +894,8 @@ mod tests {
     }
 
     #[test]
-    fn claiming_evidence_rejects_wrong_feature_comparator_and_duplicate_owner() {
+    fn claiming_evidence_allows_exact_comparator_refinement_but_rejects_wrong_feature_and_duplicate_owner()
+     {
         let spec = test_spec();
         let id = CaseId::try_new("cq-evidence-upstream-test".to_string()).expect("case id");
         let evidence = vec![EvidenceCase {
@@ -582,7 +930,8 @@ mod tests {
         }];
         let mut claimed = BTreeSet::new();
         claim_planned_evidence(
-            &spec,
+            &spec.id,
+            spec.feature_id,
             &id,
             EvidenceProvenance::UpstreamSemanticCase,
             &evidence,
@@ -591,7 +940,8 @@ mod tests {
         .expect("first claim");
         assert!(
             claim_planned_evidence(
-                &spec,
+                &spec.id,
+                spec.feature_id,
                 &id,
                 EvidenceProvenance::UpstreamSemanticCase,
                 &evidence,
@@ -604,7 +954,8 @@ mod tests {
         wrong.feature_id = FeatureId::DemFormat;
         assert!(
             claim_planned_evidence(
-                &wrong,
+                &wrong.id,
+                wrong.feature_id,
                 &id,
                 EvidenceProvenance::UpstreamSemanticCase,
                 &evidence,
@@ -612,6 +963,71 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn existing_parent_mapping_shape_requires_owned_supported_parent_kind() {
+        let mapping = ExistingParentMappingSpec {
+            id: "cq2-existing-parent-map".to_string(),
+            feature_id: FeatureId::GateContract,
+            parent: ExistingParentSpec {
+                provenance: EvidenceProvenance::BlockerLedger,
+                source_id: "pfm3-contract-fixed-tableau".to_string(),
+            },
+            upstream_owners: vec![UpstreamOwnerSpec {
+                path: RelativeSourcePath::try_new(
+                    "src/stim/simulators/tableau_simulator.test.cc".into(),
+                )
+                .expect("path"),
+                symbol: "TableauSimulator.unitary_gates_consistent_with_tableau_data_64"
+                    .to_string(),
+                subcase: None,
+            }],
+            upstream_word_size_families: Vec::new(),
+            public_api_owners: Vec::new(),
+            oracle_fixture_owners: Vec::new(),
+        };
+        validate_existing_parent_mapping_shape(&mapping).expect("valid mapping");
+
+        let mut empty = mapping;
+        empty.upstream_owners.clear();
+        assert!(validate_existing_parent_mapping_shape(&empty).is_err());
+        empty.upstream_owners.push(UpstreamOwnerSpec {
+            path: RelativeSourcePath::try_new("src/stim/gates/gates.test.cc".into()).expect("path"),
+            symbol: "gate_data.lookup".to_string(),
+            subcase: None,
+        });
+        empty.parent.provenance = EvidenceProvenance::QualificationPlan;
+        assert!(validate_existing_parent_mapping_shape(&empty).is_err());
+    }
+
+    #[test]
+    fn upstream_word_size_families_expand_to_exact_parameterized_owners() {
+        let path =
+            RelativeSourcePath::try_new("src/stim/simulators/frame_simulator.test.cc".into())
+                .expect("path");
+        let families = vec![UpstreamWordSizeFamilySpec {
+            path: path.clone(),
+            symbol_base: "FrameSimulator.noisy_measurement_x".to_string(),
+            word_sizes: vec![64, 128, 256],
+        }];
+        let expanded =
+            expand_upstream_owners("cq2-word-size-family", &[], &families).expect("expand");
+        assert_eq!(expanded.len(), 3);
+        let first = expanded.first().expect("first expanded owner");
+        let third = expanded.last().expect("last expanded owner");
+        assert_eq!(first.path, path);
+        assert_eq!(first.symbol, "FrameSimulator.noisy_measurement_x_64");
+        assert_eq!(first.subcase.as_deref(), Some("W=64"));
+        assert_eq!(third.symbol, "FrameSimulator.noisy_measurement_x_256");
+        assert_eq!(third.subcase.as_deref(), Some("W=256"));
+
+        let duplicate = vec![UpstreamWordSizeFamilySpec {
+            path: first.path.clone(),
+            symbol_base: "FrameSimulator.noisy_measurement_x".to_string(),
+            word_sizes: vec![64, 64],
+        }];
+        assert!(expand_upstream_owners("cq2-word-size-family", &[], &duplicate).is_err());
     }
 
     fn test_spec() -> QualificationCaseSpec {
@@ -637,6 +1053,7 @@ mod tests {
             resource_contract: super::super::evidence::semantic_only_resource_contract(),
             negative_axes: Vec::new(),
             upstream_owners: Vec::new(),
+            upstream_word_size_families: Vec::new(),
             public_api_owners: Vec::new(),
             oracle_fixture_owners: Vec::new(),
             static_property_plan: None,

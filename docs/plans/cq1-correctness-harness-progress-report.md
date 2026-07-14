@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, and result-format slices change the correctness inventory digest to `adcc3d19605e4fc7bd9e1b3f3373ddf38d81301430d891f062baaab0c6fdc8f6` and raise implemented-or-closed ownership from the original CQ1 410 to 493. Clean global current-digest evidence from revision `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` passes PR 331/331, full 493/493, and soak 493/493 with offline report regeneration and exact full/soak preflight for the multi-width reader parent; see `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Current-evidence note, 2026-07-14: the completed selected CQ2 `.stim`, `.dem`, result-format, and gate-contract slices change the correctness inventory digest to `d4e35f2cd834ea51a67c2ef5229d1788ae03a7c8607a9424c900fae073ab8a56` and raise implemented-or-closed ownership from the original CQ1 410 to 501. Clean global evidence from revision `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` passes PR 331/331, full 493/493, and soak 493/493 for the preceding result-format digest, but it is historical rather than promotable evidence for the current gate-refined digest. Clean current-digest PR, full, soak, report, and exact gate-parent preflight execution remain required; see `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 
@@ -14,7 +14,7 @@ Correctness inventory: schema version 3 at digest `b2909c677a66e2b034c8ab26e8dc1
 
 Evidence platform: Linux AArch64, target `aarch64-unknown-linux-gnu`, Rust `1.98.0-nightly`.
 
-CQ1 makes the frozen CQ0 selectors, comparators, statistical plans, property plans, resource contracts, execution receipts, reports, and preflight bindings executable. It does not claim that the 3,662 planned CQ2 through CQ5 atomic owners already pass.
+CQ1 makes the frozen CQ0 selectors, comparators, statistical plans, property plans, resource contracts, execution receipts, reports, and preflight bindings executable. At the original CQ1 evidence revision, it did not claim that the then-current 3,662 planned CQ2 through CQ5 atomic owners already passed.
 
 ## Delivered Harness
 
@@ -28,7 +28,7 @@ CQ1 makes the frozen CQ0 selectors, comparators, statistical plans, property pla
 - Statistical cases use canonical integer rejection boundaries, exact completion markers, declared comparison and batch multiplicity, deterministic soak seed panels, and suite-wide false-positive accounting.
 - Property cases support typed static corpora or deterministic generated workers, bounded shrinking, persisted regressions, replay, output limits, and killable timeouts.
 
-## Clean Evidence
+## Original Clean Evidence
 
 | Tier | Selected | Passed | Failed | Planned visible | Deferred selected | Statistical shots | Result |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
@@ -48,7 +48,7 @@ Every tier reports `selection_complete=true` and `local_modifications=false`.
 
 Generated evidence remains under `target/qualification/correctness/pr`, `target/qualification/correctness/full`, and `target/qualification/correctness/soak`.
 
-## Full-Tier Domain Results
+## Original Full-Tier Domain Results
 
 | Domain | Passed | Failed | Planned for later CQ milestones |
 | --- | ---: | ---: | ---: |

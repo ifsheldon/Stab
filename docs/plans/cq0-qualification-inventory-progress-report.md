@@ -2,7 +2,7 @@
 
 ## Status
 
-CQ0 is complete after CQ1-driven exact-selector and canonical-owner corrections plus the completed selected CQ2 `.stim`, `.dem`, and result-format ownership slices.
+CQ0 is complete after CQ1-driven exact-selector and canonical-owner corrections plus the completed selected CQ2 `.stim`, `.dem`, result-format, and gate-contract ownership slices.
 
 Original source-owned evidence revision: `02c93c19566bdc465ad9c795f35e956e1ff85440` with `local_modifications=false`.
 
@@ -10,11 +10,11 @@ Corrected inventory execution evidence revision: `e7ba513822c26859a2b5c70c94d406
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Current corrected schema-version-3 manifest digest: `adcc3d19605e4fc7bd9e1b3f3373ddf38d81301430d891f062baaab0c6fdc8f6`.
+Current corrected schema-version-3 manifest digest: `d4e35f2cd834ea51a67c2ef5229d1788ae03a7c8607a9424c900fae073ab8a56`.
 
 Pinned isolated Python AST version: 3.14.6.
 
-This milestone freezes a finite source and API inventory; it does not claim that the 3,223 planned CQ2 through CQ5 evidence owners already pass.
+This milestone freezes a finite source and API inventory; it does not claim that the 2,497 planned CQ2 through CQ5 evidence owners already pass.
 
 ## Inventory
 
@@ -29,50 +29,50 @@ This milestone freezes a finite source and API inventory; it does not claim that
 | Multi-domain relevance records | 651 | Primarily command plus engine behavior and mixed semantic methods; relevance does not itself confer passing evidence. |
 | Dynamic parameter families in executable scope | 0 | All 23 dynamic families are content-addressed, visible, and non-executable. |
 | Default-feature public API items | 1,922 | Includes re-exports, variants, enum payload fields, public struct fields, inherent methods, trait methods, and explicit non-synthetic, non-blanket trait implementations. |
-| Evidence owners | 3,716 | 2,383 upstream semantic owners, 685 public Rust API owners, 389 oracle-fixture owners, 165 blocker cases, 93 qualification-plan owners, and one hostile-path regression; 51 oracle fixtures are retained as supporting provenance on canonical blocker or qualification parents instead of duplicating terminal selectors. |
+| Evidence owners | 2,998 | 1,730 upstream semantic owners, 621 public Rust API owners, 380 oracle-fixture owners, 165 blocker cases, 101 qualification-plan owners, and one hostile-path regression; 60 oracle fixtures are retained as supporting provenance on canonical blocker or qualification parents instead of duplicating terminal selectors. |
 
 ### Upstream Dispositions
 
 | Disposition | Count |
 | --- | ---: |
-| `ported-rust` | 165 |
-| `semantic-mining` | 2,051 |
-| `deferred-product` | 659 |
-| `not-applicable` | 11 |
+| `ported-rust` | 456 |
+| `semantic-mining` | 1,622 |
+| `deferred-product` | 784 |
+| `not-applicable` | 24 |
 | `exact-oracle` | 0 |
 | `superseded` | 0 |
 
-The 659 deferred records name one of twelve typed products: Crumble 5, deprecated detector hypergraph 1, diagrams 88, `explain_errors` 2, interactive simulators 75, Python bindings 87, QASM 10, Quirk 4, sinter 118, stimcirq 117, stimflow 113, and ZX or lattice-surgery integrations 39.
-Of those deferred records, 182 remain relevant to at least one CQ domain summary, but no deferred record owns executable evidence or contributes a passing case.
+The 784 deferred records name one of twelve typed products: Crumble 5, deprecated detector hypergraph 1, diagrams 88, `explain_errors` 2, interactive simulators 199, Python bindings 88, QASM 10, Quirk 4, sinter 118, stimcirq 117, stimflow 113, and ZX or lattice-surgery integrations 39.
+Of those deferred records, 307 remain relevant to at least one CQ domain summary, but no deferred record owns executable evidence or contributes a passing case.
 
 ### Evidence Status
 
 | Status | Count |
 | --- | ---: |
-| `implemented` | 476 |
+| `implemented` | 484 |
 | `evidence-close` | 17 |
-| `planned` | 3,223 |
+| `planned` | 2,497 |
 | `deferred` | 0 |
 
-The 493 implemented or evidence-close owners establish that every CQ domain has at least one exact primary case; they do not close the remaining planned owners.
-All 440 implemented fixture-manifest rows are represented: 247 own exact existing oracle-fixture primary cases, 142 retain broad inherited Cargo filters only as supporting evidence behind planned atomic oracle-fixture selectors, and 51 are supporting provenance on canonical blocker-ledger or qualification parents.
+The 501 implemented or evidence-close owners establish that every CQ domain has at least one exact primary case; they do not close the remaining planned owners.
+All 440 implemented fixture-manifest rows are represented: 247 own exact existing oracle-fixture primary cases, 133 retain broad inherited Cargo filters only as supporting evidence behind planned atomic oracle-fixture selectors, and 60 are supporting provenance on canonical blocker-ledger or qualification parents.
 
 ### Comparator Inventory
 
 | Comparator | Count |
 | --- | ---: |
-| `canonical` | 34 |
+| `canonical` | 37 |
 | `error-class` | 19 |
 | `exact-bytes` | 283 |
-| `exact-value` | 97 |
+| `exact-value` | 100 |
 | `property` | 1,319 |
 | `resource` | 14 |
-| `semantic-invariant` | 432 |
-| `state-equivalence` | 631 |
-| `statistical` | 560 |
-| `structural` | 327 |
+| `semantic-invariant` | 478 |
+| `state-equivalence` | 11 |
+| `statistical` | 419 |
+| `structural` | 318 |
 
-All 560 statistical rows have typed plan references: 14 reference blocker-ledger plans, 18 reference oracle-fixture plans, and 528 planned rows reference their future qualification-case owner.
+All 419 statistical rows have typed plan references: implemented rows reference canonical blocker-ledger or oracle-fixture plans, and planned rows reference their future qualification-case owner.
 The cross-cutting qualification rows comprise one implemented symlink resource regression, one implemented registered property-worker contract, and thirteen independently planned boundary families for parser admission, checked arithmetic, result records, materialization, streaming buffers, writer and visitor failures, replay and side inputs, traversal, search, allocation, typed paths, and output lifecycle.
 Atomic semantic cases do not inherit feature-wide resource or negative claims.
 
@@ -97,6 +97,8 @@ The checked manifest separates domain relevance from executable ownership and se
 Typed case ids, API paths, repository-relative source paths, fixed-size lowercase semantic digests, bounded strings, bounded arrays, and capped validation diagnostics reject malformed or oversized checked input before semantic digest cloning or selector execution.
 Every existing Cargo primary selector must name one concrete libtest case with `--exact`, imported oracle and blocker ids must remain valid, every implemented fixture must have primary or supporting ownership, shared terminal selectors are rejected, and deterministic regeneration must match the checked bytes and frozen digest.
 Broad inherited Cargo filters remain useful as supporting evidence, but they cannot close a qualification owner or contribute a pass.
+Schema-version-2 `oracle/qualification-cases.json` can either introduce one focused exact parent or map exact owners onto one existing implemented or evidence-close blocker-ledger, oracle-fixture, or Rust-regression parent. The mapping must preserve the exact feature, let the reviewed exact parent own the final comparator instead of inheriting a provisional feature-level comparator, and reject stale owners, duplicate claims, unsupported source kinds, broad primaries, and reused terminal selectors.
+Word-size families must name their exact 64-bit, 128-bit, and 256-bit members explicitly; regeneration expands them to exact upstream symbols and rejects missing, duplicated, or unsupported widths.
 
 ## Exact-Selector Correction
 
@@ -114,9 +116,11 @@ CQ2 implementation revealed that the frozen inventory had no source-owned mechan
 The completed selected `.stim`-format slice has 32 implemented evidence parents and zero planned owners: 24 exact qualification parents map 44 upstream owners and nine exported-API owners, while eight independently selected oracle-fixture parents remain direct evidence.
 The completed selected `.dem`-format slice has 28 implemented evidence parents and zero planned owners: 17 qualification parents, eight direct oracle-fixture parents, and three blocker-ledger parents close all selected exact upstream and exported Rust API contracts while retaining broad imported fixtures as supporting-only provenance.
 The completed selected result-format slice has 39 implemented evidence parents and zero planned owners: 36 exact qualification parents and three direct oracle-fixture parents close all 156 selected upstream records and all 97 selected exported Rust API items while retaining seven broad imported fixtures as supporting-only provenance.
+The completed selected gate-contract slice has 59 implemented evidence parents and zero planned owners: 37 canonical blocker-ledger parents, 14 direct oracle-fixture parents, and eight focused qualification parents close every non-deferred exact gate owner while retaining nine broad imported fixtures as supporting-only provenance. Of 540 relevant upstream gate records, 328 are ported through exact Rust ownership, 12 remain visible semantic-mining references, and 200 are deferred with Python bindings or explicitly deferred interactive simulator products; all 178 selected gate and target API items are assigned.
 Two additional instruction-semantic parents map two exact upstream cases and four exact Rust methods without claiming untested derived traits or Stim-incompatible circuit measurement-count overflow behavior.
 Semantic review classifies mixed `circuit.test.cc`, gate-target equality, instruction value/count, and Python-only constructor ownership by exact symbol; it also found and fixed inverted Pauli-target admission for `CORRELATED_ERROR` and `ELSE_CORRELATED_ERROR`.
 One initially proposed mapping was rejected because its Cargo selector was already the canonical primary of an implemented oracle fixture, and the `MeasureRecordOffset` mapping received a new focused positive-and-boundary test instead of claiming broad mixed evidence.
+Gate review subsequently exposed that broad simulator-file relevance, inherited feature-level comparators, and duplicated canonical parents could inflate ownership. Exact-symbol classification now separates semantic gate cases from simulator-product APIs, exact parents own their reviewed comparator, existing canonical parents are reused instead of copied, and explicit word-size families close only their named `_64`, `_128`, and `_256` cases.
 
 ## Operational Surface
 
@@ -141,11 +145,11 @@ All source discovery, bounded reads, rustdoc and AST subprocesses, stable-id gen
 | Support every selected C++ and pytest form | Satisfied | Extractor tests cover four C++ macros, masked fake declarations, module, class, async, static-parameter, stacked-parameter, dynamic-family, and nested-helper cases. |
 | Freeze default-feature public API inventory | Satisfied | 1,922 typed rows; tests cover re-exports, methods, variants, enum fields, implementing-type trait identities, exclusions, and cyclic glob re-exports. |
 | Classify source relevance and executable ownership | Satisfied | 2,886 records, 651 multi-domain relevance records, zero executable dynamic families, and twelve typed deferred products. |
-| Import existing evidence by stable id | Satisfied | All 440 implemented oracle rows are represented without copied fixture payloads; 247 own exact oracle-fixture primaries, 142 retain planned atomic primaries, and 51 are supporting selectors on canonical blocker or qualification parents. |
+| Import existing evidence by stable id | Satisfied | All 440 implemented oracle rows are represented without copied fixture payloads; 247 own exact oracle-fixture primaries, 133 retain planned atomic primaries, and 60 are supporting selectors on canonical blocker or qualification parents. |
 | Freeze cross-cutting resource owners | Satisfied | One implemented symlink case, one implemented property-worker case, and thirteen exact planned boundary families are required by manifest validation. |
 | Reject stale, duplicate, unsafe, shared, oversized, or unknown state | Satisfied | Adversarial schema and mutation tests plus exact selector resolution in `correctness-check`. |
 | Freeze semantic digest and deterministic bytes | Satisfied | `correctness-regenerate --check` compares a fresh pinned-source and rustdoc build with the checked manifest. |
-| Give every CQ domain executable or evidence-close ownership | Satisfied | `correctness-check` reports an implemented-or-closed count greater than zero for all sixteen domains from 493 canonical exact owners. |
+| Give every CQ domain executable or evidence-close ownership | Satisfied | `correctness-check` reports an implemented-or-closed count greater than zero for all sixteen domains from 501 canonical exact owners. |
 
 Implementation and review revealed three genuine CQ0 specification gaps: parameterized pytest identity; the separation of domain relevance, evidence ownership, statistical-plan staging, and dedicated resource claims; and a finite cross-cutting resource-owner inventory.
 All three gaps are resolved in `docs/plans/comprehensive-correctness-qualification-plan.md` and recorded in `docs/plans/milestone-spec-gaps.md`.
@@ -180,13 +184,13 @@ just qualification::correctness-check
 The corrected focused qualification run executes the CQ0 inventory tests plus the CQ1 selector and property-plan validation tests with no failures.
 The workspace test run passed with only the repository's pre-existing documented long-running parser fuzz smoke ignored.
 `just maintenance::pre-commit` passed before the implementation commit.
-The original `just qualification::correctness-check` passed from committed revision `02c93c19566bdc465ad9c795f35e956e1ff85440` with a clean worktree. The previous corrected digest then passed clean CQ1 PR, full, and soak execution from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; the full and soak tiers each passed all 410 then-current implemented or evidence-close owners. The completed selected `.stim` and `.dem` slices raised that count to 441 and 457. The completed result-format slice now raises it to 493, and clean global current-digest execution from revision `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` passes PR 331/331, full 493/493, and soak 493/493 with offline regeneration and exact full/soak parent preflight.
+The original `just qualification::correctness-check` passed from committed revision `02c93c19566bdc465ad9c795f35e956e1ff85440` with a clean worktree. The previous corrected digest then passed clean CQ1 PR, full, and soak execution from revision `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; the full and soak tiers each passed all 410 then-current implemented or evidence-close owners. The completed selected `.stim` and `.dem` slices raised that count to 441 and 457. The completed result-format slice raised it to 493, and clean global execution from revision `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` passes PR 331/331, full 493/493, and soak 493/493 with offline regeneration and exact full/soak parent preflight for that preceding digest. The gate-contract reconciliation raises the current implemented-or-closed count to 501 at digest `d4e35f2cd834ea51a67c2ef5229d1788ae03a7c8607a9424c900fae073ab8a56`; clean current-digest execution remains required before this new checkpoint is promotable.
 
 ## Remaining Program Work
 
 - PQ0 is complete and has been regenerated against the corrected CQ digest without changing its performance dispositions.
 - CQ1 is complete with clean committed-revision audit, review, PR, full, soak, report, and preflight evidence in `docs/plans/cq1-correctness-harness-progress-report.md`.
-- CQ2 through CQ5 must replace all 3,223 planned evidence owners with direct cases or justified non-executable dispositions.
+- CQ2 through CQ5 must replace all 2,497 planned evidence owners with direct cases or justified non-executable dispositions.
 - CQ6 must run and publish the final comprehensive correctness qualification.
 
 These are later milestones and do not weaken CQ0's finite inventory contract.

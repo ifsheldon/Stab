@@ -458,8 +458,8 @@ fn validate_cross_references(manifest: &QualificationManifest, violations: &mut 
                         && ((owner.provenance == EvidenceProvenance::UpstreamSemanticCase
                             && owner.source_id == case.id.as_str())
                             || owner.provenance == EvidenceProvenance::QualificationPlan
-                            || (owner.provenance == EvidenceProvenance::BlockerLedger
-                                && case.disposition == UpstreamDisposition::PortedRust)) => {}
+                            || (case.disposition == UpstreamDisposition::PortedRust
+                                && is_reusable_existing_parent(owner))) => {}
                 Some(_) => violations.push(format!(
                     "upstream case {:?} owner {:?} has mismatched surface, feature, comparator, or source",
                     case.id, owner_id
@@ -477,7 +477,8 @@ fn validate_cross_references(manifest: &QualificationManifest, violations: &mut 
                 if owner.feature_id == item.feature_id
                     && ((owner.provenance == EvidenceProvenance::PublicRustApi
                         && api_path_is_owned_by(&owner.source_id, item.path.as_str()))
-                        || owner.provenance == EvidenceProvenance::QualificationPlan) => {}
+                    || owner.provenance == EvidenceProvenance::QualificationPlan
+                    || is_reusable_existing_parent(owner)) => {}
             Some(owner) => violations.push(format!(
                 "public API item {:?} path {:?} feature {} owner {:?} has surface {:?}, feature {}, and source {:?}",
                 item.id,
@@ -587,6 +588,18 @@ fn validate_cross_references(manifest: &QualificationManifest, violations: &mut 
             EvidenceProvenance::UpstreamSemanticCase | EvidenceProvenance::PublicRustApi => {}
         }
     }
+}
+
+fn is_reusable_existing_parent(owner: &EvidenceCase) -> bool {
+    matches!(
+        owner.provenance,
+        EvidenceProvenance::BlockerLedger
+            | EvidenceProvenance::OracleFixture
+            | EvidenceProvenance::RustRegression
+    ) && matches!(
+        owner.status,
+        EvidenceStatus::Implemented | EvidenceStatus::EvidenceClose
+    ) && owner.primary_selector.state == EvidenceState::Existing
 }
 
 fn expected_behavioral_surface(case: &EvidenceCase) -> BehavioralSurface {

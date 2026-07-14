@@ -259,17 +259,17 @@ fn gate_surface_contract_measure_reset() {
 
 #[test]
 fn gate_surface_contract_measure_reset_x() {
-    assert_noisy_measure_reset_basis("pfm3-contract-measure-reset-x", "RX 0\nZ 0", "MRX", "MX");
+    assert_noisy_measure_reset_basis("pfm3-contract-measure-reset-x", "RX 0\nZ 0", "MX", "MRX");
 }
 
 #[test]
 fn gate_surface_contract_measure_reset_y() {
-    assert_noisy_measure_reset_basis("pfm3-contract-measure-reset-y", "RY 0\nX 0", "MRY", "MY");
+    assert_noisy_measure_reset_basis("pfm3-contract-measure-reset-y", "RY 0\nX 0", "MY", "MRY");
 }
 
 #[test]
 fn gate_surface_contract_measure_reset_z() {
-    assert_noisy_measure_reset_basis("pfm3-contract-measure-reset-z", "X 0", "MR", "M");
+    assert_noisy_measure_reset_basis("pfm3-contract-measure-reset-z", "X 0", "M", "MR");
 }
 
 #[test]
@@ -581,6 +581,11 @@ fn gate_surface_contract_annotations() {
     ] {
         assert_all_semantic_surfaces_execute(text);
     }
+
+    for (reset, pauli) in [("RX", "X"), ("RY", "Y"), ("R", "Z")] {
+        let text = format!("{reset} 0\nOBSERVABLE_INCLUDE(0) {pauli}0\n");
+        assert_all_semantic_surfaces_execute(&text);
+    }
 }
 
 #[test]
@@ -831,9 +836,32 @@ fn assert_exact_reference_and_samples(text: &str, expected: &[bool]) {
     );
 }
 
-fn assert_noisy_measure_reset_basis(case_id: &str, prepare: &str, gate: &str, verify: &str) {
+fn assert_noisy_measure_reset_basis(
+    case_id: &str,
+    prepare: &str,
+    measurement_gate: &str,
+    measure_reset_gate: &str,
+) {
     let plan = statistical_plan(case_id);
-    let text = format!("{prepare}\n{gate}(0.05) !0\n{verify} 0\n");
+    let text = format!("{prepare}\n{measurement_gate}(0.05) !0\n");
+    let samples = CompiledSampler::compile(&circuit(&text))
+        .expect("compile noisy measurement circuit")
+        .sample_zero_one_with_seed(statistical_shot_count(plan), Some(plan.seed));
+    let mut counts = StatisticalCounts::new(&["measurement-zero", "measurement-one"]);
+    for record in samples {
+        let [measurement] = record.as_slice() else {
+            panic!("expected one noisy measurement: {record:?}");
+        };
+        counts.increment(if *measurement {
+            "measurement-one"
+        } else {
+            "measurement-zero"
+        });
+    }
+    assert_statistical_counts(case_id, &counts);
+    assert_all_semantic_surfaces_execute(&text);
+
+    let text = format!("{prepare}\n{measure_reset_gate}(0.05) !0\n{measurement_gate} 0\n");
     let samples = CompiledSampler::compile(&circuit(&text))
         .expect("compile noisy measurement-reset circuit")
         .sample_zero_one_with_seed(statistical_shot_count(plan), Some(plan.seed));

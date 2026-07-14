@@ -4,15 +4,17 @@
 
 In progress as of 2026-07-14.
 
-The selected `.stim`, `.dem`, and result-format domains are complete at exact upstream-symbol and exported-Rust-API granularity. This checkpoint does not complete CQ2.
+The selected `.stim`, `.dem`, result-format, and gate-contract domains are complete at exact upstream-symbol and exported-Rust-API granularity. This checkpoint does not complete CQ2.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Clean global evidence revision: `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` with `local_modifications=false`.
+Most recent clean global evidence revision for the preceding result-format digest: `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c` with `local_modifications=false`.
 
-Correctness inventory digest: `adcc3d19605e4fc7bd9e1b3f3373ddf38d81301430d891f062baaab0c6fdc8f6`.
+Current correctness inventory digest after gate-contract reconciliation: `d4e35f2cd834ea51a67c2ef5229d1788ae03a7c8607a9424c900fae073ab8a56`.
 
-Dependent performance inventory digest after checklist synchronization: `3b55089bc331b115912818ba04b584c741a8c9a56e13d8b06d85cc829b6256a1`.
+Current dependent performance inventory digest: `2be8a478a5767e7be46881b01473600d456a9af52c6078b14abdc4fc09773243`.
+
+Clean current-digest CQ1 and PQ1 reports remain pending until this gate checkpoint is committed. The earlier clean reports below are retained as historical evidence and must not be promoted against the current digests.
 
 ## Delivered Slices
 
@@ -40,6 +42,15 @@ Dependent performance inventory digest after checklist synchronization: `3b55089
 - Exact CLI matrices cover explicit, circuit-derived, and DEM-derived layouts; detector and observable namespace separation; observable side output; raw widths; all accepted format round trips; and the 2,048-bit packed path.
 - Semantic review found and fixed five contract defects: repeated sparse tokens now toggle dense parity, sparse visitors preserve source order and duplicates, scalar and batch lookback enforce the configured limit, batch intermediate writes no longer duplicate or flush incomplete 256-measurement chunks, and batch reference samples use global measurement indexes with Stim-compatible zero padding.
 
+### Gate Contract
+
+- Thirty-seven implemented blocker-ledger parents, fourteen independently selected oracle-fixture parents, and eight focused qualification parents produce 59 implemented gate-contract evidence parents and zero planned owners.
+- The exact partition assigns all 178 selected exported Rust API items. Of 540 relevant pinned-upstream records, 328 are ported through exact Rust ownership, 12 remain explicit semantic-mining references, and 200 are deferred with Python bindings or the public interactive graph and vector simulator products.
+- Schema-version-2 `oracle/qualification-cases.json` mappings reuse canonical implemented or evidence-close blocker, oracle, and Rust-regression parents without duplicating terminal selectors. Explicit 64-bit, 128-bit, and 256-bit family declarations expand to exact upstream symbols and reject missing, duplicate, or unsupported word sizes.
+- Focused qualification tests cover the 81-gate registry, exact name lookup and rejection, unitary and decomposition metadata, gate-target text and values, target accessors, inversion, and target classification. Canonical gate semantic tests cover deterministic and noisy measurement-only and measure-reset gates, pair and product measurements, Pauli channels, depolarization, correlated and heralded errors, annotations, classical controls, SPP families, rejection contracts, and reset postconditions.
+- Nine broad imported gate fixtures remain supporting provenance on exact canonical parents instead of becoming atomic primary evidence. C++ storage-layout and helper-only tests are not applicable, Python object-shape behavior remains deferred with Python bindings, and public graph and vector simulator tests remain deferred with those explicitly excluded products.
+- Review exposed two evidence loopholes and closed them in focused tests: noisy X/Y/Z evidence now exercises both measurement-only and measure-reset gates, and annotation evidence now exercises Pauli-target observable semantics in all three bases.
+
 The dependent PQ0 inventory was regenerated because correctness owner ids and acceptance state changed. No performance disposition, threshold, waiver, or comparator classification was relaxed.
 
 ## Current CQ2 Inventory
@@ -49,16 +60,18 @@ The dependent PQ0 inventory was regenerated because correctness owner ids and ac
 | `CQ-STIM-FORMAT` | 32 | 0 | 32 |
 | `CQ-DEM-FORMAT` | 28 | 0 | 28 |
 | `CQ-RESULT-FORMATS` | 39 | 0 | 39 |
-| `CQ-GATE-CONTRACT` | 84 | 646 | 730 |
+| `CQ-GATE-CONTRACT` | 59 | 0 | 59 |
 | `CQ-BIT-KERNELS` | 4 | 384 | 388 |
 | `CQ-CIRCUIT-API` | 37 | 325 | 362 |
 | `CQ-GENERATION` | 15 | 75 | 90 |
 | `CQ-ALGEBRA` | 1 | 635 | 636 |
-| **CQ2 total** | **240** | **2,065** | **2,305** |
+| **CQ2 total** | **215** | **1,419** | **1,634** |
 
 These counts are evidence owners, not an estimate of required new test functions. Reviewed exact parents may close several owners only when one selector proves their complete common contract.
 
-## Clean Correctness Evidence
+## Historical Clean Correctness Evidence
+
+These reports bind the preceding result-format correctness digest. They prove the completed harness and the earlier format slices, but they do not satisfy current-digest gate acceptance.
 
 | Tier | Selected | Passed | Failed | Artifact | Request digest | Completion digest |
 | --- | ---: | ---: | ---: | --- | --- | --- |
@@ -68,7 +81,7 @@ These counts are evidence owners, not an estimate of required new test functions
 
 Offline report regeneration passed for every tier. Exact full and soak preflight passed for `cq-evidence-qualification-db7d4cd87fe69099`, the multi-width result-reader round-trip parent, against the controller-approved request and completion receipts.
 
-## Dependent PQ1 Refresh
+## Historical Dependent PQ1 Refresh
 
 The PQ1 group remains diagnostic infrastructure with `promotable=false`, `report-only` baseline eligibility, and zero checked product thresholds.
 
@@ -78,38 +91,33 @@ The PQ1 group remains diagnostic infrastructure with `promotable=false`, `report
 | Full | 9 | 1.014584 | [1.014173, 1.016281] | 0.000405 | Verified | `target/benchmarks/qualification/pq1-cq2-result-formats-full` |
 | Soak | 15 | 1.015166 | [1.014050, 1.015688] | 0.000576 | Verified | `target/benchmarks/qualification/pq1-cq2-result-formats-soak` |
 
-All reports use schema version 13, the current correctness and performance digests, `local_modifications=false` before and after execution, and commit `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c`. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. These ratios describe only the synthetic adapter protocol and must not be reported as Stab product performance.
+All reports use schema version 13, the preceding result-format correctness and performance digests, `local_modifications=false` before and after execution, and commit `7d58bc8b3d70be7fe9188202c9611c7e076a3a8c`. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. These ratios describe only the synthetic adapter protocol and must not be reported as Stab product performance or as current-digest evidence.
 
 ## Verification
 
-Passing checks for this checkpoint:
+Passing checks through the working-tree gate checkpoint:
 
 ```sh
 cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace --quiet
+cargo test -p stab-core --test cq2_gate_contract --quiet
+cargo test -p stab-core gate_surface_contract_measure_reset_ --quiet
+cargo test -p stab-core gate_surface_contract_annotations --quiet
+cargo test -p stab-core gate_surface_contract_ --quiet
+cargo test -p stab-core --test gate_metadata --quiet
+cargo test -p stab-core --test stim_format --quiet
 cargo test -p stab-core --test cq2_dem_format --quiet
 cargo test -p stab-core --test cq2_result_io --test cq2_result_formats --quiet
 cargo test -p stab-cli convert --quiet
-cargo test -p stab-oracle --quiet
-cargo test -p stab-bench --quiet
 just qualification::correctness-regenerate --check
 just qualification::correctness-check
 just bench::qualification-regenerate --check
 just bench::qualification-check
-just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-result-formats-pr
-just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-result-formats-full
-just bench::qualification-report --input target/benchmarks/qualification/pq1-cq2-result-formats-soak
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-result-formats-pr
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-result-formats-full
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-cq2-result-formats-soak
-just maintenance::pre-commit
 ```
 
-The clean PR, full, soak, offline-report, exact-preflight, and dependent PQ1 artifacts are identified above.
+Full touched-area clippy, package tests, pre-commit, and clean current-digest CQ1/PQ1 execution are required before this gate checkpoint becomes promotable evidence.
 
 ## Remaining Blocker
 
-CQ2 still has 2,065 planned evidence owners. The active blocker is `CQ-GATE-CONTRACT`, where 646 of 730 owners remain planned across metadata, target validation, decompositions, tableaus, unitaries, aliases, inverse relations, execution semantics, malformed input, and resource contracts. Continue with an exact gate-family ownership partition before bit kernels, circuit APIs, generation, and algebra.
+CQ2 still has 1,419 planned evidence owners. The next implementation blocker is `CQ-BIT-KERNELS`, where 384 of 388 owners remain planned across dense and sparse bit vectors, matrices, SIMD/scalar differential behavior, transposition, randomization, parsing, arithmetic, and boundary/resource contracts. Publish clean current-digest gate evidence before changing bit-kernel ownership.
 
 No external dependency or user decision blocks this work. CQ2 milestone audit and GPT-5.6/max full-code-review remain pending until all selected CQ2 domains are implemented.

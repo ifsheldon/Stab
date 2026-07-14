@@ -23,6 +23,15 @@ None.
 
 ## Resolved Entries
 
+## 2026-07-14 - CQ2: Gate Ownership, Comparator Refinement, And Word-Size Families
+
+Status: Resolved
+Revealed by: implementation and exact-owner audit of the gate-contract qualification slice.
+Current text: CQ2 required exact upstream provenance, one independently selectable exact parent, same-feature and same-comparator mappings, and semantic review instead of file-level aggregation.
+Gap: Broad simulator-file classification assigned graph, vector, frame, tableau, and analyzer implementation tests to the gate domain even when they owned deferred simulator APIs or non-gate behavior. The generated feature-level comparator was only a provisional discovery hint, but the ledger could not map noisy gate rows to their canonical statistical parents. The ledger also required duplicate qualification parents instead of reusing implemented blocker, oracle, or regression parents, and it had no exact source-owned shorthand for the `_64`, `_128`, and `_256` expansions of one upstream family. Those loopholes inflated the gate inventory, encouraged duplicate terminal selectors, and could let one nearby semantic test claim a differently shaped contract.
+Proposed amendment: Classify mixed simulator sources by exact symbol; defer public graph, vector, and Python products with their product boundary; let the reviewed exact parent own the final comparator; allow same-feature mappings only to implemented or evidence-close canonical blocker, oracle, or Rust-regression parents; and expand word-size families only from explicit validated 64-bit, 128-bit, and 256-bit member lists.
+Resolution: Schema-version-2 `oracle/qualification-cases.json`, exact-symbol classification, and cross-reference validation now enforce those rules. The gate domain closes with 37 reused blocker-ledger parents, 14 direct oracle-fixture parents, and eight focused qualification parents; all 178 selected APIs and 340 non-deferred upstream records are assigned, 200 simulator or Python records remain explicitly deferred, and focused regressions separately exercise noisy measurement-only and measure-reset gates plus Pauli-target observables.
+
 ## 2026-07-14 - CQ2: Mixed Language-Specific Upstream Contracts
 
 Status: Resolved

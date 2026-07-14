@@ -206,7 +206,7 @@ pub(super) fn classify_upstream_case(path: &Path, symbol: &str) -> UpstreamClass
         return classify_dem(&value, symbol);
     }
     if value.contains("/gates/") {
-        return UpstreamClassification::selected(FeatureId::GateContract);
+        return classify_gates(&value, symbol);
     }
     if value.contains("/gen/") {
         return UpstreamClassification::selected(FeatureId::Generation);
@@ -221,7 +221,7 @@ pub(super) fn classify_upstream_case(path: &Path, symbol: &str) -> UpstreamClass
         return UpstreamClassification::selected(FeatureId::Search);
     }
     if value.contains("/simulators/") {
-        return classify_simulator(&value);
+        return classify_simulator(&value, symbol);
     }
     if value.contains("/stabilizers/") {
         return UpstreamClassification::selected(FeatureId::Algebra);
@@ -233,7 +233,9 @@ pub(super) fn classify_upstream_case(path: &Path, symbol: &str) -> UpstreamClass
         return classify_util_top(&value);
     }
     if value.ends_with("src/stim.test.cc") {
-        return UpstreamClassification::selected(FeatureId::GateContract);
+        return UpstreamClassification::not_applicable(
+            "C++ public-header include behavior has no selected Rust compatibility contract.",
+        );
     }
     if value.ends_with("src/stim/main_namespaced.test.cc") {
         return UpstreamClassification::selected(FeatureId::Cli);
@@ -419,7 +421,7 @@ fn classify_circuit(value: &str, symbol: &str) -> UpstreamClassification {
     } else if value.contains("gate_target") || value.contains("circuit_instruction") {
         UpstreamClassification::selected(FeatureId::StimFormat)
     } else if value.contains("gate_decomposition") {
-        UpstreamClassification::selected(FeatureId::GateContract)
+        classify_gate_decomposition(symbol)
     } else if value.ends_with("circuit_pybind_test.py") {
         let symbol = symbol.to_ascii_lowercase();
         let secondary = if symbol.contains("shortest_graphlike")
@@ -466,6 +468,47 @@ fn classify_circuit(value: &str, symbol: &str) -> UpstreamClassification {
         }
     } else {
         UpstreamClassification::selected(FeatureId::CircuitApi)
+    }
+}
+
+fn classify_gate_decomposition(symbol: &str) -> UpstreamClassification {
+    if symbol.is_empty()
+        || symbol
+            .rsplit('.')
+            .next()
+            .is_some_and(|leaf| leaf.starts_with("decompose_spp_or_spp_dag_operation_"))
+    {
+        UpstreamClassification::selected(FeatureId::GateContract)
+    } else {
+        UpstreamClassification::not_applicable(
+            "This case exercises a private C++ gate-decomposition traversal helper; selected Stab parity is owned by public decomposition metadata and executable gate semantics.",
+        )
+    }
+}
+
+fn classify_gates(value: &str, symbol: &str) -> UpstreamClassification {
+    if value.ends_with("gates.test.cc")
+        && matches!(
+            symbol,
+            "gate_data.zero_flag_means_not_a_gate"
+                | "gate_data.hash_matches_storage_location"
+                | "gate_data.to_euler_angles"
+                | "gate_data.to_axis_angle"
+                | "gate_data.to_euler_angles_axis_reference"
+                | "gate_data.hadamard_conjugated_vs_flow_generators_of_two_qubit_gates"
+        )
+    {
+        UpstreamClassification::not_applicable(
+            "This case exercises C++ GateData storage or helper APIs that are outside the selected public Rust Gate contract.",
+        )
+    } else if value.ends_with("gates_test.py") && symbol == "test_gate_hadamard_conjugated" {
+        UpstreamClassification::deferred_for(
+            [FeatureId::GateContract],
+            DeferredProduct::PythonBindings,
+            "GateData.hadamard_conjugated is part of the explicitly deferred Python GateData surface and has no selected Rust Gate analogue.",
+        )
+    } else {
+        UpstreamClassification::selected(FeatureId::GateContract)
     }
 }
 
@@ -555,27 +598,164 @@ fn classify_dem(value: &str, symbol: &str) -> UpstreamClassification {
     UpstreamClassification::selected(FeatureId::DemFormat)
 }
 
-fn classify_simulator(value: &str) -> UpstreamClassification {
+fn classify_simulator(value: &str, symbol: &str) -> UpstreamClassification {
     if value.contains("dem_sampler") {
         UpstreamClassification::selected(FeatureId::DemSampling)
-    } else if value.contains("measurements_to_detection") {
+    } else if value.contains("measurements_to_detection") || value.contains("frame_simulator_util")
+    {
         UpstreamClassification::selected(FeatureId::Detection)
-    } else if value.contains("frame_simulator") || value.contains("tableau_simulator") {
-        UpstreamClassification::selected_many([FeatureId::GateContract, FeatureId::Sampling])
-    } else if value.contains("graph_simulator") || value.contains("vector_simulator") {
-        UpstreamClassification {
-            feature_ids: vec![FeatureId::GateContract],
-            disposition: UpstreamDisposition::SemanticMining,
-            deferred_product: None,
-            reason: "Public graph and vector simulator products are deferred, but their bounded state-equivalence cases remain selected semantic evidence.",
+    } else if value.contains("frame_simulator") {
+        if is_frame_gate_semantic_case(symbol) {
+            UpstreamClassification::selected_many([FeatureId::GateContract, FeatureId::Sampling])
+        } else {
+            UpstreamClassification::selected(FeatureId::Sampling)
         }
+    } else if value.contains("tableau_simulator") {
+        if is_tableau_gate_semantic_case(symbol) {
+            UpstreamClassification::selected_many([FeatureId::GateContract, FeatureId::Sampling])
+        } else {
+            deferred_interactive_simulator([FeatureId::GateContract, FeatureId::Sampling])
+        }
+    } else if value.contains("graph_simulator") || value.contains("vector_simulator") {
+        deferred_interactive_simulator([FeatureId::GateContract])
     } else if value.contains("sparse_rev_frame") {
         UpstreamClassification::selected(FeatureId::FlowUtils)
     } else if value.contains("error_analyzer") {
-        UpstreamClassification::selected_many([FeatureId::GateContract, FeatureId::Analyzer])
+        if is_analyzer_gate_semantic_case(symbol) {
+            UpstreamClassification::selected_many([FeatureId::GateContract, FeatureId::Analyzer])
+        } else {
+            UpstreamClassification::selected(FeatureId::Analyzer)
+        }
     } else {
         UpstreamClassification::selected(FeatureId::Analyzer)
     }
+}
+
+fn deferred_interactive_simulator(
+    feature_ids: impl IntoIterator<Item = FeatureId>,
+) -> UpstreamClassification {
+    UpstreamClassification::deferred_for(
+        feature_ids,
+        DeferredProduct::InteractiveSimulators,
+        "This case exercises an explicitly deferred public interactive simulator surface instead of a selected Rust sampler or gate contract.",
+    )
+}
+
+fn simulator_symbol_base(symbol: &str) -> &str {
+    ["_64", "_128", "_256"]
+        .into_iter()
+        .find_map(|suffix| symbol.strip_suffix(suffix))
+        .unwrap_or(symbol)
+}
+
+fn is_frame_gate_semantic_case(symbol: &str) -> bool {
+    let symbol = simulator_symbol_base(symbol);
+    matches!(
+        symbol,
+        "FrameSimulator.bulk_operations_consistent_with_tableau_data"
+            | "FrameSimulator.correlated_error"
+            | "FrameSimulator.quantum_cannot_control_classical"
+            | "FrameSimulator.classical_can_control_quantum"
+            | "FrameSimulator.classical_controls"
+            | "FrameSimulator.measure_y_without_reset_doesnt_reset"
+            | "FrameSimulator.resets_vs_measurements"
+            | "FrameSimulator.measure_pauli_product_4body"
+            | "FrameSimulator.non_deterministic_pauli_product_detectors"
+            | "FrameSimulator.ignores_sweep_controls_when_given_no_sweep_data"
+            | "FrameSimulator.mpad"
+            | "FrameSimulator.mxxyyzz_basis"
+            | "FrameSimulator.mxxyyzz_inversion"
+            | "FrameSimulator.runs_on_general_circuit"
+            | "FrameSimulator.heralded_erase_detect_statistics"
+            | "FrameSimulator.heralded_pauli_channel_1_statistics"
+            | "FrameSimulator.heralded_erase_statistics_offset_by_2"
+            | "FrameSimulator.heralded_pauli_channel_1_statistics_offset_by_2"
+            | "FrameSimulator<W>::do_MPAD"
+            | "case GateType::I_ERROR:"
+    ) || symbol.starts_with("FrameSimulator.noisy_measurement_")
+        || symbol.starts_with("FrameSimulator.noisy_measurement_reset_")
+        || symbol.starts_with("FrameSimulator.observable_include_paulis_")
+}
+
+fn is_tableau_gate_semantic_case(symbol: &str) -> bool {
+    let symbol = simulator_symbol_base(symbol);
+    matches!(
+        symbol,
+        "TableauSimulator.identity"
+            | "TableauSimulator.identity2"
+            | "TableauSimulator.bit_flip"
+            | "TableauSimulator.bit_flip_2"
+            | "TableauSimulator.epr"
+            | "TableauSimulator.big_determinism"
+            | "TableauSimulator.unitary_gates_consistent_with_tableau_data"
+            | "TableauSimulator.certain_errors_consistent_with_gates"
+            | "TableauSimulator.simulate"
+            | "TableauSimulator.simulate_reset"
+            | "TableauSimulator.measurement_vs_vector_sim"
+            | "TableauSimulator.correlated_error"
+            | "TableauSimulator.quantum_cannot_control_classical"
+            | "TableauSimulator.classical_can_control_quantum"
+            | "TableauSimulator.classical_control_cases"
+            | "TableauSimulator.mr_repeated_target"
+            | "TableauSimulator.measure_pauli_product_1"
+            | "TableauSimulator.measure_pauli_product_4body"
+            | "TableauSimulator.measure_pauli_product_bad"
+            | "TableauSimulator.measure_pauli_product_epr"
+            | "TableauSimulator.measure_pauli_product_inversions"
+            | "TableauSimulator.measure_pauli_product_noisy"
+            | "TableauSimulator.mpad"
+            | "TableauSimulator.mxx_myy_mzz_vs_mpp_unsigned"
+            | "TableauSimulator.mxx"
+            | "TableauSimulator.myy"
+            | "TableauSimulator.mzz"
+            | "TableauSimulator.ignores_sweep_controls"
+            | "TableauSimulator.reset_pure"
+            | "TableauSimulator.reset_random"
+            | "TableauSimulator.reset_vs_measurements"
+            | "TableauSimulator.reset_x_entangled"
+            | "TableauSimulator.reset_y_entangled"
+            | "TableauSimulator.reset_z_entangled"
+            | "TableauSimulator.measure_x_entangled"
+            | "TableauSimulator.measure_y_entangled"
+            | "TableauSimulator.measure_z_entangled"
+            | "TableauSimulator.measure_reset_x_entangled"
+            | "TableauSimulator.measure_reset_y_entangled"
+            | "TableauSimulator.measure_reset_z_entangled"
+            | "TableauSimulator.runs_on_general_circuit"
+            | "TableauSimulator.heralded_erase"
+            | "TableauSimulator.heralded_pauli_channel_1"
+    ) || symbol.starts_with("TableauSimulator.noisy_measurement_")
+        || symbol.starts_with("TableauSimulator.noisy_measure_reset_")
+}
+
+fn is_analyzer_gate_semantic_case(symbol: &str) -> bool {
+    let symbol = simulator_symbol_base(symbol);
+    matches!(
+        symbol,
+        "ErrorAnalyzer.unitary_gates_match_frame_simulator"
+            | "ErrorAnalyzer.reversed_operation_order"
+            | "ErrorAnalyzer.classical_error_propagation"
+            | "ErrorAnalyzer.measure_reset_basis"
+            | "ErrorAnalyzer.repeated_measure_reset"
+            | "ErrorAnalyzer.period_3_gates"
+            | "ErrorAnalyzer.composite_error_analysis"
+            | "ErrorAnalyzer.exact_solved_pauli_channel_1_is_let_through"
+            | "ErrorAnalyzer.pauli_channel_threshold"
+            | "ErrorAnalyzer.pauli_channel_composite_errors"
+            | "ErrorAnalyzer.measure_pauli_product_4body"
+            | "ErrorAnalyzer.ignores_sweep_controls"
+            | "ErrorAnalyzer.mpp_ordering"
+            | "ErrorAnalyzer.else_correlated_error_block"
+            | "ErrorAnalyzer.mpad"
+            | "ErrorAnalyzer.mxx"
+            | "ErrorAnalyzer.myy"
+            | "ErrorAnalyzer.mzz"
+            | "ErrorAnalyzer.heralded_erase_conditional_division"
+            | "ErrorAnalyzer.heralded_erase"
+            | "ErrorAnalyzer.runs_on_general_circuit"
+            | "ErrorAnalyzer.heralded_pauli_channel_1"
+            | "ErrorAnalyzer.OBS_INCLUDE_PAULIS"
+    ) || symbol.starts_with("ErrorAnalyzer.noisy_measurement_m")
 }
 
 fn is_python_binding_shape_only(symbol: &str) -> bool {
@@ -681,244 +861,5 @@ pub(super) fn default_comparator(feature_id: FeatureId) -> Comparator {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn classifications_keep_deferred_products_out_of_selected_features() {
-        let diagram = classify_upstream_path(Path::new("src/stim/cmd/command_diagram.test.cc"));
-        assert_eq!(diagram.disposition, UpstreamDisposition::DeferredProduct);
-        assert_eq!(diagram.feature_ids, vec![FeatureId::Cli]);
-        assert_eq!(diagram.deferred_product, Some(DeferredProduct::Diagrams));
-
-        let cirq = classify_upstream_path(Path::new("glue/cirq/stimcirq/_stim_sampler_test.py"));
-        assert_eq!(cirq.disposition, UpstreamDisposition::DeferredProduct);
-        assert!(cirq.feature_ids.is_empty());
-        assert_eq!(cirq.deferred_product, Some(DeferredProduct::Stimcirq));
-    }
-
-    #[test]
-    fn classifications_distinguish_selected_execution_domains() {
-        let result = classify_upstream_path(Path::new("src/stim/cmd/command_convert.test.cc"));
-        assert_eq!(
-            result.feature_ids,
-            vec![FeatureId::ResultFormats, FeatureId::Cli]
-        );
-
-        let flow = classify_upstream_path(Path::new(
-            "src/stim/util_top/circuit_flow_generators.test.cc",
-        ));
-        assert_eq!(flow.feature_ids, vec![FeatureId::FlowUtils]);
-
-        let bits = classify_public_api_source(
-            "stab_core",
-            Path::new("crates/stab-core/src/bits/simd.rs"),
-            "stab_core::BitBlock::xor_assign",
-        );
-        assert_eq!(bits, Some(FeatureId::BitKernels));
-
-        assert_eq!(
-            classify_public_api_source(
-                "stab_core",
-                Path::new("crates/stab-core/src/dem/analyze.rs"),
-                "stab_core::ErrorAnalyzerOptions",
-            ),
-            Some(FeatureId::Analyzer)
-        );
-        assert_eq!(
-            classify_public_api_source(
-                "stab_core",
-                Path::new("crates/stab-core/src/circuit/api.rs"),
-                "stab_core::Circuit::reference_sample",
-            ),
-            Some(FeatureId::Sampling)
-        );
-        assert_eq!(
-            classify_public_api_source(
-                "stab_core",
-                Path::new("crates/stab-core/src/circuit.rs"),
-                "stab_core::Circuit::time_reversed_for_flows",
-            ),
-            Some(FeatureId::FlowUtils)
-        );
-
-        let unknown = classify_public_api_source(
-            "stab_core",
-            Path::new("crates/stab-core/src/new_domain.rs"),
-            "stab_core::NewDomain",
-        );
-        assert_eq!(unknown, None);
-    }
-
-    #[test]
-    fn classifications_split_mixed_python_cases_by_exact_symbol() {
-        let path = Path::new("src/stim/circuit/circuit_pybind_test.py");
-        let search = classify_upstream_case(path, "test_shortest_graphlike_error");
-        assert_eq!(
-            search.feature_ids,
-            vec![FeatureId::CircuitApi, FeatureId::Search]
-        );
-
-        let diagram = classify_upstream_case(path, "test_tag_diagram");
-        assert_eq!(diagram.disposition, UpstreamDisposition::DeferredProduct);
-        assert_eq!(diagram.deferred_product, Some(DeferredProduct::Diagrams));
-        assert_eq!(diagram.feature_ids, vec![FeatureId::CircuitApi]);
-
-        let repr = classify_upstream_case(path, "test_circuit_repr");
-        assert_eq!(repr.disposition, UpstreamDisposition::DeferredProduct);
-        assert_eq!(repr.deferred_product, Some(DeferredProduct::PythonBindings));
-
-        let instruction_path = Path::new("src/stim/circuit/circuit_instruction_pybind_test.py");
-        let string_constructor = classify_upstream_case(instruction_path, "test_init_from_str");
-        assert_eq!(
-            string_constructor.disposition,
-            UpstreamDisposition::DeferredProduct
-        );
-        assert_eq!(
-            string_constructor.deferred_product,
-            Some(DeferredProduct::PythonBindings)
-        );
-        assert_eq!(string_constructor.feature_ids, vec![FeatureId::StimFormat]);
-
-        let instruction_printer = classify_upstream_case(instruction_path, "test_str");
-        assert_eq!(
-            instruction_printer.disposition,
-            UpstreamDisposition::SemanticMining
-        );
-        assert_eq!(instruction_printer.feature_ids, vec![FeatureId::StimFormat]);
-
-        let instruction_value = classify_upstream_case(instruction_path, "test_init_and_equality");
-        assert_eq!(instruction_value.feature_ids, vec![FeatureId::CircuitApi]);
-        let instruction_count = classify_upstream_case(instruction_path, "test_num_measurements");
-        assert_eq!(instruction_count.feature_ids, vec![FeatureId::CircuitApi]);
-
-        let gate_target_path = Path::new("src/stim/circuit/gate_target_pybind_test.py");
-        let gate_target_value = classify_upstream_case(gate_target_path, "test_init_and_equality");
-        assert_eq!(gate_target_value.feature_ids, vec![FeatureId::GateContract]);
-    }
-
-    #[test]
-    fn classifications_split_dem_binding_search_and_value_cases_by_exact_symbol() {
-        let model_python = Path::new("src/stim/dem/detector_error_model_pybind_test.py");
-        let search = classify_upstream_case(model_python, "test_shortest_graphlike_error_line");
-        assert_eq!(search.feature_ids, vec![FeatureId::Search]);
-        assert_eq!(search.disposition, UpstreamDisposition::SemanticMining);
-
-        let binding_append = classify_upstream_case(model_python, "test_append_bad");
-        assert_eq!(
-            binding_append.disposition,
-            UpstreamDisposition::DeferredProduct
-        );
-        assert_eq!(
-            binding_append.deferred_product,
-            Some(DeferredProduct::PythonBindings)
-        );
-        assert_eq!(binding_append.feature_ids, vec![FeatureId::DemFormat]);
-
-        let shared_transform = classify_upstream_case(model_python, "test_rounded");
-        assert_eq!(
-            shared_transform.disposition,
-            UpstreamDisposition::SemanticMining
-        );
-        assert_eq!(shared_transform.feature_ids, vec![FeatureId::DemFormat]);
-
-        let binding_coordinate_shapes = classify_upstream_case(model_python, "test_coords");
-        assert_eq!(
-            binding_coordinate_shapes.disposition,
-            UpstreamDisposition::DeferredProduct
-        );
-        assert_eq!(
-            binding_coordinate_shapes.deferred_product,
-            Some(DeferredProduct::PythonBindings)
-        );
-
-        let instruction_python = Path::new("src/stim/dem/dem_instruction_pybind_test.py");
-        let copied_args = classify_upstream_case(instruction_python, "test_args_copy");
-        assert_eq!(
-            copied_args.disposition,
-            UpstreamDisposition::DeferredProduct
-        );
-        let instruction_validation = classify_upstream_case(instruction_python, "test_validation");
-        assert_eq!(
-            instruction_validation.disposition,
-            UpstreamDisposition::SemanticMining
-        );
-
-        let model_cpp = Path::new("src/stim/dem/detector_error_model.test.cc");
-        let operator = classify_upstream_case(model_cpp, "detector_error_model.mul");
-        assert_eq!(operator.disposition, UpstreamDisposition::DeferredProduct);
-        assert_eq!(operator.feature_ids, vec![FeatureId::DemFormat]);
-
-        let moved_from = classify_upstream_case(model_cpp, "detector_error_model.movement");
-        assert_eq!(moved_from.disposition, UpstreamDisposition::NotApplicable);
-        assert!(moved_from.feature_ids.is_empty());
-
-        let mixed_instruction = classify_upstream_case(model_cpp, "dem_instruction.general");
-        assert_eq!(
-            mixed_instruction.disposition,
-            UpstreamDisposition::NotApplicable
-        );
-        assert!(mixed_instruction.feature_ids.is_empty());
-
-        let parser = classify_upstream_case(model_cpp, "detector_error_model.parse");
-        assert_eq!(parser.disposition, UpstreamDisposition::SemanticMining);
-        assert_eq!(parser.feature_ids, vec![FeatureId::DemFormat]);
-    }
-
-    #[test]
-    fn classifications_reconcile_domain_matrix_sources() {
-        let circuit = classify_upstream_case(
-            Path::new("src/stim/circuit/circuit.test.cc"),
-            "circuit.from_text",
-        );
-        assert_eq!(
-            circuit.feature_ids,
-            vec![FeatureId::StimFormat, FeatureId::CircuitApi]
-        );
-
-        let count = classify_upstream_case(
-            Path::new("src/stim/circuit/circuit.test.cc"),
-            "circuit.count_qubits",
-        );
-        assert_eq!(count.feature_ids, vec![FeatureId::CircuitApi]);
-
-        let windows = classify_upstream_case(
-            Path::new("src/stim/circuit/circuit.test.cc"),
-            "circuit.parse_windows_newlines",
-        );
-        assert_eq!(
-            windows.feature_ids,
-            vec![FeatureId::StimFormat, FeatureId::CircuitApi]
-        );
-
-        let approximate = classify_upstream_case(
-            Path::new("src/stim/circuit/circuit.test.cc"),
-            "circuit.approx_equals",
-        );
-        assert_eq!(approximate.feature_ids, vec![FeatureId::CircuitApi]);
-
-        let frame = classify_upstream_case(
-            Path::new("src/stim/simulators/frame_simulator.test.cc"),
-            "FrameSimulator.consistency_64",
-        );
-        assert_eq!(
-            frame.feature_ids,
-            vec![FeatureId::GateContract, FeatureId::Sampling]
-        );
-
-        let analyzer = classify_upstream_case(
-            Path::new("src/stim/simulators/error_analyzer.test.cc"),
-            "ErrorAnalyzer.mpp_ordering",
-        );
-        assert_eq!(
-            analyzer.feature_ids,
-            vec![FeatureId::GateContract, FeatureId::Analyzer]
-        );
-
-        let compiled = classify_upstream_case(
-            Path::new("src/stim/py/compiled_measurement_sampler_pybind_test.py"),
-            "test_measurements_vs_resets",
-        );
-        assert_eq!(compiled.feature_ids, vec![FeatureId::Sampling]);
-    }
-}
+#[path = "classification/tests.rs"]
+mod tests;

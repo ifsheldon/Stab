@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "cases": [
@@ -1317,8 +1317,8 @@
           "-p",
           "stab-core",
           "--test",
-          "cq2_stim_format",
-          "cq2_stim_format_target_text_round_trip_matches_stim",
+          "cq2_gate_contract",
+          "cq2_gate_target_text_round_trip_matches_stim",
           "--quiet",
           "--exact"
         ]
@@ -1351,8 +1351,8 @@
           "-p",
           "stab-core",
           "--test",
-          "cq2_stim_format",
-          "cq2_stim_format_target_accessors_match_stim",
+          "cq2_gate_contract",
+          "cq2_gate_target_accessors_match_stim",
           "--quiet",
           "--exact"
         ]
@@ -1405,8 +1405,8 @@
           "-p",
           "stab-core",
           "--test",
-          "cq2_stim_format",
-          "cq2_stim_format_target_inversion_matches_stim",
+          "cq2_gate_contract",
+          "cq2_gate_target_inversion_matches_stim",
           "--quiet",
           "--exact"
         ]
@@ -1435,8 +1435,8 @@
           "-p",
           "stab-core",
           "--test",
-          "cq2_stim_format",
-          "cq2_stim_format_target_classification_matches_stim",
+          "cq2_gate_contract",
+          "cq2_gate_target_classification_matches_stim",
           "--quiet",
           "--exact"
         ]
@@ -3917,6 +3917,1863 @@
       ],
       "oracle_fixture_owners": [
         "coverage-command-convert-result-formats"
+      ]
+    },
+    {
+      "id": "cq2-gate-registry-contract",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stim_format",
+          "gates_table_matches_stim_v116_canonical_names_and_aliases",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The frozen 81-gate registry and alias corpus is fixed-size; lookup traverses bounded static metadata without input-sized allocation."
+      },
+      "negative_axes": [
+        "missing-canonical-gate",
+        "duplicate-canonical-gate",
+        "wrong-alias-target"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/gates/gates.test.cc",
+          "symbol": "gate_data.one_step_to_canonical_gate"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_aliases"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_gate_data_eq"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_gate_data_repr"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_gate_data_str"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_name"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::all"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::canonical_name"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::aliases"
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-gates-gates"
+      ]
+    },
+    {
+      "id": "cq2-gate-name-lookup-contract",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stim_format",
+          "gate_lookup_accepts_canonical_alias_and_lowercase_names",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Gate-name lookup accepts only bounded gate identifiers and resolves through the static registry without caller-controlled allocation growth."
+      },
+      "negative_axes": [
+        "empty-name",
+        "unknown-name",
+        "near-prefix",
+        "invalid-punctuation"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/gates/gates.test.cc",
+          "symbol": "gate_data.lookup"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::from_name"
+        }
+      ]
+    },
+    {
+      "id": "cq2-gate-unitary-matrix-contract",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "state-equivalence",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "gate_metadata",
+          "gate_unitary_matrix_metadata_matches_owned_gate_data",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Unitary metadata is restricted to fixed 2x2 and 4x4 matrices, so conversion and inverse checks use constant bounded memory."
+      },
+      "negative_axes": [
+        "non-unitary-matrix-request",
+        "wrong-dimension",
+        "wrong-endianness",
+        "inverse-not-conjugate-transpose"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::unitary_matrix"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::has_unitary_matrix"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::is_unitary"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateUnitaryMatrix"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateUnitaryMatrix::dimension"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateUnitaryMatrix::entry_count"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateUnitaryMatrix::num_qubits"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateUnitaryMatrix::to_vecs"
+        }
+      ],
+      "oracle_fixture_owners": [
+        "pf1-gate-unitary-matrix-metadata"
+      ]
+    },
+    {
+      "id": "cq2-gate-decomposition-metadata-contract",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "gate_metadata",
+          "gate_decomposition_metadata_matches_owned_gate_data",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Each gate owns one bounded static H/S/CX/M/R decomposition string; parsing materializes only that fixed decomposition."
+      },
+      "negative_axes": [
+        "missing-supported-decomposition",
+        "unsupported-decomposition-request",
+        "non-base-gate-in-decomposition",
+        "canonical-text-drift"
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/gates/gates.test.cc",
+          "symbol_base": "gate_data.decompositions_are_correct",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::h_s_cx_m_r_decomposition"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::has_h_s_cx_m_r_decomposition"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateDecomposition"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateDecomposition::as_stim_str"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateDecomposition::to_circuit"
+        }
+      ],
+      "oracle_fixture_owners": [
+        "pf1-gate-decomposition-metadata"
+      ]
+    },
+    {
+      "id": "cq2-gate-target-text-value-contract",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_stim_format",
+          "cq2_stim_format_target_text_round_trip_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "A gate target is one bounded typed value; parsing rejects overlong or out-of-range identifiers before allocating domain state."
+      },
+      "negative_axes": [
+        "malformed-target",
+        "qubit-overflow",
+        "record-lookback-overflow",
+        "sweep-id-overflow"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/gate_target.test.cc",
+          "symbol": "gate_target.equality"
+        },
+        {
+          "path": "src/stim/circuit/gate_target_pybind_test.py",
+          "symbol": "test_init_and_equality"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Pauli"
+        }
+      ]
+    },
+    {
+      "id": "cq2-gate-target-accessor-contract",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_stim_format",
+          "cq2_stim_format_target_accessors_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Target constructors and accessors operate on a single bounded enum value and allocate no input-sized storage."
+      },
+      "negative_axes": [
+        "wrong-target-kind-accessor",
+        "typed-id-boundary",
+        "record-offset-sign"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::combiner"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::is_combiner"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::is_inverted_result_target"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::is_measurement_record_target"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::is_qubit_target"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::is_sweep_bit_target"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::is_x_target"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::is_y_target"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::is_z_target"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::measurement_record"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::measurement_record_offset"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::pauli"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::pauli_type"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::qubit"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::qubit_id"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::sweep_bit"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::sweep_bit_id"
+        }
+      ]
+    },
+    {
+      "id": "cq2-gate-target-inversion-contract",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_stim_format",
+          "cq2_stim_format_target_inversion_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Target inversion transforms one bounded value in constant space and rejects non-result target kinds immediately."
+      },
+      "negative_axes": [
+        "combiner-inversion",
+        "record-inversion",
+        "sweep-inversion"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::try_inverted"
+        }
+      ]
+    },
+    {
+      "id": "cq2-gate-target-classification-contract",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_stim_format",
+          "cq2_stim_format_target_classification_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "Target classification is a constant-time enum inspection with no allocation."
+      },
+      "negative_axes": [
+        "pauli-misclassification",
+        "classical-bit-misclassification"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::is_classical_bit_target"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Target::is_pauli_target"
+        }
+      ]
+    }
+  ],
+  "existing_parent_mappings": [
+    {
+      "id": "cq2-map-gate-metadata-accessors",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "oracle-fixture",
+        "source_id": "pf1-gate-metadata-rust-accessors"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/gates/gates.test.cc",
+          "symbol": "gate_data.is_symmetric_vs_flow_generators_of_two_qubit_gates"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_gate_data_inverse"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_gate_is_symmetric"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_is_noisy_gate"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_is_reset"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_is_single_qubit_gate"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_is_two_qubit_gate"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_num_parens_arguments_range"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_produces_measurements"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_takes_measurement_record_targets"
+        },
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_takes_pauli_targets"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::argument_rule"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::best_candidate_inverse"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::can_fuse"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::category"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::generalized_inverse"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::inverse"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::is_noisy"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::is_reset"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::is_single_qubit_gate"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::is_symmetric_gate"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::is_two_qubit_gate"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::produces_measurements"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::takes_measurement_record_targets"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::takes_pauli_targets"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::target_group_kind"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::target_rule"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateArgumentRule"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateCategory"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateTargetGroupKind"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::GateTargetRule"
+        }
+      ],
+      "oracle_fixture_owners": [
+        "pf1-gate-metadata-api"
+      ]
+    },
+    {
+      "id": "cq2-map-gate-tableau-inverses",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "oracle-fixture",
+        "source_id": "pf1-gate-tableau-metadata"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_tableau"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/gates/gates.test.cc",
+          "symbol_base": "gate_data.unitary_inverses_are_correct",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::tableau"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::has_tableau"
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-gate-flow-metadata",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "oracle-fixture",
+        "source_id": "pf1-gate-flow-metadata"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/gates/gates_test.py",
+          "symbol": "test_gate_data_flows"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/gates/gates.test.cc",
+          "symbol_base": "gate_data.stabilizer_flows_are_correct",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/gates/gates.test.cc",
+          "symbol_base": "gate_data.stabilizer_flows_are_also_correct_for_decomposed_circuit",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::flows"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Gate::has_flows"
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-spp-single-products",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-spp"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/gate_decomposition.test.cc",
+          "symbol": "gate_decomposition.decompose_spp_or_spp_dag_operation_simple"
+        },
+        {
+          "path": "src/stim/circuit/gate_decomposition.test.cc",
+          "symbol": "gate_decomposition.decompose_spp_or_spp_dag_operation_inverted"
+        },
+        {
+          "path": "src/stim/circuit/gate_decomposition.test.cc",
+          "symbol": "gate_decomposition.decompose_spp_or_spp_dag_operation_inverted2"
+        },
+        {
+          "path": "src/stim/circuit/gate_decomposition.test.cc",
+          "symbol": "gate_decomposition.decompose_spp_or_spp_dag_operation_inverted3"
+        },
+        {
+          "path": "src/stim/circuit/gate_decomposition.test.cc",
+          "symbol": "gate_decomposition.decompose_spp_or_spp_dag_operation_double_inverted"
+        },
+        {
+          "path": "src/stim/circuit/gate_decomposition.test.cc",
+          "symbol": "gate_decomposition.decompose_spp_or_spp_dag_operation_triple_inverted"
+        },
+        {
+          "path": "src/stim/circuit/gate_decomposition.test.cc",
+          "symbol": "gate_decomposition.decompose_spp_or_spp_dag_operation_complex"
+        },
+        {
+          "path": "src/stim/circuit/gate_decomposition.test.cc",
+          "symbol": "gate_decomposition.decompose_spp_or_spp_dag_operation_empty"
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-circuit-gate-decomposition",
+        "pf5-missing-detectors-spp-rust"
+      ]
+    },
+    {
+      "id": "cq2-map-spp-multiple-products",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-spp-multiple"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/gate_decomposition.test.cc",
+          "symbol": "gate_decomposition.decompose_spp_or_spp_dag_operation_multiple"
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-spp-rejection",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-spp-rejection"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/gate_decomposition.test.cc",
+          "symbol": "gate_decomposition.decompose_spp_or_spp_dag_operation_bad"
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-fixed-tableau",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-fixed-tableau"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.period_3_gates"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol_base": "ErrorAnalyzer.unitary_gates_match_frame_simulator",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.bulk_operations_consistent_with_tableau_data",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.big_determinism",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.bit_flip",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.bit_flip_2",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.epr",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.identity",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.identity2",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.unitary_gates_consistent_with_tableau_data",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-py-frame-simulator",
+        "coverage-simulators-tableau-simulator",
+        "coverage-py-tableau-simulator"
+      ]
+    },
+    {
+      "id": "cq2-map-fixed-tableau-general-circuit",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-fixed-tableau-general-circuit"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.reversed_operation_order"
+        },
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.runs_on_general_circuit"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.runs_on_general_circuit",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.runs_on_general_circuit",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.simulate",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-measure-reset",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-measure-reset"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.measure_reset_basis"
+        },
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.repeated_measure_reset"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.measure_y_without_reset_doesnt_reset",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.resets_vs_measurements",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measurement_vs_vector_sim",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.mr_repeated_target",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.reset_pure",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.reset_random",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.reset_vs_measurements",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.reset_x_entangled",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.reset_y_entangled",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.reset_z_entangled",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_x_entangled",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_y_entangled",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_z_entangled",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_reset_x_entangled",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_reset_y_entangled",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_reset_z_entangled",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.simulate_reset",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-noisy-measure-reset-x",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-measure-reset-x"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.noisy_measurement_mx"
+        },
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.noisy_measurement_mrx"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.noisy_measurement_x",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.noisy_measurement_reset_x",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.noisy_measurement_x",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.noisy_measure_reset_x",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-noisy-measure-reset-y",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-measure-reset-y"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.noisy_measurement_my"
+        },
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.noisy_measurement_mry"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.noisy_measurement_y",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.noisy_measurement_reset_y",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.noisy_measurement_y",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.noisy_measure_reset_y",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-noisy-measure-reset-z",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-measure-reset-z"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.noisy_measurement_mz"
+        },
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.noisy_measurement_mrz"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.noisy_measurement_z",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.noisy_measurement_reset_z",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.noisy_measurement_z",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.noisy_measure_reset_z",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-pair-measurements",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-pair-measurement"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.mxx"
+        },
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.myy"
+        },
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.mzz"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.mxxyyzz_basis",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.mxx_myy_mzz_vs_mpp_unsigned",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.mxx",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.myy",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.mzz",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-pair-measurement-inversion",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-pair-measurement-inversion"
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.mxxyyzz_inversion",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-mpp-deterministic",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-mpp-deterministic"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.measure_pauli_product_4body"
+        },
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.mpp_ordering"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.measure_pauli_product_4body",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_pauli_product_1",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_pauli_product_4body",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_pauli_product_epr",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_pauli_product_inversions",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-mpp-rejection",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-mpp-anti-hermitian-rejection"
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_pauli_product_bad",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-mpp-stochastic",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-mpp-stochastic"
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.non_deterministic_pauli_product_detectors",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.measure_pauli_product_noisy",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-mpad-deterministic",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-mpad-deterministic"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.mpad"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.mpad",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.mpad",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-pauli-noise",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-pauli-noise"
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.certain_errors_consistent_with_gates",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-pauli-channels",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-pauli-channels"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.exact_solved_pauli_channel_1_is_let_through"
+        },
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.pauli_channel_composite_errors"
+        },
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.pauli_channel_threshold"
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-depolarization",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-depolarization"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.composite_error_analysis"
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-correlated-errors",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-correlated-errors"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.else_correlated_error_block"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.correlated_error",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.correlated_error",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-heralded-noise",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-heralded-noise"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.heralded_erase"
+        },
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.heralded_erase_conditional_division"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.heralded_erase_detect_statistics",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.heralded_erase",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-heralded-channel",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-heralded-channel"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.heralded_pauli_channel_1"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.heralded_pauli_channel_1_statistics",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.heralded_pauli_channel_1",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-heralded-erase-offset",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-heralded-erase-offset"
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.heralded_erase_statistics_offset_by_2",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-heralded-channel-offset",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-heralded-channel-offset"
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.heralded_pauli_channel_1_statistics_offset_by_2",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-annotations",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-annotations"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.OBS_INCLUDE_PAULIS"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.observable_include_paulis_rx",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.observable_include_paulis_ry",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.observable_include_paulis_rz",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-classical-controls",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-classical-controls"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.classical_error_propagation"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.classical_controls",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.classical_control_cases",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-classical-control-feedback",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-classical-control-feedback"
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.classical_can_control_quantum",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.classical_can_control_quantum",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-classical-control-rejection",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-classical-control-rejection"
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.quantum_cannot_control_classical",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.quantum_cannot_control_classical",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-map-classical-control-no-sweep-data",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "parent": {
+        "provenance": "blocker-ledger",
+        "source_id": "pfm3-contract-classical-control-no-sweep-data"
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/simulators/error_analyzer.test.cc",
+          "symbol": "ErrorAnalyzer.ignores_sweep_controls"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/simulators/frame_simulator.test.cc",
+          "symbol_base": "FrameSimulator.ignores_sweep_controls_when_given_no_sweep_data",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/simulators/tableau_simulator.test.cc",
+          "symbol_base": "TableauSimulator.ignores_sweep_controls",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
       ]
     }
   ]
