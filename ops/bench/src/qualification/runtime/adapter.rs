@@ -149,7 +149,7 @@ fn valid_digest(value: &str) -> bool {
 
 pub(crate) fn prepare_adapter(root: &RepoRoot) -> Result<AdapterExecutable, AdapterError> {
     ensure_linux()?;
-    crate::stim::validate_stim_source(&root.default_stim_source())
+    super::git::validate_pinned_stim(root)
         .map_err(|error| AdapterError::Stim(error.to_string()))?;
     let output = root
         .create_benchmark_output_dir(Path::new(ADAPTER_OUTPUT))

@@ -2,6 +2,7 @@ mod adapter;
 mod artifact;
 mod calibration;
 mod correctness;
+mod git;
 mod host;
 mod invocation;
 mod probe;

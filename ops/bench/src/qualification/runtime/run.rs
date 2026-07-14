@@ -1,6 +1,5 @@
-use std::ffi::OsString;
 use std::num::NonZeroU64;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use clap::{Args, ValueEnum};
@@ -13,7 +12,6 @@ use super::calibration::{CalibrationDecision, CalibrationPolicy, CalibrationProb
 use super::correctness::{CorrectnessPreflightEvidence, CorrectnessRequirement};
 use super::host::{HostEvidence, HostGuard};
 use super::invocation::{InvocationRecord, PreparedWorkers, WorkerIdentityEvidence, protocol_ids};
-use super::process::{ProcessLimits, ProcessRequest, run_bounded_process};
 use super::protocol::{EvidenceMode, Implementation, SemanticDigest, WorkerMeasurement};
 use super::statistics::{PairOrder, PairedSample, StatisticsSummary, pair_measurements, summarize};
 use crate::config::{STIM_COMMIT, STIM_TAG};
@@ -189,7 +187,7 @@ pub(super) fn run(
     correctness_inventory_sha256: &str,
     args: RunArgs,
 ) -> Result<PathBuf, RunError> {
-    let repository_before = git_state(root)?;
+    let repository_before = super::git::repository_state(root)?;
     let claim_class = ClaimClass::DiagnosticInfrastructure;
     let correctness_preflight = correctness_preflight(
         root,
@@ -292,7 +290,7 @@ pub(super) fn run(
     let memory = memory_evidence(memory_execution, common_iterations)?;
     workers.verify()?;
     let host = host_guard.finish()?;
-    let repository_after = git_state(root)?;
+    let repository_after = super::git::repository_state(root)?;
     if repository_before.commit != repository_after.commit {
         return Err(RunError::RepositoryChanged {
             before: repository_before.commit,
@@ -542,202 +540,6 @@ fn only_row(rows: &[WorkerMeasurement]) -> Result<&WorkerMeasurement, RunError> 
     Ok(row)
 }
 
-#[derive(Clone, Debug)]
-struct GitState {
-    commit: String,
-    local_modifications: bool,
-}
-
-fn git_state(root: &RepoRoot) -> Result<GitState, RunError> {
-    let git = PathBuf::from("/usr/bin/git");
-    if !git.is_file() {
-        return Err(RunError::MissingGit(git));
-    }
-    let scratch = tempfile::Builder::new()
-        .prefix("stab-qualification-git-")
-        .tempdir()
-        .map_err(RunError::GitScratch)?;
-    let private_index = scratch.path().join("index");
-    let commit = git_text(
-        root,
-        &git,
-        &["rev-parse", "--verify", "HEAD^{commit}"],
-        None,
-        scratch.path(),
-    )?;
-    if commit.len() != 40 || !commit.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return Err(RunError::InvalidGitCommit(commit));
-    }
-    git_command(
-        root,
-        &git,
-        &["read-tree", "HEAD"],
-        Some(&private_index),
-        scratch.path(),
-    )?;
-    let refresh = git_command_allow_status_one(
-        root,
-        &git,
-        &["update-index", "--really-refresh", "--ignore-submodules"],
-        Some(&private_index),
-        scratch.path(),
-    )?;
-    let tracked = git_command(
-        root,
-        &git,
-        &[
-            "diff-index",
-            "--name-only",
-            "-z",
-            "--no-renames",
-            "--ignore-submodules=none",
-            "HEAD",
-            "--",
-        ],
-        Some(&private_index),
-        scratch.path(),
-    )?;
-    let staged = git_command(
-        root,
-        &git,
-        &[
-            "diff-index",
-            "--cached",
-            "--name-only",
-            "-z",
-            "--no-renames",
-            "--ignore-submodules=none",
-            "HEAD",
-            "--",
-        ],
-        None,
-        scratch.path(),
-    )?;
-    let untracked = git_command(
-        root,
-        &git,
-        &[
-            "ls-files",
-            "--others",
-            "--exclude-per-directory=.gitignore",
-            "-z",
-            "--",
-        ],
-        Some(&private_index),
-        scratch.path(),
-    )?;
-    Ok(GitState {
-        commit: commit.to_ascii_lowercase(),
-        local_modifications: refresh.status == Some(1)
-            || !tracked.stdout.is_empty()
-            || !staged.stdout.is_empty()
-            || !untracked.stdout.is_empty(),
-    })
-}
-
-fn git_text(
-    root: &RepoRoot,
-    git: &Path,
-    args: &[&str],
-    private_index: Option<&Path>,
-    scratch: &Path,
-) -> Result<String, RunError> {
-    let output = git_command(root, git, args, private_index, scratch)?;
-    let text = std::str::from_utf8(&output.stdout).map_err(RunError::GitUtf8)?;
-    Ok(text.trim_end_matches(['\r', '\n']).to_string())
-}
-
-fn git_command(
-    root: &RepoRoot,
-    git: &Path,
-    args: &[&str],
-    private_index: Option<&Path>,
-    scratch: &Path,
-) -> Result<super::process::ProcessResult, RunError> {
-    git_command_with_status(root, git, args, private_index, scratch, false)
-}
-
-fn git_command_allow_status_one(
-    root: &RepoRoot,
-    git: &Path,
-    args: &[&str],
-    private_index: Option<&Path>,
-    scratch: &Path,
-) -> Result<super::process::ProcessResult, RunError> {
-    git_command_with_status(root, git, args, private_index, scratch, true)
-}
-
-fn git_command_with_status(
-    root: &RepoRoot,
-    git: &Path,
-    args: &[&str],
-    private_index: Option<&Path>,
-    scratch: &Path,
-    allow_status_one: bool,
-) -> Result<super::process::ProcessResult, RunError> {
-    let mut command_arguments = vec![
-        OsString::from("--no-optional-locks"),
-        OsString::from("-c"),
-        OsString::from("core.fsmonitor=false"),
-        OsString::from("-c"),
-        OsString::from("core.untrackedCache=false"),
-        OsString::from("-c"),
-        OsString::from("core.excludesFile=/dev/null"),
-        OsString::from("-c"),
-        OsString::from("diff.external="),
-        OsString::from("--work-tree"),
-        root.path.as_os_str().to_owned(),
-    ];
-    command_arguments.extend(args.iter().map(OsString::from));
-    let mut environment = vec![
-        (OsString::from("LANG"), OsString::from("C")),
-        (OsString::from("LC_ALL"), OsString::from("C")),
-        (OsString::from("PATH"), OsString::from("/usr/bin:/bin")),
-        (OsString::from("HOME"), scratch.as_os_str().to_owned()),
-        (
-            OsString::from("XDG_CONFIG_HOME"),
-            scratch.as_os_str().to_owned(),
-        ),
-        (OsString::from("GIT_CONFIG_NOSYSTEM"), OsString::from("1")),
-        (
-            OsString::from("GIT_CONFIG_GLOBAL"),
-            OsString::from("/dev/null"),
-        ),
-        (OsString::from("GIT_OPTIONAL_LOCKS"), OsString::from("0")),
-        (OsString::from("GIT_TERMINAL_PROMPT"), OsString::from("0")),
-        (OsString::from("GIT_LITERAL_PATHSPECS"), OsString::from("1")),
-    ];
-    if let Some(index) = private_index {
-        environment.push((
-            OsString::from("GIT_INDEX_FILE"),
-            index.as_os_str().to_owned(),
-        ));
-    }
-    let output = run_bounded_process(&ProcessRequest {
-        program: git.to_path_buf(),
-        args: command_arguments,
-        stdin: Vec::new(),
-        working_directory: root.path.clone(),
-        environment,
-        affinity_cpu: None,
-        limits: ProcessLimits {
-            stdin_bytes: 0,
-            stdout_bytes: 4 << 20,
-            stderr_bytes: 64 << 10,
-            regular_file_bytes: None,
-            timeout: Duration::from_secs(30),
-        },
-    })?;
-    let accepted_status = output.status == Some(0) || allow_status_one && output.status == Some(1);
-    if !accepted_status || output.status == Some(0) && !output.stderr.is_empty() {
-        return Err(RunError::GitFailed {
-            status: output.status,
-            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
-        });
-    }
-    Ok(output)
-}
-
 fn render_json(value: &impl Serialize) -> Result<Vec<u8>, RunError> {
     let mut bytes = serde_json::to_vec_pretty(value)?;
     bytes.push(b'\n');
@@ -788,6 +590,8 @@ pub(super) enum RunError {
     #[error(transparent)]
     Process(#[from] super::process::ProcessError),
     #[error(transparent)]
+    Git(#[from] super::git::GitError),
+    #[error(transparent)]
     Report(#[from] super::report::ReportError),
     #[error("qualification maximum iteration cap must be positive")]
     InvalidIterationCap,
@@ -810,16 +614,6 @@ pub(super) enum RunError {
     MissingMemory,
     #[error("qualification expected one measurement but received {0}")]
     ExpectedOneMeasurement(usize),
-    #[error("required Git executable is missing: {0}")]
-    MissingGit(PathBuf),
-    #[error("Git command failed with status {status:?}: {stderr}")]
-    GitFailed { status: Option<i32>, stderr: String },
-    #[error("Git output is not UTF-8: {0}")]
-    GitUtf8(std::str::Utf8Error),
-    #[error("failed to create an isolated Git audit directory: {0}")]
-    GitScratch(std::io::Error),
-    #[error("Git returned invalid commit {0:?}")]
-    InvalidGitCommit(String),
     #[error("repository commit changed during qualification: {before} -> {after}")]
     RepositoryChanged { before: String, after: String },
     #[error("system clock is before the Unix epoch: {0}")]
@@ -831,25 +625,6 @@ pub(super) enum RunError {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn test_git(repository: &Path, arguments: &[&str]) {
-        let output = std::process::Command::new("/usr/bin/git")
-            .arg("-C")
-            .arg(repository)
-            .args(arguments)
-            .env_clear()
-            .env("PATH", "/usr/bin:/bin")
-            .env("LANG", "C")
-            .env("LC_ALL", "C")
-            .output()
-            .expect("run test Git command");
-        assert!(
-            output.status.success(),
-            "Git {:?} failed: {}",
-            arguments,
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
 
     #[test]
     fn tiers_have_source_owned_pair_counts() {
@@ -884,76 +659,5 @@ mod tests {
         assert!(!common_calibration_duration_is_accepted(
             Duration::from_micros(2_000_001)
         ));
-    }
-
-    #[test]
-    fn clean_revision_audit_defeats_index_flags_and_local_excludes() {
-        let repository = tempfile::tempdir().expect("temporary repository");
-        test_git(repository.path(), &["init", "--quiet"]);
-        test_git(repository.path(), &["config", "user.name", "Stab Test"]);
-        test_git(
-            repository.path(),
-            &["config", "user.email", "stab@example.invalid"],
-        );
-        std::fs::write(repository.path().join(".gitignore"), "ignored/\n")
-            .expect("write ignore policy");
-        std::fs::write(repository.path().join("tracked.txt"), "base\n")
-            .expect("write tracked file");
-        test_git(repository.path(), &["add", "--all"]);
-        test_git(repository.path(), &["commit", "--quiet", "-m", "initial"]);
-        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
-        assert!(!git_state(&root).expect("clean state").local_modifications);
-
-        std::fs::create_dir(repository.path().join("ignored")).expect("create ignored directory");
-        std::fs::write(repository.path().join("ignored/generated"), "generated\n")
-            .expect("write ignored output");
-        assert!(
-            !git_state(&root)
-                .expect("ignored output state")
-                .local_modifications
-        );
-
-        test_git(
-            repository.path(),
-            &["update-index", "--skip-worktree", "tracked.txt"],
-        );
-        std::fs::write(repository.path().join("tracked.txt"), "hidden change\n")
-            .expect("modify skipped file");
-        assert!(
-            git_state(&root)
-                .expect("skip-worktree state")
-                .local_modifications
-        );
-
-        std::fs::write(repository.path().join("tracked.txt"), "base\n")
-            .expect("restore tracked file");
-        test_git(
-            repository.path(),
-            &["update-index", "--no-skip-worktree", "tracked.txt"],
-        );
-        std::fs::write(repository.path().join("tracked.txt"), "staged change\n")
-            .expect("write staged change");
-        test_git(repository.path(), &["add", "tracked.txt"]);
-        std::fs::write(repository.path().join("tracked.txt"), "base\n")
-            .expect("restore worktree only");
-        assert!(
-            git_state(&root)
-                .expect("staged-only state")
-                .local_modifications
-        );
-
-        test_git(
-            repository.path(),
-            &["reset", "--quiet", "HEAD", "--", "tracked.txt"],
-        );
-        std::fs::write(repository.path().join(".git/info/exclude"), "hidden.txt\n")
-            .expect("write local exclude");
-        std::fs::write(repository.path().join("hidden.txt"), "untracked\n")
-            .expect("write locally excluded file");
-        assert!(
-            git_state(&root)
-                .expect("locally excluded state")
-                .local_modifications
-        );
     }
 }
