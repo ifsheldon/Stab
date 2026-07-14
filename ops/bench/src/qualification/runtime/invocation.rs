@@ -85,6 +85,7 @@ impl PreparedWorkers {
     ) -> Result<InvocationRecord, InvocationError> {
         let cpu = self.cpu.ok_or(InvocationError::MissingCpu)?;
         let expected_cpu = u32::try_from(cpu).map_err(|_| InvocationError::CpuRange(cpu))?;
+        let expected_work_count = checked_work_count(iterations, work_items)?;
         let mut arguments = vec![
             OsString::from("--workload"),
             OsString::from(WORKLOAD_ID),
@@ -134,10 +135,6 @@ impl PreparedWorkers {
         })?;
         let process = checked_process(process, implementation)?;
         let rows = parse_worker_json_lines(&process.stdout)?;
-        let expected_work_count = iterations
-            .get()
-            .checked_mul(work_items.get())
-            .ok_or(InvocationError::WorkOverflow)?;
         ProtocolExpectation {
             implementation,
             evidence_mode,
@@ -228,6 +225,16 @@ fn worker_environment() -> Vec<(OsString, OsString)> {
     ]
 }
 
+fn checked_work_count(
+    iterations: NonZeroU64,
+    work_items: NonZeroU64,
+) -> Result<u64, InvocationError> {
+    iterations
+        .get()
+        .checked_mul(work_items.get())
+        .ok_or(InvocationError::WorkOverflow)
+}
+
 pub(crate) fn protocol_ids() -> Result<(ProtocolId, ProtocolId), InvocationError> {
     Ok((
         ProtocolId::try_new(WORKLOAD_ID)?,
@@ -275,4 +282,19 @@ pub(crate) enum InvocationError {
     InvalidMeasuredDuration(f64),
     #[error("qualification process recorded invalid wall duration {0}")]
     InvalidWallDuration(f64),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parent_rejects_semantic_work_overflow_before_invocation() {
+        let maximum = NonZeroU64::new(u64::MAX).expect("positive maximum");
+        let two = NonZeroU64::new(2).expect("positive two");
+        assert!(matches!(
+            checked_work_count(maximum, two),
+            Err(InvocationError::WorkOverflow)
+        ));
+    }
 }

@@ -79,14 +79,15 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
         use std::os::unix::process::CommandExt as _;
         command.process_group(0);
     }
-    let mut child = command.spawn().map_err(|source| ProcessError::Spawn {
+    let child = command.spawn().map_err(|source| ProcessError::Spawn {
         program: request.program.clone(),
         source,
     })?;
+    let mut child = ManagedChild::new(child, request.program.clone());
     if let Some(cpu) = request.affinity_cpu
         && let Err(source) = set_child_affinity(child.id(), cpu)
     {
-        terminate_process_tree(&mut child, &request.program, false)?;
+        child.close_group()?;
         return Err(ProcessError::SetAffinity {
             program: request.program.clone(),
             cpu,
@@ -96,7 +97,7 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
     if let Some(maximum) = request.limits.regular_file_bytes
         && let Err(source) = set_child_file_limit(child.id(), maximum)
     {
-        terminate_process_tree(&mut child, &request.program, false)?;
+        child.close_group()?;
         return Err(ProcessError::SetFileLimit {
             program: request.program.clone(),
             maximum,
@@ -107,21 +108,7 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
     let deadline = Instant::now()
         .checked_add(request.limits.timeout)
         .ok_or(ProcessError::DeadlineOverflow)?;
-    let stdout = child
-        .stdout
-        .take()
-        .map(|pipe| spawn_reader(pipe, request.limits.stdout_bytes))
-        .ok_or(ProcessError::MissingPipe("stdout"))?;
-    let stderr = child
-        .stderr
-        .take()
-        .map(|pipe| spawn_reader(pipe, request.limits.stderr_bytes))
-        .ok_or(ProcessError::MissingPipe("stderr"))?;
-    let stdin = child
-        .stdin
-        .take()
-        .map(|pipe| spawn_writer(pipe, request.stdin.clone()))
-        .ok_or(ProcessError::MissingPipe("stdin"))?;
+    child.start_io(request)?;
     let mut status = None;
     let mut peak_rss = None;
 
@@ -130,25 +117,22 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
             peak_rss = Some(peak_rss.map_or(rss, |peak: u64| peak.max(rss)));
         }
         if status.is_none() {
-            status = child.try_wait().map_err(|source| ProcessError::Wait {
-                program: request.program.clone(),
-                source,
-            })?;
+            status = child.try_wait()?;
             if status.is_some() {
-                kill_process_group(&mut child, &request.program)?;
+                child.close_group()?;
             }
         }
         if cancellation.is_cancelled() {
-            terminate_process_tree(&mut child, &request.program, status.is_some())?;
-            let captured = join_all(&request.program, stdin, stdout, stderr)?;
+            child.close_group()?;
+            let captured = child.join_io()?;
             return Err(ProcessError::Interrupted {
                 program: request.program.clone(),
                 stdout: captured.stdout,
                 stderr: captured.stderr,
             });
         }
-        if stdout.exceeded() || stderr.exceeded() {
-            let stream = if stdout.exceeded() {
+        if child.stdout_exceeded()? || child.stderr_exceeded()? {
+            let stream = if child.stdout_exceeded()? {
                 "stdout"
             } else {
                 "stderr"
@@ -158,8 +142,8 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
             } else {
                 request.limits.stderr_bytes
             };
-            terminate_process_tree(&mut child, &request.program, status.is_some())?;
-            let captured = join_all(&request.program, stdin, stdout, stderr)?;
+            child.close_group()?;
+            let captured = child.join_io()?;
             return Err(ProcessError::OutputLimit {
                 program: request.program.clone(),
                 stream,
@@ -168,13 +152,13 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
                 stderr: captured.stderr,
             });
         }
-        if status.is_some() && stdin.is_finished() && stdout.is_finished() && stderr.is_finished() {
+        if status.is_some() && child.io_finished()? {
             break;
         }
         let now = Instant::now();
         if now >= deadline {
-            terminate_process_tree(&mut child, &request.program, status.is_some())?;
-            let captured = join_all(&request.program, stdin, stdout, stderr)?;
+            child.close_group()?;
+            let captured = child.join_io()?;
             return Err(ProcessError::TimedOut {
                 program: request.program.clone(),
                 timeout: request.limits.timeout,
@@ -185,9 +169,7 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
         std::thread::sleep(POLL_INTERVAL.min(deadline.duration_since(now)));
     }
 
-    join_writer(&request.program, stdin)?;
-    let stdout = join_reader(&request.program, stdout)?;
-    let stderr = join_reader(&request.program, stderr)?;
+    let captured = child.join_io()?;
     let status = status.ok_or_else(|| ProcessError::MissingStatus(request.program.clone()))?;
     #[cfg(unix)]
     {
@@ -198,18 +180,163 @@ pub(crate) fn run_bounded_process(request: &ProcessRequest) -> Result<ProcessRes
             return Err(ProcessError::FileLimit {
                 program: request.program.clone(),
                 maximum,
-                stdout: stdout.bytes,
-                stderr: stderr.bytes,
+                stdout: captured.stdout,
+                stderr: captured.stderr,
             });
         }
     }
     Ok(ProcessResult {
         status: status.code(),
-        stdout: stdout.bytes,
-        stderr: stderr.bytes,
+        stdout: captured.stdout,
+        stderr: captured.stderr,
         parent_observed_peak_rss_bytes: peak_rss,
         wall_elapsed: wall_started.elapsed(),
     })
+}
+
+struct ManagedChild {
+    child: std::process::Child,
+    program: PathBuf,
+    stdin: Option<Writer>,
+    stdout: Option<OutputReader>,
+    stderr: Option<OutputReader>,
+    reaped: bool,
+    group_closed: bool,
+}
+
+impl ManagedChild {
+    fn new(child: std::process::Child, program: PathBuf) -> Self {
+        Self {
+            child,
+            program,
+            stdin: None,
+            stdout: None,
+            stderr: None,
+            reaped: false,
+            group_closed: false,
+        }
+    }
+
+    fn id(&self) -> u32 {
+        self.child.id()
+    }
+
+    fn start_io(&mut self, request: &ProcessRequest) -> Result<(), ProcessError> {
+        let stdout = self
+            .child
+            .stdout
+            .take()
+            .ok_or(ProcessError::MissingPipe("stdout"))?;
+        self.stdout = Some(spawn_reader(stdout, request.limits.stdout_bytes));
+        let stderr = self
+            .child
+            .stderr
+            .take()
+            .ok_or(ProcessError::MissingPipe("stderr"))?;
+        self.stderr = Some(spawn_reader(stderr, request.limits.stderr_bytes));
+        let stdin = self
+            .child
+            .stdin
+            .take()
+            .ok_or(ProcessError::MissingPipe("stdin"))?;
+        self.stdin = Some(spawn_writer(stdin, request.stdin.clone()));
+        Ok(())
+    }
+
+    fn try_wait(&mut self) -> Result<Option<std::process::ExitStatus>, ProcessError> {
+        let status = self.child.try_wait().map_err(|source| ProcessError::Wait {
+            program: self.program.clone(),
+            source,
+        })?;
+        if status.is_some() {
+            self.reaped = true;
+        }
+        Ok(status)
+    }
+
+    fn close_group(&mut self) -> Result<(), ProcessError> {
+        if self.group_closed {
+            return Ok(());
+        }
+        kill_process_group(&mut self.child, &self.program)?;
+        if !self.reaped {
+            self.child.wait().map_err(|source| ProcessError::Wait {
+                program: self.program.clone(),
+                source,
+            })?;
+            self.reaped = true;
+        }
+        self.group_closed = true;
+        Ok(())
+    }
+
+    fn stdout_exceeded(&self) -> Result<bool, ProcessError> {
+        self.stdout
+            .as_ref()
+            .map(OutputReader::exceeded)
+            .ok_or(ProcessError::MissingPipe("stdout"))
+    }
+
+    fn stderr_exceeded(&self) -> Result<bool, ProcessError> {
+        self.stderr
+            .as_ref()
+            .map(OutputReader::exceeded)
+            .ok_or(ProcessError::MissingPipe("stderr"))
+    }
+
+    fn io_finished(&self) -> Result<bool, ProcessError> {
+        Ok(self
+            .stdin
+            .as_ref()
+            .ok_or(ProcessError::MissingPipe("stdin"))?
+            .is_finished()
+            && self
+                .stdout
+                .as_ref()
+                .ok_or(ProcessError::MissingPipe("stdout"))?
+                .is_finished()
+            && self
+                .stderr
+                .as_ref()
+                .ok_or(ProcessError::MissingPipe("stderr"))?
+                .is_finished())
+    }
+
+    fn join_io(&mut self) -> Result<JoinedOutput, ProcessError> {
+        let stdin = self
+            .stdin
+            .take()
+            .ok_or(ProcessError::MissingPipe("stdin"))?;
+        let stdout = self
+            .stdout
+            .take()
+            .ok_or(ProcessError::MissingPipe("stdout"))?;
+        let stderr = self
+            .stderr
+            .take()
+            .ok_or(ProcessError::MissingPipe("stderr"))?;
+        join_all(&self.program, stdin, stdout, stderr)
+    }
+}
+
+impl Drop for ManagedChild {
+    fn drop(&mut self) {
+        if !self.group_closed {
+            drop(kill_process_group(&mut self.child, &self.program));
+            if !self.reaped {
+                drop(self.child.wait());
+            }
+        }
+        if let Some(stdin) = self.stdin.take() {
+            drop(join_writer(&self.program, stdin));
+        }
+        if let Some(stdout) = self.stdout.take() {
+            drop(join_reader(&self.program, stdout));
+        }
+        if let Some(stderr) = self.stderr.take() {
+            drop(join_reader(&self.program, stderr));
+        }
+    }
 }
 
 struct JoinedOutput {
@@ -349,21 +476,6 @@ fn join_reader(
     }
 }
 
-fn terminate_process_tree(
-    child: &mut std::process::Child,
-    program: &std::path::Path,
-    already_reaped: bool,
-) -> Result<(), ProcessError> {
-    kill_process_group(child, program)?;
-    if !already_reaped {
-        child.wait().map_err(|source| ProcessError::Wait {
-            program: program.to_path_buf(),
-            source,
-        })?;
-    }
-    Ok(())
-}
-
 fn kill_process_group(
     child: &mut std::process::Child,
     program: &std::path::Path,
@@ -420,9 +532,15 @@ fn set_child_file_limit(pid: u32, requested_maximum: u64) -> Result<(), std::io:
         )
     })?;
     let inherited = rustix::process::getrlimit(rustix::process::Resource::Fsize);
-    let maximum = inherited
-        .maximum
-        .map_or(requested_maximum, |hard| hard.min(requested_maximum));
+    let maximum = [
+        Some(requested_maximum),
+        inherited.current,
+        inherited.maximum,
+    ]
+    .into_iter()
+    .flatten()
+    .min()
+    .ok_or_else(|| std::io::Error::other("file-size limit has no finite bound"))?;
     rustix::process::prlimit(
         Some(pid),
         rustix::process::Resource::Fsize,
@@ -739,6 +857,38 @@ mod tests {
     }
 
     #[test]
+    fn managed_child_drop_kills_and_reaps_after_io_start() {
+        let request = request("sleep");
+        let mut command = std::process::Command::new(&request.program);
+        command
+            .args(&request.args)
+            .current_dir(&request.working_directory)
+            .env_clear()
+            .envs(request.environment.iter().map(|(key, value)| (key, value)))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        use std::os::unix::process::CommandExt as _;
+        command.process_group(0);
+        let child = command.spawn().expect("spawn managed helper");
+        let pid = child.id();
+        let mut managed = ManagedChild::new(child, request.program.clone());
+        managed.start_io(&request).expect("start managed IO");
+        drop(managed);
+
+        for _ in 0..100 {
+            if !PathBuf::from(format!("/proc/{pid}")).exists() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(
+            !PathBuf::from(format!("/proc/{pid}")).exists(),
+            "managed child {pid} survived guard cleanup"
+        );
+    }
+
+    #[test]
     #[ignore = "executed only as a subprocess by bounded-process tests"]
     fn process_helper() {
         let mode = std::env::var(HELPER_ENV).expect("helper mode");
@@ -768,6 +918,7 @@ mod tests {
             "panic" => {
                 std::env::var_os("STAB_BENCH_INTENTIONALLY_MISSING").expect("process helper panic");
             }
+            "sleep" => std::thread::sleep(Duration::from_secs(30)),
             "child-tree" => {
                 let child =
                     std::process::Command::new(std::env::current_exe().expect("helper executable"))

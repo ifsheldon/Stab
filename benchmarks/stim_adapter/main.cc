@@ -201,15 +201,15 @@ int main(int argc, const char **argv) {
         verify_affinity(arguments.expected_cpu);
 
         const uint64_t setup_rss = status_kib("VmRSS:");
+        if (arguments.iterations > std::numeric_limits<uint64_t>::max() / arguments.work_items) {
+            throw std::overflow_error("adapter semantic work count overflows u64");
+        }
         const auto started = std::chrono::steady_clock::now();
         const auto digest_state = protocol_smoke(arguments.iterations, arguments.work_items);
         const auto finished = std::chrono::steady_clock::now();
         const std::chrono::duration<double> elapsed = finished - started;
         if (!(elapsed.count() > 0)) {
             throw std::runtime_error("adapter measured a non-positive duration");
-        }
-        if (arguments.iterations > std::numeric_limits<uint64_t>::max() / arguments.work_items) {
-            throw std::overflow_error("adapter semantic work count overflows u64");
         }
         const uint64_t peak_rss = std::max(setup_rss, status_kib("VmHWM:"));
 
