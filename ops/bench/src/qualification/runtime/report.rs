@@ -1058,8 +1058,16 @@ pub(super) enum ReportError {
     Artifact(#[from] super::artifact::ArtifactError),
     #[error("qualification report JSON must be nonempty and newline terminated")]
     ReportBoundary,
-    #[error("qualification report JSON is not in its canonical source-owned representation")]
-    NonCanonicalReport,
+    #[error(
+        "qualification report JSON is not canonical at byte {offset}: actual={actual:?} expected={expected:?} actual_length={actual_length} expected_length={expected_length}"
+    )]
+    NonCanonicalReport {
+        offset: usize,
+        actual: Option<u8>,
+        expected: Option<u8>,
+        actual_length: usize,
+        expected_length: usize,
+    },
     #[error("qualification report output path does not match the validated directory")]
     OutputBinding,
     #[error("qualification preflight does not exactly reproduce from report.json")]

@@ -105,7 +105,18 @@ fn load_bound_report(
     let mut canonical = serde_json::to_vec_pretty(&report).map_err(ReportError::Json)?;
     canonical.push(b'\n');
     if canonical != report_json {
-        return Err(ReportError::NonCanonicalReport);
+        let offset = canonical
+            .iter()
+            .zip(&report_json)
+            .position(|(expected, actual)| expected != actual)
+            .unwrap_or_else(|| canonical.len().min(report_json.len()));
+        return Err(ReportError::NonCanonicalReport {
+            offset,
+            actual: report_json.get(offset).copied(),
+            expected: canonical.get(offset).copied(),
+            actual_length: report_json.len(),
+            expected_length: canonical.len(),
+        });
     }
     validate_report(
         root,
@@ -127,4 +138,21 @@ fn render_preflight(
     let mut bytes = serde_json::to_vec_pretty(&preflight).map_err(ReportError::Json)?;
     bytes.push(b'\n');
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn source_owned_float_evidence_round_trips_canonically() {
+        let value = 0.001_487_307_957_989_267_3_f64;
+        let encoded = serde_json::to_vec(&value).expect("serialize evidence float");
+        assert_eq!(encoded, b"0.0014873079579892673");
+
+        let decoded: f64 = serde_json::from_slice(&encoded).expect("parse evidence float");
+        assert_eq!(decoded.to_bits(), value.to_bits());
+        assert_eq!(
+            serde_json::to_vec(&decoded).expect("reserialize evidence float"),
+            encoded
+        );
+    }
 }
