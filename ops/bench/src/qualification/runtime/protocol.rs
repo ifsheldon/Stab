@@ -274,24 +274,40 @@ impl ProtocolExpectation {
     pub(super) fn validate(&self, rows: &[WorkerMeasurement]) -> Result<(), ProtocolError> {
         let mut observed = BTreeSet::new();
         for row in rows {
-            if row.implementation != self.implementation
-                || row.evidence_mode != self.evidence_mode
-                || row.workload_id != self.workload_id
-                || row.iteration_count != self.iteration_count
-                || row.work_count != self.expected_work_count
-                || row.input_bytes != self.expected_input_bytes
-                || row.input_digest != self.expected_input_digest
-                || self
-                    .expected_output_digest
-                    .as_ref()
-                    .is_some_and(|expected| row.output_digest != *expected)
-                || row.affinity_cpu != self.affinity_cpu
-                || row.stim_commit != self.stim_commit
-                || row.source_digest != self.source_digest
-                || row.build_fingerprint != self.build_fingerprint
-            {
+            let mismatch = [
+                (row.implementation != self.implementation, "implementation"),
+                (row.evidence_mode != self.evidence_mode, "evidence_mode"),
+                (row.workload_id != self.workload_id, "workload_id"),
+                (
+                    row.iteration_count != self.iteration_count,
+                    "iteration_count",
+                ),
+                (row.work_count != self.expected_work_count, "work_count"),
+                (row.input_bytes != self.expected_input_bytes, "input_bytes"),
+                (
+                    row.input_digest != self.expected_input_digest,
+                    "input_digest",
+                ),
+                (
+                    self.expected_output_digest
+                        .as_ref()
+                        .is_some_and(|expected| row.output_digest != *expected),
+                    "output_digest",
+                ),
+                (row.affinity_cpu != self.affinity_cpu, "affinity_cpu"),
+                (row.stim_commit != self.stim_commit, "stim_commit"),
+                (row.source_digest != self.source_digest, "source_digest"),
+                (
+                    row.build_fingerprint != self.build_fingerprint,
+                    "build_fingerprint",
+                ),
+            ]
+            .into_iter()
+            .find_map(|(differs, field)| differs.then_some(field));
+            if let Some(field) = mismatch {
                 return Err(ProtocolError::ExpectationMismatch {
                     measurement: row.measurement_id.clone(),
+                    field,
                 });
             }
             if !observed.insert(row.measurement_id.clone()) {
@@ -406,8 +422,11 @@ pub(crate) enum ProtocolError {
     IncompleteMemory { measurement: ProtocolId },
     #[error("qualification worker repeats measurement {0}")]
     DuplicateMeasurement(ProtocolId),
-    #[error("measurement {measurement} does not match the worker invocation receipt")]
-    ExpectationMismatch { measurement: ProtocolId },
+    #[error("measurement {measurement} field {field} does not match the worker invocation receipt")]
+    ExpectationMismatch {
+        measurement: ProtocolId,
+        field: &'static str,
+    },
     #[error("qualification worker measurement set differs: expected {expected:?}, got {actual:?}")]
     MeasurementSet {
         expected: BTreeSet<ProtocolId>,
@@ -505,7 +524,13 @@ mod tests {
             build_fingerprint: Sha256Digest::try_new("d".repeat(64))
                 .expect("different fingerprint"),
         };
-        assert!(expectation.validate(&rows).is_err());
+        assert!(matches!(
+            expectation.validate(&rows),
+            Err(ProtocolError::ExpectationMismatch {
+                field: "build_fingerprint",
+                ..
+            })
+        ));
     }
 
     #[test]
