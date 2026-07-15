@@ -1,5 +1,7 @@
 # PQ2 Circuit Parse Qualification Progress Report
 
+> Evidence-status note, 2026-07-15: the measurements below remain accepted historical evidence for revision `d2df9766c5e3543c8df016db31f48f552354d79f`, but they do not bind current performance inventory `b6bf408c54461d65670200fe701f7fff3e5e0470509d8fc89aeab729a242781b` or the shared worker extended with canonical printing. Regenerate all six parser reports and both rollups from the clean current worker before citing them as source-current.
+
 ## Status
 
 The first PQ2 product group, `PERFQ-M4-CIRCUIT-PARSE`, now passes the unchanged `1.25x` timing gate at every full and soak scale on the controlled Linux AArch64 host as of 2026-07-15.

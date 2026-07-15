@@ -12,7 +12,7 @@ Latest clean exact current-digest evidence revision: `d2df9766c5e3543c8df016db31
 
 Current correctness inventory digest: `4d9faa21e318eeebc4614c7bf62491bb2db73b5db57ae3dab7d0f19f3fda7cad`.
 
-Current dependent performance inventory digest after the first PQ2 product-contract graduation: `9687d45fa57b97388e7a8c7b1676f2545619ff3185c19aa714583b25d1680924`.
+Current dependent performance inventory digest after the first two PQ2 product-contract graduations: `b6bf408c54461d65670200fe701f7fff3e5e0470509d8fc89aeab729a242781b`.
 
 The authoritative exact current-digest report for the active dependent group is `target/qualification/pq2-circuit-parse-reviewed-full`. The clean all-domain reports at `target/qualification/cq2-deterministic-pr-clean`, `target/qualification/cq2-deterministic-full-clean`, and `target/qualification/cq2-deterministic-soak-clean` bind the preceding digest and are retained as historical evidence. Rerun the complete 270-parent family before citing all-domain execution as source-current. Earlier Generation-refined correctness and dependent PQ1 reports also remain historical.
 

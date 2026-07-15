@@ -16,8 +16,11 @@ Reproduce the process boundary and adapter boundary independently with:
 just bench::qualification-probe --group pq1-process-contract-smoke
 just bench::qualification-probe --group pq1-adapter-protocol-smoke
 just bench::qualification-probe --group pq2-circuit-parse-adapter-smoke --iterations 2 --work-items 64
+just bench::qualification-probe --group pq2-circuit-canonical-print-adapter-smoke --iterations 2 --work-items 64
 ```
 
 The PQ1 protocol-smoke body is deliberately synthetic and report-only. It proves runner symmetry and evidence reconstruction but is not a benchmark of Stim or Stab product behavior.
 
 The first product adapter workload is `circuit-parse` with measurement `parse`. Both workers build the same bounded deterministic instruction fixture before timing, parse it for the calibrated iteration count, and consume an untimed digest of the resulting canonical circuit. The digest removes Stab's single terminal newline before comparison because pinned Stim's `Circuit::str()` omits that newline; it does not otherwise normalize circuit text. The probe proves worker symmetry but remains diagnostic. A promotable ratio additionally requires a source-owned runtime group, exact passing CQ preflight, a clean full or soak run, and a verified host.
+
+The second product adapter workload is `circuit-canonical-print` with measurement `serialize`. Both workers build and parse the same exact fixture before the start barrier, then time only repeated conversion of the prepared circuit into canonical `.stim` text. Every produced string is consumed, the final string is digested outside timing, and only Stab's single terminal newline is removed before comparison. Parsing and fixture construction are setup work, while output allocation and destruction remain part of the serialization measurement.

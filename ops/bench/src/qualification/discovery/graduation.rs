@@ -5,15 +5,25 @@ use super::super::model::{
 };
 
 const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
+const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
     "cq-evidence-qualification-e660819ae9a223c6",
 ];
+const CIRCUIT_CANONICAL_PRINT_CORRECTNESS_CASES: [&str; 2] = [
+    "cq-evidence-qualification-e660819ae9a223c6",
+    "cq-evidence-qualification-ef933925fb901877",
+];
 
 pub(super) fn apply(group: &mut QualificationGroup) {
-    if group.id != CIRCUIT_PARSE_GROUP_ID {
-        return;
+    match group.id.as_str() {
+        CIRCUIT_PARSE_GROUP_ID => apply_circuit_parse(group),
+        CIRCUIT_CANONICAL_PRINT_GROUP_ID => apply_circuit_canonical_print(group),
+        _ => {}
     }
+}
+
+fn apply_circuit_parse(group: &mut QualificationGroup) {
     group.runner_fidelity = RunnerFidelity::AdapterLibrary;
     group.correctness_cases = CIRCUIT_PARSE_CORRECTNESS_CASES
         .into_iter()
@@ -21,7 +31,54 @@ pub(super) fn apply(group: &mut QualificationGroup) {
         .collect();
     group.correctness_binding = CorrectnessBinding::ExactCases;
     group.planned_correctness_case_id = None;
-    group.workload_family = WorkloadFamily {
+    group.workload_family = circuit_workload_family();
+    group.output_contract = OutputContract {
+        expected_shape:
+            "Exact fixture byte count and digest plus canonical final-circuit semantic digest."
+                .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: "Both workers construct the source-owned fixture outside timing, bind its exact bytes, and digest the final parsed circuit outside timing."
+            .to_string(),
+    };
+    group.memory_policy = circuit_memory_policy(
+        "Process setup and peak RSS are reported separately at every timing scale; maximum accepted materialization and first rejection remain PQ6 resource evidence.",
+    );
+    group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.owner = "stab-core/circuit-parser".to_string();
+    group.reason = "Implemented paired adapter and Rust parser workload with exact CQ2, input, output, scale, timing, and memory bindings."
+        .to_string();
+    group.status = QualificationStatus::Implemented;
+}
+
+fn apply_circuit_canonical_print(group: &mut QualificationGroup) {
+    group.runner_fidelity = RunnerFidelity::AdapterLibrary;
+    group.correctness_cases = CIRCUIT_CANONICAL_PRINT_CORRECTNESS_CASES
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = circuit_workload_family();
+    group.output_contract = OutputContract {
+        expected_shape:
+            "Exact fixture byte count and digest plus final canonical circuit-text digest."
+                .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: "Both workers parse the source-owned fixture once outside timing, repeatedly serialize the resulting circuit while consuming each produced string, and compare the final canonical digest outside timing after normalizing only Stab's terminal newline."
+            .to_string(),
+    };
+    group.memory_policy = circuit_memory_policy(
+        "Process setup RSS includes the parsed circuit and peak RSS includes canonical output allocation at every timing scale; maximum accepted materialization and first rejection remain PQ6 resource evidence.",
+    );
+    group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.owner = "stab-core/circuit-printer".to_string();
+    group.reason = "Implemented paired adapter and Rust canonical circuit serialization workload with exact CQ2, input, output, scale, timing, and memory bindings."
+        .to_string();
+    group.status = QualificationStatus::Implemented;
+}
+
+fn circuit_workload_family() -> WorkloadFamily {
+    WorkloadFamily {
         fixture: FixtureLocator::Generated {
             id: "circuit-parse-cycle-v1".to_string(),
         },
@@ -56,27 +113,16 @@ pub(super) fn apply(group: &mut QualificationGroup) {
             input_digest: Some(input_digest.to_string()),
         })
         .collect(),
-    };
-    group.output_contract = OutputContract {
-        expected_shape:
-            "Exact fixture byte count and digest plus canonical final-circuit semantic digest."
-                .to_string(),
-        digest_state: EvidenceState::Existing,
-        sink_policy: "Both workers construct the source-owned fixture outside timing, bind its exact bytes, and digest the final parsed circuit outside timing."
-            .to_string(),
-    };
-    group.memory_policy = MemoryPolicy {
+    }
+}
+
+fn circuit_memory_policy(expected_growth: &str) -> MemoryPolicy {
+    MemoryPolicy {
         method: MemoryMethod::ProcessRss,
         scale_ids: ["small", "medium", "large"]
             .into_iter()
             .map(str::to_string)
             .collect(),
-        expected_growth: "Process setup and peak RSS are reported separately at every timing scale; maximum accepted materialization and first rejection remain PQ6 resource evidence."
-            .to_string(),
-    };
-    group.threshold_policy = ThresholdPolicy::Primary1_25;
-    group.owner = "stab-core/circuit-parser".to_string();
-    group.reason = "Implemented paired adapter and Rust parser workload with exact CQ2, input, output, scale, timing, and memory bindings."
-        .to_string();
-    group.status = QualificationStatus::Implemented;
+        expected_growth: expected_growth.to_string(),
+    }
 }

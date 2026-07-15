@@ -1,11 +1,22 @@
 {
   "schema_version": 2,
-  "performance_inventory_sha256": "9687d45fa57b97388e7a8c7b1676f2545619ff3185c19aa714583b25d1680924",
+  "performance_inventory_sha256": "b6bf408c54461d65670200fe701f7fff3e5e0470509d8fc89aeab729a242781b",
   "groups": [
     {
       "group_id": "pq1-adapter-protocol-smoke",
       "baseline_eligibility": "report-only",
       "measurements": []
+    },
+    {
+      "group_id": "PERFQ-M4-CIRCUIT-CANONICAL-PRINT",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "serialize",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
     },
     {
       "group_id": "PERFQ-M4-CIRCUIT-PARSE",

@@ -19,6 +19,7 @@ use crate::root::RepoRoot;
 
 const ADAPTER_PROBE_ID: &str = "pq1-adapter-protocol-smoke";
 const CIRCUIT_PARSE_PROBE_ID: &str = "pq2-circuit-parse-adapter-smoke";
+const CIRCUIT_CANONICAL_PRINT_PROBE_ID: &str = "pq2-circuit-canonical-print-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
@@ -31,6 +32,8 @@ enum ProbeGroup {
     AdapterProtocol,
     #[value(name = "pq2-circuit-parse-adapter-smoke")]
     CircuitParseAdapter,
+    #[value(name = "pq2-circuit-canonical-print-adapter-smoke")]
+    CircuitCanonicalPrintAdapter,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -79,9 +82,9 @@ pub(crate) struct ProbeArgs {
 pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
     match args.group {
         ProbeGroup::ProcessContract => run_process_probe(root, args),
-        ProbeGroup::AdapterProtocol | ProbeGroup::CircuitParseAdapter => {
-            run_adapter_probe(root, args)
-        }
+        ProbeGroup::AdapterProtocol
+        | ProbeGroup::CircuitParseAdapter
+        | ProbeGroup::CircuitCanonicalPrintAdapter => run_adapter_probe(root, args),
     }
 }
 
@@ -141,6 +144,11 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
     let (probe_id, workload, measurement) = match args.group {
         ProbeGroup::AdapterProtocol => (ADAPTER_PROBE_ID, "protocol-smoke", "main"),
         ProbeGroup::CircuitParseAdapter => (CIRCUIT_PARSE_PROBE_ID, "circuit-parse", "parse"),
+        ProbeGroup::CircuitCanonicalPrintAdapter => (
+            CIRCUIT_CANONICAL_PRINT_PROBE_ID,
+            "circuit-canonical-print",
+            "serialize",
+        ),
         ProbeGroup::ProcessContract => {
             return Err(ProbeError::Contract(
                 "process-only probe cannot use the adapter path".to_string(),
@@ -383,5 +391,11 @@ mod tests {
     fn probe_ids_are_valid_protocol_ids() {
         assert!(ProtocolId::try_new(PROCESS_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(ADAPTER_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(CIRCUIT_CANONICAL_PRINT_PROBE_ID).is_ok());
+    }
+
+    #[test]
+    fn canonical_print_adapter_probe_is_registered() {
+        assert!(ProbeGroup::from_str("pq2-circuit-canonical-print-adapter-smoke", true).is_ok());
     }
 }

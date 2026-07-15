@@ -38,6 +38,7 @@ pub(super) struct WorkerIdentity {
 pub(crate) enum WorkerWorkload {
     ProtocolSmoke,
     CircuitParse,
+    CircuitCanonicalPrint,
 }
 
 impl WorkerWorkload {
@@ -45,6 +46,7 @@ impl WorkerWorkload {
         match self {
             Self::ProtocolSmoke => "protocol-smoke",
             Self::CircuitParse => "circuit-parse",
+            Self::CircuitCanonicalPrint => "circuit-canonical-print",
         }
     }
 
@@ -52,6 +54,7 @@ impl WorkerWorkload {
         match self {
             Self::ProtocolSmoke => "main",
             Self::CircuitParse => "parse",
+            Self::CircuitCanonicalPrint => "serialize",
         }
     }
 }
@@ -116,11 +119,21 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     let identity = current_identity()?;
     let circuit_fixture = match args.workload {
         WorkerWorkload::ProtocolSmoke => None,
-        WorkerWorkload::CircuitParse => Some(circuit_parse_fixture(args.work_items.get())?),
+        WorkerWorkload::CircuitParse | WorkerWorkload::CircuitCanonicalPrint => {
+            Some(circuit_parse_fixture(args.work_items.get())?)
+        }
     };
     let input = circuit_fixture.as_deref().unwrap_or_default().as_bytes();
     let input_bytes = u64::try_from(input.len()).map_err(|_| WorkerError::InputSizeRange)?;
     let input_digest = InputDigest::try_new(semantic_digest(byte_digest(input)))?;
+    let canonical_print_circuit = match args.workload {
+        WorkerWorkload::CircuitCanonicalPrint => Some(stab_core::Circuit::from_stim_str(
+            circuit_fixture
+                .as_deref()
+                .ok_or(WorkerError::MissingCircuitFixture)?,
+        )?),
+        WorkerWorkload::ProtocolSmoke | WorkerWorkload::CircuitParse => None,
+    };
     if args.start_barrier {
         wait_for_start_barrier()?;
     }
@@ -144,6 +157,14 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 .as_deref()
                 .ok_or(WorkerError::MissingCircuitFixture)?,
         )?),
+        WorkerWorkload::CircuitCanonicalPrint => {
+            WorkloadOutput::CanonicalCircuitText(circuit_canonical_print(
+                args.iterations.get(),
+                canonical_print_circuit
+                    .as_ref()
+                    .ok_or(WorkerError::MissingCanonicalPrintCircuit)?,
+            ))
+        }
     };
     let elapsed_seconds = started.elapsed().as_secs_f64();
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
@@ -220,6 +241,7 @@ fn protocol_smoke(iterations: u64, work_items: u64) -> [u64; 4] {
 enum WorkloadOutput {
     DigestState([u64; 4]),
     Circuit(stab_core::Circuit),
+    CanonicalCircuitText(String),
 }
 
 impl WorkloadOutput {
@@ -228,11 +250,16 @@ impl WorkloadOutput {
             Self::DigestState(state) => semantic_digest(state),
             Self::Circuit(circuit) => {
                 let canonical = circuit.to_stim_string();
-                let canonical = canonical.strip_suffix('\n').unwrap_or(&canonical);
-                semantic_digest(byte_digest(canonical.as_bytes()))
+                canonical_circuit_digest(&canonical)
             }
+            Self::CanonicalCircuitText(canonical) => canonical_circuit_digest(&canonical),
         }
     }
+}
+
+fn canonical_circuit_digest(canonical: &str) -> String {
+    let canonical = canonical.strip_suffix('\n').unwrap_or(canonical);
+    semantic_digest(byte_digest(canonical.as_bytes()))
 }
 
 fn circuit_parse_fixture(work_items: u64) -> Result<String, WorkerError> {
@@ -264,6 +291,14 @@ fn circuit_parse(iterations: u64, fixture: &str) -> Result<stab_core::Circuit, W
         parsed = stab_core::Circuit::from_stim_str(fixture)?;
     }
     Ok(parsed)
+}
+
+fn circuit_canonical_print(iterations: u64, circuit: &stab_core::Circuit) -> String {
+    let mut canonical = String::new();
+    for _ in 0..iterations {
+        canonical = black_box(black_box(circuit).to_stim_string());
+    }
+    canonical
 }
 
 fn byte_digest(bytes: &[u8]) -> [u64; 4] {
@@ -407,6 +442,8 @@ pub(super) enum WorkerError {
     InputSizeRange,
     #[error("circuit-parse workload was invoked without its prepared fixture")]
     MissingCircuitFixture,
+    #[error("circuit-canonical-print workload was invoked without its prepared circuit")]
+    MissingCanonicalPrintCircuit,
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]
@@ -449,6 +486,11 @@ mod tests {
     }
 
     #[test]
+    fn canonical_print_workload_is_registered() {
+        assert!(WorkerWorkload::from_str("circuit-canonical-print", true).is_ok());
+    }
+
+    #[test]
     fn circuit_parse_fixture_and_digest_are_work_sensitive() {
         let small = circuit_parse_fixture(64).expect("small fixture");
         let larger = circuit_parse_fixture(65).expect("larger fixture");
@@ -460,6 +502,19 @@ mod tests {
         let larger = WorkloadOutput::Circuit(larger).semantic_digest();
         assert_eq!(small.len(), 64);
         assert_ne!(small, larger);
+    }
+
+    #[test]
+    fn canonical_print_matches_the_parsed_circuit_digest() {
+        let fixture = circuit_parse_fixture(64).expect("fixture");
+        let circuit = circuit_parse(1, &fixture).expect("parse fixture");
+        let printed = circuit_canonical_print(2, &circuit);
+
+        assert_eq!(printed.lines().count(), 64);
+        assert_eq!(
+            WorkloadOutput::CanonicalCircuitText(printed).semantic_digest(),
+            WorkloadOutput::Circuit(circuit).semantic_digest()
+        );
     }
 
     #[test]

@@ -94,7 +94,9 @@ Arguments parse_arguments(int argc, const char **argv) {
     }
     const bool protocol_smoke = result.workload == "protocol-smoke" && result.measurement_id == "main";
     const bool circuit_parse = result.workload == "circuit-parse" && result.measurement_id == "parse";
-    if (!protocol_smoke && !circuit_parse) {
+    const bool circuit_canonical_print =
+        result.workload == "circuit-canonical-print" && result.measurement_id == "serialize";
+    if (!protocol_smoke && !circuit_parse && !circuit_canonical_print) {
         throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
@@ -211,6 +213,14 @@ stim::Circuit circuit_parse(uint64_t iterations, const std::string &fixture) {
     return parsed;
 }
 
+std::string circuit_canonical_print(uint64_t iterations, const stim::Circuit &circuit) {
+    std::string canonical;
+    for (uint64_t iteration = 0; iteration < iterations; ++iteration) {
+        canonical = circuit.str();
+    }
+    return canonical;
+}
+
 std::array<uint64_t, 4> byte_digest(std::string_view bytes) {
     std::array<uint64_t, 4> state{
         0x6a09e667f3bcc908ULL,
@@ -251,10 +261,16 @@ int main(int argc, const char **argv) {
         if (linked_stim.count_qubits() != 1) {
             throw std::runtime_error("pinned Stim circuit smoke check failed");
         }
-        const std::string circuit_fixture = arguments.workload == "circuit-parse"
+        const bool circuit_workload = arguments.workload == "circuit-parse" ||
+                                      arguments.workload == "circuit-canonical-print";
+        const std::string circuit_fixture = circuit_workload
                                                 ? circuit_parse_fixture(arguments.work_items)
                                                 : std::string{};
         const auto input_digest = byte_digest(circuit_fixture);
+        const std::optional<stim::Circuit> canonical_print_circuit =
+            arguments.workload == "circuit-canonical-print"
+                ? std::optional<stim::Circuit>(stim::Circuit(circuit_fixture))
+                : std::nullopt;
 
         if (arguments.start_barrier) {
             wait_for_start_barrier();
@@ -268,14 +284,19 @@ int main(int argc, const char **argv) {
         const auto started = std::chrono::steady_clock::now();
         std::array<uint64_t, 4> digest_state{};
         stim::Circuit parsed;
+        std::string canonical;
         if (arguments.workload == "protocol-smoke") {
             digest_state = protocol_smoke(arguments.iterations, arguments.work_items);
-        } else {
+        } else if (arguments.workload == "circuit-parse") {
             parsed = circuit_parse(arguments.iterations, circuit_fixture);
+        } else {
+            canonical = circuit_canonical_print(arguments.iterations, canonical_print_circuit.value());
         }
         const auto finished = std::chrono::steady_clock::now();
         if (arguments.workload == "circuit-parse") {
             digest_state = byte_digest(parsed.str());
+        } else if (arguments.workload == "circuit-canonical-print") {
+            digest_state = byte_digest(canonical);
         }
         const std::chrono::duration<double> elapsed = finished - started;
         if (!(elapsed.count() > 0)) {

@@ -24,6 +24,7 @@ const EMPTY_PROTOCOL_INPUT_DIGEST: &str =
     "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 pub(super) const PQ1_GROUP_ID: &str = "pq1-adapter-protocol-smoke";
 pub(super) const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
+pub(super) const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
 
 pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
     let identity = (
@@ -41,11 +42,14 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
                 || (group == CIRCUIT_PARSE_GROUP_ID
                     && workload == "circuit-parse"
                     && measurement == "parse")
+                || (group == CIRCUIT_CANONICAL_PRINT_GROUP_ID
+                    && workload == "circuit-canonical-print"
+                    && measurement == "serialize")
     )
 }
 
 pub(super) const fn registered_group_count() -> usize {
-    2
+    3
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -455,6 +455,28 @@ mod tests {
                     profiler_note: None,
                 },
                 GroupContract {
+                    id: ProtocolId::try_new(
+                        super::super::invocation::CIRCUIT_CANONICAL_PRINT_GROUP_ID,
+                    )
+                    .expect("group id"),
+                    claim_class: ClaimClass::PromotablePerformance,
+                    baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                    workload_id: ProtocolId::try_new("circuit-canonical-print")
+                        .expect("workload id"),
+                    measurement_ids: vec![
+                        ProtocolId::try_new("serialize").expect("measurement id"),
+                    ],
+                    scales: vec![ScaleContract {
+                        id: ProtocolId::try_new("small").expect("scale id"),
+                        work_items: NonZeroU64::new(64).expect("positive work"),
+                        input_bytes: 64,
+                        input_digest: InputDigest::try_new("b".repeat(64)).expect("input digest"),
+                    }],
+                    correctness_case_ids: vec!["cq-evidence-canonical-print".to_string()],
+                    owner: ProtocolId::try_new("stab-core/circuit-printer").expect("owner"),
+                    profiler_note: None,
+                },
+                GroupContract {
                     id: ProtocolId::try_new(super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
                         .expect("group id"),
                     claim_class: ClaimClass::PromotablePerformance,

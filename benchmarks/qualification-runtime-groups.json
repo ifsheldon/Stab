@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "performance_inventory_sha256": "9687d45fa57b97388e7a8c7b1676f2545619ff3185c19aa714583b25d1680924",
+  "performance_inventory_sha256": "b6bf408c54461d65670200fe701f7fff3e5e0470509d8fc89aeab729a242781b",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -18,6 +18,39 @@
       ],
       "correctness_case_ids": [],
       "owner": "ops/bench",
+      "profiler_note": null
+    },
+    {
+      "id": "PERFQ-M4-CIRCUIT-CANONICAL-PRINT",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "circuit-canonical-print",
+      "measurement_ids": ["serialize"],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 64,
+          "input_bytes": 429,
+          "input_digest": "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6"
+        },
+        {
+          "id": "medium",
+          "work_items": 4096,
+          "input_bytes": 27981,
+          "input_digest": "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04"
+        },
+        {
+          "id": "large",
+          "work_items": 65536,
+          "input_bytes": 447821,
+          "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-e660819ae9a223c6",
+        "cq-evidence-qualification-ef933925fb901877"
+      ],
+      "owner": "stab-core/circuit-printer",
       "profiler_note": null
     },
     {
@@ -53,7 +86,7 @@
       "owner": "stab-core/circuit-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m4-circuit-parse.md",
-        "sha256": "b37614a9843164d782c035d20f659fbf11be310c310caa4715a42ef792654a6b"
+        "sha256": "03c5bd352878c2bdb74695d0fad51e8a2f8db11dc0eae0472fa4ef5f4e4db784"
       }
     }
   ]

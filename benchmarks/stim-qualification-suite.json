@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "4d9faa21e318eeebc4614c7bf62491bb2db73b5db57ae3dab7d0f19f3fda7cad",
-  "semantic_digest": "9687d45fa57b97388e7a8c7b1676f2545619ff3185c19aa714583b25d1680924",
+  "semantic_digest": "b6bf408c54461d65670200fe701f7fff3e5e0470509d8fc89aeab729a242781b",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -61680,31 +61680,57 @@
       "disposition": "measured",
       "phase": "serialize",
       "runner_fidelity": "adapter-library",
-      "correctness_cases": [],
-      "correctness_binding": "unresolved",
-      "planned_correctness_case_id": "CQPLANNED-PERFQ-M4-CIRCUIT-CANONICAL-PRINT",
+      "correctness_cases": [
+        "cq-evidence-qualification-e660819ae9a223c6",
+        "cq-evidence-qualification-ef933925fb901877"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
-          "kind": "inline",
-          "id": "m4-circuit-canonical-print"
+          "kind": "generated",
+          "id": "circuit-parse-cycle-v1"
         },
-        "source": "src/stim/circuit/circuit.test.cc",
-        "deterministic_seed": "source-owned-inline:m4-circuit-canonical-print",
+        "source": "benchmarks/stim_adapter/main.cc",
+        "deterministic_seed": "circuit-parse-cycle-v1",
         "scales": [
           {
-            "id": "inherited",
-            "parameters": ".stim canonical print throughput contract",
+            "id": "small",
+            "parameters": "generator=circuit-parse-cycle-v1; instructions=64",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 429
+            },
+            "semantic_work": 64,
+            "input_digest": "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=circuit-parse-cycle-v1; instructions=4096",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 27981
+            },
+            "semantic_work": 4096,
+            "input_digest": "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=circuit-parse-cycle-v1; instructions=65536",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 447821
+            },
+            "semantic_work": 65536,
+            "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
           }
         ]
       },
       "work_unit": "instructions",
       "output_contract": {
-        "expected_shape": "canonical-print output count, width, and semantic digest from the declared correctness preflight",
-        "digest_state": "planned",
-        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+        "expected_shape": "Exact fixture byte count and digest plus final canonical circuit-text digest.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers parse the source-owned fixture once outside timing, repeatedly serialize the resulting circuit while consuming each produced string, and compare the final canonical digest outside timing after normalizing only Stab's terminal newline."
       },
       "timing_policy": {
         "calibration_min_ms": 250,
@@ -61715,16 +61741,18 @@
         "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
       },
       "memory_policy": {
-        "method": "stab-allocations",
+        "method": "process-rss",
         "scale_ids": [
-          "inherited"
+          "small",
+          "medium",
+          "large"
         ],
-        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+        "expected_growth": "Process setup RSS includes the parsed circuit and peak RSS includes canonical output allocation at every timing scale; maximum accepted materialization and first rejection remain PQ6 resource evidence."
       },
-      "threshold_policy": "report-only",
-      "reason": "The inherited workload requires a faithful runner, exact phase split, scale family, or output contract before it can produce qualification evidence.",
-      "owner": "stab-core",
-      "status": "planned"
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired adapter and Rust canonical circuit serialization workload with exact CQ2, input, output, scale, timing, and memory bindings.",
+      "owner": "stab-core/circuit-printer",
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M4-CIRCUIT-PARSE",
