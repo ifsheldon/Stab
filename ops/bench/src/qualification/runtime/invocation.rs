@@ -48,7 +48,7 @@ const MAX_POPCOUNT_OUTPUT_DIGEST: &str =
 const EMPTY_PROTOCOL_INPUT_DIGEST: &str =
     "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 const PROTOCOL_SMOKE_OUTPUT_DIGEST: &str =
-    "b1e6beb25d3a3dc1d7f6c7576e27432aa2ffb9ab1c828f6d52d8bfec128805c0";
+    "656c7d8a03ff449d0c248bdef4c3140b02252abffcd761d668e9bc4c63e0059d";
 const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 2;
 const PROTOCOL_SMOKE_CASE_ID: &str = "protocol-smoke";
 const POPCOUNT_ODD_CASE_ID: &str = "simd-word-popcount-odd";

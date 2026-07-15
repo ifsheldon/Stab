@@ -809,6 +809,15 @@ mod tests {
 
     #[test]
     fn protocol_smoke_digest_is_deterministic_and_work_sensitive() {
+        assert_eq!(
+            protocol_smoke(1, 1),
+            [
+                0x656c_7d8a_03ff_449d,
+                0x0c24_8bde_f4c3_140b,
+                0x0225_2abf_fcd7_61d6,
+                0x68e9_bc4c_63e0_059d,
+            ]
+        );
         assert_eq!(protocol_smoke(2, 8), protocol_smoke(2, 8));
         assert_ne!(protocol_smoke(2, 8), protocol_smoke(2, 9));
         assert_ne!(protocol_smoke(2, 8), protocol_smoke(3, 8));
