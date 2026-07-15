@@ -1,6 +1,6 @@
 # CQ0 Qualification Inventory Progress Report
 
-> Source-current note, 2026-07-15: this report retains CQ0 completion-era counts and evidence below. Completed CQ2 ownership sets the source-current schema-version-3 digest to `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`, with 1,972 default-feature public Rust API items and 1,741 evidence parents: 577 implemented, 17 evidence-close, and 1,147 planned. The clean reports cited below remain historical, while current-digest CQ2 PR, full, and soak evidence comes from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898`. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Source-current note, 2026-07-15: this report retains CQ0 completion-era counts and evidence below. Reviewed negative-zero analyzer ownership sets the source-current schema-version-3 digest to `4d9faa21e318eeebc4614c7bf62491bb2db73b5db57ae3dab7d0f19f3fda7cad`, with 1,972 default-feature public Rust API items and 1,743 evidence parents: 579 implemented, 17 evidence-close, and 1,147 planned. The clean all-domain reports from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898` are historical under the refreshed digest. Current-digest exact evidence for the two circuit-parser prerequisites passed on revision `d2df9766c5e3543c8df016db31f48f552354d79f`; rerun the complete CQ2 family before citing all-domain execution as source-current. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 

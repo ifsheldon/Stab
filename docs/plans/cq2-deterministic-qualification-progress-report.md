@@ -4,17 +4,17 @@
 
 Complete as of 2026-07-15.
 
-All eight selected deterministic domains are source-complete at exact upstream-symbol and exported-Rust-API granularity. The final Algebra slice passed milestone audit, three GPT-5.6/max full-code-review lanes, broad workspace verification, clean current-digest PR, full, and soak execution, offline report regeneration, and exact controller-bound preflight with every confirmed finding fixed.
+All eight selected deterministic domains are source-complete at exact upstream-symbol and exported-Rust-API granularity. The final Algebra slice passed milestone audit, three GPT-5.6/max full-code-review lanes, broad workspace verification, clean all-domain PR, full, and soak execution, offline report regeneration, and exact controller-bound preflight with every confirmed finding fixed. Those all-domain reports became historical when reviewed negative-zero analyzer ownership refreshed the global digest; implementation ownership remains complete.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Latest clean correctness evidence revision: `bae9e01cb3fedaf9d37958e6827b064c635b9898` with `local_modifications=false`.
+Latest clean exact current-digest evidence revision: `d2df9766c5e3543c8df016db31f48f552354d79f` with `local_modifications=false`, covering the two circuit-parser prerequisites.
 
-Current correctness inventory digest: `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`.
+Current correctness inventory digest: `4d9faa21e318eeebc4614c7bf62491bb2db73b5db57ae3dab7d0f19f3fda7cad`.
 
-Current dependent performance inventory digest after the first PQ2 product-contract graduation: `ce0c451a9c3123be95d3b9606b96a7ce26e3b26f09f543ae7d2e9e0345e86d54`.
+Current dependent performance inventory digest after the first PQ2 product-contract graduation: `9687d45fa57b97388e7a8c7b1676f2545619ff3185c19aa714583b25d1680924`.
 
-The authoritative current-digest reports are `target/qualification/cq2-deterministic-pr-clean`, `target/qualification/cq2-deterministic-full-clean`, and `target/qualification/cq2-deterministic-soak-clean`. The earlier Generation-refined correctness and dependent PQ1 reports remain historical and are not promoted under the final CQ2 digests.
+The authoritative exact current-digest report for the active dependent group is `target/qualification/pq2-circuit-parse-reviewed-full`. The clean all-domain reports at `target/qualification/cq2-deterministic-pr-clean`, `target/qualification/cq2-deterministic-full-clean`, and `target/qualification/cq2-deterministic-soak-clean` bind the preceding digest and are retained as historical evidence. Rerun the complete 270-parent family before citing all-domain execution as source-current. Earlier Generation-refined correctness and dependent PQ1 reports also remain historical.
 
 ## Delivered Slices
 
@@ -115,9 +115,9 @@ The dependent PQ0 inventory was regenerated because circuit owner ids, upstream 
 
 These counts are independently selectable exact evidence parents, not raw upstream subcase or exported-API counts. A reviewed parent may own several upstream records or API items only when its one exact selector proves their complete common contract.
 
-## Current Clean CQ2 Evidence
+## Historical Clean All-Domain CQ2 Evidence
 
-All three reports bind correctness inventory digest `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`, Stim v1.16.0 commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, Stab revision `bae9e01cb3fedaf9d37958e6827b064c635b9898`, and `local_modifications=false`.
+All three reports bind historical correctness inventory digest `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`, Stim v1.16.0 commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, Stab revision `bae9e01cb3fedaf9d37958e6827b064c635b9898`, and `local_modifications=false`. They are not promotable under the refreshed digest.
 
 | Tier | Selected | Passed | Failed | Artifact | Request digest | Report digest | Completion digest |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |

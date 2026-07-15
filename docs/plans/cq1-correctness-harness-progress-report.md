@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Source-current note, 2026-07-15: this report records CQ1 harness completion and historical evidence. Completed CQ2 ownership sets the source-current correctness digest to `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`, with 577 implemented, 17 evidence-close, and 1,147 planned parents. The current-digest CQ2 PR, full, and soak reports from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898` validate the harness against all 270 selected deterministic parents; older CQ1 and Generation checkpoint reports remain historical. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Source-current note, 2026-07-15: this report records CQ1 harness completion and historical evidence. Reviewed negative-zero analyzer ownership sets the source-current correctness digest to `4d9faa21e318eeebc4614c7bf62491bb2db73b5db57ae3dab7d0f19f3fda7cad`, with 579 implemented, 17 evidence-close, and 1,147 planned parents. The clean CQ2 PR, full, and soak reports from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898` are historical under the refreshed digest. Current-digest exact evidence for the two circuit-parser prerequisites passed on revision `d2df9766c5e3543c8df016db31f48f552354d79f`; rerun all 270 selected deterministic parents before citing all-domain harness execution as source-current. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 
