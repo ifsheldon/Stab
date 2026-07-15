@@ -365,7 +365,7 @@ Soak catches nonlinear behavior and rare performance instability and does not re
 
 Status: Complete.
 
-Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current CQ2 dependency-regenerated performance digest `67bcbfcf2d991c883b6d889bf48b4d9b8c09bcb52bdbd6dc1e041b6162a30193`, bound to correctness digest `7e42ddddd662593b56f0bd67885b74babf9a96319de990e4f2cb6218638edea5`. The clean dependent schema-version-13 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` binds the previous Generation-refined digests and remains historical diagnostic infrastructure evidence rather than product-performance qualification.
+Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current CQ2 dependency-regenerated performance digest `101ecb8ba8853522a234be0437e3779007428a6a8749f4fd01c77a7fd7131345`, bound to correctness digest `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`. Clean current-digest CQ2 correctness evidence comes from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898`. The dependent schema-version-13 PQ1 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` binds the previous Generation-refined digests and remains historical diagnostic infrastructure evidence rather than product-performance qualification.
 
 Implementation revision: `abf7cd1bae0de045f62e976a290507238153f976`, verified with `local_modifications=false`.
 
@@ -459,6 +459,8 @@ Make faithful comparison, calibration, statistics, and reporting reusable before
 - Inherited M12 product-row failures do not fail PQ1 when the commands execute faithfully and leave those failures visible; PQ2 through PQ6 own replacing or graduating those rows with exact correctness prerequisites and equivalent-work evidence.
 
 ## PQ2: Qualify Models, Formats, Gates, Kernels, And Algebra
+
+Status: Active as of 2026-07-15. All 270 CQ2 correctness parents pass clean current-digest PR, full, and soak execution, so PQ2 may now replace inherited deterministic-surface benchmark placeholders with exact preflight-bound equivalent-work groups.
 
 ### Objective
 

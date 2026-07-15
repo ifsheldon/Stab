@@ -2,19 +2,19 @@
 
 ## Status
 
-In progress as of 2026-07-15.
+Complete as of 2026-07-15.
 
-The selected `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, and Generation domains are source-complete at exact upstream-symbol and exported-Rust-API granularity. Generation's milestone audit, GPT-5.6/max full-code-review, broad verification, clean current-digest correctness execution, exact preflight, and dependent PQ1 publication are complete with every confirmed finding fixed. This checkpoint does not complete CQ2 because `CQ-ALGEBRA` remains open.
+All eight selected deterministic domains are source-complete at exact upstream-symbol and exported-Rust-API granularity. The final Algebra slice passed milestone audit, three GPT-5.6/max full-code-review lanes, broad workspace verification, clean current-digest PR, full, and soak execution, offline report regeneration, and exact controller-bound preflight with every confirmed finding fixed.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Latest clean correctness evidence revision: `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` with `local_modifications=false`, for the historical Generation-refined digest.
+Latest clean correctness evidence revision: `bae9e01cb3fedaf9d37958e6827b064c635b9898` with `local_modifications=false`.
 
-Current correctness inventory digest after Algebra resource-admission regeneration: `7e42ddddd662593b56f0bd67885b74babf9a96319de990e4f2cb6218638edea5`.
+Current correctness inventory digest: `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`.
 
-Current dependent performance inventory digest: `67bcbfcf2d991c883b6d889bf48b4d9b8c09bcb52bdbd6dc1e041b6162a30193`.
+Current dependent performance inventory digest: `101ecb8ba8853522a234be0437e3779007428a6a8749f4fd01c77a7fd7131345`.
 
-Clean current-digest PR, full, and soak correctness reports are not yet published. The reports from the reviewed committed revision above are historical because the source-owned Algebra dispositions changed both frozen digests.
+The authoritative current-digest reports are `target/qualification/cq2-deterministic-pr-clean`, `target/qualification/cq2-deterministic-full-clean`, and `target/qualification/cq2-deterministic-soak-clean`. The earlier Generation-refined correctness and dependent PQ1 reports remain historical and are not promoted under the final CQ2 digests.
 
 ## Delivered Slices
 
@@ -87,15 +87,17 @@ The dependent PQ0 inventory was regenerated because circuit owner ids, upstream 
 - Review also found that one broad generator-helper fixture could not remain an atomic primary. It is split into six exact independently runnable fixture rows, and qualification validation permits an imported exact fixture to become supporting provenance only when its normalized exact Cargo selector is identical to the reviewed qualification primary. Duplicate terminal primaries remain rejected.
 - Three earlier GPT-5.6/max full-code-review passes and the final focused GPT-5.6/max inventory review found incomplete deterministic matrix evidence, weak pre-allocation proof, stale fixture selectors, incorrect command documentation, Python probability overclaim, missing CLI resource ownership, stale dependent digests, stale CQ0/CQ1 current-evidence wording, and one owner-count drift. Every confirmed finding is fixed, and clean committed-head execution closed the final Generation acceptance requirement.
 
-### Algebra Resource Admission
+### Algebra
 
-- CQ2 ownership reconciliation revealed that several public caller-size-driven Algebra constructors were infallible despite allocating dense state or initiating expensive work. The resolved contract exposes typed limits through `StabilizerResource` and makes Pauli, flexible-Pauli, Clifford, Tableau, random-Tableau, and reusable Pauli-iterator construction fallible.
-- Pauli and Clifford values accept at most 1,048,576 qubits or entries; dense Tableau construction, circuit-to-Tableau conversion, and stabilizer solving accept at most 512 qubits; random-Tableau construction accepts at most 64 qubits; and unitary conversion accepts matrices through dimension 64. Clifford concatenation and repetition check projected size, repetition overflow has a resource-specific error, and empty repetition is constant-work.
-- Annotation-only identity-flow generation uses a separate 134,217,728 aggregate Pauli-bit budget. This preserves the established 2,049-qubit high-index annotation regression while rejecting larger quadratic output before constructing unchecked internal Pauli rows.
-- `crates/stab-core/tests/cq2_algebra_resources.rs` proves representative accepted boundaries, first rejection, first-extra-item collection, RNG non-consumption, circuit-derived rejection, solver and iterator limits, unitary-limit precedence, aggregate flow-output admission, and constant-work empty repetition. The complete `stab-core` suite and targeted `stab-core` plus `stab-bench` Clippy checks pass.
-- The focused milestone audit found that flow checking and time-reversal validation still selected their former 8,192-qubit dense path above the new 512-qubit Tableau cap, that iterable-constructor documentation overclaimed allocation-free rejection, and that one public Rustdoc link was broken. Dispatch now falls back to sparse validation at 513 qubits with a direct regression, documentation distinguishes explicit-size and unknown-length iterable admission, and Rustdoc passes with warnings denied.
-- Resource rejection is correctness evidence rather than a timed workload. Existing M6 benchmark setup now propagates constructor errors outside measured closures, and the performance plan requires accepted benchmark scales to cite the exact resource prerequisites without timing rejection paths.
-- This closes the deterministic-materialization spec gap but does not close the Algebra qualification slice. Exact semantic parents, public-API assignments, regenerated CQ0 and PQ0 inventories, clean evidence, milestone audit, and GPT-5.6/max review remain required.
+- Fifty-four exact Algebra parents and zero planned parents assign all 654 selected exported Rust API items. The 347 relevant pinned-upstream records are dispositioned as 12 ported Rust, 197 semantic-mining, and 138 deferred-product records; no selected Algebra record is hidden as not applicable or granted file-level credit.
+- Dedicated exact parents cover Pauli values and iterators, flexible Paulis, single-qubit Cliffords, Clifford strings, Flow values and multiplication, Tableaux and Tableau iterators, commuting iterators, circuit conversion, inversion, random construction, stabilizer solving, and scoped unitary conversion. Existing exact fixture or Rust parents remain independently selected only when their complete selector proves the mapped contract.
+- Review found that `Flow::multiply` had diverged from Stim's signed-input representation convention. Multiplication now preserves the left input sign and transfers only the relative input/output Pauli phase into the output sign, with exact signed-input and signed-output cases.
+- `Flow::new` is fallible and shares one 65,536 aggregate measurement-plus-observable-term limit with text parsing. It stops on the first excess iterator item, bounds preallocation, and multiplication performs a bounded sorted symmetric-difference merge so terms may cancel before the resulting aggregate count is admitted.
+- Pauli and Clifford values accept at most 1,048,576 qubits or entries; dense Tableau construction, circuit-to-Tableau conversion, and stabilizer solving accept at most 512 qubits; random-Tableau construction accepts at most 64 qubits; and unitary conversion accepts matrices through dimension 64. Annotation-only identity-flow generation separately admits at most 134,217,728 aggregate Pauli bits.
+- `Circuit::to_tableau` handles Hermitian `SPP` and `SPP_DAG`, including repeated-qubit phase reduction, and rejects anti-Hermitian products. Compact repeat bodies are converted once and raised through identity-aware binary exponentiation instead of linear expansion, under a 16,777,216-unit aggregate width-squared composition budget.
+- Eight exact resource parents prove maximum accepted and first rejected materialization, first-extra-item collection, cancellation before Flow admission, RNG non-consumption, dense-work allocation boundaries, logarithmic repeat semantics, the exact last accepted and first rejected repeat-work boundary, solver and iterator limits, unitary-limit precedence, and aggregate generated-flow output.
+- Milestone audit and three GPT-5.6/max full-code-review lanes found and closed signed Flow multiplication, overclaimed exact parents, nested compact-repeat exhaustion, missing repeated-qubit `SPP` evidence, weak Clifford random and multiplication ownership, incomplete `inverse_skipping_signs` assertions, and missing maximum-accepted or pre-work allocation proofs. The final re-review reported no actionable findings.
+- Resource rejection remains correctness evidence rather than a timed workload. Existing benchmark setup propagates constructor errors outside measured closures, and PQ2 must cite these exact passing prerequisites for accepted scales without timing rejection paths.
 
 ## Current CQ2 Inventory
 
@@ -108,10 +110,22 @@ The dependent PQ0 inventory was regenerated because circuit owner ids, upstream 
 | `CQ-BIT-KERNELS` | 12 | 0 | 12 |
 | `CQ-CIRCUIT-API` | 24 | 0 | 24 |
 | `CQ-GENERATION` | 25 | 0 | 25 |
-| `CQ-ALGEBRA` | 1 | 457 | 458 |
-| **CQ2 total** | **217** | **457** | **674** |
+| `CQ-ALGEBRA` | 54 | 0 | 54 |
+| **CQ2 total** | **270** | **0** | **270** |
 
-These counts are evidence owners, not an estimate of required new test functions. Reviewed exact parents may close several owners only when one selector proves their complete common contract.
+These counts are independently selectable exact evidence parents, not raw upstream subcase or exported-API counts. A reviewed parent may own several upstream records or API items only when its one exact selector proves their complete common contract.
+
+## Current Clean CQ2 Evidence
+
+All three reports bind correctness inventory digest `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`, Stim v1.16.0 commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, Stab revision `bae9e01cb3fedaf9d37958e6827b064c635b9898`, and `local_modifications=false`.
+
+| Tier | Selected | Passed | Failed | Artifact | Request digest | Report digest | Completion digest |
+| --- | ---: | ---: | ---: | --- | --- | --- | --- |
+| PR | 144 | 144 | 0 | `target/qualification/cq2-deterministic-pr-clean` | `16f8431163f42aac04db42595e811d99d23d36396f421a88e6b0481098536d53` | `9cefdbf4d5c4b5e0c5dcf8bc81fe270ad15332f494fecc57c2f8d5052662fb68` | `2e28276f9dc1519d3c3d362aca8d87d4b9b8d7373a3b9898ec23a8dacdbce06d` |
+| Full | 270 | 270 | 0 | `target/qualification/cq2-deterministic-full-clean` | `0f1904404e516e7e47624a68fea588ac94946a7aa1b41c72fb3370076b23ddc7` | `0988aa43f876c43c47d1b24dcb57cc61e19455285336fe4712bd738a74215463` | `730229e0369486192bff0f4147810532ff226afe5235a27e97a151775776cb38` |
+| Soak | 270 | 270 | 0 | `target/qualification/cq2-deterministic-soak-clean` | `64bb17d5a1946617eeb58c096bee4d8abd5f0a7025a9b099b74a561efd0068ef` | `ade3ccf60d9fe5d25ca93f5347e4f27bbfb121f9c71a218616f64c4798675e75` | `893b489e1301a980bc12c06248d77b063d4f71e344ca29b571cf93844366d868` |
+
+Offline report regeneration passed for all three artifacts. PR, full, and soak each completed all 3,800,000 planned statistical shots with consumed false-positive bound `1.87388763315569654e-9`, below the declared suite budget `1.30000000000000026e-5`, and each report retained eight exact resource cases. Exact PR and soak preflight passed for `cq-evidence-blocker-083f1e2d245c4b57`; exact full preflight also passed for the Algebra Flow resource parent `cq-evidence-qualification-f7adaaac7766234d` using the controller-approved request and completion digests above.
 
 ## Historical Clean Generation-Refined Correctness Evidence
 
@@ -125,7 +139,7 @@ All three reports bind historical correctness inventory digest `d89a5f9eaba428fb
 
 Offline report regeneration passed for every tier. Exact PR, full, and soak preflight passed for the standalone CLI resource case `cq-evidence-qualification-31f61e175cdf6367` and Generation resource case `cq-evidence-qualification-a332fc484c66d6ba`. Every preflight reconstructed the controller-approved manifest, commit, selection, selector, output, request, completion, and result bindings. PR and full each completed all 4,218,400 planned statistical shots with consumed false-positive bound `2.67062845963454362e-6`; soak completed all 4,847,200 shots with consumed bound `5.98047030092843113e-6`, below the declared suite budget `3.20000000000000053e-5`.
 
-## Dependent PQ1 Refresh
+## Historical Dependent PQ1 Refresh
 
 The PQ1 group remains diagnostic infrastructure with `promotable=false`, `report-only` baseline eligibility, and zero checked product thresholds.
 
@@ -135,55 +149,38 @@ The PQ1 group remains diagnostic infrastructure with `promotable=false`, `report
 | Full | 9 | 1.015160 | [1.013574, 1.016190] | 0.000801 | Verified AArch64 | `target/benchmarks/qualification/pq1-generation-full-schema13` |
 | Soak | 15 | 1.015225 | [1.014722, 1.015822] | 0.000586 | Verified AArch64 | `target/benchmarks/qualification/pq1-generation-soak-schema13` |
 
-All reports use schema version 13, the current correctness and performance digests, `local_modifications=false` before and after execution, and commit `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. The PR, full, and soak report digests are `ff4d559937167dcf9c495838a22656de183fffdfe7b04fb7a2a74c9f43743a9c`, `eaeeeaf993521997c1aa2061a2c1fbeb4fceac8aba946291d9f5e1b46dd7db94`, and `9ddfd5154a0d768ae4e3e66308a13483fe46a2617257e2dc29f3d222dab480f5`. These ratios describe only the synthetic adapter protocol and must not be reported as Stab product performance.
+All reports use schema version 13, the previous Generation-refined correctness and performance digests, `local_modifications=false` before and after execution, and commit `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`. They are historical after the final Algebra ownership graph changed both frozen digests. Offline report validation passed, and regression replay returned `checked=0 report_only=true` for every tier. The PR, full, and soak report digests are `ff4d559937167dcf9c495838a22656de183fffdfe7b04fb7a2a74c9f43743a9c`, `eaeeeaf993521997c1aa2061a2c1fbeb4fceac8aba946291d9f5e1b46dd7db94`, and `9ddfd5154a0d768ae4e3e66308a13483fe46a2617257e2dc29f3d222dab480f5`. These ratios describe only the synthetic adapter protocol and must not be reported as Stab product performance.
 
 ## Verification
 
-Passing checks for the current checkpoint:
+Passing checks for completed CQ2:
 
 ```sh
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --quiet
-cargo test -p stab-core --test cq2_circuit_api --test circuit_api --test circuit_transforms --test circuit_simplify --test mbqc_decomposition --quiet
-cargo test -p stab-core --test circuit_generation --quiet
 cargo test -p stab-core --test cq2_algebra_resources --quiet
-cargo test -p stab-core --lib circuit_generation::tests:: --quiet
-cargo test -p stab-cli --lib tests::generation::gen_rejects_quadratic_outputs_before_writing --quiet -- --exact
-cargo test -p stab-oracle qualification::classification::tests --quiet
-cargo test -p stab-oracle qualification::inventory::tests:: --quiet
-cargo test -p stab-oracle qualification::inventory::qualification_cases::tests:: --quiet
-just oracle::run --milestone M7
+RUSTDOCFLAGS='-D warnings' cargo doc -p stab-core --no-deps
+just oracle::run --milestone M6
 just oracle::run --implemented-only
 just qualification::correctness-regenerate --check
 just qualification::correctness-check
 just bench::qualification-regenerate --check
 just bench::qualification-check
-just qualification::correctness-run --tier pr
-just qualification::correctness-run --tier full --out target/qualification/correctness/full
-just qualification::correctness-run --tier soak --out target/qualification/correctness/soak
-just qualification::correctness-report --out target/qualification/correctness/latest
-just qualification::correctness-report --out target/qualification/correctness/full
-just qualification::correctness-report --out target/qualification/correctness/soak
-just qualification::correctness-preflight --out target/qualification/correctness/latest --case cq-evidence-qualification-a332fc484c66d6ba --request-sha256 f9affb08ccfab6c21e8c025d8d8938a806007f1c422f0f5a65d87f1b1e84c162 --completion-sha256 8e66107cebe5552bc7298346adc2fc4f99196a2fdac1456274cd0501d2eff2d4
-just qualification::correctness-preflight --out target/qualification/correctness/full --case cq-evidence-qualification-a332fc484c66d6ba --request-sha256 190ede263f11820c8029a929b9fa6a9a45bdd0d5b5203fa338e76e700772169e --completion-sha256 8b21f2a6aead2a5b54b8050d23997b42e81313bdee3157974014583b54b3ab04
-just qualification::correctness-preflight --out target/qualification/correctness/soak --case cq-evidence-qualification-a332fc484c66d6ba --request-sha256 3caa6f875ee991a3ef45074bb9dfd8a5490ce53afda0573f4a289dba7fcd6e1d --completion-sha256 dec639361b610278c24156b172381390162461a4781d19f822005fc7e2da4d13
-just bench::qualification-run --tier pr --out target/benchmarks/qualification/pq1-generation-pr-schema13
-just bench::qualification-run --tier full --out target/benchmarks/qualification/pq1-generation-full-schema13
-just bench::qualification-run --tier soak --out target/benchmarks/qualification/pq1-generation-soak-schema13
-just bench::qualification-report --input target/benchmarks/qualification/pq1-generation-pr-schema13
-just bench::qualification-report --input target/benchmarks/qualification/pq1-generation-full-schema13
-just bench::qualification-report --input target/benchmarks/qualification/pq1-generation-soak-schema13
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-generation-pr-schema13
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-generation-full-schema13
-just bench::qualification-regression --input target/benchmarks/qualification/pq1-generation-soak-schema13
+just qualification::correctness-run --tier pr --feature CQ-STIM-FORMAT --feature CQ-DEM-FORMAT --feature CQ-RESULT-FORMATS --feature CQ-GATE-CONTRACT --feature CQ-BIT-KERNELS --feature CQ-CIRCUIT-API --feature CQ-GENERATION --feature CQ-ALGEBRA --out target/qualification/cq2-deterministic-pr-clean
+just qualification::correctness-run --tier full --feature CQ-STIM-FORMAT --feature CQ-DEM-FORMAT --feature CQ-RESULT-FORMATS --feature CQ-GATE-CONTRACT --feature CQ-BIT-KERNELS --feature CQ-CIRCUIT-API --feature CQ-GENERATION --feature CQ-ALGEBRA --out target/qualification/cq2-deterministic-full-clean
+just qualification::correctness-run --tier soak --feature CQ-STIM-FORMAT --feature CQ-DEM-FORMAT --feature CQ-RESULT-FORMATS --feature CQ-GATE-CONTRACT --feature CQ-BIT-KERNELS --feature CQ-CIRCUIT-API --feature CQ-GENERATION --feature CQ-ALGEBRA --out target/qualification/cq2-deterministic-soak-clean
+just qualification::correctness-report --out target/qualification/cq2-deterministic-pr-clean
+just qualification::correctness-report --out target/qualification/cq2-deterministic-full-clean
+just qualification::correctness-report --out target/qualification/cq2-deterministic-soak-clean
+just qualification::correctness-preflight --out target/qualification/cq2-deterministic-pr-clean --case cq-evidence-blocker-083f1e2d245c4b57 --request-sha256 16f8431163f42aac04db42595e811d99d23d36396f421a88e6b0481098536d53 --completion-sha256 2e28276f9dc1519d3c3d362aca8d87d4b9b8d7373a3b9898ec23a8dacdbce06d
+just qualification::correctness-preflight --out target/qualification/cq2-deterministic-full-clean --case cq-evidence-qualification-f7adaaac7766234d --request-sha256 0f1904404e516e7e47624a68fea588ac94946a7aa1b41c72fb3370076b23ddc7 --completion-sha256 730229e0369486192bff0f4147810532ff226afe5235a27e97a151775776cb38
+just qualification::correctness-preflight --out target/qualification/cq2-deterministic-soak-clean --case cq-evidence-blocker-083f1e2d245c4b57 --request-sha256 64bb17d5a1946617eeb58c096bee4d8abd5f0a7025a9b099b74a561efd0068ef --completion-sha256 893b489e1301a980bc12c06248d77b063d4f71e344ca29b571cf93844366d868
 just maintenance::pre-commit
 ```
 
-The clean PR, full, soak, offline-report, exact-preflight, and dependent PQ1 artifacts above are authoritative for the Generation-refined digests recorded in this report.
+The clean PR, full, soak, offline-report, and exact-preflight artifacts above are authoritative for the final CQ2 digest recorded in this report. The historical dependent PQ1 artifacts remain harness evidence only and do not qualify CQ2 product performance.
 
-## Remaining Blocker
+## Next Milestone
 
-CQ2 still has 457 planned evidence owners, all in `CQ-ALGEBRA`. Generation source ownership and acceptance remain closed at 25 of 25; its clean PR, full, and soak correctness evidence plus dependent report-only PQ1 publication are historical after the Algebra digest change.
-
-No external dependency or user decision blocks this work. The active implementation blocker is `CQ-ALGEBRA`, where 457 of 458 owners remain planned; final CQ2-wide audit and review remain pending until Algebra is implemented.
+CQ2 has no remaining planned owner or evidence blocker. The active program milestone is PQ2: create equivalent-work paired performance groups for these 270 completed deterministic parents, bind every group to exact current-digest correctness preflight and output evidence, add complete scale families, and preserve every slow, noisy, or no-faithful-comparator outcome without weakening the 1.25x target.

@@ -300,6 +300,8 @@ Make every comparator, selector, statistical plan, artifact, timeout, and report
 
 ## Milestone CQ2: Deterministic Models, Formats, Generation, And Algebra
 
+Status: Complete as of 2026-07-15. All 270 exact parents across the eight selected domains pass clean current-digest PR, full, and soak execution; offline report regeneration, exact preflight, milestone audit, and full-code-review evidence are recorded in [cq2-deterministic-qualification-progress-report.md](cq2-deterministic-qualification-progress-report.md).
+
 ### Objective
 
 Complete deterministic and property coverage for `CQ-STIM-FORMAT`, `CQ-DEM-FORMAT`, `CQ-RESULT-FORMATS`, `CQ-GATE-CONTRACT`, `CQ-BIT-KERNELS`, `CQ-CIRCUIT-API`, `CQ-GENERATION`, and `CQ-ALGEBRA`.

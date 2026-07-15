@@ -1,6 +1,6 @@
 # CQ0 Qualification Inventory Progress Report
 
-> Source-current note, 2026-07-15: this report retains CQ0 completion-era counts and evidence below. Later selected CQ2 ownership and Algebra resource-admission changes set the source-current schema-version-3 digest to `7e42ddddd662593b56f0bd67885b74babf9a96319de990e4f2cb6218638edea5`, with 524 implemented, 17 evidence-close, and 1,604 planned owners. The clean reports cited below, including the Generation-refined reports from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`, are historical under the current Algebra-refined digest. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Source-current note, 2026-07-15: this report retains CQ0 completion-era counts and evidence below. Completed CQ2 ownership sets the source-current schema-version-3 digest to `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`, with 1,972 default-feature public Rust API items and 1,741 evidence parents: 577 implemented, 17 evidence-close, and 1,147 planned. The clean reports cited below remain historical, while current-digest CQ2 PR, full, and soak evidence comes from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898`. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 

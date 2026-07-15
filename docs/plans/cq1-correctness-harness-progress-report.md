@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Source-current note, 2026-07-15: this report records CQ1 harness completion and historical evidence. Later CQ2 ownership and Algebra resource-admission changes set the source-current correctness digest to `7e42ddddd662593b56f0bd67885b74babf9a96319de990e4f2cb6218638edea5`, with 524 implemented and 17 evidence-close owners. The Generation-refined PR, full, and soak reports from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` are historical after the Algebra changes; do not promote older CQ1 or CQ2 checkpoint reports under the current digest. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Source-current note, 2026-07-15: this report records CQ1 harness completion and historical evidence. Completed CQ2 ownership sets the source-current correctness digest to `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`, with 577 implemented, 17 evidence-close, and 1,147 planned parents. The current-digest CQ2 PR, full, and soak reports from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898` validate the harness against all 270 selected deterministic parents; older CQ1 and Generation checkpoint reports remain historical. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 

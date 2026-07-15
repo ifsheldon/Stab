@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73",
-  "semantic_digest": "0db669fa2a538a8616156bcad3569759a1a0df0734b34fd925a9a7707c9d0d93",
+  "semantic_digest": "101ecb8ba8853522a234be0437e3779007428a6a8749f4fd01c77a7fd7131345",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -2090,7 +2090,7 @@
     {
       "id": "PERFC-55676fc3004b7fd2",
       "source_line": 224,
-      "anchor_digest": "610ad84e0203dfb635527592f58897c6c520b3d96469be52fd43d926ca38e1f8",
+      "anchor_digest": "db1a7943c5a13d04a7fcd335d0cbb44287549e1dba6fbe28bafd516982e516ac",
       "section": "16. Test And Benchmark Surface",
       "feature": "Upstream test inventory and porting plan",
       "raw_status": "Done as a file-level hierarchy and CQ0 frozen case inventory",
@@ -3846,7 +3846,7 @@
     {
       "id": "PERFC-cccae489f6a07220",
       "source_line": 226,
-      "anchor_digest": "a5a4755de2cff0cae5d6376cc82c010e32667b487d99a790231d637e01731f1f",
+      "anchor_digest": "e4324e1b7d99def942962e304c32afa2462f471346d5b77d7361d4cc8bf08a8a",
       "section": "16. Test And Benchmark Surface",
       "feature": "Benchmark manifest and primary beta gate",
       "raw_status": "Done for current performance infrastructure; PQ0 inventory complete",

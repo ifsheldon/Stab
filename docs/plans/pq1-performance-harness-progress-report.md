@@ -1,6 +1,6 @@
 # PQ1 Paired Performance Harness Progress Report
 
-> Current-evidence note, 2026-07-15: Algebra ownership and resource-admission regeneration set correctness inventory digest `7e42ddddd662593b56f0bd67885b74babf9a96319de990e4f2cb6218638edea5` and dependent performance inventory digest `67bcbfcf2d991c883b6d889bf48b4d9b8c09bcb52bdbd6dc1e041b6162a30193`. The clean schema-version-13 PR, full, and soak dependent reports from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` bind the previous Generation-refined digests and are historical. Their diagnostic median ratios 1.014015, 1.015160, and 1.015225 remain report-only infrastructure evidence, not product performance; see `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Current-evidence note, 2026-07-15: completed CQ2 ownership sets correctness inventory digest `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73` and dependent performance inventory digest `101ecb8ba8853522a234be0437e3779007428a6a8749f4fd01c77a7fd7131345`. Clean current-digest CQ2 correctness evidence comes from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898`. The schema-version-13 PQ1 PR, full, and soak reports from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` bind the previous Generation-refined digests and remain historical; their diagnostic median ratios 1.014015, 1.015160, and 1.015225 are report-only infrastructure evidence, not product performance. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 
