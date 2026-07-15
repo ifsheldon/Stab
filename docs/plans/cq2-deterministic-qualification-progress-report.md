@@ -12,7 +12,7 @@ Latest clean correctness evidence revision: `bae9e01cb3fedaf9d37958e6827b064c635
 
 Current correctness inventory digest: `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`.
 
-Current dependent performance inventory digest: `101ecb8ba8853522a234be0437e3779007428a6a8749f4fd01c77a7fd7131345`.
+Current dependent performance inventory digest after the first PQ2 product-contract graduation: `ce0c451a9c3123be95d3b9606b96a7ce26e3b26f09f543ae7d2e9e0345e86d54`.
 
 The authoritative current-digest reports are `target/qualification/cq2-deterministic-pr-clean`, `target/qualification/cq2-deterministic-full-clean`, and `target/qualification/cq2-deterministic-soak-clean`. The earlier Generation-refined correctness and dependent PQ1 reports remain historical and are not promoted under the final CQ2 digests.
 

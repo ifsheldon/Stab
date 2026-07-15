@@ -365,7 +365,7 @@ Soak catches nonlinear behavior and rare performance instability and does not re
 
 Status: Complete.
 
-Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current CQ2 dependency-regenerated performance digest `101ecb8ba8853522a234be0437e3779007428a6a8749f4fd01c77a7fd7131345`, bound to correctness digest `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`. Clean current-digest CQ2 correctness evidence comes from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898`. The dependent schema-version-13 PQ1 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` binds the previous Generation-refined digests and remains historical diagnostic infrastructure evidence rather than product-performance qualification.
+Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md) and `benchmarks/stim-qualification-suite.json` at current PQ2 first-slice performance digest `ce0c451a9c3123be95d3b9606b96a7ce26e3b26f09f543ae7d2e9e0345e86d54`, bound to correctness digest `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`. The refresh graduates exactly `PERFQ-M4-CIRCUIT-PARSE` from planned inventory metadata into an implemented exact runtime contract and reworks the inherited `m4-circuit-parse` disposition without relaxing its `1.25x` target. Clean CQ2 correctness evidence comes from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898`; clean performance reports generated before the current input-identity and report-provenance schema are historical and must be rerun from a committed current revision. The dependent schema-version-13 PQ1 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` remains historical diagnostic infrastructure evidence rather than product-performance qualification.
 
 Implementation revision: `abf7cd1bae0de045f62e976a290507238153f976`, verified with `local_modifications=false`.
 
@@ -477,17 +477,20 @@ Cover the deterministic foundations that feed every higher-level workflow.
 
 ### First Executable Slice
 
-1. Generalize the schema-version-2 runtime group ledger so every group owns one or more immutable named scales and positive semantic work counts.
-2. Make `qualification-run --group <id> --scale <id>` resolve both values from that ledger and reject unknown groups, unknown scales, caller-selected replacement work counts, stale report scale ids, and work-count mismatches.
+1. Generalize the schema-version-3 runtime group ledger so every group owns one or more immutable named scales, positive semantic work counts, exact input byte counts and digests, an implementation owner, and any source-owned profiler-note contract.
+2. Make `qualification-run --group <id> --scale <id>` resolve the complete scale identity from that ledger and reject unknown groups, unknown scales, caller-selected replacement work counts, stale report scale ids, work-count mismatches, and input byte or digest drift.
 3. Implement `PERFQ-M4-CIRCUIT-PARSE` first with one `parse` measurement and `small`, `medium`, and `large` scales of 64, 4,096, and 65,536 instructions.
 4. Bind the group to `cq-evidence-qualification-633fa529edf5f549` and `cq-evidence-qualification-e660819ae9a223c6`, which own Stim-text construction and canonical round-trip behavior.
 5. Generate the deterministic six-instruction fixture cycle outside the timer, measure only repeated parse and replacement of the previous parsed circuit, and derive the semantic digest from the final parsed canonical circuit outside the timer.
 6. Normalize only the known single terminal-newline difference between Stab canonical circuit text and pinned Stim `Circuit::str()` before digesting. Any other canonical difference blocks timing.
-7. Cap the circuit-parse fixture at 1,000,000 instructions before allocation in both workers and reject the first unsupported instruction count.
-8. Derive report promotion from the evidence: product PR, dirty, or unverified-host reports may remain valid diagnostics with exact CQ preflight, but only clean verified full or soak reports are promotable and eligible for regression dispatch.
-9. Keep the PQ1 protocol-smoke default group and `default` scale for command compatibility, but never migrate its diagnostic ratio into a product threshold.
+7. Cap the circuit-parse fixture at 1,000,000 instructions before allocation in both workers and reject the first unsupported instruction count, while assigning maximum-accepted and 1,000,001-instruction resource evidence to PQ6 instead of treating the 65,536-instruction timing scale as cap evidence.
+8. Bind every report to the exact runtime and checked-inventory contract, retain setup and peak RSS separately, and require failed or noisy promotable evidence to carry the source-owned owner and profiler-note path and digest through offline replay.
+9. Derive report promotion from the evidence: product PR, dirty, or unverified-host reports may remain valid diagnostics with exact CQ preflight, but only clean verified full or soak reports are promotable and eligible for regression dispatch.
+10. Keep the PQ1 protocol-smoke default group and `default` scale for command compatibility, but never migrate its diagnostic ratio into a product threshold.
+11. Publish each scale-family rollup only from a clean unchanged checkout whose commit exactly equals the source reports' Stab commit, record that producer state separately from the source-report identity, require exact Stim and Stab worker source, build-fingerprint, and binary-digest identity across every scale, and bound each source report and preflight while retaining only the reduced rollup evidence needed for the family.
+12. Add offline rollup replay that reopens the current checked inventories, runtime group, canonical rollup and preflight, every exact source report and preflight, and the clean producer revision; reconstruct the complete canonical JSON and derived Markdown; reject altered paths, source bindings, outcomes, counts, identities, or preflight bytes; and use compare-and-swap publication so stale validation cannot replace newer evidence.
 
-The first slice is infrastructure plus one proving workload. It does not complete `PERF-CIRCUIT-MODEL`, reclassify the generated PQ0 group, supersede `m4-circuit-parse`, or satisfy PQ2's remaining 218 planned groups until clean three-scale evidence and the required inventory migration land.
+The first slice is infrastructure plus one proving workload. It graduates exactly `PERFQ-M4-CIRCUIT-PARSE` into the checked performance inventory and reclassifies the inherited `m4-circuit-parse` row from retained to reworked because the exact replacement contract now exists. It does not complete `PERF-CIRCUIT-MODEL`, supersede the inherited row, or satisfy PQ2's remaining 218 planned groups. The group remains an honestly failed target until current-schema clean evidence passes the threshold; landing the contract is not a performance pass.
 
 ### Tests
 
@@ -497,8 +500,14 @@ The first slice is infrastructure plus one proving workload. It does not complet
 - Verify algebra benchmarks mutate state and produce nonidentity semantic digests.
 - Verify folded huge-repeat fixtures remain compact and materialized fixtures hit their declared caps.
 - Verify each scale increases declared semantic work monotonically.
-- Verify the adapter and Stab worker emit the same circuit-parse digest for the accepted scale representatives and reject a workload or measurement mismatch before timing.
+- Verify the adapter and Stab worker emit the same exact input byte count, input digest, and circuit semantic digest for every timing scale; prove that canonically equivalent but byte-distinct input is rejected by the input-identity contract.
+- From the clean unchanged committed revision, run `just bench::qualification-worker-reproducibility` and require each receipt to hash the materialized source it builds, require each sealed binary to confirm that source and build identity through the worker protocol, invoke the first unsupported circuit-parse scale with the start barrier enabled and no input so only pre-barrier cap rejection can pass, and require two isolated private builds of both workers to produce identical source, build-fingerprint, and binary-digest identities; a dirty checkout must fail before either private build.
 - Verify product PR reports are valid but nonpromotable, clean verified full and soak reports are promotable, and regression rejects nonpromotable product reports.
+- Verify source-report offline replay rejects checked-inventory drift, runtime-group drift, stale profiler-note content, wrong ownership, and altered input or memory receipts.
+- Generate separate full-tier and soak-tier architecture-scoped scale-family rollups that list every required scale and fail closed when a scale report is missing, stale, duplicated, nonpromotable, bound to another commit or inventory digest, produced by different worker source, build, or binary identities, or produced on another architecture.
+- Verify rollup publication rejects a dirty, changed, or source-mismatched producer revision, non-direct or injection-capable artifact names, and source replacement during publication.
+- Verify rollup offline replay rejects noncanonical or oversized artifacts, output-path drift, modified source paths or digests, modified timing or memory outcomes, modified aggregate counts, modified producer identity, stale preflight bytes, and compare-and-swap replacement; verify it reconstructs valid failed and noisy families without converting them into passes.
+- Verify family outcome precedence is failed when any measurement failed, otherwise noisy when any measurement is noisy, and passed only when every scale measurement passed.
 
 ### Acceptance Criteria
 
@@ -506,6 +515,9 @@ The first slice is infrastructure plus one proving workload. It does not complet
 - Every comparable row has exact named measurement pairs and three scales where applicable.
 - Streaming and folded rows satisfy their declared memory-growth classes.
 - Every ratio above 1.25 has a profiler note and owner and remains a failed target.
+- Every measured scale binds exact input identity as well as semantic work and output identity.
+- The private Stim and Stab worker builds are byte-reproducible under their source-owned receipts, and each scale-family rollup binds one exact worker identity.
+- PQ2 completion requires clean-producer full and soak family rollups plus successful offline rollup replay per native architecture. Linux AArch64 and Linux x86-64 conclusions remain separate until PQ7 reports both; evidence from one architecture cannot close the other.
 
 ## PQ3: Qualify Generation And Public CLI Formatting Paths
 

@@ -8,7 +8,7 @@ Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4
 
 Current correctness dependency after completed CQ2 ownership: schema-version-3 CQ0 semantic digest `deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73`.
 
-Current performance inventory digest after dependent CQ2 regeneration: `101ecb8ba8853522a234be0437e3779007428a6a8749f4fd01c77a7fd7131345`.
+Current performance inventory digest after the first PQ2 product-contract graduation: `ce0c451a9c3123be95d3b9606b96a7ce26e3b26f09f543ae7d2e9e0345e86d54`.
 
 Implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
@@ -16,7 +16,7 @@ Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca3258
 
 The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
-The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, Generation, and Algebra slices changed correctness owner ids, exact classifications, checklist rows, and public API shape, so PQ0 was regenerated without relaxing any performance classification. The current refresh has 541 runtime groups and preserves all inherited disposition, threshold, waiver, and unresolved counts while rebinding exact correctness ownership. Clean current-digest CQ2 correctness evidence comes from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898`. Schema-version-13 PQ1 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` binds the previous Generation-refined digests and is historical; the synthetic adapter ratios remain report-only infrastructure evidence.
+The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, Generation, and Algebra slices changed correctness owner ids, exact classifications, checklist rows, and public API shape, so PQ0 was regenerated without relaxing any performance gate. The current refresh has 541 qualification groups, graduates exactly `PERFQ-M4-CIRCUIT-PARSE` to an implemented exact runtime contract, and reclassifies its inherited `m4-circuit-parse` row from retained to reworked because the faithful replacement now exists. This removes only that row's missing scale, correctness-preflight, output-digest, heterogeneous-selector, and unmatched-submeasurement classifications; it does not waive or pass the row's `1.25x` target. Clean current-digest CQ2 correctness evidence comes from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898`. Schema-version-13 PQ1 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` binds the previous Generation-refined digests and is historical; the synthetic adapter ratios remain report-only infrastructure evidence.
 
 PQ0 freezes inventory and migration decisions only.
 It does not claim that inherited timing ratios satisfy the comprehensive runner, preflight, scaling, memory, or statistical contract.
@@ -49,7 +49,8 @@ It does not claim that inherited timing ratios satisfy the comprehensive runner,
 | Upstream `BENCHMARK(...)` symbols | 74 |
 | Current primary waiver rows with adapter retirement mappings | 5 |
 | Groups bound to exact CQ0 API owners | 246 |
-| Groups with stable planned CQ preflight ids | 295 |
+| Groups with stable planned CQ preflight ids | 294 |
+| Groups with implemented exact CQ case bindings | 1 |
 | Exact inherited threshold measurement pairs | 24 |
 | Exact checklist row-and-domain parent groups | 133 |
 | Exact checklist child claims across those parents | 181 |
@@ -76,8 +77,8 @@ Every scale point stores either an exact input-byte count or an explicit not-app
 
 | Decision | Count | Meaning |
 | --- | ---: | --- |
-| Retained | 15 | The upstream operation shape is faithful, but comprehensive preflight, output, scaling, and statistical evidence is still missing. |
-| Reworked | 135 | The row needs a faithful runner, exact phase split, scale family, output contract, or another material correction. |
+| Retained | 14 | The upstream operation shape is faithful, but comprehensive preflight, output, scaling, and statistical evidence is still missing. |
+| Reworked | 136 | The row needs a faithful runner, exact phase split, scale family, output contract, or another material correction; `m4-circuit-parse` now has its exact replacement contract but is not superseded until replacement evidence is complete. |
 | Diagnostic | 4 | The row remains useful for investigation but cannot produce a comprehensive ratio in its current form. |
 | Superseded | 5 | A more specific row owns the behavior and the duplicate identity must be removed during manifest migration. |
 | Removed | 2 | `m7-perf-harness` and `m12-primary-performance-matrix` are metadata rather than timed workloads. |
@@ -92,12 +93,12 @@ The four diagnostic identities are `m7-cli-dispatch`, `m7-convert-stim-canonical
 | Proxy workload | 10 | PQ2 through PQ5 exact workload replacement |
 | Stale metadata row | 2 | PQ1 manifest migration |
 | Duplicate workload | 5 | PQ1 manifest migration |
-| Missing scale family | 124 | PQ2 through PQ6 |
-| Missing qualification correctness preflight | 159 | PQ1 plus dependent CQ milestones |
-| Missing semantic output digest | 159 | PQ1 |
+| Missing scale family | 123 | PQ2 through PQ6 |
+| Missing qualification correctness preflight | 158 | PQ1 plus dependent CQ milestones |
+| Missing semantic output digest | 158 | PQ1 |
 | Missing current comparator | 73 | PQ1 adapter and process runners |
 | In-process Stab versus Stim process mismatch | 58 | PQ1 symmetric process CLI runner |
-| Heterogeneous upstream measurement selector | 21 | PQ1 exact submeasurement pairing or row split |
+| Heterogeneous upstream measurement selector | 20 | PQ1 exact submeasurement pairing or row split |
 | Heterogeneous selector without current exact threshold pairs | 15 | PQ1 row split or exact pair inventory |
 
 All 58 current `stim-cli` rows are explicitly marked asymmetric and cannot enter the comprehensive primary gate until PQ1 runs built Stab and Stim processes symmetrically.

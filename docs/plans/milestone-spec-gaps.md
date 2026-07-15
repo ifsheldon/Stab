@@ -21,6 +21,42 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Resolved Entries
 
+## 2026-07-15 - PQ2: Worker Identity Across Scale Families
+
+Status: Resolved
+Revealed by: GPT-5.6/max performance review of the first scale-family rollup implementation.
+Current text: PQ2 required one commit, toolchain, host, correctness preflight, runtime contract, and complete scale set across a full or soak rollup.
+Gap: the milestone did not require every scale report to execute the exact same Stim and Stab worker binaries. Reports built from different source, build recipes, or executable bytes could therefore be aggregated even though their repository and toolchain identities matched.
+Proposed amendment: bind all Stim and Stab worker source digests, build fingerprints, and binary digests into the shared rollup identity; require private builds to be byte-reproducible; and add an operational reproducibility check plus mixed-worker rejection tests.
+Resolution: rollup schema version 3 carries the complete six-digest worker identity and rejects any cross-scale mismatch. The private Stab receipt hashes the worker source from the materialized commit, removes embedded temporary repository paths and nondeterministic symbol and linker build-id sections, and rechecks the source after building. `just bench::qualification-worker-reproducibility` requires a clean unchanged commit before rebuilding both private workers twice, requires each binary to confirm its receipt source and build identity through a bounded protocol handshake, and rejects any identity difference between builds. Rollup tests reject a changed worker binary digest. The PQ2 plan, benchmark documentation, and active goal now require exact worker identity across every accepted scale family.
+
+## 2026-07-15 - PQ2: Rollup Producer And Replay Identity
+
+Status: Resolved
+Revealed by: GPT-5.6/max security review of the first scale-family rollup implementation.
+Current text: PQ2 required architecture-scoped full and soak rollups to reopen every scale report, bind their shared identity, and fail closed on incomplete, stale, mixed, or nonpromotable source evidence.
+Gap: the milestone did not require the rollup producer checkout itself to be clean, unchanged, and equal to the source reports' Stab commit, and it did not define an offline validator that reconstructs the rollup from its exact source artifacts. A rollup could therefore be derived by uncommitted code or remain superficially valid after its report and preflight were edited together.
+Proposed amendment: record a separate clean producer repository tuple, require its commit to equal every source report, restrict rollup artifacts to bounded canonical direct-sibling paths, and add offline replay that reloads current source contracts and exact source report and preflight digests, reconstructs all canonical bytes, rejects hostile mutations, and republishes only through compare-and-swap checks.
+Resolution: rollup schema version 3 retains the producer repository state and output binding introduced by schema version 2 and adds exact worker identity; `just bench::qualification-rollup` rejects dirty, changed, or source-mismatched producer revisions and bounds source reads; `just bench::qualification-rollup-report` reconstructs the complete rollup and preflight from current source-owned evidence before atomic refresh; adversarial tests cover noncanonical and oversized bytes, stale preflight, altered source paths and digests, altered timing and memory outcomes, altered aggregate and producer fields, unsafe artifact names, source replacement, and producer-state drift. The PQ2 plan and active goal now require successful replay for every accepted full and soak family.
+
+## 2026-07-15 - PQ2: Timing Scales Versus Materialization Boundary
+
+Status: Resolved
+Revealed by: milestone audit of the first `PERFQ-M4-CIRCUIT-PARSE` implementation and three-scale evidence.
+Current text: the first PQ2 slice required 64, 4,096, and 65,536-instruction timing scales, capped both workers at 1,000,000 instructions, and required rejection of the first unsupported count.
+Gap: the milestone did not say whether the first timing slice also had to materialize and measure the maximum accepted 1,000,000-instruction fixture and the 1,000,001-instruction rejection. Treating the 65,536-instruction timing scale as cap evidence would leave the resource contract unproved, while adding the cap boundary to the paired timing family would mix resource admission with representative throughput.
+Proposed amendment: keep the three representative scales as PQ2 timing and process-RSS evidence, retain worker-level preallocation rejection tests, require the clean private-worker check to invoke the first unsupported scale through both sealed binaries with no start-barrier input, and assign maximum-accepted materialization plus first-rejected resource evidence to PQ6 outside the timing gate.
+Resolution: `docs/plans/comprehensive-stim-performance-qualification-plan.md` now makes that split explicit. The first slice binds exact inputs and memory evidence at 64, 4,096, and 65,536 instructions and makes its clean private-worker check prove that both sealed binaries reject 1,000,001 instructions before the start barrier. PQ6 owns the 1,000,000-instruction accepted materialization plus complete resource-report evidence for the accepted and first-rejected boundaries.
+
+## 2026-07-15 - PQ2: Scale-Family Aggregate Evidence
+
+Status: Resolved
+Revealed by: milestone audit of independently published small, medium, and large circuit-parse reports.
+Current text: PQ2 required three scales where applicable and clean full and soak evidence, but accepted separate report artifacts without defining one aggregate completeness check.
+Gap: three individually valid reports do not prove that a reviewer selected exactly one current, promotable report for every required scale on one architecture. A stale, missing, duplicated, cross-commit, cross-inventory, or cross-architecture scale could be overlooked while each remaining report still validates independently.
+Proposed amendment: require separate source-owned full and soak architecture-scoped scale-family rollups that reopen every report, bind one commit, Stim revision, correctness and performance inventory, runtime contract, host architecture, tier policy, and complete required scale set, and fail closed on missing, duplicate, stale, nonpromotable, or foreign evidence. Keep AArch64 and x86-64 rollups separate and combine only their conclusions in PQ7.
+Resolution: the PQ2 tests and acceptance criteria in `docs/plans/comprehensive-stim-performance-qualification-plan.md` now require both rollups before PQ2 completion. `just bench::qualification-rollup` implements the fail-closed report and preflight binding, the active goal requires the first AArch64 full and soak rollups for the circuit-parse slice, and native x86-64 evidence remains explicitly unclaimed until a controlled x86-64 host produces it.
+
 ## 2026-07-15 - PQ2: Product PR Evidence Versus Promotion
 
 Status: Resolved
