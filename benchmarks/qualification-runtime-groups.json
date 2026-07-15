@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "performance_inventory_sha256": "f3c4009044b0bafcd877f76798c7f4f08c475c0877b85f68d22ae0449e3ddb8f",
+  "performance_inventory_sha256": "1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -88,6 +88,36 @@
         "path": "benchmarks/profiler-notes/qualification/perfq-m4-circuit-parse.md",
         "sha256": "da819f8a2faeebfe7873db2b84cd090cae9853772b8ac756bb63eb86bd8d7a58"
       }
+    },
+    {
+      "id": "PERFQ-M4-GATE-LOOKUP",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "gate-name-hash",
+      "measurement_ids": ["hash-all-names"],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 82,
+          "input_bytes": 0,
+          "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
+        },
+        {
+          "id": "medium",
+          "work_items": 5248,
+          "input_bytes": 0,
+          "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
+        },
+        {
+          "id": "large",
+          "work_items": 335872,
+          "input_bytes": 0,
+          "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
+        }
+      ],
+      "correctness_case_ids": ["cq-evidence-qualification-bd20a013e903a05f"],
+      "owner": "stab-core/gates",
+      "profiler_note": null
     }
   ]
 }

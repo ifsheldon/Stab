@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "b80801fea6eae550feecf40489259de56123f6f3331b747d52c323d576fd0285",
-  "semantic_digest": "f3c4009044b0bafcd877f76798c7f4f08c475c0877b85f68d22ae0449e3ddb8f",
+  "correctness_digest": "ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2",
+  "semantic_digest": "1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -2090,7 +2090,7 @@
     {
       "id": "PERFC-55676fc3004b7fd2",
       "source_line": 224,
-      "anchor_digest": "db1a7943c5a13d04a7fcd335d0cbb44287549e1dba6fbe28bafd516982e516ac",
+      "anchor_digest": "b3f32566f8b2bd088eacfd5d543a85a2e0be6911bab32ae81b7d8e42d33279b0",
       "section": "16. Test And Benchmark Surface",
       "feature": "Upstream test inventory and porting plan",
       "raw_status": "Done as a file-level hierarchy and CQ0 frozen case inventory",
@@ -61849,32 +61849,57 @@
       "public_api_items": [],
       "disposition": "measured",
       "phase": "execute",
-      "runner_fidelity": "stim-perf",
-      "correctness_cases": [],
-      "correctness_binding": "unresolved",
-      "planned_correctness_case_id": "CQPLANNED-PERFQ-M4-GATE-LOOKUP",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-bd20a013e903a05f"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
-          "kind": "inline",
-          "id": "m4-gate-lookup"
+          "kind": "generated",
+          "id": "stim-v1.16.0-gate-name-table"
         },
         "source": "src/stim/gates/gates.perf.cc",
-        "deterministic_seed": "source-owned-inline:m4-gate-lookup",
+        "deterministic_seed": "not-applicable-static-gate-table",
         "scales": [
           {
-            "id": "inherited",
-            "parameters": "gate table lookup throughput",
+            "id": "small",
+            "parameters": "generator=stim-v1.16.0-gate-name-table; names=82; complete_sweeps=1",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 0
+            },
+            "semantic_work": 82,
+            "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=stim-v1.16.0-gate-name-table; names=82; complete_sweeps=64",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 0
+            },
+            "semantic_work": 5248,
+            "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=stim-v1.16.0-gate-name-table; names=82; complete_sweeps=4096",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 0
+            },
+            "semantic_work": 335872,
+            "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
           }
         ]
       },
       "work_unit": "gates",
       "output_contract": {
-        "expected_shape": "gate-lookup output count, width, and semantic digest from the declared correctness preflight",
-        "digest_state": "planned",
-        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+        "expected_shape": "Exact complete-table hash count plus matching final checksum, ordered table fingerprint, and semantic digest.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers prepare the 82 Stim gate-table entries, including NOT_A_GATE, outside timing, hash only complete table sweeps in the timed body, and consume the final checksum outside timing."
       },
       "timing_policy": {
         "calibration_min_ms": 250,
@@ -61885,16 +61910,18 @@
         "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
       },
       "memory_policy": {
-        "method": "stab-allocations",
+        "method": "process-rss",
         "scale_ids": [
-          "inherited"
+          "small",
+          "medium",
+          "large"
         ],
-        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+        "expected_growth": "The immutable 82-name registry is prepared before timing; setup and peak process RSS are report-only observations at every scale. This slice makes no bounded-growth claim; PQ6 owns an explicit cross-scale RSS and allocation-growth rule."
       },
       "threshold_policy": "primary-1.25",
-      "reason": "The inherited workload requires a faithful runner, exact phase split, scale family, or output contract before it can produce qualification evidence.",
-      "owner": "stab-core",
-      "status": "planned"
+      "reason": "Implemented paired pinned-Stim and Rust all-gate-name hashing with exact CQ2, complete-sweep, output-digest, scale, timing, and memory bindings.",
+      "owner": "stab-core/gates",
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M5-SIMD-BIT-TABLE",

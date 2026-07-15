@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "performance_inventory_sha256": "f3c4009044b0bafcd877f76798c7f4f08c475c0877b85f68d22ae0449e3ddb8f",
+  "performance_inventory_sha256": "1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42",
   "groups": [
     {
       "group_id": "pq1-adapter-protocol-smoke",
@@ -24,6 +24,17 @@
       "measurements": [
         {
           "measurement_id": "parse",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M4-GATE-LOOKUP",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "hash-all-names",
           "max_median_ratio": "1.25",
           "max_confidence_interval_upper": "1.25"
         }

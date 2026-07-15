@@ -6,6 +6,7 @@ use super::super::model::{
 
 const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
+const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
     "cq-evidence-qualification-e660819ae9a223c6",
@@ -14,13 +15,39 @@ const CIRCUIT_CANONICAL_PRINT_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-e660819ae9a223c6",
     "cq-evidence-qualification-ef933925fb901877",
 ];
+const GATE_NAME_HASH_CORRECTNESS_CASE: &str = "cq-evidence-qualification-bd20a013e903a05f";
+const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
 pub(super) fn apply(group: &mut QualificationGroup) {
     match group.id.as_str() {
         CIRCUIT_PARSE_GROUP_ID => apply_circuit_parse(group),
         CIRCUIT_CANONICAL_PRINT_GROUP_ID => apply_circuit_canonical_print(group),
+        GATE_NAME_HASH_GROUP_ID => apply_gate_name_hash(group),
         _ => {}
     }
+}
+
+fn apply_gate_name_hash(group: &mut QualificationGroup) {
+    group.runner_fidelity = RunnerFidelity::AdapterLibrary;
+    group.correctness_cases = vec![GATE_NAME_HASH_CORRECTNESS_CASE.to_string()];
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = gate_name_hash_workload_family();
+    group.output_contract = OutputContract {
+        expected_shape: "Exact complete-table hash count plus matching final checksum, ordered table fingerprint, and semantic digest."
+            .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: "Both workers prepare the 82 Stim gate-table entries, including NOT_A_GATE, outside timing, hash only complete table sweeps in the timed body, and consume the final checksum outside timing."
+            .to_string(),
+    };
+    group.memory_policy = circuit_memory_policy(
+        "The immutable 82-name registry is prepared before timing; setup and peak process RSS are report-only observations at every scale. This slice makes no bounded-growth claim; PQ6 owns an explicit cross-scale RSS and allocation-growth rule.",
+    );
+    group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.owner = "stab-core/gates".to_string();
+    group.reason = "Implemented paired pinned-Stim and Rust all-gate-name hashing with exact CQ2, complete-sweep, output-digest, scale, timing, and memory bindings."
+        .to_string();
+    group.status = QualificationStatus::Implemented;
 }
 
 fn apply_circuit_parse(group: &mut QualificationGroup) {
@@ -124,5 +151,30 @@ fn circuit_memory_policy(expected_growth: &str) -> MemoryPolicy {
             .map(str::to_string)
             .collect(),
         expected_growth: expected_growth.to_string(),
+    }
+}
+
+fn gate_name_hash_workload_family() -> WorkloadFamily {
+    WorkloadFamily {
+        fixture: FixtureLocator::Generated {
+            id: "stim-v1.16.0-gate-name-table".to_string(),
+        },
+        source: "src/stim/gates/gates.perf.cc".to_string(),
+        deterministic_seed: "not-applicable-static-gate-table".to_string(),
+        scales: [("small", 1_u64), ("medium", 64), ("large", 4_096)]
+            .into_iter()
+            .map(|(id, sweeps)| {
+                let gate_hashes = sweeps * 82;
+                ScalePoint {
+                    id: id.to_string(),
+                    parameters: format!(
+                        "generator=stim-v1.16.0-gate-name-table; names=82; complete_sweeps={sweeps}"
+                    ),
+                    input_bytes: InputByteCount::Exact { bytes: 0 },
+                    semantic_work: Some(gate_hashes),
+                    input_digest: Some(EMPTY_INPUT_DIGEST.to_string()),
+                }
+            })
+            .collect(),
     }
 }

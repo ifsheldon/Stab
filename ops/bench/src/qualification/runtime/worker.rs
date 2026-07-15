@@ -3,6 +3,7 @@ use std::hint::black_box;
 use std::io::Read as _;
 use std::io::Write as _;
 use std::num::NonZeroU64;
+use std::sync::atomic::{Ordering, compiler_fence};
 use std::time::Instant;
 
 use clap::{Args, ValueEnum};
@@ -19,6 +20,7 @@ const WORKER_SOURCE: &[u8] = include_bytes!("worker.rs");
 const DIAGNOSTIC_BUILD_FINGERPRINT: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 const MAX_CIRCUIT_PARSE_INSTRUCTIONS: u64 = 1_000_000;
+const GATE_HASH_NAME_COUNT: u64 = 82;
 const CIRCUIT_INSTRUCTION_CYCLE: [&str; 6] = [
     "H 0\n",
     "S 1\n",
@@ -39,6 +41,7 @@ pub(crate) enum WorkerWorkload {
     ProtocolSmoke,
     CircuitParse,
     CircuitCanonicalPrint,
+    GateNameHash,
 }
 
 impl WorkerWorkload {
@@ -47,6 +50,7 @@ impl WorkerWorkload {
             Self::ProtocolSmoke => "protocol-smoke",
             Self::CircuitParse => "circuit-parse",
             Self::CircuitCanonicalPrint => "circuit-canonical-print",
+            Self::GateNameHash => "gate-name-hash",
         }
     }
 
@@ -55,6 +59,7 @@ impl WorkerWorkload {
             Self::ProtocolSmoke => "main",
             Self::CircuitParse => "parse",
             Self::CircuitCanonicalPrint => "serialize",
+            Self::GateNameHash => "hash-all-names",
         }
     }
 }
@@ -118,7 +123,7 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     let workload_id = ProtocolId::try_new(args.workload.id())?;
     let identity = current_identity()?;
     let circuit_fixture = match args.workload {
-        WorkerWorkload::ProtocolSmoke => None,
+        WorkerWorkload::ProtocolSmoke | WorkerWorkload::GateNameHash => None,
         WorkerWorkload::CircuitParse | WorkerWorkload::CircuitCanonicalPrint => {
             Some(circuit_parse_fixture(args.work_items.get())?)
         }
@@ -132,8 +137,26 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 .as_deref()
                 .ok_or(WorkerError::MissingCircuitFixture)?,
         )?),
-        WorkerWorkload::ProtocolSmoke | WorkerWorkload::CircuitParse => None,
+        WorkerWorkload::ProtocolSmoke
+        | WorkerWorkload::CircuitParse
+        | WorkerWorkload::GateNameHash => None,
     };
+    let gate_hash_names = match args.workload {
+        WorkerWorkload::GateNameHash => Some(gate_hash_names()?),
+        WorkerWorkload::ProtocolSmoke
+        | WorkerWorkload::CircuitParse
+        | WorkerWorkload::CircuitCanonicalPrint => None,
+    };
+    let gate_hash_sweeps = match args.workload {
+        WorkerWorkload::GateNameHash => Some(gate_hash_sweeps(args.work_items.get())?),
+        WorkerWorkload::ProtocolSmoke
+        | WorkerWorkload::CircuitParse
+        | WorkerWorkload::CircuitCanonicalPrint => None,
+    };
+    let gate_hash_table_digest = gate_hash_names
+        .as_deref()
+        .map(gate_table_digest)
+        .transpose()?;
     if args.start_barrier {
         wait_for_start_barrier()?;
     }
@@ -165,6 +188,15 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                     .ok_or(WorkerError::MissingCanonicalPrintCircuit)?,
             ))
         }
+        WorkerWorkload::GateNameHash => WorkloadOutput::DigestState(gate_name_hash(
+            args.iterations.get(),
+            args.work_items.get(),
+            gate_hash_sweeps.ok_or(WorkerError::MissingGateHashSweeps)?,
+            gate_hash_names
+                .as_deref()
+                .ok_or(WorkerError::MissingGateHashNames)?,
+            gate_hash_table_digest.ok_or(WorkerError::MissingGateHashTableDigest)?,
+        )),
     };
     let elapsed_seconds = started.elapsed().as_secs_f64();
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
@@ -299,6 +331,69 @@ fn circuit_canonical_print(iterations: u64, circuit: &stab_core::Circuit) -> Str
         canonical = black_box(black_box(circuit).to_stim_string());
     }
     canonical
+}
+
+fn gate_hash_names() -> Result<Vec<String>, WorkerError> {
+    let names = std::iter::once("NOT_A_GATE")
+        .chain(stab_core::Gate::all().map(stab_core::Gate::canonical_name))
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    if u64::try_from(names.len()) != Ok(GATE_HASH_NAME_COUNT) {
+        return Err(WorkerError::GateHashNameCount {
+            actual: names.len(),
+            expected: GATE_HASH_NAME_COUNT,
+        });
+    }
+    Ok(names)
+}
+
+fn gate_hash_sweeps(work_items: u64) -> Result<u64, WorkerError> {
+    if !work_items.is_multiple_of(GATE_HASH_NAME_COUNT) {
+        return Err(WorkerError::GateHashPartialSweep {
+            actual: work_items,
+            name_count: GATE_HASH_NAME_COUNT,
+        });
+    }
+    Ok(work_items / GATE_HASH_NAME_COUNT)
+}
+
+fn gate_table_digest(names: &[String]) -> Result<u64, WorkerError> {
+    let mut digest = 0xcbf2_9ce4_8422_2325_u64;
+    for name in names {
+        for byte in name.bytes().chain(std::iter::once(0)) {
+            digest ^= u64::from(byte);
+            digest = digest.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        let hash = stab_core::Gate::stim_name_hash(name);
+        let hash = u16::try_from(hash).map_err(|_| WorkerError::GateHashValueRange {
+            name: name.clone(),
+            actual: hash,
+        })?;
+        for byte in hash.to_le_bytes() {
+            digest ^= u64::from(byte);
+            digest = digest.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    Ok(digest)
+}
+
+fn gate_name_hash(
+    iterations: u64,
+    work_items: u64,
+    sweeps: u64,
+    names: &[String],
+    table_digest: u64,
+) -> [u64; 4] {
+    let mut checksum = 0_u64;
+    for _ in 0..iterations {
+        for _ in 0..sweeps {
+            compiler_fence(Ordering::SeqCst);
+            for name in names {
+                checksum = checksum.wrapping_add(stab_core::Gate::stim_name_hash(name) as u64);
+            }
+        }
+    }
+    [checksum, iterations, work_items, table_digest]
 }
 
 fn byte_digest(bytes: &[u8]) -> [u64; 4] {
@@ -444,6 +539,18 @@ pub(super) enum WorkerError {
     MissingCircuitFixture,
     #[error("circuit-canonical-print workload was invoked without its prepared circuit")]
     MissingCanonicalPrintCircuit,
+    #[error("gate-name-hash workload was invoked without its prepared name table")]
+    MissingGateHashNames,
+    #[error("gate-name-hash workload was invoked without its validated sweep count")]
+    MissingGateHashSweeps,
+    #[error("gate-name-hash workload was invoked without its prepared table digest")]
+    MissingGateHashTableDigest,
+    #[error("gate-name-hash registry has {actual} names, expected {expected}")]
+    GateHashNameCount { actual: usize, expected: u64 },
+    #[error("gate-name-hash value {actual} for {name:?} cannot be represented as u16")]
+    GateHashValueRange { name: String, actual: usize },
+    #[error("gate-name-hash work count {actual} is not a complete sweep of {name_count} names")]
+    GateHashPartialSweep { actual: u64, name_count: u64 },
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]
@@ -488,6 +595,26 @@ mod tests {
     #[test]
     fn canonical_print_workload_is_registered() {
         assert!(WorkerWorkload::from_str("circuit-canonical-print", true).is_ok());
+    }
+
+    #[test]
+    fn gate_name_hash_covers_complete_stim_registry_sweeps() {
+        let names = gate_hash_names().expect("pinned gate names");
+        let table_digest = gate_table_digest(&names).expect("pinned gate digest");
+        let once = gate_name_hash(1, GATE_HASH_NAME_COUNT, 1, &names, table_digest);
+        let repeated = gate_name_hash(2, GATE_HASH_NAME_COUNT, 1, &names, table_digest);
+        let wider = gate_name_hash(1, GATE_HASH_NAME_COUNT * 2, 2, &names, table_digest);
+
+        assert_ne!(table_digest, 0);
+        assert_eq!(once[3], table_digest);
+        assert_eq!(repeated[3], table_digest);
+        assert_eq!(wider[3], table_digest);
+        assert_eq!(repeated[0], once[0] * 2);
+        assert_eq!(wider[0], once[0] * 2);
+        assert!(matches!(
+            gate_hash_sweeps(GATE_HASH_NAME_COUNT + 1),
+            Err(WorkerError::GateHashPartialSweep { .. })
+        ));
     }
 
     #[test]

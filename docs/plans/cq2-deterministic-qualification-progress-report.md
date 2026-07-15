@@ -2,19 +2,19 @@
 
 ## Status
 
-Complete as of 2026-07-15.
+Implementation ownership complete as of 2026-07-16; clean current-digest execution is pending.
 
-All eight selected deterministic domains are source-complete at exact upstream-symbol and exported-Rust-API granularity. The final Algebra slice passed milestone audit, three GPT-5.6/max full-code-review lanes, broad workspace verification, clean all-domain PR, full, and soak execution, offline report regeneration, and exact controller-bound preflight with every confirmed finding fixed. Those all-domain reports became historical when reviewed negative-zero analyzer ownership refreshed the global digest; implementation ownership remains complete.
+All eight selected deterministic domains are source-complete at exact upstream-symbol and exported-Rust-API granularity. The final Algebra slice passed milestone audit, three GPT-5.6/max full-code-review lanes, broad workspace verification, clean all-domain PR, full, and soak execution, offline report regeneration, and exact controller-bound preflight with every confirmed finding fixed. The later exact 82-entry Stim gate-name hash parent passed milestone audit and GPT-5.6/max review, but it refreshed the global correctness digest, so the prior all-domain and focused parser/printer reports are historical while implementation ownership remains complete.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Latest clean exact current-digest evidence revision: `ba70a52025fdd4122ac97cec263725b2ec56e431` with `local_modifications=false`, covering the three circuit parser and canonical-printer prerequisites.
+Latest clean exact evidence revision: `ba70a52025fdd4122ac97cec263725b2ec56e431` with `local_modifications=false`, covering the three circuit parser and canonical-printer prerequisites under the preceding digest. No clean current-digest execution is claimed until the exact gate-name hash owner runs after commit.
 
-Current correctness inventory digest: `b80801fea6eae550feecf40489259de56123f6f3331b747d52c323d576fd0285`.
+Current correctness inventory digest: `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2`.
 
-Current dependent performance inventory digest after the first two PQ2 product-contract graduations and legacy printer-waiver retirement: `f3c4009044b0bafcd877f76798c7f4f08c475c0877b85f68d22ae0449e3ddb8f`.
+Current dependent performance inventory digest after the first three PQ2 product-contract graduations, exact gate-hash rebinding, synchronized checklist counts, and legacy printer-waiver retirement: `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`.
 
-The authoritative exact current-digest report for the two active dependent groups is `target/qualification/pq2-m4-parse-print-full-ba70a52`. It selected all three shared owners, passed all three, and published request, report, and completion digests `23e1f36f280a101d39213d403c724fe5d498ffe428bc309796f3bbeae20bd703`, `5dcb3134e2fad22de389823f232704bb2b339133a4726f5c59234ed8684a69c0`, and `05037f849b9b317c9c2cc61653f3b979e742346a91b12237d4e1958d961cad8a`. The clean all-domain reports at `target/qualification/cq2-deterministic-pr-clean`, `target/qualification/cq2-deterministic-full-clean`, and `target/qualification/cq2-deterministic-soak-clean` bind a preceding digest and remain historical evidence. Rerun the complete 270-parent family before citing all-domain execution as source-current. Earlier Generation-refined correctness and dependent PQ1 reports also remain historical.
+The exact report at `target/qualification/pq2-m4-parse-print-full-ba70a52` selected all three shared parser and printer owners and passed all three, but it is now historical because the exact gate-name hash owner changed the correctness inventory. The gate-hash group requires `cq-evidence-qualification-bd20a013e903a05f`, which freezes the ordered 82-name table including `NOT_A_GATE` and every per-name Stim hash, so it must use a fresh clean exact report and preflight before timing. The clean all-domain reports also bind preceding correctness digests and remain historical evidence.
 
 ## Delivered Slices
 
@@ -44,10 +44,10 @@ The authoritative exact current-digest report for the two active dependent group
 
 ### Gate Contract
 
-- Thirty-seven implemented blocker-ledger parents, fourteen independently selected oracle-fixture parents, and eight focused qualification parents produce 59 implemented gate-contract evidence parents and zero planned owners.
+- Thirty-seven implemented blocker-ledger parents, fourteen independently selected oracle-fixture parents, and nine focused qualification parents produce 60 implemented gate-contract evidence parents and zero planned owners.
 - The exact partition assigns all 178 selected exported Rust API items. Of 540 relevant pinned-upstream records, 328 are ported through exact Rust ownership, 12 remain explicit semantic-mining references, and 200 are deferred with Python bindings or the public interactive graph and vector simulator products.
 - Schema-version-2 `oracle/qualification-cases.json` mappings reuse canonical implemented or evidence-close blocker, oracle, and Rust-regression parents without duplicating terminal selectors. Explicit 64-bit, 128-bit, and 256-bit family declarations expand to exact upstream symbols and reject missing, duplicate, or unsupported word sizes.
-- Focused qualification tests cover the 81-gate registry, exact name lookup and rejection, unitary and decomposition metadata, gate-target text and values, target accessors, inversion, and target classification. Canonical gate semantic tests cover deterministic and noisy measurement-only and measure-reset gates, pair and product measurements, Pauli channels, depolarization, correlated and heralded errors, annotations, classical controls, SPP families, rejection contracts, and reset postconditions.
+- Focused qualification tests cover the 81-gate registry, the ordered 82-entry canonical-name and per-name Stim hash table including `NOT_A_GATE`, exact name lookup and rejection, unitary and decomposition metadata, gate-target text and values, target accessors, inversion, and target classification. Canonical gate semantic tests cover deterministic and noisy measurement-only and measure-reset gates, pair and product measurements, Pauli channels, depolarization, correlated and heralded errors, annotations, classical controls, SPP families, rejection contracts, and reset postconditions.
 - Nine broad imported gate fixtures remain supporting provenance on exact canonical parents instead of becoming atomic primary evidence. C++ storage-layout and helper-only tests are not applicable, Python object-shape behavior remains deferred with Python bindings, and public graph and vector simulator tests remain deferred with those explicitly excluded products.
 - Review exposed two evidence loopholes and closed them in focused tests: noisy X/Y/Z evidence now exercises both measurement-only and measure-reset gates, and annotation evidence now exercises Pauli-target observable semantics in all three bases.
 - The first clean PR execution correctly rejected those broadened noisy X/Y/Z tests because the blocker ledger and core plan still declared one 100,000-shot comparison while each selector emitted two. Both source-owned plans now declare two independent comparisons and two shot batches, the helper asserts that contract locally, and no controller relaxation was made.
@@ -106,12 +106,12 @@ The dependent PQ0 inventory was regenerated because circuit owner ids, upstream 
 | `CQ-STIM-FORMAT` | 29 | 0 | 29 |
 | `CQ-DEM-FORMAT` | 28 | 0 | 28 |
 | `CQ-RESULT-FORMATS` | 39 | 0 | 39 |
-| `CQ-GATE-CONTRACT` | 59 | 0 | 59 |
+| `CQ-GATE-CONTRACT` | 60 | 0 | 60 |
 | `CQ-BIT-KERNELS` | 12 | 0 | 12 |
 | `CQ-CIRCUIT-API` | 24 | 0 | 24 |
 | `CQ-GENERATION` | 25 | 0 | 25 |
 | `CQ-ALGEBRA` | 54 | 0 | 54 |
-| **CQ2 total** | **270** | **0** | **270** |
+| **CQ2 total** | **271** | **0** | **271** |
 
 These counts are independently selectable exact evidence parents, not raw upstream subcase or exported-API counts. A reviewed parent may own several upstream records or API items only when its one exact selector proves their complete common contract.
 
@@ -129,7 +129,7 @@ Offline report regeneration passed for all three artifacts. PR, full, and soak e
 
 ## Historical Clean Generation-Refined Correctness Evidence
 
-All three reports bind historical correctness inventory digest `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`, Stim v1.16.0 commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, Stab revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`, and `local_modifications=false`. They must not be promoted as evidence for the current Algebra-refined digest.
+All three reports bind historical correctness inventory digest `d89a5f9eaba428fb72741c66ad74226820660e25e949123871c6c7ab86f82dd6`, Stim v1.16.0 commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`, Stab revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b`, and `local_modifications=false`. They must not be promoted as evidence for the current gate-hash-refined digest.
 
 | Tier | Selected | Passed | Failed | Artifact | Request digest | Report digest | Completion digest |
 | --- | ---: | ---: | ---: | --- | --- | --- | --- |
@@ -153,7 +153,7 @@ All reports use schema version 13, the previous Generation-refined correctness a
 
 ## Verification
 
-Passing checks for completed CQ2:
+Historical completion commands for the preceding 270-parent CQ2 inventory are retained below. The source-current hash owner and regenerated inventory checks pass locally; clean exact execution for the new owner remains pending until the implementation is committed.
 
 ```sh
 cargo fmt --all --check
@@ -179,8 +179,8 @@ just qualification::correctness-preflight --out target/qualification/cq2-determi
 just maintenance::pre-commit
 ```
 
-The clean PR, full, soak, offline-report, and exact-preflight artifacts above are authoritative for the final CQ2 digest recorded in this report. The historical dependent PQ1 artifacts remain harness evidence only and do not qualify CQ2 product performance.
+The clean PR, full, soak, offline-report, and exact-preflight artifacts above are historical evidence for their recorded inventories, not authoritative evidence for the current 271-parent digest. The historical dependent PQ1 artifacts remain harness evidence only and do not qualify CQ2 product performance.
 
 ## Next Milestone
 
-CQ2 has no remaining planned owner or evidence blocker. The active program milestone is PQ2: create equivalent-work paired performance groups for these 270 completed deterministic parents, bind every group to exact current-digest correctness preflight and output evidence, add complete scale families, and preserve every slow, noisy, or no-faithful-comparator outcome without weakening the 1.25x target.
+CQ2 has no remaining planned owner or evidence blocker. The active program milestone is PQ2: create equivalent-work paired performance groups for these 271 completed deterministic parents, bind every group to exact current-digest correctness preflight and output evidence, add complete scale families, and preserve every slow, noisy, or no-faithful-comparator outcome without weakening the 1.25x target.

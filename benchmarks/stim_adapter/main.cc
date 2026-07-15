@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <bit>
 #include <charconv>
 #include <chrono>
@@ -17,8 +18,10 @@
 #include <string>
 #include <string_view>
 #include <sstream>
+#include <vector>
 
 #include "stim/circuit/circuit.h"
+#include "stim/gates/gates.h"
 
 #ifndef STAB_STIM_COMMIT
 #error "STAB_STIM_COMMIT must identify the pinned Stim source"
@@ -96,7 +99,9 @@ Arguments parse_arguments(int argc, const char **argv) {
     const bool circuit_parse = result.workload == "circuit-parse" && result.measurement_id == "parse";
     const bool circuit_canonical_print =
         result.workload == "circuit-canonical-print" && result.measurement_id == "serialize";
-    if (!protocol_smoke && !circuit_parse && !circuit_canonical_print) {
+    const bool gate_name_hash =
+        result.workload == "gate-name-hash" && result.measurement_id == "hash-all-names";
+    if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !gate_name_hash) {
         throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
@@ -221,6 +226,50 @@ std::string circuit_canonical_print(uint64_t iterations, const stim::Circuit &ci
     return canonical;
 }
 
+std::vector<std::string> gate_hash_names() {
+    std::vector<std::string> names;
+    names.reserve(stim::GATE_DATA.items.size());
+    for (const auto &gate : stim::GATE_DATA.items) {
+        names.emplace_back(gate.name);
+    }
+    return names;
+}
+
+uint64_t gate_table_digest(const std::vector<std::string> &names) {
+    uint64_t digest = 0xcbf29ce484222325ULL;
+    for (const auto &name : names) {
+        for (const auto byte : name) {
+            digest ^= static_cast<uint8_t>(byte);
+            digest *= 0x100000001b3ULL;
+        }
+        digest *= 0x100000001b3ULL;
+        const uint16_t hash = stim::gate_name_to_hash(name);
+        digest ^= static_cast<uint8_t>(hash);
+        digest *= 0x100000001b3ULL;
+        digest ^= static_cast<uint8_t>(hash >> 8);
+        digest *= 0x100000001b3ULL;
+    }
+    return digest;
+}
+
+std::array<uint64_t, 4> gate_name_hash(
+    uint64_t iterations,
+    uint64_t work_items,
+    uint64_t sweeps,
+    const std::vector<std::string> &names,
+    uint64_t table_digest) {
+    uint64_t checksum = 0;
+    for (uint64_t iteration = 0; iteration < iterations; ++iteration) {
+        for (uint64_t sweep = 0; sweep < sweeps; ++sweep) {
+            std::atomic_signal_fence(std::memory_order_seq_cst);
+            for (const auto &name : names) {
+                checksum += stim::gate_name_to_hash(name);
+            }
+        }
+    }
+    return {checksum, iterations, work_items, table_digest};
+}
+
 std::array<uint64_t, 4> byte_digest(std::string_view bytes) {
     std::array<uint64_t, 4> state{
         0x6a09e667f3bcc908ULL,
@@ -271,6 +320,20 @@ int main(int argc, const char **argv) {
             arguments.workload == "circuit-canonical-print"
                 ? std::optional<stim::Circuit>(stim::Circuit(circuit_fixture))
                 : std::nullopt;
+        const std::optional<std::vector<std::string>> gate_names =
+            arguments.workload == "gate-name-hash"
+                ? std::optional<std::vector<std::string>>(gate_hash_names())
+                : std::nullopt;
+        std::optional<uint64_t> gate_sweeps;
+        std::optional<uint64_t> gate_digest;
+        if (gate_names.has_value()) {
+            if (gate_names->empty() || arguments.work_items % gate_names->size() != 0) {
+                throw std::invalid_argument(
+                    "gate-name-hash work count is not a complete gate-table sweep");
+            }
+            gate_sweeps = arguments.work_items / gate_names->size();
+            gate_digest = gate_table_digest(gate_names.value());
+        }
 
         if (arguments.start_barrier) {
             wait_for_start_barrier();
@@ -289,8 +352,17 @@ int main(int argc, const char **argv) {
             digest_state = protocol_smoke(arguments.iterations, arguments.work_items);
         } else if (arguments.workload == "circuit-parse") {
             parsed = circuit_parse(arguments.iterations, circuit_fixture);
-        } else {
+        } else if (arguments.workload == "circuit-canonical-print") {
             canonical = circuit_canonical_print(arguments.iterations, canonical_print_circuit.value());
+        } else if (arguments.workload == "gate-name-hash") {
+            digest_state = gate_name_hash(
+                arguments.iterations,
+                arguments.work_items,
+                gate_sweeps.value(),
+                gate_names.value(),
+                gate_digest.value());
+        } else {
+            throw std::invalid_argument("unreachable registered adapter workload");
         }
         const auto finished = std::chrono::steady_clock::now();
         if (arguments.workload == "circuit-parse") {

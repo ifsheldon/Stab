@@ -499,6 +499,28 @@ mod tests {
                         sha256: Sha256Digest::try_new("d".repeat(64)).expect("note digest"),
                     }),
                 },
+                GroupContract {
+                    id: ProtocolId::try_new(super::super::invocation::GATE_NAME_HASH_GROUP_ID)
+                        .expect("group id"),
+                    claim_class: ClaimClass::PromotablePerformance,
+                    baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                    workload_id: ProtocolId::try_new("gate-name-hash").expect("workload id"),
+                    measurement_ids: vec![
+                        ProtocolId::try_new("hash-all-names").expect("measurement id"),
+                    ],
+                    scales: vec![ScaleContract {
+                        id: ProtocolId::try_new("small").expect("scale id"),
+                        work_items: NonZeroU64::new(82).expect("positive work"),
+                        input_bytes: 0,
+                        input_digest: InputDigest::try_new(
+                            "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1",
+                        )
+                        .expect("empty input digest"),
+                    }],
+                    correctness_case_ids: vec!["cq-evidence-gate-name-hash".to_string()],
+                    owner: ProtocolId::try_new("stab-core/gates").expect("owner"),
+                    profiler_note: None,
+                },
             ],
         }
     }

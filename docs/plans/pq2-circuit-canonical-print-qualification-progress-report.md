@@ -1,5 +1,7 @@
 # PQ2 Circuit Canonical Print Qualification Progress Report
 
+> Current-evidence note, 2026-07-16: this report remains historical passing AArch64 evidence at performance inventory `f3c4009044b0bafcd877f76798c7f4f08c475c0877b85f68d22ae0449e3ddb8f`. Graduating `PERFQ-M4-GATE-LOOKUP` changed the global performance inventory and shared worker, and its exact hash owner later changed the correctness inventory; no claim in this report has been silently promoted to either current inventory.
+
 ## Status
 
 The second PQ2 product group, `PERFQ-M4-CIRCUIT-CANONICAL-PRINT`, passes the unchanged `1.25x` timing gate at every full and soak scale on the controlled Linux AArch64 host as of 2026-07-15.

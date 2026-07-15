@@ -4514,6 +4514,37 @@
       ]
     },
     {
+      "id": "cq2-gate-name-hash-contract",
+      "feature_id": "CQ-GATE-CONTRACT",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "gate_hash",
+          "gate_name_hash_matches_exact_stim_v116_gate_table",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact Stim v1.16.0 hash corpus contains 82 fixed names and expected values, including NOT_A_GATE, and does not grow with caller input."
+      },
+      "negative_axes": [
+        "missing-sentinel",
+        "wrong-gate-order",
+        "wrong-per-name-hash",
+        "canonical-hash-collision"
+      ],
+      "standalone": true
+    },
+    {
       "id": "cq2-gate-unitary-matrix-contract",
       "feature_id": "CQ-GATE-CONTRACT",
       "comparator": "state-equivalence",

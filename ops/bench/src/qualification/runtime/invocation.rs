@@ -20,11 +20,13 @@ const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
 const IDENTITY_PROBE_TIMEOUT: Duration = Duration::from_secs(30);
 const CAP_REJECTION_TIMEOUT: Duration = Duration::from_secs(5);
 const FIRST_UNSUPPORTED_CIRCUIT_INSTRUCTIONS: &str = "1000001";
+const FIRST_PARTIAL_GATE_SWEEP_WORK_ITEMS: &str = "83";
 const EMPTY_PROTOCOL_INPUT_DIGEST: &str =
     "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 pub(super) const PQ1_GROUP_ID: &str = "pq1-adapter-protocol-smoke";
 pub(super) const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 pub(super) const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
+pub(super) const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
 
 pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
     let identity = (
@@ -45,11 +47,14 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
                 || (group == CIRCUIT_CANONICAL_PRINT_GROUP_ID
                     && workload == "circuit-canonical-print"
                     && measurement == "serialize")
+                || (group == GATE_NAME_HASH_GROUP_ID
+                    && workload == "gate-name-hash"
+                    && measurement == "hash-all-names")
     )
 }
 
 pub(super) const fn registered_group_count() -> usize {
-    3
+    4
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -274,6 +279,8 @@ impl PreparedWorkers {
         self.invoke_identity_probe(Implementation::Stab, Some(&stim_output))?;
         self.invoke_cap_rejection(Implementation::Stim)?;
         self.invoke_cap_rejection(Implementation::Stab)?;
+        self.invoke_gate_partial_sweep_rejection(Implementation::Stim)?;
+        self.invoke_gate_partial_sweep_rejection(Implementation::Stab)?;
         Ok(())
     }
 
@@ -390,6 +397,49 @@ impl PreparedWorkers {
         checked_cap_rejection(output, implementation)
     }
 
+    fn invoke_gate_partial_sweep_rejection(
+        &self,
+        implementation: Implementation,
+    ) -> Result<(), InvocationError> {
+        let mut arguments = vec![
+            OsString::from("--workload"),
+            OsString::from("gate-name-hash"),
+            OsString::from("--measurement-id"),
+            OsString::from("hash-all-names"),
+            OsString::from("--iterations"),
+            OsString::from("1"),
+            OsString::from("--work-items"),
+            OsString::from(FIRST_PARTIAL_GATE_SWEEP_WORK_ITEMS),
+            OsString::from("--evidence-mode"),
+            OsString::from("timing"),
+            OsString::from("--start-barrier"),
+            OsString::from("true"),
+        ];
+        let program = match implementation {
+            Implementation::Stim => self.adapter.path.clone(),
+            Implementation::Stab => {
+                arguments.insert(0, OsString::from("qualification-worker"));
+                self.worker.program()
+            }
+        };
+        let output = run_bounded_process(&ProcessRequest {
+            program,
+            args: arguments,
+            stdin: Vec::new(),
+            working_directory: self.root.clone(),
+            environment: worker_environment(),
+            affinity_cpu: None,
+            limits: ProcessLimits {
+                stdin_bytes: 0,
+                stdout_bytes: PROTOCOL_OUTPUT_LIMIT,
+                stderr_bytes: 64 << 10,
+                regular_file_bytes: None,
+                timeout: CAP_REJECTION_TIMEOUT,
+            },
+        })?;
+        checked_gate_partial_sweep_rejection(output, implementation)
+    }
+
     pub(crate) fn verify(&self) -> Result<(), InvocationError> {
         self.adapter.verify()?;
         self.worker
@@ -473,6 +523,34 @@ fn checked_cap_rejection(
     Ok(())
 }
 
+fn checked_gate_partial_sweep_rejection(
+    output: ProcessResult,
+    implementation: Implementation,
+) -> Result<(), InvocationError> {
+    let (expected_status, expected_stderr) = match implementation {
+        Implementation::Stim => (
+            Some(2),
+            "stim qualification adapter: gate-name-hash work count is not a complete gate-table sweep\n",
+        ),
+        Implementation::Stab => (
+            Some(1),
+            "[stab-bench] ERROR: performance qualification validation failed:\ngate-name-hash work count 83 is not a complete sweep of 82 names\n",
+        ),
+    };
+    if output.status != expected_status
+        || !output.stdout.is_empty()
+        || output.stderr != expected_stderr.as_bytes()
+    {
+        return Err(InvocationError::GatePartialSweepRejection {
+            implementation,
+            status: output.status,
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
+    }
+    Ok(())
+}
+
 fn worker_environment() -> Vec<(OsString, OsString)> {
     vec![
         (OsString::from("LANG"), OsString::from("C")),
@@ -546,6 +624,15 @@ pub(crate) enum InvocationError {
         "{implementation} did not reject the first unsupported circuit-parse scale before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
     )]
     CapRejection {
+        implementation: Implementation,
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
+    #[error(
+        "{implementation} did not reject a partial gate-name-hash sweep before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
+    )]
+    GatePartialSweepRejection {
         implementation: Implementation,
         status: Option<i32>,
         stdout: String,
@@ -646,6 +733,58 @@ mod tests {
             ),
             Err(InvocationError::CapRejection { .. })
         ));
+    }
+
+    #[test]
+    fn partial_gate_sweep_rejection_must_precede_the_start_barrier() {
+        let output = |status, stdout: &str, stderr: &str| ProcessResult {
+            status,
+            stdout: stdout.as_bytes().to_vec(),
+            stderr: stderr.as_bytes().to_vec(),
+            parent_observed_peak_rss_bytes: None,
+            wall_elapsed: Duration::from_millis(1),
+        };
+        checked_gate_partial_sweep_rejection(
+            output(
+                Some(2),
+                "",
+                "stim qualification adapter: gate-name-hash work count is not a complete gate-table sweep\n",
+            ),
+            Implementation::Stim,
+        )
+        .expect("adapter partial-sweep rejection");
+        checked_gate_partial_sweep_rejection(
+            output(
+                Some(1),
+                "",
+                "[stab-bench] ERROR: performance qualification validation failed:\ngate-name-hash work count 83 is not a complete sweep of 82 names\n",
+            ),
+            Implementation::Stab,
+        )
+        .expect("Stab partial-sweep rejection");
+
+        for rejected in [
+            output(
+                Some(2),
+                "",
+                "stim qualification adapter: start barrier must contain one newline\n",
+            ),
+            output(
+                Some(0),
+                "",
+                "stim qualification adapter: gate-name-hash work count is not a complete gate-table sweep\n",
+            ),
+            output(
+                Some(2),
+                "unexpected output\n",
+                "stim qualification adapter: gate-name-hash work count is not a complete gate-table sweep\n",
+            ),
+        ] {
+            assert!(matches!(
+                checked_gate_partial_sweep_rejection(rejected, Implementation::Stim),
+                Err(InvocationError::GatePartialSweepRejection { .. })
+            ));
+        }
     }
 
     #[test]
