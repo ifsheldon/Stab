@@ -397,7 +397,8 @@ fn run_sparse_reverse_frame_loop_row(row: &BenchmarkRow) -> Result<Vec<Measureme
     high_x
         .set(SPARSE_REVERSE_HIGH_IDLE_QUBITS - 1, PauliBasis::X)
         .map_err(|error| stab_runner_error(&row.id, error))?;
-    let high_idle_flows = [Flow::new(high_x.clone(), high_x, [], [])];
+    let high_idle_flows = [Flow::new(high_x.clone(), high_x, [], [])
+        .map_err(|error| stab_runner_error(&row.id, error))?];
     let shifted_circuit = Circuit::from_stim_str(&sparse_reverse_shifted_frame_loop_fixture())
         .map_err(|error| stab_runner_error(&row.id, error))?;
     let shifted_flows = [generated_z_prefix_flow(&row.id, &shifted_circuit)?];

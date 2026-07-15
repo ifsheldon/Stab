@@ -14,6 +14,10 @@ const MAX_RANDOM_TABLEAU_QUBITS: usize = 64;
 const MAX_STABILIZER_SOLVE_QUBITS: usize = 512;
 // Bounds cubic unitarity checks and the later matrix conjugation work.
 const MAX_UNITARY_MATRIX_DIMENSION: usize = 64;
+// Bounds canonicalization and storage for measurement and observable terms in one Flow value.
+const MAX_FLOW_CLASSICAL_TERMS: usize = 65_536;
+// Allows 64 hidden full-width repeat compositions at the 512-qubit dense Tableau limit.
+const MAX_CIRCUIT_TABLEAU_REPEAT_WORK: usize = 16_777_216;
 
 /// A deterministic materialization or work limit enforced by stabilizer-algebra APIs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -30,6 +34,10 @@ pub enum StabilizerResource {
     StabilizerSolveQubits,
     /// Rows and columns accepted by unitary-matrix conversion.
     UnitaryMatrixDimension,
+    /// Measurement and observable terms stored by one stabilizer flow.
+    FlowClassicalTerms,
+    /// Width-squared work units spent composing compact circuit repeats into a Tableau.
+    CircuitTableauRepeatWork,
 }
 
 impl StabilizerResource {
@@ -42,6 +50,8 @@ impl StabilizerResource {
             Self::RandomTableauQubits => MAX_RANDOM_TABLEAU_QUBITS,
             Self::StabilizerSolveQubits => MAX_STABILIZER_SOLVE_QUBITS,
             Self::UnitaryMatrixDimension => MAX_UNITARY_MATRIX_DIMENSION,
+            Self::FlowClassicalTerms => MAX_FLOW_CLASSICAL_TERMS,
+            Self::CircuitTableauRepeatWork => MAX_CIRCUIT_TABLEAU_REPEAT_WORK,
         }
     }
 
@@ -68,6 +78,8 @@ impl Display for StabilizerResource {
             Self::RandomTableauQubits => "random Tableau qubits",
             Self::StabilizerSolveQubits => "stabilizer-solve qubits",
             Self::UnitaryMatrixDimension => "unitary matrix dimension",
+            Self::FlowClassicalTerms => "flow classical terms",
+            Self::CircuitTableauRepeatWork => "circuit Tableau repeat work units",
         })
     }
 }

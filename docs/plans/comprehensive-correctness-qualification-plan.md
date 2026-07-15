@@ -318,14 +318,14 @@ Complete deterministic and property coverage for `CQ-STIM-FORMAT`, `CQ-DEM-FORMA
 - Add circuit and DEM folded-versus-unrolled properties and transform-preservation properties.
 - Add exact small generator goldens and structural larger generated-code checks.
 - Add algebra laws and scalar reference comparisons over boundary sizes around SIMD word widths.
-- Assign every Algebra materialization or bounded-algorithm API to exact accepted and first-rejected resource evidence. Prove collection stops on the first excess item, random rejection consumes no RNG state, circuit-derived conversion rejects before dense allocation, output-size accounting covers annotation-only identity flows, and unitary-dimension rejection precedes row-shape and numerical work.
+- Assign every Algebra materialization or bounded-algorithm API to exact accepted and first-rejected resource evidence. Prove collection stops on the first excess item, random rejection consumes no RNG state, circuit-derived conversion rejects before dense allocation, public Flow construction and parsing share one aggregate measurement-plus-observable-term contract, Flow multiplication applies cancellation before aggregate admission, compact circuit repeats have a width-weighted aggregate Tableau-composition budget, output-size accounting covers annotation-only identity flows, and unitary-dimension rejection precedes row-shape and numerical work.
 
 ### Tests
 
 - Exact pinned fixtures for canonical `.stim`, `.dem`, generated circuits, and each result format.
 - Property cases for parse-print-parse, format round trips, repeat folding, transform idempotence where contractual, Pauli and Tableau laws, and sparse-versus-dense agreement.
 - Negative cases for malformed syntax, invalid probabilities, bad target grouping, non-finite coordinates, count overflow, partial `ptb64` groups, invalid sparse indices, and excessive materialization.
-- Allocation and work-boundary cases for parser lines, nesting, result widths, flattening, coordinate maps, generator output admission, Algebra value construction and growth, dense Tableau and solver widths, iterator state, random Tableau work, unitary dimensions, and aggregate flow output.
+- Allocation and work-boundary cases for parser lines, nesting, result widths, flattening, coordinate maps, generator output admission, Algebra value construction and growth, aggregate Flow classical terms, dense Tableau and solver widths, compact-repeat Tableau composition, iterator state, random Tableau work, unitary dimensions, and aggregate generated-flow output.
 
 ### Acceptance Criteria
 

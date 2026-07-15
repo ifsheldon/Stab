@@ -36,7 +36,7 @@ fn pfm_b4_flow_solve_over_sixteen() {
     assert_eq!(solved, vec![Some(vec![32]), Some(vec![32])]);
     for (query, measurements) in queries.iter().zip(solved) {
         let measurements = measurements.expect("selected flow is solvable");
-        let candidate = Flow::new(
+        let candidate = new_flow(
             query.input().clone(),
             query.output().clone(),
             measurements,
@@ -107,8 +107,8 @@ fn pfm_b4_flow_solver_uses_implicit_sparse_query_identity_rows() {
         .expect("set high sparse query term");
     let identity = PauliString::identity(HIGH_QUBIT + 1).expect("wide Pauli identity");
     let queries = [
-        Flow::new(high_x.clone(), high_x.clone(), [], []),
-        Flow::new(identity, high_x, [], []),
+        new_flow(high_x.clone(), high_x.clone(), [], []),
+        new_flow(identity, high_x, [], []),
     ];
 
     assert_eq!(
@@ -161,7 +161,7 @@ fn pfm_b4_flow_solver_small_arbitrary_queries_match_exhaustive_checker() {
                 "solver/checker disagreement for {circuit_text:?} and {query}"
             );
             if let Some(measurements) = actual {
-                let candidate = Flow::new(
+                let candidate = new_flow(
                     query.input().clone(),
                     query.output().clone(),
                     measurements,
@@ -211,9 +211,9 @@ fn pfm_b4_flow_solver_handles_sparse_high_qubits_and_uses_pauli_projection() {
     z.set(1023, PauliBasis::Z).expect("set sparse Z term");
     let identity = PauliString::identity(1024).expect("Pauli identity");
     let queries = [
-        Flow::new(identity.clone(), z.clone(), [], []),
-        Flow::new(identity.clone(), z.clone(), [], [7]),
-        Flow::new(identity, z, [999], [7]),
+        new_flow(identity.clone(), z.clone(), [], []),
+        new_flow(identity.clone(), z.clone(), [], [7]),
+        new_flow(identity, z, [999], [7]),
     ];
 
     assert_eq!(
@@ -255,7 +255,7 @@ fn pfm_b4_flow_solver_generated_cross_engine_corpus() {
             for generator in generators.iter().filter(|flow| {
                 !flow.input().has_no_pauli_terms() || !flow.output().has_no_pauli_terms()
             }) {
-                let query = Flow::new(
+                let query = new_flow(
                     generator.input().clone(),
                     generator.output().clone(),
                     [],
@@ -272,7 +272,7 @@ fn pfm_b4_flow_solver_generated_cross_engine_corpus() {
                         "generated query was unexpectedly unsolved\n{text}\n{query}"
                     )));
                 };
-                let candidate = Flow::new(
+                let candidate = new_flow(
                     query.input().clone(),
                     query.output().clone(),
                     measurements,
@@ -325,7 +325,7 @@ fn two_qubit_unsigned_queries() -> Vec<Flow> {
             if input.has_no_pauli_terms() && output.has_no_pauli_terms() {
                 continue;
             }
-            queries.push(Flow::new(input.clone(), output.clone(), [], []));
+            queries.push(new_flow(input.clone(), output.clone(), [], []));
         }
     }
     queries
@@ -344,7 +344,7 @@ fn exhaustive_checker_solution(circuit: &Circuit, query: &Flow) -> Option<Vec<i3
             .filter(|index| mask & (1usize << index) != 0)
             .map(|index| i32::try_from(index).expect("small measurement index"))
             .collect::<Vec<_>>();
-        let candidate = Flow::new(
+        let candidate = new_flow(
             query.input().clone(),
             query.output().clone(),
             measurements.clone(),
@@ -359,6 +359,15 @@ fn exhaustive_checker_solution(circuit: &Circuit, query: &Flow) -> Option<Vec<i3
 
 fn circuit(text: &str) -> Circuit {
     Circuit::from_stim_str(text).expect("parse circuit")
+}
+
+fn new_flow(
+    input: PauliString,
+    output: PauliString,
+    measurements: impl IntoIterator<Item = i32>,
+    observables: impl IntoIterator<Item = u32>,
+) -> Flow {
+    Flow::new(input, output, measurements, observables).expect("test Flow stays within its limit")
 }
 
 fn flow(text: &str) -> Flow {

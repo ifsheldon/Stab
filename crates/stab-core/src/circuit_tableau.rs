@@ -16,11 +16,13 @@ pub fn circuit_to_tableau(
         .ensure(num_qubits)
         .map_err(|error| CircuitError::invalid_tableau_conversion(error.to_string()))?;
     let mut result = Tableau::identity_unchecked(num_qubits);
+    let mut repeat_work = TableauRepeatWork::default();
     apply_circuit_to_tableau(
         circuit,
         ignore_noise,
         ignore_measurement,
         ignore_reset,
+        &mut repeat_work,
         &mut result,
     )?;
     Ok(result)
@@ -31,6 +33,7 @@ fn apply_circuit_to_tableau(
     ignore_noise: bool,
     ignore_measurement: bool,
     ignore_reset: bool,
+    repeat_work: &mut TableauRepeatWork,
     result: &mut Tableau,
 ) -> CircuitResult<()> {
     for item in circuit.items() {
@@ -40,17 +43,29 @@ fn apply_circuit_to_tableau(
                 ignore_noise,
                 ignore_measurement,
                 ignore_reset,
+                repeat_work,
                 result,
             )?,
             CircuitItem::RepeatBlock(repeat) => {
-                for _ in 0..repeat.repeat_count().get() {
-                    apply_circuit_to_tableau(
-                        repeat.body(),
-                        ignore_noise,
-                        ignore_measurement,
-                        ignore_reset,
-                        result,
-                    )?;
+                let mut body = Tableau::identity_unchecked(result.len());
+                apply_circuit_to_tableau(
+                    repeat.body(),
+                    ignore_noise,
+                    ignore_measurement,
+                    ignore_reset,
+                    repeat_work,
+                    &mut body,
+                )?;
+                let identity = Tableau::identity_unchecked(result.len());
+                if body != identity {
+                    let repeated = tableau_power(&body, repeat.repeat_count().get(), repeat_work)?;
+                    if repeated != identity {
+                        if *result == identity {
+                            *result = repeated;
+                        } else {
+                            *result = compose_repeat_tableaus(result, &repeated, repeat_work)?;
+                        }
+                    }
                 }
             }
         }
@@ -63,38 +78,38 @@ fn apply_instruction_to_tableau(
     ignore_noise: bool,
     ignore_measurement: bool,
     ignore_reset: bool,
+    repeat_work: &mut TableauRepeatWork,
     result: &mut Tableau,
 ) -> CircuitResult<()> {
     let gate = instruction.gate();
+
+    if !ignore_measurement && gate.produces_measurements() {
+        return Err(CircuitError::invalid_tableau_conversion(format!(
+            "measurement operation {}",
+            gate.canonical_name()
+        )));
+    }
+    if !ignore_reset && gate.is_reset() {
+        return Err(CircuitError::invalid_tableau_conversion(format!(
+            "reset operation {}",
+            gate.canonical_name()
+        )));
+    }
+    if !ignore_noise && gate.is_noisy() && instruction.args().iter().any(|argument| *argument > 0.0)
+    {
+        return Err(CircuitError::invalid_tableau_conversion(format!(
+            "noisy operation {}",
+            gate.canonical_name()
+        )));
+    }
+
     match gate.category() {
-        GateCategory::Annotation => Ok(()),
-        GateCategory::Noise | GateCategory::HeraldedNoise => {
-            if ignore_noise || instruction.args().iter().all(|arg| *arg == 0.0) {
-                Ok(())
-            } else {
-                Err(CircuitError::invalid_tableau_conversion(format!(
-                    "noisy operation {}",
-                    gate.canonical_name()
-                )))
-            }
-        }
-        GateCategory::Collapsing | GateCategory::PairMeasurement => {
-            let name = gate.canonical_name();
-            let is_reset = matches!(name, "R" | "RX" | "RY" | "MR" | "MRX" | "MRY");
-            let is_measurement = matches!(
-                name,
-                "M" | "MX" | "MY" | "MR" | "MRX" | "MRY" | "MPAD" | "MXX" | "MYY" | "MZZ"
-            );
-            if (!is_reset || ignore_reset) && (!is_measurement || ignore_measurement) {
-                Ok(())
-            } else {
-                Err(CircuitError::invalid_tableau_conversion(format!(
-                    "non-unitary operation {}",
-                    gate.canonical_name()
-                )))
-            }
-        }
-        GateCategory::ControlFlow => Ok(()),
+        GateCategory::Annotation
+        | GateCategory::Collapsing
+        | GateCategory::ControlFlow
+        | GateCategory::HeraldedNoise
+        | GateCategory::Noise
+        | GateCategory::PairMeasurement => Ok(()),
         GateCategory::Controlled
         | GateCategory::HadamardLike
         | GateCategory::Pauli
@@ -107,11 +122,84 @@ fn apply_instruction_to_tableau(
             }
             Ok(())
         }
-        GateCategory::PauliProduct => Err(CircuitError::invalid_tableau_conversion(format!(
-            "unsupported unitary operation {}",
-            gate.canonical_name()
-        ))),
+        GateCategory::PauliProduct if !gate.is_unitary() => Ok(()),
+        GateCategory::PauliProduct => {
+            let decomposed = crate::circuit_simplify::decomposed_single_instruction(instruction)
+                .map_err(|error| CircuitError::invalid_tableau_conversion(error.to_string()))?;
+            apply_circuit_to_tableau(
+                &decomposed,
+                ignore_noise,
+                ignore_measurement,
+                ignore_reset,
+                repeat_work,
+                result,
+            )
+        }
     }
+}
+
+fn tableau_power(
+    base: &Tableau,
+    mut exponent: u64,
+    repeat_work: &mut TableauRepeatWork,
+) -> CircuitResult<Tableau> {
+    let identity = Tableau::identity_unchecked(base.len());
+    if exponent == 0 || *base == identity {
+        return Ok(identity);
+    }
+    let mut result = identity.clone();
+    let mut power = base.clone();
+    while exponent > 0 {
+        if exponent & 1 == 1 && power != identity {
+            result = if result == identity {
+                power.clone()
+            } else {
+                compose_repeat_tableaus(&result, &power, repeat_work)?
+            };
+        }
+        exponent >>= 1;
+        if exponent == 0 || power == identity {
+            break;
+        }
+        power = compose_repeat_tableaus(&power, &power, repeat_work)?;
+        if power == identity {
+            break;
+        }
+    }
+    Ok(result)
+}
+
+#[derive(Default)]
+struct TableauRepeatWork {
+    consumed: usize,
+}
+
+impl TableauRepeatWork {
+    fn charge_composition(&mut self, width: usize) -> CircuitResult<()> {
+        let width = width.max(1);
+        let cost = width.saturating_mul(width);
+        let requested = self.consumed.saturating_add(cost);
+        StabilizerResource::CircuitTableauRepeatWork
+            .ensure(requested)
+            .map_err(|error| CircuitError::invalid_tableau_conversion(error.to_string()))?;
+        self.consumed = requested;
+        Ok(())
+    }
+}
+
+fn compose_repeat_tableaus(
+    first: &Tableau,
+    second: &Tableau,
+    repeat_work: &mut TableauRepeatWork,
+) -> CircuitResult<Tableau> {
+    repeat_work.charge_composition(first.len())?;
+    compose_tableaus(first, second)
+}
+
+fn compose_tableaus(first: &Tableau, second: &Tableau) -> CircuitResult<Tableau> {
+    first
+        .then(second)
+        .map_err(|error| CircuitError::invalid_tableau_conversion(error.to_string()))
 }
 
 fn apply_unitary_group_to_tableau(
@@ -129,9 +217,7 @@ fn apply_unitary_group_to_tableau(
         )));
     }
     let expanded = scatter_tableau(&local, &target_ids, result.len())?;
-    *result = result
-        .then(&expanded)
-        .map_err(|error| CircuitError::invalid_tableau_conversion(error.to_string()))?;
+    *result = compose_tableaus(result, &expanded)?;
     Ok(())
 }
 

@@ -97,7 +97,7 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_valid_tableaus() {
 fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
     // Adapted from Stim v1.16.0 src/stim/util_top/stabilizers_to_tableau.test.cc fuzz coverage.
     let mut rng = SmallRng::seed_from_u64(0x57ab_1ea7);
-    for num_qubits in 0..8 {
+    for num_qubits in 0..10 {
         let source = Tableau::random(num_qubits, &mut rng).expect("random tableau");
         let stabilizers = (0..source.len())
             .map(|index| source.z_output(index).expect("source z").clone())
@@ -112,6 +112,26 @@ fn stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus() {
             );
         }
         assert!(actual.satisfies_invariants().expect("invariants"));
+
+        for skipped in 1..num_qubits.min(4) {
+            let kept = &stabilizers[..num_qubits - skipped];
+            assert!(stabilizers_to_tableau(kept, false, false, false).is_err());
+            let completed = stabilizers_to_tableau(kept, false, true, false)
+                .expect("complete partial stabilizers");
+            for (index, expected) in kept.iter().enumerate() {
+                assert_eq!(completed.z_output(index).expect("completed z"), expected);
+            }
+            assert!(
+                completed
+                    .satisfies_invariants()
+                    .expect("completed invariants")
+            );
+            assert_eq!(
+                stabilizers_to_tableau(kept, false, true, true)
+                    .expect("inverse partial completion"),
+                completed.inverse().expect("expected completed inverse")
+            );
+        }
     }
 }
 

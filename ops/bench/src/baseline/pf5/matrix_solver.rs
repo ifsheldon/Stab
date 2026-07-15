@@ -279,8 +279,9 @@ fn build_case(
                 solution.iter().flatten().copied(),
                 [],
             )
+            .map_err(|error| stab_runner_error(row_id, error))
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, _>>()?;
     if check_if_circuit_has_unsigned_stabilizer_flows(&circuit, &solved_flows)
         .iter()
         .any(|valid| !valid)
@@ -530,12 +531,13 @@ fn generator_queries(
                     ),
                 });
             }
-            Ok(Flow::new(
+            Flow::new(
                 composed.input().clone(),
                 composed.output().clone(),
                 [],
                 [],
-            ))
+            )
+            .map_err(|error| stab_runner_error(row_id, error))
         })
         .collect()
 }

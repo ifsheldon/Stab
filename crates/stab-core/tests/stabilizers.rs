@@ -12,6 +12,7 @@ use rand::rngs::SmallRng;
 use stab_core::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Gate, PauliBasis, PauliPhase,
     PauliString, PauliStringIterator, SingleQubitClifford, Tableau, TableauIterator,
+    unitary_to_tableau,
 };
 
 #[test]
@@ -473,8 +474,35 @@ fn stabilizers_clifford_string_concat_repeat_and_padding_are_stim_like() {
 #[test]
 fn stabilizers_single_qubit_clifford_multiplication_is_associative() {
     let gates = SingleQubitClifford::all().collect::<Vec<_>>();
-    for left in gates.iter().copied() {
-        for middle in gates.iter().copied() {
+    let tableaus = gates
+        .iter()
+        .map(|gate| {
+            let matrix = Gate::from_name(gate.canonical_name())
+                .expect("single-qubit gate")
+                .unitary_matrix()
+                .expect("single-qubit Clifford matrix")
+                .to_vecs();
+            unitary_to_tableau(&matrix, true).expect("single-qubit Clifford Tableau")
+        })
+        .collect::<Vec<_>>();
+
+    for (left_index, left) in gates.iter().copied().enumerate() {
+        for (middle_index, middle) in gates.iter().copied().enumerate() {
+            let product = left.multiply(middle).expect("Clifford product");
+            let product_index = gates
+                .iter()
+                .position(|candidate| *candidate == product)
+                .expect("product in Clifford group");
+            assert_eq!(
+                tableaus[middle_index]
+                    .then(&tableaus[left_index])
+                    .expect("Tableau product"),
+                tableaus[product_index],
+                "{} * {}",
+                left.canonical_name(),
+                middle.canonical_name()
+            );
+
             for right in gates.iter().copied() {
                 let lhs = left
                     .multiply(middle)
@@ -542,6 +570,27 @@ fn stabilizers_pauli_random_hook_is_seeded_and_well_formed() {
 fn stabilizers_clifford_random_hook_covers_single_qubit_cliffords() {
     // Adapted from Stim v1.16.0 src/stim/stabilizers/clifford_string.test.cc random.
     let gates = upstream_clifford_gate_order();
+    let mut direct_first_rng = SmallRng::seed_from_u64(0xc11f_f07d);
+    let mut direct_second_rng = SmallRng::seed_from_u64(0xc11f_f07d);
+    let mut direct_counts = vec![0usize; gates.len()];
+    for _ in 0..16_384 {
+        let first = SingleQubitClifford::random(&mut direct_first_rng);
+        let second = SingleQubitClifford::random(&mut direct_second_rng);
+        assert_eq!(first, second);
+        let count_index = gates
+            .iter()
+            .position(|candidate| *candidate == first)
+            .expect("direct random gate is in upstream Clifford set");
+        direct_counts[count_index] += 1;
+    }
+    let direct_expected = 16_384.0 / 24.0;
+    for (gate, count) in gates.iter().copied().zip(direct_counts) {
+        assert!(
+            (direct_expected * 0.5) < count as f64 && (count as f64) < (direct_expected * 1.5),
+            "direct {gate:?} count {count} outside broad uniformity band around {direct_expected}"
+        );
+    }
+
     let mut rng = SmallRng::seed_from_u64(0xc11f_f07d);
     let mut cliffords = CliffordString::random(128, &mut rng).expect("random Clifford string");
     let mut counts = vec![0usize; gates.len()];
@@ -569,31 +618,18 @@ fn stabilizers_clifford_random_hook_covers_single_qubit_cliffords() {
 
 #[test]
 fn stabilizers_tableau_random_hook_is_seeded_and_preserves_invariants() {
-    // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc random and inverse.
-    for num_qubits in [0, 1, 2, 3, 8] {
+    // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc random.
+    for num_qubits in [0, 1, 2, 3, 30] {
         let mut first_rng = SmallRng::seed_from_u64(0x007a_b1ea + num_qubits as u64);
         let mut second_rng = SmallRng::seed_from_u64(0x007a_b1ea + num_qubits as u64);
-        let first = Tableau::random(num_qubits, &mut first_rng).expect("random tableau");
-        let second = Tableau::random(num_qubits, &mut second_rng).expect("random tableau");
+        for _ in 0..20 {
+            let first = Tableau::random(num_qubits, &mut first_rng).expect("random tableau");
+            let second = Tableau::random(num_qubits, &mut second_rng).expect("random tableau");
 
-        assert_eq!(first, second);
-        assert_eq!(first.len(), num_qubits);
-        assert!(first.satisfies_invariants().expect("tableau invariants"));
-
-        let inverse = first.inverse().expect("inverse");
-        assert!(
-            inverse
-                .satisfies_invariants()
-                .expect("inverse tableau invariants")
-        );
-        assert_eq!(
-            first.then(&inverse).expect("tableau then inverse"),
-            Tableau::identity(num_qubits).expect("Tableau identity")
-        );
-        assert_eq!(
-            inverse.then(&first).expect("inverse then tableau"),
-            Tableau::identity(num_qubits).expect("Tableau identity")
-        );
+            assert_eq!(first, second);
+            assert_eq!(first.len(), num_qubits);
+            assert!(first.satisfies_invariants().expect("tableau invariants"));
+        }
     }
 
     let mut rng = SmallRng::seed_from_u64(0x071a_b1ea);
@@ -673,10 +709,44 @@ fn stabilizers_tableau_eval_matches_stim_examples() {
 #[test]
 fn stabilizers_tableau_then_and_pauli_product_round_trip_match_stim() {
     // Adapted from Stim v1.16.0 src/stim/stabilizers/tableau.test.cc then and from_pauli_string.
+    let empty = Tableau::identity(0).expect("empty Tableau");
+    assert_eq!(empty.then(&empty).expect("empty composition"), empty);
+
     let cnot = cnot_tableau();
     assert_eq!(
         cnot.then(&cnot).expect("cnot twice"),
         Tableau::identity(2).expect("Tableau identity")
+    );
+
+    let hh = Tableau::gate2("+Z_", "+X_", "+_Z", "+_X").expect("H tensor H");
+    let swap = Tableau::gate2("+_X", "+_Z", "+X_", "+Z_").expect("SWAP");
+    assert_eq!(
+        hh.then(&cnot)
+            .expect("HH then CNOT")
+            .then(&hh)
+            .expect("then HH"),
+        swap.then(&cnot)
+            .expect("SWAP then CNOT")
+            .then(&swap)
+            .expect("then SWAP")
+    );
+
+    let mut rng = SmallRng::seed_from_u64(0xc0a0_0517);
+    let first = Tableau::random(4, &mut rng).expect("first random Tableau");
+    let second = Tableau::random(4, &mut rng).expect("second random Tableau");
+    let input = PauliString::random(4, &mut rng).expect("random Pauli");
+    let composed = first.then(&second).expect("random composition");
+    assert_eq!(
+        composed.apply(&input).expect("composed action"),
+        second
+            .apply(&first.apply(&input).expect("first action"))
+            .expect("second action")
+    );
+    assert!(
+        Tableau::identity(3)
+            .expect("three-qubit Tableau")
+            .then(&Tableau::identity(4).expect("four-qubit Tableau"))
+            .is_err()
     );
 
     let pauli_string_empty = pauli("");
@@ -830,6 +900,12 @@ fn stabilizers_tableau_iter_commuting_pauli_iterator_constraints_match_stim() {
 
 #[test]
 fn stabilizers_tableau_iter_counts_match_stim() {
+    let iter0 = TableauIterator::new(0, false).expect("0q unsigned tableau iterator");
+    assert_eq!(iter0.count(), 1);
+
+    let iter0_signs = TableauIterator::new(0, true).expect("0q signed tableau iterator");
+    assert_eq!(iter0_signs.count(), 1);
+
     let iter1 = TableauIterator::new(1, false).expect("1q unsigned tableau iterator");
     assert_eq!(iter1.count(), 6);
 
@@ -838,6 +914,12 @@ fn stabilizers_tableau_iter_counts_match_stim() {
 
     let iter2 = TableauIterator::new(2, false).expect("2q unsigned tableau iterator");
     assert_eq!(iter2.count(), 720);
+}
+
+#[test]
+fn stabilizers_tableau_iter_unsigned_3q_count_matches_stim() {
+    let iter3 = TableauIterator::new(3, false).expect("3q unsigned tableau iterator");
+    assert_eq!(iter3.count(), 1_451_520);
 }
 
 #[test]

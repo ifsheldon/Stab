@@ -35,6 +35,70 @@ fn unitary_to_tableau_matches_known_gate_data_like_stim() {
 }
 
 #[test]
+fn tableau_inverse_matches_all_known_gate_data_and_word_boundary() {
+    let cases = known_unitary_gate_cases();
+    assert_eq!(cases.len(), 46);
+    for case in cases {
+        let tableau = case.expected_tableau();
+        let inverse = tableau.inverse().expect("known gate inverse");
+        let identity = Tableau::identity(tableau.len()).expect("gate identity");
+        assert_eq!(
+            tableau.then(&inverse).expect("gate then inverse"),
+            identity,
+            "{} right inverse",
+            case.name
+        );
+        assert_eq!(
+            inverse.then(&tableau).expect("inverse then gate"),
+            identity,
+            "{} left inverse",
+            case.name
+        );
+        for index in 0..tableau.len() {
+            assert_eq!(
+                inverse
+                    .apply(tableau.x_output(index).expect("gate X output"))
+                    .expect("inverse X action"),
+                identity.x_output(index).expect("identity X output").clone(),
+                "{} inverse X{index}",
+                case.name
+            );
+            assert_eq!(
+                inverse
+                    .apply(tableau.z_output(index).expect("gate Z output"))
+                    .expect("inverse Z action"),
+                identity.z_output(index).expect("identity Z output").clone(),
+                "{} inverse Z{index}",
+                case.name
+            );
+        }
+    }
+
+    let sign_only = Tableau::gate1("+X", "-Z").expect("signed Pauli Tableau");
+    assert_eq!(
+        sign_only
+            .inverse_skipping_signs()
+            .expect("sign-only inverse without signs"),
+        Tableau::identity(1).expect("unsigned identity")
+    );
+
+    let basis_changing = Tableau::gate1("-Y", "+Z").expect("signed phase Tableau");
+    let unsigned_inverse = basis_changing
+        .inverse_skipping_signs()
+        .expect("sign-skipping inverse");
+    assert_eq!(
+        unsigned_inverse,
+        Tableau::gate1("+Y", "+Z").expect("unsigned S inverse")
+    );
+
+    let wide_identity = Tableau::identity(65).expect("word-boundary identity");
+    assert_eq!(
+        wide_identity.inverse().expect("word-boundary inverse"),
+        wide_identity
+    );
+}
+
+#[test]
 fn gate_unitary_matrix_metadata_matches_known_gate_data_like_stim() {
     // Uses the same Stim v1.16.0 gate_data rows as the unitary-to-tableau parity test, but checks
     // exact matrix metadata instead of the global-phase-insensitive tableau action.

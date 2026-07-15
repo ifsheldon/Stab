@@ -230,11 +230,9 @@ fn reversed_target_groups(instruction: &CircuitInstruction) -> Vec<Target> {
 }
 
 fn reversed_pauli_only_flow(flow: &Flow) -> Flow {
-    Flow::new(
+    Flow::from_paulis(
         flow.output().with_sign(PauliSign::Plus),
         flow.input().with_sign(PauliSign::Plus),
-        [],
-        [],
     )
 }
 

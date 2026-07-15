@@ -193,30 +193,33 @@ pub(super) fn input_measurement_flow(
     record_index: usize,
     record_sign: PauliSign,
 ) -> CircuitResult<Flow> {
-    Ok(Flow::new(
+    Flow::new(
         single_pauli(qubit_count, qubit, basis),
         PauliString::from_bases_unchecked(record_sign, []),
         [record_index_i32(record_index)?],
         [],
-    ))
+    )
+    .map_err(stabilizer_to_circuit_error)
 }
 
 pub(super) fn positive_record_flow(record_index: usize) -> CircuitResult<Flow> {
-    Ok(Flow::new(
+    Flow::new(
         PauliString::identity_unchecked(0),
         PauliString::identity_unchecked(0),
         [record_index_i32(record_index)?],
         [],
-    ))
+    )
+    .map_err(stabilizer_to_circuit_error)
 }
 
 pub(super) fn negative_record_flow(record_index: usize) -> CircuitResult<Flow> {
-    Ok(Flow::new(
+    Flow::new(
         PauliString::identity_unchecked(0),
         PauliString::from_bases_unchecked(PauliSign::Minus, []),
         [record_index_i32(record_index)?],
         [],
-    ))
+    )
+    .map_err(stabilizer_to_circuit_error)
 }
 
 pub(super) fn pauli_basis(pauli: Pauli) -> PauliBasis {

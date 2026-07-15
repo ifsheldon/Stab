@@ -87,13 +87,14 @@ struct ReverseFlowState<'a> {
 }
 
 impl ReverseFlowState<'_> {
-    fn original_flow(&self) -> Flow {
+    fn original_flow(&self) -> CircuitResult<Flow> {
         Flow::new(
             self.input.clone(),
             self.output.clone(),
             self.measurements.iter().copied(),
             self.observables.iter().copied(),
         )
+        .map_err(|error| reverse_error(error.to_string()))
     }
 }
 
@@ -427,9 +428,10 @@ impl ReverseFlowEngine {
         let active = self.tracker.active_targets();
         if let Some(target) = active.first() {
             if let Some(state) = states.iter().find(|state| state.target == *target) {
+                let original_flow = state.original_flow()?;
                 return Err(reverse_error(format!(
                     "the circuit didn't satisfy one of the given flows (ignoring sign): {}",
-                    state.original_flow()
+                    original_flow
                 )));
             }
             return Err(reverse_error(format!(
@@ -453,12 +455,13 @@ impl ReverseFlowEngine {
                         output_measurement_index(measurement, self.new_measurement_count)
                     })
                     .collect::<CircuitResult<Vec<_>>>()?;
-                Ok(Flow::new(
+                Flow::new(
                     state.output.with_sign(PauliSign::Plus),
                     state.input.with_sign(PauliSign::Plus),
                     measurements,
                     [],
-                ))
+                )
+                .map_err(|error| reverse_error(error.to_string()))
             })
             .collect()
     }

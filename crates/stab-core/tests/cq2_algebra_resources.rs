@@ -4,7 +4,7 @@ use num_complex::Complex32;
 use rand::rngs::StdRng;
 use rand::{Rng as _, SeedableRng as _};
 use stab_core::{
-    Circuit, CircuitError, CliffordString, CommutingPauliStringIterator, FlexPauliString,
+    Circuit, CircuitError, CliffordString, CommutingPauliStringIterator, FlexPauliString, Flow,
     PauliBasis, PauliSign, PauliString, PauliStringIterator, SingleQubitClifford, StabilizerError,
     StabilizerResource, StabilizerResult, Tableau, TableauIterator, circuit_flow_generators,
     stabilizers_to_tableau, unitary_to_tableau,
@@ -31,6 +31,12 @@ fn cq2_algebra_pauli_materialization_has_a_typed_first_rejection() {
     assert_eq!(
         PauliString::identity(65_536).as_ref().map(PauliString::len),
         Ok(65_536)
+    );
+    assert_eq!(
+        PauliString::identity(resource.limit())
+            .as_ref()
+            .map(PauliString::len),
+        Ok(resource.limit())
     );
     assert_resource_limit(
         PauliString::identity(resource.limit() + 1),
@@ -142,9 +148,73 @@ fn cq2_algebra_clifford_growth_rejects_limits_and_overflow() {
 }
 
 #[test]
+#[allow(
+    clippy::expect_used,
+    reason = "the resource regression needs concrete accepted values before asserting boundaries"
+)]
+fn cq2_algebra_flow_terms_have_an_aggregate_typed_limit() {
+    let resource = StabilizerResource::FlowClassicalTerms;
+    let limit_i32 = i32::try_from(resource.limit()).expect("Flow term limit fits i32");
+    let identity = PauliString::identity(0).expect("empty Pauli");
+
+    let accepted = Flow::new(identity.clone(), identity.clone(), 0..limit_i32, [])
+        .expect("maximum Flow term count");
+    assert_eq!(accepted.measurements().count(), resource.limit());
+    let cancelled = accepted
+        .multiply(&accepted)
+        .expect("maximum overlapping Flow terms cancel");
+    assert_eq!(cancelled.measurements().count(), 0);
+
+    let limit_u32 = u32::try_from(resource.limit()).expect("Flow term limit fits u32");
+    let observable_only = Flow::new(identity.clone(), identity.clone(), [], 0..limit_u32)
+        .expect("maximum observable-only Flow term count");
+    assert_resource_limit(
+        accepted.multiply(&observable_only),
+        resource,
+        resource.limit() + 1,
+    );
+
+    assert_resource_limit(
+        Flow::new(identity.clone(), identity.clone(), 0..limit_i32, [0]),
+        resource,
+        resource.limit() + 1,
+    );
+
+    let consumed = Cell::new(0_usize);
+    let measurements = std::iter::from_fn(|| {
+        consumed.set(consumed.get() + 1);
+        Some(0)
+    });
+    assert_resource_limit(
+        Flow::new(identity.clone(), identity, measurements, []),
+        resource,
+        resource.limit() + 1,
+    );
+    assert_eq!(consumed.get(), resource.limit() + 1);
+
+    let oversized_text = format!(
+        "1 -> {}",
+        std::iter::repeat_n("rec[0]", resource.limit() + 1)
+            .collect::<Vec<_>>()
+            .join(" xor ")
+    );
+    assert_resource_limit(
+        oversized_text.parse::<Flow>(),
+        resource,
+        resource.limit() + 1,
+    );
+}
+
+#[test]
 fn cq2_algebra_tableau_admission_precedes_materialization_and_rng_use() {
     let tableau_resource = StabilizerResource::TableauQubits;
     assert_eq!(Tableau::identity(500).as_ref().map(Tableau::len), Ok(500));
+    assert_eq!(
+        Tableau::identity(tableau_resource.limit())
+            .as_ref()
+            .map(Tableau::len),
+        Ok(tableau_resource.limit())
+    );
     assert_resource_limit(
         Tableau::identity(tableau_resource.limit() + 1),
         tableau_resource,
@@ -167,23 +237,117 @@ fn cq2_algebra_tableau_admission_precedes_materialization_and_rng_use() {
 }
 
 #[test]
-fn cq2_algebra_circuit_tableau_and_flow_generation_reject_before_dense_work() {
-    let tableau_result = Circuit::from_stim_str("H 512\n")
+#[allow(
+    clippy::expect_used,
+    reason = "the admission regression needs concrete parsed circuits before measuring conversion work"
+)]
+fn cq2_algebra_circuit_tableau_and_flow_generation_admit_limits_before_dense_work() {
+    let accepted_tableau = Circuit::from_stim_str("H 511\n")
+        .and_then(|circuit| circuit.to_tableau(false, false, false))
+        .expect("maximum circuit-to-Tableau width");
+    assert_eq!(
+        accepted_tableau.len(),
+        StabilizerResource::TableauQubits.limit()
+    );
+
+    let rejected_tableau = Circuit::from_stim_str("H 512\n").expect("rejected-width circuit");
+    let tableau_allocations = allocation_counter::measure(|| {
+        let result = rejected_tableau.to_tableau(false, false, false);
+        assert!(matches!(
+            result,
+            Err(CircuitError::InvalidTableauConversion { ref message })
+                if message == "Tableau qubits request 513 exceeds limit 512"
+        ));
+        drop(std::hint::black_box(result));
+    });
+    assert!(
+        tableau_allocations.count_total <= 8
+            && tableau_allocations.bytes_total <= 1_024
+            && tableau_allocations.bytes_max <= 512,
+        "circuit-to-Tableau rejection performed dense work: {tableau_allocations:?}"
+    );
+
+    let accepted_flows = Circuit::from_stim_str("QUBIT_COORDS(0) 4095\n")
+        .and_then(|circuit| circuit_flow_generators(&circuit))
+        .expect("maximum ignored-only flow-generator width");
+    assert_eq!(accepted_flows.len(), 2 * 4096);
+
+    let rejected_flows =
+        Circuit::from_stim_str("QUBIT_COORDS(0) 4096\n").expect("rejected-width flow circuit");
+    let flow_allocations = allocation_counter::measure(|| {
+        let result = circuit_flow_generators(&rejected_flows);
+        assert!(matches!(
+            result,
+            Err(CircuitError::InvalidDomainValue {
+                kind: "ignored-only flow-generator Pauli bits",
+                ref value,
+            }) if value == "134283272 exceeds current limit 134217728"
+        ));
+        drop(std::hint::black_box(result));
+    });
+    assert!(
+        flow_allocations.count_total <= 8
+            && flow_allocations.bytes_total <= 1_024
+            && flow_allocations.bytes_max <= 512,
+        "flow-generator rejection performed dense work: {flow_allocations:?}"
+    );
+}
+
+#[test]
+#[allow(
+    clippy::expect_used,
+    reason = "the resource regression needs concrete Tableaus before asserting exact folding"
+)]
+fn cq2_algebra_circuit_tableau_repeat_work_is_logarithmic_and_bounded() {
+    let folded = Circuit::from_stim_str("H 0\nREPEAT 37 {\nS 0\nH 0\n}\nSQRT_X 0\n")
+        .and_then(|circuit| circuit.to_tableau(false, false, false))
+        .expect("folded noncommuting repeat");
+    let unrolled = Circuit::from_stim_str(&format!("H 0\n{}SQRT_X 0\n", "S 0\nH 0\n".repeat(37)))
+        .and_then(|circuit| circuit.to_tableau(false, false, false))
+        .expect("unrolled noncommuting repeat");
+    assert_eq!(folded, unrolled);
+
+    let huge_repeat =
+        Circuit::from_stim_str("REPEAT 1000000000001 {\nREPEAT 1000000000001 {\nH 0\n}\n}\n")
+            .expect("parse nested huge repeat");
+    let actual = huge_repeat
+        .to_tableau(false, false, false)
+        .expect("fold nested huge repeat");
+    let expected = Circuit::from_stim_str("H 0\n")
+        .and_then(|circuit| circuit.to_tableau(false, false, false))
+        .expect("H tableau");
+    assert_eq!(actual, expected);
+
+    let resource = StabilizerResource::CircuitTableauRepeatWork;
+    let width = StabilizerResource::TableauQubits.limit();
+    let work_per_composition = width * width;
+    let accepted_depth = resource.limit() / work_per_composition;
+    assert_eq!(resource.limit() % work_per_composition, 0);
+
+    let nested = |depth: usize| {
+        let mut body = "H 0\n".to_owned();
+        for _ in 0..depth {
+            body = format!("REPEAT 18446744073709551615 {{\n{body}}}\n");
+        }
+        format!("I 511\n{body}")
+    };
+    let accepted = Circuit::from_stim_str(&nested(accepted_depth))
+        .and_then(|circuit| circuit.to_tableau(false, false, false))
+        .expect("last accepted aggregate compact-repeat work");
+    let accepted_expected = Circuit::from_stim_str("I 511\nH 0\n")
+        .and_then(|circuit| circuit.to_tableau(false, false, false))
+        .expect("wide H tableau");
+    assert_eq!(accepted, accepted_expected);
+    let rejected = Circuit::from_stim_str(&nested(accepted_depth + 1))
         .and_then(|circuit| circuit.to_tableau(false, false, false));
     assert!(matches!(
-        tableau_result,
+        rejected,
         Err(CircuitError::InvalidTableauConversion { ref message })
-            if message.contains("Tableau qubits request 513 exceeds limit 512")
-    ));
-
-    let flow_result = Circuit::from_stim_str("QUBIT_COORDS(0) 4096\n")
-        .and_then(|circuit| circuit_flow_generators(&circuit));
-    assert!(matches!(
-        flow_result,
-        Err(CircuitError::InvalidDomainValue {
-            kind: "ignored-only flow-generator Pauli bits",
-            ..
-        })
+            if message == &format!(
+                "circuit Tableau repeat work units request {} exceeds limit {}",
+                resource.limit() + work_per_composition,
+                resource.limit()
+            )
     ));
 }
 

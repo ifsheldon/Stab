@@ -302,23 +302,19 @@ impl Gate {
         let tableau = self.tableau()?;
         let mut flows = Vec::with_capacity(tableau.len() * 2);
         for index in 0..tableau.len() {
-            flows.push(Flow::new(
+            flows.push(Flow::from_paulis(
                 single_pauli(tableau.len(), index, PauliBasis::X),
                 tableau
                     .x_output(index)
                     .map_err(stabilizer_to_circuit_error)?
                     .clone(),
-                [],
-                [],
             ));
-            flows.push(Flow::new(
+            flows.push(Flow::from_paulis(
                 single_pauli(tableau.len(), index, PauliBasis::Z),
                 tableau
                     .z_output(index)
                     .map_err(stabilizer_to_circuit_error)?
                     .clone(),
-                [],
-                [],
             ));
         }
         Ok(flows)

@@ -44,23 +44,58 @@ pub struct Flow {
 }
 
 impl Flow {
+    pub(crate) fn from_paulis(input: PauliString, output: PauliString) -> Self {
+        Self {
+            input,
+            output,
+            measurements: Vec::new(),
+            observables: Vec::new(),
+        }
+    }
+
+    /// Constructs a canonical stabilizer flow from Pauli and classical terms.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StabilizerError::ResourceLimitExceeded`] when the combined number of measurement
+    /// and observable terms exceeds [`super::StabilizerResource::FlowClassicalTerms`].
     pub fn new(
         input: PauliString,
         output: PauliString,
         measurements: impl IntoIterator<Item = i32>,
         observables: impl IntoIterator<Item = u32>,
-    ) -> Self {
+    ) -> StabilizerResult<Self> {
+        let measurements = measurements.into_iter();
+        let mut stored_measurements = Vec::with_capacity(
+            measurements
+                .size_hint()
+                .0
+                .min(super::StabilizerResource::FlowClassicalTerms.limit()),
+        );
+        for measurement in measurements {
+            ensure_additional_classical_term(stored_measurements.len(), 0)?;
+            stored_measurements.push(FlowMeasurementIndex::new(measurement));
+        }
+        let observables = observables.into_iter();
+        let mut stored_observables = Vec::with_capacity(
+            observables.size_hint().0.min(
+                super::StabilizerResource::FlowClassicalTerms
+                    .limit()
+                    .saturating_sub(stored_measurements.len()),
+            ),
+        );
+        for observable in observables {
+            ensure_additional_classical_term(stored_measurements.len(), stored_observables.len())?;
+            stored_observables.push(FlowObservableIndex(observable));
+        }
         let mut result = Self {
             input,
             output,
-            measurements: measurements
-                .into_iter()
-                .map(FlowMeasurementIndex::new)
-                .collect(),
-            observables: observables.into_iter().map(FlowObservableIndex).collect(),
+            measurements: stored_measurements,
+            observables: stored_observables,
         };
         result.canonicalize();
-        result
+        Ok(result)
     }
 
     pub fn input(&self) -> &PauliString {
@@ -85,12 +120,26 @@ impl Flow {
             .map(FlowObservableIndex::get)
     }
 
+    /// Multiplies two flows using Stim's signed-input representation convention.
+    ///
+    /// The returned flow preserves this flow's input sign and transfers the relative input/output
+    /// multiplication phase into its output sign.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StabilizerError::InvalidFlowProduct`] when the input and output products have an
+    /// imaginary relative phase, or [`StabilizerError::ResourceLimitExceeded`] when the resulting
+    /// classical terms exceed [`super::StabilizerResource::FlowClassicalTerms`].
     pub fn multiply(&self, rhs: &Self) -> StabilizerResult<Self> {
         let input_product = self.input.multiply(&rhs.input)?;
         let output_product = self.output.multiply(&rhs.output)?;
-        let phase_ratio = output_product
+        let input_phase_delta = input_product
             .phase()
-            .multiply(inverse_phase(input_product.phase()));
+            .multiply(inverse_phase(self.input.phase()));
+        let output_phase_delta = output_product
+            .phase()
+            .multiply(inverse_phase(self.output.phase()));
+        let phase_ratio = output_phase_delta.multiply(inverse_phase(input_phase_delta));
         if phase_ratio.is_imaginary() {
             return Err(StabilizerError::InvalidFlowProduct {
                 left: self.to_string(),
@@ -98,12 +147,23 @@ impl Flow {
             });
         }
 
-        let input = unsigned_pauli_from_flex(&input_product);
-        let output_sign = phase_ratio.sign();
+        // Stim keeps the left input sign as the representation anchor and transfers only the
+        // relative input/output multiplication phase into the output sign.
+        let input = unsigned_pauli_from_flex(&input_product).with_sign(self.input.sign());
+        let output_sign = if phase_ratio.sign().is_negative() {
+            toggled_sign(self.output.sign())
+        } else {
+            self.output.sign()
+        };
         let output = unsigned_pauli_from_flex(&output_product).with_sign(output_sign);
-        let measurements = self.measurements().chain(rhs.measurements());
-        let observables = self.observables().chain(rhs.observables());
-        Ok(Self::new(input, output, measurements, observables))
+        let measurements = xor_merge(&self.measurements, &rhs.measurements, 0)?;
+        let observables = xor_merge(&self.observables, &rhs.observables, measurements.len())?;
+        Ok(Self {
+            input,
+            output,
+            measurements,
+            observables,
+        })
     }
 
     fn canonicalize(&mut self) {
@@ -188,7 +248,7 @@ impl FromStr for Flow {
         if input_is_imaginary != output_is_imaginary {
             return Err(StabilizerError::AntiHermitianFlow);
         }
-        Ok(Self::new(input, output, measurements, observables))
+        Self::new(input, output, measurements, observables)
     }
 }
 
@@ -249,14 +309,78 @@ fn parse_classical_output_term(
     observables: &mut Vec<u32>,
 ) -> StabilizerResult<()> {
     if token.starts_with('r') {
+        ensure_additional_classical_term(measurements.len(), observables.len())?;
         measurements.push(parse_rec_index(token, original_text)?);
         Ok(())
     } else if token.starts_with('o') {
+        ensure_additional_classical_term(measurements.len(), observables.len())?;
         observables.push(parse_obs_index(token, original_text)?);
         Ok(())
     } else {
         Err(invalid_flow_text(original_text))
     }
+}
+
+fn ensure_additional_classical_term(
+    measurement_count: usize,
+    observable_count: usize,
+) -> StabilizerResult<()> {
+    let requested = measurement_count
+        .checked_add(observable_count)
+        .and_then(|count| count.checked_add(1))
+        .unwrap_or(usize::MAX);
+    super::StabilizerResource::FlowClassicalTerms.ensure(requested)
+}
+
+fn xor_merge<T: Copy + Ord>(
+    left: &[T],
+    right: &[T],
+    stored_before: usize,
+) -> StabilizerResult<Vec<T>> {
+    let remaining_capacity = super::StabilizerResource::FlowClassicalTerms
+        .limit()
+        .saturating_sub(stored_before);
+    let mut result = Vec::with_capacity(
+        left.len()
+            .saturating_add(right.len())
+            .min(remaining_capacity),
+    );
+    let mut left = left.iter().copied().peekable();
+    let mut right = right.iter().copied().peekable();
+    loop {
+        match (left.peek().copied(), right.peek().copied()) {
+            (None, None) => break,
+            (Some(value), None) => {
+                push_xor_term(&mut result, value, stored_before)?;
+                left.next();
+            }
+            (None, Some(value)) => {
+                push_xor_term(&mut result, value, stored_before)?;
+                right.next();
+            }
+            (Some(left_value), Some(right_value)) => match left_value.cmp(&right_value) {
+                Ordering::Less => {
+                    push_xor_term(&mut result, left_value, stored_before)?;
+                    left.next();
+                }
+                Ordering::Greater => {
+                    push_xor_term(&mut result, right_value, stored_before)?;
+                    right.next();
+                }
+                Ordering::Equal => {
+                    left.next();
+                    right.next();
+                }
+            },
+        }
+    }
+    Ok(result)
+}
+
+fn push_xor_term<T>(values: &mut Vec<T>, value: T, stored_before: usize) -> StabilizerResult<()> {
+    ensure_additional_classical_term(stored_before, values.len())?;
+    values.push(value);
+    Ok(())
 }
 
 fn parse_flow_pauli(text: &str, original_text: &str) -> StabilizerResult<(PauliString, bool)> {

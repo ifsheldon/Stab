@@ -32,7 +32,7 @@ pub(super) fn final_canonicalize_measurement_generators(
     }
 
     for flow in flows.iter_mut() {
-        *flow = flow_with_final_sign_and_trimmed_identities(flow);
+        *flow = flow_with_final_sign_and_trimmed_identities(flow)?;
     }
     flows.sort();
     Ok(())
@@ -81,7 +81,7 @@ fn rows_matching(flows: &[Flow], predicate: impl Fn(&Flow) -> bool) -> Vec<usize
         .collect()
 }
 
-fn flow_with_final_sign_and_trimmed_identities(flow: &Flow) -> Flow {
+fn flow_with_final_sign_and_trimmed_identities(flow: &Flow) -> CircuitResult<Flow> {
     let output_sign = xor_sign(flow.output().sign(), flow.input().sign());
     Flow::new(
         trimmed_pauli_with_sign(flow.input(), PauliSign::Plus),
@@ -89,6 +89,7 @@ fn flow_with_final_sign_and_trimmed_identities(flow: &Flow) -> Flow {
         flow.measurements(),
         flow.observables(),
     )
+    .map_err(stabilizer_to_circuit_error)
 }
 
 fn trimmed_pauli_with_sign(pauli: &PauliString, sign: PauliSign) -> PauliString {
