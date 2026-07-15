@@ -325,7 +325,7 @@ mod tests {
         let waivers = read_beta_waivers(&path).expect("read source-owned M12 beta waivers");
 
         assert_eq!(waivers.schema_version, 1);
-        assert_eq!(waivers.rows.len(), 5);
+        assert_eq!(waivers.rows.len(), 4);
     }
 
     fn row(

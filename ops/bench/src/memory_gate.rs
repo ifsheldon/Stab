@@ -433,7 +433,7 @@ mod tests {
             .join("../../benchmarks/m12-primary-memory-baseline.json");
         let baseline = super::read_memory_baseline(&path).expect("read M12 memory baseline");
 
-        assert_eq!(baseline.rows.len(), 85);
+        assert_eq!(baseline.rows.len(), 84);
         assert_eq!(baseline.schema_version, 2);
         assert!(
             baseline

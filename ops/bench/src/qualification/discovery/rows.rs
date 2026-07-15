@@ -159,8 +159,9 @@ pub(super) fn classify_phase(row: &BenchmarkRow) -> Phase {
 
 pub(super) fn row_decision(row: &BenchmarkRow) -> RowDecision {
     const REMOVED: [&str; 2] = ["m7-perf-harness", "m12-primary-performance-matrix"];
-    const SUPERSEDED: [&str; 5] = [
+    const SUPERSEDED: [&str; 6] = [
         "m10-analyze-errors-fold-cli",
+        "m4-circuit-canonical-print",
         "m9-feedback-inline-mpp-batch",
         "pf3-m2d-sweep-b8",
         "pf7-cli-m2d-sweep-b8",

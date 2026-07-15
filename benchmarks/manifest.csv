@@ -1,6 +1,6 @@
 id,milestone,threshold_class,runner,upstream_source,stim_perf_filter,argv,stdin_path,phase,measurement,description,comparability
 m4-circuit-parse,M4,report-only,stim-perf,src/stim/circuit/circuit.perf.cc,circuit_parse*,,,analysis,parser-throughput,.stim parser throughput including sparse circuits,direct-match
-m4-circuit-canonical-print,M4,report-only,contract-only,src/stim/circuit/circuit.test.cc,,,,analysis,canonical-print,.stim canonical print throughput contract,contract-only
+m4-circuit-canonical-print,M4,non-primary-report-only,contract-only,src/stim/circuit/circuit.test.cc,,,,analysis,canonical-print,.stim canonical print throughput contract superseded by PERFQ-M4-CIRCUIT-CANONICAL-PRINT,contract-only
 m9-convert-measurements-dets,M9,report-only,stim-cli,src/stim/cmd/command_convert.test.cc,,convert|--in_format=01|--out_format=dets|--circuit=oracle/fixtures/inputs/m2d_basic.stim|--types=M,oracle/fixtures/inputs/m2d_basic_measurements.01,throughput,convert-cli,measurement-to-dets CLI throughput through the implemented circuit plus --types convert layout,cli-baseline
 m4-gate-lookup,M4,report-only,stim-perf,src/stim/gates/gates.perf.cc,gate_data_hash_all_gate_names,,,analysis,gate-lookup,gate table lookup throughput,partial-match
 m8-probability-util,M8,report-only,stim-perf,src/stim/util_bot/probability_util.perf.cc,biased_random_1024_*,,,throughput,random-probability,biased random probability utility throughput,direct-match

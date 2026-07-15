@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "performance_inventory_sha256": "103085012b72133d7a20a7a7fb91ca7fe7cd357d59455695f7b3c79310b544d5",
+  "performance_inventory_sha256": "f3c4009044b0bafcd877f76798c7f4f08c475c0877b85f68d22ae0449e3ddb8f",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -86,7 +86,7 @@
       "owner": "stab-core/circuit-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m4-circuit-parse.md",
-        "sha256": "03c5bd352878c2bdb74695d0fad51e8a2f8db11dc0eae0472fa4ef5f4e4db784"
+        "sha256": "da819f8a2faeebfe7873db2b84cd090cae9853772b8ac756bb63eb86bd8d7a58"
       }
     }
   ]

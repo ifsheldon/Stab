@@ -8,12 +8,6 @@
       "stab_resident_delta_bytes_max": 28672
     },
     {
-      "id": "m4-circuit-canonical-print",
-      "stab_allocation_bytes_max": 200,
-      "stab_resident_bytes_max": 4591616,
-      "stab_resident_delta_bytes_max": 0
-    },
-    {
       "id": "m9-convert-measurements-dets",
       "stab_allocation_bytes_max": 88093,
       "stab_resident_bytes_max": 4857856,
