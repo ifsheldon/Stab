@@ -60,3 +60,25 @@ fn parse_common_detector_instruction(
         None,
     )))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::parse_common_plain_instruction;
+    use crate::circuit::parse_instruction_fully_generic;
+
+    #[test]
+    #[allow(
+        clippy::expect_used,
+        reason = "internal parser equivalence fixtures require both selected paths to succeed"
+    )]
+    fn exact_paths_match_fully_generic_instruction_parsing() {
+        for line in ["S 1", "TICK", "DETECTOR rec[-1]"] {
+            let fast = parse_common_plain_instruction(1, line)
+                .expect("selected exact fast path")
+                .expect("parse exact fast path");
+            let generic =
+                parse_instruction_fully_generic(1, line).expect("parse fully generic path");
+            assert_eq!(fast, generic, "{line}");
+        }
+    }
+}

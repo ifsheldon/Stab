@@ -174,12 +174,12 @@ fn cq2_stim_format_target_text_round_trip_matches_stim() {
     assert_eq!(Target::from_str("rec[-3]").unwrap(), record(-3));
     let parsed_zero = Target::from_str("rec[-0]").unwrap();
     assert_eq!(parsed_zero.to_string(), "rec[-0]");
-    assert_eq!(
-        parsed_zero
-            .measurement_record_offset()
-            .map(MeasureRecordOffset::get),
-        Some(0)
-    );
+    let parsed_zero_offset = parsed_zero
+        .measurement_record_offset()
+        .expect("negative-zero record offset");
+    assert_eq!(parsed_zero_offset.get(), 0);
+    assert_eq!(format!("{parsed_zero_offset:?}"), "MeasureRecordOffset(0)");
+    assert!(parsed_zero_offset > MeasureRecordOffset::try_new(-1).unwrap());
     assert_eq!(
         Target::from_str("y17").unwrap(),
         Target::pauli(Pauli::Y, QubitId::new(17).unwrap(), false)

@@ -959,7 +959,7 @@ impl SparseReverseFrameTracker {
                     "measurement record offset overflowed during sparse reverse tracking",
                 )
             })?;
-        if index < 0 || index >= measurement_count {
+        if index < 0 || index > measurement_count {
             return Err(CircuitError::invalid_detector_error_model(format!(
                 "measurement record offset rec[{offset}] is outside the sparse reverse tracker history"
             )));

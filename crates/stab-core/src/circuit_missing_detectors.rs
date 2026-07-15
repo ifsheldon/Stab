@@ -268,6 +268,9 @@ impl MissingDetectorFinder {
                     "DETECTOR target {target} is not a measurement record"
                 ))
             })?;
+            if offset.is_negative_zero() {
+                continue;
+            }
             let index = self.absolute_record_index(offset)?;
             row.toggle(index);
         }
@@ -290,6 +293,9 @@ impl MissingDetectorFinder {
         let mut row_delta = MeasurementRow::new();
         for target in instruction.targets() {
             if let Some(offset) = target.measurement_record_offset() {
+                if offset.is_negative_zero() {
+                    continue;
+                }
                 let index = self.absolute_record_index(offset)?;
                 row_delta.toggle(index);
             } else if target.is_pauli_target() {
@@ -323,7 +329,7 @@ impl MissingDetectorFinder {
         if index < 0 || index >= current {
             return Err(CircuitError::invalid_detector_error_model(format!(
                 "measurement record target rec[{}] is outside missing-detector analysis history",
-                offset.get()
+                offset.stim_text()
             )));
         }
         usize::try_from(index).map_err(|_| {

@@ -1025,13 +1025,13 @@ fn measurement_record_bit(
     let index = usize::try_from(index).map_err(|_| {
         CircuitError::invalid_result_format(format!(
             "measurement record target rec[{}] is not available",
-            offset.get()
+            offset.stim_text()
         ))
     })?;
     measurements.get(index).copied().ok_or_else(|| {
         CircuitError::invalid_result_format(format!(
             "measurement record target rec[{}] is not available",
-            offset.get()
+            offset.stim_text()
         ))
     })
 }

@@ -725,6 +725,14 @@ fn parse_instruction(line_number: usize, line: &str) -> CircuitResult<CircuitIns
     if let Some(instruction) = parse_simple_plain_instruction(line_number, name, rest) {
         return instruction;
     }
+    parse_instruction_fully_generic_from_parts(line_number, name, rest)
+}
+
+fn parse_instruction_fully_generic_from_parts(
+    line_number: usize,
+    name: &str,
+    rest: &str,
+) -> CircuitResult<CircuitInstruction> {
     let gate = Gate::from_name(name).map_err(|error| wrap_line(line_number, error))?;
     let (tag, rest) = parse_optional_tag(line_number, rest)?;
     let (args, rest) = parse_optional_args(line_number, rest)?;
@@ -734,6 +742,15 @@ fn parse_instruction(line_number: usize, line: &str) -> CircuitResult<CircuitIns
     Ok(CircuitInstruction::from_validated_parts(
         gate, args, targets, tag,
     ))
+}
+
+#[cfg(test)]
+fn parse_instruction_fully_generic(
+    line_number: usize,
+    line: &str,
+) -> CircuitResult<CircuitInstruction> {
+    let (name, rest) = parse_name(line_number, line)?;
+    parse_instruction_fully_generic_from_parts(line_number, name, rest)
 }
 
 fn parse_common_single_qubit_instruction(

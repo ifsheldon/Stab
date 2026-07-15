@@ -272,8 +272,7 @@ impl Display for Target {
                     write!(f, "{}", id.get())
                 }
             }
-            Self::MeasurementRecord { offset } if offset.get() == 0 => f.write_str("rec[-0]"),
-            Self::MeasurementRecord { offset } => write!(f, "rec[{}]", offset.get()),
+            Self::MeasurementRecord { offset } => write!(f, "rec[{}]", offset.stim_text()),
             Self::SweepBit { id } => write!(f, "sweep[{id}]"),
             Self::Pauli {
                 pauli,

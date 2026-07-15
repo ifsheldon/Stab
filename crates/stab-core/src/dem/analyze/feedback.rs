@@ -1,4 +1,6 @@
-use crate::{CircuitError, CircuitInstruction, CircuitResult, QubitId, Target};
+use crate::{
+    CircuitError, CircuitInstruction, CircuitResult, MeasureRecordOffset, QubitId, Target,
+};
 
 use super::{Analyzer, AnalyzerPauli, NoiseEffect, PendingError};
 
@@ -11,7 +13,7 @@ pub(super) enum ControlledPauliAction {
         right_basis: AnalyzerPauli,
     },
     MeasurementFeedback {
-        record_offset: i32,
+        record_offset: MeasureRecordOffset,
         qubit: QubitId,
         pauli: AnalyzerPauli,
     },
@@ -52,7 +54,7 @@ impl Analyzer {
 
     fn apply_measurement_feedback(
         &mut self,
-        record_offset: i32,
+        record_offset: MeasureRecordOffset,
         qubit: QubitId,
         pauli: AnalyzerPauli,
     ) -> CircuitResult<()> {
@@ -144,8 +146,11 @@ fn z_controlled_feedback_action(
         return Ok(ControlledPauliAction::NoEffect);
     }
     if let Some(record_offset) = control.measurement_record_offset() {
+        if record_offset.is_negative_zero() {
+            return Ok(ControlledPauliAction::NoEffect);
+        }
         return Ok(ControlledPauliAction::MeasurementFeedback {
-            record_offset: record_offset.get(),
+            record_offset,
             qubit,
             pauli,
         });
@@ -164,8 +169,11 @@ fn reversed_z_controlled_action(
         return Ok(ControlledPauliAction::NoEffect);
     }
     if let Some(record_offset) = control.measurement_record_offset() {
+        if record_offset.is_negative_zero() {
+            return Ok(ControlledPauliAction::NoEffect);
+        }
         return Ok(ControlledPauliAction::MeasurementFeedback {
-            record_offset: record_offset.get(),
+            record_offset,
             qubit,
             pauli,
         });
@@ -186,16 +194,22 @@ fn symmetric_z_controlled_action(
     ) {
         (Some(record_offset), None, None, None) => {
             let qubit = require_qubit(gate_name, "target", second)?;
+            if record_offset.is_negative_zero() {
+                return Ok(ControlledPauliAction::NoEffect);
+            }
             Ok(ControlledPauliAction::MeasurementFeedback {
-                record_offset: record_offset.get(),
+                record_offset,
                 qubit,
                 pauli: AnalyzerPauli::Z,
             })
         }
         (None, Some(record_offset), None, None) => {
             let qubit = require_qubit(gate_name, "target", first)?;
+            if record_offset.is_negative_zero() {
+                return Ok(ControlledPauliAction::NoEffect);
+            }
             Ok(ControlledPauliAction::MeasurementFeedback {
-                record_offset: record_offset.get(),
+                record_offset,
                 qubit,
                 pauli: AnalyzerPauli::Z,
             })

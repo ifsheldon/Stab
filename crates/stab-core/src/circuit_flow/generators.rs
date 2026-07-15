@@ -1146,7 +1146,7 @@ fn absolute_record_index(measurements_in_past: usize, record_offset: i32) -> Cir
                 "measurement record index overflowed during feedback flow generation",
             )
         })?;
-    if index < 0 || index >= measurements_in_past {
+    if index < 0 || index > measurements_in_past {
         return Err(CircuitError::invalid_tableau_conversion(format!(
             "measurement record offset {record_offset} is outside the flow generation history"
         )));

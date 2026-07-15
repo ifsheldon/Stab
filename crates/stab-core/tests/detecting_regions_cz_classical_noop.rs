@@ -51,6 +51,27 @@ fn require_contains(haystack: &str, needle: &str, context: &str) -> Result<(), S
 }
 
 #[test]
+fn detecting_regions_treat_stim_negative_zero_detector_as_empty() -> Result<(), String> {
+    let circuit = Circuit::from_stim_str("TICK\nM 0\nDETECTOR rec[-0]\n")
+        .map_err(|error| error.to_string())?;
+    let regions = circuit_detecting_regions(
+        &circuit,
+        DetectingRegionOptions {
+            detectors: vec![detector(0)?],
+            ticks: vec![0],
+            ignore_anticommutation_errors: true,
+        },
+    )
+    .map_err(|error| error.to_string())?;
+
+    regions
+        .get(&detector(0)?)
+        .is_some_and(|ticks| ticks.is_empty())
+        .then_some(())
+        .ok_or_else(|| format!("expected an empty detector D0 region map, got {regions:?}"))
+}
+
+#[test]
 fn detecting_regions_target_shape_supports_cz_record_sweep_noop() -> Result<(), String> {
     for (name, circuit_text) in [
         (

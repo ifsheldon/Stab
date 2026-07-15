@@ -32,8 +32,8 @@ impl ObservableId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct MeasureRecordOffset(i32);
+#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
+pub struct MeasureRecordOffset(MeasureRecordOffsetRepr);
 
 impl MeasureRecordOffset {
     pub fn try_new(value: i32) -> CircuitResult<Self> {
@@ -43,11 +43,11 @@ impl MeasureRecordOffset {
                 value,
             ));
         }
-        Ok(Self(value))
+        Self::from_valid_lookback(value)
     }
 
     pub fn get(self) -> i32 {
-        self.0
+        self.raw_value()
     }
 }
 
@@ -106,14 +106,59 @@ impl Probability {
 }
 
 impl MeasureRecordOffset {
-    /// Preserves Stim v1.16's text-only `rec[-0]` parser behavior.
+    fn from_valid_lookback(value: i32) -> CircuitResult<Self> {
+        let value = std::num::NonZeroI32::new(value).ok_or_else(|| {
+            CircuitError::invalid_domain_value("measurement record offset", value)
+        })?;
+        Ok(Self(MeasureRecordOffsetRepr::Lookback(value)))
+    }
+
+    /// Preserves Stim v1.16's distinct parsed `rec[-0]` target.
     pub(crate) fn from_stim_text(value: i32) -> CircuitResult<Self> {
-        if !(MIN_MEASUREMENT_RECORD_OFFSET..=0).contains(&value) {
-            return Err(CircuitError::invalid_domain_value(
-                "measurement record offset",
-                value,
-            ));
+        if value == 0 {
+            return Ok(Self(MeasureRecordOffsetRepr::NegativeZero));
         }
-        Ok(Self(value))
+        Self::try_new(value)
+    }
+
+    fn raw_value(self) -> i32 {
+        match self.0 {
+            MeasureRecordOffsetRepr::Lookback(value) => value.get(),
+            MeasureRecordOffsetRepr::NegativeZero => 0,
+        }
+    }
+
+    pub(crate) fn is_negative_zero(self) -> bool {
+        matches!(self.0, MeasureRecordOffsetRepr::NegativeZero)
+    }
+
+    pub(crate) fn stim_text(self) -> MeasureRecordOffsetText {
+        MeasureRecordOffsetText(self)
+    }
+}
+
+#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
+enum MeasureRecordOffsetRepr {
+    Lookback(std::num::NonZeroI32),
+    NegativeZero,
+}
+
+impl std::fmt::Debug for MeasureRecordOffset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("MeasureRecordOffset")
+            .field(&self.get())
+            .finish()
+    }
+}
+
+pub(crate) struct MeasureRecordOffsetText(MeasureRecordOffset);
+
+impl std::fmt::Display for MeasureRecordOffsetText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0.is_negative_zero() {
+            f.write_str("-0")
+        } else {
+            std::fmt::Display::fmt(&self.0.get(), f)
+        }
     }
 }

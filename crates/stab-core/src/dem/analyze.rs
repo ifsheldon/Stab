@@ -18,8 +18,8 @@ mod probabilities;
 mod reverse_fold;
 
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, Probability, QubitId,
-    RepeatBlock, SingleQubitClifford,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, MeasureRecordOffset,
+    Probability, QubitId, RepeatBlock, SingleQubitClifford,
 };
 
 use super::{DemInstruction, DemTarget, DetectorErrorModel};
@@ -945,7 +945,10 @@ impl Analyzer {
                     "DETECTOR target {target} is not a measurement record"
                 )));
             };
-            let measurement = self.measurement_index_from_offset(offset.get())?;
+            if offset.is_negative_zero() {
+                continue;
+            }
+            let measurement = self.measurement_index_from_offset(offset)?;
             self.detector_terms_by_measurement
                 .entry(measurement)
                 .or_default()
@@ -969,7 +972,10 @@ impl Analyzer {
         for target in instruction.targets() {
             if let Some(offset) = target.measurement_record_offset() {
                 has_measurement_record_target = true;
-                let measurement = self.measurement_index_from_offset(offset.get())?;
+                if offset.is_negative_zero() {
+                    continue;
+                }
+                let measurement = self.measurement_index_from_offset(offset)?;
                 self.observable_terms_by_measurement
                     .entry(measurement)
                     .or_default()
@@ -1014,18 +1020,19 @@ impl Analyzer {
         Ok(())
     }
 
-    fn measurement_index_from_offset(&self, offset: i32) -> CircuitResult<usize> {
+    fn measurement_index_from_offset(&self, offset: MeasureRecordOffset) -> CircuitResult<usize> {
         let measurement_count = i64::try_from(self.measurement_count).map_err(|_| {
             CircuitError::invalid_detector_error_model("measurement count does not fit i64")
         })?;
         let index = measurement_count
-            .checked_add(i64::from(offset))
+            .checked_add(i64::from(offset.get()))
             .ok_or_else(|| {
                 CircuitError::invalid_detector_error_model("measurement offset overflowed")
             })?;
         if index < 0 || index >= measurement_count {
             return Err(CircuitError::invalid_detector_error_model(format!(
-                "measurement record offset rec[{offset}] is out of range"
+                "measurement record offset rec[{}] is out of range",
+                offset.stim_text()
             )));
         }
         usize::try_from(index).map_err(|_| {

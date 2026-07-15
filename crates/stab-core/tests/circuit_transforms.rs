@@ -525,6 +525,40 @@ OBSERVABLE_INCLUDE(2) rec[-1]
 }
 
 #[test]
+fn with_inlined_feedback_matches_stim_negative_zero_target() {
+    let input = circuit("M 0\nCX rec[-0] 1\nM 1\nDETECTOR rec[-1]\n");
+    let inlined = input
+        .with_inlined_feedback()
+        .expect("inline Stim negative-zero feedback target");
+
+    assert_eq!(inlined.to_stim_string(), "M 0 1\nDETECTOR\n");
+}
+
+#[test]
+fn with_inlined_feedback_preserves_untouched_negative_zero_detector_target() {
+    let input = circuit("M 0\nDETECTOR rec[-0]\n");
+    let inlined = input
+        .with_inlined_feedback()
+        .expect("preserve untouched negative-zero detector target");
+
+    assert_eq!(inlined, input);
+}
+
+#[test]
+fn with_inlined_feedback_rejects_synthesized_negative_zero_detector_target() {
+    let input = circuit("M 0\nCX rec[-0] 1\nM 1\nDETECTOR rec[-1] rec[-0]\n");
+    let error = input
+        .with_inlined_feedback()
+        .expect_err("Stim rejects a rewritten detector with a surviving zero lookback");
+
+    assert!(matches!(
+        error,
+        CircuitError::InvalidDetectorErrorModel { .. }
+    ));
+    assert!(error.to_string().contains("rec[-0]"));
+}
+
+#[test]
 fn with_inlined_feedback_preserves_mpp_detector_error_model() {
     let input = circuit(
         "

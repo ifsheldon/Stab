@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, PauliBasis, PauliString,
-    QubitId, SingleQubitClifford, Tableau, circuit_tableau::gate_tableau,
+    Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, MeasureRecordOffset,
+    PauliBasis, PauliString, QubitId, SingleQubitClifford, Tableau, circuit_tableau::gate_tableau,
 };
 
 use super::effects::analyzer_paulis_anticommute;
@@ -697,7 +697,7 @@ impl GaugeTracker {
 
     fn undo_measurement_feedback(
         &mut self,
-        record_offset: i32,
+        record_offset: MeasureRecordOffset,
         qubit: QubitId,
         pauli: AnalyzerPauli,
     ) -> CircuitResult<()> {
@@ -815,14 +815,14 @@ impl GaugeTracker {
         Ok(())
     }
 
-    fn measurement_index_from_offset(&self, offset: i32) -> CircuitResult<usize> {
+    fn measurement_index_from_offset(&self, offset: MeasureRecordOffset) -> CircuitResult<usize> {
         let measurement_count = i64::try_from(self.measurement_count).map_err(|_| {
             CircuitError::invalid_detector_error_model(
                 "measurement count does not fit i64 during gauge analysis",
             )
         })?;
         let index = measurement_count
-            .checked_add(i64::from(offset))
+            .checked_add(i64::from(offset.get()))
             .ok_or_else(|| {
                 CircuitError::invalid_detector_error_model(
                     "measurement offset overflowed during gauge analysis",
@@ -830,7 +830,8 @@ impl GaugeTracker {
             })?;
         if index < 0 || index >= measurement_count {
             return Err(CircuitError::invalid_detector_error_model(format!(
-                "measurement record offset rec[{offset}] is out of range during gauge analysis"
+                "measurement record offset rec[{}] is out of range during gauge analysis",
+                offset.stim_text()
             )));
         }
         usize::try_from(index).map_err(|_| {

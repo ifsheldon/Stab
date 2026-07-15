@@ -34,6 +34,28 @@ fn circuit_inverse_qec_unitary_matches_stim() {
 }
 
 #[test]
+fn circuit_inverse_qec_matches_stim_negative_zero_detector_packet() {
+    let input = circuit("R 0\nM 0\nDETECTOR rec[-0]\n");
+    let expected = circuit("M 0 0\n");
+
+    assert_eq!(
+        circuit_inverse_qec(&input).expect("inverse negative-zero detector packet"),
+        expected
+    );
+}
+
+#[test]
+fn circuit_inverse_qec_matches_stim_negative_zero_measure_reset_packet() {
+    let input = circuit("R 0\nM 0\nMR 0\nDETECTOR rec[-0]\n");
+    let expected = circuit("MR 0\nM 0 0\n");
+
+    assert_eq!(
+        circuit_inverse_qec(&input).expect("inverse negative-zero measure-reset packet"),
+        expected
+    );
+}
+
+#[test]
 fn circuit_inverse_qec_supports_selected_two_to_one_detector_flow() {
     // Adapted from Stim v1.16.0 circuit_inverse_qec two_to_one behavior.
     for (input_text, expected_text) in [

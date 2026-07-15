@@ -8,7 +8,7 @@ use frame::{
 use crate::sampling::ReferenceSampleScratch;
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, CompiledSampler,
-    RepeatBlock, SampleFormat,
+    MeasureRecordOffset, RepeatBlock, SampleFormat,
     result_formats::{MeasureRecordWriter, write_ptb64_records_checked},
 };
 
@@ -618,7 +618,7 @@ impl ConversionPlan {
                             "DETECTOR target {target} is not a measurement record"
                         ))
                     })
-                    .and_then(|offset| self.measurement_index_from_offset(offset.get()))
+                    .and_then(|offset| self.measurement_index_from_offset(offset))
             })
             .collect::<CircuitResult<Vec<_>>>()?;
         self.detector_terms.push(terms);
@@ -673,7 +673,7 @@ impl ConversionPlan {
         let mut terms = Vec::new();
         for target in instruction.targets() {
             if let Some(offset) = target.measurement_record_offset() {
-                terms.push(self.measurement_index_from_offset(offset.get())?);
+                terms.push(self.measurement_index_from_offset(offset)?);
             } else if target.is_pauli_target() {
                 continue;
             } else {
@@ -751,21 +751,23 @@ impl ConversionPlan {
         validate_buffer_bits("detection records", shots, self.output_bit_count()?)
     }
 
-    fn measurement_index_from_offset(&self, offset: i32) -> CircuitResult<usize> {
+    fn measurement_index_from_offset(&self, offset: MeasureRecordOffset) -> CircuitResult<usize> {
         let current = i64::try_from(self.measurement_count).map_err(|_| {
             CircuitError::invalid_result_format("measurement count does not fit i64")
         })?;
         let index = current
-            .checked_add(i64::from(offset))
+            .checked_add(i64::from(offset.get()))
             .ok_or_else(|| CircuitError::invalid_result_format("measurement reference overflow"))?;
         let index = usize::try_from(index).map_err(|_| {
             CircuitError::invalid_result_format(format!(
-                "measurement record target rec[{offset}] is not available"
+                "measurement record target rec[{}] is not available",
+                offset.stim_text()
             ))
         })?;
         if index >= self.measurement_count {
             return Err(CircuitError::invalid_result_format(format!(
-                "measurement record target rec[{offset}] is not available"
+                "measurement record target rec[{}] is not available",
+                offset.stim_text()
             )));
         }
         Ok(index)

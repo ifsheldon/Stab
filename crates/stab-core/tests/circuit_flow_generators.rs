@@ -24,6 +24,23 @@ fn circuit_flow_generators_empty_and_single_qubit_unitaries_match_stim() {
 }
 
 #[test]
+fn circuit_flow_generators_match_stim_negative_zero_feedback() {
+    assert_eq!(
+        generator_strings("M 0\nDETECTOR rec[-0]\n"),
+        vec!["1 -> Z xor rec[0]", "Z -> rec[0]"]
+    );
+    assert_eq!(
+        generator_strings("M 0\nCX rec[-0] 1\nM 1\n"),
+        vec![
+            "1 -> _Z xor rec[1]",
+            "1 -> Z_ xor rec[0]",
+            "_Z -> 1",
+            "Z_ -> rec[0]",
+        ]
+    );
+}
+
+#[test]
 fn circuit_flow_generators_composed_unitary_matches_stim() {
     assert_eq!(
         generator_strings(

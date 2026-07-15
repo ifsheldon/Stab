@@ -660,6 +660,9 @@ fn build_selected_measure_reset_pass_through_inverse(
                 "detector targets must be measurement records",
             ));
         };
+        if offset.is_negative_zero() {
+            continue;
+        }
         let index = measure_reset_count + i64::from(offset.get());
         if !(0..measure_reset_count).contains(&index) {
             return Err(inverse_qec_measure_reset_pass_through_error(
@@ -817,6 +820,9 @@ fn build_selected_reset_measure_detector_inverse(
                 "detector targets must be measurement records",
             ));
         };
+        if offset.is_negative_zero() {
+            continue;
+        }
         let index = measurement_count + i64::from(offset.get());
         if !(0..measurement_count).contains(&index) {
             return Err(inverse_qec_reset_measure_detector_error(

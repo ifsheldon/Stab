@@ -28,6 +28,19 @@ fn missing(text: &str) -> Result<String, Box<dyn std::error::Error>> {
     missing_with_options(text, true)
 }
 
+#[test]
+fn missing_detectors_matches_stim_negative_zero_rows() -> Result<(), Box<dyn std::error::Error>> {
+    for declaration in ["DETECTOR rec[-0]", "OBSERVABLE_INCLUDE(0) rec[-0]"] {
+        require_missing_eq(
+            &format!("M 0\n{declaration}\n"),
+            false,
+            "DETECTOR rec[-1]\n",
+            declaration,
+        )?;
+    }
+    Ok(())
+}
+
 fn require_missing_eq(
     text: &str,
     ignore_non_deterministic_measurements: bool,

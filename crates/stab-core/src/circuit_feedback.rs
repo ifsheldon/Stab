@@ -3,8 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::{
     Circuit, CircuitError, CircuitInstruction, CircuitItem, CircuitResult, DemTarget, Gate,
     GateCategory, MeasureRecordOffset, Pauli, RepeatBlock, RepeatCount, Target,
-    detection::instruction_measurement_count, measurement_record_count,
-    sparse_rev_frame_tracker::SparseReverseFrameTracker,
+    detection::instruction_measurement_count, sparse_rev_frame_tracker::SparseReverseFrameTracker,
 };
 
 const MAX_FEEDBACK_REPEAT_COUNT: u64 = 100_000;
@@ -13,7 +12,11 @@ const MAX_FEEDBACK_REPEAT_NESTING: usize = 256;
 
 pub fn circuit_with_inlined_feedback(circuit: &Circuit) -> CircuitResult<Circuit> {
     validate_feedback_repeat_budget(circuit)?;
-    let measurement_count = measurement_record_count(circuit)?;
+    let measurement_count = usize::try_from(circuit.count_measurements()?).map_err(|_| {
+        CircuitError::invalid_detector_error_model(
+            "measurement count does not fit usize while inlining feedback",
+        )
+    })?;
     let detector_count = detector_count(circuit)?;
     let mut helper = WithoutFeedbackHelper {
         reversed_output: Vec::new(),
@@ -461,7 +464,7 @@ fn rewritten_detector(
                 "DETECTOR target {target} is not a measurement record"
             ))
         })?;
-        let index = absolute_record_index(measurements_in_past, offset.get())?;
+        let index = absolute_record_index(measurements_in_past, offset)?;
         toggle_value(&mut targets, index);
     }
     CircuitInstruction::new(
@@ -544,20 +547,26 @@ fn validate_feedback_record_position(gate: Gate, record_is_first: bool) -> Circu
     }
 }
 
-fn absolute_record_index(measurements_in_past: usize, offset: i32) -> CircuitResult<usize> {
+fn absolute_record_index(
+    measurements_in_past: usize,
+    offset: MeasureRecordOffset,
+) -> CircuitResult<usize> {
     let current = i64::try_from(measurements_in_past).map_err(|_| {
         CircuitError::invalid_detector_error_model(
             "measurement count does not fit i64 while rewriting detector",
         )
     })?;
-    let index = current.checked_add(i64::from(offset)).ok_or_else(|| {
-        CircuitError::invalid_detector_error_model(
-            "measurement record offset overflowed while rewriting detector",
-        )
-    })?;
+    let index = current
+        .checked_add(i64::from(offset.get()))
+        .ok_or_else(|| {
+            CircuitError::invalid_detector_error_model(
+                "measurement record offset overflowed while rewriting detector",
+            )
+        })?;
     if index < 0 || index >= current {
         return Err(CircuitError::invalid_detector_error_model(format!(
-            "measurement record target rec[{offset}] is outside feedback rewrite history"
+            "measurement record target rec[{}] is outside feedback rewrite history",
+            offset.stim_text()
         )));
     }
     usize::try_from(index).map_err(|_| {

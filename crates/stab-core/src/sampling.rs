@@ -412,7 +412,8 @@ impl CompileState {
         let required = u64::from(offset.get().unsigned_abs());
         if required == 0 {
             return Err(CircuitError::invalid_sampler_compilation(format!(
-                "measurement record target rec[-0] is not a valid lookback while compiling {} feedback",
+                "measurement record target rec[{}] is not a valid lookback while compiling {} feedback",
+                offset.stim_text(),
                 instruction.gate().canonical_name()
             )));
         }
