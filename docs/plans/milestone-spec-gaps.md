@@ -21,6 +21,24 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Resolved Entries
 
+## 2026-07-16 - PQ1/PQ2: Adapter Machine Flags And Mandatory Contract Preflight
+
+Status: Resolved
+Revealed by: GPT-5.6/max full code review of the corrected `PERFQ-M5-SIMD-WORD` comparator and evidence path.
+Current text: private-worker reproducibility bound adapter tools and canonical compiler arguments and exercised popcount boundaries, but the standalone adapter reconstructed generic compiler flags instead of inheriting CMake's resolved `libstim` machine flags. Canonical vectors and boundary probes ran only in the separate reproducibility command, so a normal promotable qualification run did not record proof that they ran.
+Gap: on x86-64, pinned Stim CMake can compile `libstim` and `stim_perf` with `-march=native`, selecting a wider `MAX_BITWORD_WIDTH`, while the adapter headers could compile under the default SSE2 width. Two workers with a shared encoding defect could also pass pairwise semantic preflight when canonical independent probes were omitted from the normal run path.
+Proposed amendment: derive the adapter's compile flags from CMake's generated `libstim` target flags, record and fingerprint the exact ordered list, require the complete canonical worker preflight while preparing every worker pair, and bind the actual probe receipts and their recomputed digest into report and rollup identity.
+Resolution: adapter receipt schema version 4 records CMake's generated `libstim` compile flags, the isolated comparator-source digest, and the derived standalone compile command and fingerprint. Qualification report schema version 17 records all 18 actual worker-contract probe receipts and binds their recomputed digest into worker identity; rollup schema version 4 reopens and validates every source report before accepting that shared digest. Every `PreparedWorkers::prepare` executes the frozen protocol vector, odd and even popcount vectors, actual accepted-maximum popcount, circuit and gate rejection probes, and all three popcount rejection classes before calibration. Offline replay reconstructs the exact source-owned receipt list and rejects missing, reordered, altered, refingerprinted, or stale evidence.
+
+## 2026-07-16 - PQ2: Popcount Comparator And Output Contract Precision
+
+Status: Resolved
+Revealed by: milestone audit of the first `PERFQ-M5-SIMD-WORD` implementation and clean full-tier evidence.
+Current text: the fourth PQ2 slice said that the workload was derived from `simd_compat_popcnt`, timed a toggle and complete-vector popcount, bound the checksum and fixture fingerprint into an output digest, and tested the accepted maximum.
+Gap: the milestone did not name the exact architecture-dependent Stim loop, so the adapter could call `simd_bits::popcnt()` instead of iterating `ptr_simd[k].popcount()` and still appear compliant on AArch64 where `MAX_BITWORD_WIDTH` is 64. It did not define field order, byte order, digest algorithm, or fixed vectors for the output identity, so three of four fingerprint lanes could be omitted without a failing test. It also did not say that accepted-maximum evidence required real construction and execution in both sealed workers, and its generic adapter test accidentally called every workload output a circuit digest.
+Proposed amendment: require the literal pinned `simd_compat_popcnt` SIMD-word loop, define an eight-field little-endian `u64` output encoding followed by the shared four-lane byte digest, add fixed odd and even output vectors, execute both sealed workers at the accepted maximum, exercise below-minimum, unaligned, and over-cap pre-barrier rejections, and use workload-neutral semantic-output wording.
+Resolution: the fourth executable slice and tests in `docs/plans/comprehensive-stim-performance-qualification-plan.md` now define those contracts explicitly. The C++ adapter uses an isolated `ptr_simd[k].popcount()` implementation, and runtime-group schema version 4 binds both its call site and implementation path and SHA-256 through the generated inventory, materialized adapter receipt, invocation, and report replay. Both workers construct the complete output identity after timing, Rust tests bind fixed odd and even vectors and execute the accepted maximum, private-worker reproducibility exercises both sealed workers at that maximum and at all three rejection classes, and `benchmarks/stim_adapter/README.md` documents the exact encoding and timing boundary.
+
 ## 2026-07-15 - PQ2/PQ6: Programmatic Circuit Serialization Depth
 
 Status: Resolved

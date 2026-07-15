@@ -8,9 +8,9 @@ Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4
 
 Current correctness dependency after exact gate-name hash ownership: schema-version-3 CQ0 semantic digest `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2`.
 
-Current performance inventory digest after the first four PQ2 product-contract graduations, including exact gate hashing and toggle-plus-popcount: `9be7dea23a221e9d7fe6ba2e9bdfaf65ad2b4a7675b557386b3de6ea58306557`.
+Current performance inventory digest after the first four PQ2 product-contract graduations, including the corrected exact gate hashing and source-bound toggle-plus-popcount contract: `877df12bf1b3d63da92289e22f117097cedbc20860d165c90b41554aa110263b`.
 
-Implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
+Original PQ0 implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
 Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca325860c57a9a2c973e11`; clean CQ1 evidence revision: `e7ba513822c26859a2b5c70c94d406e1c6adb6b6`; final acceptance-status synchronization revision: `6d4c55fdddf84c90bd3f64c2bf49bf67a9b786ba`, validated with `local_modifications=false`. The final synchronization does not change any PQ0 disposition or unresolved count.
 
@@ -49,8 +49,8 @@ It does not claim that inherited timing ratios satisfy the comprehensive runner,
 | Upstream `BENCHMARK(...)` symbols | 74 |
 | Current primary waiver rows with adapter retirement mappings | 4 |
 | Groups bound to exact CQ0 API owners | 246 |
-| Groups with stable planned CQ preflight ids | 292 |
-| Groups with implemented exact CQ case bindings | 3 |
+| Groups with stable planned CQ preflight ids | 291 |
+| Groups with implemented exact CQ case bindings | 4 |
 | Exact inherited threshold measurement pairs | 24 |
 | Exact checklist row-and-domain parent groups | 133 |
 | Exact checklist child claims across those parents | 181 |
@@ -58,8 +58,8 @@ It does not claim that inherited timing ratios satisfy the comprehensive runner,
 | Typed generated fixture families | 380 |
 | Typed repository fixture families with SHA-256 | 35 |
 | Typed inline fixture families | 126 |
-| Scale points with exact input byte counts | 122 |
-| Scale points explicitly not byte-sized | 1,179 |
+| Scale points with exact input byte counts | 134 |
+| Scale points explicitly not byte-sized | 1,175 |
 
 The API inventory preserves the CQ0 primary performance ownership counts: 274 bit-kernel, 202 circuit, 1 CLI, 128 DEM, 15 DEM-sampling, 62 detection, 105 error-analysis, 96 flow and detector-utility, 178 gate, 107 generation, 97 result-IO, 49 sampling, 4 search, and 654 stabilizer-algebra items.
 Declaration-only kinds and marker or diagnostic trait implementations do not receive independent runtime claims.
@@ -77,8 +77,8 @@ Every scale point stores either an exact input-byte count or an explicit not-app
 
 | Decision | Count | Meaning |
 | --- | ---: | --- |
-| Retained | 14 | The upstream operation shape is faithful, but comprehensive preflight, output, scaling, and statistical evidence is still missing. |
-| Reworked | 135 | The row needs a faithful runner, exact phase split, scale family, output contract, or another material correction; `m4-circuit-parse` now has its exact replacement contract but is not superseded until replacement evidence is complete. |
+| Retained | 13 | The upstream operation shape is faithful, but comprehensive preflight, output, scaling, and statistical evidence is still missing. |
+| Reworked | 136 | The row needs a faithful runner, exact phase split, scale family, output contract, or another material correction; `m4-circuit-parse` now has its exact replacement contract, and `m5-simd-word` remains reworked while its older M12 threshold stays active pending explicit replacement migration. |
 | Diagnostic | 4 | The row remains useful for investigation but cannot produce a comprehensive ratio in its current form. |
 | Superseded | 6 | A more specific row owns the behavior and the duplicate identity must be removed during manifest migration. |
 | Removed | 2 | `m7-perf-harness` and `m12-primary-performance-matrix` are metadata rather than timed workloads. |
