@@ -19,7 +19,7 @@ mod published;
 
 pub(super) use published::{load_validated_published_report, run};
 
-const PREFLIGHT_SCHEMA_VERSION: u32 = 4;
+const PREFLIGHT_SCHEMA_VERSION: u32 = 5;
 const EXPECTED_WARMUPS: usize = 3;
 const EXPECTED_MAXIMUM_TIMING_ATTEMPTS: usize = 2;
 const EXPECTED_THRESHOLD: f64 = 1.25;
@@ -37,6 +37,8 @@ pub(super) struct PerformancePreflightArtifact {
     schema_version: u32,
     report_sha256: String,
     group_id: String,
+    scale_id: String,
+    work_items: u64,
     group_contract_sha256: String,
     claim_class: ClaimClass,
     baseline_eligibility: super::group::BaselineEligibility,
@@ -76,6 +78,8 @@ pub(super) fn validate_report(
     }
     if report.command.output.is_empty()
         || !valid_output_path(&report.command.output)
+        || report.command.group_id.is_empty()
+        || report.command.scale_id.is_empty()
         || report.command.work_items == 0
         || report.command.warmup_batches != EXPECTED_WARMUPS
         || report.command.paired_samples != expected_pair_count(report.tier)
@@ -107,6 +111,13 @@ pub(super) fn validate_report(
     if report.group_contract_sha256 != resolved_group.source_sha256
         || report.claim_class != resolved_group.contract.claim_class
         || report.baseline_eligibility != resolved_group.contract.baseline_eligibility
+    {
+        return Err(ReportError::GroupEvidence);
+    }
+    let scale = resolved_group.contract.scale(&report.scale_id)?;
+    if report.command.group_id != report.group_id
+        || report.command.scale_id != report.scale_id
+        || report.command.work_items != scale.work_items.get()
     {
         return Err(ReportError::GroupEvidence);
     }
@@ -722,16 +733,17 @@ fn validate_claim(
         ClaimClass::PromotablePerformance => {
             if group.baseline_eligibility != super::group::BaselineEligibility::ThresholdEligible
                 || report.correctness_preflight.case_ids != group.correctness_case_ids
-                || !promotable_claim_requirements(PromotionEvidence {
-                    promotable: report.promotable,
-                    allow_unverified_host: report.command.allow_unverified_host,
-                    tier: report.tier,
-                    local_modifications_before: report.repository.local_modifications_before,
-                    local_modifications_after: report.repository.local_modifications_after,
-                    host_verified: report.host.verified,
-                    correctness_status: report.correctness_preflight.status,
-                    correctness_case_count: report.correctness_preflight.case_ids.len(),
-                })
+                || report.promotable
+                    != promotion_eligibility(PromotionEvidence {
+                        claim_class: report.claim_class,
+                        allow_unverified_host: report.command.allow_unverified_host,
+                        tier: report.tier,
+                        local_modifications_before: report.repository.local_modifications_before,
+                        local_modifications_after: report.repository.local_modifications_after,
+                        host_verified: report.host.verified,
+                        correctness_status: report.correctness_preflight.status,
+                        correctness_case_count: report.correctness_preflight.case_ids.len(),
+                    })
             {
                 return Err(ReportError::Claim);
             }
@@ -741,20 +753,19 @@ fn validate_claim(
 }
 
 #[derive(Clone, Copy)]
-struct PromotionEvidence {
-    promotable: bool,
-    allow_unverified_host: bool,
-    tier: QualificationTier,
-    local_modifications_before: bool,
-    local_modifications_after: bool,
-    host_verified: bool,
-    correctness_status: CorrectnessPreflightStatus,
-    correctness_case_count: usize,
+pub(super) struct PromotionEvidence {
+    pub(super) claim_class: ClaimClass,
+    pub(super) allow_unverified_host: bool,
+    pub(super) tier: QualificationTier,
+    pub(super) local_modifications_before: bool,
+    pub(super) local_modifications_after: bool,
+    pub(super) host_verified: bool,
+    pub(super) correctness_status: CorrectnessPreflightStatus,
+    pub(super) correctness_case_count: usize,
 }
 
 fn promotable_claim_requirements(evidence: PromotionEvidence) -> bool {
-    evidence.promotable
-        && !evidence.allow_unverified_host
+    !evidence.allow_unverified_host
         && matches!(
             evidence.tier,
             QualificationTier::Full | QualificationTier::Soak
@@ -764,6 +775,11 @@ fn promotable_claim_requirements(evidence: PromotionEvidence) -> bool {
         && evidence.host_verified
         && evidence.correctness_status == CorrectnessPreflightStatus::Passed
         && evidence.correctness_case_count > 0
+}
+
+pub(super) fn promotion_eligibility(evidence: PromotionEvidence) -> bool {
+    evidence.claim_class == ClaimClass::PromotablePerformance
+        && promotable_claim_requirements(evidence)
 }
 
 fn validate_pair_execution(
@@ -876,6 +892,8 @@ pub(super) fn preflight_artifact(
         schema_version: PREFLIGHT_SCHEMA_VERSION,
         report_sha256: sha256_hex(report_json),
         group_id: report.group_id.clone(),
+        scale_id: report.scale_id.clone(),
+        work_items: report.command.work_items,
         group_contract_sha256: report.group_contract_sha256.clone(),
         claim_class: report.claim_class,
         baseline_eligibility: report.baseline_eligibility,
@@ -929,8 +947,10 @@ pub(super) fn render_markdown(report: &QualificationReport, report_sha256: &str)
             .map_or("unavailable".to_string(), |value| value.to_string())
     };
     format!(
-        "# PQ1 Qualification Harness Report\n\n- Group: `{}`\n- Group contract SHA-256: `{}`\n- Claim class: `{:?}`\n- Baseline eligibility: `{:?}`\n- Tier: `{:?}`\n- Stim: `{}` (`{}`)\n- Stab commit: `{}`\n- Local modifications: `{}`\n- Host profile: `{}`\n- Host verified: `{}`\n- CPU: `{}` on `{}`\n- Frequency governor: `{:?}`\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: `{}`\n- Target: `{}`\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median diagnostic ratio: `{}`\n- Upper bootstrap bound: `{}`\n- Diagnostic 1.25 outcome: `{}`\n- Process memory evidence: separate from timing\n- Promotable product claim: `{}`\n- Report SHA-256: `{}`\n",
+        "# Performance Qualification Report\n\n- Group: `{}`\n- Scale: `{}` (`{}` work items per iteration)\n- Group contract SHA-256: `{}`\n- Claim class: `{:?}`\n- Baseline eligibility: `{:?}`\n- Tier: `{:?}`\n- Stim: `{}` (`{}`)\n- Stab commit: `{}`\n- Local modifications: `{}`\n- Host profile: `{}`\n- Host verified: `{}`\n- CPU: `{}` on `{}`\n- Frequency governor: `{:?}`\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: `{}`\n- Target: `{}`\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median Stab/Stim ratio: `{}`\n- Upper bootstrap bound: `{}`\n- 1.25 outcome: `{}`\n- Process memory evidence: separate from timing\n- Promotable product claim: `{}`\n- Report SHA-256: `{}`\n",
         report.group_id,
+        report.scale_id,
+        report.command.work_items,
         report.group_contract_sha256,
         report.claim_class,
         report.baseline_eligibility,
@@ -1064,7 +1084,7 @@ mod tests {
     fn dirty_or_unverified_evidence_cannot_be_promoted() {
         let accepted = |allow_unverified_host, tier, before, after, host, status, cases| {
             promotable_claim_requirements(PromotionEvidence {
-                promotable: true,
+                claim_class: ClaimClass::PromotablePerformance,
                 allow_unverified_host,
                 tier,
                 local_modifications_before: before,
@@ -1128,5 +1148,25 @@ mod tests {
             CorrectnessPreflightStatus::NotApplicable,
             0,
         ));
+        assert!(!promotion_eligibility(PromotionEvidence {
+            claim_class: ClaimClass::PromotablePerformance,
+            allow_unverified_host: false,
+            tier: QualificationTier::Pr,
+            local_modifications_before: false,
+            local_modifications_after: false,
+            host_verified: true,
+            correctness_status: CorrectnessPreflightStatus::Passed,
+            correctness_case_count: 1,
+        }));
+        assert!(!promotion_eligibility(PromotionEvidence {
+            claim_class: ClaimClass::DiagnosticInfrastructure,
+            allow_unverified_host: false,
+            tier: QualificationTier::Full,
+            local_modifications_before: false,
+            local_modifications_after: false,
+            host_verified: true,
+            correctness_status: CorrectnessPreflightStatus::Passed,
+            correctness_case_count: 1,
+        }));
     }
 }

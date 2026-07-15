@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "performance_inventory_sha256": "101ecb8ba8853522a234be0437e3779007428a6a8749f4fd01c77a7fd7131345",
   "groups": [
     {
@@ -8,7 +8,38 @@
       "baseline_eligibility": "report-only",
       "workload_id": "protocol-smoke",
       "measurement_ids": ["main"],
+      "scales": [
+        {
+          "id": "default",
+          "work_items": 4096
+        }
+      ],
       "correctness_case_ids": []
+    },
+    {
+      "id": "PERFQ-M4-CIRCUIT-PARSE",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "circuit-parse",
+      "measurement_ids": ["parse"],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 64
+        },
+        {
+          "id": "medium",
+          "work_items": 4096
+        },
+        {
+          "id": "large",
+          "work_items": 65536
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-633fa529edf5f549",
+        "cq-evidence-qualification-e660819ae9a223c6"
+      ]
     }
   ]
 }

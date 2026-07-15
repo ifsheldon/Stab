@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::num::NonZeroU64;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -8,11 +9,12 @@ use super::run::ClaimClass;
 use crate::root::RepoRoot;
 
 const GROUP_CONTRACT_PATH: &str = "benchmarks/qualification-runtime-groups.json";
-const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 1;
+const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 2;
 const MAX_GROUP_CONTRACT_BYTES: usize = 1 << 20;
 const MAX_GROUPS: usize = 256;
 const MAX_MEASUREMENTS_PER_GROUP: usize = 64;
 const MAX_CORRECTNESS_CASES_PER_GROUP: usize = 4096;
+const MAX_SCALES_PER_GROUP: usize = 64;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -29,7 +31,15 @@ pub(super) struct GroupContract {
     pub(super) baseline_eligibility: BaselineEligibility,
     pub(super) workload_id: ProtocolId,
     pub(super) measurement_ids: Vec<ProtocolId>,
+    pub(super) scales: Vec<ScaleContract>,
     pub(super) correctness_case_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ScaleContract {
+    pub(super) id: ProtocolId,
+    pub(super) work_items: NonZeroU64,
 }
 
 impl GroupContract {
@@ -49,6 +59,16 @@ impl GroupContract {
             return Err(GroupError::UnsupportedRuntimeShape(self.id.to_string()));
         }
         Ok(())
+    }
+
+    pub(super) fn scale(&self, scale_id: &str) -> Result<&ScaleContract, GroupError> {
+        self.scales
+            .iter()
+            .find(|scale| scale.id.to_string() == scale_id)
+            .ok_or_else(|| GroupError::UnknownScale {
+                group: self.id.to_string(),
+                scale: scale_id.to_string(),
+            })
     }
 }
 
@@ -127,13 +147,25 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
         if !group_ids.insert(group.id.clone())
             || group.measurement_ids.is_empty()
             || group.measurement_ids.len() > MAX_MEASUREMENTS_PER_GROUP
+            || group.scales.is_empty()
+            || group.scales.len() > MAX_SCALES_PER_GROUP
             || group.correctness_case_ids.len() > MAX_CORRECTNESS_CASES_PER_GROUP
         {
             return Err(GroupError::InvalidGroup(group.id.to_string()));
         }
         let measurement_ids = group.measurement_ids.iter().collect::<BTreeSet<_>>();
+        let scale_ids = group
+            .scales
+            .iter()
+            .map(|scale| &scale.id)
+            .collect::<BTreeSet<_>>();
         let correctness_case_ids = group.correctness_case_ids.iter().collect::<BTreeSet<_>>();
         if measurement_ids.len() != group.measurement_ids.len()
+            || scale_ids.len() != group.scales.len()
+            || !group
+                .scales
+                .windows(2)
+                .all(|pair| matches!(pair, [left, right] if left.work_items < right.work_items))
             || correctness_case_ids.len() != group.correctness_case_ids.len()
             || !group
                 .correctness_case_ids
@@ -198,6 +230,8 @@ pub(super) enum GroupError {
     InvalidGroup(String),
     #[error("runtime group contract does not define group {0}")]
     UnknownGroup(String),
+    #[error("runtime group contract group {group} does not define scale {scale}")]
+    UnknownScale { group: String, scale: String },
     #[error("runtime group {0} does not match the implemented worker shape")]
     UnsupportedRuntimeShape(String),
     #[error("runtime group contract does not exactly match the executable group registry")]
@@ -208,20 +242,44 @@ pub(super) enum GroupError {
 mod tests {
     use super::*;
 
-    #[test]
-    fn diagnostic_groups_are_report_only_and_have_no_correctness_cases() {
-        let valid = GroupContractFile {
+    fn valid_contract_file() -> GroupContractFile {
+        GroupContractFile {
             schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
             performance_inventory_sha256: "a".repeat(64),
-            groups: vec![GroupContract {
-                id: ProtocolId::try_new(super::super::invocation::PQ1_GROUP_ID).expect("group id"),
-                claim_class: ClaimClass::DiagnosticInfrastructure,
-                baseline_eligibility: BaselineEligibility::ReportOnly,
-                workload_id: ProtocolId::try_new("protocol-smoke").expect("workload id"),
-                measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
-                correctness_case_ids: Vec::new(),
-            }],
-        };
+            groups: vec![
+                GroupContract {
+                    id: ProtocolId::try_new(super::super::invocation::PQ1_GROUP_ID)
+                        .expect("group id"),
+                    claim_class: ClaimClass::DiagnosticInfrastructure,
+                    baseline_eligibility: BaselineEligibility::ReportOnly,
+                    workload_id: ProtocolId::try_new("protocol-smoke").expect("workload id"),
+                    measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
+                    scales: vec![ScaleContract {
+                        id: ProtocolId::try_new("default").expect("scale id"),
+                        work_items: NonZeroU64::new(4096).expect("positive work"),
+                    }],
+                    correctness_case_ids: Vec::new(),
+                },
+                GroupContract {
+                    id: ProtocolId::try_new(super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
+                        .expect("group id"),
+                    claim_class: ClaimClass::PromotablePerformance,
+                    baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                    workload_id: ProtocolId::try_new("circuit-parse").expect("workload id"),
+                    measurement_ids: vec![ProtocolId::try_new("parse").expect("measurement id")],
+                    scales: vec![ScaleContract {
+                        id: ProtocolId::try_new("small").expect("scale id"),
+                        work_items: NonZeroU64::new(64).expect("positive work"),
+                    }],
+                    correctness_case_ids: vec!["cq-evidence-example".to_string()],
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn diagnostic_groups_are_report_only_and_have_no_correctness_cases() {
+        let valid = valid_contract_file();
         validate(&valid, &"a".repeat(64)).expect("valid diagnostic contract");
 
         let mut thresholded = valid;
@@ -238,21 +296,85 @@ mod tests {
 
     #[test]
     fn source_contract_rejects_unregistered_groups() {
-        let unsupported = GroupContractFile {
-            schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
-            performance_inventory_sha256: "a".repeat(64),
-            groups: vec![GroupContract {
-                id: ProtocolId::try_new("unregistered").expect("group id"),
-                claim_class: ClaimClass::DiagnosticInfrastructure,
-                baseline_eligibility: BaselineEligibility::ReportOnly,
-                workload_id: ProtocolId::try_new("protocol-smoke").expect("workload id"),
-                measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
-                correctness_case_ids: Vec::new(),
-            }],
-        };
+        let mut unsupported = valid_contract_file();
+        unsupported.groups.first_mut().expect("diagnostic group").id =
+            ProtocolId::try_new("unregistered").expect("group id");
         assert!(matches!(
             validate(&unsupported, &"a".repeat(64)),
             Err(GroupError::UnsupportedRuntimeShape(group)) if group == "unregistered"
+        ));
+    }
+
+    #[test]
+    fn source_contract_rejects_duplicate_and_zero_scales() {
+        let mut duplicate = valid_contract_file();
+        duplicate
+            .groups
+            .first_mut()
+            .expect("diagnostic group")
+            .scales = vec![
+            ScaleContract {
+                id: ProtocolId::try_new("same").expect("scale id"),
+                work_items: NonZeroU64::new(1).expect("positive work"),
+            },
+            ScaleContract {
+                id: ProtocolId::try_new("same").expect("scale id"),
+                work_items: NonZeroU64::new(2).expect("positive work"),
+            },
+        ];
+        assert!(matches!(
+            validate(&duplicate, &"a".repeat(64)),
+            Err(GroupError::InvalidGroup(_))
+        ));
+
+        let zero = serde_json::json!({
+            "schema_version": GROUP_CONTRACT_SCHEMA_VERSION,
+            "performance_inventory_sha256": "a".repeat(64),
+            "groups": [{
+                "id": "group",
+                "claim_class": "diagnostic-infrastructure",
+                "baseline_eligibility": "report-only",
+                "workload_id": "protocol-smoke",
+                "measurement_ids": ["main"],
+                "scales": [{"id": "zero", "work_items": 0}],
+                "correctness_case_ids": []
+            }]
+        });
+        assert!(serde_json::from_value::<GroupContractFile>(zero).is_err());
+
+        let mut nonmonotonic = valid_contract_file();
+        nonmonotonic
+            .groups
+            .first_mut()
+            .expect("diagnostic group")
+            .scales = vec![
+            ScaleContract {
+                id: ProtocolId::try_new("small").expect("scale id"),
+                work_items: NonZeroU64::new(2).expect("positive work"),
+            },
+            ScaleContract {
+                id: ProtocolId::try_new("large").expect("scale id"),
+                work_items: NonZeroU64::new(1).expect("positive work"),
+            },
+        ];
+        assert!(matches!(
+            validate(&nonmonotonic, &"a".repeat(64)),
+            Err(GroupError::InvalidGroup(_))
+        ));
+    }
+
+    #[test]
+    fn scale_lookup_is_exact_and_fail_closed() {
+        let file = valid_contract_file();
+        let group = file.groups.first().expect("diagnostic group");
+        assert_eq!(
+            group.scale("default").expect("default scale").work_items,
+            NonZeroU64::new(4096).expect("positive work")
+        );
+        assert!(matches!(
+            group.scale("Default"),
+            Err(GroupError::UnknownScale { group, scale })
+                if group == super::super::invocation::PQ1_GROUP_ID && scale == "Default"
         ));
     }
 }

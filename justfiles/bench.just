@@ -23,12 +23,12 @@ qualification-list *args:
 qualification-regenerate *args:
     cargo run -q -p stab-bench -- qualification-regenerate {{args}}
 
-# Reproduce one bounded paired-runner qualification probe.
+# Reproduce one bounded paired-runner or product-adapter qualification probe.
 [working-directory: '..']
 qualification-probe *args:
     cargo run -q -p stab-bench --profile release -- qualification-probe {{args}}
 
-# Execute the paired PQ1 qualification harness and publish validated evidence.
+# Execute one source-owned paired qualification group and publish validated evidence.
 [working-directory: '..']
 qualification-run *args:
     cargo run -q -p stab-bench --profile release -- qualification-run {{args}}

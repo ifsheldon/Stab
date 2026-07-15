@@ -18,15 +18,18 @@ use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
 const ADAPTER_PROBE_ID: &str = "pq1-adapter-protocol-smoke";
+const CIRCUIT_PARSE_PROBE_ID: &str = "pq2-circuit-parse-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum ProbeGroup {
     #[value(name = "pq1-process-contract-smoke")]
-    ProcessContractSmoke,
+    ProcessContract,
     #[value(name = "pq1-adapter-protocol-smoke")]
-    AdapterProtocolSmoke,
+    AdapterProtocol,
+    #[value(name = "pq2-circuit-parse-adapter-smoke")]
+    CircuitParseAdapter,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -74,8 +77,10 @@ pub(crate) struct ProbeArgs {
 
 pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
     match args.group {
-        ProbeGroup::ProcessContractSmoke => run_process_probe(root, args),
-        ProbeGroup::AdapterProtocolSmoke => run_adapter_probe(root, args),
+        ProbeGroup::ProcessContract => run_process_probe(root, args),
+        ProbeGroup::AdapterProtocol | ProbeGroup::CircuitParseAdapter => {
+            run_adapter_probe(root, args)
+        }
     }
 }
 
@@ -130,13 +135,24 @@ fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
 }
 
 fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
+    let (probe_id, workload, measurement) = match args.group {
+        ProbeGroup::AdapterProtocol => (ADAPTER_PROBE_ID, "protocol-smoke", "main"),
+        ProbeGroup::CircuitParseAdapter => (CIRCUIT_PARSE_PROBE_ID, "circuit-parse", "parse"),
+        ProbeGroup::ProcessContract => {
+            return Err(ProbeError::Contract(
+                "process-only probe cannot use the adapter path".to_string(),
+            ));
+        }
+    };
     let repository = super::git::repository_state(root)?;
     let adapter = prepare_adapter(root, &repository.commit)?;
     let worker_identity = worker::current_identity()?;
     let current_exe = std::env::current_exe().map_err(ProbeError::CurrentExecutable)?;
-    let common_arguments = [
+    let common_arguments = vec![
         OsString::from("--workload"),
-        OsString::from("protocol-smoke"),
+        OsString::from(workload),
+        OsString::from("--measurement-id"),
+        OsString::from(measurement),
         OsString::from("--iterations"),
         OsString::from(args.iterations.get().to_string()),
         OsString::from("--work-items"),
@@ -146,7 +162,7 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
     ];
     let adapter_request = ProcessRequest {
         program: adapter.path.clone(),
-        args: common_arguments.to_vec(),
+        args: common_arguments.clone(),
         stdin: Vec::new(),
         working_directory: root.path.clone(),
         environment: probe_environment(),
@@ -177,8 +193,8 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
 
     let stim_rows = parse_worker_json_lines(&stim_output.stdout)?;
     let stab_rows = parse_worker_json_lines(&stab_output.stdout)?;
-    let workload_id = ProtocolId::try_new("protocol-smoke")?;
-    let measurement_id = ProtocolId::try_new("main")?;
+    let workload_id = ProtocolId::try_new(workload)?;
+    let measurement_id = ProtocolId::try_new(measurement)?;
     let measurement_ids = BTreeSet::from([measurement_id.clone()]);
     let stim_commit = GitCommit::try_new(STIM_COMMIT)?;
     let expected_work_count = expected_work_count(&args)?;
@@ -218,7 +234,7 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
         })?;
         println!(
             "[stab-bench] probe={} mode=timing work={} stim_seconds={:.9} stab_seconds={:.9} diagnostic_ratio={:.6} stim_parent_peak_rss={} stab_parent_peak_rss={}",
-            ADAPTER_PROBE_ID,
+            probe_id,
             pair.work_count,
             pair.stim_elapsed_seconds,
             pair.stab_elapsed_seconds,
@@ -240,7 +256,7 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
         }
         println!(
             "[stab-bench] probe={} mode=memory work={} stim_setup_rss={} stim_peak_rss={} stab_setup_rss={} stab_peak_rss={}",
-            ADAPTER_PROBE_ID,
+            probe_id,
             stim.work_count,
             display_rss(stim.setup_rss_bytes),
             display_rss(stim.peak_rss_bytes),
@@ -256,6 +272,8 @@ fn worker_arguments(args: &ProbeArgs) -> Vec<OsString> {
         OsString::from("qualification-worker"),
         OsString::from("--workload"),
         OsString::from("protocol-smoke"),
+        OsString::from("--measurement-id"),
+        OsString::from("main"),
         OsString::from("--iterations"),
         OsString::from(args.iterations.get().to_string()),
         OsString::from("--work-items"),

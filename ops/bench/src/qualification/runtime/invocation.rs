@@ -10,7 +10,7 @@ use thiserror::Error;
 use super::adapter::{AdapterExecutable, prepare_adapter};
 use super::process::{ProcessLimits, ProcessRequest, ProcessResult, run_bounded_process};
 use super::protocol::{
-    EvidenceMode, GitCommit, Implementation, ProtocolExpectation, ProtocolId, SemanticDigest,
+    EvidenceMode, GitCommit, Implementation, ProtocolExpectation, SemanticDigest,
     WorkerMeasurement, parse_worker_json_lines,
 };
 use crate::config::STIM_COMMIT;
@@ -18,21 +18,29 @@ use crate::root::RepoRoot;
 
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
 pub(super) const PQ1_GROUP_ID: &str = "pq1-adapter-protocol-smoke";
-const WORKLOAD_ID: &str = "protocol-smoke";
-const MEASUREMENT_ID: &str = "main";
+pub(super) const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 
 pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
-    contract.id.to_string() == PQ1_GROUP_ID
-        && contract.workload_id.to_string() == WORKLOAD_ID
-        && contract.measurement_ids.len() == 1
-        && contract
-            .measurement_ids
-            .first()
-            .is_some_and(|measurement| measurement.to_string() == MEASUREMENT_ID)
+    let identity = (
+        contract.id.to_string(),
+        contract.workload_id.to_string(),
+        contract.measurement_ids.first().map(ToString::to_string),
+        contract.measurement_ids.len(),
+    );
+    matches!(
+        identity,
+        (group, workload, Some(measurement), 1)
+            if (group == PQ1_GROUP_ID
+                && workload == "protocol-smoke"
+                && measurement == "main")
+                || (group == CIRCUIT_PARSE_GROUP_ID
+                    && workload == "circuit-parse"
+                    && measurement == "parse")
+    )
 }
 
 pub(super) const fn registered_group_count() -> usize {
-    1
+    2
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -54,6 +62,16 @@ pub(crate) struct PreparedWorkers {
     repository_commit: String,
     toolchain: super::toolchain::ToolchainEvidence,
     cpu: Option<usize>,
+}
+
+pub(super) struct InvocationRequest<'a> {
+    pub(super) group: &'a super::group::GroupContract,
+    pub(super) implementation: Implementation,
+    pub(super) evidence_mode: EvidenceMode,
+    pub(super) iterations: NonZeroU64,
+    pub(super) work_items: NonZeroU64,
+    pub(super) expected_output_digest: Option<&'a SemanticDigest>,
+    pub(super) timeout: Duration,
 }
 
 impl PreparedWorkers {
@@ -107,19 +125,29 @@ impl PreparedWorkers {
 
     pub(crate) fn invoke(
         &self,
-        implementation: Implementation,
-        evidence_mode: EvidenceMode,
-        iterations: NonZeroU64,
-        work_items: NonZeroU64,
-        expected_output_digest: Option<&SemanticDigest>,
-        timeout: Duration,
+        request: InvocationRequest<'_>,
     ) -> Result<InvocationRecord, InvocationError> {
+        let InvocationRequest {
+            group,
+            implementation,
+            evidence_mode,
+            iterations,
+            work_items,
+            expected_output_digest,
+            timeout,
+        } = request;
+        if !supports_group(group) {
+            return Err(InvocationError::UnsupportedGroup(group.id.to_string()));
+        }
+        let measurement_id = group.single_measurement()?;
         let cpu = self.cpu.ok_or(InvocationError::MissingCpu)?;
         let expected_cpu = u32::try_from(cpu).map_err(|_| InvocationError::CpuRange(cpu))?;
         let expected_work_count = checked_work_count(iterations, work_items)?;
         let mut arguments = vec![
             OsString::from("--workload"),
-            OsString::from(WORKLOAD_ID),
+            OsString::from(group.workload_id.to_string()),
+            OsString::from("--measurement-id"),
+            OsString::from(measurement_id.to_string()),
             OsString::from("--iterations"),
             OsString::from(iterations.get().to_string()),
             OsString::from("--work-items"),
@@ -169,8 +197,8 @@ impl PreparedWorkers {
         ProtocolExpectation {
             implementation,
             evidence_mode,
-            workload_id: ProtocolId::try_new(WORKLOAD_ID)?,
-            measurement_ids: BTreeSet::from([ProtocolId::try_new(MEASUREMENT_ID)?]),
+            workload_id: group.workload_id.clone(),
+            measurement_ids: BTreeSet::from([measurement_id.clone()]),
             iteration_count: iterations.get(),
             expected_work_count,
             expected_output_digest: expected_output_digest.cloned(),
@@ -262,13 +290,6 @@ fn checked_work_count(
         .ok_or(InvocationError::WorkOverflow)
 }
 
-pub(crate) fn protocol_ids() -> Result<(ProtocolId, ProtocolId), InvocationError> {
-    Ok((
-        ProtocolId::try_new(WORKLOAD_ID)?,
-        ProtocolId::try_new(MEASUREMENT_ID)?,
-    ))
-}
-
 #[derive(Debug, Error)]
 pub(crate) enum InvocationError {
     #[error(transparent)]
@@ -279,6 +300,10 @@ pub(crate) enum InvocationError {
     Process(#[from] super::process::ProcessError),
     #[error(transparent)]
     Protocol(#[from] super::protocol::ProtocolError),
+    #[error(transparent)]
+    Group(#[from] super::group::GroupError),
+    #[error("qualification runtime group is not implemented by both workers: {0}")]
+    UnsupportedGroup(String),
     #[error("qualification CPU {0} exceeds the shared worker protocol")]
     CpuRange(usize),
     #[error("qualification workers were invoked before selecting a host-policy CPU")]

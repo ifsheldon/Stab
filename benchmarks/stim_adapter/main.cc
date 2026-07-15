@@ -33,6 +33,8 @@
 namespace {
 
 struct Arguments {
+    std::string workload;
+    std::string measurement_id;
     uint64_t iterations = 0;
     uint64_t work_items = 0;
     std::string evidence_mode;
@@ -59,7 +61,6 @@ uint64_t parse_positive_u64(std::string_view text, std::string_view name) {
 
 Arguments parse_arguments(int argc, const char **argv) {
     Arguments result;
-    std::string workload;
     for (int index = 1; index < argc; index += 2) {
         if (index + 1 >= argc) {
             throw std::invalid_argument("adapter options require values");
@@ -67,7 +68,9 @@ Arguments parse_arguments(int argc, const char **argv) {
         const std::string_view name(argv[index]);
         const std::string_view value(argv[index + 1]);
         if (name == "--workload") {
-            workload = value;
+            result.workload = value;
+        } else if (name == "--measurement-id") {
+            result.measurement_id = value;
         } else if (name == "--iterations") {
             result.iterations = parse_positive_u64(value, "iterations");
         } else if (name == "--work-items") {
@@ -89,8 +92,10 @@ Arguments parse_arguments(int argc, const char **argv) {
             throw std::invalid_argument("unknown adapter option " + std::string(name));
         }
     }
-    if (workload != "protocol-smoke") {
-        throw std::invalid_argument("adapter supports only the PQ1 protocol-smoke workload");
+    const bool protocol_smoke = result.workload == "protocol-smoke" && result.measurement_id == "main";
+    const bool circuit_parse = result.workload == "circuit-parse" && result.measurement_id == "parse";
+    if (!protocol_smoke && !circuit_parse) {
+        throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
         throw std::invalid_argument("adapter requires --iterations and --work-items");
@@ -173,6 +178,58 @@ std::array<uint64_t, 4> protocol_smoke(uint64_t iterations, uint64_t work_items)
     return state;
 }
 
+constexpr uint64_t MAX_CIRCUIT_PARSE_INSTRUCTIONS = 1000000;
+constexpr std::array<std::string_view, 6> CIRCUIT_INSTRUCTION_CYCLE{
+    "H 0\n",
+    "S 1\n",
+    "CX 0 1\n",
+    "M 0\n",
+    "DETECTOR rec[-1]\n",
+    "TICK\n",
+};
+
+std::string circuit_parse_fixture(uint64_t work_items) {
+    if (work_items > MAX_CIRCUIT_PARSE_INSTRUCTIONS) {
+        throw std::invalid_argument("circuit-parse instruction count exceeds the source-owned limit");
+    }
+    std::string fixture;
+    if (work_items > std::numeric_limits<size_t>::max() / 12) {
+        throw std::overflow_error("circuit-parse fixture capacity overflows size_t");
+    }
+    fixture.reserve(static_cast<size_t>(work_items) * 12);
+    for (uint64_t index = 0; index < work_items; ++index) {
+        fixture.append(CIRCUIT_INSTRUCTION_CYCLE[index % CIRCUIT_INSTRUCTION_CYCLE.size()]);
+    }
+    return fixture;
+}
+
+stim::Circuit circuit_parse(uint64_t iterations, const std::string &fixture) {
+    stim::Circuit parsed;
+    for (uint64_t iteration = 0; iteration < iterations; ++iteration) {
+        parsed = stim::Circuit(fixture);
+    }
+    return parsed;
+}
+
+std::array<uint64_t, 4> byte_digest(std::string_view bytes) {
+    std::array<uint64_t, 4> state{
+        0x6a09e667f3bcc908ULL,
+        0xbb67ae8584caa73bULL,
+        0x3c6ef372fe94f82bULL,
+        0xa54ff53a5f1d36f1ULL,
+    };
+    for (uint64_t index = 0; index < bytes.size(); ++index) {
+        const uint64_t value = static_cast<uint8_t>(bytes[index]) + index * 0x9e3779b97f4a7c15ULL;
+        for (uint32_t lane = 0; lane < state.size(); ++lane) {
+            state[lane] ^= std::rotl(value, static_cast<int>(lane * 13));
+            state[lane] = std::rotl(
+                state[lane] * (0x100000001b3ULL + static_cast<uint64_t>(lane) * 2),
+                static_cast<int>(9 + lane));
+        }
+    }
+    return state;
+}
+
 std::string semantic_digest(const std::array<uint64_t, 4> &state) {
     std::ostringstream output;
     output << std::hex << std::setfill('0');
@@ -188,25 +245,37 @@ int main(int argc, const char **argv) {
     try {
         const Arguments arguments = parse_arguments(argc, argv);
 
-        if (arguments.start_barrier) {
-            wait_for_start_barrier();
-        }
-        verify_affinity(arguments.expected_cpu);
-
         // Linking and constructing a pinned Stim type ensures this is an adapter build, not a
-        // free-standing synthetic comparator. Product workloads are added after PQ1.
+        // free-standing synthetic comparator.
         const stim::Circuit linked_stim("H 0\nM 0\n");
         if (linked_stim.count_qubits() != 1) {
             throw std::runtime_error("pinned Stim circuit smoke check failed");
         }
+        const std::string circuit_fixture = arguments.workload == "circuit-parse"
+                                                ? circuit_parse_fixture(arguments.work_items)
+                                                : std::string{};
+
+        if (arguments.start_barrier) {
+            wait_for_start_barrier();
+        }
+        verify_affinity(arguments.expected_cpu);
 
         const uint64_t setup_rss = status_kib("VmRSS:");
         if (arguments.iterations > std::numeric_limits<uint64_t>::max() / arguments.work_items) {
             throw std::overflow_error("adapter semantic work count overflows u64");
         }
         const auto started = std::chrono::steady_clock::now();
-        const auto digest_state = protocol_smoke(arguments.iterations, arguments.work_items);
+        std::array<uint64_t, 4> digest_state{};
+        stim::Circuit parsed;
+        if (arguments.workload == "protocol-smoke") {
+            digest_state = protocol_smoke(arguments.iterations, arguments.work_items);
+        } else {
+            parsed = circuit_parse(arguments.iterations, circuit_fixture);
+        }
         const auto finished = std::chrono::steady_clock::now();
+        if (arguments.workload == "circuit-parse") {
+            digest_state = byte_digest(parsed.str());
+        }
         const std::chrono::duration<double> elapsed = finished - started;
         if (!(elapsed.count() > 0)) {
             throw std::runtime_error("adapter measured a non-positive duration");
@@ -216,7 +285,8 @@ int main(int argc, const char **argv) {
         std::cout << std::setprecision(17)
                   << "{\"schema_version\":2,\"implementation\":\"stim\","
                   << "\"evidence_mode\":\"" << arguments.evidence_mode << "\","
-                  << "\"workload_id\":\"protocol-smoke\",\"measurement_id\":\"main\","
+                  << "\"workload_id\":\"" << arguments.workload << "\","
+                  << "\"measurement_id\":\"" << arguments.measurement_id << "\","
                   << "\"iteration_count\":" << arguments.iterations << ','
                   << "\"elapsed_seconds\":" << elapsed.count() << ','
                   << "\"work_count\":" << arguments.iterations * arguments.work_items << ','

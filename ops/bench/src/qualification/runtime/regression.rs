@@ -332,6 +332,8 @@ pub(super) enum RegressionError {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroU64;
+
     use super::super::protocol::ProtocolId;
     use super::*;
 
@@ -342,6 +344,10 @@ mod tests {
             baseline_eligibility: BaselineEligibility::ReportOnly,
             workload_id: ProtocolId::try_new("workload").expect("workload id"),
             measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
+            scales: vec![super::super::group::ScaleContract {
+                id: ProtocolId::try_new("default").expect("scale id"),
+                work_items: NonZeroU64::new(1).expect("positive work"),
+            }],
             correctness_case_ids: Vec::new(),
         }
     }

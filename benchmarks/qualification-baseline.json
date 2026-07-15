@@ -6,6 +6,17 @@
       "group_id": "pq1-adapter-protocol-smoke",
       "baseline_eligibility": "report-only",
       "measurements": []
+    },
+    {
+      "group_id": "PERFQ-M4-CIRCUIT-PARSE",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "parse",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
     }
   ]
 }

@@ -46,7 +46,7 @@ pub(crate) fn run_qualification(
     )
     .map_err(BenchError::Qualification)?;
     println!(
-        "[{PREFIX}] published PQ1 qualification evidence at {}",
+        "[{PREFIX}] published performance qualification evidence at {}",
         output.display()
     );
     Ok(())
@@ -67,7 +67,7 @@ pub(crate) fn report(
     )
     .map_err(BenchError::Qualification)?;
     println!(
-        "[{PREFIX}] validated PQ1 qualification evidence at {}",
+        "[{PREFIX}] validated performance qualification evidence at {}",
         output.display()
     );
     Ok(())

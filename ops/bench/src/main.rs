@@ -88,10 +88,10 @@ enum Command {
         check: bool,
     },
 
-    /// Reproduce one bounded PQ1 runner probe.
+    /// Reproduce one bounded runner or product-adapter probe.
     QualificationProbe(qualification::ProbeArgs),
 
-    /// Run the paired PQ1 qualification harness and publish validated evidence.
+    /// Run one paired qualification group and publish validated evidence.
     QualificationRun(qualification::RunArgs),
 
     /// Validate a paired qualification report and regenerate derived artifacts.

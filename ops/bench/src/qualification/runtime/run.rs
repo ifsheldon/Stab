@@ -11,7 +11,9 @@ use super::artifact::QualificationOutput;
 use super::calibration::{CalibrationDecision, CalibrationPolicy, CalibrationProbe, calibrate};
 use super::correctness::{CorrectnessPreflightEvidence, CorrectnessRequirement};
 use super::host::{HostEvidence, HostGuard};
-use super::invocation::{InvocationRecord, PreparedWorkers, WorkerIdentityEvidence, protocol_ids};
+use super::invocation::{
+    InvocationRecord, InvocationRequest, PreparedWorkers, WorkerIdentityEvidence,
+};
 use super::protocol::{EvidenceMode, Implementation, SemanticDigest, WorkerMeasurement};
 use super::statistics::{
     GateOutcome, PairOrder, PairedSample, StatisticsSummary, pair_measurements, summarize,
@@ -19,7 +21,7 @@ use super::statistics::{
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 13;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 14;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
@@ -50,6 +52,14 @@ impl QualificationTier {
 
 #[derive(Clone, Debug, Args)]
 pub(crate) struct RunArgs {
+    /// Source-owned runtime group to execute.
+    #[arg(long, default_value = "pq1-adapter-protocol-smoke")]
+    group: String,
+
+    /// Source-owned workload scale within the selected group.
+    #[arg(long, default_value = "default")]
+    scale: String,
+
     /// Qualification tier controlling the number of retained pairs.
     #[arg(long, value_enum)]
     tier: QualificationTier,
@@ -62,11 +72,7 @@ pub(crate) struct RunArgs {
     #[arg(long)]
     allow_unverified_host: bool,
 
-    /// Semantic work items per protocol-smoke iteration.
-    #[arg(long, default_value = "4096")]
-    work_items: NonZeroU64,
-
-    /// CQ1 report directory used by future promotable product groups.
+    /// Correctness qualification report directory for a promotable product group.
     #[arg(long)]
     correctness_out: Option<PathBuf>,
 
@@ -97,6 +103,7 @@ pub(super) enum ClaimClass {
 pub(super) struct QualificationReport {
     pub(super) schema_version: u32,
     pub(super) group_id: String,
+    pub(super) scale_id: String,
     pub(super) group_contract_sha256: String,
     pub(super) claim_class: ClaimClass,
     pub(super) baseline_eligibility: super::group::BaselineEligibility,
@@ -125,6 +132,8 @@ pub(super) struct QualificationReport {
 #[serde(deny_unknown_fields)]
 pub(super) struct RunCommandEvidence {
     pub(super) output: String,
+    pub(super) group_id: String,
+    pub(super) scale_id: String,
     pub(super) work_items: u64,
     pub(super) allow_unverified_host: bool,
     pub(super) warmup_batches: usize,
@@ -231,12 +240,12 @@ pub(super) fn run(
     args: RunArgs,
 ) -> Result<PathBuf, RunError> {
     let repository_before = super::git::repository_state(root)?;
-    let resolved_group = super::group::load_group(
-        root,
-        performance_inventory_sha256,
-        super::invocation::PQ1_GROUP_ID,
-    )?;
-    let (workload_id, measurement_id) = protocol_ids()?;
+    let resolved_group = super::group::load_group(root, performance_inventory_sha256, &args.group)?;
+    let scale = resolved_group.contract.scale(&args.scale)?;
+    let work_items = scale.work_items;
+    let scale_id = scale.id.clone();
+    let workload_id = resolved_group.contract.workload_id.clone();
+    let measurement_id = resolved_group.contract.single_measurement()?.clone();
     resolved_group
         .contract
         .validate_worker_shape(&workload_id, &measurement_id)?;
@@ -254,16 +263,30 @@ pub(super) fn run(
     workers.pin_to_cpu(host_guard.selected_cpu());
 
     let policy = calibration_policy()?;
-    let (stim_decision, stim_probes) =
-        calibrate_worker(&workers, Implementation::Stim, args.work_items, policy)?;
-    let (stab_decision, stab_probes) =
-        calibrate_worker(&workers, Implementation::Stab, args.work_items, policy)?;
+    let (stim_decision, stim_probes) = calibrate_worker(
+        &workers,
+        &resolved_group.contract,
+        Implementation::Stim,
+        work_items,
+        policy,
+    )?;
+    let (stab_decision, stab_probes) = calibrate_worker(
+        &workers,
+        &resolved_group.contract,
+        Implementation::Stab,
+        work_items,
+        policy,
+    )?;
     let common_iterations = stim_decision.iterations.max(stab_decision.iterations);
+    let batch = WorkloadBatch {
+        iterations: common_iterations,
+        work_items,
+    };
     let semantic_preflight = execute_pair(
         &workers,
+        &resolved_group.contract,
         0,
-        common_iterations,
-        args.work_items,
+        batch,
         EvidenceMode::Timing,
         None,
     )?;
@@ -273,9 +296,9 @@ pub(super) fn run(
         .clone();
     let common_validation = execute_pair(
         &workers,
+        &resolved_group.contract,
         0,
-        common_iterations,
-        args.work_items,
+        batch,
         EvidenceMode::Timing,
         Some(&expected_output_digest),
     )?;
@@ -293,11 +316,11 @@ pub(super) fn run(
 
     let mut timing_attempts = vec![execute_timing_attempt(
         &workers,
+        &resolved_group.contract,
         0,
         TimingAttemptKind::Initial,
         args.tier,
-        common_iterations,
-        args.work_items,
+        batch,
         &expected_output_digest,
     )?];
     if timing_attempts
@@ -306,24 +329,24 @@ pub(super) fn run(
     {
         timing_attempts.push(execute_timing_attempt(
             &workers,
+            &resolved_group.contract,
             1,
             TimingAttemptKind::PairedRatioNoiseRerun,
             args.tier,
-            common_iterations,
-            args.work_items,
+            batch,
             &expected_output_digest,
         )?);
     }
 
     let memory_execution = execute_pair(
         &workers,
+        &resolved_group.contract,
         0,
-        common_iterations,
-        args.work_items,
+        batch,
         EvidenceMode::Memory,
         Some(&expected_output_digest),
     )?;
-    let memory = memory_evidence(memory_execution, common_iterations)?;
+    let memory = memory_evidence(memory_execution, batch.iterations)?;
     workers.verify()?;
     let host = host_guard.finish()?;
     let repository_after = super::git::repository_state(root)?;
@@ -339,16 +362,29 @@ pub(super) fn run(
         local_modifications_before: repository_before.local_modifications,
         local_modifications_after: repository_after.local_modifications,
     };
+    let promotable = super::report::promotion_eligibility(super::report::PromotionEvidence {
+        claim_class,
+        allow_unverified_host: args.allow_unverified_host,
+        tier: args.tier,
+        local_modifications_before: repository.local_modifications_before,
+        local_modifications_after: repository.local_modifications_after,
+        host_verified: host.verified,
+        correctness_status: correctness_preflight.status,
+        correctness_case_count: correctness_preflight.case_ids.len(),
+    });
     let report = QualificationReport {
         schema_version: REPORT_SCHEMA_VERSION,
         group_id: resolved_group.contract.id.to_string(),
+        scale_id: scale_id.to_string(),
         group_contract_sha256: resolved_group.source_sha256,
         claim_class,
         baseline_eligibility: resolved_group.contract.baseline_eligibility,
         tier: args.tier,
         command: RunCommandEvidence {
             output: args.out.to_string_lossy().into_owned(),
-            work_items: args.work_items.get(),
+            group_id: resolved_group.contract.id.to_string(),
+            scale_id: scale_id.to_string(),
+            work_items: work_items.get(),
             allow_unverified_host: args.allow_unverified_host,
             warmup_batches: WARMUP_BATCHES,
             paired_samples: args.tier.pair_count(),
@@ -377,7 +413,7 @@ pub(super) fn run(
         calibration,
         timing_attempts,
         memory,
-        promotable: false,
+        promotable,
     };
     super::report::validate_report(
         root,
@@ -440,6 +476,7 @@ fn correctness_preflight(
 
 fn calibrate_worker(
     workers: &PreparedWorkers,
+    group: &super::group::GroupContract,
     implementation: Implementation,
     work_items: NonZeroU64,
     policy: CalibrationPolicy,
@@ -447,14 +484,15 @@ fn calibrate_worker(
     let mut evidence = Vec::new();
     let decision = calibrate(policy, |iterations| {
         let invocation = workers
-            .invoke(
+            .invoke(InvocationRequest {
+                group,
                 implementation,
-                EvidenceMode::Timing,
+                evidence_mode: EvidenceMode::Timing,
                 iterations,
                 work_items,
-                None,
-                INVOCATION_TIMEOUT,
-            )
+                expected_output_digest: None,
+                timeout: INVOCATION_TIMEOUT,
+            })
             .map_err(|error| error.to_string())?;
         let measured = invocation
             .measured_duration()
@@ -494,22 +532,28 @@ fn calibration_evidence(
     }
 }
 
+#[derive(Clone, Copy)]
+struct WorkloadBatch {
+    iterations: NonZeroU64,
+    work_items: NonZeroU64,
+}
+
 fn execute_timing_attempt(
     workers: &PreparedWorkers,
+    group: &super::group::GroupContract,
     attempt_index: usize,
     kind: TimingAttemptKind,
     tier: QualificationTier,
-    iterations: NonZeroU64,
-    work_items: NonZeroU64,
+    batch: WorkloadBatch,
     expected_output_digest: &SemanticDigest,
 ) -> Result<TimingAttempt, RunError> {
     let mut warmups = Vec::with_capacity(WARMUP_BATCHES);
     for pair_index in 0..WARMUP_BATCHES {
         let execution = execute_pair(
             workers,
+            group,
             pair_index,
-            iterations,
-            work_items,
+            batch,
             EvidenceMode::Timing,
             Some(expected_output_digest),
         )?;
@@ -522,16 +566,16 @@ fn execute_timing_attempt(
     for pair_index in 0..tier.pair_count() {
         let execution = execute_pair(
             workers,
+            group,
             pair_index,
-            iterations,
-            work_items,
+            batch,
             EvidenceMode::Timing,
             Some(expected_output_digest),
         )?;
         paired_samples.extend(pair_execution(&execution)?);
         samples.push(execution);
     }
-    let (_, measurement_id) = protocol_ids()?;
+    let measurement_id = group.single_measurement()?.clone();
     let statistics = vec![summarize(
         measurement_id,
         &paired_samples,
@@ -555,22 +599,23 @@ fn execute_timing_attempt(
 
 fn execute_pair(
     workers: &PreparedWorkers,
+    group: &super::group::GroupContract,
     pair_index: usize,
-    iterations: NonZeroU64,
-    work_items: NonZeroU64,
+    batch: WorkloadBatch,
     evidence_mode: EvidenceMode,
     expected_output_digest: Option<&SemanticDigest>,
 ) -> Result<PairExecution, RunError> {
     let order = PairOrder::for_pair(pair_index);
     let invoke = |implementation| {
-        workers.invoke(
+        workers.invoke(InvocationRequest {
+            group,
             implementation,
             evidence_mode,
-            iterations,
-            work_items,
+            iterations: batch.iterations,
+            work_items: batch.work_items,
             expected_output_digest,
-            INVOCATION_TIMEOUT,
-        )
+            timeout: INVOCATION_TIMEOUT,
+        })
     };
     let (stim, stab) = match order {
         PairOrder::StimThenStab => {
@@ -746,6 +791,13 @@ pub(super) enum RunError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::Parser;
+
+    #[derive(Debug, Parser)]
+    struct RunCli {
+        #[command(flatten)]
+        args: RunArgs,
+    }
 
     #[test]
     fn tiers_have_source_owned_pair_counts() {
@@ -780,5 +832,30 @@ mod tests {
         assert!(!common_calibration_duration_is_accepted(
             Duration::from_micros(2_000_001)
         ));
+    }
+
+    #[test]
+    fn run_cli_selects_source_owned_group_and_scale_without_free_work() {
+        let defaults = RunCli::try_parse_from(["qualification-run", "--tier", "pr"])
+            .expect("default diagnostic run");
+        assert_eq!(defaults.args.group, super::super::invocation::PQ1_GROUP_ID);
+        assert_eq!(defaults.args.scale, "default");
+
+        let product = RunCli::try_parse_from([
+            "qualification-run",
+            "--tier",
+            "full",
+            "--group",
+            super::super::invocation::CIRCUIT_PARSE_GROUP_ID,
+            "--scale",
+            "large",
+        ])
+        .expect("product group and scale");
+        assert_eq!(product.args.scale, "large");
+
+        assert!(
+            RunCli::try_parse_from(["qualification-run", "--tier", "pr", "--work-items", "1",])
+                .is_err()
+        );
     }
 }

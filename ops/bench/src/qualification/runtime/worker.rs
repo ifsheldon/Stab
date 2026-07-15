@@ -18,6 +18,15 @@ use crate::config::STIM_COMMIT;
 const WORKER_SOURCE: &[u8] = include_bytes!("worker.rs");
 const DIAGNOSTIC_BUILD_FINGERPRINT: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
+const MAX_CIRCUIT_PARSE_INSTRUCTIONS: u64 = 1_000_000;
+const CIRCUIT_INSTRUCTION_CYCLE: [&str; 6] = [
+    "H 0\n",
+    "S 1\n",
+    "CX 0 1\n",
+    "M 0\n",
+    "DETECTOR rec[-1]\n",
+    "TICK\n",
+];
 
 #[derive(Clone, Debug)]
 pub(super) struct WorkerIdentity {
@@ -28,12 +37,21 @@ pub(super) struct WorkerIdentity {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub(crate) enum WorkerWorkload {
     ProtocolSmoke,
+    CircuitParse,
 }
 
 impl WorkerWorkload {
     fn id(self) -> &'static str {
         match self {
             Self::ProtocolSmoke => "protocol-smoke",
+            Self::CircuitParse => "circuit-parse",
+        }
+    }
+
+    fn measurement_id(self) -> &'static str {
+        match self {
+            Self::ProtocolSmoke => "main",
+            Self::CircuitParse => "parse",
         }
     }
 }
@@ -86,9 +104,20 @@ pub(crate) struct WorkerArgs {
 
 pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     ensure_linux()?;
+    if args.measurement_id != args.workload.measurement_id() {
+        return Err(WorkerError::MeasurementMismatch {
+            workload: args.workload.id(),
+            expected: args.workload.measurement_id(),
+            actual: args.measurement_id,
+        });
+    }
     let measurement_id = ProtocolId::try_new(args.measurement_id)?;
     let workload_id = ProtocolId::try_new(args.workload.id())?;
     let identity = current_identity()?;
+    let circuit_fixture = match args.workload {
+        WorkerWorkload::ProtocolSmoke => None,
+        WorkerWorkload::CircuitParse => Some(circuit_parse_fixture(args.work_items.get())?),
+    };
     if args.start_barrier {
         wait_for_start_barrier()?;
     }
@@ -101,17 +130,24 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         .ok_or(WorkerError::WorkOverflow)?;
 
     let started = Instant::now();
-    let digest_state = match args.workload {
-        WorkerWorkload::ProtocolSmoke => {
-            protocol_smoke(args.iterations.get(), args.work_items.get())
-        }
+    let output = match args.workload {
+        WorkerWorkload::ProtocolSmoke => WorkloadOutput::DigestState(protocol_smoke(
+            args.iterations.get(),
+            args.work_items.get(),
+        )),
+        WorkerWorkload::CircuitParse => WorkloadOutput::Circuit(circuit_parse(
+            args.iterations.get(),
+            circuit_fixture
+                .as_deref()
+                .ok_or(WorkerError::MissingCircuitFixture)?,
+        )?),
     };
     let elapsed_seconds = started.elapsed().as_secs_f64();
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
     }
     let peak_rss_bytes = peak_rss_bytes()?.max(current_rss_bytes()?);
-    let digest = semantic_digest(digest_state);
+    let digest = output.semantic_digest();
     let row = WorkerMeasurement {
         schema_version: PROTOCOL_SCHEMA_VERSION,
         implementation: Implementation::Stab,
@@ -173,6 +209,75 @@ fn protocol_smoke(iterations: u64, work_items: u64) -> [u64; 4] {
         }
     }
     black_box(state);
+    state
+}
+
+enum WorkloadOutput {
+    DigestState([u64; 4]),
+    Circuit(stab_core::Circuit),
+}
+
+impl WorkloadOutput {
+    fn semantic_digest(self) -> String {
+        match self {
+            Self::DigestState(state) => semantic_digest(state),
+            Self::Circuit(circuit) => {
+                let canonical = circuit.to_stim_string();
+                let canonical = canonical.strip_suffix('\n').unwrap_or(&canonical);
+                semantic_digest(byte_digest(canonical.as_bytes()))
+            }
+        }
+    }
+}
+
+fn circuit_parse_fixture(work_items: u64) -> Result<String, WorkerError> {
+    if work_items > MAX_CIRCUIT_PARSE_INSTRUCTIONS {
+        return Err(WorkerError::CircuitScaleLimit {
+            actual: work_items,
+            maximum: MAX_CIRCUIT_PARSE_INSTRUCTIONS,
+        });
+    }
+    let instruction_count =
+        usize::try_from(work_items).map_err(|_| WorkerError::CircuitScaleRange(work_items))?;
+    let capacity = instruction_count
+        .checked_mul(12)
+        .ok_or(WorkerError::CircuitFixtureOverflow)?;
+    let mut fixture = String::with_capacity(capacity);
+    for instruction in CIRCUIT_INSTRUCTION_CYCLE
+        .iter()
+        .cycle()
+        .take(instruction_count)
+    {
+        fixture.push_str(instruction);
+    }
+    Ok(fixture)
+}
+
+fn circuit_parse(iterations: u64, fixture: &str) -> Result<stab_core::Circuit, WorkerError> {
+    let mut parsed = stab_core::Circuit::new();
+    for _ in 0..iterations {
+        parsed = stab_core::Circuit::from_stim_str(fixture)?;
+    }
+    Ok(parsed)
+}
+
+fn byte_digest(bytes: &[u8]) -> [u64; 4] {
+    let mut state = [
+        0x6a09_e667_f3bc_c908_u64,
+        0xbb67_ae85_84ca_a73b_u64,
+        0x3c6e_f372_fe94_f82b_u64,
+        0xa54f_f53a_5f1d_36f1_u64,
+    ];
+    for (index, byte) in bytes.iter().copied().enumerate() {
+        let value =
+            u64::from(byte).wrapping_add((index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15));
+        for (lane_state, lane) in state.iter_mut().zip(0_u32..) {
+            *lane_state ^= value.rotate_left(lane * 13);
+            *lane_state = lane_state
+                .wrapping_mul(0x0100_0000_01b3_u64.wrapping_add(u64::from(lane) * 2))
+                .rotate_left(9 + lane);
+        }
+    }
     state
 }
 
@@ -279,6 +384,22 @@ pub(super) enum WorkerError {
     UnsupportedHost,
     #[error(transparent)]
     Protocol(#[from] super::protocol::ProtocolError),
+    #[error(transparent)]
+    Circuit(#[from] stab_core::CircuitError),
+    #[error("qualification workload {workload} requires measurement {expected}, got {actual}")]
+    MeasurementMismatch {
+        workload: &'static str,
+        expected: &'static str,
+        actual: String,
+    },
+    #[error("circuit-parse scale has {actual} instructions, maximum {maximum}")]
+    CircuitScaleLimit { actual: u64, maximum: u64 },
+    #[error("circuit-parse scale {0} cannot be represented on this host")]
+    CircuitScaleRange(u64),
+    #[error("circuit-parse fixture capacity overflows usize")]
+    CircuitFixtureOverflow,
+    #[error("circuit-parse workload was invoked without its prepared fixture")]
+    MissingCircuitFixture,
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]
@@ -318,5 +439,28 @@ mod tests {
         assert_eq!(protocol_smoke(2, 8), protocol_smoke(2, 8));
         assert_ne!(protocol_smoke(2, 8), protocol_smoke(2, 9));
         assert_ne!(protocol_smoke(2, 8), protocol_smoke(3, 8));
+    }
+
+    #[test]
+    fn circuit_parse_fixture_and_digest_are_work_sensitive() {
+        let small = circuit_parse_fixture(64).expect("small fixture");
+        let larger = circuit_parse_fixture(65).expect("larger fixture");
+        assert_eq!(small.lines().count(), 64);
+        assert_eq!(larger.lines().count(), 65);
+        let small = circuit_parse(1, &small).expect("parse small fixture");
+        let larger = circuit_parse(1, &larger).expect("parse larger fixture");
+        let small = WorkloadOutput::Circuit(small).semantic_digest();
+        let larger = WorkloadOutput::Circuit(larger).semantic_digest();
+        assert_eq!(small.len(), 64);
+        assert_ne!(small, larger);
+    }
+
+    #[test]
+    fn circuit_parse_fixture_rejects_the_first_unsupported_scale() {
+        assert!(circuit_parse_fixture(MAX_CIRCUIT_PARSE_INSTRUCTIONS).is_ok());
+        assert!(matches!(
+            circuit_parse_fixture(MAX_CIRCUIT_PARSE_INSTRUCTIONS + 1),
+            Err(WorkerError::CircuitScaleLimit { .. })
+        ));
     }
 }
