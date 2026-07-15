@@ -2,9 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::discovery::{self, PERFORMANCE_FEATURE_IDS, SourceReferences};
 use super::model::{
-    ChecklistScope, CorrectnessBinding, FixtureLocator, InputByteCount, PerformanceDisposition,
-    QualificationStatus, QualificationSuite, RowClassification, RowDecision, RowOrigin,
-    SCHEMA_VERSION, StimMapping, ThresholdPolicy,
+    ChecklistScope, CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount,
+    PerformanceDisposition, QualificationStatus, QualificationSuite, RowClassification,
+    RowDecision, RowOrigin, SCHEMA_VERSION, StimMapping, ThresholdPolicy,
 };
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
@@ -575,7 +575,9 @@ fn validate_groups(
                     group.id, group.manifest_row
                 ));
             }
-            if let Some(row) = manifest_by_id.get(group.manifest_row.as_str()) {
+            if group.status == QualificationStatus::Planned
+                && let Some(row) = manifest_by_id.get(group.manifest_row.as_str())
+            {
                 let inherited_scale = group.workload_family.scales.first();
                 if row.stdin_path.is_empty() {
                     if !matches!(
@@ -692,6 +694,21 @@ fn validate_groups(
                     group.id
                 ));
             }
+            CorrectnessBinding::ExactCases
+                if group.correctness_cases.is_empty()
+                    || group.planned_correctness_case_id.is_some() =>
+            {
+                issues.push(format!(
+                    "exact-case group {} lacks exact CQ cases",
+                    group.id
+                ));
+            }
+            CorrectnessBinding::ExactCases if group.id.starts_with("PERFQ-API-") => {
+                issues.push(format!(
+                    "API group {} does not use exact API owner binding",
+                    group.id
+                ));
+            }
             CorrectnessBinding::Unresolved
                 if !group.correctness_cases.is_empty()
                     || group.planned_correctness_case_id.is_none() =>
@@ -738,6 +755,24 @@ fn validate_groups(
                 issues.push(format!("group {} repeats scale {}", group.id, scale.id));
             }
             validate_text("scale parameters", &scale.parameters, issues);
+            if group.status != QualificationStatus::Planned {
+                if scale.semantic_work.is_none_or(|work| work == 0) {
+                    issues.push(format!(
+                        "implemented group {} scale {} lacks positive typed semantic work",
+                        group.id, scale.id
+                    ));
+                }
+                if scale
+                    .input_digest
+                    .as_deref()
+                    .is_none_or(|digest| !is_digest(digest))
+                {
+                    issues.push(format!(
+                        "implemented group {} scale {} lacks a valid input digest",
+                        group.id, scale.id
+                    ));
+                }
+            }
         }
         for scale in &group.memory_policy.scale_ids {
             if !scale_ids.contains(scale.as_str()) {
@@ -747,8 +782,14 @@ fn validate_groups(
                 ));
             }
         }
-        if group.status != QualificationStatus::Planned {
-            issues.push(format!("PQ0 group {} is not planned", group.id));
+        if group.status != QualificationStatus::Planned
+            && (group.correctness_binding == CorrectnessBinding::Unresolved
+                || group.output_contract.digest_state != EvidenceState::Existing)
+        {
+            issues.push(format!(
+                "implemented group {} lacks exact correctness or output evidence",
+                group.id
+            ));
         }
         validate_text("qualification group reason", &group.reason, issues);
         if group.id.starts_with("PERFQ-API-")
@@ -1103,8 +1144,8 @@ fn validate_rows(
             "manifest primary performance ownership is stale: {primary_owners:?}"
         ));
     }
-    validate_decision_count(suite, RowDecision::Retained, 15, issues);
-    validate_decision_count(suite, RowDecision::Reworked, 135, issues);
+    validate_decision_count(suite, RowDecision::Retained, 14, issues);
+    validate_decision_count(suite, RowDecision::Reworked, 136, issues);
     validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
     validate_decision_count(suite, RowDecision::Superseded, 5, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);
@@ -1113,14 +1154,14 @@ fn validate_rows(
     validate_classification_count(suite, RowClassification::Proxy, 10, issues);
     validate_classification_count(suite, RowClassification::Stale, 2, issues);
     validate_classification_count(suite, RowClassification::Duplicate, 5, issues);
-    validate_classification_count(suite, RowClassification::MissingScale, 124, issues);
+    validate_classification_count(suite, RowClassification::MissingScale, 123, issues);
     validate_classification_count(
         suite,
         RowClassification::MissingCorrectnessPreflight,
-        159,
+        158,
         issues,
     );
-    validate_classification_count(suite, RowClassification::MissingOutputDigest, 159, issues);
+    validate_classification_count(suite, RowClassification::MissingOutputDigest, 158, issues);
     validate_classification_count(suite, RowClassification::MissingComparator, 73, issues);
     validate_classification_count(suite, RowClassification::AdapterCandidate, 73, issues);
     validate_classification_count(
@@ -1132,13 +1173,13 @@ fn validate_rows(
     validate_classification_count(
         suite,
         RowClassification::HeterogeneousMeasurements,
-        21,
+        20,
         issues,
     );
     validate_classification_count(
         suite,
         RowClassification::UnmatchedSubmeasurement,
-        15,
+        14,
         issues,
     );
 }

@@ -14,8 +14,44 @@ const OUTPUT_PREFIX: [&str; 3] = ["target", "benchmarks", "qualification"];
 const PUBLICATION_LOCK: &str = ".publication.lock";
 const MAX_ARTIFACT_BYTES: usize = 64 << 20;
 const MAX_DIRECTORY_ENTRIES: usize = 16;
+const MAX_DIRECT_ARTIFACT_NAME_BYTES: usize = 128;
 const ARTIFACT_NAMES: [&str; 3] = ["preflight.json", "report.json", "report.md"];
 static STAGING_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(crate) struct DirectQualificationArtifactPath(PathBuf);
+
+impl DirectQualificationArtifactPath {
+    pub(crate) fn try_new(path: &Path) -> Result<Self, ArtifactError> {
+        let components = validate_output(path)?;
+        if components.len() != OUTPUT_PREFIX.len() + 1 {
+            return Err(ArtifactError::NonDirectArtifact(path.to_path_buf()));
+        }
+        let Some(name) = components.last().and_then(|component| component.to_str()) else {
+            return Err(ArtifactError::NonDirectArtifact(path.to_path_buf()));
+        };
+        if name.len() > MAX_DIRECT_ARTIFACT_NAME_BYTES
+            || !name
+                .as_bytes()
+                .first()
+                .is_some_and(u8::is_ascii_alphanumeric)
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        {
+            return Err(ArtifactError::NonDirectArtifact(path.to_path_buf()));
+        }
+        Ok(Self(components.into_iter().collect()))
+    }
+
+    pub(crate) fn as_path(&self) -> &Path {
+        &self.0
+    }
+
+    pub(crate) fn into_path_buf(self) -> PathBuf {
+        self.0
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct QualificationOutput {
@@ -141,8 +177,37 @@ impl QualificationOutput {
         }
         let target =
             open_directory_at(&self.parent, &self.target_name).map_err(ArtifactError::Io)?;
-        let current = read_artifact_from_directory(&target, name)?;
+        let current = read_artifact_from_directory(&target, name, MAX_ARTIFACT_BYTES)?;
         if current == expected {
+            Ok(())
+        } else {
+            Err(ArtifactError::ConcurrentReplacement(name))
+        }
+    }
+
+    pub(crate) fn require_sibling_artifact_digest(
+        &self,
+        source_path: &DirectQualificationArtifactPath,
+        name: &'static str,
+        expected_sha256: &str,
+        maximum_bytes: usize,
+    ) -> Result<(), ArtifactError> {
+        if !ARTIFACT_NAMES.contains(&name) {
+            return Err(ArtifactError::InvalidArtifactName(name));
+        }
+        DirectQualificationArtifactPath::try_new(&self.relative)?;
+        let source_components = validate_output(source_path.as_path())?;
+        let source_name = source_components
+            .last()
+            .ok_or_else(|| ArtifactError::NonDirectArtifact(source_path.as_path().to_path_buf()))?;
+        if *source_name == self.target_name {
+            return Err(ArtifactError::NonSiblingArtifact(
+                source_path.as_path().to_path_buf(),
+            ));
+        }
+        let source = open_directory_at(&self.parent, source_name).map_err(ArtifactError::Io)?;
+        let current = read_artifact_from_directory(&source, name, maximum_bytes)?;
+        if super::run::sha256_hex(&current) == expected_sha256 {
             Ok(())
         } else {
             Err(ArtifactError::ConcurrentReplacement(name))
@@ -150,14 +215,27 @@ impl QualificationOutput {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn read_artifact(
     root: &RepoRoot,
     relative: &Path,
     name: &'static str,
 ) -> Result<Vec<u8>, ArtifactError> {
+    read_artifact_bounded(root, relative, name, MAX_ARTIFACT_BYTES)
+}
+
+pub(crate) fn read_artifact_bounded(
+    root: &RepoRoot,
+    relative: &Path,
+    name: &'static str,
+    maximum_bytes: usize,
+) -> Result<Vec<u8>, ArtifactError> {
     ensure_linux()?;
     if !ARTIFACT_NAMES.contains(&name) {
         return Err(ArtifactError::InvalidArtifactName(name));
+    }
+    if maximum_bytes > MAX_ARTIFACT_BYTES {
+        return Err(ArtifactError::InvalidReadLimit(maximum_bytes));
     }
     let components = validate_output(relative)?;
     let (target_name, parent_components) = components
@@ -177,12 +255,13 @@ pub(crate) fn read_artifact(
     .map_err(ArtifactError::Io)?;
     rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockShared).map_err(ArtifactError::Io)?;
     let target = open_directory_at(&parent, target_name).map_err(ArtifactError::Io)?;
-    read_artifact_from_directory(&target, name)
+    read_artifact_from_directory(&target, name, maximum_bytes)
 }
 
 fn read_artifact_from_directory(
     directory: &OwnedFd,
     name: &'static str,
+    maximum_bytes: usize,
 ) -> Result<Vec<u8>, ArtifactError> {
     let descriptor = rustix::fs::openat(
         directory,
@@ -196,7 +275,7 @@ fn read_artifact_from_directory(
     .map_err(ArtifactError::Io)?;
     let mut file = std::fs::File::from(descriptor);
     let metadata = file.metadata().map_err(ArtifactError::Write)?;
-    let maximum = u64::try_from(MAX_ARTIFACT_BYTES).map_err(|_| ArtifactError::SizeOverflow)?;
+    let maximum = u64::try_from(maximum_bytes).map_err(|_| ArtifactError::SizeOverflow)?;
     if !metadata.is_file() || metadata.len() > maximum {
         return Err(ArtifactError::UnsafeArtifact(name));
     }
@@ -207,11 +286,11 @@ fn read_artifact_from_directory(
         .take(maximum.saturating_add(1))
         .read_to_end(&mut bytes)
         .map_err(ArtifactError::Write)?;
-    if bytes.len() > MAX_ARTIFACT_BYTES {
+    if bytes.len() > maximum_bytes {
         return Err(ArtifactError::ArtifactTooLarge {
             name,
             actual: bytes.len(),
-            maximum: MAX_ARTIFACT_BYTES,
+            maximum: maximum_bytes,
         });
     }
     Ok(bytes)
@@ -447,8 +526,14 @@ pub(crate) enum ArtifactError {
     UnsafeArtifact(&'static str),
     #[error("qualification artifact {0} changed while its derived report was being validated")]
     ConcurrentReplacement(&'static str),
+    #[error("qualification rollup source is not a direct sibling artifact: {0}")]
+    NonSiblingArtifact(PathBuf),
+    #[error("qualification artifact is not a direct child of its source-owned root: {0}")]
+    NonDirectArtifact(PathBuf),
     #[error("qualification artifact size cannot be represented on this host")]
     SizeOverflow,
+    #[error("qualification artifact read limit exceeds the source-owned maximum: {0}")]
+    InvalidReadLimit(usize),
 }
 
 #[cfg(test)]
@@ -461,6 +546,23 @@ mod tests {
         assert!(validate_output(Path::new("target/benchmarks/qualification")).is_err());
         assert!(validate_output(Path::new("target/benchmarks/qualification/../outside")).is_err());
         assert!(validate_output(Path::new("/tmp/qualification")).is_err());
+        assert!(
+            DirectQualificationArtifactPath::try_new(Path::new(
+                "target/benchmarks/qualification/pr"
+            ))
+            .is_ok()
+        );
+        for unsafe_name in [
+            "nested/pr",
+            ".publication.lock",
+            ".run-1-0.staging",
+            "bad|row",
+            "bad`code",
+            "bad\nrow",
+        ] {
+            let path = PathBuf::from("target/benchmarks/qualification").join(unsafe_name);
+            assert!(DirectQualificationArtifactPath::try_new(&path).is_err());
+        }
     }
 
     #[test]
@@ -552,5 +654,63 @@ mod tests {
             read_artifact(&root, output, "report.json").expect("read newer report"),
             b"second\n"
         );
+    }
+
+    #[test]
+    fn sibling_binding_rejects_changed_or_nested_sources() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let source_path = Path::new("target/benchmarks/qualification/source");
+        let source = QualificationOutput::begin(&root, source_path).expect("begin source");
+        source
+            .write("report.json", b"current\n")
+            .expect("write source");
+        source.commit().expect("publish source");
+
+        let rollup_path = Path::new("target/benchmarks/qualification/rollup");
+        let rollup = QualificationOutput::begin(&root, rollup_path).expect("begin rollup");
+        let source_path =
+            DirectQualificationArtifactPath::try_new(source_path).expect("direct source path");
+        let current_digest = super::super::run::sha256_hex(b"current\n");
+        let stale_digest = super::super::run::sha256_hex(b"stale\n");
+        rollup
+            .require_sibling_artifact_digest(&source_path, "report.json", &current_digest, 64)
+            .expect("bind current source");
+        assert!(matches!(
+            rollup.require_sibling_artifact_digest(&source_path, "report.json", &stale_digest, 64,),
+            Err(ArtifactError::ConcurrentReplacement("report.json"))
+        ));
+        assert!(matches!(
+            DirectQualificationArtifactPath::try_new(Path::new(
+                "target/benchmarks/qualification/nested/source"
+            )),
+            Err(ArtifactError::NonDirectArtifact(_))
+        ));
+    }
+
+    #[test]
+    fn bounded_reads_reject_oversized_artifacts_and_invalid_limits() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let output = Path::new("target/benchmarks/qualification/bounded-read");
+        let publication = QualificationOutput::begin(&root, output).expect("begin publication");
+        publication
+            .write("report.json", &[b'x'; 65])
+            .expect("write oversized-for-test report");
+        publication.commit().expect("publish report");
+
+        assert!(matches!(
+            read_artifact_bounded(&root, output, "report.json", 64),
+            Err(ArtifactError::UnsafeArtifact("report.json"))
+        ));
+        assert!(matches!(
+            read_artifact_bounded(
+                &root,
+                output,
+                "report.json",
+                MAX_ARTIFACT_BYTES.saturating_add(1),
+            ),
+            Err(ArtifactError::InvalidReadLimit(_))
+        ));
     }
 }

@@ -28,6 +28,11 @@ qualification-regenerate *args:
 qualification-probe *args:
     cargo run -q -p stab-bench --profile release -- qualification-probe {{args}}
 
+# From one clean commit, rebuild both workers twice and prove identity and cap handshakes.
+[working-directory: '..']
+qualification-worker-reproducibility:
+    cargo run -q -p stab-bench --profile release -- qualification-worker-reproducibility
+
 # Execute one source-owned paired qualification group and publish validated evidence.
 [working-directory: '..']
 qualification-run *args:
@@ -42,6 +47,16 @@ qualification-report *args:
 [working-directory: '..']
 qualification-regression *args:
     cargo run -q -p stab-bench --profile release -- qualification-regression {{args}}
+
+# Bind one complete architecture-scoped qualification scale family.
+[working-directory: '..']
+qualification-rollup *args:
+    cargo run -q -p stab-bench --profile release -- qualification-rollup {{args}}
+
+# Replay a qualification scale-family rollup from its sealed source reports.
+[working-directory: '..']
+qualification-rollup-report *args:
+    cargo run -q -p stab-bench --profile release -- qualification-rollup-report {{args}}
 
 # Record pinned C++ Stim baseline benchmark results.
 [working-directory: '..']

@@ -19,6 +19,7 @@ use stab_core::{
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
+use crate::root::RepoRoot;
 
 use super::{measure_stab_iterations, stab_runner_error};
 
@@ -75,6 +76,7 @@ const SWEEP_PTB64_WIDTH: usize = 8;
 type FlowCheckCase = (Circuit, Vec<Flow>, Vec<bool>);
 
 pub(super) fn run_detection_compare_row(
+    root: &RepoRoot,
     row: &BenchmarkRow,
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
@@ -91,7 +93,7 @@ pub(super) fn run_detection_compare_row(
         "m9-m2d-sweep-01-cli" => run_m2d_cli_row(
             row,
             "stab_m2d_sweep_01_dets",
-            m2d_sweep_args(false),
+            m2d_sweep_args(root, false),
             M2D_SWEEP_MEASUREMENTS,
             None,
         )
@@ -99,7 +101,7 @@ pub(super) fn run_detection_compare_row(
         "m9-m2d-sweep-b8-cli" => run_m2d_cli_row(
             row,
             "stab_m2d_sweep_b8",
-            m2d_sweep_b8_args(),
+            m2d_sweep_b8_args(root),
             M2D_SWEEP_B8_MEASUREMENTS,
             None,
         )
@@ -107,15 +109,15 @@ pub(super) fn run_detection_compare_row(
         "m9-m2d-sweep-obs-out-cli" => run_m2d_cli_row(
             row,
             "stab_m2d_sweep_obs_out",
-            m2d_sweep_args(true),
+            m2d_sweep_args(root, true),
             M2D_SWEEP_MEASUREMENTS,
-            Some(obs_out_path()),
+            Some(obs_out_path(root)),
         )
         .map(Some),
         "m9-m2d-ran-without-feedback-cli" => run_m2d_cli_row(
             row,
             "stab_m2d_ran_without_feedback",
-            m2d_ran_without_feedback_args(),
+            m2d_ran_without_feedback_args(root),
             M2D_RAN_WITHOUT_FEEDBACK_MEASUREMENTS,
             None,
         )
@@ -143,18 +145,18 @@ pub(super) fn run_detection_compare_row(
         "pf3-m2d-sweep-b8" => run_m2d_cli_row(
             row,
             "stab_pf3_m2d_sweep_b8",
-            m2d_sweep_b8_args(),
+            m2d_sweep_b8_args(root),
             M2D_SWEEP_B8_MEASUREMENTS,
             None,
         )
         .map(Some),
-        "pf3-m2d-sweep-ptb64-input" => run_m2d_sweep_ptb64_cli_row(row).map(Some),
+        "pf3-m2d-sweep-ptb64-input" => run_m2d_sweep_ptb64_cli_row(root, row).map(Some),
         "pf3-detect-sweep-sampling" => run_detect_sweep_sampling_row(row).map(Some),
         "pf3-gate-semantic-wide" => gate_semantic::run(row).map(Some),
         "pf7-cli-m2d-sweep-b8" => run_m2d_cli_row(
             row,
             "stab_pf7_cli_m2d_sweep_b8",
-            m2d_sweep_b8_args(),
+            m2d_sweep_b8_args(root),
             M2D_SWEEP_B8_MEASUREMENTS,
             None,
         )
@@ -162,7 +164,7 @@ pub(super) fn run_detection_compare_row(
         "pf7-cli-m2d-feedback-inline" => run_m2d_cli_row(
             row,
             "stab_pf7_cli_m2d_feedback_inline",
-            m2d_ran_without_feedback_args(),
+            m2d_ran_without_feedback_args(root),
             M2D_RAN_WITHOUT_FEEDBACK_MEASUREMENTS,
             None,
         )
@@ -515,10 +517,13 @@ fn run_m2d_cli_row(
     )?])
 }
 
-fn run_m2d_sweep_ptb64_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, BenchError> {
+fn run_m2d_sweep_ptb64_cli_row(
+    root: &RepoRoot,
+    row: &BenchmarkRow,
+) -> Result<Vec<Measurement>, BenchError> {
     let measurement_input = sweep_ptb64_records(row, false)?;
     let sweep_input = sweep_ptb64_records(row, true)?;
-    let sweep_path = sweep_ptb64_path();
+    let sweep_path = sweep_ptb64_path(root);
     create_parent_dir(row, &sweep_path)?;
     std::fs::write(&sweep_path, &sweep_input).map_err(|source| BenchError::StabRunner {
         row_id: row.id.clone(),
@@ -530,7 +535,7 @@ fn run_m2d_sweep_ptb64_cli_row(row: &BenchmarkRow) -> Result<Vec<Measurement>, B
     run_m2d_cli_row(
         row,
         "stab_pf3_m2d_sweep_ptb64",
-        m2d_sweep_ptb64_args(&sweep_path),
+        m2d_sweep_ptb64_args(root, &sweep_path),
         &measurement_input,
         None,
     )
@@ -578,7 +583,7 @@ impl Write for CountingWriter {
     }
 }
 
-fn m2d_sweep_args(obs_out: bool) -> Vec<OsString> {
+fn m2d_sweep_args(root: &RepoRoot, obs_out: bool) -> Vec<OsString> {
     let mut args = vec![
         OsString::from("stab"),
         OsString::from("m2d"),
@@ -589,36 +594,36 @@ fn m2d_sweep_args(obs_out: bool) -> Vec<OsString> {
             "--out_format=dets"
         }),
         OsString::from("--sweep"),
-        repo_path("oracle/fixtures/inputs/m2d_sweep_bits.01").into_os_string(),
+        repo_path(root, "oracle/fixtures/inputs/m2d_sweep_bits.01").into_os_string(),
         OsString::from("--sweep_format=01"),
         OsString::from("--circuit"),
-        repo_path("oracle/fixtures/inputs/m2d_sweep.stim").into_os_string(),
+        repo_path(root, "oracle/fixtures/inputs/m2d_sweep.stim").into_os_string(),
     ];
     if obs_out {
         args.extend([
             OsString::from("--obs_out"),
-            obs_out_path().into_os_string(),
+            obs_out_path(root).into_os_string(),
             OsString::from("--obs_out_format=b8"),
         ]);
     }
     args
 }
 
-fn m2d_sweep_b8_args() -> Vec<OsString> {
+fn m2d_sweep_b8_args(root: &RepoRoot) -> Vec<OsString> {
     vec![
         OsString::from("stab"),
         OsString::from("m2d"),
         OsString::from("--in_format=b8"),
         OsString::from("--out_format=b8"),
         OsString::from("--sweep"),
-        repo_path("benchmarks/fixtures/m9_m2d_sweep_b8_sweep.b8").into_os_string(),
+        repo_path(root, "benchmarks/fixtures/m9_m2d_sweep_b8_sweep.b8").into_os_string(),
         OsString::from("--sweep_format=b8"),
         OsString::from("--circuit"),
-        repo_path("benchmarks/fixtures/m9_m2d_sweep_b8.stim").into_os_string(),
+        repo_path(root, "benchmarks/fixtures/m9_m2d_sweep_b8.stim").into_os_string(),
     ]
 }
 
-fn m2d_sweep_ptb64_args(sweep_path: &Path) -> Vec<OsString> {
+fn m2d_sweep_ptb64_args(root: &RepoRoot, sweep_path: &Path) -> Vec<OsString> {
     vec![
         OsString::from("stab"),
         OsString::from("m2d"),
@@ -628,11 +633,11 @@ fn m2d_sweep_ptb64_args(sweep_path: &Path) -> Vec<OsString> {
         sweep_path.as_os_str().to_os_string(),
         OsString::from("--sweep_format=ptb64"),
         OsString::from("--circuit"),
-        repo_path("benchmarks/fixtures/m9_m2d_sweep_b8.stim").into_os_string(),
+        repo_path(root, "benchmarks/fixtures/m9_m2d_sweep_b8.stim").into_os_string(),
     ]
 }
 
-fn m2d_ran_without_feedback_args() -> Vec<OsString> {
+fn m2d_ran_without_feedback_args(root: &RepoRoot) -> Vec<OsString> {
     vec![
         OsString::from("stab"),
         OsString::from("m2d"),
@@ -641,7 +646,7 @@ fn m2d_ran_without_feedback_args() -> Vec<OsString> {
         OsString::from("--out_format=dets"),
         OsString::from("--ran_without_feedback"),
         OsString::from("--circuit"),
-        repo_path("oracle/fixtures/inputs/m2d_ran_without_feedback.stim").into_os_string(),
+        repo_path(root, "oracle/fixtures/inputs/m2d_ran_without_feedback.stim").into_os_string(),
     ]
 }
 
@@ -852,18 +857,22 @@ fn parse_circuit(row_id: &str, text: &str) -> Result<Circuit, BenchError> {
     Circuit::from_stim_str(text).map_err(|error| stab_runner_error(row_id, error))
 }
 
-fn repo_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .join(relative)
+fn repo_path(root: &RepoRoot, relative: &str) -> PathBuf {
+    root.path.join(relative)
 }
 
-fn obs_out_path() -> PathBuf {
-    repo_path("target/benchmarks/cli-scratch/m9-m2d-sweep-obs-out.b8")
+fn obs_out_path(root: &RepoRoot) -> PathBuf {
+    repo_path(
+        root,
+        "target/benchmarks/cli-scratch/m9-m2d-sweep-obs-out.b8",
+    )
 }
 
-fn sweep_ptb64_path() -> PathBuf {
-    repo_path("target/benchmarks/cli-scratch/pf3-m2d-sweep-ptb64.sweep")
+fn sweep_ptb64_path(root: &RepoRoot) -> PathBuf {
+    repo_path(
+        root,
+        "target/benchmarks/cli-scratch/pf3-m2d-sweep-ptb64.sweep",
+    )
 }
 
 fn create_parent_dir(row: &BenchmarkRow, path: &Path) -> Result<(), BenchError> {

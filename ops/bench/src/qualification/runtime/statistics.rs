@@ -340,7 +340,7 @@ pub(crate) enum StatisticsError {
 mod tests {
     use super::*;
     use crate::qualification::runtime::protocol::{
-        GitCommit, PROTOCOL_SCHEMA_VERSION, SemanticDigest, Sha256Digest,
+        GitCommit, InputDigest, PROTOCOL_SCHEMA_VERSION, SemanticDigest, Sha256Digest,
     };
 
     fn row(implementation: Implementation, elapsed_seconds: f64) -> WorkerMeasurement {
@@ -353,6 +353,11 @@ mod tests {
             iteration_count: 1,
             elapsed_seconds,
             work_count: 100,
+            input_bytes: 0,
+            input_digest: InputDigest::try_new(
+                "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1",
+            )
+            .expect("empty input digest"),
             output_digest: SemanticDigest::try_new("a".repeat(64)).expect("output digest"),
             setup_rss_bytes: None,
             peak_rss_bytes: None,

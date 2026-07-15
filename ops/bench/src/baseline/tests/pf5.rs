@@ -4,8 +4,8 @@ use super::super::{
         expected_flow_generator_measurement_work_for_test,
         expected_flow_solve_measurement_work_for_test, matrix_solver,
     },
-    run_stab_compare_row,
 };
+use super::run_stab_compare_row;
 use crate::manifest::{BenchmarkRow, Milestone, Runner};
 
 #[test]

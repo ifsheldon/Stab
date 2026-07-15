@@ -347,8 +347,15 @@ mod tests {
             scales: vec![super::super::group::ScaleContract {
                 id: ProtocolId::try_new("default").expect("scale id"),
                 work_items: NonZeroU64::new(1).expect("positive work"),
+                input_bytes: 0,
+                input_digest: super::super::protocol::InputDigest::try_new(
+                    "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1",
+                )
+                .expect("empty input digest"),
             }],
             correctness_case_ids: Vec::new(),
+            owner: ProtocolId::try_new("ops/bench").expect("owner"),
+            profiler_note: None,
         }
     }
 

@@ -4,7 +4,7 @@ use std::fmt;
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-pub(super) const PROTOCOL_SCHEMA_VERSION: u32 = 2;
+pub(super) const PROTOCOL_SCHEMA_VERSION: u32 = 3;
 const MAX_PROTOCOL_BYTES: usize = 1 << 20;
 const MAX_PROTOCOL_LINE_BYTES: usize = 16 << 10;
 const MAX_PROTOCOL_ROWS: usize = 64;
@@ -92,6 +92,38 @@ impl Sha256Digest {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(transparent)]
+pub(crate) struct InputDigest(Box<str>);
+
+impl InputDigest {
+    pub(super) fn try_new(value: impl Into<String>) -> Result<Self, ProtocolError> {
+        let value = value.into();
+        if value.len() != 64
+            || !value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(ProtocolError::InvalidInputDigest(value));
+        }
+        Ok(Self(value.into_boxed_str()))
+    }
+
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for InputDigest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        Self::try_new(value).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(transparent)]
 pub(crate) struct SemanticDigest(Box<str>);
 
 impl SemanticDigest {
@@ -167,6 +199,8 @@ pub(crate) struct WorkerMeasurement {
     pub(super) iteration_count: u64,
     pub(super) elapsed_seconds: f64,
     pub(super) work_count: u64,
+    pub(super) input_bytes: u64,
+    pub(super) input_digest: InputDigest,
     pub(super) output_digest: SemanticDigest,
     pub(super) setup_rss_bytes: Option<u64>,
     pub(super) peak_rss_bytes: Option<u64>,
@@ -227,6 +261,8 @@ pub(crate) struct ProtocolExpectation {
     pub(super) measurement_ids: BTreeSet<ProtocolId>,
     pub(super) iteration_count: u64,
     pub(super) expected_work_count: u64,
+    pub(super) expected_input_bytes: u64,
+    pub(super) expected_input_digest: InputDigest,
     pub(super) expected_output_digest: Option<SemanticDigest>,
     pub(super) affinity_cpu: Option<u32>,
     pub(super) stim_commit: GitCommit,
@@ -243,6 +279,8 @@ impl ProtocolExpectation {
                 || row.workload_id != self.workload_id
                 || row.iteration_count != self.iteration_count
                 || row.work_count != self.expected_work_count
+                || row.input_bytes != self.expected_input_bytes
+                || row.input_digest != self.expected_input_digest
                 || self
                     .expected_output_digest
                     .as_ref()
@@ -330,6 +368,8 @@ pub(crate) enum ProtocolError {
     InvalidSha256(String),
     #[error("invalid 256-bit semantic digest {0:?}")]
     InvalidSemanticDigest(String),
+    #[error("invalid 256-bit input digest {0:?}")]
+    InvalidInputDigest(String),
     #[error("invalid 40-character Git commit {0:?}")]
     InvalidGitCommit(String),
     #[error("qualification worker output is {actual} bytes, exceeding {maximum}")]
@@ -379,6 +419,11 @@ pub(crate) enum ProtocolError {
 mod tests {
     use super::*;
 
+    fn empty_input_digest() -> InputDigest {
+        InputDigest::try_new("6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1")
+            .expect("empty input digest")
+    }
+
     fn valid_line() -> String {
         serde_json::json!({
             "schema_version": PROTOCOL_SCHEMA_VERSION,
@@ -389,6 +434,8 @@ mod tests {
             "iteration_count": 4,
             "elapsed_seconds": 0.25,
             "work_count": 64,
+            "input_bytes": 0,
+            "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1",
             "output_digest": "a".repeat(64),
             "setup_rss_bytes": 1024,
             "peak_rss_bytes": 2048,
@@ -448,6 +495,8 @@ mod tests {
                 .collect(),
             iteration_count: 4,
             expected_work_count: 64,
+            expected_input_bytes: 0,
+            expected_input_digest: empty_input_digest(),
             expected_output_digest: None,
             affinity_cpu: None,
             stim_commit: GitCommit::try_new("e2fc1eca7fd21684d433aa5f10f4504ea4860d07")
@@ -495,6 +544,8 @@ mod tests {
                 .collect(),
             iteration_count: 4,
             expected_work_count: 64,
+            expected_input_bytes: 0,
+            expected_input_digest: empty_input_digest(),
             expected_output_digest: None,
             affinity_cpu: Some(0),
             stim_commit: GitCommit::try_new("e2fc1eca7fd21684d433aa5f10f4504ea4860d07")
@@ -527,6 +578,8 @@ mod tests {
                 .collect(),
             iteration_count: 4,
             expected_work_count: 64,
+            expected_input_bytes: 0,
+            expected_input_digest: empty_input_digest(),
             expected_output_digest: Some(
                 SemanticDigest::try_new("a".repeat(64)).expect("semantic digest"),
             ),
@@ -541,6 +594,15 @@ mod tests {
         let mut wrong_work = base.clone();
         wrong_work.expected_work_count = 65;
         assert!(wrong_work.validate(&rows).is_err());
+
+        let mut wrong_input = base.clone();
+        wrong_input.expected_input_bytes = 1;
+        assert!(wrong_input.validate(&rows).is_err());
+
+        let mut wrong_input = base.clone();
+        wrong_input.expected_input_digest =
+            InputDigest::try_new("e".repeat(64)).expect("different input digest");
+        assert!(wrong_input.validate(&rows).is_err());
 
         let mut wrong_digest = base;
         wrong_digest.expected_output_digest =

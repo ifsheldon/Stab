@@ -10,8 +10,8 @@ use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 
 use super::protocol::{
-    EvidenceMode, GitCommit, Implementation, PROTOCOL_SCHEMA_VERSION, ProtocolId, SemanticDigest,
-    Sha256Digest, WorkerMeasurement,
+    EvidenceMode, GitCommit, Implementation, InputDigest, PROTOCOL_SCHEMA_VERSION, ProtocolId,
+    SemanticDigest, Sha256Digest, WorkerMeasurement,
 };
 use crate::config::STIM_COMMIT;
 
@@ -118,6 +118,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         WorkerWorkload::ProtocolSmoke => None,
         WorkerWorkload::CircuitParse => Some(circuit_parse_fixture(args.work_items.get())?),
     };
+    let input = circuit_fixture.as_deref().unwrap_or_default().as_bytes();
+    let input_bytes = u64::try_from(input.len()).map_err(|_| WorkerError::InputSizeRange)?;
+    let input_digest = InputDigest::try_new(semantic_digest(byte_digest(input)))?;
     if args.start_barrier {
         wait_for_start_barrier()?;
     }
@@ -157,6 +160,8 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         iteration_count: args.iterations.get(),
         elapsed_seconds,
         work_count,
+        input_bytes,
+        input_digest,
         output_digest: SemanticDigest::try_new(digest)?,
         setup_rss_bytes: Some(setup_rss_bytes),
         peak_rss_bytes: Some(peak_rss_bytes.max(setup_rss_bytes)),
@@ -398,6 +403,8 @@ pub(super) enum WorkerError {
     CircuitScaleRange(u64),
     #[error("circuit-parse fixture capacity overflows usize")]
     CircuitFixtureOverflow,
+    #[error("qualification input byte count cannot be represented as u64")]
+    InputSizeRange,
     #[error("circuit-parse workload was invoked without its prepared fixture")]
     MissingCircuitFixture,
     #[error("qualification worker semantic work count overflows u64")]
@@ -453,6 +460,24 @@ mod tests {
         let larger = WorkloadOutput::Circuit(larger).semantic_digest();
         assert_eq!(small.len(), 64);
         assert_ne!(small, larger);
+    }
+
+    #[test]
+    fn canonically_equivalent_parse_inputs_have_distinct_input_digests() {
+        let canonical = circuit_parse_fixture(64).expect("fixture");
+        let whitespace_variant = canonical.replacen("H 0\n", "H  0\n", 1);
+        let canonical_output =
+            WorkloadOutput::Circuit(circuit_parse(1, &canonical).expect("canonical parse"))
+                .semantic_digest();
+        let variant_output =
+            WorkloadOutput::Circuit(circuit_parse(1, &whitespace_variant).expect("variant parse"))
+                .semantic_digest();
+
+        assert_eq!(canonical_output, variant_output);
+        assert_ne!(
+            semantic_digest(byte_digest(canonical.as_bytes())),
+            semantic_digest(byte_digest(whitespace_variant.as_bytes()))
+        );
     }
 
     #[test]

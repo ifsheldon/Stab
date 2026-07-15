@@ -9,7 +9,7 @@ use thiserror::Error;
 use super::adapter::prepare_adapter;
 use super::process::{ProcessLimits, ProcessRequest, ProcessResult, run_bounded_process};
 use super::protocol::{
-    EvidenceMode, GitCommit, Implementation, ProtocolExpectation, ProtocolId,
+    EvidenceMode, GitCommit, Implementation, InputDigest, ProtocolExpectation, ProtocolId,
     parse_worker_json_lines,
 };
 use super::statistics::{PairOrder, pair_measurements};
@@ -21,6 +21,7 @@ const ADAPTER_PROBE_ID: &str = "pq1-adapter-protocol-smoke";
 const CIRCUIT_PARSE_PROBE_ID: &str = "pq2-circuit-parse-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
+const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum ProbeGroup {
@@ -106,6 +107,8 @@ fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
         measurement_ids: BTreeSet::from([ProtocolId::try_new("main")?]),
         iteration_count: args.iterations.get(),
         expected_work_count,
+        expected_input_bytes: 0,
+        expected_input_digest: InputDigest::try_new(EMPTY_INPUT_DIGEST)?,
         expected_output_digest: None,
         affinity_cpu: None,
         stim_commit: GitCommit::try_new(STIM_COMMIT)?,
@@ -198,6 +201,11 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
     let measurement_ids = BTreeSet::from([measurement_id.clone()]);
     let stim_commit = GitCommit::try_new(STIM_COMMIT)?;
     let expected_work_count = expected_work_count(&args)?;
+    let stim_input = stim_rows
+        .first()
+        .ok_or_else(|| ProbeError::Contract("Stim probe returned no row".to_string()))?;
+    let expected_input_bytes = stim_input.input_bytes;
+    let expected_input_digest = stim_input.input_digest.clone();
     ProtocolExpectation {
         implementation: Implementation::Stim,
         evidence_mode: args.evidence_mode.into(),
@@ -205,6 +213,8 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
         measurement_ids: measurement_ids.clone(),
         iteration_count: args.iterations.get(),
         expected_work_count,
+        expected_input_bytes,
+        expected_input_digest: expected_input_digest.clone(),
         expected_output_digest: None,
         affinity_cpu: None,
         stim_commit: stim_commit.clone(),
@@ -219,6 +229,8 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
         measurement_ids,
         iteration_count: args.iterations.get(),
         expected_work_count,
+        expected_input_bytes,
+        expected_input_digest,
         expected_output_digest: None,
         affinity_cpu: None,
         stim_commit,

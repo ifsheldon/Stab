@@ -21,7 +21,7 @@ use super::statistics::{
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 14;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 15;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
@@ -107,6 +107,8 @@ pub(super) struct QualificationReport {
     pub(super) group_contract_sha256: String,
     pub(super) claim_class: ClaimClass,
     pub(super) baseline_eligibility: super::group::BaselineEligibility,
+    pub(super) owner: String,
+    pub(super) profiler_note: Option<super::group::ProfilerNoteContract>,
     pub(super) tier: QualificationTier,
     pub(super) command: RunCommandEvidence,
     pub(super) generated_unix_epoch_seconds: u64,
@@ -145,7 +147,7 @@ pub(super) struct RunCommandEvidence {
     pub(super) correctness_completion_sha256: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct RepositoryEvidence {
     pub(super) commit_before: String,
@@ -242,7 +244,6 @@ pub(super) fn run(
     let repository_before = super::git::repository_state(root)?;
     let resolved_group = super::group::load_group(root, performance_inventory_sha256, &args.group)?;
     let scale = resolved_group.contract.scale(&args.scale)?;
-    let work_items = scale.work_items;
     let scale_id = scale.id.clone();
     let workload_id = resolved_group.contract.workload_id.clone();
     let measurement_id = resolved_group.contract.single_measurement()?.clone();
@@ -267,20 +268,20 @@ pub(super) fn run(
         &workers,
         &resolved_group.contract,
         Implementation::Stim,
-        work_items,
+        scale,
         policy,
     )?;
     let (stab_decision, stab_probes) = calibrate_worker(
         &workers,
         &resolved_group.contract,
         Implementation::Stab,
-        work_items,
+        scale,
         policy,
     )?;
     let common_iterations = stim_decision.iterations.max(stab_decision.iterations);
     let batch = WorkloadBatch {
         iterations: common_iterations,
-        work_items,
+        scale,
     };
     let semantic_preflight = execute_pair(
         &workers,
@@ -379,12 +380,14 @@ pub(super) fn run(
         group_contract_sha256: resolved_group.source_sha256,
         claim_class,
         baseline_eligibility: resolved_group.contract.baseline_eligibility,
+        owner: resolved_group.contract.owner.to_string(),
+        profiler_note: resolved_group.contract.profiler_note.clone(),
         tier: args.tier,
         command: RunCommandEvidence {
             output: args.out.to_string_lossy().into_owned(),
             group_id: resolved_group.contract.id.to_string(),
             scale_id: scale_id.to_string(),
-            work_items: work_items.get(),
+            work_items: scale.work_items.get(),
             allow_unverified_host: args.allow_unverified_host,
             warmup_batches: WARMUP_BATCHES,
             paired_samples: args.tier.pair_count(),
@@ -424,7 +427,7 @@ pub(super) fn run(
     let report_json = render_json(&report)?;
     let preflight = super::report::preflight_artifact(&report, &report_json)?;
     let preflight_json = render_json(&preflight)?;
-    let markdown = super::report::render_markdown(&report, &sha256_hex(&report_json));
+    let markdown = super::report::render_markdown(&report, &sha256_hex(&report_json))?;
     let output = QualificationOutput::begin(root, &args.out)?;
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;
@@ -478,7 +481,7 @@ fn calibrate_worker(
     workers: &PreparedWorkers,
     group: &super::group::GroupContract,
     implementation: Implementation,
-    work_items: NonZeroU64,
+    scale: &super::group::ScaleContract,
     policy: CalibrationPolicy,
 ) -> Result<(CalibrationDecision, Vec<CalibrationProbeEvidence>), RunError> {
     let mut evidence = Vec::new();
@@ -489,7 +492,7 @@ fn calibrate_worker(
                 implementation,
                 evidence_mode: EvidenceMode::Timing,
                 iterations,
-                work_items,
+                scale,
                 expected_output_digest: None,
                 timeout: INVOCATION_TIMEOUT,
             })
@@ -533,9 +536,9 @@ fn calibration_evidence(
 }
 
 #[derive(Clone, Copy)]
-struct WorkloadBatch {
+struct WorkloadBatch<'a> {
     iterations: NonZeroU64,
-    work_items: NonZeroU64,
+    scale: &'a super::group::ScaleContract,
 }
 
 fn execute_timing_attempt(
@@ -544,7 +547,7 @@ fn execute_timing_attempt(
     attempt_index: usize,
     kind: TimingAttemptKind,
     tier: QualificationTier,
-    batch: WorkloadBatch,
+    batch: WorkloadBatch<'_>,
     expected_output_digest: &SemanticDigest,
 ) -> Result<TimingAttempt, RunError> {
     let mut warmups = Vec::with_capacity(WARMUP_BATCHES);
@@ -601,7 +604,7 @@ fn execute_pair(
     workers: &PreparedWorkers,
     group: &super::group::GroupContract,
     pair_index: usize,
-    batch: WorkloadBatch,
+    batch: WorkloadBatch<'_>,
     evidence_mode: EvidenceMode,
     expected_output_digest: Option<&SemanticDigest>,
 ) -> Result<PairExecution, RunError> {
@@ -612,7 +615,7 @@ fn execute_pair(
             implementation,
             evidence_mode,
             iterations: batch.iterations,
-            work_items: batch.work_items,
+            scale: batch.scale,
             expected_output_digest,
             timeout: INVOCATION_TIMEOUT,
         })

@@ -220,7 +220,8 @@ pub(crate) fn validate_baseline_metadata(report: &BaselineReport) -> Result<(), 
     }
 }
 
-pub(crate) fn run_stab_compare_row(
+pub(crate) fn run_stab_compare_row_with_root(
+    root: &RepoRoot,
     row: &BenchmarkRow,
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     match row.id.as_str() {
@@ -503,11 +504,11 @@ pub(crate) fn run_stab_compare_row(
             ]))
         }
         _ => {
-            if let Some(measurements) = convert::run_convert_compare_row(row)? {
+            if let Some(measurements) = convert::run_convert_compare_row(root, row)? {
                 Ok(Some(measurements))
             } else if let Some(measurements) = m8::run_sample_compare_row(row)? {
                 Ok(Some(measurements))
-            } else if let Some(measurements) = m9::run_detection_compare_row(row)? {
+            } else if let Some(measurements) = m9::run_detection_compare_row(root, row)? {
                 Ok(Some(measurements))
             } else if let Some(measurements) = pf6::run_compare_row(row)? {
                 Ok(Some(measurements))

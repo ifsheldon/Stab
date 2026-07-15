@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use crate::error::BenchError;
 use crate::manifest::BenchmarkRow;
 use crate::report::Measurement;
+use crate::root::RepoRoot;
 
 use super::measure_stab;
 
@@ -25,6 +26,7 @@ const M2D_BASIC_MEASUREMENTS: &[u8] =
     include_bytes!("../../../../oracle/fixtures/inputs/m2d_basic_measurements.01");
 
 pub(super) fn run_convert_compare_row(
+    root: &RepoRoot,
     row: &BenchmarkRow,
 ) -> Result<Option<Vec<Measurement>>, BenchError> {
     let Some(workload) = ConvertWorkload::from_row_id(&row.id) else {
@@ -32,7 +34,7 @@ pub(super) fn run_convert_compare_row(
     };
     Ok(Some(vec![measure_stab(
         workload.measurement_name(),
-        || run_convert_workload(row, workload),
+        || run_convert_workload(root, row, workload),
     )?]))
 }
 
@@ -59,14 +61,23 @@ pub(super) fn compare_note(row_id: &str) -> Option<&'static str> {
     ConvertWorkload::from_row_id(row_id).map(|workload| workload.compare_note())
 }
 
-fn run_convert_workload(row: &BenchmarkRow, workload: ConvertWorkload) -> Result<(), BenchError> {
+fn run_convert_workload(
+    root: &RepoRoot,
+    row: &BenchmarkRow,
+    workload: ConvertWorkload,
+) -> Result<(), BenchError> {
     let mut stdout = CountingWriter::default();
     let mut stderr = Vec::new();
-    let side_output = workload.side_output();
+    let side_output = workload.side_output(root);
     if let Some(path) = side_output.as_ref() {
         create_parent_dir(row, path)?;
     }
-    let status = stab_cli::run_from(workload.args(), workload.input(), &mut stdout, &mut stderr);
+    let status = stab_cli::run_from(
+        workload.args(root),
+        workload.input(),
+        &mut stdout,
+        &mut stderr,
+    );
     if status != 0 {
         return Err(BenchError::StabRunner {
             row_id: row.id.clone(),
@@ -175,7 +186,7 @@ impl ConvertWorkload {
         }
     }
 
-    fn args(self) -> Vec<OsString> {
+    fn args(self, root: &RepoRoot) -> Vec<OsString> {
         let mut args = vec![OsString::from("stab"), OsString::from("convert")];
         match self {
             Self::ZeroOneToB8 => {
@@ -210,11 +221,11 @@ impl ConvertWorkload {
                 push_flags(&mut args, "01", "dets");
                 args.extend([
                     OsString::from("--circuit"),
-                    repo_path("benchmarks/fixtures/convert_circuit_dl.stim").into_os_string(),
+                    repo_path(root, "benchmarks/fixtures/convert_circuit_dl.stim").into_os_string(),
                     OsString::from("--types"),
                     OsString::from("DL"),
                     OsString::from("--obs_out"),
-                    obs_out_path().into_os_string(),
+                    obs_out_path(root).into_os_string(),
                     OsString::from("--obs_out_format"),
                     OsString::from("b8"),
                 ]);
@@ -223,14 +234,14 @@ impl ConvertWorkload {
                 push_flags(&mut args, "dets", "01");
                 args.extend([
                     OsString::from("--dem"),
-                    repo_path("benchmarks/fixtures/convert_dem_dl.dem").into_os_string(),
+                    repo_path(root, "benchmarks/fixtures/convert_dem_dl.dem").into_os_string(),
                 ]);
             }
             Self::M9MeasurementsToDets => {
                 push_flags(&mut args, "01", "dets");
                 args.extend([
                     OsString::from("--circuit"),
-                    repo_path("oracle/fixtures/inputs/m2d_basic.stim").into_os_string(),
+                    repo_path(root, "oracle/fixtures/inputs/m2d_basic.stim").into_os_string(),
                     OsString::from("--types"),
                     OsString::from("M"),
                 ]);
@@ -239,8 +250,8 @@ impl ConvertWorkload {
         args
     }
 
-    fn side_output(self) -> Option<PathBuf> {
-        matches!(self, Self::CircuitDlObsOut).then(obs_out_path)
+    fn side_output(self, root: &RepoRoot) -> Option<PathBuf> {
+        matches!(self, Self::CircuitDlObsOut).then(|| obs_out_path(root))
     }
 
     fn compare_note(self) -> &'static str {
@@ -305,14 +316,13 @@ fn create_parent_dir(row: &BenchmarkRow, path: &Path) -> Result<(), BenchError> 
     })
 }
 
-fn obs_out_path() -> PathBuf {
-    repo_path("target/benchmarks/cli-scratch/m7-convert-circuit-dl-obs-out.obs.b8")
+fn obs_out_path(root: &RepoRoot) -> PathBuf {
+    repo_path(
+        root,
+        "target/benchmarks/cli-scratch/m7-convert-circuit-dl-obs-out.obs.b8",
+    )
 }
 
-fn repo_path(relative: &str) -> PathBuf {
-    repo_root().join(relative)
-}
-
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+fn repo_path(root: &RepoRoot, relative: &str) -> PathBuf {
+    root.path.join(relative)
 }

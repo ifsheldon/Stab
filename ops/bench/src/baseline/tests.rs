@@ -1,5 +1,5 @@
 use super::{
-    compare_note, measurement_work, parse_stim_perf_line, run_stab_compare_row,
+    compare_note, measurement_work, parse_stim_perf_line, run_stab_compare_row_with_root,
     selected_baseline_rows, validate_baseline_metadata,
 };
 use crate::comparability::ComparabilityClass;
@@ -9,11 +9,25 @@ use crate::compare::{
 };
 use crate::manifest::{BenchmarkManifest, BenchmarkRow, Milestone, Runner};
 use crate::report::{BaselineReport, Measurement};
+use crate::root::RepoRoot;
+use std::path::Path;
 
 mod pf3;
 mod pf5;
 mod pfm_b1;
 mod runner_smoke;
+
+fn run_stab_compare_row(
+    row: &BenchmarkRow,
+) -> Result<Option<Vec<Measurement>>, crate::error::BenchError> {
+    let root = RepoRoot::resolve(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("repository root"),
+    )?;
+    run_stab_compare_row_with_root(&root, row)
+}
 
 #[test]
 fn parses_stim_perf_measurement_line() {

@@ -1,6 +1,6 @@
 {
-  "schema_version": 2,
-  "performance_inventory_sha256": "101ecb8ba8853522a234be0437e3779007428a6a8749f4fd01c77a7fd7131345",
+  "schema_version": 3,
+  "performance_inventory_sha256": "ce0c451a9c3123be95d3b9606b96a7ce26e3b26f09f543ae7d2e9e0345e86d54",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -11,10 +11,14 @@
       "scales": [
         {
           "id": "default",
-          "work_items": 4096
+          "work_items": 4096,
+          "input_bytes": 0,
+          "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
         }
       ],
-      "correctness_case_ids": []
+      "correctness_case_ids": [],
+      "owner": "ops/bench",
+      "profiler_note": null
     },
     {
       "id": "PERFQ-M4-CIRCUIT-PARSE",
@@ -25,21 +29,32 @@
       "scales": [
         {
           "id": "small",
-          "work_items": 64
+          "work_items": 64,
+          "input_bytes": 429,
+          "input_digest": "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6"
         },
         {
           "id": "medium",
-          "work_items": 4096
+          "work_items": 4096,
+          "input_bytes": 27981,
+          "input_digest": "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04"
         },
         {
           "id": "large",
-          "work_items": 65536
+          "work_items": 65536,
+          "input_bytes": 447821,
+          "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
         }
       ],
       "correctness_case_ids": [
         "cq-evidence-qualification-633fa529edf5f549",
         "cq-evidence-qualification-e660819ae9a223c6"
-      ]
+      ],
+      "owner": "stab-core/circuit-parser",
+      "profiler_note": {
+        "path": "benchmarks/profiler-notes/qualification/perfq-m4-circuit-parse.md",
+        "sha256": "d970e7bb466f9305535cd4a9e66944f4323d26e44a7b992c424a5a47ab7fb588"
+      }
     }
   ]
 }

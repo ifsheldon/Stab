@@ -10,7 +10,9 @@ use super::executable::SealedExecutable;
 use super::process::{ProcessLimits, ProcessRequest, run_bounded_process};
 use super::protocol::Sha256Digest;
 use super::toolchain::ToolchainEvidence;
-use super::worker::{self, WorkerIdentity};
+#[cfg(test)]
+use super::worker;
+use super::worker::WorkerIdentity;
 use crate::root::RepoRoot;
 
 const RECEIPT_SCHEMA_VERSION: u32 = 1;
@@ -18,6 +20,7 @@ const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const BUILD_OUTPUT_LIMIT: usize = 16 << 20;
 const MAX_SOURCE_INPUT_BYTES: u64 = 16 << 20;
 const RUNTIME_PARENT: &str = "/tmp";
+const WORKER_SOURCE_PATH: &str = "ops/bench/src/qualification/runtime/worker.rs";
 const FINGERPRINT_PLACEHOLDER: &str = "$FINGERPRINT";
 const RUNTIME_PLACEHOLDER: &str = "$RUNTIME";
 const SOURCE_PLACEHOLDER: &str = "$SOURCE";
@@ -28,6 +31,7 @@ pub(super) struct StabWorkerExecutable {
     executable: SealedExecutable,
     identity: WorkerIdentity,
     receipt: StabBuildReceipt,
+    source_path: PathBuf,
 }
 
 impl StabWorkerExecutable {
@@ -52,7 +56,8 @@ impl StabWorkerExecutable {
         super::git::materialize_repository_commit(root, repository_commit, &source)?;
         link_cargo_cache(&cargo_home)?;
 
-        let worker_source_sha256 = worker::source_digest()?.as_str().to_string();
+        let worker_source_path = source.join(WORKER_SOURCE_PATH);
+        let worker_source_sha256 = digest_materialized_worker_source(&source)?;
         let cargo_lock_sha256 = digest_file(&source.join("Cargo.lock"))?;
         let workspace_manifest_sha256 = digest_file(&source.join("Cargo.toml"))?;
         let package_manifest_sha256 = digest_file(&source.join("ops/bench/Cargo.toml"))?;
@@ -131,6 +136,7 @@ impl StabWorkerExecutable {
             executable,
             identity,
             receipt,
+            source_path: worker_source_path,
         };
         worker.verify(toolchain, repository_commit)?;
         Ok(worker)
@@ -158,7 +164,8 @@ impl StabWorkerExecutable {
         repository_commit: &str,
     ) -> Result<(), StabBuildError> {
         self.executable.verify()?;
-        if self.receipt.binary_sha256 != self.executable.sha256()
+        if digest_file(&self.source_path)? != self.receipt.worker_source_sha256
+            || self.receipt.binary_sha256 != self.executable.sha256()
             || !self.receipt.validates_report_identity(
                 self.identity.source_digest.as_str(),
                 self.identity.build_fingerprint.as_str(),
@@ -307,7 +314,7 @@ fn normalized_build_environment(
     }
     let rustc_library = rustc_library_path(Path::new(&toolchain.rustc_path))?;
     let rustflags = format!(
-        "-Clinker={} --remap-path-prefix=$SOURCE=/stab/source --remap-path-prefix=$RUNTIME=/stab/build",
+        "-Clinker={} -Cstrip=symbols -Clink-arg=-Wl,--build-id=none --remap-path-prefix=$SOURCE=/stab/source --remap-path-prefix=$RUNTIME=/stab/build",
         linker.display()
     );
     let mut entries = vec![
@@ -458,6 +465,10 @@ fn digest_file(path: &Path) -> Result<String, StabBuildError> {
     super::adapter::sha256_regular_file(path, MAX_SOURCE_INPUT_BYTES).map_err(StabBuildError::from)
 }
 
+fn digest_materialized_worker_source(source: &Path) -> Result<String, StabBuildError> {
+    digest_file(&source.join(WORKER_SOURCE_PATH))
+}
+
 fn valid_receipt_digest(value: &str) -> bool {
     value.len() == 64
         && value
@@ -534,6 +545,21 @@ pub(super) enum StabBuildError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn worker_receipt_hashes_the_materialized_source() {
+        let runtime = tempfile::tempdir().expect("temporary source tree");
+        let worker_path = runtime.path().join(WORKER_SOURCE_PATH);
+        std::fs::create_dir_all(worker_path.parent().expect("worker parent"))
+            .expect("materialized source directories");
+        std::fs::write(&worker_path, b"materialized worker source\n")
+            .expect("materialized worker source");
+
+        let materialized =
+            digest_materialized_worker_source(runtime.path()).expect("materialized digest");
+        let controller = worker::source_digest().expect("controller digest");
+        assert_ne!(materialized, controller.as_str());
+    }
 
     #[test]
     fn build_fingerprint_changes_with_commit_tools_and_flags() {

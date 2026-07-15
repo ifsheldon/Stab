@@ -254,6 +254,7 @@ int main(int argc, const char **argv) {
         const std::string circuit_fixture = arguments.workload == "circuit-parse"
                                                 ? circuit_parse_fixture(arguments.work_items)
                                                 : std::string{};
+        const auto input_digest = byte_digest(circuit_fixture);
 
         if (arguments.start_barrier) {
             wait_for_start_barrier();
@@ -283,13 +284,15 @@ int main(int argc, const char **argv) {
         const uint64_t peak_rss = std::max(setup_rss, status_kib("VmHWM:"));
 
         std::cout << std::setprecision(17)
-                  << "{\"schema_version\":2,\"implementation\":\"stim\","
+                  << "{\"schema_version\":3,\"implementation\":\"stim\","
                   << "\"evidence_mode\":\"" << arguments.evidence_mode << "\","
                   << "\"workload_id\":\"" << arguments.workload << "\","
                   << "\"measurement_id\":\"" << arguments.measurement_id << "\","
                   << "\"iteration_count\":" << arguments.iterations << ','
                   << "\"elapsed_seconds\":" << elapsed.count() << ','
                   << "\"work_count\":" << arguments.iterations * arguments.work_items << ','
+                  << "\"input_bytes\":" << circuit_fixture.size() << ','
+                  << "\"input_digest\":\"" << semantic_digest(input_digest) << "\","
                   << "\"output_digest\":\"" << semantic_digest(digest_state) << "\","
                   << "\"setup_rss_bytes\":" << setup_rss << ','
                   << "\"peak_rss_bytes\":" << peak_rss << ','

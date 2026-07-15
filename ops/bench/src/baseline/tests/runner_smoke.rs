@@ -1,4 +1,5 @@
-use super::super::{compare_note, measurement_rate_work, measurement_work, run_stab_compare_row};
+use super::super::{compare_note, measurement_rate_work, measurement_work};
+use super::run_stab_compare_row;
 use crate::manifest::{BenchmarkRow, Milestone, Runner};
 
 #[test]

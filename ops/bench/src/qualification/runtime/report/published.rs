@@ -7,6 +7,9 @@ use super::{
 use crate::qualification::runtime::run::sha256_hex;
 use crate::root::RepoRoot;
 
+pub(in crate::qualification::runtime) const MAX_PUBLISHED_REPORT_BYTES: usize = 4 << 20;
+pub(in crate::qualification::runtime) const MAX_PUBLISHED_PREFLIGHT_BYTES: usize = 1 << 20;
+
 pub(in crate::qualification::runtime) fn run(
     root: &RepoRoot,
     expected_performance_inventory_sha256: &str,
@@ -20,7 +23,7 @@ pub(in crate::qualification::runtime) fn run(
         expected_correctness_inventory_sha256,
     )?;
     let preflight_json = render_preflight(&report, &report_json)?;
-    let markdown = render_markdown(&report, &sha256_hex(&report_json));
+    let markdown = render_markdown(&report, &sha256_hex(&report_json))?;
 
     let output = super::super::artifact::QualificationOutput::begin(root, &args.input)?;
     output.require_current_artifact("report.json", &report_json)?;
@@ -38,6 +41,27 @@ pub(in crate::qualification::runtime) fn load_validated_published_report(
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
 ) -> Result<QualificationReport, ReportError> {
+    Ok(load_validated_published_evidence(
+        root,
+        input,
+        expected_performance_inventory_sha256,
+        expected_correctness_inventory_sha256,
+    )?
+    .report)
+}
+
+pub(in crate::qualification::runtime) struct PublishedReportEvidence {
+    pub(in crate::qualification::runtime) report: QualificationReport,
+    pub(in crate::qualification::runtime) report_sha256: String,
+    pub(in crate::qualification::runtime) preflight_sha256: String,
+}
+
+pub(in crate::qualification::runtime) fn load_validated_published_evidence(
+    root: &RepoRoot,
+    input: &Path,
+    expected_performance_inventory_sha256: &str,
+    expected_correctness_inventory_sha256: &str,
+) -> Result<PublishedReportEvidence, ReportError> {
     let (report, report_json) = load_bound_report(
         root,
         input,
@@ -45,11 +69,20 @@ pub(in crate::qualification::runtime) fn load_validated_published_report(
         expected_correctness_inventory_sha256,
     )?;
     let expected_preflight = render_preflight(&report, &report_json)?;
-    let actual_preflight = super::super::artifact::read_artifact(root, input, "preflight.json")?;
+    let actual_preflight = super::super::artifact::read_artifact_bounded(
+        root,
+        input,
+        "preflight.json",
+        MAX_PUBLISHED_PREFLIGHT_BYTES,
+    )?;
     if actual_preflight != expected_preflight {
         return Err(ReportError::PreflightBinding);
     }
-    Ok(report)
+    Ok(PublishedReportEvidence {
+        report,
+        report_sha256: sha256_hex(&report_json),
+        preflight_sha256: sha256_hex(&actual_preflight),
+    })
 }
 
 fn load_bound_report(
@@ -58,12 +91,22 @@ fn load_bound_report(
     expected_performance_inventory_sha256: &str,
     expected_correctness_inventory_sha256: &str,
 ) -> Result<(QualificationReport, Vec<u8>), ReportError> {
-    let report_json = super::super::artifact::read_artifact(root, input, "report.json")?;
+    let report_json = super::super::artifact::read_artifact_bounded(
+        root,
+        input,
+        "report.json",
+        MAX_PUBLISHED_REPORT_BYTES,
+    )?;
     if report_json.is_empty() || !report_json.ends_with(b"\n") {
         return Err(ReportError::ReportBoundary);
     }
     let report: QualificationReport =
         serde_json::from_slice(&report_json).map_err(ReportError::Json)?;
+    let mut canonical = serde_json::to_vec_pretty(&report).map_err(ReportError::Json)?;
+    canonical.push(b'\n');
+    if canonical != report_json {
+        return Err(ReportError::NonCanonicalReport);
+    }
     validate_report(
         root,
         &report,

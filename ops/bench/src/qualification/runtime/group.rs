@@ -1,20 +1,23 @@
 use std::collections::BTreeSet;
 use std::num::NonZeroU64;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-use super::protocol::ProtocolId;
+use super::protocol::{InputDigest, ProtocolId, Sha256Digest};
 use super::run::ClaimClass;
 use crate::root::RepoRoot;
 
 const GROUP_CONTRACT_PATH: &str = "benchmarks/qualification-runtime-groups.json";
-const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 2;
+const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 3;
 const MAX_GROUP_CONTRACT_BYTES: usize = 1 << 20;
 const MAX_GROUPS: usize = 256;
 const MAX_MEASUREMENTS_PER_GROUP: usize = 64;
 const MAX_CORRECTNESS_CASES_PER_GROUP: usize = 4096;
 const MAX_SCALES_PER_GROUP: usize = 64;
+const MAX_PROFILER_NOTE_PATH_BYTES: usize = 512;
+const MAX_PROFILER_NOTE_BYTES: usize = 64 << 10;
+const PROFILER_NOTE_PREFIX: &str = "benchmarks/profiler-notes/qualification/";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -33,6 +36,51 @@ pub(super) struct GroupContract {
     pub(super) measurement_ids: Vec<ProtocolId>,
     pub(super) scales: Vec<ScaleContract>,
     pub(super) correctness_case_ids: Vec<String>,
+    pub(super) owner: ProtocolId,
+    pub(super) profiler_note: Option<ProfilerNoteContract>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ProfilerNoteContract {
+    pub(super) path: ProfilerNotePath,
+    pub(super) sha256: Sha256Digest,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(transparent)]
+pub(super) struct ProfilerNotePath(Box<str>);
+
+impl ProfilerNotePath {
+    fn try_new(value: String) -> Result<Self, GroupError> {
+        if value.is_empty()
+            || value.len() > MAX_PROFILER_NOTE_PATH_BYTES
+            || !value.starts_with(PROFILER_NOTE_PREFIX)
+            || !value.ends_with(".md")
+            || value
+                .split('/')
+                .any(|component| component.is_empty() || component == "." || component == "..")
+            || !value.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'/')
+            })
+        {
+            return Err(GroupError::ProfilerNotePath(value));
+        }
+        Ok(Self(value.into_boxed_str()))
+    }
+
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for ProfilerNotePath {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Self::try_new(String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -40,6 +88,8 @@ pub(super) struct GroupContract {
 pub(super) struct ScaleContract {
     pub(super) id: ProtocolId,
     pub(super) work_items: NonZeroU64,
+    pub(super) input_bytes: u64,
+    pub(super) input_digest: InputDigest,
 }
 
 impl GroupContract {
@@ -110,8 +160,103 @@ pub(super) fn load_groups(
     load(root, expected_inventory_sha256).map(|(file, _)| file.groups)
 }
 
-pub(super) fn check(root: &RepoRoot, expected_inventory_sha256: &str) -> Result<(), GroupError> {
-    load(root, expected_inventory_sha256).map(|_| ())
+pub(super) fn check(
+    root: &RepoRoot,
+    expected_inventory_sha256: &str,
+    suite: &super::super::model::QualificationSuite,
+) -> Result<(), GroupError> {
+    let (file, _) = load(root, expected_inventory_sha256)?;
+    validate_inventory_contracts(&file, suite)
+}
+
+fn validate_inventory_contracts(
+    file: &GroupContractFile,
+    suite: &super::super::model::QualificationSuite,
+) -> Result<(), GroupError> {
+    use super::super::model::{
+        CorrectnessBinding, EvidenceState, InputByteCount, PerformanceDisposition,
+        QualificationStatus, RunnerFidelity, ThresholdPolicy,
+    };
+
+    let runtime_group_ids = file
+        .groups
+        .iter()
+        .filter(|group| group.claim_class == ClaimClass::PromotablePerformance)
+        .map(|group| group.id.to_string())
+        .collect::<BTreeSet<_>>();
+    let inventory_group_ids = suite
+        .qualification_groups
+        .iter()
+        .filter(|group| {
+            group.status != QualificationStatus::Planned
+                && group.threshold_policy == ThresholdPolicy::Primary1_25
+        })
+        .map(|group| group.id.clone())
+        .collect::<BTreeSet<_>>();
+    if runtime_group_ids != inventory_group_ids {
+        return Err(GroupError::InventoryCoverage {
+            runtime_only: runtime_group_ids
+                .difference(&inventory_group_ids)
+                .cloned()
+                .collect(),
+            inventory_only: inventory_group_ids
+                .difference(&runtime_group_ids)
+                .cloned()
+                .collect(),
+        });
+    }
+
+    for contract in file
+        .groups
+        .iter()
+        .filter(|group| group.claim_class == ClaimClass::PromotablePerformance)
+    {
+        let group = suite
+            .qualification_groups
+            .iter()
+            .find(|candidate| candidate.id == contract.id.to_string())
+            .ok_or_else(|| GroupError::InventoryContract(contract.id.to_string()))?;
+        let contract_scale_ids = contract
+            .scales
+            .iter()
+            .map(|scale| scale.id.to_string())
+            .collect::<Vec<_>>();
+        let inventory_scale_ids = group
+            .workload_family
+            .scales
+            .iter()
+            .map(|scale| scale.id.clone())
+            .collect::<Vec<_>>();
+        let scales_match = contract
+            .scales
+            .iter()
+            .zip(&group.workload_family.scales)
+            .all(|(contract, inventory)| {
+                contract.id.to_string() == inventory.id
+                    && inventory.semantic_work == Some(contract.work_items.get())
+                    && inventory.input_bytes
+                        == InputByteCount::Exact {
+                            bytes: contract.input_bytes,
+                        }
+                    && inventory.input_digest.as_deref() == Some(contract.input_digest.as_str())
+            });
+        if group.disposition != PerformanceDisposition::Measured
+            || group.runner_fidelity != RunnerFidelity::AdapterLibrary
+            || group.correctness_binding != CorrectnessBinding::ExactCases
+            || group.correctness_cases != contract.correctness_case_ids
+            || group.owner != contract.owner.to_string()
+            || group.planned_correctness_case_id.is_some()
+            || group.output_contract.digest_state != EvidenceState::Existing
+            || group.threshold_policy != ThresholdPolicy::Primary1_25
+            || group.status == QualificationStatus::Planned
+            || inventory_scale_ids != contract_scale_ids
+            || group.memory_policy.scale_ids != contract_scale_ids
+            || !scales_match
+        {
+            return Err(GroupError::InventoryContract(contract.id.to_string()));
+        }
+    }
+    Ok(())
 }
 
 fn load(
@@ -124,7 +269,32 @@ fn load(
             .map_err(|error| GroupError::Read(error.to_string()))?;
     let file: GroupContractFile = serde_json::from_slice(&bytes).map_err(GroupError::Json)?;
     validate(&file, expected_inventory_sha256)?;
+    validate_profiler_notes(root, &file)?;
     Ok((file, super::run::sha256_hex(&bytes)))
+}
+
+fn validate_profiler_notes(root: &RepoRoot, file: &GroupContractFile) -> Result<(), GroupError> {
+    for group in &file.groups {
+        let Some(note) = &group.profiler_note else {
+            continue;
+        };
+        let path = root.path.join(note.path.as_str());
+        let bytes = crate::source_file::read_repo_regular_file_bounded(
+            root,
+            &path,
+            MAX_PROFILER_NOTE_BYTES,
+        )
+        .map_err(|error| GroupError::ProfilerNote(error.to_string()))?;
+        if super::run::sha256_hex(&bytes) != note.sha256.as_str() {
+            return Err(GroupError::ProfilerNoteDigest(group.id.to_string()));
+        }
+        let text = std::str::from_utf8(&bytes)
+            .map_err(|error| GroupError::ProfilerNote(error.to_string()))?;
+        if !text.contains("Dominant cost:") || !text.contains("Next owner action:") {
+            return Err(GroupError::ProfilerNoteContent(group.id.to_string()));
+        }
+    }
+    Ok(())
 }
 
 fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result<(), GroupError> {
@@ -236,6 +406,23 @@ pub(super) enum GroupError {
     UnsupportedRuntimeShape(String),
     #[error("runtime group contract does not exactly match the executable group registry")]
     ExecutableRegistration,
+    #[error("runtime group contract does not match performance inventory group {0}")]
+    InventoryContract(String),
+    #[error(
+        "runtime and implemented threshold-eligible inventory groups differ: runtime-only={runtime_only:?}, inventory-only={inventory_only:?}"
+    )]
+    InventoryCoverage {
+        runtime_only: Vec<String>,
+        inventory_only: Vec<String>,
+    },
+    #[error("invalid source-owned profiler-note path {0:?}")]
+    ProfilerNotePath(String),
+    #[error("failed to read source-owned profiler note: {0}")]
+    ProfilerNote(String),
+    #[error("runtime group {0} profiler-note digest is stale")]
+    ProfilerNoteDigest(String),
+    #[error("runtime group {0} profiler note lacks required cost and owner-action fields")]
+    ProfilerNoteContent(String),
 }
 
 #[cfg(test)]
@@ -257,8 +444,15 @@ mod tests {
                     scales: vec![ScaleContract {
                         id: ProtocolId::try_new("default").expect("scale id"),
                         work_items: NonZeroU64::new(4096).expect("positive work"),
+                        input_bytes: 0,
+                        input_digest: InputDigest::try_new(
+                            "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1",
+                        )
+                        .expect("empty input digest"),
                     }],
                     correctness_case_ids: Vec::new(),
+                    owner: ProtocolId::try_new("ops/bench").expect("owner"),
+                    profiler_note: None,
                 },
                 GroupContract {
                     id: ProtocolId::try_new(super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
@@ -270,8 +464,18 @@ mod tests {
                     scales: vec![ScaleContract {
                         id: ProtocolId::try_new("small").expect("scale id"),
                         work_items: NonZeroU64::new(64).expect("positive work"),
+                        input_bytes: 64,
+                        input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
                     }],
                     correctness_case_ids: vec!["cq-evidence-example".to_string()],
+                    owner: ProtocolId::try_new("stab-core/circuit-parser").expect("owner"),
+                    profiler_note: Some(ProfilerNoteContract {
+                        path: ProfilerNotePath::try_new(
+                            "benchmarks/profiler-notes/qualification/example.md".to_string(),
+                        )
+                        .expect("note path"),
+                        sha256: Sha256Digest::try_new("d".repeat(64)).expect("note digest"),
+                    }),
                 },
             ],
         }
@@ -292,6 +496,17 @@ mod tests {
             validate(&thresholded, &"a".repeat(64)),
             Err(GroupError::InvalidGroup(_))
         ));
+    }
+
+    #[test]
+    fn product_contract_allows_profiler_note_to_follow_a_failure() {
+        let mut file = valid_contract_file();
+        file.groups
+            .iter_mut()
+            .find(|group| group.claim_class == ClaimClass::PromotablePerformance)
+            .expect("product group")
+            .profiler_note = None;
+        validate(&file, &"a".repeat(64)).expect("product contract without a preemptive note");
     }
 
     #[test]
@@ -316,10 +531,14 @@ mod tests {
             ScaleContract {
                 id: ProtocolId::try_new("same").expect("scale id"),
                 work_items: NonZeroU64::new(1).expect("positive work"),
+                input_bytes: 1,
+                input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
             },
             ScaleContract {
                 id: ProtocolId::try_new("same").expect("scale id"),
                 work_items: NonZeroU64::new(2).expect("positive work"),
+                input_bytes: 2,
+                input_digest: InputDigest::try_new("b".repeat(64)).expect("input digest"),
             },
         ];
         assert!(matches!(
@@ -336,8 +555,15 @@ mod tests {
                 "baseline_eligibility": "report-only",
                 "workload_id": "protocol-smoke",
                 "measurement_ids": ["main"],
-                "scales": [{"id": "zero", "work_items": 0}],
-                "correctness_case_ids": []
+                "scales": [{
+                    "id": "zero",
+                    "work_items": 0,
+                    "input_bytes": 0,
+                    "input_digest": "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1"
+                }],
+                "correctness_case_ids": [],
+                "owner": "ops/bench",
+                "profiler_note": null
             }]
         });
         assert!(serde_json::from_value::<GroupContractFile>(zero).is_err());
@@ -351,10 +577,14 @@ mod tests {
             ScaleContract {
                 id: ProtocolId::try_new("small").expect("scale id"),
                 work_items: NonZeroU64::new(2).expect("positive work"),
+                input_bytes: 2,
+                input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
             },
             ScaleContract {
                 id: ProtocolId::try_new("large").expect("scale id"),
                 work_items: NonZeroU64::new(1).expect("positive work"),
+                input_bytes: 1,
+                input_digest: InputDigest::try_new("b".repeat(64)).expect("input digest"),
             },
         ];
         assert!(matches!(
@@ -375,6 +605,110 @@ mod tests {
             group.scale("Default"),
             Err(GroupError::UnknownScale { group, scale })
                 if group == super::super::invocation::PQ1_GROUP_ID && scale == "Default"
+        ));
+    }
+
+    #[test]
+    fn runtime_contract_rejects_inventory_scale_drift() {
+        let root =
+            RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+                .expect("repository root");
+        let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
+        let mut suite = super::super::super::discovery::generate(&root, &manifest)
+            .expect("generated performance inventory");
+        let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+        validate_inventory_contracts(&file, &suite).expect("matching ledgers");
+
+        let scale = suite
+            .qualification_groups
+            .iter_mut()
+            .find(|group| group.id == super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
+            .and_then(|group| group.workload_family.scales.first_mut())
+            .expect("circuit parse scale");
+        scale.semantic_work = scale.semantic_work.and_then(|work| work.checked_add(1));
+
+        assert!(matches!(
+            validate_inventory_contracts(&file, &suite),
+            Err(GroupError::InventoryContract(group))
+                if group == super::super::invocation::CIRCUIT_PARSE_GROUP_ID
+        ));
+
+        let mut suite = super::super::super::discovery::generate(&root, &manifest)
+            .expect("generated performance inventory");
+        let scale = suite
+            .qualification_groups
+            .iter_mut()
+            .find(|group| group.id == super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
+            .and_then(|group| group.workload_family.scales.first_mut())
+            .expect("circuit parse scale");
+        scale.input_digest = Some("e".repeat(64));
+        assert!(matches!(
+            validate_inventory_contracts(&file, &suite),
+            Err(GroupError::InventoryContract(group))
+                if group == super::super::invocation::CIRCUIT_PARSE_GROUP_ID
+        ));
+    }
+
+    #[test]
+    fn runtime_contract_rejects_inventory_groups_without_runtime_owners() {
+        let root =
+            RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+                .expect("repository root");
+        let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
+        let mut suite = super::super::super::discovery::generate(&root, &manifest)
+            .expect("generated performance inventory");
+        let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+        let mut orphan = suite
+            .qualification_groups
+            .iter()
+            .find(|group| group.id == super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
+            .expect("implemented threshold group")
+            .clone();
+        orphan.id = "PERFQ-ORPHAN".to_string();
+        suite.qualification_groups.push(orphan);
+
+        assert!(matches!(
+            validate_inventory_contracts(&file, &suite),
+            Err(GroupError::InventoryCoverage {
+                runtime_only,
+                inventory_only,
+            }) if runtime_only.is_empty() && inventory_only == ["PERFQ-ORPHAN"]
+        ));
+
+        suite.qualification_groups.retain(|group| {
+            group.id != "PERFQ-ORPHAN"
+                && group.id != super::super::invocation::CIRCUIT_PARSE_GROUP_ID
+        });
+        assert!(matches!(
+            validate_inventory_contracts(&file, &suite),
+            Err(GroupError::InventoryCoverage {
+                runtime_only,
+                inventory_only,
+            }) if runtime_only == [super::super::invocation::CIRCUIT_PARSE_GROUP_ID]
+                && inventory_only.is_empty()
+        ));
+    }
+
+    #[test]
+    fn runtime_contract_rejects_stale_profiler_note_digest() {
+        let root =
+            RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+                .expect("repository root");
+        let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
+        let suite = super::super::super::discovery::generate(&root, &manifest)
+            .expect("generated performance inventory");
+        let (mut file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+        file.groups
+            .iter_mut()
+            .find(|group| group.id.to_string() == super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
+            .and_then(|group| group.profiler_note.as_mut())
+            .expect("profiler note")
+            .sha256 = Sha256Digest::try_new("e".repeat(64)).expect("different digest");
+
+        assert!(matches!(
+            validate_profiler_notes(&root, &file),
+            Err(GroupError::ProfilerNoteDigest(group))
+                if group == super::super::invocation::CIRCUIT_PARSE_GROUP_ID
         ));
     }
 }

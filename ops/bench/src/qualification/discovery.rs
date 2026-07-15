@@ -19,6 +19,7 @@ use crate::manifest::{BenchmarkManifest, BenchmarkRow, Runner, ThresholdClass};
 use crate::root::RepoRoot;
 
 mod api;
+mod graduation;
 mod rows;
 
 use rows::{
@@ -348,7 +349,7 @@ pub(super) fn generate(
                 .collect(),
             waiver_refs: waiver_refs(row, &beta_by_id, &regression_by_id),
         });
-        groups.push(QualificationGroup {
+        let mut group = QualificationGroup {
             id: group_id.clone(),
             manifest_row: row.id.clone(),
             row_origin: RowOrigin::Inherited,
@@ -395,7 +396,9 @@ pub(super) fn generate(
             reason: group_reason(decision).to_string(),
             owner: owner(feature_id).to_string(),
             status: QualificationStatus::Planned,
-        });
+        };
+        graduation::apply(&mut group);
+        groups.push(group);
     }
     groups.push(resource_boundary_group());
     groups.extend(api::qualification_groups(&correctness));
@@ -539,6 +542,8 @@ fn resource_boundary_group() -> QualificationGroup {
                 id: id.to_string(),
                 parameters: parameters.to_string(),
                 input_bytes: InputByteCount::Exact { bytes: input_bytes },
+                semantic_work: None,
+                input_digest: None,
             })
                 .collect(),
         },
@@ -630,6 +635,8 @@ fn checklist_qualification_group(item: &RawChecklistItem, feature: &str) -> Qual
                     } else {
                         InputByteCount::NotApplicable
                     },
+                    semantic_work: None,
+                    input_digest: None,
                 })
                 .collect(),
         },

@@ -1,6 +1,6 @@
 use super::super::protocol::{GitCommit, PROTOCOL_SCHEMA_VERSION, Sha256Digest, WorkerMeasurement};
 use super::super::run::{CalibrationProbeEvidence, ImplementationCalibration, MemoryEvidence};
-use super::super::statistics::{GateOutcome, StatisticsSummary};
+use super::super::statistics::StatisticsSummary;
 use super::*;
 
 const WORK_ITEMS: u64 = 4;
@@ -25,6 +25,11 @@ fn measurement(
         iteration_count: iterations,
         elapsed_seconds,
         work_count: iterations.checked_mul(WORK_ITEMS).expect("work count"),
+        input_bytes: 0,
+        input_digest: InputDigest::try_new(
+            "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1",
+        )
+        .expect("empty input digest"),
         output_digest: SemanticDigest::try_new(repeated(b'd')).expect("semantic digest"),
         setup_rss_bytes: Some(100),
         peak_rss_bytes: Some(120),
@@ -147,6 +152,27 @@ fn noisy_attempt_gets_exactly_one_complete_rerun_slot() {
 }
 
 #[test]
+fn failed_or_noisy_product_evidence_requires_a_profiler_note() {
+    let passed = vec![timing_attempt(
+        0,
+        TimingAttemptKind::Initial,
+        GateOutcome::Passed,
+    )];
+    let failed = vec![timing_attempt(
+        0,
+        TimingAttemptKind::Initial,
+        GateOutcome::Failed,
+    )];
+    assert!(require_failure_evidence(ClaimClass::PromotablePerformance, &passed, false).is_ok());
+    assert!(matches!(
+        require_failure_evidence(ClaimClass::PromotablePerformance, &failed, false),
+        Err(ReportError::FailureEvidence)
+    ));
+    assert!(require_failure_evidence(ClaimClass::PromotablePerformance, &failed, true).is_ok());
+    assert!(require_failure_evidence(ClaimClass::DiagnosticInfrastructure, &failed, false).is_ok());
+}
+
+#[test]
 fn calibration_evidence_must_replay_the_controller_decision() {
     let valid = calibration(Implementation::Stim);
     replay_calibration(&valid).expect("valid calibration replay");
@@ -202,6 +228,11 @@ fn invocation_receipt_binds_phase_and_worker_identity() {
     let build = repeated(b'b');
     let identity = ReceiptIdentity {
         work_items: WORK_ITEMS,
+        input_bytes: 0,
+        input_digest: &InputDigest::try_new(
+            "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1",
+        )
+        .expect("empty input digest"),
         invocation_timeout_seconds: 30.0,
         expected_cpu: CPU,
         stim_commit: STIM_COMMIT,
@@ -241,6 +272,11 @@ fn invocation_receipt_binds_phase_and_worker_identity() {
         .iteration_count = 3;
     let mut wrong_work = valid.clone();
     wrong_work.rows.first_mut().expect("row").work_count = 9;
+    let mut wrong_input_bytes = valid.clone();
+    wrong_input_bytes.rows.first_mut().expect("row").input_bytes = 1;
+    let mut wrong_input = valid.clone();
+    wrong_input.rows.first_mut().expect("row").input_digest =
+        InputDigest::try_new(repeated(b'e')).expect("other input digest");
     let mut wrong_cpu = valid.clone();
     wrong_cpu.rows.first_mut().expect("row").affinity_cpu = Some(CPU + 1);
     let mut wrong_digest = valid.clone();
@@ -257,6 +293,8 @@ fn invocation_receipt_binds_phase_and_worker_identity() {
         wrong_measurement,
         wrong_iterations,
         wrong_work,
+        wrong_input_bytes,
+        wrong_input,
         wrong_cpu,
         wrong_digest,
         wrong_source,

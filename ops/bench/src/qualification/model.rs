@@ -149,6 +149,7 @@ pub(super) enum RunnerFidelity {
 #[serde(rename_all = "kebab-case")]
 pub(super) enum CorrectnessBinding {
     ExactApiOwners,
+    ExactCases,
     Unresolved,
 }
 
@@ -175,6 +176,10 @@ pub(super) struct ScalePoint {
     pub(super) id: String,
     pub(super) parameters: String,
     pub(super) input_bytes: InputByteCount,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) semantic_work: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) input_digest: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

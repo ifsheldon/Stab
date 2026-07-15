@@ -7,17 +7,28 @@ use thiserror::Error;
 
 use super::calibration::{CalibrationProbe, calibrate};
 use super::correctness::CorrectnessPreflightStatus;
-use super::protocol::{EvidenceMode, Implementation, ProtocolId, SemanticDigest};
+use super::protocol::{EvidenceMode, Implementation, InputDigest, ProtocolId, SemanticDigest};
 use super::run::{
     ClaimClass, PairExecution, QualificationReport, QualificationTier, REPORT_SCHEMA_VERSION,
     TimingAttempt, TimingAttemptKind, sha256_hex,
 };
-use super::statistics::{PairOrder, PairedSample, pair_measurements, summarize};
+use super::statistics::{GateOutcome, PairOrder, PairedSample, pair_measurements, summarize};
 use crate::config::{STIM_COMMIT, STIM_TAG};
 
+mod markdown;
 mod published;
 
-pub(super) use published::{load_validated_published_report, run};
+pub(super) use published::{
+    MAX_PUBLISHED_PREFLIGHT_BYTES, MAX_PUBLISHED_REPORT_BYTES, load_validated_published_evidence,
+    load_validated_published_report, run,
+};
+
+pub(super) fn render_markdown(
+    report: &QualificationReport,
+    report_sha256: &str,
+) -> Result<String, ReportError> {
+    markdown::render(report, report_sha256)
+}
 
 const PREFLIGHT_SCHEMA_VERSION: u32 = 5;
 const EXPECTED_WARMUPS: usize = 3;
@@ -111,6 +122,8 @@ pub(super) fn validate_report(
     if report.group_contract_sha256 != resolved_group.source_sha256
         || report.claim_class != resolved_group.contract.claim_class
         || report.baseline_eligibility != resolved_group.contract.baseline_eligibility
+        || report.owner != resolved_group.contract.owner.to_string()
+        || report.profiler_note != resolved_group.contract.profiler_note
     {
         return Err(ReportError::GroupEvidence);
     }
@@ -208,8 +221,34 @@ pub(super) fn validate_report(
     validate_pair_execution(&report.semantic_preflight, EvidenceMode::Timing)?;
     validate_calibration(report)?;
     validate_timing_attempts(report)?;
+    validate_failure_evidence(report)?;
     validate_memory(report)?;
     validate_claim(report, &resolved_group.contract)?;
+    Ok(())
+}
+
+fn validate_failure_evidence(report: &QualificationReport) -> Result<(), ReportError> {
+    require_failure_evidence(
+        report.claim_class,
+        &report.timing_attempts,
+        report.profiler_note.is_some(),
+    )
+}
+
+fn require_failure_evidence(
+    claim_class: ClaimClass,
+    timing_attempts: &[TimingAttempt],
+    has_profiler_note: bool,
+) -> Result<(), ReportError> {
+    let failed_or_noisy = timing_attempts.iter().any(|attempt| {
+        attempt
+            .statistics
+            .iter()
+            .any(|summary| summary.outcome != GateOutcome::Passed)
+    });
+    if claim_class == ClaimClass::PromotablePerformance && failed_or_noisy && !has_profiler_note {
+        return Err(ReportError::FailureEvidence);
+    }
     Ok(())
 }
 
@@ -436,7 +475,8 @@ fn validate_all_worker_receipts(
 ) -> Result<(), ReportError> {
     let workload_id = &group.workload_id;
     let measurement_id = group.single_measurement()?;
-    let identity = ReceiptIdentity::from_report(report)?;
+    let scale = group.scale(&report.scale_id)?;
+    let identity = ReceiptIdentity::from_report(report, scale)?;
     let preflight_stim = only_row(&report.semantic_preflight.stim.rows)?;
     let preflight_stab = only_row(&report.semantic_preflight.stab.rows)?;
     if preflight_stim.output_digest != preflight_stab.output_digest {
@@ -500,6 +540,8 @@ fn validate_all_worker_receipts(
 
 struct ReceiptIdentity<'a> {
     work_items: u64,
+    input_bytes: u64,
+    input_digest: &'a InputDigest,
     invocation_timeout_seconds: f64,
     expected_cpu: u32,
     stim_commit: &'a str,
@@ -510,9 +552,14 @@ struct ReceiptIdentity<'a> {
 }
 
 impl<'a> ReceiptIdentity<'a> {
-    fn from_report(report: &'a QualificationReport) -> Result<Self, ReportError> {
+    fn from_report(
+        report: &'a QualificationReport,
+        scale: &'a super::group::ScaleContract,
+    ) -> Result<Self, ReportError> {
         Ok(Self {
             work_items: report.command.work_items,
+            input_bytes: scale.input_bytes,
+            input_digest: &scale.input_digest,
             invocation_timeout_seconds: report.command.invocation_timeout_seconds as f64,
             expected_cpu: u32::try_from(report.host.selected_cpu)
                 .map_err(|_| ReportError::HostEvidence)?,
@@ -579,6 +626,8 @@ fn validate_invocation_receipt(
         || row.affinity_cpu != Some(identity.expected_cpu)
         || row.stim_commit.as_str() != identity.stim_commit
         || row.work_count != expected_work_count
+        || row.input_bytes != identity.input_bytes
+        || row.input_digest != *identity.input_digest
         || phase
             .output_digest
             .is_some_and(|expected| row.output_digest != *expected)
@@ -927,63 +976,6 @@ pub(super) fn authoritative_timing_attempt(
         .ok_or(ReportError::TimingAttemptCount(0))
 }
 
-pub(super) fn render_markdown(report: &QualificationReport, report_sha256: &str) -> String {
-    let authoritative = report.timing_attempts.last();
-    let summary = authoritative.and_then(|attempt| attempt.statistics.first());
-    let median = summary.map_or("n/a".to_string(), |value| {
-        format!("{:.6}", value.median_ratio)
-    });
-    let upper = summary.map_or("n/a".to_string(), |value| {
-        format!("{:.6}", value.confidence_interval_upper)
-    });
-    let outcome = summary.map_or("n/a".to_string(), |value| {
-        format!("{:?}", value.outcome).to_ascii_lowercase()
-    });
-    let maximum_temperature = |readings: &[super::host::ThermalReading]| {
-        readings
-            .iter()
-            .map(|reading| reading.millidegrees_celsius)
-            .max()
-            .map_or("unavailable".to_string(), |value| value.to_string())
-    };
-    format!(
-        "# Performance Qualification Report\n\n- Group: `{}`\n- Scale: `{}` (`{}` work items per iteration)\n- Group contract SHA-256: `{}`\n- Claim class: `{:?}`\n- Baseline eligibility: `{:?}`\n- Tier: `{:?}`\n- Stim: `{}` (`{}`)\n- Stab commit: `{}`\n- Local modifications: `{}`\n- Host profile: `{}`\n- Host verified: `{}`\n- CPU: `{}` on `{}`\n- Frequency governor: `{:?}`\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: `{}`\n- Target: `{}`\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median Stab/Stim ratio: `{}`\n- Upper bootstrap bound: `{}`\n- 1.25 outcome: `{}`\n- Process memory evidence: separate from timing\n- Promotable product claim: `{}`\n- Report SHA-256: `{}`\n",
-        report.group_id,
-        report.scale_id,
-        report.command.work_items,
-        report.group_contract_sha256,
-        report.claim_class,
-        report.baseline_eligibility,
-        report.tier,
-        report.stim_tag,
-        report.stim_commit,
-        report.repository.commit_after,
-        report.repository.local_modifications_before || report.repository.local_modifications_after,
-        report.host.profile_id,
-        report.host.verified,
-        report.host.selected_cpu,
-        report.host.cpu_identity,
-        report.host.frequency_governor_before,
-        maximum_temperature(&report.host.thermal_readings_before),
-        maximum_temperature(&report.host.thermal_readings_after),
-        report.toolchain.rust_toolchain,
-        report.toolchain.target_triple,
-        report.calibration.target_minimum_seconds,
-        report.calibration.acceptance_minimum_seconds,
-        report.timing_attempts.len(),
-        authoritative.map_or("n/a".to_string(), |attempt| attempt
-            .attempt_index
-            .to_string()),
-        authoritative.map_or(0, |attempt| attempt.warmups.len()),
-        authoritative.map_or(0, |attempt| attempt.samples.len()),
-        median,
-        upper,
-        outcome,
-        report.promotable,
-        report_sha256,
-    )
-}
-
 #[derive(Debug, Error)]
 pub(super) enum ReportError {
     #[error("qualification report schema is {actual}, expected {expected}")]
@@ -992,6 +984,8 @@ pub(super) enum ReportError {
     Identity,
     #[error("qualification report group contract evidence is stale or inconsistent")]
     GroupEvidence,
+    #[error("failed or noisy product evidence lacks source-owned failure ownership")]
+    FailureEvidence,
     #[error("qualification report inventory evidence differs from the checked inventories")]
     InventoryEvidence,
     #[error("qualification report command evidence is invalid")]
@@ -1064,6 +1058,8 @@ pub(super) enum ReportError {
     Artifact(#[from] super::artifact::ArtifactError),
     #[error("qualification report JSON must be nonempty and newline terminated")]
     ReportBoundary,
+    #[error("qualification report JSON is not in its canonical source-owned representation")]
+    NonCanonicalReport,
     #[error("qualification report output path does not match the validated directory")]
     OutputBinding,
     #[error("qualification preflight does not exactly reproduce from report.json")]

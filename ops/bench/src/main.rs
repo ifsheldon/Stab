@@ -91,6 +91,9 @@ enum Command {
     /// Reproduce one bounded runner or product-adapter probe.
     QualificationProbe(qualification::ProbeArgs),
 
+    /// Require two isolated private builds to produce identical worker binaries.
+    QualificationWorkerReproducibility,
+
     /// Run one paired qualification group and publish validated evidence.
     QualificationRun(qualification::RunArgs),
 
@@ -99,6 +102,12 @@ enum Command {
 
     /// Check promotable qualification evidence against source-owned thresholds.
     QualificationRegression(qualification::RegressionArgs),
+
+    /// Bind one complete architecture-scoped scale family into a rollup.
+    QualificationRollup(qualification::RollupArgs),
+
+    /// Replay a scale-family rollup from its exact source reports.
+    QualificationRollupReport(qualification::RollupReportArgs),
 
     /// Record pinned C++ Stim baseline benchmark results.
     Baseline {
@@ -254,6 +263,9 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         Command::QualificationProbe(args) => {
             qualification::probe(&root, args)?;
         }
+        Command::QualificationWorkerReproducibility => {
+            qualification::worker_reproducibility(&root, &manifest)?;
+        }
         Command::QualificationRun(args) => {
             qualification::run_qualification(&root, &manifest, args)?;
         }
@@ -262,6 +274,12 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         }
         Command::QualificationRegression(args) => {
             qualification::regression(&root, &manifest, args)?;
+        }
+        Command::QualificationRollup(args) => {
+            qualification::rollup(&root, &manifest, args)?;
+        }
+        Command::QualificationRollupReport(args) => {
+            qualification::rollup_report(&root, &manifest, args)?;
         }
         Command::Baseline {
             stim,

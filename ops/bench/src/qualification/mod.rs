@@ -17,10 +17,12 @@ mod model;
 mod runtime;
 mod validation;
 
-pub(crate) use runtime::{ProbeArgs, RegressionArgs, ReportArgs, RunArgs, WorkerArgs};
+pub(crate) use runtime::{
+    ProbeArgs, RegressionArgs, ReportArgs, RollupArgs, RollupReportArgs, RunArgs, WorkerArgs,
+};
 
 const EXPECTED_FROZEN_DIGEST: &str =
-    "101ecb8ba8853522a234be0437e3779007428a6a8749f4fd01c77a7fd7131345";
+    "ce0c451a9c3123be95d3b9606b96a7ce26e3b26f09f543ae7d2e9e0345e86d54";
 const MAX_SUITE_BYTES: usize = 32 << 20;
 
 pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
@@ -29,6 +31,20 @@ pub(crate) fn run_worker(args: WorkerArgs) -> Result<(), BenchError> {
 
 pub(crate) fn probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), BenchError> {
     runtime::run_probe(root, args).map_err(BenchError::Qualification)
+}
+
+pub(crate) fn worker_reproducibility(
+    root: &RepoRoot,
+    manifest: &BenchmarkManifest,
+) -> Result<(), BenchError> {
+    check(root, manifest)?;
+    let (stim_binary_sha256, stab_binary_sha256) =
+        runtime::verify_worker_reproducibility(root).map_err(BenchError::Qualification)?;
+    println!(
+        "[{PREFIX}] private qualification workers are reproducible: stim={} stab={}",
+        stim_binary_sha256, stab_binary_sha256
+    );
+    Ok(())
 }
 
 pub(crate) fn run_qualification(
@@ -94,6 +110,48 @@ pub(crate) fn regression(
     Ok(())
 }
 
+pub(crate) fn rollup(
+    root: &RepoRoot,
+    manifest: &BenchmarkManifest,
+    args: RollupArgs,
+) -> Result<(), BenchError> {
+    check(root, manifest)?;
+    let checked = read(root)?;
+    let output = runtime::run_rollup(
+        root,
+        EXPECTED_FROZEN_DIGEST,
+        &checked.correctness_digest,
+        args,
+    )
+    .map_err(BenchError::Qualification)?;
+    println!(
+        "[{PREFIX}] published performance qualification scale-family rollup at {}",
+        output.display()
+    );
+    Ok(())
+}
+
+pub(crate) fn rollup_report(
+    root: &RepoRoot,
+    manifest: &BenchmarkManifest,
+    args: RollupReportArgs,
+) -> Result<(), BenchError> {
+    check(root, manifest)?;
+    let checked = read(root)?;
+    let output = runtime::run_rollup_report(
+        root,
+        EXPECTED_FROZEN_DIGEST,
+        &checked.correctness_digest,
+        args,
+    )
+    .map_err(BenchError::Qualification)?;
+    println!(
+        "[{PREFIX}] replayed performance qualification scale-family rollup at {}",
+        output.display()
+    );
+    Ok(())
+}
+
 pub(crate) fn check(root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(), BenchError> {
     ensure_frozen()?;
     let references = discovery::load_source_references(root)?;
@@ -105,7 +163,8 @@ pub(crate) fn check(root: &RepoRoot, manifest: &BenchmarkManifest) -> Result<(),
     if checked_bytes != render(&generated)? {
         return Err(BenchError::QualificationDrift);
     }
-    runtime::check_contracts(root, EXPECTED_FROZEN_DIGEST).map_err(BenchError::Qualification)?;
+    runtime::check_contracts(root, EXPECTED_FROZEN_DIGEST, &checked)
+        .map_err(BenchError::Qualification)?;
     print_summary(&checked, None);
     Ok(())
 }
@@ -300,7 +359,7 @@ fn print_summary(suite: &QualificationSuite, feature: Option<&str>) {
             .unwrap_or(0)
     );
     println!(
-        "[{PREFIX}] primary-rows inherited={} planned={} correctness exact-api-owners={} planned-preflight={} exact-threshold-pairs={}",
+        "[{PREFIX}] primary-rows inherited={} planned={} correctness exact-api-owners={} exact-cases={} planned-preflight={} exact-threshold-pairs={}",
         groups
             .iter()
             .filter(|group| group.row_origin == RowOrigin::Inherited)
@@ -312,6 +371,10 @@ fn print_summary(suite: &QualificationSuite, feature: Option<&str>) {
         groups
             .iter()
             .filter(|group| group.correctness_binding == CorrectnessBinding::ExactApiOwners)
+            .count(),
+        groups
+            .iter()
+            .filter(|group| group.correctness_binding == CorrectnessBinding::ExactCases)
             .count(),
         groups
             .iter()

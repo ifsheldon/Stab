@@ -172,7 +172,9 @@ pub(super) fn row_decision(row: &BenchmarkRow) -> RowDecision {
         "m7-convert-01-to-ptb64",
         "pf3-gate-semantic-wide",
     ];
-    if REMOVED.contains(&row.id.as_str()) {
+    if row.id == "m4-circuit-parse" {
+        RowDecision::Reworked
+    } else if REMOVED.contains(&row.id.as_str()) {
         RowDecision::Removed
     } else if SUPERSEDED.contains(&row.id.as_str()) {
         RowDecision::Superseded
@@ -192,6 +194,9 @@ pub(super) fn row_classifications(
     waived: bool,
     selected_stim_symbols: &[String],
 ) -> Vec<RowClassification> {
+    if row.id == "m4-circuit-parse" {
+        return vec![RowClassification::Faithful];
+    }
     let mut values = BTreeSet::new();
     let decision = row_decision(row);
     let active = !matches!(decision, RowDecision::Removed);
@@ -398,6 +403,8 @@ pub(super) fn workload_family(
             id: "inherited".to_string(),
             parameters: row.description.clone(),
             input_bytes,
+            semantic_work: None,
+            input_digest: None,
         }],
     })
 }

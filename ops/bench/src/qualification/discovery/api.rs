@@ -142,6 +142,8 @@ fn qualification_group(
                     } else {
                         InputByteCount::NotApplicable
                     },
+                    semantic_work: None,
+                    input_digest: None,
                 })
                 .collect(),
         },

@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "deb6c025854e0e9dc555b45ee5afda33ac22b31c307d41d01731fa320a399f73",
-  "semantic_digest": "101ecb8ba8853522a234be0437e3779007428a6a8749f4fd01c77a7fd7131345",
+  "semantic_digest": "ce0c451a9c3123be95d3b9606b96a7ce26e3b26f09f543ae7d2e9e0345e86d54",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -61736,32 +61736,58 @@
       "public_api_items": [],
       "disposition": "measured",
       "phase": "parse",
-      "runner_fidelity": "stim-perf",
-      "correctness_cases": [],
-      "correctness_binding": "unresolved",
-      "planned_correctness_case_id": "CQPLANNED-PERFQ-M4-CIRCUIT-PARSE",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-633fa529edf5f549",
+        "cq-evidence-qualification-e660819ae9a223c6"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
-          "kind": "inline",
-          "id": "m4-circuit-parse"
+          "kind": "generated",
+          "id": "circuit-parse-cycle-v1"
         },
-        "source": "src/stim/circuit/circuit.perf.cc",
-        "deterministic_seed": "source-owned-inline:m4-circuit-parse",
+        "source": "benchmarks/stim_adapter/main.cc",
+        "deterministic_seed": "circuit-parse-cycle-v1",
         "scales": [
           {
-            "id": "inherited",
-            "parameters": ".stim parser throughput including sparse circuits",
+            "id": "small",
+            "parameters": "generator=circuit-parse-cycle-v1; instructions=64",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 429
+            },
+            "semantic_work": 64,
+            "input_digest": "c3c0855f4f04402cd1768dee1ca0606d7d1ff8907d6a3a4e3b386fd78ff6c3b6"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=circuit-parse-cycle-v1; instructions=4096",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 27981
+            },
+            "semantic_work": 4096,
+            "input_digest": "7c0a60d24fde2f776143003b987c30cd682d77fee5fd9f17bd9e9b5377a8ad04"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=circuit-parse-cycle-v1; instructions=65536",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 447821
+            },
+            "semantic_work": 65536,
+            "input_digest": "397e8db6accb8e66a826015e2d5db453271851fa2c49d40a0d98f91748219b60"
           }
         ]
       },
       "work_unit": "instructions",
       "output_contract": {
-        "expected_shape": "parser-throughput output count, width, and semantic digest from the declared correctness preflight",
-        "digest_state": "planned",
-        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+        "expected_shape": "Exact fixture byte count and digest plus canonical final-circuit semantic digest.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers construct the source-owned fixture outside timing, bind its exact bytes, and digest the final parsed circuit outside timing."
       },
       "timing_policy": {
         "calibration_min_ms": 250,
@@ -61772,16 +61798,18 @@
         "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
       },
       "memory_policy": {
-        "method": "stab-allocations",
+        "method": "process-rss",
         "scale_ids": [
-          "inherited"
+          "small",
+          "medium",
+          "large"
         ],
-        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+        "expected_growth": "Process setup and peak RSS are reported separately at every timing scale; maximum accepted materialization and first rejection remain PQ6 resource evidence."
       },
-      "threshold_policy": "report-only",
-      "reason": "The inherited operation shape is retained, but PQ1 must add correctness preflight, exact output digest, scales, and paired statistics before qualification.",
-      "owner": "stab-core",
-      "status": "planned"
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired adapter and Rust parser workload with exact CQ2, input, output, scale, timing, and memory bindings.",
+      "owner": "stab-core/circuit-parser",
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M4-GATE-LOOKUP",
@@ -70533,14 +70561,9 @@
       "id": "m4-circuit-parse",
       "primary_group_id": "PERFQ-M4-CIRCUIT-PARSE",
       "supporting_performance_features": [],
-      "decision": "retained",
+      "decision": "reworked",
       "classifications": [
-        "faithful",
-        "missing-scale",
-        "missing-correctness-preflight",
-        "missing-output-digest",
-        "heterogeneous-measurements",
-        "unmatched-submeasurement"
+        "faithful"
       ],
       "stim_mapping": {
         "kind": "stim-perf",
