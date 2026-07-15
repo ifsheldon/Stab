@@ -300,7 +300,7 @@ Make every comparator, selector, statistical plan, artifact, timeout, and report
 
 ## Milestone CQ2: Deterministic Models, Formats, Generation, And Algebra
 
-Status: Implementation and exact ownership remain complete as of 2026-07-16 with 271 parents across the eight selected domains. The new exact Stim v1.16.0 gate-name hash parent changed the correctness digest, so the previous clean PR, full, soak, and focused parser/printer reports are historical; run the new exact hash parent after commit before dependent gate timing, and rerun the complete 271-parent family before claiming source-current all-domain execution. Historical execution, audit, and full-code-review evidence is recorded in [cq2-deterministic-qualification-progress-report.md](cq2-deterministic-qualification-progress-report.md).
+Status: Implementation and exact ownership remain complete as of 2026-07-16 with 271 parents across the eight selected domains. The new exact Stim v1.16.0 gate-name hash parent changed the correctness digest, so the previous clean PR, full, soak, and focused parser/printer reports are historical. The exact hash parent passed clean current-digest execution and dependent preflight at revision `c76b7071fc4d7ac358ef3a2fffc053ea675bd05f`; rerun the complete 271-parent family before claiming source-current all-domain execution. Historical and current focused execution, audit, and full-code-review evidence is recorded in [cq2-deterministic-qualification-progress-report.md](cq2-deterministic-qualification-progress-report.md) and [pq2-gate-name-hash-qualification-progress-report.md](pq2-gate-name-hash-qualification-progress-report.md).
 
 ### Objective
 

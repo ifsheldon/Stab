@@ -2,19 +2,19 @@
 
 ## Status
 
-Implementation ownership complete as of 2026-07-16; clean current-digest execution is pending.
+Implementation ownership complete as of 2026-07-16; the exact gate-hash prerequisite has clean current-digest evidence, while complete 271-parent execution is pending.
 
 All eight selected deterministic domains are source-complete at exact upstream-symbol and exported-Rust-API granularity. The final Algebra slice passed milestone audit, three GPT-5.6/max full-code-review lanes, broad workspace verification, clean all-domain PR, full, and soak execution, offline report regeneration, and exact controller-bound preflight with every confirmed finding fixed. The later exact 82-entry Stim gate-name hash parent passed milestone audit and GPT-5.6/max review, but it refreshed the global correctness digest, so the prior all-domain and focused parser/printer reports are historical while implementation ownership remains complete.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Latest clean exact evidence revision: `ba70a52025fdd4122ac97cec263725b2ec56e431` with `local_modifications=false`, covering the three circuit parser and canonical-printer prerequisites under the preceding digest. No clean current-digest execution is claimed until the exact gate-name hash owner runs after commit.
+Latest clean exact evidence revision: `c76b7071fc4d7ac358ef3a2fffc053ea675bd05f` with `local_modifications=false`, covering the exact gate-name hash prerequisite under the current digest. Complete current-digest execution of all 271 selected parents remains pending.
 
 Current correctness inventory digest: `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2`.
 
 Current dependent performance inventory digest after the first three PQ2 product-contract graduations, exact gate-hash rebinding, synchronized checklist counts, and legacy printer-waiver retirement: `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`.
 
-The exact report at `target/qualification/pq2-m4-parse-print-full-ba70a52` selected all three shared parser and printer owners and passed all three, but it is now historical because the exact gate-name hash owner changed the correctness inventory. The gate-hash group requires `cq-evidence-qualification-bd20a013e903a05f`, which freezes the ordered 82-name table including `NOT_A_GATE` and every per-name Stim hash, so it must use a fresh clean exact report and preflight before timing. The clean all-domain reports also bind preceding correctness digests and remain historical evidence.
+The exact report at `target/qualification/pq2-m4-parse-print-full-ba70a52` selected all three shared parser and printer owners and passed all three, but it is now historical because the exact gate-name hash owner changed the correctness inventory. The clean current-digest report at `target/qualification/pq2-m4-gate-hash-full-c76b707` selected and passed `cq-evidence-qualification-bd20a013e903a05f`, which freezes the ordered 82-name table including `NOT_A_GATE` and every per-name Stim hash, and its exact dependent preflight passed before gate timing. The clean all-domain reports bind preceding correctness digests and remain historical evidence.
 
 ## Delivered Slices
 
