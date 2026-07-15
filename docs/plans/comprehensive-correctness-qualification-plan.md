@@ -440,6 +440,7 @@ Run the complete suite, remove coverage loopholes, and publish durable qualifica
 - Ban ignored qualification cases unless they are explicitly `soak` and have an owner and reason.
 - Run milestone-audit against every CQ milestone and full-code-review across test, oracle, statistical, resource, and documentation changes.
 - Update the feature checklist, test-porting plan, completion report, and benchmark correctness prerequisites.
+- Add an independently selectable resource case for programmatically constructed circuit repeat nesting, covering string serialization, file serialization, early writer failure, and destruction at the maximum accepted depth and first rejected depth.
 
 ### Required Commands
 
@@ -462,6 +463,7 @@ The `soak` command is required in scheduled evidence but is not a local pre-comm
 - Every selected case is implemented or evidence-closed, and no selected case is deferred, missing, stale, shared-primary, skipped, or ambiguous.
 - Every upstream case in selected source files has a disposition.
 - Every comparator and resource claim has adversarial validation.
+- Public programmatic circuits cannot trigger unbounded recursive serialization or destruction beyond their documented accepted depth.
 - Full reports identify clean Stab and pinned Stim commits.
 - Milestone-audit and full-code-review have no unresolved confirmed finding.
 - Documentation agrees on selected scope, explicit deferrals, counts, commands, and report paths.

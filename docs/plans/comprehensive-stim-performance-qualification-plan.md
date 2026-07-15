@@ -365,7 +365,7 @@ Soak catches nonlinear behavior and rare performance instability and does not re
 
 Status: Complete.
 
-Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md), [pq2-circuit-parse-qualification-progress-report.md](pq2-circuit-parse-qualification-progress-report.md), and `benchmarks/stim-qualification-suite.json` at current performance digest `b6bf408c54461d65670200fe701f7fff3e5e0470509d8fc89aeab729a242781b`, bound to correctness digest `4d9faa21e318eeebc4614c7bf62491bb2db73b5db57ae3dab7d0f19f3fda7cad`. The current refresh graduates `PERFQ-M4-CIRCUIT-PARSE` and `PERFQ-M4-CIRCUIT-CANONICAL-PRINT` into implemented exact runtime contracts without relaxing either `1.25x` target. Clean revision `d2df9766c5e3543c8df016db31f48f552354d79f` produced six valid non-noisy parser passes at the preceding performance inventory, with medians from `0.859679x` to `0.917843x` and worst upper confidence bound `0.926499x`; those artifacts are historical after the shared worker and inventory changed. Current clean evidence for both groups is pending. The dependent schema-version-13 PQ1 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` remains historical diagnostic infrastructure evidence rather than product-performance qualification.
+Evidence: [pq0-performance-disposition-progress-report.md](pq0-performance-disposition-progress-report.md), [pq2-circuit-parse-qualification-progress-report.md](pq2-circuit-parse-qualification-progress-report.md), [pq2-circuit-canonical-print-qualification-progress-report.md](pq2-circuit-canonical-print-qualification-progress-report.md), and `benchmarks/stim-qualification-suite.json` at current performance digest `f3c4009044b0bafcd877f76798c7f4f08c475c0877b85f68d22ae0449e3ddb8f`, bound to correctness digest `b80801fea6eae550feecf40489259de56123f6f3331b747d52c323d576fd0285`. Exactly `PERFQ-M4-CIRCUIT-PARSE` and `PERFQ-M4-CIRCUIT-CANONICAL-PRINT` are implemented exact runtime contracts, and both retain the exact `1.25x` target. Clean revision `ba70a52025fdd4122ac97cec263725b2ec56e431` produced twelve valid non-noisy AArch64 full and soak passes plus four replayed scale-family rollups. Parser medians range from `0.897744x` to `0.970298x` with worst upper confidence bound `0.974833x`; canonical-print medians range from `0.372912x` to `0.376075x` with worst upper confidence bound `0.398775x`. The legacy canonical-print diagnostic is superseded and no longer owns beta, timing-regression, or memory waivers. The dependent schema-version-13 PQ1 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` remains historical diagnostic infrastructure evidence rather than product-performance qualification.
 
 Implementation revision: `abf7cd1bae0de045f62e976a290507238153f976`, verified with `local_modifications=false`.
 
@@ -460,7 +460,7 @@ Make faithful comparison, calibration, statistics, and reporting reusable before
 
 ## PQ2: Qualify Models, Formats, Gates, Kernels, And Algebra
 
-Status: Active as of 2026-07-15. All 270 selected CQ2 parents have complete exact ownership, and current-digest exact prerequisite reports can unblock individual performance groups after controller-bound preflight. The preceding all-domain CQ2 execution is historical after the negative-zero owner refresh and must be rerun before it is cited as source-current all-domain evidence.
+Status: Active as of 2026-07-15. All 270 selected CQ2 parents have complete exact ownership. The first two exact runtime groups pass on controlled Linux AArch64 with controller-bound current-digest correctness preflight, but the remaining model, format, gate, kernel, and algebra groups are still planned. The preceding all-domain CQ2 execution is historical after later owner refreshes and must be rerun before it is cited as source-current all-domain evidence.
 
 ### Objective
 
@@ -490,7 +490,7 @@ Cover the deterministic foundations that feed every higher-level workflow.
 11. Publish each scale-family rollup only from a clean unchanged checkout whose commit exactly equals the source reports' Stab commit, record that producer state separately from the source-report identity, require exact Stim and Stab worker source, build-fingerprint, and binary-digest identity across every scale, and bound each source report and preflight while retaining only the reduced rollup evidence needed for the family.
 12. Add offline rollup replay that reopens the current checked inventories, runtime group, canonical rollup and preflight, every exact source report and preflight, and the clean producer revision; reconstruct the complete canonical JSON and derived Markdown; reject altered paths, source bindings, outcomes, counts, identities, or preflight bytes; and use compare-and-swap publication so stale validation cannot replace newer evidence.
 
-The first slice is infrastructure plus one proving workload. It graduates exactly `PERFQ-M4-CIRCUIT-PARSE` into the checked performance inventory and reclassifies the inherited `m4-circuit-parse` row from retained to reworked because the exact replacement contract now exists. Clean AArch64 full and soak evidence and both scale-family rollups at revision `d2df9766c5e3543c8df016db31f48f552354d79f` passed the unchanged `1.25x` target, with full and soak medians of `0.883627x` and `0.881622x` at small scale, `0.860613x` and `0.859679x` at medium scale, and `0.917797x` and `0.917843x` at large scale. These reports remain the accepted historical first-slice evidence but no longer bind the current performance inventory or shared worker source. This slice does not complete `PERF-CIRCUIT-MODEL`, supersede the inherited row, satisfy PQ2's remaining planned groups, or provide native x86-64 evidence.
+The first slice is infrastructure plus one proving workload. It graduates exactly `PERFQ-M4-CIRCUIT-PARSE` into the checked performance inventory and reclassifies the inherited `m4-circuit-parse` row from retained to reworked because the exact replacement contract exists. Source-current clean AArch64 full and soak evidence and both scale-family rollups at revision `ba70a52025fdd4122ac97cec263725b2ec56e431` pass the unchanged `1.25x` target, with full and soak medians of `0.920317x` and `0.920661x` at small scale, `0.897744x` and `0.900131x` at medium scale, and `0.963578x` and `0.970298x` at large scale. This slice does not complete `PERF-CIRCUIT-MODEL`, satisfy PQ2's remaining planned groups, or provide native x86-64 evidence.
 
 ### Second Executable Slice
 
@@ -505,7 +505,7 @@ The first slice is infrastructure plus one proving workload. It graduates exactl
 9. Rebuild both private workers twice from one clean commit, run the exact adapter probe, and produce full and soak source reports plus architecture-scoped rollups for canonical print.
 10. Regenerate parser reports and rollups from the same clean worker and inventory so the first group remains source-current after the shared worker extension.
 
-The source contract, symmetric worker implementation, exact correctness bindings, scale family, runtime dispatch, and regression rule are implemented at performance inventory `b6bf408c54461d65670200fe701f7fff3e5e0470509d8fc89aeab729a242781b`. Clean private-worker, correctness-preflight, timing, memory, regression, and rollup evidence remains pending and blocks acceptance of this slice.
+The second slice is complete on controlled Linux AArch64 at performance inventory `f3c4009044b0bafcd877f76798c7f4f08c475c0877b85f68d22ae0449e3ddb8f` and correctness inventory `b80801fea6eae550feecf40489259de56123f6f3331b747d52c323d576fd0285`. Clean revision `ba70a52025fdd4122ac97cec263725b2ec56e431` binds one reproducible private-worker identity, one exact three-case correctness execution, six printer reports, six refreshed parser reports, twelve successful regression checks, and four replayed AArch64 rollups. Canonical-print medians are `0.375252x` and `0.373080x` at small scale, `0.372912x` and `0.376075x` at medium scale, and `0.373970x` and `0.375580x` at large scale for full and soak respectively. The legacy `m4-circuit-canonical-print` row is superseded, removed from the M12 beta and timing-regression waivers and memory baseline, and retained only as a non-primary historical diagnostic. Native x86-64 execution remains unclaimed, programmatic nesting beyond the parser's 256-level admission limit remains CQ6/PQ6 resource work, and the flat fixture does not qualify float-heavy, tag-heavy, target-heavy, repeat-heavy, or public file-output performance.
 
 ### Tests
 
@@ -640,6 +640,7 @@ Turn qualified workloads into durable regression controls without freezing noisy
 5. Establish versioned process-memory and Stab allocation baselines from the same selected workload inventory.
 6. Add scaling bounds for streaming, compact traversal, materialization, and search work.
 7. Keep existing M12 thresholds until replacement rows have equal or stronger coverage and an explicit migration record.
+8. Select an explicit public resource contract for programmatically constructed circuits deeper than the parser's 256-level repeat-nesting limit: either iterative serialization and destruction with bounded work or a fallible depth-checked construction or serialization boundary.
 
 ### Tests
 
@@ -648,12 +649,14 @@ Turn qualified workloads into durable regression controls without freezing noisy
 - Reject memory baselines from timing builds or timing thresholds from memory builds.
 - Reject scale families with missing sizes, nonmonotonic work, changed semantics, or insufficient range.
 - Verify threshold migration preserves every old primary feature or records a reviewed supersession.
+- Test maximum-accepted and first-rejected programmatic repeat depth for string and file serialization, early writer failure, and destruction without process stack exhaustion.
 
 ### Acceptance Criteria
 
 - Every comparable measured group has an explicit target result and no slow row is waived.
 - Every primary threshold is backed by two clean full reports.
 - Every streaming or compact group has a machine-checked growth result.
+- Programmatic circuit serialization has an explicit tested repeat-depth resource contract independent of parser admission.
 - Current M12 coverage is preserved or superseded by stronger named evidence.
 
 ## PQ7: Final Qualification, Audit, And Reporting

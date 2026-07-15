@@ -1,113 +1,108 @@
 # PQ2 Circuit Parse Qualification Progress Report
 
-> Evidence-status note, 2026-07-15: the measurements below remain accepted historical evidence for revision `d2df9766c5e3543c8df016db31f48f552354d79f`, but they do not bind current performance inventory `b6bf408c54461d65670200fe701f7fff3e5e0470509d8fc89aeab729a242781b` or the shared worker extended with canonical printing. Regenerate all six parser reports and both rollups from the clean current worker before citing them as source-current.
-
 ## Status
 
-The first PQ2 product group, `PERFQ-M4-CIRCUIT-PARSE`, now passes the unchanged `1.25x` timing gate at every full and soak scale on the controlled Linux AArch64 host as of 2026-07-15.
+`PERFQ-M4-CIRCUIT-PARSE` passes the unchanged `1.25x` timing gate at every full and soak scale on the controlled Linux AArch64 host as of 2026-07-15.
 
-All six promotable measurements pass with upper bootstrap confidence bounds below `0.927x`. Stab uses between 8.2 percent and 14.0 percent less measured parse time than pinned Stim across these rows. The former parser optimization blocker is closed without changing the comparator, workload, scale, semantic output obligation, or threshold.
+All six source-current `parse` measurements pass with median ratios from `0.897744x` to `0.970298x` and a worst bootstrap confidence-interval upper bound of `0.974833x`. Stab takes between about 10 percent and 3 percent less measured parse time than pinned Stim across these rows.
 
-This report closes only the first proving group. It does not complete `PERF-CIRCUIT-MODEL`, the remaining PQ2 runtime groups, PQ2 on AArch64, or the separately required native x86-64 evidence.
+The earlier reports from revision `d2df9766c5e3543c8df016db31f48f552354d79f` remain valid historical evidence. This report replaces them as source-current evidence after the shared worker gained canonical printing and the qualification inventories changed.
+
+This report closes only the parser proving group on AArch64. It does not complete `PERF-CIRCUIT-MODEL`, the remaining PQ2 runtime groups, PQ2 on AArch64, or native Linux x86-64 evidence.
 
 ## Frozen Inputs
 
-- Stab evidence revision: `d2df9766c5e3543c8df016db31f48f552354d79f`, clean and unchanged before and after every promotable report and both rollups.
+- Stab evidence revision: `ba70a52025fdd4122ac97cec263725b2ec56e431`, with `local_modifications=false` in every correctness and performance report.
 - Stim baseline: v1.16.0 at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
-- Correctness inventory: `4d9faa21e318eeebc4614c7bf62491bb2db73b5db57ae3dab7d0f19f3fda7cad`.
-- Performance inventory: `9687d45fa57b97388e7a8c7b1676f2545619ff3185c19aa714583b25d1680924`.
-- Runtime group contract: `11f905ce465c884aa07841a8d05ba9050e5dcb8c4c6032c9ef6936fa8890f720`.
-- Profiler note: `benchmarks/profiler-notes/qualification/perfq-m4-circuit-parse.md` at `b37614a9843164d782c035d20f659fbf11be310c310caa4715a42ef792654a6b`.
+- Correctness inventory: `b80801fea6eae550feecf40489259de56123f6f3331b747d52c323d576fd0285`.
+- Performance inventory: `f3c4009044b0bafcd877f76798c7f4f08c475c0877b85f68d22ae0449e3ddb8f`.
+- Runtime group contract shared by parser and canonical printing: `e0e00907862b2fa59700f339f318bb1a15c6f4f0bbb0641caa7ad56f195c86a2`.
+- Profiler note: `benchmarks/profiler-notes/qualification/perfq-m4-circuit-parse.md` at `da819f8a2faeebfe7873db2b84cd090cae9853772b8ac756bb63eb86bd8d7a58`.
+- Host profile: verified `linux-aarch64-controlled`, pinned to logical CPU 0 with the performance governor at 2,808,000 kHz and no host-policy violation.
 
 ## Correctness Preflight
 
-The clean report at `target/qualification/pq2-circuit-parse-reviewed-full` selected and passed exactly these two parser owners:
+The clean report at `target/qualification/pq2-m4-parse-print-full-ba70a52` selected and passed all three shared parser and printer prerequisites. Parsing depends on these exact owners:
 
 - `cq-evidence-qualification-633fa529edf5f549`
 - `cq-evidence-qualification-e660819ae9a223c6`
 
-The report passed canonical offline regeneration and exact dependent preflight with these bindings:
+The combined report passed canonical offline regeneration and exact dependent preflight with these bindings:
 
 | Artifact | SHA-256 |
 | --- | --- |
-| Request | `50f7d370b5e7a28ff9334ea7c093a0c182d555001bd75e83b4ec49aeeb0d58e4` |
-| Report | `8fb7c2808615a3e91a6d6b9f001755904e50eac9626518e26da226e32202b0cd` |
-| Completion | `05f81d460661e26bc19aabcb08d041a4a93cc39e5f483e6e037859b7413a9047` |
-| Preflight | `3c9b0c327fa9114f88370f1ad70159a9aec883e1a1b4f7a8af75653ac352105e` |
+| Request | `23e1f36f280a101d39213d403c724fe5d498ffe428bc309796f3bbeae20bd703` |
+| Report | `5dcb3134e2fad22de389823f232704bb2b339133a4726f5c59234ed8684a69c0` |
+| Completion | `05037f849b9b317c9c2cc61653f3b979e742346a91b12237d4e1958d961cad8a` |
+| Preflight | `68c05127c48674aae13d3908355e335a86c9ec89c4f9755d38308e93c81e72dd` |
 
 Every performance report reopens these artifacts and reconstructs their canonical receipts before timing.
 
 ## Reproducible Workers
 
-`just bench::qualification-worker-reproducibility` rebuilt both private workers twice from the clean unchanged evidence revision, verified each live protocol identity, and proved exact pre-barrier rejection of the first unsupported circuit size.
+`just bench::qualification-worker-reproducibility` rebuilt both private workers twice from the clean evidence revision, verified their live protocol identities, and proved exact pre-barrier rejection of the first unsupported circuit size.
 
 | Worker identity | SHA-256 |
 | --- | --- |
-| Stim source | `1a22bfd87554e0c184f130de45ae89c59786e5d2592ded4ebddc701cde5a0abe` |
-| Stim build fingerprint | `b17167a0fd156f37c27bb03ee96f0ceca3a6103ae2c9f6b427bca860d43875fe` |
-| Stim binary | `d6d4a654bfb810c73bc1d4b13de744e3cf4c8b4cec59af828c4bc57d50bfb2e1` |
-| Stab source | `7568b5a1cd0d53959f5abaea776bfb79b4a26346745a907fc00b6fff71b10e87` |
-| Stab build fingerprint | `e4d8cab353a1e2549994b60667dd47ea71cacd1410ec08ed8d4c0b05a7415aaf` |
-| Stab binary | `20f532cb6693bc7cd37218a05b69eb0c6786cb278ab6ac6e433770604faa43f9` |
+| Stim source | `0efaa28c8b44616df925b6731b04821b536c83c692e3ae25dd7623d58c2be187` |
+| Stim build fingerprint | `7c8d9c6bd06efb54845543e1df0ef03aa3ce3fc2aaaba55ec327efc7ef9fb3b4` |
+| Stim binary | `2403e3ea9d1cdd56ccab2b19ed9483b4d860426117d9ab6b64bb7031822b6999` |
+| Stab source | `9b92a8ac92a014fd1ebae619f386eb1664b5ca90fc2feb0d3eab7318c08f8b99` |
+| Stab build fingerprint | `dd3ed1465aebcfc153070e86172b7fa0badb57c0197f180fc819e929e935f880` |
+| Stab binary | `3772ceaaff4d2e5e802dc014767386feb7146ddfb203ab96d08e439bf2bf8de2` |
 
 ## AArch64 Timing Results
 
-All reports used the verified `linux-aarch64-controlled` host, matched exact input bytes and digests, matched the semantic output digest, retained raw paired samples, and completed without a noise rerun.
+All reports used the verified host, matched exact input bytes and digests, matched the final canonical circuit digest, retained raw interleaved paired samples, and completed without a noise rerun.
 
 | Scale | Tier | Pairs | Median ratio | Bootstrap 95% interval | Ratio rMAD | Outcome |
 | --- | --- | ---: | ---: | --- | ---: | --- |
-| 64 instructions | Full | 9 | 0.883627 | [0.880187, 0.890209] | 0.001659 | Passed |
-| 64 instructions | Soak | 15 | 0.881622 | [0.876938, 0.889910] | 0.008228 | Passed |
-| 4,096 instructions | Full | 9 | 0.860613 | [0.856153, 0.868392] | 0.004007 | Passed |
-| 4,096 instructions | Soak | 15 | 0.859679 | [0.859250, 0.862876] | 0.003425 | Passed |
-| 65,536 instructions | Full | 9 | 0.917797 | [0.908443, 0.922543] | 0.005171 | Passed |
-| 65,536 instructions | Soak | 15 | 0.917843 | [0.914851, 0.926499] | 0.004860 | Passed |
+| 64 instructions | Full | 9 | 0.920317 | [0.908506, 0.924204] | 0.004224 | Passed |
+| 64 instructions | Soak | 15 | 0.920661 | [0.917691, 0.929440] | 0.003872 | Passed |
+| 4,096 instructions | Full | 9 | 0.897744 | [0.887921, 0.922286] | 0.009427 | Passed |
+| 4,096 instructions | Soak | 15 | 0.900131 | [0.886904, 0.904183] | 0.006687 | Passed |
+| 65,536 instructions | Full | 9 | 0.963578 | [0.949537, 0.970843] | 0.006921 | Passed |
+| 65,536 instructions | Soak | 15 | 0.970298 | [0.966151, 0.974833] | 0.004275 | Passed |
 
-Both full and soak family outcomes are `passed` with three passing measurements and zero noisy measurements. `qualification-regression` accepts every source report against the unchanged `1.25x` median and confidence-bound rules.
-
-The large scale remains slower relative to the other Stab rows, but it is still a measured speedup over Stim and has more than 32 percentage points of confidence-bound headroom below the gate.
+Both family outcomes are `passed`, with three passing measurements and no failed or noisy measurement. `qualification-regression` accepts every source report against the exact `1.25x` median and confidence-bound rules.
 
 ## AArch64 Memory Results
 
-Memory remains separate evidence. Stab has higher peak RSS at small and medium scales but lower peak RSS at the large scale.
+Memory remains separate observational evidence. Stab has higher peak RSS at small and medium scales but lower peak RSS at the large scale.
 
-| Scale | Tier | Stim peak RSS | Stab peak RSS | Direction |
-| --- | --- | ---: | ---: | --- |
-| 64 instructions | Soak | 3,420,160 bytes | 4,374,528 bytes | Stab higher |
-| 4,096 instructions | Soak | 4,177,920 bytes | 5,263,360 bytes | Stab higher |
-| 65,536 instructions | Soak | 19,456,000 bytes | 18,456,576 bytes | Stab lower |
+| Scale | Tier | Stim peak RSS | Stab peak RSS | Stab/Stim |
+| --- | --- | ---: | ---: | ---: |
+| 64 instructions | Soak | 3,411,968 bytes | 4,444,160 bytes | 1.303x |
+| 4,096 instructions | Soak | 4,038,656 bytes | 5,328,896 bytes | 1.319x |
+| 65,536 instructions | Soak | 19,451,904 bytes | 18,518,016 bytes | 0.952x |
 
 ## Authoritative Artifacts
 
 | Evidence | Path | Report SHA-256 |
 | --- | --- | --- |
-| Small full | `target/benchmarks/qualification/pq2-circuit-parse-reviewed-small-full` | `ae9d0ce097a72131765fd3a6a0cd5700537a21763a08fbb066aa4fd93864f4d1` |
-| Medium full | `target/benchmarks/qualification/pq2-circuit-parse-reviewed-medium-full` | `b6a1ed26475b114c3d20d80b4dedf1bffee55065640c22bd1b2916f30c04fafe` |
-| Large full | `target/benchmarks/qualification/pq2-circuit-parse-reviewed-large-full` | `479b41aa1a9821eecd241a170aad5d02deea0678c6ee9bc8ac61e83b96f2683c` |
-| Small soak | `target/benchmarks/qualification/pq2-circuit-parse-reviewed-small-soak` | `ce2652a8f908cf3963883f52cd32a3b0a6d3359c97b45cf8691db8c7bdcbb6f2` |
-| Medium soak | `target/benchmarks/qualification/pq2-circuit-parse-reviewed-medium-soak` | `3fd990c3103084c60188591a0f438ff40d59acbe556f6855bc1f8d5c38774b7f` |
-| Large soak | `target/benchmarks/qualification/pq2-circuit-parse-reviewed-large-soak` | `0415f60a09ce2f1f3ee5094269ce96e9194ca48efc24f84a16dfd9c38b49a466` |
-| AArch64 full rollup | `target/benchmarks/qualification/pq2-circuit-parse-reviewed-aarch64-full-rollup` | `78aa09bbcf916b9a068d68caffd9f9ef3d6ea9bd7d11459c322dfca964fdae61` |
-| AArch64 soak rollup | `target/benchmarks/qualification/pq2-circuit-parse-reviewed-aarch64-soak-rollup` | `87c2524bc9a6201fd3f3838ee94167ab5a9d83abf4656c502ee212b9fa34f279` |
+| Small full | `target/benchmarks/qualification/pq2-m4-parse-ba70a52-small-full` | `ce514a3f13705b734a9b3567184c2b5ef95cf3672125efef20d25617e3d7fa99` |
+| Medium full | `target/benchmarks/qualification/pq2-m4-parse-ba70a52-medium-full` | `dd7982999414b0bd561aa32c4a41d25891f025c1d2c026f8f3206bb28c58cbdd` |
+| Large full | `target/benchmarks/qualification/pq2-m4-parse-ba70a52-large-full` | `a4ba58e1a78fadfa124308d89800cab1826037b54cf56ef4633ebcea07eec38c` |
+| Small soak | `target/benchmarks/qualification/pq2-m4-parse-ba70a52-small-soak` | `9af73fd2cf31be87a32c5b4912b727feeee0e7d1bffdf09af56e3e195fe4e747` |
+| Medium soak | `target/benchmarks/qualification/pq2-m4-parse-ba70a52-medium-soak` | `2d0c6d145c951bed45494f264c4603322c0b2eb90ed42e0839fd46ddbf5463af` |
+| Large soak | `target/benchmarks/qualification/pq2-m4-parse-ba70a52-large-soak` | `f6fdf949c89511689f7cf3e414eec23cae2d95f74bd3484280d68cd2c3f9289f` |
+| AArch64 full rollup | `target/benchmarks/qualification/pq2-m4-parse-ba70a52-aarch64-full-rollup` | `55bf7046404e8cd07aedd86e5ab82d4d0065cadcfe0fb947913e379454f1eb99` |
+| AArch64 soak rollup | `target/benchmarks/qualification/pq2-m4-parse-ba70a52-aarch64-soak-rollup` | `1f751233008bd4db19bd33cb812c5d6046d4f3f19d5ea7b40ebae921fbbadaab` |
 
-Both rollups passed offline replay and bind all three required scales, one architecture, one tier, one correctness preflight, one runtime contract, and one exact six-digest worker identity.
+The full and soak rollup preflights are `626436f79ba0607860f64ea04200df03696617329e6ae4e90ac39ab000d0995e` and `2aac2deb2fb494ec75013de06d35f943ffb5447c7785a74c6d50581ea87a0192`. Both rollups passed offline replay and bind every required scale, one architecture and tier, the exact correctness and inventory digests, one runtime contract, and one six-digest worker identity.
 
 ## Review Closure
 
-The parser optimization retained the generic parser fallback and one-allocation qualification contract. Review then found Stim's unusual context-specific `rec[-0]` behavior. Commit `efd1c1299f1d407b574ec49cfb34a0b5305805d7` added an explicit typed representation, exact analyzer fixtures, controlled detection and sampling rejection, and direct transform, flow, missing-detector, detecting-region, and selected inverse-QEC regressions.
+The parser retains its generic fallback, exact canonical output obligation, one-allocation qualification contract, typed negative-zero measurement-record representation, and controlled rejection paths. The current refresh changed no parser semantics or threshold; it reran the group because the shared worker source and performance inventory changed when canonical printing graduated.
 
-The final GPT-5.6/max full-code-review found no remaining code, compatibility, architecture, or modernization issue. Its only P1 was the intentionally stale correctness and performance inventory binding after the new evidence owners landed. Commit `3527b660` regenerated and froze both inventories without changing any threshold or comparator.
-
-The milestone audit found no remaining implementation defect or new under-specification. The former evidence is retained as historical context in the profiler note; none of its failed or pre-review passing rows is promoted as current evidence.
+The source-current milestone audit and GPT-5.6/max review found no remaining parser implementation or evidence defect. The legacy parser row remains explicitly reworked by this exact source-owned replacement group rather than silently serving as duplicate evidence.
 
 ## Remaining Work
 
-1. Produce the same clean full and soak scale families and rollups on a controlled native Linux x86-64 host. No x86-64 timing conclusion is currently claimed.
-2. Implement and qualify the remaining PQ2 runtime groups. This first group does not close the broader deterministic performance inventory.
-3. Capture stack profiles on an authorized host if future parser work needs line-level attribution. `perf_event_paranoid=4` blocks local stack sampling, but profiling is no longer an acceptance blocker for this passing group.
+1. Produce the same clean full and soak scale families and rollups on a controlled native Linux x86-64 host. No x86-64 timing conclusion is claimed.
+2. Qualify the remaining PQ2 runtime groups. Parser and canonical printing do not close the broader circuit-model feature.
+3. Capture stack profiles on an authorized host if future parser work needs line-level attribution. `perf_event_paranoid=4` blocks local stack sampling, but profiling is not an acceptance blocker for this passing group.
 
 ## Verification
 
-The evidence revision passed workspace format, Clippy, tests, correctness and performance inventory checks, deterministic regeneration checks, benchmark smoke, worker reproducibility, exact CQ report regeneration and preflight, immediate offline replay for all six performance reports, all six regression checks, and full and soak rollup replay.
-
-Milestone audit and GPT-5.6/max full-code-review were completed before final evidence generation. No required process remains running.
+The evidence revision passed workspace format, Clippy, tests, correctness and performance inventory checks, deterministic regeneration checks, benchmark smoke, worker reproducibility, exact CQ report regeneration and preflight, immediate offline replay for all twelve parser and printer reports, all twelve regression checks, and replay of all four architecture rollups. No required process remains running.

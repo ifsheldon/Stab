@@ -21,6 +21,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Resolved Entries
 
+## 2026-07-15 - PQ2/PQ6: Programmatic Circuit Serialization Depth
+
+Status: Resolved
+Revealed by: GPT-5.6/max review of the canonical-printer qualification slice.
+Current text: the PQ2 canonical-print group owns a parsed flat fixture family, while the shared one-million-instruction accepted boundary and first rejected input are assigned to PQ6. The parser separately rejects repeat nesting beyond 256 levels.
+Gap: the plans do not define a resource contract for public circuits constructed programmatically with more than 256 nested `RepeatBlock` values. Those values bypass parser admission and currently recurse during capacity calculation, string or file emission, and destruction, so sufficiently deep values can exhaust the process stack. The flat PQ2 timing result does not exercise or claim this behavior.
+Proposed amendment: make CQ6/PQ6 select one explicit public contract before deep programmatic circuits are qualified: either implement iterative serialization and destruction with a declared bounded-work policy, or introduce a fallible depth-checked construction or serialization boundary. Add maximum-accepted and first-rejected depth tests for string and file output, early writer failure, and drop behavior, and keep the flat PQ2 performance claim separate from this resource evidence.
+Resolution: `docs/plans/comprehensive-correctness-qualification-plan.md` now requires an independently selectable CQ6 programmatic-repeat resource case, and `docs/plans/comprehensive-stim-performance-qualification-plan.md` assigns the implementation choice, depth boundary, string and file output, writer failure, destruction, and scaling evidence to PQ6. The work remains planned; the under-specification is resolved without extending the flat PQ2 timing claim.
+
 ## 2026-07-15 - PQ2: Worker Identity Across Scale Families
 
 Status: Resolved

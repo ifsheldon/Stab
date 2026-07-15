@@ -8,13 +8,13 @@ All eight selected deterministic domains are source-complete at exact upstream-s
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Latest clean exact current-digest evidence revision: `d2df9766c5e3543c8df016db31f48f552354d79f` with `local_modifications=false`, covering the two circuit-parser prerequisites.
+Latest clean exact current-digest evidence revision: `ba70a52025fdd4122ac97cec263725b2ec56e431` with `local_modifications=false`, covering the three circuit parser and canonical-printer prerequisites.
 
-Current correctness inventory digest: `4d9faa21e318eeebc4614c7bf62491bb2db73b5db57ae3dab7d0f19f3fda7cad`.
+Current correctness inventory digest: `b80801fea6eae550feecf40489259de56123f6f3331b747d52c323d576fd0285`.
 
-Current dependent performance inventory digest after the first two PQ2 product-contract graduations: `b6bf408c54461d65670200fe701f7fff3e5e0470509d8fc89aeab729a242781b`.
+Current dependent performance inventory digest after the first two PQ2 product-contract graduations and legacy printer-waiver retirement: `f3c4009044b0bafcd877f76798c7f4f08c475c0877b85f68d22ae0449e3ddb8f`.
 
-The authoritative exact current-digest report for the active dependent group is `target/qualification/pq2-circuit-parse-reviewed-full`. The clean all-domain reports at `target/qualification/cq2-deterministic-pr-clean`, `target/qualification/cq2-deterministic-full-clean`, and `target/qualification/cq2-deterministic-soak-clean` bind the preceding digest and are retained as historical evidence. Rerun the complete 270-parent family before citing all-domain execution as source-current. Earlier Generation-refined correctness and dependent PQ1 reports also remain historical.
+The authoritative exact current-digest report for the two active dependent groups is `target/qualification/pq2-m4-parse-print-full-ba70a52`. It selected all three shared owners, passed all three, and published request, report, and completion digests `23e1f36f280a101d39213d403c724fe5d498ffe428bc309796f3bbeae20bd703`, `5dcb3134e2fad22de389823f232704bb2b339133a4726f5c59234ed8684a69c0`, and `05037f849b9b317c9c2cc61653f3b979e742346a91b12237d4e1958d961cad8a`. The clean all-domain reports at `target/qualification/cq2-deterministic-pr-clean`, `target/qualification/cq2-deterministic-full-clean`, and `target/qualification/cq2-deterministic-soak-clean` bind a preceding digest and remain historical evidence. Rerun the complete 270-parent family before citing all-domain execution as source-current. Earlier Generation-refined correctness and dependent PQ1 reports also remain historical.
 
 ## Delivered Slices
 

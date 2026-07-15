@@ -6,9 +6,9 @@ Completed: 2026-07-13.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Current correctness dependency after reviewed negative-zero analyzer ownership: schema-version-3 CQ0 semantic digest `4d9faa21e318eeebc4614c7bf62491bb2db73b5db57ae3dab7d0f19f3fda7cad`.
+Current correctness dependency after canonical-printer parity and resource ownership: schema-version-3 CQ0 semantic digest `b80801fea6eae550feecf40489259de56123f6f3331b747d52c323d576fd0285`.
 
-Current performance inventory digest after the first two PQ2 product-contract graduations: `b6bf408c54461d65670200fe701f7fff3e5e0470509d8fc89aeab729a242781b`.
+Current performance inventory digest after the first two PQ2 product-contract graduations and legacy printer-waiver retirement: `f3c4009044b0bafcd877f76798c7f4f08c475c0877b85f68d22ae0449e3ddb8f`.
 
 Implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
@@ -16,7 +16,7 @@ Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca3258
 
 The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
-The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, Generation, and Algebra slices changed correctness owner ids, exact classifications, checklist rows, and public API shape, so PQ0 was regenerated without relaxing any performance gate. The current refresh has 541 qualification groups and graduates exactly `PERFQ-M4-CIRCUIT-PARSE` and `PERFQ-M4-CIRCUIT-CANONICAL-PRINT` to implemented exact runtime contracts. Both retain exact `1.25x` rules. Current-digest exact correctness evidence exists for both groups, but the passing AArch64 parser reports from revision `d2df9766c5e3543c8df016db31f48f552354d79f` bind the preceding performance inventory and shared worker source and are now historical; current clean timing evidence is pending. The clean all-domain CQ2 reports from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898` are historical under the refreshed correctness digest. Schema-version-13 PQ1 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` binds the previous Generation-refined digests and is historical; the synthetic adapter ratios remain report-only infrastructure evidence.
+The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, Generation, and Algebra slices changed correctness owner ids, exact classifications, checklist rows, and public API shape, so PQ0 was regenerated without relaxing any performance gate. The current inventory has 541 qualification groups and exactly two implemented runtime contracts, `PERFQ-M4-CIRCUIT-PARSE` and `PERFQ-M4-CIRCUIT-CANONICAL-PRINT`. Both retain exact `1.25x` rules. Clean revision `ba70a52025fdd4122ac97cec263725b2ec56e431` supplies current-digest correctness, full and soak AArch64 timing, memory, regression, and rollup evidence for both groups. The legacy canonical-print row is superseded, retains only non-primary diagnostic history, and no longer owns an M12 beta, timing-regression, or memory waiver. The clean all-domain CQ2 reports from revision `bae9e01cb3fedaf9d37958e6827b064c635b9898` remain historical under the refreshed correctness digest. Schema-version-13 PQ1 PR, full, and soak execution from revision `d0ecafd62794daad0ab5eb63d54c481a5e32a30b` binds previous digests and remains historical; its synthetic adapter ratios are report-only infrastructure evidence.
 
 PQ0 freezes inventory and migration decisions only.
 It does not claim that inherited timing ratios satisfy the comprehensive runner, preflight, scaling, memory, or statistical contract.
