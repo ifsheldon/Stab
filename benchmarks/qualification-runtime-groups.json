@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "performance_inventory_sha256": "67bcbfcf2d991c883b6d889bf48b4d9b8c09bcb52bdbd6dc1e041b6162a30193",
+  "performance_inventory_sha256": "0db669fa2a538a8616156bcad3569759a1a0df0734b34fd925a9a7707c9d0d93",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
