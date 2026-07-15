@@ -1,6 +1,6 @@
 # PQ1 Paired Performance Harness Progress Report
 
-> Current-evidence note, 2026-07-16: the exact gate-name hash owner and synchronized checklist counts set correctness inventory digest `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2` and performance inventory digest `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`. The prior parser and canonical-printer AArch64 reports remain historical passing evidence under preceding inventories; clean revision `c76b7071fc4d7ac358ef3a2fffc053ea675bd05f` supplies current passing gate-hash evidence. The schema-version-13 PQ1 reports remain historical diagnostic infrastructure evidence, not product performance.
+> Current-evidence note, 2026-07-16: the exact gate-name hash and popcount graduations set correctness inventory digest `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2` and performance inventory digest `9be7dea23a221e9d7fe6ba2e9bdfaf65ad2b4a7675b557386b3de6ea58306557`. Parser, canonical-printer, and gate-hash AArch64 reports remain historical passing evidence under preceding inventories; clean popcount evidence is pending. The schema-version-13 PQ1 reports remain historical diagnostic infrastructure evidence, not product performance.
 
 ## Status
 

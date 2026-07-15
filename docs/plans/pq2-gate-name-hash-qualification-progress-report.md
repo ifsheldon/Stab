@@ -1,5 +1,7 @@
 # PQ2 Gate Name Hash Qualification Progress Report
 
+> Historical-evidence note, 2026-07-16: this report remains authoritative for gate-name hashing at performance inventory `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`. Graduating `PERFQ-M5-SIMD-WORD` changed the source-current performance inventory and shared workers to digest `9be7dea23a221e9d7fe6ba2e9bdfaf65ad2b4a7675b557386b3de6ea58306557`, so the gate reports below are historical and are not relabeled as simultaneous current-inventory evidence.
+
 ## Status
 
 The third PQ2 product group, `PERFQ-M4-GATE-LOOKUP`, passes the exact `1.25x` timing gate at every full and soak scale on the controlled Linux AArch64 host as of 2026-07-16.
@@ -107,7 +109,7 @@ A final evidence audit then found that the PQ2 section-level status still descri
 ## Remaining Work
 
 1. Produce the same clean full and soak scale families and rollups on a controlled native Linux x86-64 host. No x86-64 timing conclusion is claimed.
-2. Select and implement the next finite PQ2 runtime group with exact current-digest CQ prerequisites, equivalent work, semantic output, three scales, and the unchanged `1.25x` policy where a faithful comparator exists.
+2. Finish clean committed execution for the implemented `PERFQ-M5-SIMD-WORD` group, then select the next finite PQ2 runtime group with the same exact evidence discipline.
 3. Rerun the complete 271-parent CQ2 family before claiming current-digest all-domain correctness execution.
 4. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a gate-hash memory claim.
 

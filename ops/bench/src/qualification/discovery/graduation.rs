@@ -7,6 +7,7 @@ use super::super::model::{
 const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
 const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
+const SIMD_WORD_POPCOUNT_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
     "cq-evidence-qualification-e660819ae9a223c6",
@@ -16,6 +17,11 @@ const CIRCUIT_CANONICAL_PRINT_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-ef933925fb901877",
 ];
 const GATE_NAME_HASH_CORRECTNESS_CASE: &str = "cq-evidence-qualification-bd20a013e903a05f";
+const SIMD_WORD_POPCOUNT_CORRECTNESS_CASES: [&str; 3] = [
+    "cq-evidence-qualification-5118006702599a45",
+    "cq-evidence-qualification-b1530dc4e48e942d",
+    "cq-evidence-qualification-ba252d42660a41ce",
+];
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
 pub(super) fn apply(group: &mut QualificationGroup) {
@@ -23,8 +29,35 @@ pub(super) fn apply(group: &mut QualificationGroup) {
         CIRCUIT_PARSE_GROUP_ID => apply_circuit_parse(group),
         CIRCUIT_CANONICAL_PRINT_GROUP_ID => apply_circuit_canonical_print(group),
         GATE_NAME_HASH_GROUP_ID => apply_gate_name_hash(group),
+        SIMD_WORD_POPCOUNT_GROUP_ID => apply_simd_word_popcount(group),
         _ => {}
     }
+}
+
+fn apply_simd_word_popcount(group: &mut QualificationGroup) {
+    group.runner_fidelity = RunnerFidelity::AdapterLibrary;
+    group.correctness_cases = SIMD_WORD_POPCOUNT_CORRECTNESS_CASES
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = simd_word_popcount_workload_family();
+    group.output_contract = OutputContract {
+        expected_shape: "Exact deterministic fixture bytes plus matching toggle/popcount checksum, final toggle state, work count, and semantic digest."
+            .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: "Both workers prepare identical little-endian SplitMix64 words outside timing, toggle bit 300 and popcount the complete aligned vector in the timed body, and consume the accumulated checksum and final state outside timing."
+            .to_string(),
+    };
+    group.memory_policy = circuit_memory_policy(
+        "The aligned bit vector is prepared before timing and setup and peak process RSS are report-only observations at every scale. This slice makes no linear-growth acceptance claim; PQ6 owns explicit cross-scale RSS and allocation slack.",
+    );
+    group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.owner = "stab-core/bits".to_string();
+    group.reason = "Implemented paired pinned-Stim and Rust toggle-plus-popcount work with exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts."
+        .to_string();
+    group.status = QualificationStatus::Implemented;
 }
 
 fn apply_gate_name_hash(group: &mut QualificationGroup) {
@@ -176,5 +209,46 @@ fn gate_name_hash_workload_family() -> WorkloadFamily {
                 }
             })
             .collect(),
+    }
+}
+
+fn simd_word_popcount_workload_family() -> WorkloadFamily {
+    WorkloadFamily {
+        fixture: FixtureLocator::Generated {
+            id: "splitmix64-word-v1".to_string(),
+        },
+        source: "src/stim/mem/simd_word.perf.cc".to_string(),
+        deterministic_seed: "splitmix64-word-v1".to_string(),
+        scales: [
+            (
+                "small",
+                4_096,
+                512,
+                "101e05fc22ce0676c277e9b16363a38750079d12e0b93f3c687ed95457b79d1c",
+            ),
+            (
+                "medium",
+                262_144,
+                32_768,
+                "b33ad442a544ef4b367ab3b2e9a47d65676791ed7661ad7fa2529b5249bfea77",
+            ),
+            (
+                "large",
+                16_777_216,
+                2_097_152,
+                "b1e7afd7d73691441ea033a9eb9496d02fa12bc4d3bcf059856c089112dae368",
+            ),
+        ]
+        .into_iter()
+        .map(|(id, bits, input_bytes, input_digest)| ScalePoint {
+            id: id.to_string(),
+            parameters: format!(
+                "generator=splitmix64-word-v1; bits={bits}; alignment_bits=256; toggle_bit=300"
+            ),
+            input_bytes: InputByteCount::Exact { bytes: input_bytes },
+            semantic_work: Some(bits),
+            input_digest: Some(input_digest.to_string()),
+        })
+        .collect(),
     }
 }

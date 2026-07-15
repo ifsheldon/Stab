@@ -21,6 +21,10 @@ const DIAGNOSTIC_BUILD_FINGERPRINT: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
 const MAX_CIRCUIT_PARSE_INSTRUCTIONS: u64 = 1_000_000;
 const GATE_HASH_NAME_COUNT: u64 = 82;
+const POPCOUNT_ALIGNMENT_BITS: u64 = 256;
+const POPCOUNT_MIN_BITS: u64 = 512;
+const POPCOUNT_MAX_BITS: u64 = 268_435_456;
+const POPCOUNT_TOGGLE_BIT: usize = 300;
 const CIRCUIT_INSTRUCTION_CYCLE: [&str; 6] = [
     "H 0\n",
     "S 1\n",
@@ -42,6 +46,7 @@ pub(crate) enum WorkerWorkload {
     CircuitParse,
     CircuitCanonicalPrint,
     GateNameHash,
+    SimdWordPopcount,
 }
 
 impl WorkerWorkload {
@@ -51,6 +56,7 @@ impl WorkerWorkload {
             Self::CircuitParse => "circuit-parse",
             Self::CircuitCanonicalPrint => "circuit-canonical-print",
             Self::GateNameHash => "gate-name-hash",
+            Self::SimdWordPopcount => "simd-word-popcount",
         }
     }
 
@@ -60,6 +66,7 @@ impl WorkerWorkload {
             Self::CircuitParse => "parse",
             Self::CircuitCanonicalPrint => "serialize",
             Self::GateNameHash => "hash-all-names",
+            Self::SimdWordPopcount => "toggle-popcount",
         }
     }
 }
@@ -123,14 +130,30 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     let workload_id = ProtocolId::try_new(args.workload.id())?;
     let identity = current_identity()?;
     let circuit_fixture = match args.workload {
-        WorkerWorkload::ProtocolSmoke | WorkerWorkload::GateNameHash => None,
+        WorkerWorkload::ProtocolSmoke
+        | WorkerWorkload::GateNameHash
+        | WorkerWorkload::SimdWordPopcount => None,
         WorkerWorkload::CircuitParse | WorkerWorkload::CircuitCanonicalPrint => {
             Some(circuit_parse_fixture(args.work_items.get())?)
         }
     };
-    let input = circuit_fixture.as_deref().unwrap_or_default().as_bytes();
-    let input_bytes = u64::try_from(input.len()).map_err(|_| WorkerError::InputSizeRange)?;
-    let input_digest = InputDigest::try_new(semantic_digest(byte_digest(input)))?;
+    let mut popcount_fixture = match args.workload {
+        WorkerWorkload::SimdWordPopcount => Some(popcount_fixture(args.work_items.get())?),
+        WorkerWorkload::ProtocolSmoke
+        | WorkerWorkload::CircuitParse
+        | WorkerWorkload::CircuitCanonicalPrint
+        | WorkerWorkload::GateNameHash => None,
+    };
+    let (input_bytes, input_digest_state) = if let Some(fixture) = &popcount_fixture {
+        (fixture.input_bytes, fixture.input_digest)
+    } else {
+        let input = circuit_fixture.as_deref().unwrap_or_default().as_bytes();
+        (
+            u64::try_from(input.len()).map_err(|_| WorkerError::InputSizeRange)?,
+            byte_digest(input),
+        )
+    };
+    let input_digest = InputDigest::try_new(semantic_digest(input_digest_state))?;
     let canonical_print_circuit = match args.workload {
         WorkerWorkload::CircuitCanonicalPrint => Some(stab_core::Circuit::from_stim_str(
             circuit_fixture
@@ -139,19 +162,22 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         )?),
         WorkerWorkload::ProtocolSmoke
         | WorkerWorkload::CircuitParse
-        | WorkerWorkload::GateNameHash => None,
+        | WorkerWorkload::GateNameHash
+        | WorkerWorkload::SimdWordPopcount => None,
     };
     let gate_hash_names = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_names()?),
         WorkerWorkload::ProtocolSmoke
         | WorkerWorkload::CircuitParse
-        | WorkerWorkload::CircuitCanonicalPrint => None,
+        | WorkerWorkload::CircuitCanonicalPrint
+        | WorkerWorkload::SimdWordPopcount => None,
     };
     let gate_hash_sweeps = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_sweeps(args.work_items.get())?),
         WorkerWorkload::ProtocolSmoke
         | WorkerWorkload::CircuitParse
-        | WorkerWorkload::CircuitCanonicalPrint => None,
+        | WorkerWorkload::CircuitCanonicalPrint
+        | WorkerWorkload::SimdWordPopcount => None,
     };
     let gate_hash_table_digest = gate_hash_names
         .as_deref()
@@ -197,6 +223,13 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 .ok_or(WorkerError::MissingGateHashNames)?,
             gate_hash_table_digest.ok_or(WorkerError::MissingGateHashTableDigest)?,
         )),
+        WorkerWorkload::SimdWordPopcount => WorkloadOutput::DigestState(simd_word_popcount(
+            args.iterations.get(),
+            args.work_items.get(),
+            popcount_fixture
+                .as_mut()
+                .ok_or(WorkerError::MissingPopcountFixture)?,
+        )?),
     };
     let elapsed_seconds = started.elapsed().as_secs_f64();
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
@@ -396,14 +429,113 @@ fn gate_name_hash(
     [checksum, iterations, work_items, table_digest]
 }
 
+#[derive(Clone)]
+struct PopcountFixture {
+    bits: stab_core::BitVec,
+    input_bytes: u64,
+    input_digest: [u64; 4],
+}
+
+fn popcount_fixture(bit_count: u64) -> Result<PopcountFixture, WorkerError> {
+    let word_count = validate_popcount_width(bit_count)?;
+    let bit_count_usize =
+        usize::try_from(bit_count).map_err(|_| WorkerError::PopcountWidthRange(bit_count))?;
+    let mut words = Vec::new();
+    words
+        .try_reserve_exact(word_count)
+        .map_err(WorkerError::PopcountFixtureAllocation)?;
+    for index in 0..word_count {
+        let index = u64::try_from(index).map_err(|_| WorkerError::PopcountWordIndexRange)?;
+        words.push(splitmix64_word(index));
+    }
+    let input_bytes = u64::try_from(word_count)
+        .ok()
+        .and_then(|count| count.checked_mul(u64::BITS as u64 / 8))
+        .ok_or(WorkerError::InputSizeRange)?;
+    let input_digest = byte_digest_words(&words);
+    Ok(PopcountFixture {
+        bits: stab_core::BitVec::from_words_truncated(bit_count_usize, words),
+        input_bytes,
+        input_digest,
+    })
+}
+
+fn validate_popcount_width(bit_count: u64) -> Result<usize, WorkerError> {
+    if bit_count < POPCOUNT_MIN_BITS {
+        return Err(WorkerError::PopcountWidthMinimum {
+            actual: bit_count,
+            minimum: POPCOUNT_MIN_BITS,
+        });
+    }
+    if bit_count > POPCOUNT_MAX_BITS {
+        return Err(WorkerError::PopcountWidthLimit {
+            actual: bit_count,
+            maximum: POPCOUNT_MAX_BITS,
+        });
+    }
+    if !bit_count.is_multiple_of(POPCOUNT_ALIGNMENT_BITS) {
+        return Err(WorkerError::PopcountWidthAlignment {
+            actual: bit_count,
+            alignment: POPCOUNT_ALIGNMENT_BITS,
+        });
+    }
+    usize::try_from(bit_count / u64::BITS as u64)
+        .map_err(|_| WorkerError::PopcountWidthRange(bit_count))
+}
+
+fn splitmix64_word(index: u64) -> u64 {
+    let mut value = index.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    value ^ (value >> 31)
+}
+
+fn simd_word_popcount(
+    iterations: u64,
+    work_items: u64,
+    fixture: &mut PopcountFixture,
+) -> Result<[u64; 4], WorkerError> {
+    let mut toggled = fixture
+        .bits
+        .get(POPCOUNT_TOGGLE_BIT)
+        .ok_or(WorkerError::MissingPopcountToggleBit)?;
+    let mut checksum = 0_u64;
+    for _ in 0..iterations {
+        compiler_fence(Ordering::SeqCst);
+        toggled = !toggled;
+        fixture.bits.set(POPCOUNT_TOGGLE_BIT, toggled)?;
+        let count =
+            u64::try_from(fixture.bits.popcount()).map_err(|_| WorkerError::PopcountResultRange)?;
+        checksum = checksum.wrapping_add(count);
+    }
+    let final_bit = fixture
+        .bits
+        .get(POPCOUNT_TOGGLE_BIT)
+        .ok_or(WorkerError::MissingPopcountToggleBit)?;
+    Ok([
+        checksum,
+        iterations,
+        work_items,
+        fixture.input_digest[0] ^ u64::from(final_bit),
+    ])
+}
+
 fn byte_digest(bytes: &[u8]) -> [u64; 4] {
+    byte_digest_iter(bytes.iter().copied())
+}
+
+fn byte_digest_words(words: &[u64]) -> [u64; 4] {
+    byte_digest_iter(words.iter().flat_map(|word| word.to_le_bytes()))
+}
+
+fn byte_digest_iter(bytes: impl IntoIterator<Item = u8>) -> [u64; 4] {
     let mut state = [
         0x6a09_e667_f3bc_c908_u64,
         0xbb67_ae85_84ca_a73b_u64,
         0x3c6e_f372_fe94_f82b_u64,
         0xa54f_f53a_5f1d_36f1_u64,
     ];
-    for (index, byte) in bytes.iter().copied().enumerate() {
+    for (index, byte) in bytes.into_iter().enumerate() {
         let value =
             u64::from(byte).wrapping_add((index as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15));
         for (lane_state, lane) in state.iter_mut().zip(0_u32..) {
@@ -521,6 +653,8 @@ pub(super) enum WorkerError {
     Protocol(#[from] super::protocol::ProtocolError),
     #[error(transparent)]
     Circuit(#[from] stab_core::CircuitError),
+    #[error(transparent)]
+    Bits(#[from] stab_core::BitError),
     #[error("qualification workload {workload} requires measurement {expected}, got {actual}")]
     MeasurementMismatch {
         workload: &'static str,
@@ -551,6 +685,24 @@ pub(super) enum WorkerError {
     GateHashValueRange { name: String, actual: usize },
     #[error("gate-name-hash work count {actual} is not a complete sweep of {name_count} names")]
     GateHashPartialSweep { actual: u64, name_count: u64 },
+    #[error("simd-word-popcount width {actual} bits is below the minimum {minimum}")]
+    PopcountWidthMinimum { actual: u64, minimum: u64 },
+    #[error("simd-word-popcount width {actual} bits exceeds the maximum {maximum}")]
+    PopcountWidthLimit { actual: u64, maximum: u64 },
+    #[error("simd-word-popcount width {actual} bits is not a multiple of {alignment}")]
+    PopcountWidthAlignment { actual: u64, alignment: u64 },
+    #[error("simd-word-popcount width {0} cannot be represented on this host")]
+    PopcountWidthRange(u64),
+    #[error("simd-word-popcount word index cannot be represented as u64")]
+    PopcountWordIndexRange,
+    #[error("simd-word-popcount fixture allocation failed: {0}")]
+    PopcountFixtureAllocation(std::collections::TryReserveError),
+    #[error("simd-word-popcount fixture does not contain its toggle bit")]
+    MissingPopcountToggleBit,
+    #[error("simd-word-popcount workload was invoked without its prepared fixture")]
+    MissingPopcountFixture,
+    #[error("simd-word-popcount result cannot be represented as u64")]
+    PopcountResultRange,
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]
@@ -614,6 +766,61 @@ mod tests {
         assert!(matches!(
             gate_hash_sweeps(GATE_HASH_NAME_COUNT + 1),
             Err(WorkerError::GateHashPartialSweep { .. })
+        ));
+    }
+
+    #[test]
+    fn simd_word_popcount_fixture_binds_exact_scales_and_output() {
+        let mut small = popcount_fixture(4_096).expect("small fixture");
+        let medium = popcount_fixture(262_144).expect("medium fixture");
+        let large = popcount_fixture(16_777_216).expect("large fixture");
+        assert_eq!(small.input_bytes, 512);
+        assert_eq!(medium.input_bytes, 32_768);
+        assert_eq!(large.input_bytes, 2_097_152);
+        assert_eq!(
+            semantic_digest(small.input_digest),
+            "101e05fc22ce0676c277e9b16363a38750079d12e0b93f3c687ed95457b79d1c"
+        );
+        assert_eq!(
+            semantic_digest(medium.input_digest),
+            "b33ad442a544ef4b367ab3b2e9a47d65676791ed7661ad7fa2529b5249bfea77"
+        );
+        assert_eq!(
+            semantic_digest(large.input_digest),
+            "b1e7afd7d73691441ea033a9eb9496d02fa12bc4d3bcf059856c089112dae368"
+        );
+
+        let initial_count = small.bits.popcount() as u64;
+        let initial_bit = small.bits.get(POPCOUNT_TOGGLE_BIT).expect("toggle bit");
+        let once = simd_word_popcount(1, 4_096, &mut small).expect("popcount workload");
+        let expected_count = if initial_bit {
+            initial_count - 1
+        } else {
+            initial_count + 1
+        };
+        assert_eq!(once[0], expected_count);
+        assert_eq!(once[1], 1);
+        assert_eq!(once[2], 4_096);
+        assert_eq!(once[3], small.input_digest[0] ^ u64::from(!initial_bit));
+    }
+
+    #[test]
+    fn simd_word_popcount_fixture_rejects_invalid_widths_before_allocation() {
+        assert!(matches!(
+            popcount_fixture(256),
+            Err(WorkerError::PopcountWidthMinimum { .. })
+        ));
+        assert!(matches!(
+            popcount_fixture(513),
+            Err(WorkerError::PopcountWidthAlignment { .. })
+        ));
+        assert_eq!(
+            validate_popcount_width(POPCOUNT_MAX_BITS).expect("maximum width"),
+            usize::try_from(POPCOUNT_MAX_BITS / u64::BITS as u64).expect("host width")
+        );
+        assert!(matches!(
+            popcount_fixture(POPCOUNT_MAX_BITS + POPCOUNT_ALIGNMENT_BITS),
+            Err(WorkerError::PopcountWidthLimit { .. })
         ));
     }
 

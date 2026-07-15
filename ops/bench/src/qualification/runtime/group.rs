@@ -521,6 +521,25 @@ mod tests {
                     owner: ProtocolId::try_new("stab-core/gates").expect("owner"),
                     profiler_note: None,
                 },
+                GroupContract {
+                    id: ProtocolId::try_new(super::super::invocation::SIMD_WORD_POPCOUNT_GROUP_ID)
+                        .expect("group id"),
+                    claim_class: ClaimClass::PromotablePerformance,
+                    baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                    workload_id: ProtocolId::try_new("simd-word-popcount").expect("workload id"),
+                    measurement_ids: vec![
+                        ProtocolId::try_new("toggle-popcount").expect("measurement id"),
+                    ],
+                    scales: vec![ScaleContract {
+                        id: ProtocolId::try_new("small").expect("scale id"),
+                        work_items: NonZeroU64::new(4_096).expect("positive work"),
+                        input_bytes: 512,
+                        input_digest: InputDigest::try_new("e".repeat(64)).expect("input digest"),
+                    }],
+                    correctness_case_ids: vec!["cq-evidence-simd-word-popcount".to_string()],
+                    owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
+                    profiler_note: None,
+                },
             ],
         }
     }

@@ -21,11 +21,16 @@ const ADAPTER_PROBE_ID: &str = "pq1-adapter-protocol-smoke";
 const CIRCUIT_PARSE_PROBE_ID: &str = "pq2-circuit-parse-adapter-smoke";
 const CIRCUIT_CANONICAL_PRINT_PROBE_ID: &str = "pq2-circuit-canonical-print-adapter-smoke";
 const GATE_NAME_HASH_PROBE_ID: &str = "pq2-gate-name-hash-adapter-smoke";
+const SIMD_WORD_POPCOUNT_PROBE_ID: &str = "pq2-simd-word-popcount-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
 const DEFAULT_PROBE_WORK_ITEMS: u64 = 4_096;
 const DEFAULT_GATE_HASH_WORK_ITEMS: u64 = 5_248;
+const DEFAULT_POPCOUNT_WORK_ITEMS: u64 = 262_144;
 const GATE_HASH_NAME_COUNT: u64 = 82;
+const POPCOUNT_ALIGNMENT_BITS: u64 = 256;
+const POPCOUNT_MIN_BITS: u64 = 512;
+const POPCOUNT_MAX_BITS: u64 = 268_435_456;
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -40,6 +45,8 @@ enum ProbeGroup {
     CircuitCanonicalPrintAdapter,
     #[value(name = "pq2-gate-name-hash-adapter-smoke")]
     GateNameHashAdapter,
+    #[value(name = "pq2-simd-word-popcount-adapter-smoke")]
+    SimdWordPopcountAdapter,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -92,7 +99,8 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         ProbeGroup::AdapterProtocol
         | ProbeGroup::CircuitParseAdapter
         | ProbeGroup::CircuitCanonicalPrintAdapter
-        | ProbeGroup::GateNameHashAdapter => run_adapter_probe(root, args),
+        | ProbeGroup::GateNameHashAdapter
+        | ProbeGroup::SimdWordPopcountAdapter => run_adapter_probe(root, args),
     }
 }
 
@@ -160,6 +168,11 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
         ProbeGroup::GateNameHashAdapter => {
             (GATE_NAME_HASH_PROBE_ID, "gate-name-hash", "hash-all-names")
         }
+        ProbeGroup::SimdWordPopcountAdapter => (
+            SIMD_WORD_POPCOUNT_PROBE_ID,
+            "simd-word-popcount",
+            "toggle-popcount",
+        ),
         ProbeGroup::ProcessContract => {
             return Err(ProbeError::Contract(
                 "process-only probe cannot use the adapter path".to_string(),
@@ -325,6 +338,7 @@ fn probe_work_items(args: &ProbeArgs) -> u64 {
     args.work_items.map_or_else(
         || match args.group {
             ProbeGroup::GateNameHashAdapter => DEFAULT_GATE_HASH_WORK_ITEMS,
+            ProbeGroup::SimdWordPopcountAdapter => DEFAULT_POPCOUNT_WORK_ITEMS,
             ProbeGroup::ProcessContract
             | ProbeGroup::AdapterProtocol
             | ProbeGroup::CircuitParseAdapter
@@ -339,6 +353,20 @@ fn validate_probe_work_items(group: ProbeGroup, work_items: u64) -> Result<(), P
     {
         return Err(ProbeError::Contract(format!(
             "gate-name-hash probe work count {work_items} is not a complete sweep of {GATE_HASH_NAME_COUNT} names"
+        )));
+    }
+    if group == ProbeGroup::SimdWordPopcountAdapter
+        && !(POPCOUNT_MIN_BITS..=POPCOUNT_MAX_BITS).contains(&work_items)
+    {
+        return Err(ProbeError::Contract(format!(
+            "simd-word-popcount probe width {work_items} is outside {POPCOUNT_MIN_BITS}..={POPCOUNT_MAX_BITS} bits"
+        )));
+    }
+    if group == ProbeGroup::SimdWordPopcountAdapter
+        && !work_items.is_multiple_of(POPCOUNT_ALIGNMENT_BITS)
+    {
+        return Err(ProbeError::Contract(format!(
+            "simd-word-popcount probe width {work_items} is not a multiple of {POPCOUNT_ALIGNMENT_BITS} bits"
         )));
     }
     Ok(())
@@ -427,6 +455,7 @@ mod tests {
         assert!(ProtocolId::try_new(ADAPTER_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(CIRCUIT_CANONICAL_PRINT_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(GATE_NAME_HASH_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(SIMD_WORD_POPCOUNT_PROBE_ID).is_ok());
     }
 
     #[test]
@@ -451,6 +480,26 @@ mod tests {
         assert!(
             validate_probe_work_items(ProbeGroup::GateNameHashAdapter, DEFAULT_PROBE_WORK_ITEMS)
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn simd_word_popcount_probe_enforces_bounded_aligned_widths() {
+        assert!(ProbeGroup::from_str("pq2-simd-word-popcount-adapter-smoke", true).is_ok());
+        assert!(
+            validate_probe_work_items(
+                ProbeGroup::SimdWordPopcountAdapter,
+                DEFAULT_POPCOUNT_WORK_ITEMS
+            )
+            .is_ok()
+        );
+        assert!(validate_probe_work_items(ProbeGroup::SimdWordPopcountAdapter, 513).is_err());
+        assert!(
+            validate_probe_work_items(
+                ProbeGroup::SimdWordPopcountAdapter,
+                POPCOUNT_MAX_BITS + POPCOUNT_ALIGNMENT_BITS
+            )
+            .is_err()
         );
     }
 }

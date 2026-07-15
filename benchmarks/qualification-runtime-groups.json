@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "performance_inventory_sha256": "1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42",
+  "performance_inventory_sha256": "9be7dea23a221e9d7fe6ba2e9bdfaf65ad2b4a7675b557386b3de6ea58306557",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -117,6 +117,42 @@
       ],
       "correctness_case_ids": ["cq-evidence-qualification-bd20a013e903a05f"],
       "owner": "stab-core/gates",
+      "profiler_note": null
+    },
+    {
+      "id": "PERFQ-M5-SIMD-WORD",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "simd-word-popcount",
+      "measurement_ids": [
+        "toggle-popcount"
+      ],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 4096,
+          "input_bytes": 512,
+          "input_digest": "101e05fc22ce0676c277e9b16363a38750079d12e0b93f3c687ed95457b79d1c"
+        },
+        {
+          "id": "medium",
+          "work_items": 262144,
+          "input_bytes": 32768,
+          "input_digest": "b33ad442a544ef4b367ab3b2e9a47d65676791ed7661ad7fa2529b5249bfea77"
+        },
+        {
+          "id": "large",
+          "work_items": 16777216,
+          "input_bytes": 2097152,
+          "input_digest": "b1e7afd7d73691441ea033a9eb9496d02fa12bc4d3bcf059856c089112dae368"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-5118006702599a45",
+        "cq-evidence-qualification-b1530dc4e48e942d",
+        "cq-evidence-qualification-ba252d42660a41ce"
+      ],
+      "owner": "stab-core/bits",
       "profiler_note": null
     }
   ]

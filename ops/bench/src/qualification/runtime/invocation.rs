@@ -21,12 +21,15 @@ const IDENTITY_PROBE_TIMEOUT: Duration = Duration::from_secs(30);
 const CAP_REJECTION_TIMEOUT: Duration = Duration::from_secs(5);
 const FIRST_UNSUPPORTED_CIRCUIT_INSTRUCTIONS: &str = "1000001";
 const FIRST_PARTIAL_GATE_SWEEP_WORK_ITEMS: &str = "83";
+const FIRST_UNSUPPORTED_POPCOUNT_BITS: &str = "268435712";
+const FIRST_UNALIGNED_POPCOUNT_BITS: &str = "513";
 const EMPTY_PROTOCOL_INPUT_DIGEST: &str =
     "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 pub(super) const PQ1_GROUP_ID: &str = "pq1-adapter-protocol-smoke";
 pub(super) const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 pub(super) const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
 pub(super) const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
+pub(super) const SIMD_WORD_POPCOUNT_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
 
 pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
     let identity = (
@@ -50,11 +53,14 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
                 || (group == GATE_NAME_HASH_GROUP_ID
                     && workload == "gate-name-hash"
                     && measurement == "hash-all-names")
+                || (group == SIMD_WORD_POPCOUNT_GROUP_ID
+                    && workload == "simd-word-popcount"
+                    && measurement == "toggle-popcount")
     )
 }
 
 pub(super) const fn registered_group_count() -> usize {
-    4
+    5
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -281,6 +287,10 @@ impl PreparedWorkers {
         self.invoke_cap_rejection(Implementation::Stab)?;
         self.invoke_gate_partial_sweep_rejection(Implementation::Stim)?;
         self.invoke_gate_partial_sweep_rejection(Implementation::Stab)?;
+        self.invoke_popcount_cap_rejection(Implementation::Stim)?;
+        self.invoke_popcount_cap_rejection(Implementation::Stab)?;
+        self.invoke_popcount_alignment_rejection(Implementation::Stim)?;
+        self.invoke_popcount_alignment_rejection(Implementation::Stab)?;
         Ok(())
     }
 
@@ -440,6 +450,68 @@ impl PreparedWorkers {
         checked_gate_partial_sweep_rejection(output, implementation)
     }
 
+    fn invoke_popcount_cap_rejection(
+        &self,
+        implementation: Implementation,
+    ) -> Result<(), InvocationError> {
+        let output =
+            self.invoke_invalid_popcount_width(implementation, FIRST_UNSUPPORTED_POPCOUNT_BITS)?;
+        checked_popcount_cap_rejection(output, implementation)
+    }
+
+    fn invoke_popcount_alignment_rejection(
+        &self,
+        implementation: Implementation,
+    ) -> Result<(), InvocationError> {
+        let output =
+            self.invoke_invalid_popcount_width(implementation, FIRST_UNALIGNED_POPCOUNT_BITS)?;
+        checked_popcount_alignment_rejection(output, implementation)
+    }
+
+    fn invoke_invalid_popcount_width(
+        &self,
+        implementation: Implementation,
+        work_items: &'static str,
+    ) -> Result<ProcessResult, InvocationError> {
+        let mut arguments = vec![
+            OsString::from("--workload"),
+            OsString::from("simd-word-popcount"),
+            OsString::from("--measurement-id"),
+            OsString::from("toggle-popcount"),
+            OsString::from("--iterations"),
+            OsString::from("1"),
+            OsString::from("--work-items"),
+            OsString::from(work_items),
+            OsString::from("--evidence-mode"),
+            OsString::from("timing"),
+            OsString::from("--start-barrier"),
+            OsString::from("true"),
+        ];
+        let program = match implementation {
+            Implementation::Stim => self.adapter.path.clone(),
+            Implementation::Stab => {
+                arguments.insert(0, OsString::from("qualification-worker"));
+                self.worker.program()
+            }
+        };
+        run_bounded_process(&ProcessRequest {
+            program,
+            args: arguments,
+            stdin: Vec::new(),
+            working_directory: self.root.clone(),
+            environment: worker_environment(),
+            affinity_cpu: None,
+            limits: ProcessLimits {
+                stdin_bytes: 0,
+                stdout_bytes: PROTOCOL_OUTPUT_LIMIT,
+                stderr_bytes: 64 << 10,
+                regular_file_bytes: None,
+                timeout: CAP_REJECTION_TIMEOUT,
+            },
+        })
+        .map_err(InvocationError::Process)
+    }
+
     pub(crate) fn verify(&self) -> Result<(), InvocationError> {
         self.adapter.verify()?;
         self.worker
@@ -551,6 +623,62 @@ fn checked_gate_partial_sweep_rejection(
     Ok(())
 }
 
+fn checked_popcount_cap_rejection(
+    output: ProcessResult,
+    implementation: Implementation,
+) -> Result<(), InvocationError> {
+    let (expected_status, expected_stderr) = match implementation {
+        Implementation::Stim => (
+            Some(2),
+            "stim qualification adapter: simd-word-popcount bit width exceeds the source-owned limit\n",
+        ),
+        Implementation::Stab => (
+            Some(1),
+            "[stab-bench] ERROR: performance qualification validation failed:\nsimd-word-popcount width 268435712 bits exceeds the maximum 268435456\n",
+        ),
+    };
+    if output.status != expected_status
+        || !output.stdout.is_empty()
+        || output.stderr != expected_stderr.as_bytes()
+    {
+        return Err(InvocationError::PopcountCapRejection {
+            implementation,
+            status: output.status,
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn checked_popcount_alignment_rejection(
+    output: ProcessResult,
+    implementation: Implementation,
+) -> Result<(), InvocationError> {
+    let (expected_status, expected_stderr) = match implementation {
+        Implementation::Stim => (
+            Some(2),
+            "stim qualification adapter: simd-word-popcount bit width is not a multiple of 256\n",
+        ),
+        Implementation::Stab => (
+            Some(1),
+            "[stab-bench] ERROR: performance qualification validation failed:\nsimd-word-popcount width 513 bits is not a multiple of 256\n",
+        ),
+    };
+    if output.status != expected_status
+        || !output.stdout.is_empty()
+        || output.stderr != expected_stderr.as_bytes()
+    {
+        return Err(InvocationError::PopcountAlignmentRejection {
+            implementation,
+            status: output.status,
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
+    }
+    Ok(())
+}
+
 fn worker_environment() -> Vec<(OsString, OsString)> {
     vec![
         (OsString::from("LANG"), OsString::from("C")),
@@ -638,6 +766,24 @@ pub(crate) enum InvocationError {
         stdout: String,
         stderr: String,
     },
+    #[error(
+        "{implementation} did not reject the first unsupported simd-word-popcount width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
+    )]
+    PopcountCapRejection {
+        implementation: Implementation,
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
+    #[error(
+        "{implementation} did not reject an unaligned simd-word-popcount width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
+    )]
+    PopcountAlignmentRejection {
+        implementation: Implementation,
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
     #[error("qualification invocation returned no measurement")]
     MissingMeasurement,
     #[error("qualification worker measured invalid duration {0}")]
@@ -647,152 +793,5 @@ pub(crate) enum InvocationError {
 }
 
 #[cfg(test)]
-mod tests {
-    #[cfg(target_os = "linux")]
-    use std::path::Path;
-
-    use super::*;
-
-    #[test]
-    fn parent_rejects_semantic_work_overflow_before_invocation() {
-        let maximum = NonZeroU64::new(u64::MAX).expect("positive maximum");
-        let two = NonZeroU64::new(2).expect("positive two");
-        assert!(matches!(
-            checked_work_count(maximum, two),
-            Err(InvocationError::WorkOverflow)
-        ));
-    }
-
-    #[test]
-    fn reproducibility_requires_one_clean_unchanged_commit() {
-        let state = |commit: char, dirty| super::super::git::RepositoryState {
-            commit: commit.to_string().repeat(40),
-            local_modifications: dirty,
-        };
-        assert!(matches!(
-            require_reproducibility_repository(&state('a', true), &state('a', false)),
-            Err(InvocationError::DirtyReproducibilityRepository)
-        ));
-        assert!(matches!(
-            require_reproducibility_repository(&state('a', false), &state('b', false)),
-            Err(InvocationError::ReproducibilityRepositoryChanged { before, after })
-                if before == "a".repeat(40) && after == "b".repeat(40)
-        ));
-    }
-
-    #[test]
-    fn cap_rejection_requires_the_worker_limit_before_the_start_barrier() {
-        let output = |status, stderr: &str| ProcessResult {
-            status,
-            stdout: Vec::new(),
-            stderr: stderr.as_bytes().to_vec(),
-            parent_observed_peak_rss_bytes: None,
-            wall_elapsed: Duration::from_millis(1),
-        };
-        checked_cap_rejection(
-            output(
-                Some(2),
-                "stim qualification adapter: circuit-parse instruction count exceeds the source-owned limit\n",
-            ),
-            Implementation::Stim,
-        )
-        .expect("adapter cap rejection");
-        checked_cap_rejection(
-            output(
-                Some(1),
-                "[stab-bench] ERROR: performance qualification validation failed:\ncircuit-parse scale has 1000001 instructions, maximum 1000000\n",
-            ),
-            Implementation::Stab,
-        )
-        .expect("Stab cap rejection");
-        assert!(matches!(
-            checked_cap_rejection(
-                output(
-                    Some(2),
-                    "stim qualification adapter error: start barrier must contain one newline\n"
-                ),
-                Implementation::Stim,
-            ),
-            Err(InvocationError::CapRejection { .. })
-        ));
-        let signaled = output(
-            None,
-            "stim qualification adapter: circuit-parse instruction count exceeds the source-owned limit\n",
-        );
-        assert!(matches!(
-            checked_cap_rejection(signaled, Implementation::Stim),
-            Err(InvocationError::CapRejection { .. })
-        ));
-        assert!(matches!(
-            checked_cap_rejection(
-                output(
-                    Some(2),
-                    "stim qualification adapter: circuit-parse instruction count exceeds the source-owned limit\nunrelated error\n"
-                ),
-                Implementation::Stim,
-            ),
-            Err(InvocationError::CapRejection { .. })
-        ));
-    }
-
-    #[test]
-    fn partial_gate_sweep_rejection_must_precede_the_start_barrier() {
-        let output = |status, stdout: &str, stderr: &str| ProcessResult {
-            status,
-            stdout: stdout.as_bytes().to_vec(),
-            stderr: stderr.as_bytes().to_vec(),
-            parent_observed_peak_rss_bytes: None,
-            wall_elapsed: Duration::from_millis(1),
-        };
-        checked_gate_partial_sweep_rejection(
-            output(
-                Some(2),
-                "",
-                "stim qualification adapter: gate-name-hash work count is not a complete gate-table sweep\n",
-            ),
-            Implementation::Stim,
-        )
-        .expect("adapter partial-sweep rejection");
-        checked_gate_partial_sweep_rejection(
-            output(
-                Some(1),
-                "",
-                "[stab-bench] ERROR: performance qualification validation failed:\ngate-name-hash work count 83 is not a complete sweep of 82 names\n",
-            ),
-            Implementation::Stab,
-        )
-        .expect("Stab partial-sweep rejection");
-
-        for rejected in [
-            output(
-                Some(2),
-                "",
-                "stim qualification adapter: start barrier must contain one newline\n",
-            ),
-            output(
-                Some(0),
-                "",
-                "stim qualification adapter: gate-name-hash work count is not a complete gate-table sweep\n",
-            ),
-            output(
-                Some(2),
-                "unexpected output\n",
-                "stim qualification adapter: gate-name-hash work count is not a complete gate-table sweep\n",
-            ),
-        ] {
-            assert!(matches!(
-                checked_gate_partial_sweep_rejection(rejected, Implementation::Stim),
-                Err(InvocationError::GatePartialSweepRejection { .. })
-            ));
-        }
-    }
-
-    #[test]
-    #[cfg(target_os = "linux")]
-    #[ignore = "builds the pinned Stim adapter and Stab worker twice"]
-    fn private_worker_builds_are_byte_reproducible() {
-        let root = RepoRoot::resolve(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
-            .expect("repository root");
-        verify_private_worker_reproducibility(&root).expect("reproducible private workers");
-    }
-}
+#[path = "invocation_tests.rs"]
+mod tests;

@@ -158,6 +158,7 @@ pub(super) fn classify_phase(row: &BenchmarkRow) -> Phase {
 }
 
 pub(super) fn row_decision(row: &BenchmarkRow) -> RowDecision {
+    const REWORKED: [&str; 2] = ["m4-circuit-parse", "m5-simd-word"];
     const REMOVED: [&str; 2] = ["m7-perf-harness", "m12-primary-performance-matrix"];
     const SUPERSEDED: [&str; 6] = [
         "m10-analyze-errors-fold-cli",
@@ -173,7 +174,7 @@ pub(super) fn row_decision(row: &BenchmarkRow) -> RowDecision {
         "m7-convert-01-to-ptb64",
         "pf3-gate-semantic-wide",
     ];
-    if row.id == "m4-circuit-parse" {
+    if REWORKED.contains(&row.id.as_str()) {
         RowDecision::Reworked
     } else if REMOVED.contains(&row.id.as_str()) {
         RowDecision::Removed

@@ -22,6 +22,7 @@
 
 #include "stim/circuit/circuit.h"
 #include "stim/gates/gates.h"
+#include "stim/mem/simd_bits.h"
 
 #ifndef STAB_STIM_COMMIT
 #error "STAB_STIM_COMMIT must identify the pinned Stim source"
@@ -101,7 +102,10 @@ Arguments parse_arguments(int argc, const char **argv) {
         result.workload == "circuit-canonical-print" && result.measurement_id == "serialize";
     const bool gate_name_hash =
         result.workload == "gate-name-hash" && result.measurement_id == "hash-all-names";
-    if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !gate_name_hash) {
+    const bool simd_word_popcount =
+        result.workload == "simd-word-popcount" && result.measurement_id == "toggle-popcount";
+    if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !gate_name_hash &&
+        !simd_word_popcount) {
         throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
@@ -298,6 +302,94 @@ std::string semantic_digest(const std::array<uint64_t, 4> &state) {
     return output.str();
 }
 
+constexpr uint64_t POPCOUNT_ALIGNMENT_BITS = 256;
+constexpr uint64_t POPCOUNT_MIN_BITS = 512;
+constexpr uint64_t POPCOUNT_MAX_BITS = 268435456;
+constexpr size_t POPCOUNT_TOGGLE_BIT = 300;
+
+uint64_t splitmix64_word(uint64_t index) {
+    uint64_t value = index + 0x9e3779b97f4a7c15ULL;
+    value = (value ^ (value >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    value = (value ^ (value >> 27)) * 0x94d049bb133111ebULL;
+    return value ^ (value >> 31);
+}
+
+void mix_digest_byte(std::array<uint64_t, 4> &state, uint64_t index, uint8_t byte) {
+    const uint64_t value = byte + index * 0x9e3779b97f4a7c15ULL;
+    for (uint32_t lane = 0; lane < state.size(); ++lane) {
+        state[lane] ^= std::rotl(value, static_cast<int>(lane * 13));
+        state[lane] = std::rotl(
+            state[lane] * (0x100000001b3ULL + static_cast<uint64_t>(lane) * 2),
+            static_cast<int>(9 + lane));
+    }
+}
+
+std::array<uint64_t, 4> byte_digest_words(const uint64_t *words, size_t word_count) {
+    std::array<uint64_t, 4> state{
+        0x6a09e667f3bcc908ULL,
+        0xbb67ae8584caa73bULL,
+        0x3c6ef372fe94f82bULL,
+        0xa54ff53a5f1d36f1ULL,
+    };
+    uint64_t index = 0;
+    for (size_t word_index = 0; word_index < word_count; ++word_index) {
+        const uint64_t word = words[word_index];
+        for (uint32_t byte_index = 0; byte_index < 8; ++byte_index) {
+            mix_digest_byte(state, index, static_cast<uint8_t>(word >> (byte_index * 8)));
+            ++index;
+        }
+    }
+    return state;
+}
+
+struct PopcountFixture {
+    stim::simd_bits<stim::MAX_BITWORD_WIDTH> bits;
+    uint64_t input_bytes;
+    std::array<uint64_t, 4> input_digest;
+};
+
+PopcountFixture popcount_fixture(uint64_t bit_count) {
+    if (bit_count < POPCOUNT_MIN_BITS) {
+        throw std::invalid_argument("simd-word-popcount bit width is below the source-owned minimum");
+    }
+    if (bit_count > POPCOUNT_MAX_BITS) {
+        throw std::invalid_argument("simd-word-popcount bit width exceeds the source-owned limit");
+    }
+    if (bit_count % POPCOUNT_ALIGNMENT_BITS != 0) {
+        throw std::invalid_argument("simd-word-popcount bit width is not a multiple of 256");
+    }
+    if (bit_count > std::numeric_limits<size_t>::max()) {
+        throw std::overflow_error("simd-word-popcount bit width exceeds size_t");
+    }
+    const uint64_t word_count = bit_count / 64;
+    if (word_count > std::numeric_limits<size_t>::max()) {
+        throw std::overflow_error("simd-word-popcount word count exceeds size_t");
+    }
+    stim::simd_bits<stim::MAX_BITWORD_WIDTH> bits(static_cast<size_t>(bit_count));
+    if (bits.num_u64_padded() != word_count) {
+        throw std::runtime_error("simd-word-popcount padded width differs from the fixture");
+    }
+    for (uint64_t index = 0; index < word_count; ++index) {
+        bits.u64[index] = splitmix64_word(index);
+    }
+    const auto input_digest = byte_digest_words(bits.u64, static_cast<size_t>(word_count));
+    return PopcountFixture{std::move(bits), word_count * 8, input_digest};
+}
+
+std::array<uint64_t, 4> simd_word_popcount(
+    uint64_t iterations,
+    uint64_t work_items,
+    PopcountFixture &fixture) {
+    uint64_t checksum = 0;
+    for (uint64_t iteration = 0; iteration < iterations; ++iteration) {
+        std::atomic_signal_fence(std::memory_order_seq_cst);
+        fixture.bits[POPCOUNT_TOGGLE_BIT] ^= true;
+        checksum += fixture.bits.popcnt();
+    }
+    const bool final_bit = fixture.bits[POPCOUNT_TOGGLE_BIT];
+    return {checksum, iterations, work_items, fixture.input_digest[0] ^ final_bit};
+}
+
 }  // namespace
 
 int main(int argc, const char **argv) {
@@ -315,7 +407,6 @@ int main(int argc, const char **argv) {
         const std::string circuit_fixture = circuit_workload
                                                 ? circuit_parse_fixture(arguments.work_items)
                                                 : std::string{};
-        const auto input_digest = byte_digest(circuit_fixture);
         const std::optional<stim::Circuit> canonical_print_circuit =
             arguments.workload == "circuit-canonical-print"
                 ? std::optional<stim::Circuit>(stim::Circuit(circuit_fixture))
@@ -334,6 +425,15 @@ int main(int argc, const char **argv) {
             gate_sweeps = arguments.work_items / gate_names->size();
             gate_digest = gate_table_digest(gate_names.value());
         }
+        std::optional<PopcountFixture> popcount;
+        if (arguments.workload == "simd-word-popcount") {
+            popcount.emplace(popcount_fixture(arguments.work_items));
+        }
+        const uint64_t input_bytes = popcount.has_value()
+                                         ? popcount->input_bytes
+                                         : static_cast<uint64_t>(circuit_fixture.size());
+        const auto input_digest =
+            popcount.has_value() ? popcount->input_digest : byte_digest(circuit_fixture);
 
         if (arguments.start_barrier) {
             wait_for_start_barrier();
@@ -361,6 +461,9 @@ int main(int argc, const char **argv) {
                 gate_sweeps.value(),
                 gate_names.value(),
                 gate_digest.value());
+        } else if (arguments.workload == "simd-word-popcount") {
+            digest_state = simd_word_popcount(
+                arguments.iterations, arguments.work_items, popcount.value());
         } else {
             throw std::invalid_argument("unreachable registered adapter workload");
         }
@@ -384,7 +487,7 @@ int main(int argc, const char **argv) {
                   << "\"iteration_count\":" << arguments.iterations << ','
                   << "\"elapsed_seconds\":" << elapsed.count() << ','
                   << "\"work_count\":" << arguments.iterations * arguments.work_items << ','
-                  << "\"input_bytes\":" << circuit_fixture.size() << ','
+                  << "\"input_bytes\":" << input_bytes << ','
                   << "\"input_digest\":\"" << semantic_digest(input_digest) << "\","
                   << "\"output_digest\":\"" << semantic_digest(digest_state) << "\","
                   << "\"setup_rss_bytes\":" << setup_rss << ','
