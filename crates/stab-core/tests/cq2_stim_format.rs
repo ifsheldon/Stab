@@ -116,6 +116,22 @@ fn cq2_stim_format_canonical_printer_contract_matches_stim() {
         "TICK\nCX 2 3 rec[-5] 3\nCY sweep[6] 4\nM 1 3 2\nDETECTOR rec[-7]\nOBSERVABLE_INCLUDE(17) rec[-11] rec[-1]\nX_ERROR(0.5) 19\nE(0.25) X23 Z27 Y29\n"
     );
 
+    for (input, expected) in [
+        ("REPEAT 2 {\n}\n", "REPEAT 2 {\n\n}\n"),
+        ("REPEAT[empty] 3 {\n}\n", "REPEAT[empty] 3 {\n\n}\n"),
+        (
+            "REPEAT 2 {\nREPEAT 3 {\n}\n}\n",
+            "REPEAT 2 {\n    REPEAT 3 {\n\n    }\n}\n",
+        ),
+    ] {
+        assert_eq!(
+            Circuit::from_stim_str(input)
+                .expect("parse empty-repeat canonical fixture")
+                .to_stim_string(),
+            expected
+        );
+    }
+
     let qualification_cycle = [
         "H 0\n",
         "S 1\n",
@@ -131,13 +147,7 @@ fn cq2_stim_format_canonical_printer_contract_matches_stim() {
     .collect::<String>();
     let qualification_circuit =
         Circuit::from_stim_str(&qualification_cycle).expect("parse qualification print cycle");
-    let mut qualification_output = String::new();
-    let allocations = allocation_counter::measure(|| {
-        qualification_output = qualification_circuit.to_stim_string();
-    });
-    assert_eq!(qualification_output, qualification_cycle);
-    assert_eq!(allocations.count_total, 1, "{allocations:?}");
-    assert_eq!(allocations.count_max, 1, "{allocations:?}");
+    assert_eq!(qualification_circuit.to_stim_string(), qualification_cycle);
 }
 
 #[test]

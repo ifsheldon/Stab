@@ -1030,10 +1030,10 @@
           "--exact"
         ]
       },
-      "resource_contract": {
-        "kind": "not-applicable",
-        "detail": "This case proves canonical printing of aliases, plain and classical pair targets, measurement targets, detector and observable records, probabilities, and Pauli lists."
-      },
+        "resource_contract": {
+          "kind": "not-applicable",
+          "detail": "This case proves canonical printing of aliases, plain and classical pair targets, measurement targets, detector and observable records, probabilities, Pauli lists, and empty, tagged-empty, and nested-empty repeats."
+        },
       "upstream_owners": [
         {
           "path": "src/stim/circuit/circuit.test.cc",

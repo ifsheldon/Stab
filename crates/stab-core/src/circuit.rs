@@ -500,7 +500,7 @@ impl CircuitInstruction {
                 if index > 0 {
                     out.push_str(", ");
                 }
-                out.push_str(&printing::format_float(*arg));
+                out.push_str(printing::format_float(*arg).as_str());
             }
             out.push(')');
         }
@@ -583,6 +583,9 @@ impl RepeatBlock {
         printing::push_u64(out, self.repeat_count.get());
         out.push_str(" {\n");
         self.body.write_stim(out, indent + 4);
+        if self.body.is_empty() {
+            out.push('\n');
+        }
         write_indent(out, indent);
         out.push_str("}\n");
     }
@@ -597,6 +600,9 @@ impl RepeatBlock {
         }
         writeln!(out, " {} {{", self.repeat_count.get())?;
         self.body.write_stim_io_indented(out, indent + 4)?;
+        if self.body.is_empty() {
+            out.write_all(b"\n")?;
+        }
         write_indent_io(out, indent)?;
         out.write_all(b"}\n")
     }
@@ -1062,7 +1068,7 @@ fn write_targets_io(out: &mut impl Write, targets: &[Target]) -> io::Result<()> 
         } else {
             out.write_all(b" ")?;
         }
-        out.write_all(target.to_string().as_bytes())?;
+        printing::write_target_io(out, target)?;
     }
     Ok(())
 }

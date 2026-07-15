@@ -473,7 +473,14 @@ fn pf1_circuit_file_helpers_read_and_write_canonical_stim_text() {
     let input_path = dir.join("input.stim");
     fs::write(
         &input_path,
-        "H[test] 5\ncnot 0 1\nREPEAT[tag] 2 {\n    H 2\n}\n",
+        concat!(
+            "H[test] 5\n",
+            "cnot 0 1\n",
+            "REPEAT[tag] 2 {\n    H 2\n}\n",
+            "REPEAT 2 {\n}\n",
+            "REPEAT[empty] 3 {\n}\n",
+            "REPEAT 2 {\n    REPEAT 3 {\n    }\n}\n",
+        ),
     )
     .expect("write input circuit");
 
@@ -485,6 +492,17 @@ fn pf1_circuit_file_helpers_read_and_write_canonical_stim_text() {
             "CX 0 1\n",
             "REPEAT[tag] 2 {\n",
             "    H 2\n",
+            "}\n",
+            "REPEAT 2 {\n",
+            "\n",
+            "}\n",
+            "REPEAT[empty] 3 {\n",
+            "\n",
+            "}\n",
+            "REPEAT 2 {\n",
+            "    REPEAT 3 {\n",
+            "\n",
+            "    }\n",
             "}\n",
         )
     );
