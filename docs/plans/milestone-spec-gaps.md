@@ -21,6 +21,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Resolved Entries
 
+## 2026-07-15 - PQ2: Product PR Evidence Versus Promotion
+
+Status: Resolved
+Revealed by: implementation of the first correctness-bound product runtime group.
+Current text: the performance plan requires PR, full, and soak qualification tiers, exact correctness preflight before product timing, and clean verified full evidence for promotable claims.
+Gap: the PQ1 report validator required every `promotable-performance` group report to have `promotable=true`. A PR-tier product report can never satisfy the full-or-soak promotion rule, so the validator made the required PR product tier structurally impossible even when its correctness, work, output, and host evidence were valid. The plan did not explicitly distinguish a product-class diagnostic report from a promoted product claim.
+Proposed amendment: derive promotion from claim class, tier, repository cleanliness, host verification, and exact correctness preflight. Permit a product PR report to validate with `promotable=false`, require clean verified full or soak reports to record `promotable=true`, and keep regression dispatch fail-closed for nonpromotable product reports.
+Resolution: report schema version 14 derives promotion from the complete evidence tuple. Product PR, dirty, and unverified-host reports remain nonpromotable; exact correctness preflight remains mandatory for all product tiers; and `qualification-regression` continues to reject nonpromotable product evidence. The active goal and performance plan now state the distinction.
+
 ## 2026-07-15 - CQ2 Algebra Deterministic Materialization Admission
 
 Status: Resolved

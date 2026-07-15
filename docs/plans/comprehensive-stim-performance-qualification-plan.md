@@ -8,7 +8,7 @@ PQ0 completed: 2026-07-13, with source-owned evidence in [pq0-performance-dispos
 
 PQ1 completed: 2026-07-14, with clean schema-version-13 PR, full, and soak evidence from commit `bfef511ccaa57c61cbe209c41d89d77ba8f52eee` recorded in [pq1-performance-harness-progress-report.md](pq1-performance-harness-progress-report.md). The bounded process runner, independent process and adapter probes, symmetric protocol-smoke workers, calibration, paired statistics, canonical CQ preflight reconstruction, host and current-toolchain policy, process-memory evidence, atomic reports, and report-only regression dispatch passed milestone audit and GPT-5.6/max review.
 
-PQ2 through PQ7 remain planned, and PQ2 waits for the exact CQ2 correctness prerequisites.
+PQ2 is active after clean CQ2 completion; PQ3 through PQ7 remain planned.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07` in `vendor/stim`.
 
@@ -475,6 +475,20 @@ Cover the deterministic foundations that feed every higher-level workflow.
 5. Add memory-growth evidence for result streaming, compact repeat traversal, and wide stabilizer structures.
 6. Reclassify or remove stale M4 through M6 rows only after their replacement evidence is present.
 
+### First Executable Slice
+
+1. Generalize the schema-version-2 runtime group ledger so every group owns one or more immutable named scales and positive semantic work counts.
+2. Make `qualification-run --group <id> --scale <id>` resolve both values from that ledger and reject unknown groups, unknown scales, caller-selected replacement work counts, stale report scale ids, and work-count mismatches.
+3. Implement `PERFQ-M4-CIRCUIT-PARSE` first with one `parse` measurement and `small`, `medium`, and `large` scales of 64, 4,096, and 65,536 instructions.
+4. Bind the group to `cq-evidence-qualification-633fa529edf5f549` and `cq-evidence-qualification-e660819ae9a223c6`, which own Stim-text construction and canonical round-trip behavior.
+5. Generate the deterministic six-instruction fixture cycle outside the timer, measure only repeated parse and replacement of the previous parsed circuit, and derive the semantic digest from the final parsed canonical circuit outside the timer.
+6. Normalize only the known single terminal-newline difference between Stab canonical circuit text and pinned Stim `Circuit::str()` before digesting. Any other canonical difference blocks timing.
+7. Cap the circuit-parse fixture at 1,000,000 instructions before allocation in both workers and reject the first unsupported instruction count.
+8. Derive report promotion from the evidence: product PR, dirty, or unverified-host reports may remain valid diagnostics with exact CQ preflight, but only clean verified full or soak reports are promotable and eligible for regression dispatch.
+9. Keep the PQ1 protocol-smoke default group and `default` scale for command compatibility, but never migrate its diagnostic ratio into a product threshold.
+
+The first slice is infrastructure plus one proving workload. It does not complete `PERF-CIRCUIT-MODEL`, reclassify the generated PQ0 group, supersede `m4-circuit-parse`, or satisfy PQ2's remaining 218 planned groups until clean three-scale evidence and the required inventory migration land.
+
 ### Tests
 
 - Run every row's CQ correctness dependency before timing.
@@ -483,6 +497,8 @@ Cover the deterministic foundations that feed every higher-level workflow.
 - Verify algebra benchmarks mutate state and produce nonidentity semantic digests.
 - Verify folded huge-repeat fixtures remain compact and materialized fixtures hit their declared caps.
 - Verify each scale increases declared semantic work monotonically.
+- Verify the adapter and Stab worker emit the same circuit-parse digest for the accepted scale representatives and reject a workload or measurement mismatch before timing.
+- Verify product PR reports are valid but nonpromotable, clean verified full and soak reports are promotable, and regression rejects nonpromotable product reports.
 
 ### Acceptance Criteria
 
