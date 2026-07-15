@@ -452,7 +452,7 @@ fn checked_cap_rejection(
         ),
         Implementation::Stab => (
             Some(1),
-            "[stab-bench] ERROR: circuit-parse scale has 1000001 instructions, maximum 1000000\n",
+            "[stab-bench] ERROR: performance qualification validation failed:\ncircuit-parse scale has 1000001 instructions, maximum 1000000\n",
         ),
     };
     if output.status != expected_status
@@ -609,7 +609,7 @@ mod tests {
         checked_cap_rejection(
             output(
                 Some(1),
-                "[stab-bench] ERROR: circuit-parse scale has 1000001 instructions, maximum 1000000\n",
+                "[stab-bench] ERROR: performance qualification validation failed:\ncircuit-parse scale has 1000001 instructions, maximum 1000000\n",
             ),
             Implementation::Stab,
         )
