@@ -461,10 +461,9 @@ fn validate_output_path(path: &Path) -> Result<(), CorrectnessError> {
         return Err(CorrectnessError::InvalidOutput(path.to_path_buf()));
     }
     let components = path.components().collect::<Vec<_>>();
-    if components.len() < 4
+    if components.len() < 3
         || components.first() != Some(&Component::Normal("target".as_ref()))
         || components.get(1) != Some(&Component::Normal("qualification".as_ref()))
-        || components.get(2) != Some(&Component::Normal("correctness".as_ref()))
     {
         return Err(CorrectnessError::InvalidOutput(path.to_path_buf()));
     }
@@ -747,9 +746,7 @@ struct CorrectnessCaseReceipt {
 pub(super) enum CorrectnessError {
     #[error("diagnostic correctness preflight requires a reason")]
     MissingReason,
-    #[error(
-        "correctness evidence path must be a normal directory below target/qualification/correctness: {0}"
-    )]
+    #[error("correctness evidence path must be a normal directory below target/qualification: {0}")]
     InvalidOutput(PathBuf),
     #[error("correctness preflight expectation has an invalid manifest digest or Stab commit")]
     InvalidExpectation,
@@ -806,6 +803,23 @@ mod tests {
         assert_eq!(evidence.status, CorrectnessPreflightStatus::NotApplicable);
         assert!(evidence.case_ids.is_empty());
         assert!(evidence.request_sha256.is_none());
+    }
+
+    #[test]
+    fn correctness_output_path_matches_the_producer_boundary() {
+        for accepted in [
+            "target/qualification/cq2-full",
+            "target/qualification/correctness/full",
+        ] {
+            validate_output_path(Path::new(accepted)).expect("producer-compatible output path");
+        }
+        for rejected in [
+            "target/qualification",
+            "target/qualification/../escape",
+            "/target/qualification/cq2-full",
+        ] {
+            assert!(validate_output_path(Path::new(rejected)).is_err());
+        }
     }
 
     #[test]
