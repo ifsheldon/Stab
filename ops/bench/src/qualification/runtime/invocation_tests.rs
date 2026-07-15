@@ -3,10 +3,39 @@ use std::path::Path;
 
 use super::*;
 
+fn contract_identity() -> WorkerContractIdentityEvidence {
+    let digest = |value: char| {
+        Sha256Digest::try_new(value.to_string().repeat(64)).expect("contract identity digest")
+    };
+    WorkerContractIdentityEvidence {
+        stim_source_sha256: digest('a'),
+        stim_build_fingerprint: digest('b'),
+        stim_binary_sha256: digest('c'),
+        stab_source_sha256: digest('d'),
+        stab_build_fingerprint: digest('e'),
+        stab_binary_sha256: digest('f'),
+    }
+}
+
+fn report_identity(
+    identity: &WorkerContractIdentityEvidence,
+    contract_preflight_sha256: String,
+) -> WorkerIdentityEvidence {
+    WorkerIdentityEvidence {
+        stim_source_sha256: identity.stim_source_sha256.as_str().to_string(),
+        stim_build_fingerprint: identity.stim_build_fingerprint.as_str().to_string(),
+        stim_binary_sha256: identity.stim_binary_sha256.as_str().to_string(),
+        stab_source_sha256: identity.stab_source_sha256.as_str().to_string(),
+        stab_build_fingerprint: identity.stab_build_fingerprint.as_str().to_string(),
+        stab_binary_sha256: identity.stab_binary_sha256.as_str().to_string(),
+        contract_preflight_sha256,
+    }
+}
+
 #[test]
 fn canonical_worker_contract_preflight_binds_actual_receipts() {
     let probes = expected_contract_preflight_probes().expect("source-owned probes");
-    let evidence = WorkerContractPreflightEvidence::from_actual_probes(probes)
+    let evidence = WorkerContractPreflightEvidence::from_actual_probes(contract_identity(), probes)
         .expect("valid contract evidence");
     assert_eq!(evidence.probe_count(), 18);
     assert!(evidence.validates_source_contract());
@@ -15,6 +44,11 @@ fn canonical_worker_contract_preflight_binds_actual_receipts() {
         encoded
             .windows(b"\"probes\"".len())
             .any(|window| window == b"\"probes\"")
+    );
+    assert!(
+        encoded
+            .windows(b"\"worker_identity\"".len())
+            .any(|window| window == b"\"worker_identity\"")
     );
     let decoded: WorkerContractPreflightEvidence =
         serde_json::from_slice(&encoded).expect("deserialize preflight evidence");
@@ -25,6 +59,7 @@ fn canonical_worker_contract_preflight_binds_actual_receipts() {
     assert!(!tampered.validates_source_contract());
 
     let mut refingerprinted = WorkerContractPreflightEvidence::from_actual_probes(
+        contract_identity(),
         expected_contract_preflight_probes().expect("source-owned probes"),
     )
     .expect("valid contract evidence");
@@ -37,8 +72,38 @@ fn canonical_worker_contract_preflight_binds_actual_receipts() {
         *work_count += 1;
     }
     refingerprinted.sha256 =
-        worker_contract_preflight_digest(&refingerprinted.probes).expect("tampered digest");
+        worker_contract_preflight_digest(&refingerprinted.worker_identity, &refingerprinted.probes)
+            .expect("tampered digest");
     assert!(!refingerprinted.validates_source_contract());
+}
+
+#[test]
+fn report_replay_rejects_refingerprinted_preflight_from_another_worker_pair() {
+    let evidence = WorkerContractPreflightEvidence::from_actual_probes(
+        contract_identity(),
+        expected_contract_preflight_probes().expect("source-owned probes"),
+    )
+    .expect("valid contract evidence");
+    let workers = report_identity(&evidence.worker_identity, evidence.sha256.clone());
+    super::super::report::validate_worker_contract_preflight(&evidence, &workers)
+        .expect("matching worker-bound preflight");
+
+    let mut transplanted = evidence;
+    transplanted.worker_identity.stim_binary_sha256 =
+        Sha256Digest::try_new("0".repeat(64)).expect("different binary digest");
+    transplanted.sha256 =
+        worker_contract_preflight_digest(&transplanted.worker_identity, &transplanted.probes)
+            .expect("refingerprinted preflight");
+    let refingerprinted_workers =
+        report_identity(&contract_identity(), transplanted.sha256.clone());
+
+    assert!(matches!(
+        super::super::report::validate_worker_contract_preflight(
+            &transplanted,
+            &refingerprinted_workers,
+        ),
+        Err(super::super::report::ReportError::WorkerReceipt)
+    ));
 }
 
 #[test]

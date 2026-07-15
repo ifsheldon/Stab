@@ -17,11 +17,13 @@ use crate::config::{STIM_COMMIT, STIM_TAG};
 
 mod markdown;
 mod published;
+mod worker_contract;
 
 pub(super) use published::{
     MAX_PUBLISHED_PREFLIGHT_BYTES, MAX_PUBLISHED_REPORT_BYTES, load_validated_published_evidence,
     load_validated_published_report, run,
 };
+pub(super) use worker_contract::validate as validate_worker_contract_preflight;
 
 pub(super) fn render_markdown(
     report: &QualificationReport,
@@ -151,11 +153,7 @@ pub(super) fn validate_report(
         "contract_preflight_sha256",
         &report.workers.contract_preflight_sha256,
     )?;
-    if !report.contract_preflight.validates_source_contract()
-        || report.workers.contract_preflight_sha256 != report.contract_preflight.sha256()
-    {
-        return Err(ReportError::WorkerReceipt);
-    }
+    validate_worker_contract_preflight(&report.contract_preflight, &report.workers)?;
     if !report.adapter_receipt.validates_report_identity(
         &report.workers.stim_source_sha256,
         &report.workers.stim_build_fingerprint,

@@ -1,18 +1,21 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 
+use super::super::contract::{
+    PROTOCOL_SMOKE_INPUT_DIGEST, PROTOCOL_SMOKE_ITERATIONS, PROTOCOL_SMOKE_WORK_ITEMS,
+    protocol_smoke_output_digest,
+};
 use super::super::process::ProcessResult;
 use super::super::protocol::{
     Implementation, InputDigest, ProtocolId, SemanticDigest, Sha256Digest, WorkerMeasurement,
 };
 use super::{
-    CIRCUIT_CAP_CASE_ID, CONTRACT_PREFLIGHT_SCHEMA_VERSION, EMPTY_PROTOCOL_INPUT_DIGEST,
-    EVEN_POPCOUNT_ITERATIONS, EVEN_POPCOUNT_OUTPUT_DIGEST, GATE_PARTIAL_SWEEP_CASE_ID,
-    InvocationError, MAX_POPCOUNT_INPUT_DIGEST, MAX_POPCOUNT_OUTPUT_DIGEST,
-    MAX_SUPPORTED_POPCOUNT_BITS, ODD_POPCOUNT_ITERATIONS, ODD_POPCOUNT_OUTPUT_DIGEST,
-    POPCOUNT_ALIGNMENT_CASE_ID, POPCOUNT_CAP_CASE_ID, POPCOUNT_EVEN_CASE_ID,
-    POPCOUNT_MAXIMUM_CASE_ID, POPCOUNT_MINIMUM_CASE_ID, POPCOUNT_ODD_CASE_ID,
-    PROTOCOL_SMOKE_CASE_ID, PROTOCOL_SMOKE_OUTPUT_DIGEST, SMALL_POPCOUNT_BITS,
+    CIRCUIT_CAP_CASE_ID, CONTRACT_PREFLIGHT_SCHEMA_VERSION, EVEN_POPCOUNT_ITERATIONS,
+    EVEN_POPCOUNT_OUTPUT_DIGEST, GATE_PARTIAL_SWEEP_CASE_ID, InvocationError,
+    MAX_POPCOUNT_INPUT_DIGEST, MAX_POPCOUNT_OUTPUT_DIGEST, MAX_SUPPORTED_POPCOUNT_BITS,
+    ODD_POPCOUNT_ITERATIONS, ODD_POPCOUNT_OUTPUT_DIGEST, POPCOUNT_ALIGNMENT_CASE_ID,
+    POPCOUNT_CAP_CASE_ID, POPCOUNT_EVEN_CASE_ID, POPCOUNT_MAXIMUM_CASE_ID,
+    POPCOUNT_MINIMUM_CASE_ID, POPCOUNT_ODD_CASE_ID, PROTOCOL_SMOKE_CASE_ID, SMALL_POPCOUNT_BITS,
     SMALL_POPCOUNT_INPUT_DIGEST,
 };
 
@@ -20,8 +23,20 @@ use super::{
 #[serde(deny_unknown_fields)]
 pub(crate) struct WorkerContractPreflightEvidence {
     pub(super) schema_version: u32,
+    pub(super) worker_identity: WorkerContractIdentityEvidence,
     pub(super) probes: Vec<WorkerContractProbeEvidence>,
     pub(super) sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WorkerContractIdentityEvidence {
+    pub(super) stim_source_sha256: Sha256Digest,
+    pub(super) stim_build_fingerprint: Sha256Digest,
+    pub(super) stim_binary_sha256: Sha256Digest,
+    pub(super) stab_source_sha256: Sha256Digest,
+    pub(super) stab_build_fingerprint: Sha256Digest,
+    pub(super) stab_binary_sha256: Sha256Digest,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -49,16 +64,19 @@ pub(super) enum WorkerContractProbeEvidence {
 #[serde(deny_unknown_fields)]
 struct WorkerContractPreflightDigestMaterial<'a> {
     schema_version: u32,
+    worker_identity: &'a WorkerContractIdentityEvidence,
     probes: &'a [WorkerContractProbeEvidence],
 }
 
 impl WorkerContractPreflightEvidence {
     pub(super) fn from_actual_probes(
+        worker_identity: WorkerContractIdentityEvidence,
         probes: Vec<WorkerContractProbeEvidence>,
     ) -> Result<Self, InvocationError> {
         let evidence = Self {
             schema_version: CONTRACT_PREFLIGHT_SCHEMA_VERSION,
-            sha256: worker_contract_preflight_digest(&probes)?,
+            sha256: worker_contract_preflight_digest(&worker_identity, &probes)?,
+            worker_identity,
             probes,
         };
         if !evidence.validates_source_contract() {
@@ -70,8 +88,22 @@ impl WorkerContractPreflightEvidence {
     pub(crate) fn validates_source_contract(&self) -> bool {
         self.schema_version == CONTRACT_PREFLIGHT_SCHEMA_VERSION
             && expected_contract_preflight_probes().is_ok_and(|expected| self.probes == expected)
-            && worker_contract_preflight_digest(&self.probes)
+            && worker_contract_preflight_digest(&self.worker_identity, &self.probes)
                 .is_ok_and(|digest| self.sha256 == digest)
+    }
+
+    pub(crate) fn validates_worker_identity(
+        &self,
+        identity: &super::WorkerIdentityEvidence,
+    ) -> bool {
+        self.worker_identity.stim_source_sha256.as_str() == identity.stim_source_sha256
+            && self.worker_identity.stim_build_fingerprint.as_str()
+                == identity.stim_build_fingerprint
+            && self.worker_identity.stim_binary_sha256.as_str() == identity.stim_binary_sha256
+            && self.worker_identity.stab_source_sha256.as_str() == identity.stab_source_sha256
+            && self.worker_identity.stab_build_fingerprint.as_str()
+                == identity.stab_build_fingerprint
+            && self.worker_identity.stab_binary_sha256.as_str() == identity.stab_binary_sha256
     }
 
     pub(crate) fn sha256(&self) -> &str {
@@ -84,10 +116,12 @@ impl WorkerContractPreflightEvidence {
 }
 
 pub(super) fn worker_contract_preflight_digest(
+    worker_identity: &WorkerContractIdentityEvidence,
     probes: &[WorkerContractProbeEvidence],
 ) -> Result<String, InvocationError> {
     let material = serde_json::to_vec(&WorkerContractPreflightDigestMaterial {
         schema_version: CONTRACT_PREFLIGHT_SCHEMA_VERSION,
+        worker_identity,
         probes,
     })?;
     sha256_hex_bytes(&material)
@@ -107,15 +141,18 @@ fn sha256_hex_bytes(bytes: &[u8]) -> Result<String, InvocationError> {
 pub(super) fn expected_contract_preflight_probes()
 -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
     let mut probes = Vec::with_capacity(18);
+    let protocol_output_digest = protocol_smoke_output_digest();
     for implementation in [Implementation::Stim, Implementation::Stab] {
         probes.push(expected_accepted_probe(
             PROTOCOL_SMOKE_CASE_ID,
             implementation,
-            1,
-            1,
+            PROTOCOL_SMOKE_ITERATIONS,
+            PROTOCOL_SMOKE_ITERATIONS
+                .checked_mul(PROTOCOL_SMOKE_WORK_ITEMS)
+                .ok_or(InvocationError::WorkOverflow)?,
             0,
-            EMPTY_PROTOCOL_INPUT_DIGEST,
-            PROTOCOL_SMOKE_OUTPUT_DIGEST,
+            PROTOCOL_SMOKE_INPUT_DIGEST,
+            &protocol_output_digest,
         )?);
     }
     for implementation in [Implementation::Stim, Implementation::Stab] {
@@ -190,8 +227,8 @@ fn expected_accepted_probe(
     iteration_count: u64,
     work_count: u64,
     input_bytes: u64,
-    input_digest: &'static str,
-    output_digest: &'static str,
+    input_digest: &str,
+    output_digest: &str,
 ) -> Result<WorkerContractProbeEvidence, InvocationError> {
     Ok(WorkerContractProbeEvidence::Accepted {
         case_id: ProtocolId::try_new(case_id)?,

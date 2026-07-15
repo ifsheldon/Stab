@@ -8,17 +8,21 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::adapter::{AdapterExecutable, prepare_adapter};
+use super::contract::{
+    PROTOCOL_SMOKE_INPUT_DIGEST, PROTOCOL_SMOKE_ITERATIONS, PROTOCOL_SMOKE_WORK_ITEMS,
+    protocol_smoke_output_digest,
+};
 use super::process::{ProcessLimits, ProcessRequest, ProcessResult, run_bounded_process};
 use super::protocol::{
     EvidenceMode, GitCommit, Implementation, InputDigest, ProtocolExpectation, ProtocolId,
-    SemanticDigest, WorkerMeasurement, parse_worker_json_lines,
+    SemanticDigest, Sha256Digest, WorkerMeasurement, parse_worker_json_lines,
 };
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
 mod preflight;
 
-pub(crate) use preflight::WorkerContractPreflightEvidence;
+pub(crate) use preflight::{WorkerContractIdentityEvidence, WorkerContractPreflightEvidence};
 use preflight::{WorkerContractProbeEvidence, accepted_probe, rejected_probe};
 #[cfg(test)]
 use preflight::{expected_contract_preflight_probes, worker_contract_preflight_digest};
@@ -45,11 +49,7 @@ const MAX_POPCOUNT_INPUT_DIGEST: &str =
     "cf5061f39d456d884fbdbcebfc53e04c47c29c872830a6a424f55d2e1e3d8ab4";
 const MAX_POPCOUNT_OUTPUT_DIGEST: &str =
     "72b158a2870c2bca123553e5aca970f39107a3c7448bdbdda1512a9bcdfa33aa";
-const EMPTY_PROTOCOL_INPUT_DIGEST: &str =
-    "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
-const PROTOCOL_SMOKE_OUTPUT_DIGEST: &str =
-    "656c7d8a03ff449d0c248bdef4c3140b02252abffcd761d668e9bc4c63e0059d";
-const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 2;
+const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 3;
 const PROTOCOL_SMOKE_CASE_ID: &str = "protocol-smoke";
 const POPCOUNT_ODD_CASE_ID: &str = "simd-word-popcount-odd";
 const POPCOUNT_EVEN_CASE_ID: &str = "simd-word-popcount-even";
@@ -218,6 +218,19 @@ impl PreparedWorkers {
         })
     }
 
+    fn contract_identity_evidence(
+        &self,
+    ) -> Result<WorkerContractIdentityEvidence, InvocationError> {
+        Ok(WorkerContractIdentityEvidence {
+            stim_source_sha256: self.adapter.source_digest.clone(),
+            stim_build_fingerprint: self.adapter.build_fingerprint.clone(),
+            stim_binary_sha256: self.adapter.binary_digest.clone(),
+            stab_source_sha256: self.worker.identity().source_digest.clone(),
+            stab_build_fingerprint: self.worker.identity().build_fingerprint.clone(),
+            stab_binary_sha256: Sha256Digest::try_new(self.worker.binary_sha256().to_string())?,
+        })
+    }
+
     pub(crate) fn contract_preflight_evidence(
         &self,
     ) -> Result<&WorkerContractPreflightEvidence, InvocationError> {
@@ -343,7 +356,7 @@ impl PreparedWorkers {
         &self,
     ) -> Result<WorkerContractPreflightEvidence, InvocationError> {
         let mut probes = Vec::with_capacity(18);
-        let protocol_output = SemanticDigest::try_new(PROTOCOL_SMOKE_OUTPUT_DIGEST)?;
+        let protocol_output = SemanticDigest::try_new(protocol_smoke_output_digest())?;
         probes.push(self.invoke_identity_probe(Implementation::Stim, &protocol_output)?);
         probes.push(self.invoke_identity_probe(Implementation::Stab, &protocol_output)?);
         let small_input = InputDigest::try_new(SMALL_POPCOUNT_INPUT_DIGEST)?;
@@ -392,7 +405,10 @@ impl PreparedWorkers {
         for implementation in [Implementation::Stim, Implementation::Stab] {
             probes.push(self.invoke_popcount_minimum_rejection(implementation)?);
         }
-        WorkerContractPreflightEvidence::from_actual_probes(probes)
+        WorkerContractPreflightEvidence::from_actual_probes(
+            self.contract_identity_evidence()?,
+            probes,
+        )
     }
 
     fn invoke_identity_probe(
@@ -406,9 +422,9 @@ impl PreparedWorkers {
             OsString::from("--measurement-id"),
             OsString::from("main"),
             OsString::from("--iterations"),
-            OsString::from("1"),
+            OsString::from(PROTOCOL_SMOKE_ITERATIONS.to_string()),
             OsString::from("--work-items"),
-            OsString::from("1"),
+            OsString::from(PROTOCOL_SMOKE_WORK_ITEMS.to_string()),
             OsString::from("--evidence-mode"),
             OsString::from("timing"),
             OsString::from("--start-barrier"),
@@ -451,10 +467,12 @@ impl PreparedWorkers {
             evidence_mode: EvidenceMode::Timing,
             workload_id: ProtocolId::try_new("protocol-smoke")?,
             measurement_ids: BTreeSet::from([ProtocolId::try_new("main")?]),
-            iteration_count: 1,
-            expected_work_count: 1,
+            iteration_count: PROTOCOL_SMOKE_ITERATIONS,
+            expected_work_count: PROTOCOL_SMOKE_ITERATIONS
+                .checked_mul(PROTOCOL_SMOKE_WORK_ITEMS)
+                .ok_or(InvocationError::WorkOverflow)?,
             expected_input_bytes: 0,
-            expected_input_digest: InputDigest::try_new(EMPTY_PROTOCOL_INPUT_DIGEST)?,
+            expected_input_digest: InputDigest::try_new(PROTOCOL_SMOKE_INPUT_DIGEST)?,
             expected_output_digest: Some(expected_output_digest.clone()),
             affinity_cpu: None,
             stim_commit: GitCommit::try_new(STIM_COMMIT)?,

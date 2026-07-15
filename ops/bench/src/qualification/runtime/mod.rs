@@ -1,6 +1,7 @@
 mod adapter;
 mod artifact;
 mod calibration;
+mod contract;
 mod correctness;
 mod executable;
 mod git;
