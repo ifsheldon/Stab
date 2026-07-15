@@ -16,6 +16,13 @@ use super::protocol::{
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
+mod preflight;
+
+pub(crate) use preflight::WorkerContractPreflightEvidence;
+use preflight::{WorkerContractProbeEvidence, accepted_probe, rejected_probe};
+#[cfg(test)]
+use preflight::{expected_contract_preflight_probes, worker_contract_preflight_digest};
+
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
 const IDENTITY_PROBE_TIMEOUT: Duration = Duration::from_secs(30);
 const CAP_REJECTION_TIMEOUT: Duration = Duration::from_secs(5);
@@ -23,8 +30,35 @@ const FIRST_UNSUPPORTED_CIRCUIT_INSTRUCTIONS: &str = "1000001";
 const FIRST_PARTIAL_GATE_SWEEP_WORK_ITEMS: &str = "83";
 const FIRST_UNSUPPORTED_POPCOUNT_BITS: &str = "268435712";
 const FIRST_UNALIGNED_POPCOUNT_BITS: &str = "513";
+const FIRST_BELOW_MINIMUM_POPCOUNT_BITS: &str = "256";
+const MAX_SUPPORTED_POPCOUNT_BITS: u64 = 268_435_456;
+const SMALL_POPCOUNT_BITS: u64 = 4_096;
+const ODD_POPCOUNT_ITERATIONS: u64 = 1;
+const EVEN_POPCOUNT_ITERATIONS: u64 = 2;
+const SMALL_POPCOUNT_INPUT_DIGEST: &str =
+    "101e05fc22ce0676c277e9b16363a38750079d12e0b93f3c687ed95457b79d1c";
+const ODD_POPCOUNT_OUTPUT_DIGEST: &str =
+    "b7c42176f3f0246013376d1d65756b9b6092f0aed397cb2afefd29eba663acf9";
+const EVEN_POPCOUNT_OUTPUT_DIGEST: &str =
+    "b29b34efb75f68c6c751edd91d96fecacef5d5032644a76bb36973ca427ea649";
+const MAX_POPCOUNT_INPUT_DIGEST: &str =
+    "cf5061f39d456d884fbdbcebfc53e04c47c29c872830a6a424f55d2e1e3d8ab4";
+const MAX_POPCOUNT_OUTPUT_DIGEST: &str =
+    "72b158a2870c2bca123553e5aca970f39107a3c7448bdbdda1512a9bcdfa33aa";
 const EMPTY_PROTOCOL_INPUT_DIGEST: &str =
     "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
+const PROTOCOL_SMOKE_OUTPUT_DIGEST: &str =
+    "b1e6beb25d3a3dc1d7f6c7576e27432aa2ffb9ab1c828f6d52d8bfec128805c0";
+const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 2;
+const PROTOCOL_SMOKE_CASE_ID: &str = "protocol-smoke";
+const POPCOUNT_ODD_CASE_ID: &str = "simd-word-popcount-odd";
+const POPCOUNT_EVEN_CASE_ID: &str = "simd-word-popcount-even";
+const POPCOUNT_MAXIMUM_CASE_ID: &str = "simd-word-popcount-maximum";
+const CIRCUIT_CAP_CASE_ID: &str = "circuit-parse-over-cap";
+const GATE_PARTIAL_SWEEP_CASE_ID: &str = "gate-name-hash-partial-sweep";
+const POPCOUNT_CAP_CASE_ID: &str = "simd-word-popcount-over-cap";
+const POPCOUNT_ALIGNMENT_CASE_ID: &str = "simd-word-popcount-unaligned";
+const POPCOUNT_MINIMUM_CASE_ID: &str = "simd-word-popcount-below-minimum";
 pub(super) const PQ1_GROUP_ID: &str = "pq1-adapter-protocol-smoke";
 pub(super) const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 pub(super) const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
@@ -72,6 +106,7 @@ pub(crate) struct WorkerIdentityEvidence {
     pub(super) stab_source_sha256: String,
     pub(super) stab_build_fingerprint: String,
     pub(super) stab_binary_sha256: String,
+    pub(super) contract_preflight_sha256: String,
 }
 
 #[derive(Debug)]
@@ -82,6 +117,7 @@ pub(crate) struct PreparedWorkers {
     repository_commit: String,
     toolchain: super::toolchain::ToolchainEvidence,
     cpu: Option<usize>,
+    contract_preflight: Option<WorkerContractPreflightEvidence>,
 }
 
 pub(super) fn verify_private_worker_reproducibility(
@@ -91,12 +127,10 @@ pub(super) fn verify_private_worker_reproducibility(
     require_reproducibility_repository(&repository_before, &repository_before)?;
     let toolchain = super::toolchain::collect(root)?;
     let first = PreparedWorkers::prepare(root, &repository_before.commit, &toolchain)?;
-    first.verify_identity_handshake()?;
-    let first_identity = first.identity_evidence();
+    let first_identity = first.identity_evidence()?;
     drop(first);
     let second = PreparedWorkers::prepare(root, &repository_before.commit, &toolchain)?;
-    second.verify_identity_handshake()?;
-    let second_identity = second.identity_evidence();
+    let second_identity = second.identity_evidence()?;
     drop(second);
     let repository_after = super::git::repository_state(root)?;
     require_reproducibility_repository(&repository_before, &repository_after)?;
@@ -144,14 +178,17 @@ impl PreparedWorkers {
         let adapter = prepare_adapter(root, repository_commit)?;
         let worker =
             super::stab_build::StabWorkerExecutable::prepare(root, repository_commit, toolchain)?;
-        let workers = Self {
+        let mut workers = Self {
             root: root.path.clone(),
             adapter,
             worker,
             repository_commit: repository_commit.to_string(),
             toolchain: toolchain.clone(),
             cpu: None,
+            contract_preflight: None,
         };
+        workers.verify_executables()?;
+        workers.contract_preflight = Some(workers.verify_identity_handshake()?);
         workers.verify()?;
         Ok(workers)
     }
@@ -160,8 +197,12 @@ impl PreparedWorkers {
         self.cpu = Some(cpu);
     }
 
-    pub(crate) fn identity_evidence(&self) -> WorkerIdentityEvidence {
-        WorkerIdentityEvidence {
+    pub(crate) fn identity_evidence(&self) -> Result<WorkerIdentityEvidence, InvocationError> {
+        let contract_preflight = self
+            .contract_preflight
+            .as_ref()
+            .ok_or(InvocationError::MissingContractPreflight)?;
+        Ok(WorkerIdentityEvidence {
             stim_source_sha256: self.adapter.source_digest.as_str().to_string(),
             stim_build_fingerprint: self.adapter.build_fingerprint.as_str().to_string(),
             stim_binary_sha256: self.adapter.binary_digest.as_str().to_string(),
@@ -173,7 +214,16 @@ impl PreparedWorkers {
                 .as_str()
                 .to_string(),
             stab_binary_sha256: self.worker.binary_sha256().to_string(),
-        }
+            contract_preflight_sha256: contract_preflight.sha256.clone(),
+        })
+    }
+
+    pub(crate) fn contract_preflight_evidence(
+        &self,
+    ) -> Result<&WorkerContractPreflightEvidence, InvocationError> {
+        self.contract_preflight
+            .as_ref()
+            .ok_or(InvocationError::MissingContractPreflight)
     }
 
     pub(crate) fn adapter_receipt(&self) -> &super::adapter::AdapterBuildReceipt {
@@ -199,6 +249,15 @@ impl PreparedWorkers {
         } = request;
         if !supports_group(group) {
             return Err(InvocationError::UnsupportedGroup(group.id.to_string()));
+        }
+        if !self
+            .adapter
+            .receipt
+            .validates_comparator_sources(&group.comparator_sources)
+        {
+            return Err(InvocationError::ComparatorSourceContract(
+                group.id.to_string(),
+            ));
         }
         let measurement_id = group.single_measurement()?;
         let cpu = self.cpu.ok_or(InvocationError::MissingCpu)?;
@@ -280,25 +339,67 @@ impl PreparedWorkers {
         })
     }
 
-    fn verify_identity_handshake(&self) -> Result<(), InvocationError> {
-        let stim_output = self.invoke_identity_probe(Implementation::Stim, None)?;
-        self.invoke_identity_probe(Implementation::Stab, Some(&stim_output))?;
-        self.invoke_cap_rejection(Implementation::Stim)?;
-        self.invoke_cap_rejection(Implementation::Stab)?;
-        self.invoke_gate_partial_sweep_rejection(Implementation::Stim)?;
-        self.invoke_gate_partial_sweep_rejection(Implementation::Stab)?;
-        self.invoke_popcount_cap_rejection(Implementation::Stim)?;
-        self.invoke_popcount_cap_rejection(Implementation::Stab)?;
-        self.invoke_popcount_alignment_rejection(Implementation::Stim)?;
-        self.invoke_popcount_alignment_rejection(Implementation::Stab)?;
-        Ok(())
+    fn verify_identity_handshake(
+        &self,
+    ) -> Result<WorkerContractPreflightEvidence, InvocationError> {
+        let mut probes = Vec::with_capacity(18);
+        let protocol_output = SemanticDigest::try_new(PROTOCOL_SMOKE_OUTPUT_DIGEST)?;
+        probes.push(self.invoke_identity_probe(Implementation::Stim, &protocol_output)?);
+        probes.push(self.invoke_identity_probe(Implementation::Stab, &protocol_output)?);
+        let small_input = InputDigest::try_new(SMALL_POPCOUNT_INPUT_DIGEST)?;
+        let odd_output = SemanticDigest::try_new(ODD_POPCOUNT_OUTPUT_DIGEST)?;
+        let even_output = SemanticDigest::try_new(EVEN_POPCOUNT_OUTPUT_DIGEST)?;
+        let maximum_input = InputDigest::try_new(MAX_POPCOUNT_INPUT_DIGEST)?;
+        let maximum_output = SemanticDigest::try_new(MAX_POPCOUNT_OUTPUT_DIGEST)?;
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_popcount_acceptance(
+                POPCOUNT_ODD_CASE_ID,
+                implementation,
+                ODD_POPCOUNT_ITERATIONS,
+                SMALL_POPCOUNT_BITS,
+                &small_input,
+                &odd_output,
+            )?);
+            probes.push(self.invoke_popcount_acceptance(
+                POPCOUNT_EVEN_CASE_ID,
+                implementation,
+                EVEN_POPCOUNT_ITERATIONS,
+                SMALL_POPCOUNT_BITS,
+                &small_input,
+                &even_output,
+            )?);
+            probes.push(self.invoke_popcount_acceptance(
+                POPCOUNT_MAXIMUM_CASE_ID,
+                implementation,
+                1,
+                MAX_SUPPORTED_POPCOUNT_BITS,
+                &maximum_input,
+                &maximum_output,
+            )?);
+        }
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_cap_rejection(implementation)?);
+        }
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_gate_partial_sweep_rejection(implementation)?);
+        }
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_popcount_cap_rejection(implementation)?);
+        }
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_popcount_alignment_rejection(implementation)?);
+        }
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_popcount_minimum_rejection(implementation)?);
+        }
+        WorkerContractPreflightEvidence::from_actual_probes(probes)
     }
 
     fn invoke_identity_probe(
         &self,
         implementation: Implementation,
-        expected_output_digest: Option<&SemanticDigest>,
-    ) -> Result<SemanticDigest, InvocationError> {
+        expected_output_digest: &SemanticDigest,
+    ) -> Result<WorkerContractProbeEvidence, InvocationError> {
         let mut arguments = vec![
             OsString::from("--workload"),
             OsString::from("protocol-smoke"),
@@ -354,20 +455,101 @@ impl PreparedWorkers {
             expected_work_count: 1,
             expected_input_bytes: 0,
             expected_input_digest: InputDigest::try_new(EMPTY_PROTOCOL_INPUT_DIGEST)?,
-            expected_output_digest: expected_output_digest.cloned(),
+            expected_output_digest: Some(expected_output_digest.clone()),
             affinity_cpu: None,
             stim_commit: GitCommit::try_new(STIM_COMMIT)?,
             source_digest,
             build_fingerprint,
         }
         .validate(&rows)?;
-        rows.into_iter()
+        let row = rows
+            .into_iter()
             .next()
-            .map(|row| row.output_digest)
-            .ok_or(InvocationError::MissingMeasurement)
+            .ok_or(InvocationError::MissingMeasurement)?;
+        accepted_probe(PROTOCOL_SMOKE_CASE_ID, &row)
     }
 
-    fn invoke_cap_rejection(&self, implementation: Implementation) -> Result<(), InvocationError> {
+    fn invoke_popcount_acceptance(
+        &self,
+        case_id: &'static str,
+        implementation: Implementation,
+        iterations: u64,
+        work_items: u64,
+        expected_input_digest: &InputDigest,
+        expected_output_digest: &SemanticDigest,
+    ) -> Result<WorkerContractProbeEvidence, InvocationError> {
+        let mut arguments = vec![
+            OsString::from("--workload"),
+            OsString::from("simd-word-popcount"),
+            OsString::from("--measurement-id"),
+            OsString::from("toggle-popcount"),
+            OsString::from("--iterations"),
+            OsString::from(iterations.to_string()),
+            OsString::from("--work-items"),
+            OsString::from(work_items.to_string()),
+            OsString::from("--evidence-mode"),
+            OsString::from("timing"),
+            OsString::from("--start-barrier"),
+            OsString::from("true"),
+        ];
+        let (program, source_digest, build_fingerprint) = match implementation {
+            Implementation::Stim => (
+                self.adapter.path.clone(),
+                self.adapter.source_digest.clone(),
+                self.adapter.build_fingerprint.clone(),
+            ),
+            Implementation::Stab => {
+                arguments.insert(0, OsString::from("qualification-worker"));
+                (
+                    self.worker.program(),
+                    self.worker.identity().source_digest.clone(),
+                    self.worker.identity().build_fingerprint.clone(),
+                )
+            }
+        };
+        let process = run_bounded_process(&ProcessRequest {
+            program,
+            args: arguments,
+            stdin: vec![b'\n'],
+            working_directory: self.root.clone(),
+            environment: worker_environment(),
+            affinity_cpu: None,
+            limits: ProcessLimits {
+                stdin_bytes: 1,
+                stdout_bytes: PROTOCOL_OUTPUT_LIMIT,
+                stderr_bytes: 64 << 10,
+                regular_file_bytes: None,
+                timeout: IDENTITY_PROBE_TIMEOUT,
+            },
+        })?;
+        let process = checked_process(process, implementation)?;
+        let rows = parse_worker_json_lines(&process.stdout)?;
+        ProtocolExpectation {
+            implementation,
+            evidence_mode: EvidenceMode::Timing,
+            workload_id: ProtocolId::try_new("simd-word-popcount")?,
+            measurement_ids: BTreeSet::from([ProtocolId::try_new("toggle-popcount")?]),
+            iteration_count: iterations,
+            expected_work_count: iterations
+                .checked_mul(work_items)
+                .ok_or(InvocationError::WorkOverflow)?,
+            expected_input_bytes: work_items / 8,
+            expected_input_digest: expected_input_digest.clone(),
+            expected_output_digest: Some(expected_output_digest.clone()),
+            affinity_cpu: None,
+            stim_commit: GitCommit::try_new(STIM_COMMIT)?,
+            source_digest,
+            build_fingerprint,
+        }
+        .validate(&rows)?;
+        let row = rows.first().ok_or(InvocationError::MissingMeasurement)?;
+        accepted_probe(case_id, row)
+    }
+
+    fn invoke_cap_rejection(
+        &self,
+        implementation: Implementation,
+    ) -> Result<WorkerContractProbeEvidence, InvocationError> {
         let mut arguments = vec![
             OsString::from("--workload"),
             OsString::from("circuit-parse"),
@@ -404,13 +586,14 @@ impl PreparedWorkers {
                 timeout: CAP_REJECTION_TIMEOUT,
             },
         })?;
-        checked_cap_rejection(output, implementation)
+        checked_cap_rejection(&output, implementation)?;
+        rejected_probe(CIRCUIT_CAP_CASE_ID, implementation, &output)
     }
 
     fn invoke_gate_partial_sweep_rejection(
         &self,
         implementation: Implementation,
-    ) -> Result<(), InvocationError> {
+    ) -> Result<WorkerContractProbeEvidence, InvocationError> {
         let mut arguments = vec![
             OsString::from("--workload"),
             OsString::from("gate-name-hash"),
@@ -447,25 +630,38 @@ impl PreparedWorkers {
                 timeout: CAP_REJECTION_TIMEOUT,
             },
         })?;
-        checked_gate_partial_sweep_rejection(output, implementation)
+        checked_gate_partial_sweep_rejection(&output, implementation)?;
+        rejected_probe(GATE_PARTIAL_SWEEP_CASE_ID, implementation, &output)
     }
 
     fn invoke_popcount_cap_rejection(
         &self,
         implementation: Implementation,
-    ) -> Result<(), InvocationError> {
+    ) -> Result<WorkerContractProbeEvidence, InvocationError> {
         let output =
             self.invoke_invalid_popcount_width(implementation, FIRST_UNSUPPORTED_POPCOUNT_BITS)?;
-        checked_popcount_cap_rejection(output, implementation)
+        checked_popcount_cap_rejection(&output, implementation)?;
+        rejected_probe(POPCOUNT_CAP_CASE_ID, implementation, &output)
     }
 
     fn invoke_popcount_alignment_rejection(
         &self,
         implementation: Implementation,
-    ) -> Result<(), InvocationError> {
+    ) -> Result<WorkerContractProbeEvidence, InvocationError> {
         let output =
             self.invoke_invalid_popcount_width(implementation, FIRST_UNALIGNED_POPCOUNT_BITS)?;
-        checked_popcount_alignment_rejection(output, implementation)
+        checked_popcount_alignment_rejection(&output, implementation)?;
+        rejected_probe(POPCOUNT_ALIGNMENT_CASE_ID, implementation, &output)
+    }
+
+    fn invoke_popcount_minimum_rejection(
+        &self,
+        implementation: Implementation,
+    ) -> Result<WorkerContractProbeEvidence, InvocationError> {
+        let output =
+            self.invoke_invalid_popcount_width(implementation, FIRST_BELOW_MINIMUM_POPCOUNT_BITS)?;
+        checked_popcount_minimum_rejection(&output, implementation)?;
+        rejected_probe(POPCOUNT_MINIMUM_CASE_ID, implementation, &output)
     }
 
     fn invoke_invalid_popcount_width(
@@ -513,6 +709,18 @@ impl PreparedWorkers {
     }
 
     pub(crate) fn verify(&self) -> Result<(), InvocationError> {
+        self.verify_executables()?;
+        if self
+            .contract_preflight
+            .as_ref()
+            .is_none_or(|evidence| !evidence.validates_source_contract())
+        {
+            return Err(InvocationError::MissingContractPreflight);
+        }
+        Ok(())
+    }
+
+    fn verify_executables(&self) -> Result<(), InvocationError> {
         self.adapter.verify()?;
         self.worker
             .verify(&self.toolchain, &self.repository_commit)?;
@@ -568,20 +776,11 @@ fn checked_process(
 }
 
 fn checked_cap_rejection(
-    output: ProcessResult,
+    output: &ProcessResult,
     implementation: Implementation,
 ) -> Result<(), InvocationError> {
-    let (expected_status, expected_stderr) = match implementation {
-        Implementation::Stim => (
-            Some(2),
-            "stim qualification adapter: circuit-parse instruction count exceeds the source-owned limit\n",
-        ),
-        Implementation::Stab => (
-            Some(1),
-            "[stab-bench] ERROR: performance qualification validation failed:\ncircuit-parse scale has 1000001 instructions, maximum 1000000\n",
-        ),
-    };
-    if output.status != expected_status
+    let (expected_status, expected_stderr) = cap_rejection_expectation(implementation);
+    if output.status != Some(expected_status)
         || !output.stdout.is_empty()
         || output.stderr != expected_stderr.as_bytes()
     {
@@ -595,21 +794,26 @@ fn checked_cap_rejection(
     Ok(())
 }
 
-fn checked_gate_partial_sweep_rejection(
-    output: ProcessResult,
-    implementation: Implementation,
-) -> Result<(), InvocationError> {
-    let (expected_status, expected_stderr) = match implementation {
+fn cap_rejection_expectation(implementation: Implementation) -> (i32, &'static str) {
+    match implementation {
         Implementation::Stim => (
-            Some(2),
-            "stim qualification adapter: gate-name-hash work count is not a complete gate-table sweep\n",
+            2,
+            "stim qualification adapter: circuit-parse instruction count exceeds the source-owned limit\n",
         ),
         Implementation::Stab => (
-            Some(1),
-            "[stab-bench] ERROR: performance qualification validation failed:\ngate-name-hash work count 83 is not a complete sweep of 82 names\n",
+            1,
+            "[stab-bench] ERROR: performance qualification validation failed:\ncircuit-parse scale has 1000001 instructions, maximum 1000000\n",
         ),
-    };
-    if output.status != expected_status
+    }
+}
+
+fn checked_gate_partial_sweep_rejection(
+    output: &ProcessResult,
+    implementation: Implementation,
+) -> Result<(), InvocationError> {
+    let (expected_status, expected_stderr) =
+        gate_partial_sweep_rejection_expectation(implementation);
+    if output.status != Some(expected_status)
         || !output.stdout.is_empty()
         || output.stderr != expected_stderr.as_bytes()
     {
@@ -623,21 +827,25 @@ fn checked_gate_partial_sweep_rejection(
     Ok(())
 }
 
-fn checked_popcount_cap_rejection(
-    output: ProcessResult,
-    implementation: Implementation,
-) -> Result<(), InvocationError> {
-    let (expected_status, expected_stderr) = match implementation {
+fn gate_partial_sweep_rejection_expectation(implementation: Implementation) -> (i32, &'static str) {
+    match implementation {
         Implementation::Stim => (
-            Some(2),
-            "stim qualification adapter: simd-word-popcount bit width exceeds the source-owned limit\n",
+            2,
+            "stim qualification adapter: gate-name-hash work count is not a complete gate-table sweep\n",
         ),
         Implementation::Stab => (
-            Some(1),
-            "[stab-bench] ERROR: performance qualification validation failed:\nsimd-word-popcount width 268435712 bits exceeds the maximum 268435456\n",
+            1,
+            "[stab-bench] ERROR: performance qualification validation failed:\ngate-name-hash work count 83 is not a complete sweep of 82 names\n",
         ),
-    };
-    if output.status != expected_status
+    }
+}
+
+fn checked_popcount_cap_rejection(
+    output: &ProcessResult,
+    implementation: Implementation,
+) -> Result<(), InvocationError> {
+    let (expected_status, expected_stderr) = popcount_cap_rejection_expectation(implementation);
+    if output.status != Some(expected_status)
         || !output.stdout.is_empty()
         || output.stderr != expected_stderr.as_bytes()
     {
@@ -651,21 +859,26 @@ fn checked_popcount_cap_rejection(
     Ok(())
 }
 
-fn checked_popcount_alignment_rejection(
-    output: ProcessResult,
-    implementation: Implementation,
-) -> Result<(), InvocationError> {
-    let (expected_status, expected_stderr) = match implementation {
+fn popcount_cap_rejection_expectation(implementation: Implementation) -> (i32, &'static str) {
+    match implementation {
         Implementation::Stim => (
-            Some(2),
-            "stim qualification adapter: simd-word-popcount bit width is not a multiple of 256\n",
+            2,
+            "stim qualification adapter: simd-word-popcount bit width exceeds the source-owned limit\n",
         ),
         Implementation::Stab => (
-            Some(1),
-            "[stab-bench] ERROR: performance qualification validation failed:\nsimd-word-popcount width 513 bits is not a multiple of 256\n",
+            1,
+            "[stab-bench] ERROR: performance qualification validation failed:\nsimd-word-popcount width 268435712 bits exceeds the maximum 268435456\n",
         ),
-    };
-    if output.status != expected_status
+    }
+}
+
+fn checked_popcount_alignment_rejection(
+    output: &ProcessResult,
+    implementation: Implementation,
+) -> Result<(), InvocationError> {
+    let (expected_status, expected_stderr) =
+        popcount_alignment_rejection_expectation(implementation);
+    if output.status != Some(expected_status)
         || !output.stdout.is_empty()
         || output.stderr != expected_stderr.as_bytes()
     {
@@ -677,6 +890,51 @@ fn checked_popcount_alignment_rejection(
         });
     }
     Ok(())
+}
+
+fn popcount_alignment_rejection_expectation(implementation: Implementation) -> (i32, &'static str) {
+    match implementation {
+        Implementation::Stim => (
+            2,
+            "stim qualification adapter: simd-word-popcount bit width is not a multiple of 256\n",
+        ),
+        Implementation::Stab => (
+            1,
+            "[stab-bench] ERROR: performance qualification validation failed:\nsimd-word-popcount width 513 bits is not a multiple of 256\n",
+        ),
+    }
+}
+
+fn checked_popcount_minimum_rejection(
+    output: &ProcessResult,
+    implementation: Implementation,
+) -> Result<(), InvocationError> {
+    let (expected_status, expected_stderr) = popcount_minimum_rejection_expectation(implementation);
+    if output.status != Some(expected_status)
+        || !output.stdout.is_empty()
+        || output.stderr != expected_stderr.as_bytes()
+    {
+        return Err(InvocationError::PopcountMinimumRejection {
+            implementation,
+            status: output.status,
+            stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn popcount_minimum_rejection_expectation(implementation: Implementation) -> (i32, &'static str) {
+    match implementation {
+        Implementation::Stim => (
+            2,
+            "stim qualification adapter: simd-word-popcount bit width is below the source-owned minimum\n",
+        ),
+        Implementation::Stab => (
+            1,
+            "[stab-bench] ERROR: performance qualification validation failed:\nsimd-word-popcount width 256 bits is below the minimum 512\n",
+        ),
+    }
 }
 
 fn worker_environment() -> Vec<(OsString, OsString)> {
@@ -708,6 +966,8 @@ pub(crate) enum InvocationError {
     #[error(transparent)]
     Protocol(#[from] super::protocol::ProtocolError),
     #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    #[error(transparent)]
     Group(#[from] super::group::GroupError),
     #[error(transparent)]
     Git(#[from] super::git::GitError),
@@ -728,10 +988,16 @@ pub(crate) enum InvocationError {
     },
     #[error("qualification runtime group is not implemented by both workers: {0}")]
     UnsupportedGroup(String),
+    #[error("qualification runtime group {0} does not match the materialized comparator sources")]
+    ComparatorSourceContract(String),
     #[error("qualification CPU {0} exceeds the shared worker protocol")]
     CpuRange(usize),
     #[error("qualification workers were invoked before selecting a host-policy CPU")]
     MissingCpu,
+    #[error("qualification workers lack the mandatory canonical contract preflight")]
+    MissingContractPreflight,
+    #[error("the source-owned worker contract preflight digest is stale")]
+    ContractPreflightDefinition,
     #[error("qualification parent semantic work count overflows u64")]
     WorkOverflow,
     #[error(
@@ -779,6 +1045,15 @@ pub(crate) enum InvocationError {
         "{implementation} did not reject an unaligned simd-word-popcount width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
     )]
     PopcountAlignmentRejection {
+        implementation: Implementation,
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
+    #[error(
+        "{implementation} did not reject a below-minimum simd-word-popcount width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
+    )]
+    PopcountMinimumRejection {
         implementation: Implementation,
         status: Option<i32>,
         stdout: String,

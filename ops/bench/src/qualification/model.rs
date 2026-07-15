@@ -195,6 +195,15 @@ pub(super) struct OutputContract {
     pub(super) expected_shape: String,
     pub(super) digest_state: EvidenceState,
     pub(super) sink_policy: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) comparator_sources: Vec<ComparatorSource>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ComparatorSource {
+    pub(super) path: String,
+    pub(super) sha256: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

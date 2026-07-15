@@ -147,12 +147,27 @@ pub(super) fn validate_report(
         &report.workers.stab_build_fingerprint,
     )?;
     validate_sha256("stab_binary_sha256", &report.workers.stab_binary_sha256)?;
+    validate_sha256(
+        "contract_preflight_sha256",
+        &report.workers.contract_preflight_sha256,
+    )?;
+    if !report.contract_preflight.validates_source_contract()
+        || report.workers.contract_preflight_sha256 != report.contract_preflight.sha256()
+    {
+        return Err(ReportError::WorkerReceipt);
+    }
     if !report.adapter_receipt.validates_report_identity(
         &report.workers.stim_source_sha256,
         &report.workers.stim_build_fingerprint,
         &report.workers.stim_binary_sha256,
     ) {
         return Err(ReportError::AdapterReceipt);
+    }
+    if !report
+        .adapter_receipt
+        .validates_comparator_sources(&resolved_group.contract.comparator_sources)
+    {
+        return Err(ReportError::ComparatorSourceReceipt);
     }
     if !report.stab_build_receipt.validates_report_identity(
         &report.workers.stab_source_sha256,
@@ -1000,6 +1015,8 @@ pub(super) enum ReportError {
     HostEvidence,
     #[error("qualification report adapter build receipt is stale or inconsistent")]
     AdapterReceipt,
+    #[error("qualification report comparator sources differ from the adapter build receipt")]
+    ComparatorSourceReceipt,
     #[error("qualification report Stab build receipt is stale or inconsistent")]
     StabBuildReceipt,
     #[error("qualification report worker receipt is stale or inconsistent")]

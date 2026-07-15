@@ -1,13 +1,20 @@
+use std::path::Path;
+
 use super::super::model::{
-    CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount, MemoryMethod, MemoryPolicy,
-    OutputContract, QualificationGroup, QualificationStatus, RunnerFidelity, ScalePoint,
-    ThresholdPolicy, WorkloadFamily,
+    ComparatorSource, CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount,
+    MemoryMethod, MemoryPolicy, OutputContract, QualificationGroup, QualificationStatus,
+    RunnerFidelity, ScalePoint, ThresholdPolicy, WorkloadFamily,
 };
+use crate::error::BenchError;
+use crate::root::RepoRoot;
 
 const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
 const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
 const SIMD_WORD_POPCOUNT_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
+const STIM_ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
+const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
+    "benchmarks/stim_adapter/simd_word_popcount_contract.h";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
     "cq-evidence-qualification-e660819ae9a223c6",
@@ -24,17 +31,21 @@ const SIMD_WORD_POPCOUNT_CORRECTNESS_CASES: [&str; 3] = [
 ];
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
-pub(super) fn apply(group: &mut QualificationGroup) {
+pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(), BenchError> {
     match group.id.as_str() {
         CIRCUIT_PARSE_GROUP_ID => apply_circuit_parse(group),
         CIRCUIT_CANONICAL_PRINT_GROUP_ID => apply_circuit_canonical_print(group),
         GATE_NAME_HASH_GROUP_ID => apply_gate_name_hash(group),
-        SIMD_WORD_POPCOUNT_GROUP_ID => apply_simd_word_popcount(group),
+        SIMD_WORD_POPCOUNT_GROUP_ID => apply_simd_word_popcount(root, group)?,
         _ => {}
     }
+    Ok(())
 }
 
-fn apply_simd_word_popcount(group: &mut QualificationGroup) {
+fn apply_simd_word_popcount(
+    root: &RepoRoot,
+    group: &mut QualificationGroup,
+) -> Result<(), BenchError> {
     group.runner_fidelity = RunnerFidelity::AdapterLibrary;
     group.correctness_cases = SIMD_WORD_POPCOUNT_CORRECTNESS_CASES
         .into_iter()
@@ -44,11 +55,15 @@ fn apply_simd_word_popcount(group: &mut QualificationGroup) {
     group.planned_correctness_case_id = None;
     group.workload_family = simd_word_popcount_workload_family();
     group.output_contract = OutputContract {
-        expected_shape: "Exact deterministic fixture bytes plus matching toggle/popcount checksum, final toggle state, work count, and semantic digest."
+        expected_shape: "Exact deterministic fixture bytes plus a canonical digest over eight little-endian u64 fields in this order: accumulated popcount checksum, iteration count, bit width, all four input-fingerprint lanes, and final toggle-bit state."
             .to_string(),
         digest_state: EvidenceState::Existing,
-        sink_policy: "Both workers prepare identical little-endian SplitMix64 words outside timing, toggle bit 300 and popcount the complete aligned vector in the timed body, and consume the accumulated checksum and final state outside timing."
+        sink_policy: "Both workers prepare identical little-endian SplitMix64 words and initial toggle state outside timing, toggle bit 300 in the timed body, accumulate exact whole-vector popcounts using Stim ptr_simd[k].popcount() and Stab BitVec::popcount(), then read final state and construct the canonical output digest outside timing."
             .to_string(),
+        comparator_sources: [STIM_ADAPTER_SOURCE, SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE]
+            .into_iter()
+            .map(|path| comparator_source(root, path))
+            .collect::<Result<_, _>>()?,
     };
     group.memory_policy = circuit_memory_policy(
         "The aligned bit vector is prepared before timing and setup and peak process RSS are report-only observations at every scale. This slice makes no linear-growth acceptance claim; PQ6 owns explicit cross-scale RSS and allocation slack.",
@@ -58,6 +73,15 @@ fn apply_simd_word_popcount(group: &mut QualificationGroup) {
     group.reason = "Implemented paired pinned-Stim and Rust toggle-plus-popcount work with exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts."
         .to_string();
     group.status = QualificationStatus::Implemented;
+    Ok(())
+}
+
+fn comparator_source(root: &RepoRoot, path: &str) -> Result<ComparatorSource, BenchError> {
+    let source = super::read_repo_text_bounded(root, &root.path.join(Path::new(path)))?;
+    Ok(ComparatorSource {
+        path: path.to_string(),
+        sha256: super::sha256_hex(source.as_bytes()),
+    })
 }
 
 fn apply_gate_name_hash(group: &mut QualificationGroup) {
@@ -72,6 +96,7 @@ fn apply_gate_name_hash(group: &mut QualificationGroup) {
         digest_state: EvidenceState::Existing,
         sink_policy: "Both workers prepare the 82 Stim gate-table entries, including NOT_A_GATE, outside timing, hash only complete table sweeps in the timed body, and consume the final checksum outside timing."
             .to_string(),
+        comparator_sources: Vec::new(),
     };
     group.memory_policy = circuit_memory_policy(
         "The immutable 82-name registry is prepared before timing; setup and peak process RSS are report-only observations at every scale. This slice makes no bounded-growth claim; PQ6 owns an explicit cross-scale RSS and allocation-growth rule.",
@@ -99,6 +124,7 @@ fn apply_circuit_parse(group: &mut QualificationGroup) {
         digest_state: EvidenceState::Existing,
         sink_policy: "Both workers construct the source-owned fixture outside timing, bind its exact bytes, and digest the final parsed circuit outside timing."
             .to_string(),
+        comparator_sources: Vec::new(),
     };
     group.memory_policy = circuit_memory_policy(
         "Process setup and peak RSS are reported separately at every timing scale; maximum accepted materialization and first rejection remain PQ6 resource evidence.",
@@ -126,6 +152,7 @@ fn apply_circuit_canonical_print(group: &mut QualificationGroup) {
         digest_state: EvidenceState::Existing,
         sink_policy: "Both workers parse the source-owned fixture once outside timing, repeatedly serialize the resulting circuit while consuming each produced string, and compare the final canonical digest outside timing after normalizing only Stab's terminal newline."
             .to_string(),
+        comparator_sources: Vec::new(),
     };
     group.memory_policy = circuit_memory_policy(
         "Process setup RSS includes the parsed circuit and peak RSS includes canonical output allocation at every timing scale; maximum accepted materialization and first rejection remain PQ6 resource evidence.",

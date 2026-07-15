@@ -24,6 +24,8 @@
 #include "stim/gates/gates.h"
 #include "stim/mem/simd_bits.h"
 
+#include "simd_word_popcount_contract.h"
+
 #ifndef STAB_STIM_COMMIT
 #error "STAB_STIM_COMMIT must identify the pinned Stim source"
 #endif
@@ -376,18 +378,31 @@ PopcountFixture popcount_fixture(uint64_t bit_count) {
     return PopcountFixture{std::move(bits), word_count * 8, input_digest};
 }
 
-std::array<uint64_t, 4> simd_word_popcount(
+std::array<uint64_t, 4> popcount_output_digest(
+    uint64_t checksum,
     uint64_t iterations,
     uint64_t work_items,
-    PopcountFixture &fixture) {
-    uint64_t checksum = 0;
-    for (uint64_t iteration = 0; iteration < iterations; ++iteration) {
-        std::atomic_signal_fence(std::memory_order_seq_cst);
-        fixture.bits[POPCOUNT_TOGGLE_BIT] ^= true;
-        checksum += fixture.bits.popcnt();
-    }
-    const bool final_bit = fixture.bits[POPCOUNT_TOGGLE_BIT];
-    return {checksum, iterations, work_items, fixture.input_digest[0] ^ final_bit};
+    const std::array<uint64_t, 4> &input_digest,
+    bool final_bit) {
+    const std::array<uint64_t, 8> fields{
+        checksum,
+        iterations,
+        work_items,
+        input_digest[0],
+        input_digest[1],
+        input_digest[2],
+        input_digest[3],
+        static_cast<uint64_t>(final_bit),
+    };
+    return byte_digest_words(fields.data(), fields.size());
+}
+
+template <typename CALLBACK>
+double measure_workload(CALLBACK callback) {
+    const auto started = std::chrono::steady_clock::now();
+    callback();
+    const auto finished = std::chrono::steady_clock::now();
+    return std::chrono::duration<double>(finished - started).count();
 }
 
 }  // namespace
@@ -444,37 +459,57 @@ int main(int argc, const char **argv) {
         if (arguments.iterations > std::numeric_limits<uint64_t>::max() / arguments.work_items) {
             throw std::overflow_error("adapter semantic work count overflows u64");
         }
-        const auto started = std::chrono::steady_clock::now();
         std::array<uint64_t, 4> digest_state{};
         stim::Circuit parsed;
         std::string canonical;
+        uint64_t popcount_checksum = 0;
+        double elapsed_seconds = 0;
         if (arguments.workload == "protocol-smoke") {
-            digest_state = protocol_smoke(arguments.iterations, arguments.work_items);
+            elapsed_seconds = measure_workload(
+                [&]() { digest_state = protocol_smoke(arguments.iterations, arguments.work_items); });
         } else if (arguments.workload == "circuit-parse") {
-            parsed = circuit_parse(arguments.iterations, circuit_fixture);
+            elapsed_seconds = measure_workload(
+                [&]() { parsed = circuit_parse(arguments.iterations, circuit_fixture); });
         } else if (arguments.workload == "circuit-canonical-print") {
-            canonical = circuit_canonical_print(arguments.iterations, canonical_print_circuit.value());
+            const auto &prepared_circuit = canonical_print_circuit.value();
+            elapsed_seconds = measure_workload([&]() {
+                canonical = circuit_canonical_print(arguments.iterations, prepared_circuit);
+            });
         } else if (arguments.workload == "gate-name-hash") {
-            digest_state = gate_name_hash(
-                arguments.iterations,
-                arguments.work_items,
-                gate_sweeps.value(),
-                gate_names.value(),
-                gate_digest.value());
+            const uint64_t prepared_sweeps = gate_sweeps.value();
+            const auto &prepared_names = gate_names.value();
+            const uint64_t prepared_digest = gate_digest.value();
+            elapsed_seconds = measure_workload([&]() {
+                digest_state = gate_name_hash(
+                    arguments.iterations,
+                    arguments.work_items,
+                    prepared_sweeps,
+                    prepared_names,
+                    prepared_digest);
+            });
         } else if (arguments.workload == "simd-word-popcount") {
-            digest_state = simd_word_popcount(
-                arguments.iterations, arguments.work_items, popcount.value());
+            auto &prepared_popcount = popcount.value();
+            elapsed_seconds = measure_workload([&]() {
+                popcount_checksum = stab_qualification::simd_word_popcount_contract(
+                    arguments.iterations, prepared_popcount.bits);
+            });
         } else {
             throw std::invalid_argument("unreachable registered adapter workload");
         }
-        const auto finished = std::chrono::steady_clock::now();
         if (arguments.workload == "circuit-parse") {
             digest_state = byte_digest(parsed.str());
         } else if (arguments.workload == "circuit-canonical-print") {
             digest_state = byte_digest(canonical);
+        } else if (arguments.workload == "simd-word-popcount") {
+            const bool final_bit = popcount->bits[POPCOUNT_TOGGLE_BIT];
+            digest_state = popcount_output_digest(
+                popcount_checksum,
+                arguments.iterations,
+                arguments.work_items,
+                popcount->input_digest,
+                final_bit);
         }
-        const std::chrono::duration<double> elapsed = finished - started;
-        if (!(elapsed.count() > 0)) {
+        if (!(elapsed_seconds > 0)) {
             throw std::runtime_error("adapter measured a non-positive duration");
         }
         const uint64_t peak_rss = std::max(setup_rss, status_kib("VmHWM:"));
@@ -485,7 +520,7 @@ int main(int argc, const char **argv) {
                   << "\"workload_id\":\"" << arguments.workload << "\","
                   << "\"measurement_id\":\"" << arguments.measurement_id << "\","
                   << "\"iteration_count\":" << arguments.iterations << ','
-                  << "\"elapsed_seconds\":" << elapsed.count() << ','
+                  << "\"elapsed_seconds\":" << elapsed_seconds << ','
                   << "\"work_count\":" << arguments.iterations * arguments.work_items << ','
                   << "\"input_bytes\":" << input_bytes << ','
                   << "\"input_digest\":\"" << semantic_digest(input_digest) << "\","

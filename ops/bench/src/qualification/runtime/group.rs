@@ -9,15 +9,23 @@ use super::run::ClaimClass;
 use crate::root::RepoRoot;
 
 const GROUP_CONTRACT_PATH: &str = "benchmarks/qualification-runtime-groups.json";
-const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 3;
+const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 4;
 const MAX_GROUP_CONTRACT_BYTES: usize = 1 << 20;
 const MAX_GROUPS: usize = 256;
 const MAX_MEASUREMENTS_PER_GROUP: usize = 64;
 const MAX_CORRECTNESS_CASES_PER_GROUP: usize = 4096;
 const MAX_SCALES_PER_GROUP: usize = 64;
 const MAX_PROFILER_NOTE_PATH_BYTES: usize = 512;
+const MAX_COMPARATOR_SOURCE_PATH_BYTES: usize = 512;
 const MAX_PROFILER_NOTE_BYTES: usize = 64 << 10;
+const MAX_COMPARATOR_SOURCE_BYTES: usize = 1 << 20;
 const PROFILER_NOTE_PREFIX: &str = "benchmarks/profiler-notes/qualification/";
+const COMPARATOR_SOURCE_PREFIX: &str = "benchmarks/stim_adapter/";
+const SIMD_WORD_POPCOUNT_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
+const SIMD_WORD_POPCOUNT_COMPARATOR_PATHS: [&str; 2] = [
+    "benchmarks/stim_adapter/main.cc",
+    "benchmarks/stim_adapter/simd_word_popcount_contract.h",
+];
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -38,6 +46,50 @@ pub(super) struct GroupContract {
     pub(super) correctness_case_ids: Vec<String>,
     pub(super) owner: ProtocolId,
     pub(super) profiler_note: Option<ProfilerNoteContract>,
+    #[serde(default)]
+    pub(super) comparator_sources: Vec<ComparatorSourceContract>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ComparatorSourceContract {
+    pub(super) path: ComparatorSourcePath,
+    pub(super) sha256: Sha256Digest,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(transparent)]
+pub(super) struct ComparatorSourcePath(Box<str>);
+
+impl ComparatorSourcePath {
+    fn try_new(value: String) -> Result<Self, GroupError> {
+        if value.is_empty()
+            || value.len() > MAX_COMPARATOR_SOURCE_PATH_BYTES
+            || !value.starts_with(COMPARATOR_SOURCE_PREFIX)
+            || value
+                .split('/')
+                .any(|component| component.is_empty() || component == "." || component == "..")
+            || !value.bytes().all(|byte| {
+                byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'/')
+            })
+        {
+            return Err(GroupError::ComparatorSourcePath(value));
+        }
+        Ok(Self(value.into_boxed_str()))
+    }
+
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for ComparatorSourcePath {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Self::try_new(String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -240,6 +292,17 @@ fn validate_inventory_contracts(
                         }
                     && inventory.input_digest.as_deref() == Some(contract.input_digest.as_str())
             });
+        let contract_comparator_sources = contract
+            .comparator_sources
+            .iter()
+            .map(|source| (source.path.as_str(), source.sha256.as_str()))
+            .collect::<Vec<_>>();
+        let inventory_comparator_sources = group
+            .output_contract
+            .comparator_sources
+            .iter()
+            .map(|source| (source.path.as_str(), source.sha256.as_str()))
+            .collect::<Vec<_>>();
         if group.disposition != PerformanceDisposition::Measured
             || group.runner_fidelity != RunnerFidelity::AdapterLibrary
             || group.correctness_binding != CorrectnessBinding::ExactCases
@@ -251,6 +314,7 @@ fn validate_inventory_contracts(
             || group.status == QualificationStatus::Planned
             || inventory_scale_ids != contract_scale_ids
             || group.memory_policy.scale_ids != contract_scale_ids
+            || inventory_comparator_sources != contract_comparator_sources
             || !scales_match
         {
             return Err(GroupError::InventoryContract(contract.id.to_string()));
@@ -270,6 +334,7 @@ fn load(
     let file: GroupContractFile = serde_json::from_slice(&bytes).map_err(GroupError::Json)?;
     validate(&file, expected_inventory_sha256)?;
     validate_profiler_notes(root, &file)?;
+    validate_comparator_sources(root, &file)?;
     Ok((file, super::run::sha256_hex(&bytes)))
 }
 
@@ -292,6 +357,27 @@ fn validate_profiler_notes(root: &RepoRoot, file: &GroupContractFile) -> Result<
             .map_err(|error| GroupError::ProfilerNote(error.to_string()))?;
         if !text.contains("Dominant cost:") || !text.contains("Next owner action:") {
             return Err(GroupError::ProfilerNoteContent(group.id.to_string()));
+        }
+    }
+    Ok(())
+}
+
+fn validate_comparator_sources(
+    root: &RepoRoot,
+    file: &GroupContractFile,
+) -> Result<(), GroupError> {
+    for group in &file.groups {
+        for source in &group.comparator_sources {
+            let path = root.path.join(source.path.as_str());
+            let bytes = crate::source_file::read_repo_regular_file_bounded(
+                root,
+                &path,
+                MAX_COMPARATOR_SOURCE_BYTES,
+            )
+            .map_err(|error| GroupError::ComparatorSource(error.to_string()))?;
+            if super::run::sha256_hex(&bytes) != source.sha256.as_str() {
+                return Err(GroupError::ComparatorSourceDigest(group.id.to_string()));
+            }
         }
     }
     Ok(())
@@ -330,6 +416,16 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
             .map(|scale| &scale.id)
             .collect::<BTreeSet<_>>();
         let correctness_case_ids = group.correctness_case_ids.iter().collect::<BTreeSet<_>>();
+        let comparator_paths = group
+            .comparator_sources
+            .iter()
+            .map(|source| source.path.as_str())
+            .collect::<Vec<_>>();
+        let expected_comparator_paths = if group.id.to_string() == SIMD_WORD_POPCOUNT_GROUP_ID {
+            SIMD_WORD_POPCOUNT_COMPARATOR_PATHS.as_slice()
+        } else {
+            &[]
+        };
         if measurement_ids.len() != group.measurement_ids.len()
             || scale_ids.len() != group.scales.len()
             || !group
@@ -345,6 +441,7 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
                 .correctness_case_ids
                 .iter()
                 .any(|case| !valid_case_id(case))
+            || comparator_paths != expected_comparator_paths
         {
             return Err(GroupError::InvalidGroup(group.id.to_string()));
         }
@@ -423,6 +520,12 @@ pub(super) enum GroupError {
     ProfilerNoteDigest(String),
     #[error("runtime group {0} profiler note lacks required cost and owner-action fields")]
     ProfilerNoteContent(String),
+    #[error("invalid source-owned comparator path {0:?}")]
+    ComparatorSourcePath(String),
+    #[error("failed to read source-owned comparator source: {0}")]
+    ComparatorSource(String),
+    #[error("runtime group {0} comparator-source digest is stale")]
+    ComparatorSourceDigest(String),
 }
 
 #[cfg(test)]
@@ -453,6 +556,7 @@ mod tests {
                     correctness_case_ids: Vec::new(),
                     owner: ProtocolId::try_new("ops/bench").expect("owner"),
                     profiler_note: None,
+                    comparator_sources: Vec::new(),
                 },
                 GroupContract {
                     id: ProtocolId::try_new(
@@ -475,6 +579,7 @@ mod tests {
                     correctness_case_ids: vec!["cq-evidence-canonical-print".to_string()],
                     owner: ProtocolId::try_new("stab-core/circuit-printer").expect("owner"),
                     profiler_note: None,
+                    comparator_sources: Vec::new(),
                 },
                 GroupContract {
                     id: ProtocolId::try_new(super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
@@ -498,6 +603,7 @@ mod tests {
                         .expect("note path"),
                         sha256: Sha256Digest::try_new("d".repeat(64)).expect("note digest"),
                     }),
+                    comparator_sources: Vec::new(),
                 },
                 GroupContract {
                     id: ProtocolId::try_new(super::super::invocation::GATE_NAME_HASH_GROUP_ID)
@@ -520,6 +626,7 @@ mod tests {
                     correctness_case_ids: vec!["cq-evidence-gate-name-hash".to_string()],
                     owner: ProtocolId::try_new("stab-core/gates").expect("owner"),
                     profiler_note: None,
+                    comparator_sources: Vec::new(),
                 },
                 GroupContract {
                     id: ProtocolId::try_new(super::super::invocation::SIMD_WORD_POPCOUNT_GROUP_ID)
@@ -539,6 +646,15 @@ mod tests {
                     correctness_case_ids: vec!["cq-evidence-simd-word-popcount".to_string()],
                     owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
                     profiler_note: None,
+                    comparator_sources: SIMD_WORD_POPCOUNT_COMPARATOR_PATHS
+                        .iter()
+                        .map(|path| ComparatorSourceContract {
+                            path: ComparatorSourcePath::try_new((*path).to_string())
+                                .expect("comparator path"),
+                            sha256: Sha256Digest::try_new("f".repeat(64))
+                                .expect("comparator digest"),
+                        })
+                        .collect(),
                 },
             ],
         }
@@ -772,6 +888,31 @@ mod tests {
             validate_profiler_notes(&root, &file),
             Err(GroupError::ProfilerNoteDigest(group))
                 if group == super::super::invocation::CIRCUIT_PARSE_GROUP_ID
+        ));
+    }
+
+    #[test]
+    fn runtime_contract_rejects_stale_comparator_source_digest() {
+        let root =
+            RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+                .expect("repository root");
+        let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
+        let suite = super::super::super::discovery::generate(&root, &manifest)
+            .expect("generated performance inventory");
+        let (mut file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+        file.groups
+            .iter_mut()
+            .find(|group| {
+                group.id.to_string() == super::super::invocation::SIMD_WORD_POPCOUNT_GROUP_ID
+            })
+            .and_then(|group| group.comparator_sources.first_mut())
+            .expect("comparator source")
+            .sha256 = Sha256Digest::try_new("e".repeat(64)).expect("different digest");
+
+        assert!(matches!(
+            validate_comparator_sources(&root, &file),
+            Err(GroupError::ComparatorSourceDigest(group))
+                if group == super::super::invocation::SIMD_WORD_POPCOUNT_GROUP_ID
         ));
     }
 }

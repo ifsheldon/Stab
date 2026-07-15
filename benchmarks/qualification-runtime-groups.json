@@ -1,6 +1,6 @@
 {
-  "schema_version": 3,
-  "performance_inventory_sha256": "9be7dea23a221e9d7fe6ba2e9bdfaf65ad2b4a7675b557386b3de6ea58306557",
+  "schema_version": 4,
+  "performance_inventory_sha256": "877df12bf1b3d63da92289e22f117097cedbc20860d165c90b41554aa110263b",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -153,7 +153,17 @@
         "cq-evidence-qualification-ba252d42660a41ce"
       ],
       "owner": "stab-core/bits",
-      "profiler_note": null
+      "profiler_note": null,
+      "comparator_sources": [
+        {
+          "path": "benchmarks/stim_adapter/main.cc",
+          "sha256": "8f7bed25d8af3116f705574d2de88745e214c6b1845d8c8d6bb86b72241eacc3"
+        },
+        {
+          "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
+          "sha256": "0875f68e7e4a725f633c90895906604cc0ff942d7432c0e8c32f25c49e61bdda"
+        }
+      ]
     }
   ]
 }

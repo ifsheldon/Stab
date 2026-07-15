@@ -37,6 +37,7 @@ fn contract() -> GroupContract {
         correctness_case_ids: vec!["cq-one".to_string()],
         owner: ProtocolId::try_new("owner").expect("owner"),
         profiler_note: None,
+        comparator_sources: Vec::new(),
     }
 }
 
@@ -71,6 +72,7 @@ fn shared() -> SharedIdentity {
             stab_source_sha256: digest('9'),
             stab_build_fingerprint: digest('a'),
             stab_binary_sha256: digest('b'),
+            contract_preflight_sha256: digest('c'),
         },
         correctness_preflight: CorrectnessPreflightEvidence {
             status: CorrectnessPreflightStatus::Passed,
@@ -250,6 +252,17 @@ fn rollup_rejects_duplicate_nonpromotable_and_mixed_identity_reports() {
         assemble_candidates(vec![
             candidate("small", 1, GateOutcome::Passed),
             mixed_worker,
+            candidate("large", 3, GateOutcome::Passed),
+        ]),
+        Err(RollupError::MixedIdentity(scale)) if scale == "medium"
+    ));
+
+    let mut stale_preflight = candidate("small", 1, GateOutcome::Passed);
+    stale_preflight.shared.workers.contract_preflight_sha256 = digest('d');
+    assert!(matches!(
+        assemble_candidates(vec![
+            stale_preflight,
+            candidate("medium", 2, GateOutcome::Passed),
             candidate("large", 3, GateOutcome::Passed),
         ]),
         Err(RollupError::MixedIdentity(scale)) if scale == "medium"

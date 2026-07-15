@@ -21,7 +21,7 @@ use super::statistics::{
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 15;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 17;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
@@ -120,6 +120,7 @@ pub(super) struct QualificationReport {
     pub(super) host: HostEvidence,
     pub(super) toolchain: super::toolchain::ToolchainEvidence,
     pub(super) workers: WorkerIdentityEvidence,
+    pub(super) contract_preflight: super::invocation::WorkerContractPreflightEvidence,
     pub(super) adapter_receipt: super::adapter::AdapterBuildReceipt,
     pub(super) stab_build_receipt: super::stab_build::StabBuildReceipt,
     pub(super) correctness_preflight: CorrectnessPreflightEvidence,
@@ -408,7 +409,8 @@ pub(super) fn run(
         repository,
         host,
         toolchain,
-        workers: workers.identity_evidence(),
+        workers: workers.identity_evidence()?,
+        contract_preflight: workers.contract_preflight_evidence()?.clone(),
         adapter_receipt: workers.adapter_receipt().clone(),
         stab_build_receipt: workers.stab_build_receipt().clone(),
         correctness_preflight,

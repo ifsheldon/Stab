@@ -356,6 +356,7 @@ mod tests {
             correctness_case_ids: Vec::new(),
             owner: ProtocolId::try_new("ops/bench").expect("owner"),
             profiler_note: None,
+            comparator_sources: Vec::new(),
         }
     }
 

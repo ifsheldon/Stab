@@ -14,8 +14,11 @@ use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
 const ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
-const RECEIPT_SCHEMA_VERSION: u32 = 2;
+const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
+    "benchmarks/stim_adapter/simd_word_popcount_contract.h";
+const RECEIPT_SCHEMA_VERSION: u32 = 4;
 const MAX_SOURCE_BYTES: u64 = 1 << 20;
+const MAX_FLAGS_FILE_BYTES: u64 = 64 << 10;
 const MAX_TOOL_BYTES: u64 = 512 << 20;
 const MAX_LIBRARY_BYTES: u64 = 1 << 30;
 const BUILD_OUTPUT_BYTES: usize = 16 << 20;
@@ -35,6 +38,7 @@ pub(crate) struct AdapterExecutable {
     _runtime: tempfile::TempDir,
     executable: SealedExecutable,
     source_path: PathBuf,
+    comparator_source_path: PathBuf,
     library_path: PathBuf,
 }
 
@@ -42,6 +46,8 @@ impl AdapterExecutable {
     pub(crate) fn verify(&self) -> Result<(), AdapterError> {
         self.executable.verify()?;
         let source = sha256_regular_file(&self.source_path, MAX_SOURCE_BYTES)?;
+        let comparator_source =
+            sha256_regular_file(&self.comparator_source_path, MAX_SOURCE_BYTES)?;
         let library = sha256_regular_file(&self.library_path, MAX_LIBRARY_BYTES)?;
         if self.path != self.executable.program()
             || self.executable.sha256() != self.binary_digest.as_str()
@@ -49,6 +55,7 @@ impl AdapterExecutable {
             || self.receipt.adapter_source_sha256 != self.source_digest.as_str()
             || self.receipt.build_fingerprint != self.build_fingerprint.as_str()
             || source != self.receipt.adapter_source_sha256
+            || comparator_source != self.receipt.comparator_source_sha256
             || library != self.receipt.stim_library_sha256
             || !self.receipt.validates_report_identity(
                 self.source_digest.as_str(),
@@ -69,6 +76,7 @@ pub(crate) struct AdapterBuildReceipt {
     stim_tag: String,
     stim_commit: String,
     adapter_source_sha256: String,
+    comparator_source_sha256: String,
     stim_library_sha256: String,
     cmake: ToolIdentity,
     cc: ToolIdentity,
@@ -76,6 +84,7 @@ pub(crate) struct AdapterBuildReceipt {
     make: ToolIdentity,
     configure_arguments: Vec<String>,
     library_build_arguments: Vec<String>,
+    stim_compile_flags: Vec<String>,
     compile_arguments: Vec<String>,
     build_environment: Vec<BuildEnvironmentEntry>,
     build_fingerprint: String,
@@ -93,6 +102,7 @@ impl AdapterBuildReceipt {
             && self.stim_tag == STIM_TAG
             && self.stim_commit == STIM_COMMIT
             && self.adapter_source_sha256 == source_sha256
+            && valid_digest(&self.comparator_source_sha256)
             && self.build_fingerprint == build_fingerprint
             && self.binary_sha256 == binary_sha256
             && valid_digest(&self.stim_library_sha256)
@@ -104,27 +114,58 @@ impl AdapterBuildReceipt {
             && self.configure_arguments
                 == normalized_configure_arguments(&self.cc, &self.cxx, &self.make)
             && self.library_build_arguments == normalized_library_build_arguments()
+            && valid_stim_compile_flags(&self.stim_compile_flags)
             && self.compile_arguments
-                == normalized_compile_arguments(source_sha256, build_fingerprint)
+                == normalized_compile_arguments(
+                    source_sha256,
+                    build_fingerprint,
+                    &self.stim_compile_flags,
+                )
             && self.build_environment == normalized_build_environment(&self.cc, &self.cxx)
             && self
                 .recomputed_build_fingerprint()
                 .is_ok_and(|actual| actual == build_fingerprint)
     }
 
+    pub(super) fn validates_comparator_sources(
+        &self,
+        sources: &[super::group::ComparatorSourceContract],
+    ) -> bool {
+        sources.is_empty()
+            || matches!(
+                sources,
+                [adapter, comparator]
+                    if adapter.path.as_str() == ADAPTER_SOURCE
+                        && adapter.sha256.as_str() == self.adapter_source_sha256
+                        && comparator.path.as_str() == SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE
+                        && comparator.sha256.as_str() == self.comparator_source_sha256
+            )
+    }
+
     fn recomputed_build_fingerprint(&self) -> Result<String, AdapterError> {
         if self.compile_arguments
-            != normalized_compile_arguments(&self.adapter_source_sha256, &self.build_fingerprint)
+            != normalized_compile_arguments(
+                &self.adapter_source_sha256,
+                &self.build_fingerprint,
+                &self.stim_compile_flags,
+            )
         {
             return Err(AdapterError::ReceiptShape);
         }
-        let pending_arguments =
-            normalized_compile_arguments(&self.adapter_source_sha256, FINGERPRINT_PENDING);
+        if !valid_stim_compile_flags(&self.stim_compile_flags) {
+            return Err(AdapterError::ReceiptShape);
+        }
+        let pending_arguments = normalized_compile_arguments(
+            &self.adapter_source_sha256,
+            FINGERPRINT_PENDING,
+            &self.stim_compile_flags,
+        );
         let material = serde_json::to_vec(&serde_json::json!({
             "schema_version": self.schema_version,
             "stim_tag": self.stim_tag,
             "stim_commit": self.stim_commit,
             "adapter_source_sha256": self.adapter_source_sha256,
+            "comparator_source_sha256": self.comparator_source_sha256,
             "stim_library_sha256": self.stim_library_sha256,
             "cmake": self.cmake,
             "cc": self.cc,
@@ -132,6 +173,7 @@ impl AdapterBuildReceipt {
             "make": self.make,
             "configure_arguments": self.configure_arguments,
             "library_build_arguments": self.library_build_arguments,
+            "stim_compile_flags": self.stim_compile_flags,
             "compile_arguments": pending_arguments,
             "build_environment": self.build_environment,
         }))?;
@@ -217,13 +259,17 @@ pub(crate) fn prepare_adapter(
     )?;
     let library_path = stim_build.join("out/libstim.a");
     let library_digest = sha256_regular_file(&library_path, MAX_LIBRARY_BYTES)?;
+    let stim_compile_flags = read_stim_compile_flags(&stim_build)?;
     let source_path = stab_source.join(ADAPTER_SOURCE);
     let source_digest = sha256_regular_file(&source_path, MAX_SOURCE_BYTES)?;
+    let comparator_source_path = stab_source.join(SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE);
+    let comparator_source_digest = sha256_regular_file(&comparator_source_path, MAX_SOURCE_BYTES)?;
     let mut receipt = AdapterBuildReceipt {
         schema_version: RECEIPT_SCHEMA_VERSION,
         stim_tag: STIM_TAG.to_string(),
         stim_commit: STIM_COMMIT.to_string(),
         adapter_source_sha256: source_digest.clone(),
+        comparator_source_sha256: comparator_source_digest,
         stim_library_sha256: library_digest,
         cmake,
         cc,
@@ -231,14 +277,22 @@ pub(crate) fn prepare_adapter(
         make,
         configure_arguments,
         library_build_arguments,
-        compile_arguments: normalized_compile_arguments(&source_digest, FINGERPRINT_PENDING),
+        compile_arguments: normalized_compile_arguments(
+            &source_digest,
+            FINGERPRINT_PENDING,
+            &stim_compile_flags,
+        ),
+        stim_compile_flags,
         build_environment,
         build_fingerprint: FINGERPRINT_PENDING.to_string(),
         binary_sha256: String::new(),
     };
     receipt.build_fingerprint = receipt.recomputed_build_fingerprint()?;
-    receipt.compile_arguments =
-        normalized_compile_arguments(&source_digest, &receipt.build_fingerprint);
+    receipt.compile_arguments = normalized_compile_arguments(
+        &source_digest,
+        &receipt.build_fingerprint,
+        &receipt.stim_compile_flags,
+    );
     let binary = runtime.path().join("stim-qualification-adapter");
     run_build_command(
         Path::new(&receipt.cxx.path),
@@ -258,6 +312,7 @@ pub(crate) fn prepare_adapter(
         _runtime: runtime,
         executable,
         source_path,
+        comparator_source_path,
         library_path,
     };
     adapter.verify()?;
@@ -297,16 +352,15 @@ fn normalized_library_build_arguments() -> Vec<String> {
     .collect()
 }
 
-fn normalized_compile_arguments(source_digest: &str, fingerprint: &str) -> Vec<String> {
-    vec![
-        "-std=c++20".to_string(),
-        "-O3".to_string(),
-        "-DNDEBUG".to_string(),
-        "-Wall".to_string(),
+fn normalized_compile_arguments(
+    source_digest: &str,
+    fingerprint: &str,
+    stim_compile_flags: &[String],
+) -> Vec<String> {
+    let mut arguments = stim_compile_flags.to_vec();
+    arguments.extend([
         "-Wextra".to_string(),
-        "-Wpedantic".to_string(),
         "-Werror".to_string(),
-        "-fno-strict-aliasing".to_string(),
         "-I".to_string(),
         "$STIM_SOURCE/src".to_string(),
         format!("-DSTAB_STIM_COMMIT=\"{STIM_COMMIT}\""),
@@ -316,7 +370,63 @@ fn normalized_compile_arguments(source_digest: &str, fingerprint: &str) -> Vec<S
         "$STIM_BUILD/out/libstim.a".to_string(),
         "-o".to_string(),
         "$RUNTIME/stim-qualification-adapter".to_string(),
-    ]
+    ]);
+    arguments
+}
+
+fn read_stim_compile_flags(stim_build: &Path) -> Result<Vec<String>, AdapterError> {
+    let path = stim_build.join("CMakeFiles/libstim.dir/flags.make");
+    let mut file =
+        crate::source_file::open_regular_file_bounded_descriptor(&path, MAX_FLAGS_FILE_BYTES)
+            .map_err(|error| AdapterError::SafeFile(error.to_string()))?;
+    let mut bytes = Vec::new();
+    file.by_ref()
+        .take(MAX_FLAGS_FILE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|source| AdapterError::Io {
+            path: path.clone(),
+            source,
+        })?;
+    if bytes.len() as u64 > MAX_FLAGS_FILE_BYTES {
+        return Err(AdapterError::UnsafeFile {
+            path,
+            maximum: MAX_FLAGS_FILE_BYTES,
+        });
+    }
+    let contents = std::str::from_utf8(&bytes).map_err(|_| AdapterError::StimFlagsUtf8)?;
+    let mut matching_lines = contents
+        .lines()
+        .filter_map(|line| line.strip_prefix("CXX_FLAGS = "));
+    let flags = matching_lines.next().ok_or(AdapterError::StimFlagsShape)?;
+    if matching_lines.next().is_some() {
+        return Err(AdapterError::StimFlagsShape);
+    }
+    let flags = flags
+        .split_ascii_whitespace()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    if !valid_stim_compile_flags(&flags) {
+        return Err(AdapterError::StimFlagsShape);
+    }
+    Ok(flags)
+}
+
+fn valid_stim_compile_flags(flags: &[String]) -> bool {
+    !flags.is_empty()
+        && flags.iter().all(|flag| {
+            flag.starts_with('-')
+                && flag.len() <= 128
+                && flag.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric()
+                        || matches!(byte, b'-' | b'_' | b'=' | b'+' | b'.' | b'/')
+                })
+        })
+        && flags.iter().any(|flag| flag == "-O3")
+        && flags.iter().any(|flag| flag == "-DNDEBUG")
+        && flags.iter().any(|flag| flag == "-fno-strict-aliasing")
+        && flags
+            .iter()
+            .any(|flag| matches!(flag.as_str(), "-std=c++20" | "-std=gnu++20"))
 }
 
 fn normalized_build_environment(
@@ -607,6 +717,10 @@ pub(crate) enum AdapterError {
     },
     #[error("adapter build receipt has an invalid source-owned shape")]
     ReceiptShape,
+    #[error("generated Stim compile flags are not UTF-8")]
+    StimFlagsUtf8,
+    #[error("generated Stim compile flags have an unexpected shape")]
+    StimFlagsShape,
     #[error("adapter identity changed after preparation")]
     StaleBuild,
     #[error("adapter path is not UTF-8: {0}")]
@@ -661,10 +775,16 @@ mod tests {
             stim_tag: STIM_TAG.to_string(),
             stim_commit: STIM_COMMIT.to_string(),
             adapter_source_sha256: source.to_string(),
+            comparator_source_sha256: source.to_string(),
             stim_library_sha256: library.to_string(),
             configure_arguments: normalized_configure_arguments(&cc, &cxx, &make),
             library_build_arguments: normalized_library_build_arguments(),
-            compile_arguments: normalized_compile_arguments(source, FINGERPRINT_PENDING),
+            compile_arguments: normalized_compile_arguments(
+                source,
+                FINGERPRINT_PENDING,
+                &test_stim_compile_flags(),
+            ),
+            stim_compile_flags: test_stim_compile_flags(),
             build_environment: normalized_build_environment(&cc, &cxx),
             cmake,
             cc,
@@ -676,9 +796,28 @@ mod tests {
         receipt.build_fingerprint = receipt
             .recomputed_build_fingerprint()
             .expect("build fingerprint");
-        receipt.compile_arguments =
-            normalized_compile_arguments(source, &receipt.build_fingerprint);
+        receipt.compile_arguments = normalized_compile_arguments(
+            source,
+            &receipt.build_fingerprint,
+            &receipt.stim_compile_flags,
+        );
         receipt
+    }
+
+    fn test_stim_compile_flags() -> Vec<String> {
+        [
+            "-O3",
+            "-DNDEBUG",
+            "-std=gnu++20",
+            "-Wall",
+            "-Wpedantic",
+            "-fPIC",
+            "-fno-strict-aliasing",
+            "-march=native",
+        ]
+        .into_iter()
+        .map(str::to_string)
+        .collect()
     }
 
     #[test]
@@ -725,15 +864,156 @@ mod tests {
             &receipt.build_fingerprint,
             &binary
         ));
+        let mut changed_stim_flags = receipt.clone();
+        changed_stim_flags
+            .stim_compile_flags
+            .retain(|flag| flag != "-march=native");
+        assert!(!changed_stim_flags.validates_report_identity(
+            &source,
+            &receipt.build_fingerprint,
+            &binary
+        ));
+
+        let mut refingerprinted_flags = receipt.clone();
+        refingerprinted_flags
+            .stim_compile_flags
+            .push("-mavx2".to_string());
+        refingerprinted_flags.build_fingerprint = FINGERPRINT_PENDING.to_string();
+        refingerprinted_flags.compile_arguments = normalized_compile_arguments(
+            &source,
+            FINGERPRINT_PENDING,
+            &refingerprinted_flags.stim_compile_flags,
+        );
+        assert_ne!(
+            refingerprinted_flags
+                .recomputed_build_fingerprint()
+                .expect("changed flag fingerprint"),
+            receipt.build_fingerprint
+        );
+
+        let mut reordered_flags = receipt.clone();
+        reordered_flags.stim_compile_flags.swap(0, 1);
+        assert!(!reordered_flags.validates_report_identity(
+            &source,
+            &receipt.build_fingerprint,
+            &binary
+        ));
+        reordered_flags.build_fingerprint = FINGERPRINT_PENDING.to_string();
+        reordered_flags.compile_arguments = normalized_compile_arguments(
+            &source,
+            FINGERPRINT_PENDING,
+            &reordered_flags.stim_compile_flags,
+        );
+        assert_ne!(
+            reordered_flags
+                .recomputed_build_fingerprint()
+                .expect("reordered flag fingerprint"),
+            receipt.build_fingerprint
+        );
+
+        let mut changed_comparator = receipt.clone();
+        changed_comparator.comparator_source_sha256 = "e".repeat(64);
+        assert!(!changed_comparator.validates_report_identity(
+            &source,
+            &receipt.build_fingerprint,
+            &binary
+        ));
+        changed_comparator.build_fingerprint = FINGERPRINT_PENDING.to_string();
+        changed_comparator.compile_arguments = normalized_compile_arguments(
+            &source,
+            FINGERPRINT_PENDING,
+            &changed_comparator.stim_compile_flags,
+        );
+        assert_ne!(
+            changed_comparator
+                .recomputed_build_fingerprint()
+                .expect("changed comparator fingerprint"),
+            receipt.build_fingerprint
+        );
+
+        let comparator_sources: Vec<super::super::group::ComparatorSourceContract> =
+            serde_json::from_value(serde_json::json!([
+                {"path": ADAPTER_SOURCE, "sha256": source},
+                {
+                    "path": SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE,
+                    "sha256": receipt.comparator_source_sha256
+                }
+            ]))
+            .expect("comparator source contracts");
+        assert!(receipt.validates_comparator_sources(&comparator_sources));
+        let stale_sources: Vec<super::super::group::ComparatorSourceContract> =
+            serde_json::from_value(serde_json::json!([
+                {"path": ADAPTER_SOURCE, "sha256": source},
+                {
+                    "path": SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE,
+                    "sha256": "e".repeat(64)
+                }
+            ]))
+            .expect("stale comparator source contracts");
+        assert!(!receipt.validates_comparator_sources(&stale_sources));
+    }
+
+    #[test]
+    fn reads_and_preserves_generated_stim_machine_flags() {
+        let runtime = tempfile::tempdir().expect("adapter runtime");
+        let directory = runtime.path().join("CMakeFiles/libstim.dir");
+        std::fs::create_dir_all(&directory).expect("create flags directory");
+        std::fs::write(
+            directory.join("flags.make"),
+            "CXX_FLAGS = -O3 -DNDEBUG -std=gnu++20 -fno-strict-aliasing -march=native\n",
+        )
+        .expect("write flags");
+
+        let flags = read_stim_compile_flags(runtime.path()).expect("read flags");
+        assert_eq!(flags.last().map(String::as_str), Some("-march=native"));
+        let arguments = normalized_compile_arguments(&"a".repeat(64), "PENDING", &flags);
+        assert_eq!(
+            arguments
+                .iter()
+                .filter(|argument| argument.as_str() == "-march=native")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn rejects_ambiguous_or_injection_capable_stim_flags() {
+        let runtime = tempfile::tempdir().expect("adapter runtime");
+        let directory = runtime.path().join("CMakeFiles/libstim.dir");
+        std::fs::create_dir_all(&directory).expect("create flags directory");
+        let flags_path = directory.join("flags.make");
+        let valid = "-O3 -DNDEBUG -std=gnu++20 -fno-strict-aliasing";
+
+        std::fs::write(
+            &flags_path,
+            format!("CXX_FLAGS = {valid}\nCXX_FLAGS = {valid}\n"),
+        )
+        .expect("write duplicate flags");
+        assert!(matches!(
+            read_stim_compile_flags(runtime.path()),
+            Err(AdapterError::StimFlagsShape)
+        ));
+
+        std::fs::write(
+            &flags_path,
+            format!("CXX_FLAGS = {valid} '-march=native'\n"),
+        )
+        .expect("write quoted flags");
+        assert!(matches!(
+            read_stim_compile_flags(runtime.path()),
+            Err(AdapterError::StimFlagsShape)
+        ));
     }
 
     #[test]
     fn executable_verification_rejects_materialized_source_drift() {
         let runtime = tempfile::tempdir().expect("adapter runtime");
         let source = runtime.path().join("main.cc");
+        let comparator_source = runtime.path().join("simd_word_popcount_contract.h");
         let library = runtime.path().join("libstim.a");
         let binary = runtime.path().join("adapter");
         std::fs::write(&source, b"source").expect("write source");
+        std::fs::write(&comparator_source, b"source").expect("write comparator source");
         std::fs::write(&library, b"library").expect("write library");
         std::fs::write(&binary, b"binary").expect("write binary");
         std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700))
@@ -754,10 +1034,17 @@ mod tests {
             _runtime: runtime,
             executable,
             source_path: source.clone(),
+            comparator_source_path: comparator_source.clone(),
             library_path: library,
         };
         adapter.verify().expect("unchanged adapter verifies");
         std::fs::write(source, b"drifted source").expect("drift source");
+        assert!(matches!(adapter.verify(), Err(AdapterError::StaleBuild)));
+
+        std::fs::write(&adapter.source_path, b"source").expect("restore source");
+        adapter.verify().expect("restored adapter verifies");
+        std::fs::write(comparator_source, b"drifted comparator source")
+            .expect("drift comparator source");
         assert!(matches!(adapter.verify(), Err(AdapterError::StaleBuild)));
     }
 }

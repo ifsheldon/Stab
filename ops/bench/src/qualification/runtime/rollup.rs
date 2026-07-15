@@ -16,7 +16,7 @@ use super::statistics::GateOutcome;
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-const ROLLUP_SCHEMA_VERSION: u32 = 3;
+const ROLLUP_SCHEMA_VERSION: u32 = 4;
 const ROLLUP_PREFLIGHT_SCHEMA_VERSION: u32 = 2;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/rollup-latest";
 const MAX_ROLLUP_REPORT_BYTES: usize = 4 << 20;
@@ -840,6 +840,7 @@ fn valid_worker_identity(identity: &WorkerIdentityEvidence) -> bool {
         &identity.stab_source_sha256,
         &identity.stab_build_fingerprint,
         &identity.stab_binary_sha256,
+        &identity.contract_preflight_sha256,
     ]
     .into_iter()
     .all(|digest| {
@@ -923,15 +924,18 @@ fn render_markdown(report: &RollupReport, report_sha256: &str) -> String {
     let target_triple = super::markdown::inline_code(&report.target_triple);
     let host_profile_id = super::markdown::inline_code(&report.host_profile_id);
     let cpu_identity = super::markdown::inline_code(&report.cpu_identity);
+    let contract_preflight =
+        super::markdown::inline_code(&report.workers.contract_preflight_sha256);
     let report_sha256 = super::markdown::inline_code(report_sha256);
     let mut markdown = format!(
-        "# Performance Qualification Scale-Family Rollup\n\n- Group: {}\n- Tier: `{:?}`\n- Owner: {}\n- Profiler note: {}\n- Stab commit: {}\n- Stim commit: {}\n- Architecture: {} ({})\n- Host profile: {}\n- CPU: {}\n- Required scales: `{}`\n- Passed measurements: `{}`\n- Failed measurements: `{}`\n- Noisy measurements: `{}`\n- Overall outcome: `{:?}`\n- Rollup report SHA-256: {}\n\n## Timing\n\n| Scale | Work items | Measurement | Pairs | Median Stab/Stim | Upper 95% bound | Ratio rMAD | Outcome |\n| --- | ---: | --- | ---: | ---: | ---: | ---: | --- |\n",
+        "# Performance Qualification Scale-Family Rollup\n\n- Group: {}\n- Tier: `{:?}`\n- Owner: {}\n- Profiler note: {}\n- Stab commit: {}\n- Stim commit: {}\n- Worker contract preflight: {}\n- Architecture: {} ({})\n- Host profile: {}\n- CPU: {}\n- Required scales: `{}`\n- Passed measurements: `{}`\n- Failed measurements: `{}`\n- Noisy measurements: `{}`\n- Overall outcome: `{:?}`\n- Rollup report SHA-256: {}\n\n## Timing\n\n| Scale | Work items | Measurement | Pairs | Median Stab/Stim | Upper 95% bound | Ratio rMAD | Outcome |\n| --- | ---: | --- | ---: | ---: | ---: | ---: | --- |\n",
         group_id,
         report.tier,
         owner,
         profiler_note,
         stab_commit,
         stim_commit,
+        contract_preflight,
         architecture,
         target_triple,
         host_profile_id,

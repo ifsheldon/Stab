@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2",
-  "semantic_digest": "9be7dea23a221e9d7fe6ba2e9bdfaf65ad2b4a7675b557386b3de6ea58306557",
+  "semantic_digest": "877df12bf1b3d63da92289e22f117097cedbc20860d165c90b41554aa110263b",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -62097,9 +62097,19 @@
       },
       "work_unit": "bits",
       "output_contract": {
-        "expected_shape": "Exact deterministic fixture bytes plus matching toggle/popcount checksum, final toggle state, work count, and semantic digest.",
+        "expected_shape": "Exact deterministic fixture bytes plus a canonical digest over eight little-endian u64 fields in this order: accumulated popcount checksum, iteration count, bit width, all four input-fingerprint lanes, and final toggle-bit state.",
         "digest_state": "existing",
-        "sink_policy": "Both workers prepare identical little-endian SplitMix64 words outside timing, toggle bit 300 and popcount the complete aligned vector in the timed body, and consume the accumulated checksum and final state outside timing."
+        "sink_policy": "Both workers prepare identical little-endian SplitMix64 words and initial toggle state outside timing, toggle bit 300 in the timed body, accumulate exact whole-vector popcounts using Stim ptr_simd[k].popcount() and Stab BitVec::popcount(), then read final state and construct the canonical output digest outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "8f7bed25d8af3116f705574d2de88745e214c6b1845d8c8d6bb86b72241eacc3"
+          },
+          {
+            "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
+            "sha256": "0875f68e7e4a725f633c90895906604cc0ff942d7432c0e8c32f25c49e61bdda"
+          }
+        ]
       },
       "timing_policy": {
         "calibration_min_ms": 250,

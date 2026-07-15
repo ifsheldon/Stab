@@ -494,6 +494,7 @@ mod tests {
             .is_ok()
         );
         assert!(validate_probe_work_items(ProbeGroup::SimdWordPopcountAdapter, 513).is_err());
+        assert!(validate_probe_work_items(ProbeGroup::SimdWordPopcountAdapter, 256).is_err());
         assert!(
             validate_probe_work_items(
                 ProbeGroup::SimdWordPopcountAdapter,

@@ -156,6 +156,7 @@ fn qualification_group(
             digest_state: EvidenceState::Planned,
             sink_policy: "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
                 .to_string(),
+            comparator_sources: Vec::new(),
         },
         timing_policy: default_timing_policy(),
         memory_policy: MemoryPolicy {

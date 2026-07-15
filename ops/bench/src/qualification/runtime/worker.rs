@@ -154,6 +154,16 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         )
     };
     let input_digest = InputDigest::try_new(semantic_digest(input_digest_state))?;
+    let mut popcount_toggle_state = if let Some(fixture) = &popcount_fixture {
+        Some(
+            fixture
+                .bits
+                .get(POPCOUNT_TOGGLE_BIT)
+                .ok_or(WorkerError::MissingPopcountToggleBit)?,
+        )
+    } else {
+        None
+    };
     let canonical_print_circuit = match args.workload {
         WorkerWorkload::CircuitCanonicalPrint => Some(stab_core::Circuit::from_stim_str(
             circuit_fixture
@@ -194,49 +204,90 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         .checked_mul(args.work_items.get())
         .ok_or(WorkerError::WorkOverflow)?;
 
-    let started = Instant::now();
-    let output = match args.workload {
-        WorkerWorkload::ProtocolSmoke => WorkloadOutput::DigestState(protocol_smoke(
-            args.iterations.get(),
-            args.work_items.get(),
-        )),
-        WorkerWorkload::CircuitParse => WorkloadOutput::Circuit(circuit_parse(
-            args.iterations.get(),
-            circuit_fixture
+    let (output, elapsed_seconds) = match args.workload {
+        WorkerWorkload::ProtocolSmoke => measure_workload(|| {
+            Ok(TimedWorkloadOutput::Complete(WorkloadOutput::DigestState(
+                protocol_smoke(args.iterations.get(), args.work_items.get()),
+            )))
+        })?,
+        WorkerWorkload::CircuitParse => {
+            let fixture = circuit_fixture
                 .as_deref()
-                .ok_or(WorkerError::MissingCircuitFixture)?,
-        )?),
-        WorkerWorkload::CircuitCanonicalPrint => {
-            WorkloadOutput::CanonicalCircuitText(circuit_canonical_print(
-                args.iterations.get(),
-                canonical_print_circuit
-                    .as_ref()
-                    .ok_or(WorkerError::MissingCanonicalPrintCircuit)?,
-            ))
+                .ok_or(WorkerError::MissingCircuitFixture)?;
+            measure_workload(|| {
+                circuit_parse(args.iterations.get(), fixture)
+                    .map(WorkloadOutput::Circuit)
+                    .map(TimedWorkloadOutput::Complete)
+            })?
         }
-        WorkerWorkload::GateNameHash => WorkloadOutput::DigestState(gate_name_hash(
-            args.iterations.get(),
-            args.work_items.get(),
-            gate_hash_sweeps.ok_or(WorkerError::MissingGateHashSweeps)?,
-            gate_hash_names
+        WorkerWorkload::CircuitCanonicalPrint => {
+            let circuit = canonical_print_circuit
+                .as_ref()
+                .ok_or(WorkerError::MissingCanonicalPrintCircuit)?;
+            measure_workload(|| {
+                Ok(TimedWorkloadOutput::Complete(
+                    WorkloadOutput::CanonicalCircuitText(circuit_canonical_print(
+                        args.iterations.get(),
+                        circuit,
+                    )),
+                ))
+            })?
+        }
+        WorkerWorkload::GateNameHash => {
+            let sweeps = gate_hash_sweeps.ok_or(WorkerError::MissingGateHashSweeps)?;
+            let names = gate_hash_names
                 .as_deref()
-                .ok_or(WorkerError::MissingGateHashNames)?,
-            gate_hash_table_digest.ok_or(WorkerError::MissingGateHashTableDigest)?,
-        )),
-        WorkerWorkload::SimdWordPopcount => WorkloadOutput::DigestState(simd_word_popcount(
-            args.iterations.get(),
-            args.work_items.get(),
-            popcount_fixture
+                .ok_or(WorkerError::MissingGateHashNames)?;
+            let table_digest =
+                gate_hash_table_digest.ok_or(WorkerError::MissingGateHashTableDigest)?;
+            measure_workload(|| {
+                Ok(TimedWorkloadOutput::Complete(WorkloadOutput::DigestState(
+                    gate_name_hash(
+                        args.iterations.get(),
+                        args.work_items.get(),
+                        sweeps,
+                        names,
+                        table_digest,
+                    ),
+                )))
+            })?
+        }
+        WorkerWorkload::SimdWordPopcount => {
+            let fixture = popcount_fixture
                 .as_mut()
-                .ok_or(WorkerError::MissingPopcountFixture)?,
-        )?),
+                .ok_or(WorkerError::MissingPopcountFixture)?;
+            let toggle_state = popcount_toggle_state
+                .as_mut()
+                .ok_or(WorkerError::MissingPopcountToggleBit)?;
+            measure_workload(|| {
+                simd_word_popcount(args.iterations.get(), fixture, toggle_state)
+                    .map(TimedWorkloadOutput::PopcountChecksum)
+            })?
+        }
     };
-    let elapsed_seconds = started.elapsed().as_secs_f64();
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
     }
     let peak_rss_bytes = peak_rss_bytes()?.max(current_rss_bytes()?);
-    let digest = output.semantic_digest();
+    let digest = match output {
+        TimedWorkloadOutput::Complete(output) => output.semantic_digest(),
+        TimedWorkloadOutput::PopcountChecksum(checksum) => {
+            let fixture = popcount_fixture
+                .as_ref()
+                .ok_or(WorkerError::MissingPopcountFixture)?;
+            let final_bit = fixture
+                .bits
+                .get(POPCOUNT_TOGGLE_BIT)
+                .ok_or(WorkerError::MissingPopcountToggleBit)?;
+            semantic_digest(popcount_output_digest(
+                checksum,
+                args.iterations.get(),
+                args.work_items.get(),
+                fixture.input_digest,
+                final_bit,
+            ))
+        }
+    };
     let row = WorkerMeasurement {
         schema_version: PROTOCOL_SCHEMA_VERSION,
         implementation: Implementation::Stab,
@@ -309,6 +360,11 @@ enum WorkloadOutput {
     CanonicalCircuitText(String),
 }
 
+enum TimedWorkloadOutput {
+    Complete(WorkloadOutput),
+    PopcountChecksum(u64),
+}
+
 impl WorkloadOutput {
     fn semantic_digest(self) -> String {
         match self {
@@ -325,6 +381,14 @@ impl WorkloadOutput {
 fn canonical_circuit_digest(canonical: &str) -> String {
     let canonical = canonical.strip_suffix('\n').unwrap_or(canonical);
     semantic_digest(byte_digest(canonical.as_bytes()))
+}
+
+fn measure_workload<T>(
+    operation: impl FnOnce() -> Result<T, WorkerError>,
+) -> Result<(T, f64), WorkerError> {
+    let started = Instant::now();
+    let output = operation()?;
+    Ok((output, started.elapsed().as_secs_f64()))
 }
 
 fn circuit_parse_fixture(work_items: u64) -> Result<String, WorkerError> {
@@ -492,31 +556,37 @@ fn splitmix64_word(index: u64) -> u64 {
 
 fn simd_word_popcount(
     iterations: u64,
-    work_items: u64,
     fixture: &mut PopcountFixture,
-) -> Result<[u64; 4], WorkerError> {
-    let mut toggled = fixture
-        .bits
-        .get(POPCOUNT_TOGGLE_BIT)
-        .ok_or(WorkerError::MissingPopcountToggleBit)?;
+    toggle_state: &mut bool,
+) -> Result<u64, WorkerError> {
     let mut checksum = 0_u64;
     for _ in 0..iterations {
         compiler_fence(Ordering::SeqCst);
-        toggled = !toggled;
-        fixture.bits.set(POPCOUNT_TOGGLE_BIT, toggled)?;
+        *toggle_state = !*toggle_state;
+        fixture.bits.set(POPCOUNT_TOGGLE_BIT, *toggle_state)?;
         let count =
             u64::try_from(fixture.bits.popcount()).map_err(|_| WorkerError::PopcountResultRange)?;
         checksum = checksum.wrapping_add(count);
     }
-    let final_bit = fixture
-        .bits
-        .get(POPCOUNT_TOGGLE_BIT)
-        .ok_or(WorkerError::MissingPopcountToggleBit)?;
-    Ok([
+    Ok(checksum)
+}
+
+fn popcount_output_digest(
+    checksum: u64,
+    iterations: u64,
+    work_items: u64,
+    input_digest: [u64; 4],
+    final_bit: bool,
+) -> [u64; 4] {
+    byte_digest_words(&[
         checksum,
         iterations,
         work_items,
-        fixture.input_digest[0] ^ u64::from(final_bit),
+        input_digest[0],
+        input_digest[1],
+        input_digest[2],
+        input_digest[3],
+        u64::from(final_bit),
     ])
 }
 
@@ -770,8 +840,8 @@ mod tests {
     }
 
     #[test]
-    fn simd_word_popcount_fixture_binds_exact_scales_and_output() {
-        let mut small = popcount_fixture(4_096).expect("small fixture");
+    fn simd_word_popcount_fixture_binds_exact_scales() {
+        let small = popcount_fixture(4_096).expect("small fixture");
         let medium = popcount_fixture(262_144).expect("medium fixture");
         let large = popcount_fixture(16_777_216).expect("large fixture");
         assert_eq!(small.input_bytes, 512);
@@ -789,19 +859,84 @@ mod tests {
             semantic_digest(large.input_digest),
             "b1e7afd7d73691441ea033a9eb9496d02fa12bc4d3bcf059856c089112dae368"
         );
+    }
 
-        let initial_count = small.bits.popcount() as u64;
-        let initial_bit = small.bits.get(POPCOUNT_TOGGLE_BIT).expect("toggle bit");
-        let once = simd_word_popcount(1, 4_096, &mut small).expect("popcount workload");
+    #[test]
+    fn simd_word_popcount_accumulates_and_binds_odd_and_even_final_state() {
+        let mut odd = popcount_fixture(4_096).expect("odd fixture");
+        let initial_count = odd.bits.popcount() as u64;
+        let initial_bit = odd.bits.get(POPCOUNT_TOGGLE_BIT).expect("toggle bit");
         let expected_count = if initial_bit {
             initial_count - 1
         } else {
             initial_count + 1
         };
-        assert_eq!(once[0], expected_count);
-        assert_eq!(once[1], 1);
-        assert_eq!(once[2], 4_096);
-        assert_eq!(once[3], small.input_digest[0] ^ u64::from(!initial_bit));
+        let mut odd_toggle = initial_bit;
+        let odd_checksum =
+            simd_word_popcount(1, &mut odd, &mut odd_toggle).expect("odd popcount workload");
+        let odd_final = odd.bits.get(POPCOUNT_TOGGLE_BIT).expect("odd final bit");
+        assert_eq!(odd_checksum, expected_count);
+        assert_eq!(odd_toggle, !initial_bit);
+        assert_eq!(odd_final, odd_toggle);
+        assert_eq!(
+            semantic_digest(popcount_output_digest(
+                odd_checksum,
+                1,
+                4_096,
+                odd.input_digest,
+                odd_final,
+            )),
+            "b7c42176f3f0246013376d1d65756b9b6092f0aed397cb2afefd29eba663acf9"
+        );
+
+        let mut even = popcount_fixture(4_096).expect("even fixture");
+        let mut even_toggle = initial_bit;
+        let even_checksum =
+            simd_word_popcount(2, &mut even, &mut even_toggle).expect("even popcount workload");
+        let even_final = even.bits.get(POPCOUNT_TOGGLE_BIT).expect("even final bit");
+        assert_eq!(even_checksum, expected_count + initial_count);
+        assert_eq!(even_toggle, initial_bit);
+        assert_eq!(even_final, even_toggle);
+        assert_eq!(
+            semantic_digest(popcount_output_digest(
+                even_checksum,
+                2,
+                4_096,
+                even.input_digest,
+                even_final,
+            )),
+            "b29b34efb75f68c6c751edd91d96fecacef5d5032644a76bb36973ca427ea649"
+        );
+    }
+
+    #[test]
+    fn simd_word_popcount_constructs_and_executes_the_accepted_maximum() {
+        let mut maximum = popcount_fixture(POPCOUNT_MAX_BITS).expect("maximum fixture");
+        assert_eq!(maximum.input_bytes, POPCOUNT_MAX_BITS / 8);
+        assert_eq!(
+            semantic_digest(maximum.input_digest),
+            "cf5061f39d456d884fbdbcebfc53e04c47c29c872830a6a424f55d2e1e3d8ab4"
+        );
+        let initial_bit = maximum
+            .bits
+            .get(POPCOUNT_TOGGLE_BIT)
+            .expect("maximum toggle bit");
+        let mut toggle_state = initial_bit;
+        let checksum = simd_word_popcount(1, &mut maximum, &mut toggle_state)
+            .expect("maximum popcount workload");
+        assert!(checksum > 0);
+        assert_eq!(toggle_state, !initial_bit);
+        assert_eq!(maximum.bits.get(POPCOUNT_TOGGLE_BIT), Some(toggle_state));
+        assert_eq!(
+            semantic_digest(popcount_output_digest(
+                checksum,
+                1,
+                POPCOUNT_MAX_BITS,
+                maximum.input_digest,
+                toggle_state,
+            )),
+            "72b158a2870c2bca123553e5aca970f39107a3c7448bdbdda1512a9bcdfa33aa"
+        );
     }
 
     #[test]
@@ -814,10 +949,6 @@ mod tests {
             popcount_fixture(513),
             Err(WorkerError::PopcountWidthAlignment { .. })
         ));
-        assert_eq!(
-            validate_popcount_width(POPCOUNT_MAX_BITS).expect("maximum width"),
-            usize::try_from(POPCOUNT_MAX_BITS / u64::BITS as u64).expect("host width")
-        );
         assert!(matches!(
             popcount_fixture(POPCOUNT_MAX_BITS + POPCOUNT_ALIGNMENT_BITS),
             Err(WorkerError::PopcountWidthLimit { .. })

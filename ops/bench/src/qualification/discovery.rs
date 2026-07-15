@@ -378,6 +378,7 @@ pub(super) fn generate(
                     "Both workers black-box equal semantic work and an untimed output digest."
                         .to_string()
                 },
+                comparator_sources: Vec::new(),
             },
             timing_policy: default_timing_policy(),
             memory_policy: MemoryPolicy {
@@ -397,7 +398,7 @@ pub(super) fn generate(
             owner: owner(feature_id).to_string(),
             status: QualificationStatus::Planned,
         };
-        graduation::apply(&mut group);
+        graduation::apply(root, &mut group)?;
         groups.push(group);
     }
     groups.push(resource_boundary_group());
@@ -554,6 +555,7 @@ fn resource_boundary_group() -> QualificationGroup {
             digest_state: EvidenceState::Planned,
             sink_policy: "Resource evidence is reported per contract and scale; heterogeneous contracts never produce an aggregate timing ratio."
                 .to_string(),
+            comparator_sources: Vec::new(),
         },
         timing_policy: default_timing_policy(),
         memory_policy: MemoryPolicy {
@@ -655,6 +657,7 @@ fn checklist_qualification_group(item: &RawChecklistItem, feature: &str) -> Qual
                 "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
                     .to_string()
             },
+            comparator_sources: Vec::new(),
         },
         timing_policy: default_timing_policy(),
         memory_policy: MemoryPolicy {
