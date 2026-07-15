@@ -460,7 +460,7 @@ Make faithful comparison, calibration, statistics, and reporting reusable before
 
 ## PQ2: Qualify Models, Formats, Gates, Kernels, And Algebra
 
-Status: Active as of 2026-07-16. All 271 selected CQ2 parents have complete exact ownership. Three exact runtime groups are implemented. Parser and canonical printing have historical passing controlled-host evidence under preceding inventories, while gate-name hashing awaits clean exact CQ, full, and soak execution under the current inventories. The remaining model, format, kernel, and algebra groups are still planned.
+Status: Active as of 2026-07-16. All 271 selected CQ2 parents have complete exact ownership. Three exact runtime groups are implemented. Parser and canonical printing have historical passing controlled-host evidence under preceding inventories, while gate-name hashing has clean current-digest exact CQ, full, and soak AArch64 evidence plus replayed scale-family rollups from revision `c76b7071fc4d7ac358ef3a2fffc053ea675bd05f`. The remaining model, format, kernel, and algebra groups are still planned.
 
 ### Objective
 

@@ -102,6 +102,8 @@ Milestone audit found three issues before evidence: the exact CQ owner also asse
 
 The GPT-5.6/max full-code-review pass found one stale 59-parent gate count in the CQ2 progress narrative. That narrative now records the exact new parent and 60-parent total. The closure review reported no remaining P0 through P2 finding. No threshold, comparator, output obligation, evidence count, or acceptance rule was relaxed.
 
+A final evidence audit then found that the PQ2 section-level status still described gate-hash execution as pending even though the same plan recorded this completed evidence. The status now names the clean `c76b7071fc4d7ac358ef3a2fffc053ea675bd05f` AArch64 evidence and rollups. This documentation-only P2 finding is closed; no executable contract or result changed.
+
 ## Remaining Work
 
 1. Produce the same clean full and soak scale families and rollups on a controlled native Linux x86-64 host. No x86-64 timing conclusion is claimed.
