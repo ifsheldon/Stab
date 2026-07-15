@@ -53,7 +53,7 @@
       "owner": "stab-core/circuit-parser",
       "profiler_note": {
         "path": "benchmarks/profiler-notes/qualification/perfq-m4-circuit-parse.md",
-        "sha256": "d00dc949e4ba4d106505b15e829e7de4538a4cfff64504e9074f96a56261320b"
+        "sha256": "b37614a9843164d782c035d20f659fbf11be310c310caa4715a42ef792654a6b"
       }
     }
   ]

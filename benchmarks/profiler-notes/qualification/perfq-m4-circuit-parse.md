@@ -10,9 +10,17 @@ Allocation and phase instrumentation narrowed the qualification cycle without ch
 
 ## Implemented Optimization
 
-Commit `f99861fe9ea0da05c3bf437c2ab5e3179793396d` adds allocation-free exact fast paths for the qualification cycle's common plain instructions while preserving the generic parser for aliases, decorations, unusual whitespace, multiple targets, arguments, and errors. The single-record detector path still delegates record-target validation to `Target::from_str`, so record-offset semantics remain centralized. Focused regressions prove exact and fallback equivalence, Unicode-whitespace fallback, invalid detector-target rejection, and the one-allocation qualification-cycle contract. They also preserve Stim v1.16's text-parser-only `rec[-0]` behavior while proving that detection conversion, DEM analysis, and sampler compilation reject zero lookback through controlled domain errors.
+Commit `f99861fe9ea0da05c3bf437c2ab5e3179793396d` adds allocation-free exact fast paths for the qualification cycle's common plain instructions while preserving the generic parser for aliases, decorations, unusual whitespace, multiple targets, arguments, and errors. The single-record detector path still delegates record-target validation to `Target::from_str`, so record-offset semantics remain centralized. Focused regressions prove exact and fully generic equivalence, Unicode-whitespace fallback, invalid detector-target rejection, and the one-allocation qualification-cycle contract.
 
-A clean PR-tier diagnostic produced before this note changed measured a small-scale median ratio of `0.961658x` with an upper bootstrap bound of `0.968127x`. That report is optimization guidance only because it binds the preceding profiler-note digest. It is not promotable evidence for this revised source contract.
+Full review then found that pinned Stim preserves a distinct parsed `rec[-0]` target and applies context-specific semantics after parsing. Commit `efd1c1299f1d407b574ec49cfb34a0b5305805d7` represents that state separately from publicly constructible nonzero lookbacks. Parsing and printing preserve `rec[-0]`; exact and folded error analysis retain detector and observable declarations while treating the future-record term as unused; analyzer feedback treats it as having no effect; flow generation, missing-detector analysis, detecting regions, and selected inverse-QEC packets match direct pinned probes. Detection conversion and sampling still reject it through controlled domain errors. Feedback inlining preserves an untouched declaration but rejects a rewrite that would synthesize a zero lookback, matching the pinned C++ constructor boundary. Two exact CLI oracle fixtures and focused core regressions own these behaviors.
+
+The clean revision `788cef289da40361608746d681e3d74761d13d2c` produced three useful pre-review diagnostics against the previous correctness inventory and profiler-note digest. They are optimization guidance only and are not promotable after the reviewed semantic fix or the current inventory refresh.
+
+| Scale | Tier | Median ratio | Bootstrap 95% interval | Outcome |
+| --- | --- | ---: | --- | --- |
+| 64 instructions | Full | 0.970288 | [0.952965, 0.972032] | Passed diagnostically |
+| 64 instructions | Soak | 0.967460 | [0.960886, 0.968714] | Passed diagnostically |
+| 4,096 instructions | Full | 0.941616 | [0.935564, 0.948273] | Passed diagnostically |
 
 ## Historical Clean Evidence
 
@@ -39,4 +47,4 @@ The large-scale regression is materially worse than the small and medium results
 
 The large fixture uses slightly less peak RSS in Stab despite the larger timing deficit. Peak RSS therefore does not support blaming the large-scale slowdown on retained circuit size alone.
 
-Next owner action: regenerate exact correctness preflight, private-worker reproducibility, one full and one soak report at all three scales, regression checks, and architecture-scoped rollups from one clean commit that binds this note. Preserve every failed or noisy outcome instead of promoting the diagnostic PR result. Native x86-64 evidence remains independent of AArch64 evidence.
+Next owner action: regenerate exact correctness preflight, private-worker reproducibility, one full and one soak report at all three scales, regression checks, and architecture-scoped rollups from one clean commit that binds correctness inventory `4d9faa21e318eeebc4614c7bf62491bb2db73b5db57ae3dab7d0f19f3fda7cad`, performance inventory `9687d45fa57b97388e7a8c7b1676f2545619ff3185c19aa714583b25d1680924`, and this note. Preserve every failed or noisy outcome instead of promoting the diagnostic results. Native x86-64 evidence remains independent of AArch64 evidence.
