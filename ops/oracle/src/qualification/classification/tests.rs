@@ -663,7 +663,6 @@ fn classifications_split_pauli_and_clifford_semantics_from_language_helpers() {
     let pauli = Path::new("src/stim/stabilizers/pauli_string.test.cc");
     for symbol in [
         "pauli_string.multiplication_64",
-        "pauli_string.after_tableau_128",
         "PauliString.pauli_xyz_to_xz",
     ] {
         let classified = classify_upstream_case(pauli, symbol);
@@ -674,6 +673,9 @@ fn classifications_split_pauli_and_clifford_semantics_from_language_helpers() {
         "pauli_string.gather_64",
         "pauli_string.before_circuit_128",
         "pauli_string.ensure_num_qubits_256",
+        "pauli_string.after_tableau_128",
+        "pauli_string.before_tableau_128",
+        "pauli_string.left_mul_pauli_64",
     ] {
         assert_eq!(
             classify_upstream_case(pauli, symbol).disposition,
@@ -734,6 +736,13 @@ fn classifications_split_tableau_semantics_from_unselected_products() {
         classify_upstream_case(python, "test_append").deferred_product,
         Some(DeferredProduct::PythonBindings)
     );
+    for symbol in ["test_from_conjugated_generators", "test_to_stabilizers"] {
+        assert_eq!(
+            classify_upstream_case(python, symbol).deferred_product,
+            Some(DeferredProduct::PythonBindings),
+            "symbol={symbol}"
+        );
+    }
     assert_eq!(
         classify_upstream_case(python, "test_from_state_vector_fuzz").deferred_product,
         Some(DeferredProduct::InteractiveSimulators)
@@ -755,6 +764,10 @@ fn classifications_bound_util_top_algebra_to_selected_conversion_direction() {
     let amplitudes = Path::new("src/stim/util_top/stabilizers_vs_amplitudes.test.cc");
     assert_eq!(
         classify_upstream_case(amplitudes, "conversions.unitary_to_tableau_fail_64").feature_ids,
+        vec![FeatureId::Algebra]
+    );
+    assert_eq!(
+        classify_upstream_case(amplitudes, "conversions.unitary_vs_tableau_basic_64").feature_ids,
         vec![FeatureId::Algebra]
     );
     assert_eq!(

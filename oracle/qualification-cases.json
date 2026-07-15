@@ -5910,9 +5910,3362 @@
         { "path": "src/stim/gen/circuit_gen_params.test.cc", "symbol": "circuit_gen_params.append_measure_reset" }
       ],
       "oracle_fixture_owners": ["coverage-gen-param-measure-reset"]
+    },
+    {
+      "id": "cq2-algebra-pauli-value-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "all-basis-pairs",
+        "all-phase-and-sign-variants"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_values",
+          "cq2_algebra_pauli_value_types_have_complete_scalar_contract",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The complete scalar table uses fixed-size enum values and no input-sized allocation."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/pauli_string.test.cc",
+          "symbol": "PauliString.pauli_xyz_to_xz"
+        },
+        {
+          "path": "src/stim/stabilizers/pauli_string.test.cc",
+          "symbol": "PauliString.pauli_xz_to_xyz"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/pauli_string.test.cc",
+          "symbol_base": "pauli_string.left_mul_pauli_mul_table",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/pauli_string.test.cc",
+          "symbol_base": "pauli_string.right_mul_pauli_mul_table",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliBasis"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliBasis::from_xz"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliBasis::log_i_scalar_byproduct"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliBasis::multiply"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliBasis::x_bit"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliBasis::z_bit"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliPhase"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliPhase::is_imaginary"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliPhase::is_negative"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliPhase::is_real"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliPhase::sign"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliSign"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliSign::is_negative"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliBasis"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliBasis::from_xz"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliBasis::log_i_scalar_byproduct"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliBasis::multiply"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliBasis::x_bit"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliBasis::z_bit"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliPhase"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliPhase::is_imaginary"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliPhase::is_negative"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliPhase::is_real"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliPhase::sign"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliSign"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliSign::is_negative"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-pauli-owned-value-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_values",
+          "cq2_algebra_pauli_owned_value_contract_is_typed_and_canonical",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "negative_axes": [
+        "empty-value",
+        "canonical-I-spelling",
+        "typed-invalid-character",
+        "out-of-range-mutation-is-atomic",
+        "word-backed-access"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/pauli_string_pybind_test.py",
+          "symbol": "test_identity"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/pauli_string.test.cc",
+          "symbol_base": "pauli_string.equality",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/pauli_string.test.cc",
+          "symbol_base": "pauli_string.identity",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/pauli_string.test.cc",
+          "symbol_base": "pauli_string.sparse_str",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/pauli_string.test.cc",
+          "symbol_base": "pauli_string.str",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-stabilizers-pauli-string"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::from_bases"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::get"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::identity"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::is_empty"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::len"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::phase"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::set"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::sign"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::sparse_string"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::x_bits"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::z_bits"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::from_bases"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::get"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::identity"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::is_empty"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::len"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::phase"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::set"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::sign"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::sparse_string"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::x_bits"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::z_bits"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-pauli-scalar-product-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "identity-and-noncommuting-pairs",
+        "multi-qubit-phase-accumulation"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_pauli_scalar_byproduct_table_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes fixed Pauli products across the claimed scalar-product axes; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/pauli_string.test.cc",
+          "symbol_base": "pauli_string.log_i_scalar_byproduct",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::log_i_scalar_byproduct"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::log_i_scalar_byproduct"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-pauli-multiplication-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "real-and-imaginary-products",
+        "signed-products"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_pauli_multiplication_tracks_real_and_imaginary_phases",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/pauli_string.test.cc",
+          "symbol_base": "pauli_string.multiplication",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::multiply"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::multiply_real"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::right_multiply_in_place_returning_log_i_scalar"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::multiply"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::multiply_real"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::right_multiply_in_place_returning_log_i_scalar"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-pauli-commutation-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "different-length-inputs",
+        "sign-insensitivity"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_pauli_commutation_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes fixed Pauli pairs across the claimed commutation axes; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/pauli_string_pybind_test.py",
+          "symbol": "test_commutes"
+        },
+        {
+          "path": "src/stim/stabilizers/pauli_string_pybind_test.py",
+          "symbol": "test_commutes_different_lengths"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/pauli_string.test.cc",
+          "symbol_base": "pauli_string.commutes",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::commutes"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::commutes"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-pauli-random-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "semantic-invariant",
+      "negative_axes": [
+        "empty-and-nonempty-widths",
+        "seed-repeatability"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_pauli_random_hook_is_seeded_and_well_formed",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/pauli_string_pybind_test.py",
+          "symbol": "test_random"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::random"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::randomize"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::random"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::randomize"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-pauli-iterator-order-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "zero-weight",
+        "full-weight",
+        "mixed-weight-order"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_pauli_string_iter_small_cases_match_stim_order",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The case checks deterministic restartable search state at small exact sizes; constructor limits and first rejection are owned by the source-owned Algebra resource-admission parents."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/pauli_string_iter.test.cc",
+          "symbol_base": "pauli_string_iter.small_cases",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-stabilizers-pauli-string-iter"
+      ]
+    },
+    {
+      "id": "cq2-algebra-pauli-iterator-api-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "borrowed-and-owned-iteration",
+        "clone-and-restart"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_tableau",
+          "cq2_algebra_pauli_iterator_state_contract_is_restartable_and_typed",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The case checks deterministic restartable search state at small exact sizes; constructor limits and first rejection are owned by the source-owned Algebra resource-admission parents."
+      },
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliStringIterator"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliStringIterator::iter_next"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliStringIterator::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliStringIterator::restart"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliStringIterator::result"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliStringIterator"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliStringIterator::iter_next"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliStringIterator::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliStringIterator::restart"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliStringIterator::result"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-flex-pauli-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_values",
+          "cq2_algebra_flex_pauli_contract_tracks_all_four_phases",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "negative_axes": [
+        "all-four-phases",
+        "dense-and-sparse-text",
+        "imaginary-to-real-rejection",
+        "typed-invalid-character"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/pauli_string_pybind_test.py",
+          "symbol": "test_from_str"
+        },
+        {
+          "path": "src/stim/stabilizers/pauli_string_pybind_test.py",
+          "symbol": "test_str"
+        },
+        {
+          "path": "src/stim/stabilizers/flex_pauli_string.test.cc",
+          "symbol": "flex_pauli_string.from_text"
+        },
+        {
+          "path": "src/stim/stabilizers/flex_pauli_string.test.cc",
+          "symbol": "flex_pauli_string.mul"
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-stabilizers-flex-pauli-string"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlexPauliString"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlexPauliString::from_phase_and_bases"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlexPauliString::get"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlexPauliString::identity"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlexPauliString::is_empty"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlexPauliString::len"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlexPauliString::multiply"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlexPauliString::phase"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlexPauliString::try_into_real"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlexPauliString::value"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlexPauliString"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlexPauliString::from_phase_and_bases"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlexPauliString::get"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlexPauliString::identity"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlexPauliString::is_empty"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlexPauliString::len"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlexPauliString::multiply"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlexPauliString::phase"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlexPauliString::try_into_real"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlexPauliString::value"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-single-qubit-clifford-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "all-24-elements",
+        "invalid-two-qubit-gate",
+        "unique-canonical-names-and-tokens"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_values",
+          "cq2_algebra_single_qubit_clifford_contract_covers_values_and_names",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The complete scalar table uses fixed-size enum values and no input-sized allocation."
+      },
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::SingleQubitClifford"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::SingleQubitClifford::all"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::SingleQubitClifford::canonical_name"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::SingleQubitClifford::from_gate"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::SingleQubitClifford::token"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::SingleQubitClifford"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::SingleQubitClifford::all"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::SingleQubitClifford::canonical_name"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::SingleQubitClifford::from_gate"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::SingleQubitClifford::token"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-clifford-string-api-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_values",
+          "cq2_algebra_clifford_string_contract_covers_growth_and_composition",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "negative_axes": [
+        "empty-value",
+        "out-of-range-mutation-is-atomic",
+        "zero-repeat",
+        "right-extension",
+        "seeded-randomization"
+      ],
+      "oracle_fixture_owners": [
+        "coverage-stabilizers-clifford-string"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::concat"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::from_gates"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::gate_at"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::identity"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::is_empty"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::len"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::multiply"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::random"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::randomize"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::repeat"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::right_multiply_in_place"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CliffordString::set_gate_at"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::concat"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::from_gates"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::gate_at"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::identity"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::is_empty"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::len"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::multiply"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::random"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::randomize"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::repeat"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::right_multiply_in_place"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CliffordString::set_gate_at"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-clifford-string-text-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "canonical",
+      "negative_axes": [
+        "all-24-canonical-tokens",
+        "out-of-range-read"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_clifford_string_set_gate_at_vs_str_vs_gate_at_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/clifford_string_pybind_test.py",
+          "symbol": "test_all_cliffords_string"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/clifford_string.test.cc",
+          "symbol_base": "clifford_string.set_gate_at_vs_str_vs_gate_at",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-clifford-string-identity-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "nontrivial-identity-products",
+        "composition-order"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_clifford_string_known_identities_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes fixed Clifford strings across the claimed identity and composition axes; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/clifford_string.test.cc",
+          "symbol_base": "clifford_string.known_identities",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-clifford-group-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "semantic-invariant",
+      "negative_axes": [
+        "all-group-triples",
+        "tableau-consistent-products"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_single_qubit_clifford_multiplication_is_associative",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The complete scalar table uses fixed-size enum values and no input-sized allocation."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/clifford_string.test.cc",
+          "symbol_base": "clifford_string.multiplication_table_vs_tableau_multiplication",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::SingleQubitClifford::multiply"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::SingleQubitClifford::multiply"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-clifford-random-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "semantic-invariant",
+      "negative_axes": [
+        "all-24-outcomes",
+        "seeded-distribution"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_clifford_random_hook_covers_single_qubit_cliffords",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/clifford_string_pybind_test.py",
+          "symbol": "test_random"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/clifford_string.test.cc",
+          "symbol_base": "clifford_string.random",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::SingleQubitClifford::random"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::SingleQubitClifford::random"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-flow-value-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "canonical",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_values",
+          "cq2_algebra_flow_value_contract_canonicalizes_and_reports_typed_errors",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "negative_axes": [
+        "duplicate-classical-terms",
+        "absolute-and-relative-measurements",
+        "observable-order",
+        "anti-Hermitian-text",
+        "anticommuting-product",
+        "invalid-text-preservation"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/flow_pybind_test.py",
+          "symbol": "test_flow_canonicalization"
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-stabilizers-flow"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Flow"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Flow::input"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Flow::measurements"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Flow::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Flow::observables"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Flow::output"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlowMeasurementIndex"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlowMeasurementIndex::get"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::FlowMeasurementIndex::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Flow"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Flow::input"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Flow::measurements"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Flow::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Flow::observables"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Flow::output"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlowMeasurementIndex"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlowMeasurementIndex::get"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::FlowMeasurementIndex::new"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-flow-multiplication-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "canonical",
+      "negative_axes": [
+        "measurement-and-observable-symmetric-difference",
+        "pauli-phase-transfer",
+        "left-input-sign-retention",
+        "right-input-and-output-signs",
+        "anticommuting-product-rejection"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizer_flows",
+          "stabilizers_flow_multiplication_matches_stim_examples",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case multiplies fixed representative flows; the source-owned Flow classical-term resource parent owns maximum accepted aggregate terms, cancellation at the limit, and first rejection."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/flow_pybind_test.py",
+          "symbol": "test_flow_multiplication"
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Flow::multiply"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Flow::multiply"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-flow-parse-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "canonical",
+      "negative_axes": [
+        "dense-and-sparse-paulis",
+        "absolute-and-relative-records",
+        "malformed-arrow-and-empty-sides",
+        "invalid-record-and-observable-tokens",
+        "Pauli-after-classical-term-rejection"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizer_flows",
+          "stabilizers_flow_from_str_matches_stim_examples",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/flow.test.cc",
+          "symbol_base": "stabilizer_flow.from_str",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-flow-deduplication-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "canonical",
+      "negative_axes": [
+        "odd-and-even-duplicate-parity"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizer_flows",
+          "stabilizers_flow_from_str_canonicalizes_duplicate_terms",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/flow.test.cc",
+          "symbol_base": "stabilizer_flow.from_str_dedupe",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-flow-observable-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "canonical",
+      "negative_axes": [
+        "interleaved-observable-and-measurement-terms"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizer_flows",
+          "stabilizers_flow_observable_terms_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/flow.test.cc",
+          "symbol_base": "stabilizer_flow.from_str_obs",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-flow-display-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "canonical",
+      "negative_axes": [
+        "dense-and-sparse-round-trip",
+        "identity-terms"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizer_flows",
+          "stabilizers_flow_display_and_sparse_round_trip_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/flow.test.cc",
+          "symbol_base": "stabilizer_flow.str_and_from_str",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-flow-order-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "input-output-measurement-and-sign-order"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizer_flows",
+          "stabilizers_flow_ordering_matches_stim_examples",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes fixed flow terms across the claimed ordering axes; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/flow.test.cc",
+          "symbol_base": "stabilizer_flow.ordering",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-error-resource-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_values",
+          "cq2_algebra_error_and_resource_contract_is_exhaustive",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "constant-scratch",
+        "detail": "The complete scalar table uses fixed-size enum values and no input-sized allocation."
+      },
+      "negative_axes": [
+        "all-error-variants",
+        "exact-error-text",
+        "transparent-bit-conversion",
+        "all-resource-limits"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::StabilizerError"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::StabilizerResource"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::StabilizerResource::limit"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::StabilizerResult"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::StabilizerError"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::StabilizerResource"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::StabilizerResource::limit"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::StabilizerResult"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-resource-pauli-materialization",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "resource",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_resources",
+          "cq2_algebra_pauli_materialization_has_a_typed_first_rejection",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact boundary case proves the maximum accepted Pauli width, typed first rejection across constructors and parsers, bounded iterator consumption, and rejection before caller-owned RNG use."
+      },
+      "negative_axes": [
+        "maximum-accepted-width",
+        "first-rejected-width",
+        "bounded-iterator-consumption",
+        "parse-width-rejection",
+        "rng-unchanged-on-rejection"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-algebra-resource-clifford-growth",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "resource",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_resources",
+          "cq2_algebra_clifford_growth_rejects_limits_and_overflow",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact boundary case proves Clifford construction, concatenation, and repetition limits, checked size overflow, empty repetition behavior, bounded iterator consumption, and rejection before caller-owned RNG use."
+      },
+      "negative_axes": [
+        "first-rejected-width",
+        "concatenation-growth-limit",
+        "repetition-growth-limit",
+        "size-overflow",
+        "empty-overflow-exemption",
+        "rng-unchanged-on-rejection"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-algebra-resource-flow-classical-terms",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "resource",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_resources",
+          "cq2_algebra_flow_terms_have_an_aggregate_typed_limit",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact boundary case proves the maximum aggregate measurement-and-observable term count, first rejection across iterator streams and text parsing, and first-extra-item iterator consumption."
+      },
+      "negative_axes": [
+        "maximum-accepted-term-count",
+        "measurement-observable-aggregate-limit",
+        "first-rejected-term-count",
+        "first-extra-item-consumption",
+        "text-parse-term-limit",
+        "multiply-overlap-cancellation",
+        "multiply-disjoint-result-limit"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-algebra-resource-tableau-admission",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "resource",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_resources",
+          "cq2_algebra_tableau_admission_precedes_materialization_and_rng_use",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact boundary case proves accepted dense Tableau width, first rejection for identity and Pauli conversion, the separate random-Tableau algorithmic limit, and rejection before caller-owned RNG use."
+      },
+      "negative_axes": [
+        "maximum-accepted-dense-width",
+        "first-rejected-dense-width",
+        "pauli-conversion-width",
+        "random-tableau-limit",
+        "rng-unchanged-on-rejection"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-algebra-resource-circuit-and-flow-admission",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "resource",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_resources",
+          "cq2_algebra_circuit_tableau_and_flow_generation_admit_limits_before_dense_work",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact boundary case proves the maximum circuit-to-Tableau and ignored-only flow-generator widths are accepted, then uses allocation counters to prove each first rejection occurs with constant-size error allocation before dense algebra state."
+      },
+      "negative_axes": [
+        "circuit-tableau-maximum-acceptance",
+        "circuit-tableau-first-rejection",
+        "flow-generator-maximum-acceptance",
+        "flow-generator-first-rejection",
+        "constant-allocation-before-dense-work"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-algebra-resource-circuit-tableau-repeat-work",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "resource",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_resources",
+          "cq2_algebra_circuit_tableau_repeat_work_is_logarithmic_and_bounded",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "Exact folded-versus-unrolled and nested trillion-count regressions prove logarithmic compact-repeat conversion, while a width-weighted aggregate budget proves the last accepted work request and first rejection for hostile nested repeats."
+      },
+      "negative_axes": [
+        "folded-versus-unrolled-noncommuting-body",
+        "trillion-count-repeat",
+        "nested-trillion-count-repeat",
+        "exact-odd-parity-result",
+        "maximum-accepted-width-weighted-work",
+        "first-rejected-width-weighted-work"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-algebra-resource-iterators-and-solver",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "resource",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_resources",
+          "cq2_algebra_iterators_and_stabilizer_solver_fail_at_owned_boundaries",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The exact boundary case proves Pauli, commuting-Pauli, and Tableau iterator constructor limits plus stabilizer-solver first rejection at its owned width."
+      },
+      "negative_axes": [
+        "pauli-iterator-first-rejection",
+        "commuting-iterator-zero-width",
+        "commuting-iterator-excess-width",
+        "tableau-iterator-excess-width",
+        "solver-first-rejection"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-algebra-resource-unitary-admission",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "resource",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_resources",
+          "cq2_algebra_unitary_dimension_limit_precedes_shape_and_numeric_work",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The exact boundary case proves an oversized malformed unitary is rejected by the dimension admission check before shape traversal or numeric Clifford analysis."
+      },
+      "negative_axes": [
+        "oversized-malformed-matrix",
+        "dimension-before-shape-validation",
+        "dimension-before-numeric-work"
+      ],
+      "standalone": true
+    },
+    {
+      "id": "cq2-algebra-tableau-access-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "semantic-invariant",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_tableau",
+          "cq2_algebra_tableau_access_and_value_contract_is_exact",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "negative_axes": [
+        "empty-tableau",
+        "all-xyz-accessors",
+        "input-and-output-index-errors",
+        "length-errors",
+        "non-Pauli-product",
+        "exact-Pauli-product-Tableau-signs",
+        "invalid-generator-invariants",
+        "signed-canonical-text",
+        "500-qubit-word-boundary"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/pauli_string_pybind_test.py",
+          "symbol": "test_to_tableau"
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_identity"
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_init_equality"
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_pauli_output"
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_signs"
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_str"
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_to_pauli_string"
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_xyz_output_pauli"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.big_not_seeing_double",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.check_invariants",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.equality",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.eval_y",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.from_pauli_string",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.gate1",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.identity",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.pauli_access_methods",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.str",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.to_pauli_string",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-stabilizers-tableau"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::from_pauli_string"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::gate1"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::gate2"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::identity"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::is_empty"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::len"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::satisfies_invariants"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::to_pauli_string"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::x_output"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::x_output_pauli_xyz"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::y_output"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::y_output_pauli_xyz"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::z_output"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::z_output_pauli_xyz"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::from_pauli_string"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::gate1"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::gate2"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::identity"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::is_empty"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::len"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::satisfies_invariants"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::to_pauli_string"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::x_output"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::x_output_pauli_xyz"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::y_output"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::y_output_pauli_xyz"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::z_output"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::z_output_pauli_xyz"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-tableau-apply-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "X-Y-Z-inputs",
+        "signed-inputs"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_tableau_eval_matches_stim_examples",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.eval",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::apply"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::apply"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-tableau-composition-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "empty-composition",
+        "composition-order",
+        "random-Pauli-action-equivalence",
+        "length-mismatch",
+        "Pauli-product-round-trip"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_tableau_then_and_pauli_product_round_trip_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_composition"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.then",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::then"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::then"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-tableau-inverse-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "all-known-gate-inverses",
+        "forward-output-preimages",
+        "sign-skipping-inverse",
+        "word-boundary-padding"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers_vs_amplitudes",
+          "tableau_inverse_matches_all_known_gate_data_and_word_boundary",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_inverse"
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_inverse_xyz_output"
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_inverse_xyz_output_pauli"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.inverse",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.inverse_data",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.inverse_pauli_string_acces_methods",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.inverse_not_confused_by_size_padding",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::inverse"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::inverse_skipping_signs"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::inverse"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::inverse_skipping_signs"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-tableau-random-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "semantic-invariant",
+      "negative_axes": [
+        "zero-one-two-three-and-thirty-qubit-invariants",
+        "twenty-trials-per-upstream-size",
+        "seed-repeatability"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_tableau_random_hook_is_seeded_and_preserves_invariants",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_random"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.random",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Tableau::random"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::Tableau::random"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-commuting-iterator-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "one-two-and-four-qubit-ordering",
+        "valid-and-invalid-constraint-widths",
+        "same-constraint-restart",
+        "contradictory-constraints"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_tableau",
+          "cq2_algebra_commuting_iterator_state_contract_is_restartable_and_typed",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The case checks deterministic restartable search state at small exact sizes; constructor limits and first rejection are owned by the source-owned Algebra resource-admission parents."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/tableau_iter.test.cc",
+          "symbol_base": "tableau_iter.CommutingPauliStringIterator_1",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_iter.test.cc",
+          "symbol_base": "tableau_iter.CommutingPauliStringIterator_2",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_iter.test.cc",
+          "symbol_base": "tableau_iter.CommutingPauliStringIterator_4",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CommutingPauliStringIterator"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CommutingPauliStringIterator::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CommutingPauliStringIterator::restart_iter"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::CommutingPauliStringIterator::restart_iter_same_constraints"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CommutingPauliStringIterator"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CommutingPauliStringIterator::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CommutingPauliStringIterator::restart_iter"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::CommutingPauliStringIterator::restart_iter_same_constraints"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-tableau-iterator-api-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "zero-qubit-signed-and-unsigned",
+        "clone-and-restart"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_tableau",
+          "cq2_algebra_tableau_iterator_state_contract_is_restartable_and_typed",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The case checks deterministic restartable search state at small exact sizes; constructor limits and first rejection are owned by the source-owned Algebra resource-admission parents."
+      },
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::TableauIterator"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::TableauIterator::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::TableauIterator::restart"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::TableauIterator"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::TableauIterator::new"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::TableauIterator::restart"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-tableau-iterator-count-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "zero-one-two-qubit-counts",
+        "signed-and-unsigned-counts"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_tableau_iter_counts_match_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The case checks deterministic restartable search state at small exact sizes; constructor limits and first rejection are owned by the source-owned Algebra resource-admission parents."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_iter_0q"
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_iter_1q"
+        },
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_iter_2q"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/tableau_iter.test.cc",
+          "symbol_base": "tableau_iter.iter_tableau",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-tableau-iterator-three-qubit-count-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "unsigned-three-qubit-exact-cardinality"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_tableau_iter_unsigned_3q_count_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The exact upstream cardinality case exhausts all 1,451,520 unsigned three-qubit Tableaus without retaining the generated values."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_iter_3q"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-tableau-iterator-distinct-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "semantic-invariant",
+      "negative_axes": [
+        "signed-two-qubit-distinctness"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_tableau_iter_signed_2q_tableaus_are_distinct",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The case checks deterministic restartable search state at small exact sizes; constructor limits and first rejection are owned by the source-owned Algebra resource-admission parents."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/tableau_iter.test.cc",
+          "symbol_base": "tableau_iter.iter_tableau_distinct",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-stabilizers-tableau-iter"
+      ]
+    },
+    {
+      "id": "cq2-algebra-tableau-iterator-copy-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "exact-value",
+      "negative_axes": [
+        "three-qubit-clone-continuation"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers",
+          "stabilizers_tableau_iter_clone_continues_from_same_state",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-search",
+        "detail": "The case checks deterministic restartable search state at small exact sizes; constructor limits and first rejection are owned by the source-owned Algebra resource-admission parents."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/tableau_iter.test.cc",
+          "symbol_base": "tableau_iter.iter_tableau_copy",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-circuit-tableau-ignore-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "complete-pinned-unitary-gate-list",
+        "noise-measurement-reset-and-measure-reset-rejection",
+        "MPP-measurement-ignore",
+        "independent-ignore-flags",
+        "combined-ignore-flags",
+        "noisy-measurement-multi-flag-precedence",
+        "noisy-measure-reset-multi-flag-precedence",
+        "heralded-result-and-noise-multi-flag-precedence",
+        "zero-probability-noise-precedence"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "circuit_tableau",
+          "circuit_to_tableau_ignores_or_rejects_non_unitary_gate_classes_like_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/util_top/circuit_vs_tableau.test.cc",
+          "symbol_base": "conversions.circuit_to_tableau_ignoring_gates",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-circuit-tableau-conversion-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "empty-circuit",
+        "repeat-parity",
+        "conjugated-two-qubit-gate",
+        "single-qubit-unitary-pauli-product",
+        "multi-qubit-unitary-pauli-product",
+        "inverted-pauli-product-phase",
+        "anti-hermitian-pauli-product-rejection"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "circuit_tableau",
+          "circuit_to_tableau_matches_stim_basic_examples",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/circuit/circuit_pybind_test.py",
+          "symbol": "test_to_tableau"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/util_top/circuit_vs_tableau.test.cc",
+          "symbol_base": "conversions.circuit_to_tableau",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-util-top-circuit-vs-tableau"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::Circuit::to_tableau"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::circuit_to_tableau"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-stabilizer-solver-error-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_tableau",
+          "cq2_algebra_stabilizer_solver_error_contract_is_exact",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "negative_axes": [
+        "anticommutation",
+        "distant-anticommutation",
+        "redundancy",
+        "inconsistent-sign",
+        "distant-contradiction",
+        "underconstraint",
+        "inverse-output"
+      ],
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_from_stabilizers_error_messages"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/util_top/stabilizers_to_tableau.test.cc",
+          "symbol_base": "conversions.stabilizer_to_tableau_detect_anticommutation",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-util-top-stabilizers-to-tableau"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::stabilizers_to_tableau"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers_to_tableau"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-stabilizer-solver-overconstrained-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "four-through-nine-qubit-inputs",
+        "identity-and-dependent-generators",
+        "reject-without-redundancy-opt-in",
+        "preserve-independent-generator-order"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_tableau",
+          "cq2_algebra_stabilizer_solver_overconstrained_contract_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes seeded four-through-nine-qubit stabilizer sets with dependent generators; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/util_top/stabilizers_to_tableau.test.cc",
+          "symbol_base": "conversions.stabilizers_to_tableau_overconstrained",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-stabilizer-solver-bell-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "redundant-extension",
+        "inconsistent-extension"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers_to_tableau",
+          "stabilizers_to_tableau_bell_pair_matches_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/util_top/stabilizers_to_tableau.test.cc",
+          "symbol_base": "conversions.stabilizers_to_tableau_bell_pair",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-stabilizer-solver-redundancy-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "large-redundant-input"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers_to_tableau",
+          "stabilizers_to_tableau_handles_size_affecting_redundancy",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/util_top/stabilizers_to_tableau.test.cc",
+          "symbol_base": "conversions.stabilizer_to_tableau_size_affecting_redundancy",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-stabilizer-solver-completion-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "zero-through-nine-qubit-tableaus",
+        "one-through-three-missing-generators",
+        "partial-generator-completion-and-inverse"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers_to_tableau",
+          "stabilizers_to_tableau_preserves_z_outputs_from_random_tableaus",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/util_top/stabilizers_to_tableau.test.cc",
+          "symbol_base": "conversions.stabilizers_to_tableau_fuzz",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/util_top/stabilizers_to_tableau.test.cc",
+          "symbol_base": "conversions.stabilizers_to_tableau_partial_fuzz",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-unitary-conversion-success-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "all-known-one-and-two-qubit-gates",
+        "one-qubit-endian-invariance",
+        "gate-tableau-vs-unitary"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers_vs_amplitudes",
+          "unitary_to_tableau_matches_known_gate_data_like_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_from_named_gate"
+        }
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/tableau.test.cc",
+          "symbol_base": "tableau.gate_tableau_data_vs_unitary_data",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/util_top/stabilizers_vs_amplitudes.test.cc",
+          "symbol_base": "conversions.unitary_to_tableau_vs_gate_data",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "oracle_fixture_owners": [
+        "coverage-util-top-stabilizers-vs-amplitudes"
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::unitary_to_tableau"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::unitary_to_tableau"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-unitary-endianness-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "little-and-big-endian",
+        "XCZ-and-ZCX-target-order",
+        "XCY-and-YCX-target-order"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "stabilizers_vs_amplitudes",
+          "unitary_to_tableau_handles_controlled_gate_endianness_like_stim",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes fixed four-by-four controlled-Clifford matrices in both endianness modes; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/util_top/stabilizers_vs_amplitudes.test.cc",
+          "symbol_base": "conversions.unitary_vs_tableau_basic",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-unitary-python-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "state-equivalence",
+      "negative_axes": [
+        "Hadamard-success",
+        "non-unitary-rejection"
+      ],
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_tableau",
+          "cq2_algebra_unitary_conversion_python_contract_is_exact",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes the exact two-by-two success and rejection matrices from the pinned Python contract; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "upstream_owners": [
+        {
+          "path": "src/stim/stabilizers/tableau_pybind_test.py",
+          "symbol": "test_from_unitary_matrix"
+        }
+      ]
+    },
+    {
+      "id": "cq2-algebra-unitary-conversion-error-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "comparator": "error-class",
+      "primary_selector": {
+        "state": "existing",
+        "kind": "cargo-test",
+        "value": [
+          "cargo",
+          "test",
+          "-p",
+          "stab-core",
+          "--test",
+          "cq2_algebra_tableau",
+          "cq2_algebra_unitary_conversion_error_contract_is_exact",
+          "--quiet",
+          "--exact"
+        ]
+      },
+      "resource_contract": {
+        "kind": "bounded-materialized",
+        "detail": "The case materializes only fixed representative values; the source-owned Algebra resource-admission parents own maximum accepted sizes, first rejection, and overflow behavior."
+      },
+      "negative_axes": [
+        "empty-matrix",
+        "row-width-precedence",
+        "non-power-of-two-height",
+        "non-unitary",
+        "two-four-and-eight-dimensional-non-Clifford"
+      ],
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/util_top/stabilizers_vs_amplitudes.test.cc",
+          "symbol_base": "conversions.unitary_to_tableau_fail",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ]
     }
   ],
   "existing_parent_mappings": [
+    {
+      "id": "cq2-map-algebra-pauli-ref-contract",
+      "feature_id": "CQ-ALGEBRA",
+      "parent": {
+        "provenance": "oracle-fixture",
+        "source_id": "coverage-stabilizers-pauli-string-ref"
+      },
+      "upstream_word_size_families": [
+        {
+          "path": "src/stim/stabilizers/pauli_string_ref.test.cc",
+          "symbol_base": "pauli_string.for_each_active_pauli",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/pauli_string_ref.test.cc",
+          "symbol_base": "pauli_string.has_no_pauli_terms",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/pauli_string_ref.test.cc",
+          "symbol_base": "pauli_string.intersects",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        },
+        {
+          "path": "src/stim/stabilizers/pauli_string_ref.test.cc",
+          "symbol_base": "pauli_string.weight",
+          "word_sizes": [
+            64,
+            128,
+            256
+          ]
+        }
+      ],
+      "public_api_owners": [
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::active_terms"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::has_no_pauli_terms"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::intersects"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::PauliString::weight"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::active_terms"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::has_no_pauli_terms"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::intersects"
+        },
+        {
+          "crate_name": "stab_core",
+          "owner_path": "stab_core::stabilizers::PauliString::weight"
+        }
+      ]
+    },
     {
       "id": "cq2-map-circuit-concatenation",
       "feature_id": "CQ-CIRCUIT-API",

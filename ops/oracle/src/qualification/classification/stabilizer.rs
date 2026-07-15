@@ -56,6 +56,11 @@ pub(super) fn classify(value: &str, symbol: &str) -> UpstreamClassification {
                 "Stab has no selected PauliString circuit-propagation API; Tableau and circuit-conversion owners prove the shared implemented semantics independently.",
             );
         }
+        if matches!(leaf, "after_tableau" | "before_tableau" | "left_mul_pauli") {
+            return not_applicable(
+                "Stab has no selected target-scatter or target-growing Pauli mutation API; full-width Tableau action and owned Pauli multiplication are qualified independently.",
+            );
+        }
         if matches!(
             leaf,
             "ensure_num_qubits"
@@ -74,12 +79,9 @@ pub(super) fn classify(value: &str, symbol: &str) -> UpstreamClassification {
             leaf,
             "pauli_xyz_to_xz"
                 | "pauli_xz_to_xyz"
-                | "after_tableau"
-                | "before_tableau"
                 | "commutes"
                 | "equality"
                 | "identity"
-                | "left_mul_pauli"
                 | "left_mul_pauli_mul_table"
                 | "log_i_scalar_byproduct"
                 | "multiplication"
@@ -196,7 +198,6 @@ pub(super) fn classify(value: &str, symbol: &str) -> UpstreamClassification {
         return if matches!(
             leaf,
             "test_composition"
-                | "test_from_conjugated_generators"
                 | "test_from_named_gate"
                 | "test_from_stabilizers_error_messages"
                 | "test_from_unitary_matrix"
@@ -214,10 +215,16 @@ pub(super) fn classify(value: &str, symbol: &str) -> UpstreamClassification {
                 | "test_signs"
                 | "test_str"
                 | "test_to_pauli_string"
-                | "test_to_stabilizers"
                 | "test_xyz_output_pauli"
         ) {
             UpstreamClassification::selected(FeatureId::Algebra)
+        } else if matches!(
+            leaf,
+            "test_from_conjugated_generators" | "test_to_stabilizers"
+        ) {
+            deferred_python(
+                "Arbitrary conjugated-generator construction and Tableau-to-stabilizer collection output are not exposed by the selected Rust Tableau API.",
+            )
         } else {
             deferred_python(
                 "This complete case exercises Python Tableau operators, aliasing, constructors, calls, copying, coercion, or collection shape; focused Rust owners prove the portable Tableau semantics.",

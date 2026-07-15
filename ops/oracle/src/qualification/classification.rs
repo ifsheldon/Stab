@@ -1110,7 +1110,9 @@ fn classify_util_top(value: &str, symbol: &str) -> UpstreamClassification {
             .unwrap_or(symbol);
         if matches!(
             leaf,
-            "unitary_to_tableau_fail" | "unitary_to_tableau_vs_gate_data"
+            "unitary_to_tableau_fail"
+                | "unitary_to_tableau_vs_gate_data"
+                | "unitary_vs_tableau_basic"
         ) {
             UpstreamClassification::selected(FeatureId::Algebra)
         } else {
