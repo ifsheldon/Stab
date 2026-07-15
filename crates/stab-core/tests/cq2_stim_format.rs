@@ -40,6 +40,7 @@ fn cq2_stim_format_from_text_contract_matches_stim() {
         ),
         ("DETECTOR rec[-5]", "DETECTOR rec[-5]\n"),
         ("DETECTOR rec[-6]", "DETECTOR rec[-6]\n"),
+        ("DETECTOR rec[-0]", "DETECTOR rec[-0]\n"),
         (
             "CORRELATED_ERROR(0.125) X90 Y91 Z92 X93",
             "E(0.125) X90 Y91 Z92 X93\n",
@@ -171,6 +172,14 @@ fn cq2_stim_format_target_text_round_trip_matches_stim() {
 
     assert_eq!(Target::from_str("5").unwrap(), q(5));
     assert_eq!(Target::from_str("rec[-3]").unwrap(), record(-3));
+    let parsed_zero = Target::from_str("rec[-0]").unwrap();
+    assert_eq!(parsed_zero.to_string(), "rec[-0]");
+    assert_eq!(
+        parsed_zero
+            .measurement_record_offset()
+            .map(MeasureRecordOffset::get),
+        Some(0)
+    );
     assert_eq!(
         Target::from_str("y17").unwrap(),
         Target::pauli(Pauli::Y, QubitId::new(17).unwrap(), false)

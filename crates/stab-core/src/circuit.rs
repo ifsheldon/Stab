@@ -608,6 +608,8 @@ impl Display for Circuit {
     }
 }
 
+mod parser_fast;
+
 struct Parser<'a> {
     lines: Lines<'a>,
     line_number: usize,
@@ -716,7 +718,7 @@ fn top_level_item_capacity(input: &str) -> usize {
 }
 
 fn parse_instruction(line_number: usize, line: &str) -> CircuitResult<CircuitInstruction> {
-    if let Some(instruction) = parse_common_plain_instruction(line_number, line) {
+    if let Some(instruction) = parser_fast::parse_common_plain_instruction(line_number, line) {
         return instruction;
     }
     let (name, rest) = parse_name(line_number, line)?;
@@ -732,25 +734,6 @@ fn parse_instruction(line_number: usize, line: &str) -> CircuitResult<CircuitIns
     Ok(CircuitInstruction::from_validated_parts(
         gate, args, targets, tag,
     ))
-}
-
-fn parse_common_plain_instruction(
-    line_number: usize,
-    line: &str,
-) -> Option<CircuitResult<CircuitInstruction>> {
-    if let Some(rest) = line.strip_prefix("H ") {
-        return parse_common_single_qubit_instruction(line_number, Gate::plain_h(), rest);
-    }
-    if let Some(rest) = line.strip_prefix("M ").or_else(|| line.strip_prefix("MZ ")) {
-        return parse_common_single_qubit_instruction(line_number, Gate::plain_m(), rest);
-    }
-    if let Some(rest) = line
-        .strip_prefix("CX ")
-        .or_else(|| line.strip_prefix("CNOT "))
-    {
-        return parse_common_pair_instruction(line_number, Gate::plain_cx(), rest);
-    }
-    None
 }
 
 fn parse_common_single_qubit_instruction(

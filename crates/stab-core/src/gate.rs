@@ -118,6 +118,33 @@ impl Gate {
     pub(crate) fn targets_are_measurement_pads(self) -> bool {
         self.info.target_rule == TargetRule::MeasurementPads
     }
+
+    #[inline]
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
+    )]
+    pub(crate) fn plain_s() -> Self {
+        Self { info: &GATES[60] }
+    }
+
+    #[inline]
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
+    )]
+    pub(crate) fn plain_detector() -> Self {
+        Self { info: &GATES[0] }
+    }
+
+    #[inline]
+    #[allow(
+        clippy::indexing_slicing,
+        reason = "constant gate-table indexes are guarded by canonical-name round-trip tests"
+    )]
+    pub(crate) fn plain_tick() -> Self {
+        Self { info: &GATES[2] }
+    }
 }
 
 #[cfg(feature = "ops-contracts")]
@@ -486,9 +513,11 @@ fn gate_info_from_simple_plain_name(name: &str) -> Option<&'static GateInfo> {
         "M" | "MZ" => &GATES[9],
         "CX" | "CNOT" => &GATES[22],
         "H" => &GATES[25],
+        "S" | "SQRT_Z" => &GATES[60],
         _ if name.eq_ignore_ascii_case("M") || name.eq_ignore_ascii_case("MZ") => &GATES[9],
         _ if name.eq_ignore_ascii_case("CX") || name.eq_ignore_ascii_case("CNOT") => &GATES[22],
         _ if name.eq_ignore_ascii_case("H") => &GATES[25],
+        _ if name.eq_ignore_ascii_case("S") || name.eq_ignore_ascii_case("SQRT_Z") => &GATES[60],
         _ => return None,
     })
 }

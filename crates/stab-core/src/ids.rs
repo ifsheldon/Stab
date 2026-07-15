@@ -104,3 +104,16 @@ impl Probability {
         self.0
     }
 }
+
+impl MeasureRecordOffset {
+    /// Preserves Stim v1.16's text-only `rec[-0]` parser behavior.
+    pub(crate) fn from_stim_text(value: i32) -> CircuitResult<Self> {
+        if !(MIN_MEASUREMENT_RECORD_OFFSET..=0).contains(&value) {
+            return Err(CircuitError::invalid_domain_value(
+                "measurement record offset",
+                value,
+            ));
+        }
+        Ok(Self(value))
+    }
+}

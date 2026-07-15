@@ -241,9 +241,9 @@ impl FromStr for Target {
             let offset = i32::try_from(offset).map_err(|_| {
                 CircuitError::invalid_domain_value("measurement record target", raw)
             })?;
-            return Ok(Self::measurement_record(MeasureRecordOffset::try_new(
-                -offset,
-            )?));
+            return Ok(Self::measurement_record(
+                MeasureRecordOffset::from_stim_text(-offset)?,
+            ));
         }
         if let Some(index) = raw.strip_prefix("sweep[").and_then(|v| v.strip_suffix(']')) {
             let id = parse_u24(index, "sweep target")?;
@@ -272,6 +272,7 @@ impl Display for Target {
                     write!(f, "{}", id.get())
                 }
             }
+            Self::MeasurementRecord { offset } if offset.get() == 0 => f.write_str("rec[-0]"),
             Self::MeasurementRecord { offset } => write!(f, "rec[{}]", offset.get()),
             Self::SweepBit { id } => write!(f, "sweep[{id}]"),
             Self::Pauli {

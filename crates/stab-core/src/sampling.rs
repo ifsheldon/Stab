@@ -410,6 +410,12 @@ impl CompileState {
         offset: MeasureRecordOffset,
     ) -> CircuitResult<()> {
         let required = u64::from(offset.get().unsigned_abs());
+        if required == 0 {
+            return Err(CircuitError::invalid_sampler_compilation(format!(
+                "measurement record target rec[-0] is not a valid lookback while compiling {} feedback",
+                instruction.gate().canonical_name()
+            )));
+        }
         if required <= self.measurement_count {
             return Ok(());
         }
