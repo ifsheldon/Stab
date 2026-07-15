@@ -109,7 +109,7 @@ A final evidence audit then found that the PQ2 section-level status still descri
 ## Remaining Work
 
 1. Produce the same clean full and soak scale families and rollups on a controlled native Linux x86-64 host. No x86-64 timing conclusion is claimed.
-2. Finish clean committed execution for the implemented `PERFQ-M5-SIMD-WORD` group, then select the next finite PQ2 runtime group with the same exact evidence discipline.
+2. Preserve the completed clean `PERFQ-M5-SIMD-WORD` evidence and select the next finite PQ2 runtime group with the same exact evidence discipline.
 3. Rerun the complete 271-parent CQ2 family before claiming current-digest all-domain correctness execution.
 4. Define and validate explicit cross-scale RSS and allocation-growth slack in PQ6 before making a gate-hash memory claim.
 
