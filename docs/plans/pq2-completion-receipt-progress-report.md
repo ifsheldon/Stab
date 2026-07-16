@@ -1,5 +1,7 @@
 # PQ2 Completion Receipt Infrastructure Progress Report
 
+> Current-use note, 2026-07-16: the three `not_zero` groups and both sparse-XOR groups have since published and byte-for-byte replayed schema-version-1 completion receipts. This report remains the infrastructure acceptance record; the product evidence lives in their respective PQ2 progress reports.
+
 Date: 2026-07-16
 
 Status: Complete for the machine-readable completion-receipt infrastructure.
@@ -45,7 +47,7 @@ No implementation defect or remaining specification loophole blocks this infrast
 | Prospective acceptance policy | Satisfied | `GOAL.md`, the performance plan, the dense-XOR report, and the specification-gap resolution |
 | Human audit and review kept separate | Satisfied | Receipt Markdown and operational documentation |
 
-The real completion and replay commands were not run against the five historical product groups because the receipt contract is prospective and requires source-current full and soak evidence from one clean committed revision. The next executable PQ2 slice must exercise both commands before it can claim closure.
+The real completion and replay commands were not run against the five historical product groups because the receipt contract is prospective and requires source-current full and soak evidence from one clean committed revision. Later `not_zero` and sparse-XOR slices exercised both commands before claiming closure, without retroactively relabeling the first five groups as receipt-backed.
 
 ## Independent Full Code Review
 
@@ -68,4 +70,4 @@ All required checks passed. The staged large-file check reported five watch-list
 
 ## Next Action
 
-Select the next finite source-owned PQ2 workload and use schema-version-1 completion publication and replay as part of its initial acceptance evidence. `simd_bits::not_zero` is the current candidate, but its early-hit, all-zero, and late-hit paths must remain separate measurements because short-circuit position changes executed work.
+Select the next finite source-owned PQ2 workload and use schema-version-1 completion publication and replay as part of its initial acceptance evidence. Preserve the already accepted `not_zero` and sparse-XOR receipts as historical evidence when later shared-worker or inventory changes occur; do not relabel them as current-inventory reports.

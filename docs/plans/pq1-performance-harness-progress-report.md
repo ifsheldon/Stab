@@ -1,6 +1,6 @@
 # PQ1 Paired Performance Harness Progress Report
 
-> Current-evidence note, 2026-07-16: correctness inventory digest `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2` and performance inventory digest `0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0` are source-current. The first five qualified product-group AArch64 report families remain historical passing evidence under preceding inventories, including dense XOR at digest `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`. The three `not_zero` groups have accepted clean evidence at the source-current inventory from revision `60b732c77f1828058fbd65ec6c5c4ad582467fd1`, including replayed completion receipts after evidence-authorized retirement of the duplicate legacy M12 `not_zero` threshold pair. The schema-version-13 PQ1 reports remain historical diagnostic infrastructure evidence, not product performance. Current report schema version 23 adds offline-derived wide-ratio common batches without relabeling those historical reports.
+> Current-evidence note, 2026-07-16: correctness inventory digest `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2` and performance inventory digest `8cc3ab3eb88faaf539c3c0eabaf3865ad421d8f67b14549cb4c7acc71faf2406` are source-current. The first five qualified product-group AArch64 report families remain historical passing evidence under preceding inventories, including dense XOR at digest `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`. The three `not_zero` groups have accepted clean evidence from revision `60b732c77f1828058fbd65ec6c5c4ad582467fd1`, and the two sparse-XOR groups have accepted clean post-migration evidence from revision `7b43b46d1c08f669264d009b8d3872ce86838f0e`. The current product harness has ten executable exact-case groups, adapter receipt schema version 7, contract-preflight schema version 6 with 58 probes, and qualification report schema version 24. The schema-version-13 PQ1 reports remain historical diagnostic infrastructure evidence, not product performance.
 
 ## Status
 
@@ -112,5 +112,5 @@ The real CQ soak compatibility probe was temporary and target-dependent, so it w
 
 ## Next Milestone
 
-CQ2 is active.
-PQ2 remains blocked on its exact CQ2 correctness prerequisites and must add real deterministic model, format, gate, kernel, and algebra workloads instead of promoting the PQ1 synthetic ratio.
+CQ2 implementation ownership is complete for all 271 deterministic parents, and PQ2 is active.
+Ten exact-case PQ2 product contracts are executable; the remaining work must continue adding equivalent-work deterministic model, format, gate, kernel, and algebra groups instead of promoting the PQ1 synthetic ratio.

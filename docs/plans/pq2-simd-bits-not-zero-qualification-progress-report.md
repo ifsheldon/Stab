@@ -1,5 +1,7 @@
 # PQ2 SIMD-Bits `not_zero` Qualification Progress Report
 
+> Historical-inventory note, 2026-07-16: this report remains accepted passing Linux AArch64 evidence at performance inventory `0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0`. The source-current inventory is `8cc3ab3eb88faaf539c3c0eabaf3865ad421d8f67b14549cb4c7acc71faf2406` after the sparse-XOR groups, worker source, receipts, and evidence-authorized legacy-threshold migration were added. The measured `not_zero` contracts and outcomes below are not relabeled as current-inventory evidence.
+
 ## Status
 
 The sixth PQ2 executable slice passes its independent `1.25x` timing gate for early-hit, all-zero, and late-hit `not_zero` scans at every full and soak scale on the controlled Linux AArch64 host as of 2026-07-16.
@@ -20,12 +22,12 @@ It does not qualify native Linux x86-64, other bit-kernel phases, cross-scale me
 
 - Clean Stab evidence revision: `60b732c77f1828058fbd65ec6c5c4ad582467fd1`, with `local_modifications=false` before and after every correctness, performance, rollup, and completion producer.
 - Stim baseline: v1.16.0 at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
-- Evidence and source-current performance inventory: `0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0`.
+- Accepted evidence performance inventory: `0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0`.
 - Correctness inventory: `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2`.
 - Host profile: verified `linux-aarch64-controlled`, pinned to logical CPU 0 with CPU identity `CPU implementer=0x41, CPU architecture=8, CPU variant=0x0, CPU part=0xd87, CPU revision=1`.
 - Rust toolchain: `nightly-2026-06-20`, release profile, target `aarch64-unknown-linux-gnu`.
 
-This evidence was regenerated after the duplicate legacy M12 `not_zero` threshold pair was retired, so report and completion replay bind the same current inventory that owns the closure claim.
+This evidence was regenerated after the duplicate legacy M12 `not_zero` threshold pair was retired, so report and completion replay bind the same accepted inventory that owns the sixth-slice closure claim.
 
 ## Correctness Preflight
 
@@ -155,7 +157,7 @@ All three completion receipts passed independent replay.
 ## Legacy M12 Migration
 
 The early group's clean completion receipt is the exact migration evidence for legacy pair `simd_bits_not_zero_100K` / `stab_simd_bits_not_zero_10K`.
-The source-current M12 threshold file therefore retires only that pair and retains `simd_bits_xor_10K` / `stab_simd_bits_xor_10K` at `1.25x`.
+At the accepted sixth-slice checkpoint, the M12 threshold file therefore retired only that pair and retained `simd_bits_xor_10K` / `stab_simd_bits_xor_10K` at `1.25x`.
 The generated inventory removes the stale `not_zero` replacement marker and keeps the XOR replacement marker.
 All-zero and late-hit evidence remain independent additional guards and were not used as substitutes for the legacy pair.
 
@@ -184,7 +186,7 @@ just bench::qualification-probe --group pq2-simd-bits-not-zero-all-zero-adapter-
 just bench::qualification-probe --group pq2-simd-bits-not-zero-late-adapter-smoke --iterations 2 --work-items 10000
 ```
 
-The source-current migration and evidence state passed:
+The accepted sixth-slice migration and evidence state passed:
 
 ```sh
 just bench::qualification-regenerate --check
