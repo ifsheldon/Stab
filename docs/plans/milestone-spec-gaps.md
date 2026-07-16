@@ -19,6 +19,24 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
+## 2026-07-16 - PQ2: Completion-Command Receipt Boundary
+
+Status: Open
+Revealed by: milestone audit of the fifth PQ2 dense-XOR qualification slice.
+Current text: the fifth slice requires standalone worker reproducibility, an adapter probe, immediate source-report replay and regression checks, rollup replay, milestone audit, and GPT-5.6/max full code review before completion; `GOAL.md` requires a prose progress report that records the commands and outcomes.
+Gap: neither plan requires one machine-readable completion receipt that binds each standalone command, exact revision, input artifact, result, and output digest. The prose report can record execution, but the normal report and rollup schemas cannot independently attest the complete closure sequence.
+Proposed amendment: before the next executable PQ2 slice, define a canonical milestone-completion receipt that records each required standalone command as a typed step with the clean revision, canonical arguments, input identities, exit status, and produced artifact digests; validate the receipt during progress-report or rollup publication without making human review mechanically self-certifying.
+Resolution: Pending.
+
+## 2026-07-16 - PQ2: Allocation-Free Comparator Proof Standard
+
+Status: Open
+Revealed by: milestone audit of the fifth PQ2 dense-XOR qualification slice.
+Current text: the fifth slice says that the timed mutation must allocate zero bytes and requires an allocation-counter test, while the source-owned performance reports record process RSS for both workers.
+Gap: the plan does not state whether zero-allocation proof must cover Stab only or both implementations, whether it must execute at every scale, or whether pinned Stim source inspection is an acceptable proof for the C++ comparator. The implemented executable check instruments Stab at the medium scale, while Stim's no-allocation body is supported by the pinned comparator source.
+Proposed amendment: state explicitly which implementations and scales require allocator instrumentation, which source-inspection evidence is acceptable for a comparator implemented by in-place operators, and whether the zero-allocation invariant belongs to correctness preflight, report replay, or PQ6 allocation qualification.
+Resolution: Pending.
+
 ## Resolved Entries
 
 ## 2026-07-16 - PQ2: Pinned Stim Header Warning Boundary

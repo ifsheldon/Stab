@@ -1,5 +1,7 @@
 # PQ2 SIMD-Word Popcount Qualification Progress Report
 
+> Historical-inventory note, 2026-07-16: this report remains valid passing AArch64 evidence for its frozen performance inventory `877df12bf1b3d63da92289e22f117097cedbc20860d165c90b41554aa110263b`, but it is not current-inventory evidence after the dense-XOR graduation produced performance digest `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716` and new shared worker identities.
+
 ## Status
 
 The fourth PQ2 product group, `PERFQ-M5-SIMD-WORD`, passes the exact `1.25x` timing gate at every full and soak scale on the controlled Linux AArch64 host as of 2026-07-16.
