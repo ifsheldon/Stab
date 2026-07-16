@@ -61,9 +61,14 @@ Do not treat PQ0's 12 retained rows as qualified evidence: the current inventory
 ## Current Execution Contract
 
 The sixth and seventh executable slices are closed on controlled Linux AArch64 and must not be reopened merely to produce a newer aggregate digest.
-The next step is to select one finite dependency-ordered PQ2 group from the remaining deterministic model, format, gate, kernel, or algebra inventory and write its exact workload, comparator, CQ prerequisite, output, scale, resource, threshold, migration, evidence, audit, and review contract before implementation.
-Do not select a group only because its legacy benchmark is easy to run; prefer a phase whose equivalent work and public owner can be stated precisely and whose correctness case is already executable.
-Keep native Linux x86-64 execution and PQ6 memory-growth qualification visible as separate later obligations rather than silently folding them into the next AArch64 slice.
+The active eighth slice is the two-group BitMatrix transpose contract in `docs/plans/comprehensive-stim-performance-qualification-plan.md`: public allocating transpose and public square in-place transpose remain independent from inventory ownership through final completion.
+Implement exact API ownership and failing tests first, then replace the per-bit implementation with a safe blocked kernel that preserves every existing edge and error contract. Do not add a public raw-word constructor, a public preallocated transpose API, architecture-specific intrinsics, or a zero-filled no-op-friendly fixture to make the comparison easier.
+Use the pinned-Stim adapter because allocating transpose must compare `BitMatrix::transpose()` to `simd_bit_table::transposed()` with allocation and destruction on both sides, while in-place transpose compares directly to `do_square_transpose()` and must prove zero timed Stab allocations.
+Do not start promotable timing until both exact CQ cases, every frozen input and output receipt, all four rejection classes for both workloads and workers, worker reproducibility, both public probes, allocation instrumentation, and scalar-reference kernel tests pass from a clean committed revision.
+Treat a ratio above `1.25x` as an optimization task with a source-owned profiler note, not as a reason to weaken work, omit allocation, substitute `transpose_into`, aggregate the two methods, or rerun toward a pass.
+Keep the legacy `m5-simd-bit-table` timing threshold and memory baseline active through both first-stage completion receipts. Retire only the timing row after explicit migration review, then rerun the complete evidence chain at the post-migration inventory; PQ6 alone may replace the memory baseline.
+Run milestone audit and an independent GPT-5.6/max full-code-review subagent after final post-migration evidence, fix every confirmed finding, and synchronize the active goal, performance plan, PQ0/PQ1/CQ2 reports, benchmark and adapter READMEs, historical inventory notes, generated inventories, migration ledger, and new progress report before closure.
+Keep native Linux x86-64 execution and PQ6 memory-growth qualification visible as separate later obligations rather than silently folding them into this AArch64 slice.
 
 Execute the milestones in this dependency order:
 
