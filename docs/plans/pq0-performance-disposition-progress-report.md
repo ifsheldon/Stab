@@ -8,7 +8,7 @@ Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4
 
 Current correctness dependency after exact gate-name hash ownership: schema-version-3 CQ0 semantic digest `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2`.
 
-Current performance inventory digest after eight PQ2 product-contract graduations and exact legacy-threshold replacement mapping: `7fc15258f7fe1e5e4ca075c41e9ab2b869e7d845a11f5f8694386e854cea5435`.
+Current performance inventory digest after eight PQ2 product-contract graduations, exact legacy-threshold replacement mapping, and the `not_zero` anti-elision contract correction: `1edd56083186a64b2a1772f01fdd14b835563dd2db4e002673b724b0aec3e4de`.
 
 Original PQ0 implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 

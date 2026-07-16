@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "performance_inventory_sha256": "7fc15258f7fe1e5e4ca075c41e9ab2b869e7d845a11f5f8694386e854cea5435",
+  "performance_inventory_sha256": "1edd56083186a64b2a1772f01fdd14b835563dd2db4e002673b724b0aec3e4de",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -203,7 +203,7 @@
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
-          "sha256": "d1a0d47e842f279d4175c6b12d53af8c1ebc52d28e42dd93241c0de67e0c7d4b"
+          "sha256": "cb1876dfbbbe2d9500edfc8c563518df1f97498b1683e4623db9a114fbb7e4bb"
         }
       ]
     },
@@ -246,7 +246,7 @@
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
-          "sha256": "d1a0d47e842f279d4175c6b12d53af8c1ebc52d28e42dd93241c0de67e0c7d4b"
+          "sha256": "cb1876dfbbbe2d9500edfc8c563518df1f97498b1683e4623db9a114fbb7e4bb"
         }
       ]
     },
@@ -289,7 +289,7 @@
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
-          "sha256": "d1a0d47e842f279d4175c6b12d53af8c1ebc52d28e42dd93241c0de67e0c7d4b"
+          "sha256": "cb1876dfbbbe2d9500edfc8c563518df1f97498b1683e4623db9a114fbb7e4bb"
         }
       ]
     },

@@ -1,3 +1,4 @@
+use std::hint::black_box;
 use std::sync::atomic::{Ordering, compiler_fence};
 
 use super::{WorkerError, byte_digest_words};
@@ -96,7 +97,8 @@ pub(super) fn simd_bits_not_zero(iterations: u64, fixture: &NotZeroFixture) -> u
     let mut checksum = 0_u64;
     for _ in 0..iterations {
         compiler_fence(Ordering::SeqCst);
-        checksum = checksum.wrapping_add(u64::from(fixture.bits.not_zero()));
+        let is_not_zero = black_box(&fixture.bits).not_zero();
+        checksum = checksum.wrapping_add(u64::from(is_not_zero));
     }
     checksum
 }

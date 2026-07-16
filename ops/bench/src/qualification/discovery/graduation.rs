@@ -133,7 +133,7 @@ fn not_zero_group(
         expected_shape: "Exact generated logical-word fixture bytes plus a canonical digest over checksum, iteration count, logical bit width, pattern marker, and all four input-fingerprint lanes."
             .to_string(),
         digest_state: EvidenceState::Existing,
-        sink_policy: "Both workers prepare the same logical u64 words outside timing, invoke only not_zero behind matching compiler fences, accumulate the Boolean result, and digest the semantic output outside timing."
+        sink_policy: "Both workers prepare the same logical u64 words outside timing, obtain the immutable input through matching optimizer-opaque references behind compiler fences, invoke only not_zero, accumulate the Boolean result, and digest the semantic output outside timing."
             .to_string(),
         comparator_sources: [STIM_ADAPTER_SOURCE, SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE]
             .into_iter()
