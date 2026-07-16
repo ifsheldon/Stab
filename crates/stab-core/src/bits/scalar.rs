@@ -32,6 +32,10 @@ pub(super) fn popcount_words(words: &[u64]) -> usize {
     words.iter().map(|word| popcount_word(*word)).sum()
 }
 
+pub(super) fn not_zero_words(words: &[u64]) -> bool {
+    words.iter().any(|word| *word != 0)
+}
+
 pub(super) fn popcount_word(word: u64) -> usize {
     word.count_ones() as usize
 }

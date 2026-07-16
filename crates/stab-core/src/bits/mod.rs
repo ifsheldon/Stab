@@ -82,7 +82,7 @@ impl BitLen {
         let Some((last, prefix)) = words.split_last() else {
             return false;
         };
-        prefix.iter().any(|word| *word != 0) || (*last & self.last_word_mask()) != 0
+        simd::not_zero_words(prefix) || (*last & self.last_word_mask()) != 0
     }
 }
 
