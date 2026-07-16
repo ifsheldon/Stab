@@ -461,6 +461,9 @@ fn cq2_bit_matrix_transpose_contract_matches_scalar_reference() {
         (64, 64),
         (65, 63),
         (128, 129),
+        (255, 257),
+        (256, 256),
+        (257, 255),
     ] {
         let mut matrix = BitMatrix::zeros(rows, cols).expect("bounded matrix");
         for row in 0..rows {
@@ -470,7 +473,9 @@ fn cq2_bit_matrix_transpose_contract_matches_scalar_reference() {
                 }
             }
         }
+        let original = matrix.clone();
         let transposed = matrix.transpose().expect("transpose");
+        assert_eq!(matrix, original, "allocating transpose mutated its source");
         assert_eq!(transposed.rows(), cols);
         assert_eq!(transposed.cols(), rows);
         for row in 0..rows {
@@ -481,7 +486,7 @@ fn cq2_bit_matrix_transpose_contract_matches_scalar_reference() {
         assert_eq!(transposed.transpose().expect("double transpose"), matrix);
     }
 
-    for &size in &[0, 1, 63, 64, 65, 129] {
+    for &size in &[0, 1, 63, 64, 65, 129, 255, 256, 257] {
         let mut matrix = BitMatrix::zeros(size, size).expect("square matrix");
         for row in 0..size {
             for col in 0..size {
@@ -501,9 +506,46 @@ fn cq2_bit_matrix_transpose_contract_matches_scalar_reference() {
     }
 
     let mut rectangular = BitMatrix::zeros(2, 3).expect("rectangular matrix");
+    rectangular.set(1, 2, true).expect("set rectangular bit");
+    let rectangular_before = rectangular.clone();
     assert_eq!(
         rectangular.transpose_square_in_place(),
         Err(BitError::NotSquareMatrix { rows: 2, cols: 3 })
+    );
+    assert_eq!(rectangular, rectangular_before);
+
+    let mut in_place = BitMatrix::zeros(256, 256).expect("in-place allocation fixture");
+    for row in 0..256 {
+        in_place
+            .set(row, (row * 73 + 19) % 256, true)
+            .expect("set in-place fixture bit");
+    }
+    let in_place_allocations = allocation_counter::measure(|| {
+        in_place
+            .transpose_square_in_place()
+            .expect("allocation-free in-place transpose");
+    });
+    assert_eq!(
+        in_place_allocations.count_total, 0,
+        "in-place transpose allocated: {in_place_allocations:?}"
+    );
+    assert_eq!(
+        in_place_allocations.bytes_total, 0,
+        "in-place transpose allocated: {in_place_allocations:?}"
+    );
+
+    let allocating = BitMatrix::zeros(256, 256).expect("allocating transpose fixture");
+    let allocating_allocations = allocation_counter::measure(|| {
+        std::hint::black_box(allocating.transpose().expect("allocating transpose"));
+    });
+    assert_eq!(
+        allocating_allocations.count_total, 1,
+        "allocating transpose must allocate one result buffer: {allocating_allocations:?}"
+    );
+    assert_eq!(
+        allocating_allocations.bytes_total,
+        256 * 256 / 8,
+        "allocating transpose requested unexpected storage: {allocating_allocations:?}"
     );
 }
 

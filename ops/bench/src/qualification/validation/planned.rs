@@ -23,7 +23,8 @@ pub(super) fn validate_planned_workload(
         .iter()
         .map(|scale| scale.id.as_str())
         .collect::<Vec<_>>();
-    let expected_generator = if group.id.starts_with("PERFQ-API-") {
+    let api_group = group.correctness_binding == CorrectnessBinding::ExactApiOwners;
+    let expected_generator = if api_group {
         "api-owner-phase-v1"
     } else if group.id.starts_with("PERFQ-CHECKLIST-") {
         "checklist-child-v1"
@@ -36,7 +37,7 @@ pub(super) fn validate_planned_workload(
         ));
         return;
     };
-    let expected_fixture_id = if group.id.starts_with("PERFQ-API-") {
+    let expected_fixture_id = if api_group {
         format!("api-small-medium-large-17-{}", group.id)
     } else if group.id.starts_with("PERFQ-CHECKLIST-") {
         format!("checklist-small-medium-large-17-{}", group.id)
@@ -69,7 +70,7 @@ pub(super) fn validate_planned_workload(
                 group.id, scale.id
             ));
         }
-        if group.id.starts_with("PERFQ-API-") {
+        if api_group {
             validate_parameter_keys(
                 group,
                 scale,

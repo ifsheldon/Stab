@@ -196,6 +196,67 @@ fn superseded_sparse_xor_row_retires_legacy_timing_pairs() {
 }
 
 #[test]
+fn bit_matrix_transpose_paths_have_exact_independent_parents() {
+    let (suite, manifest, references) = fixture();
+    let in_place = suite
+        .qualification_groups
+        .iter()
+        .find(|group| group.id == "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE")
+        .expect("in-place transpose qualification group");
+    let allocating = suite
+        .qualification_groups
+        .iter()
+        .find(|group| group.id == "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING")
+        .expect("allocating transpose qualification group");
+
+    assert_eq!(
+        in_place.public_api_items,
+        [
+            "stab_core::BitMatrix::transpose_square_in_place",
+            "stab_core::bits::BitMatrix::transpose_square_in_place",
+        ]
+    );
+    assert_eq!(
+        allocating.public_api_items,
+        [
+            "stab_core::BitMatrix::transpose",
+            "stab_core::bits::BitMatrix::transpose",
+        ]
+    );
+    assert!(suite.qualification_groups.iter().all(|group| {
+        group.id == in_place.id
+            || group.id == allocating.id
+            || group.public_api_items.iter().all(|path| {
+                !path.ends_with("BitMatrix::transpose")
+                    && !path.ends_with("BitMatrix::transpose_square_in_place")
+            })
+    }));
+    for path in in_place
+        .public_api_items
+        .iter()
+        .chain(&allocating.public_api_items)
+    {
+        let disposition = suite
+            .public_api_items
+            .iter()
+            .find(|item| item.path == *path)
+            .expect("transpose API disposition");
+        let expected_parent = if path.ends_with("transpose_square_in_place") {
+            &in_place.id
+        } else {
+            &allocating.id
+        };
+        assert_eq!(
+            disposition.parent_group_ids.as_slice(),
+            std::slice::from_ref(expected_parent)
+        );
+    }
+
+    validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect("exact transpose ownership must validate");
+}
+
+#[test]
 fn reworked_heterogeneous_primary_threshold_requires_an_exact_replacement_mapping() {
     let (mut suite, manifest, references) = fixture();
     suite

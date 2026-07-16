@@ -5326,14 +5326,17 @@
       },
       "resource_contract": {
         "kind": "bounded-materialized",
-        "detail": "Out-of-place transpose allocates exactly the checked transposed shape; in-place square transpose replaces the matrix with that bounded result and rejects rectangular shapes before mutation."
+        "detail": "Out-of-place transpose allocates exactly one checked transposed result buffer without mutating its source; in-place square transpose uses bounded stack scratch with zero heap allocation and rejects rectangular shapes before mutation."
       },
       "negative_axes": [
         "rectangular-in-place",
         "zero-dimension",
         "word-boundary-shape",
         "simd-lane-boundary-shape",
-        "double-transpose"
+        "double-transpose",
+        "source-immutability",
+        "in-place-zero-allocation",
+        "allocating-one-result-buffer"
       ],
       "upstream_word_size_families": [
         {

@@ -19,13 +19,13 @@ It does not qualify native Linux x86-64, broader sparse-density crossover behavi
 
 - Clean Stab evidence revision: `7b43b46d1c08f669264d009b8d3872ce86838f0e`, with `local_modifications=false` before and after every final correctness, performance, rollup, and completion producer.
 - Stim baseline: v1.16.0 at `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
-- Source-current performance inventory: `8cc3ab3eb88faaf539c3c0eabaf3865ad421d8f67b14549cb4c7acc71faf2406`.
+- Accepted evidence performance inventory: `8cc3ab3eb88faaf539c3c0eabaf3865ad421d8f67b14549cb4c7acc71faf2406`; later transpose ownership work changed the source-current inventory without relabeling these reports.
 - Correctness inventory: `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2`.
 - Runtime-group contract: `cc46c5c545c73ce462a93b9a6e0e9ae15b2c0ae4abf692717f17f4e2360c4efa`.
 - Host profile: verified `linux-aarch64-controlled`, pinned to logical CPU 0 with CPU identity `CPU implementer=0x41, CPU architecture=8, CPU variant=0x0, CPU part=0xd87, CPU revision=1`.
 - Rust toolchain: `nightly-2026-06-20`, release profile, target `aarch64-unknown-linux-gnu`.
 
-The source-current performance inventory contains 545 groups: 543 measured, zero covered by a parent, two not performance relevant, and zero without a faithful comparator.
+The accepted evidence performance inventory contains 545 groups: 543 measured, zero covered by a parent, two not performance relevant, and zero without a faithful comparator.
 Its 161 inherited rows are classified as 12 retained, 136 reworked, four diagnostic, seven superseded, and two removed; 21 exact threshold pairs remain after the two sparse-XOR legacy timing pairs were retired.
 The inventory has ten executable exact-case product groups and preserves all 123 missing scale families, 158 missing correctness preflights, 158 missing output digests, 73 missing comparators, 58 asymmetric CLI rows, and 20 heterogeneous rows as later work.
 

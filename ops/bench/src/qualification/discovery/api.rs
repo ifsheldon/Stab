@@ -9,6 +9,11 @@ use crate::qualification::model::{
     RowOrigin, RunnerFidelity, ScalePoint, ThresholdPolicy, WorkloadFamily,
 };
 
+pub(super) const BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID: &str =
+    "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING";
+pub(super) const BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID: &str =
+    "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE";
+
 pub(super) fn make_disposition(item: &CorrectnessApi) -> ApiDisposition {
     let performance_feature = item
         .performance_groups
@@ -54,6 +59,18 @@ pub(super) fn is_behavioral(item: &CorrectnessApi) -> bool {
 }
 
 fn qualification_group_id(item: &CorrectnessApi, performance_feature: &str) -> String {
+    if performance_feature == "PERF-BIT-KERNELS" {
+        match item.path.as_str() {
+            "stab_core::BitMatrix::transpose" | "stab_core::bits::BitMatrix::transpose" => {
+                return BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID.to_string();
+            }
+            "stab_core::BitMatrix::transpose_square_in_place"
+            | "stab_core::bits::BitMatrix::transpose_square_in_place" => {
+                return BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID.to_string();
+            }
+            _ => {}
+        }
+    }
     let phase = phase(&item.path);
     let key = format!(
         "{performance_feature}\0{}\0{}",

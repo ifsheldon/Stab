@@ -1,5 +1,6 @@
 mod scalar;
 mod simd;
+mod transpose;
 
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
@@ -445,13 +446,7 @@ impl BitMatrix {
 
     pub fn transpose(&self) -> BitResult<Self> {
         let mut transposed = Self::zeros(self.cols(), self.rows)?;
-        for row in 0..self.rows {
-            for col in 0..self.cols() {
-                if self.get(row, col).unwrap_or(false) {
-                    transposed.set(col, row, true)?;
-                }
-            }
-        }
+        transpose::out_of_place(self, &mut transposed);
         Ok(transposed)
     }
 
@@ -462,7 +457,7 @@ impl BitMatrix {
                 cols: self.cols(),
             });
         }
-        *self = self.transpose()?;
+        transpose::square_in_place(self);
         Ok(())
     }
 

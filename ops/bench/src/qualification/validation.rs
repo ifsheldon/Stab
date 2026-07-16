@@ -23,7 +23,7 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2";
+const CORRECTNESS_DIGEST: &str = "5d795e831bc20b3f2780ca72c1eaea7c75387388d38f8e37f4539254a41e821b";
 const EXPECTED_CHECKLIST_ROWS: usize = 127;
 const EXPECTED_PUBLIC_API_ITEMS: usize = 1_972;
 const EXPECTED_MANIFEST_ROWS: usize = 161;
@@ -474,9 +474,11 @@ fn validate_apis(suite: &QualificationSuite, references: &SourceReferences, issu
                     if let Some(group) = measured_groups.get(parent.as_str()).filter(|group| {
                         group.public_api_items.contains(&item.path)
                             && api_features.contains(group.performance_feature.as_str())
-                            && group.correctness_binding == CorrectnessBinding::ExactApiOwners
+                            && matches!(
+                                group.correctness_binding,
+                                CorrectnessBinding::ExactApiOwners | CorrectnessBinding::ExactCases
+                            )
                             && group.correctness_cases.contains(&item.correctness_case_id)
-                            && group.id.starts_with("PERFQ-API-")
                     }) {
                         parent_features.insert(group.performance_feature.as_str());
                     } else {
@@ -689,7 +691,7 @@ fn validate_groups(
                     group.id
                 ));
             }
-            CorrectnessBinding::ExactApiOwners if !group.id.starts_with("PERFQ-API-") => {
+            CorrectnessBinding::ExactApiOwners if group.public_api_items.is_empty() => {
                 issues.push(format!(
                     "non-API group {} claims exact API correctness owners",
                     group.id
@@ -701,12 +703,6 @@ fn validate_groups(
             {
                 issues.push(format!(
                     "exact-case group {} lacks exact CQ cases",
-                    group.id
-                ));
-            }
-            CorrectnessBinding::ExactCases if group.id.starts_with("PERFQ-API-") => {
-                issues.push(format!(
-                    "API group {} does not use exact API owner binding",
                     group.id
                 ));
             }
@@ -793,7 +789,7 @@ fn validate_groups(
             ));
         }
         validate_text("qualification group reason", &group.reason, issues);
-        if group.id.starts_with("PERFQ-API-")
+        if group.correctness_binding == CorrectnessBinding::ExactApiOwners
             && (group.public_api_items.is_empty()
                 || !group
                     .output_contract

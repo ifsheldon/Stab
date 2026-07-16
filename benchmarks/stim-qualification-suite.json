@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2",
-  "semantic_digest": "8cc3ab3eb88faaf539c3c0eabaf3865ad421d8f67b14549cb4c7acc71faf2406",
+  "correctness_digest": "5d795e831bc20b3f2780ca72c1eaea7c75387388d38f8e37f4539254a41e821b",
+  "semantic_digest": "43798bc7a9c81e371e5c3e37ca6d7809ad087ae438b70bee6e8562e9331a6448",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -194,6 +194,8 @@
         "PERFQ-API-fec4e7f5b42b63cb",
         "PERFQ-API-fef3f7885fc841cf",
         "PERFQ-CHECKLIST-d2d203c23e3ef634-BIT-KERNELS",
+        "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING",
+        "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE",
         "PERFQ-M5-SIMD-BIT-TABLE",
         "PERFQ-M5-SIMD-BITS",
         "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO",
@@ -5594,7 +5596,7 @@
       "correctness_case_id": "cq-evidence-qualification-4d0291febfd22b68",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-5a019983cb3c6bb0"
+        "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -5607,7 +5609,7 @@
       "correctness_case_id": "cq-evidence-qualification-4d0291febfd22b68",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-5a019983cb3c6bb0"
+        "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -23537,7 +23539,7 @@
       "correctness_case_id": "cq-evidence-qualification-4d0291febfd22b68",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-408c9aa2a1037eae"
+        "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -23550,7 +23552,7 @@
       "correctness_case_id": "cq-evidence-qualification-4d0291febfd22b68",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-408c9aa2a1037eae"
+        "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -34848,8 +34850,6 @@
         "stab_core::bits::BitMatrix::rows",
         "stab_core::bits::BitMatrix::set",
         "stab_core::bits::BitMatrix::swap_rows",
-        "stab_core::bits::BitMatrix::transpose",
-        "stab_core::bits::BitMatrix::transpose_square_in_place",
         "stab_core::bits::BitMatrix::xor_row_into",
         "stab_core::bits::BitMatrix::zeros"
       ],
@@ -34857,7 +34857,6 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-qualification-4d0291febfd22b68",
         "cq-evidence-qualification-66e29faafe5f2856"
       ],
       "correctness_binding": "exact-api-owners",
@@ -37674,8 +37673,6 @@
         "stab_core::BitMatrix::rows",
         "stab_core::BitMatrix::set",
         "stab_core::BitMatrix::swap_rows",
-        "stab_core::BitMatrix::transpose",
-        "stab_core::BitMatrix::transpose_square_in_place",
         "stab_core::BitMatrix::xor_row_into",
         "stab_core::BitMatrix::zeros"
       ],
@@ -37683,7 +37680,6 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-qualification-4d0291febfd22b68",
         "cq-evidence-qualification-66e29faafe5f2856"
       ],
       "correctness_binding": "exact-api-owners",
@@ -62323,6 +62319,164 @@
       "reason": "Implemented paired pinned-Stim and Rust all-gate-name hashing with exact CQ2, complete-sweep, output-digest, scale, timing, and memory bindings.",
       "owner": "stab-core/gates",
       "status": "implemented"
+    },
+    {
+      "id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING",
+      "manifest_row": "perfq-m5-bit-matrix-transpose-allocating",
+      "row_origin": "planned",
+      "performance_feature": "PERF-BIT-KERNELS",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::BitMatrix::transpose",
+        "stab_core::bits::BitMatrix::transpose"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-4d0291febfd22b68"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-0296dbd0b172287d",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-0296dbd0b172287d",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-0296dbd0b172287d",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "bits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::BitMatrix with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in record or bit width"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::BitMatrix in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core/bits",
+      "status": "planned"
+    },
+    {
+      "id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE",
+      "manifest_row": "perfq-m5-bit-matrix-transpose-in-place",
+      "row_origin": "planned",
+      "performance_feature": "PERF-BIT-KERNELS",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [
+        "stab_core::BitMatrix::transpose_square_in_place",
+        "stab_core::bits::BitMatrix::transpose_square_in_place"
+      ],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-4d0291febfd22b68"
+      ],
+      "correctness_binding": "exact-api-owners",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "api-small-medium-large-17-PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE"
+        },
+        "source": "oracle/qualification-manifest.json",
+        "deterministic_seed": "17",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-d3b99ead38282ccc",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-d3b99ead38282ccc",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          },
+          {
+            "id": "large",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-d3b99ead38282ccc",
+            "input_bytes": {
+              "kind": "not-applicable"
+            }
+          }
+        ]
+      },
+      "work_unit": "bits",
+      "output_contract": {
+        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::BitMatrix with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
+        "digest_state": "planned",
+        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "stab-allocations",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "linear in record or bit width"
+      },
+      "threshold_policy": "report-only",
+      "reason": "Behavioral API paths owned by stab_core::BitMatrix in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "owner": "stab-core/bits",
+      "status": "planned"
     },
     {
       "id": "PERFQ-M5-SIMD-BIT-TABLE",
