@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "performance_inventory_sha256": "43798bc7a9c81e371e5c3e37ca6d7809ad087ae438b70bee6e8562e9331a6448",
+  "performance_inventory_sha256": "1ff62c5aaebb8d47b1956d135fd5889d376ca2b397226ccdcaa142bcdfa60fb3",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -156,7 +156,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+          "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -199,7 +199,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+          "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -242,7 +242,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+          "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -285,7 +285,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+          "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -331,7 +331,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+          "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
         },
         {
           "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -375,7 +375,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+          "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
         },
         {
           "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -419,11 +419,97 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+          "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
         },
         {
           "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
           "sha256": "344b5fe4c5a5e8a61c0bf8c3676e7dddbb83cc1b277edd1444458c26f818f365"
+        }
+      ]
+    },
+    {
+      "id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "bit-matrix-transpose-in-place",
+      "measurement_ids": ["in-place-transpose"],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 65536,
+          "input_bytes": 8208,
+          "input_digest": "2a2a5f587d3c9fdb6fea43274c06ad453fcc76bbbcf6bcd9563991076cdf79da"
+        },
+        {
+          "id": "medium",
+          "work_items": 4194304,
+          "input_bytes": 524304,
+          "input_digest": "15e610ea94b541a52446f7ff48ff9ca9560f8dbef5f96232806d0bcbff95f054"
+        },
+        {
+          "id": "large",
+          "work_items": 268435456,
+          "input_bytes": 33554448,
+          "input_digest": "d68c253c0ca01452ce0624f0fdeb67dd92c85b442034b4b0e574286f3c9f636e"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-4d0291febfd22b68",
+        "cq-evidence-qualification-66e29faafe5f2856"
+      ],
+      "owner": "stab-core/bits",
+      "profiler_note": null,
+      "comparator_sources": [
+        {
+          "path": "benchmarks/stim_adapter/main.cc",
+          "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+        },
+        {
+          "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
+          "sha256": "fc6543e8acc83130fdeaced066e17f49d6e86132ab7b688fe953d567ff6cada2"
+        }
+      ]
+    },
+    {
+      "id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "bit-matrix-transpose-allocating",
+      "measurement_ids": ["allocating-transpose"],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 65536,
+          "input_bytes": 8208,
+          "input_digest": "2a2a5f587d3c9fdb6fea43274c06ad453fcc76bbbcf6bcd9563991076cdf79da"
+        },
+        {
+          "id": "medium",
+          "work_items": 4194304,
+          "input_bytes": 524304,
+          "input_digest": "15e610ea94b541a52446f7ff48ff9ca9560f8dbef5f96232806d0bcbff95f054"
+        },
+        {
+          "id": "large",
+          "work_items": 268435456,
+          "input_bytes": 33554448,
+          "input_digest": "d68c253c0ca01452ce0624f0fdeb67dd92c85b442034b4b0e574286f3c9f636e"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-4d0291febfd22b68",
+        "cq-evidence-qualification-66e29faafe5f2856"
+      ],
+      "owner": "stab-core/bits",
+      "profiler_note": null,
+      "comparator_sources": [
+        {
+          "path": "benchmarks/stim_adapter/main.cc",
+          "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+        },
+        {
+          "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
+          "sha256": "fc6543e8acc83130fdeaced066e17f49d6e86132ab7b688fe953d567ff6cada2"
         }
       ]
     }

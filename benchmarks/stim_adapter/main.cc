@@ -24,6 +24,7 @@
 #include "stim/gates/gates.h"
 #include "stim/mem/simd_bits.h"
 
+#include "bit_matrix_transpose_contract.h"
 #include "simd_bits_not_zero_contract.h"
 #include "simd_bits_xor_contract.h"
 #include "simd_word_popcount_contract.h"
@@ -152,8 +153,15 @@ Arguments parse_arguments(int argc, const char **argv) {
          result.measurement_id == "row-xor") ||
         (sparse_xor_kind(result.workload) == SparseXorKind::ITEM &&
          result.measurement_id == "xor-item");
+    const auto transpose_kind = stab_qualification::bit_matrix_transpose_kind(result.workload);
+    const bool bit_matrix_transpose =
+        (transpose_kind == stab_qualification::BitMatrixTransposeKind::IN_PLACE &&
+         result.measurement_id == "in-place-transpose") ||
+        (transpose_kind == stab_qualification::BitMatrixTransposeKind::ALLOCATING &&
+         result.measurement_id == "allocating-transpose");
     if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !gate_name_hash &&
-        !simd_word_popcount && !simd_bits_xor && !simd_bits_not_zero && !sparse_xor) {
+        !simd_word_popcount && !simd_bits_xor && !simd_bits_not_zero && !sparse_xor &&
+        !bit_matrix_transpose) {
         throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
@@ -835,6 +843,13 @@ int main(int argc, const char **argv) {
             sparse_xor.emplace(
                 sparse_xor_fixture(prepared_sparse_xor_kind.value(), arguments.work_items));
         }
+        const auto prepared_transpose_kind =
+            stab_qualification::bit_matrix_transpose_kind(arguments.workload);
+        std::optional<stab_qualification::BitMatrixTransposeFixture> transpose;
+        if (prepared_transpose_kind.has_value()) {
+            transpose.emplace(stab_qualification::bit_matrix_transpose_fixture(
+                prepared_transpose_kind.value(), arguments.work_items));
+        }
         const uint64_t input_bytes = popcount.has_value()
                                          ? popcount->input_bytes
                                      : dense_xor.has_value()
@@ -843,6 +858,8 @@ int main(int argc, const char **argv) {
                                          ? not_zero->input_bytes
                                      : sparse_xor.has_value()
                                          ? sparse_xor->input_bytes
+                                     : transpose.has_value()
+                                         ? transpose->input_bytes
                                          : static_cast<uint64_t>(circuit_fixture.size());
         const auto input_digest = popcount.has_value()
                                       ? popcount->input_digest
@@ -852,6 +869,8 @@ int main(int argc, const char **argv) {
                                       ? not_zero->input_digest
                                   : sparse_xor.has_value()
                                       ? sparse_xor->input_digest
+                                  : transpose.has_value()
+                                      ? transpose->input_digest
                                       : byte_digest(circuit_fixture);
 
         if (arguments.start_barrier) {
@@ -926,6 +945,12 @@ int main(int argc, const char **argv) {
                     prepared_sparse_xor.sweeps,
                     prepared_sparse_xor.buffer);
             });
+        } else if (prepared_transpose_kind.has_value()) {
+            auto &prepared_transpose = transpose.value();
+            elapsed_seconds = measure_workload([&]() {
+                stab_qualification::bit_matrix_transpose_contract(
+                    arguments.iterations, prepared_transpose);
+            });
         } else {
             throw std::invalid_argument("unreachable registered adapter workload");
         }
@@ -953,6 +978,9 @@ int main(int argc, const char **argv) {
         } else if (prepared_sparse_xor_kind.has_value()) {
             digest_state = sparse_xor_output_digest(
                 sparse_xor.value(), arguments.iterations, arguments.work_items);
+        } else if (prepared_transpose_kind.has_value()) {
+            digest_state = stab_qualification::bit_matrix_transpose_output_digest(
+                transpose.value(), arguments.iterations, arguments.work_items);
         }
         if (!(elapsed_seconds > 0)) {
             throw std::runtime_error("adapter measured a non-positive duration");

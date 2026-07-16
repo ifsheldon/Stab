@@ -28,6 +28,10 @@ const SIMD_BITS_NOT_ZERO_ALL_ZERO_PROBE_ID: &str = "pq2-simd-bits-not-zero-all-z
 const SIMD_BITS_NOT_ZERO_LATE_PROBE_ID: &str = "pq2-simd-bits-not-zero-late-adapter-smoke";
 const SPARSE_XOR_ROW_PROBE_ID: &str = "pq2-sparse-xor-row-adapter-smoke";
 const SPARSE_XOR_ITEM_PROBE_ID: &str = "pq2-sparse-xor-item-adapter-smoke";
+const BIT_MATRIX_TRANSPOSE_IN_PLACE_PROBE_ID: &str =
+    "pq2-bit-matrix-transpose-in-place-adapter-smoke";
+const BIT_MATRIX_TRANSPOSE_ALLOCATING_PROBE_ID: &str =
+    "pq2-bit-matrix-transpose-allocating-adapter-smoke";
 const SIMD_WORD_POPCOUNT_PROBE_ID: &str = "pq2-simd-word-popcount-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
@@ -35,6 +39,7 @@ const DEFAULT_PROBE_WORK_ITEMS: u64 = 4_096;
 const DEFAULT_GATE_HASH_WORK_ITEMS: u64 = 5_248;
 const DEFAULT_POPCOUNT_WORK_ITEMS: u64 = 262_144;
 const DEFAULT_NOT_ZERO_WORK_ITEMS: u64 = 10_000;
+const DEFAULT_TRANSPOSE_WORK_ITEMS: u64 = 65_536;
 const GATE_HASH_NAME_COUNT: u64 = 82;
 const POPCOUNT_ALIGNMENT_BITS: u64 = 256;
 const POPCOUNT_MIN_BITS: u64 = 512;
@@ -48,6 +53,9 @@ const SPARSE_XOR_ROW_BASE_WORK_ITEMS: u64 = 1_997;
 const SPARSE_XOR_ROW_MAX_WORK_ITEMS: u64 = 8_179_712;
 const SPARSE_XOR_ITEM_BASE_WORK_ITEMS: u64 = 7;
 const SPARSE_XOR_ITEM_MAX_WORK_ITEMS: u64 = 28_672;
+const TRANSPOSE_MIN_DIMENSION: u64 = 256;
+const TRANSPOSE_MAX_DIMENSION: u64 = 16_384;
+const TRANSPOSE_DIMENSION_ALIGNMENT: u64 = 256;
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 const CIRCUIT_PARSE_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
@@ -59,6 +67,10 @@ const SIMD_BITS_NOT_ZERO_ALL_ZERO_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-N
 const SIMD_BITS_NOT_ZERO_LATE_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE";
 const SPARSE_XOR_ROW_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SPARSE-XOR";
 const SPARSE_XOR_ITEM_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SPARSE-XOR-ITEM";
+const BIT_MATRIX_TRANSPOSE_IN_PLACE_RUNTIME_GROUP_ID: &str =
+    "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE";
+const BIT_MATRIX_TRANSPOSE_ALLOCATING_RUNTIME_GROUP_ID: &str =
+    "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum ProbeGroup {
@@ -86,6 +98,10 @@ enum ProbeGroup {
     SparseXorRowAdapter,
     #[value(name = "pq2-sparse-xor-item-adapter-smoke")]
     SparseXorItemAdapter,
+    #[value(name = "pq2-bit-matrix-transpose-in-place-adapter-smoke")]
+    BitMatrixTransposeInPlaceAdapter,
+    #[value(name = "pq2-bit-matrix-transpose-allocating-adapter-smoke")]
+    BitMatrixTransposeAllocatingAdapter,
 }
 
 impl ProbeGroup {
@@ -105,6 +121,12 @@ impl ProbeGroup {
             Self::SimdBitsNotZeroLateAdapter => Some(SIMD_BITS_NOT_ZERO_LATE_RUNTIME_GROUP_ID),
             Self::SparseXorRowAdapter => Some(SPARSE_XOR_ROW_RUNTIME_GROUP_ID),
             Self::SparseXorItemAdapter => Some(SPARSE_XOR_ITEM_RUNTIME_GROUP_ID),
+            Self::BitMatrixTransposeInPlaceAdapter => {
+                Some(BIT_MATRIX_TRANSPOSE_IN_PLACE_RUNTIME_GROUP_ID)
+            }
+            Self::BitMatrixTransposeAllocatingAdapter => {
+                Some(BIT_MATRIX_TRANSPOSE_ALLOCATING_RUNTIME_GROUP_ID)
+            }
         }
     }
 
@@ -123,6 +145,12 @@ impl ProbeGroup {
             SIMD_BITS_NOT_ZERO_LATE_RUNTIME_GROUP_ID => Some(Self::SimdBitsNotZeroLateAdapter),
             SPARSE_XOR_ROW_RUNTIME_GROUP_ID => Some(Self::SparseXorRowAdapter),
             SPARSE_XOR_ITEM_RUNTIME_GROUP_ID => Some(Self::SparseXorItemAdapter),
+            BIT_MATRIX_TRANSPOSE_IN_PLACE_RUNTIME_GROUP_ID => {
+                Some(Self::BitMatrixTransposeInPlaceAdapter)
+            }
+            BIT_MATRIX_TRANSPOSE_ALLOCATING_RUNTIME_GROUP_ID => {
+                Some(Self::BitMatrixTransposeAllocatingAdapter)
+            }
             _ => None,
         }
     }
@@ -204,7 +232,11 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         | ProbeGroup::SimdBitsNotZeroAllZeroAdapter
         | ProbeGroup::SimdBitsNotZeroLateAdapter
         | ProbeGroup::SparseXorRowAdapter
-        | ProbeGroup::SparseXorItemAdapter => run_adapter_probe(root, args).map(|_| ()),
+        | ProbeGroup::SparseXorItemAdapter
+        | ProbeGroup::BitMatrixTransposeInPlaceAdapter
+        | ProbeGroup::BitMatrixTransposeAllocatingAdapter => {
+            run_adapter_probe(root, args).map(|_| ())
+        }
     }
 }
 
@@ -319,6 +351,16 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
         ProbeGroup::SparseXorItemAdapter => {
             (SPARSE_XOR_ITEM_PROBE_ID, "sparse-xor-item", "xor-item")
         }
+        ProbeGroup::BitMatrixTransposeInPlaceAdapter => (
+            BIT_MATRIX_TRANSPOSE_IN_PLACE_PROBE_ID,
+            "bit-matrix-transpose-in-place",
+            "in-place-transpose",
+        ),
+        ProbeGroup::BitMatrixTransposeAllocatingAdapter => (
+            BIT_MATRIX_TRANSPOSE_ALLOCATING_PROBE_ID,
+            "bit-matrix-transpose-allocating",
+            "allocating-transpose",
+        ),
         ProbeGroup::ProcessContract => {
             return Err(ProbeError::Contract(
                 "process-only probe cannot use the adapter path".to_string(),
@@ -517,6 +559,8 @@ fn probe_work_items(args: &ProbeArgs) -> u64 {
             | ProbeGroup::SimdBitsNotZeroLateAdapter => DEFAULT_NOT_ZERO_WORK_ITEMS,
             ProbeGroup::SparseXorRowAdapter => SPARSE_XOR_ROW_BASE_WORK_ITEMS,
             ProbeGroup::SparseXorItemAdapter => SPARSE_XOR_ITEM_BASE_WORK_ITEMS,
+            ProbeGroup::BitMatrixTransposeInPlaceAdapter
+            | ProbeGroup::BitMatrixTransposeAllocatingAdapter => DEFAULT_TRANSPOSE_WORK_ITEMS,
             ProbeGroup::ProcessContract
             | ProbeGroup::AdapterProtocol
             | ProbeGroup::CircuitParseAdapter
@@ -582,7 +626,33 @@ fn validate_probe_work_items(group: ProbeGroup, work_items: u64) -> Result<(), P
             "sparse-XOR item probe work count {work_items} is not a positive complete callback through {SPARSE_XOR_ITEM_MAX_WORK_ITEMS} item toggles"
         )));
     }
+    if is_transpose_probe(group) {
+        let dimension = work_items.isqrt();
+        if dimension.saturating_mul(dimension) != work_items {
+            return Err(ProbeError::Contract(format!(
+                "bit-matrix transpose probe work count {work_items} is not a perfect square"
+            )));
+        }
+        if !(TRANSPOSE_MIN_DIMENSION..=TRANSPOSE_MAX_DIMENSION).contains(&dimension) {
+            return Err(ProbeError::Contract(format!(
+                "bit-matrix transpose probe dimension {dimension} is outside {TRANSPOSE_MIN_DIMENSION}..={TRANSPOSE_MAX_DIMENSION}"
+            )));
+        }
+        if !dimension.is_multiple_of(TRANSPOSE_DIMENSION_ALIGNMENT) {
+            return Err(ProbeError::Contract(format!(
+                "bit-matrix transpose probe dimension {dimension} is not a multiple of {TRANSPOSE_DIMENSION_ALIGNMENT}"
+            )));
+        }
+    }
     Ok(())
+}
+
+const fn is_transpose_probe(group: ProbeGroup) -> bool {
+    matches!(
+        group,
+        ProbeGroup::BitMatrixTransposeInPlaceAdapter
+            | ProbeGroup::BitMatrixTransposeAllocatingAdapter
+    )
 }
 
 const fn is_not_zero_probe(group: ProbeGroup) -> bool {
@@ -686,6 +756,8 @@ mod tests {
         assert!(ProtocolId::try_new(SIMD_BITS_NOT_ZERO_LATE_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(SPARSE_XOR_ROW_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(SPARSE_XOR_ITEM_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(BIT_MATRIX_TRANSPOSE_IN_PLACE_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(BIT_MATRIX_TRANSPOSE_ALLOCATING_PROBE_ID).is_ok());
     }
 
     #[test]
@@ -822,6 +894,31 @@ mod tests {
             assert!(
                 validate_probe_work_items(ProbeGroup::SparseXorItemAdapter, work_items).is_err()
             );
+        }
+    }
+
+    #[test]
+    fn transpose_probes_are_distinct_mapped_and_fully_bounded() {
+        let in_place = ProbeGroup::from_str(BIT_MATRIX_TRANSPOSE_IN_PLACE_PROBE_ID, true)
+            .expect("in-place probe");
+        let allocating = ProbeGroup::from_str(BIT_MATRIX_TRANSPOSE_ALLOCATING_PROBE_ID, true)
+            .expect("allocating probe");
+        assert_ne!(in_place, allocating);
+        assert_eq!(
+            in_place.runtime_group_id(),
+            Some(BIT_MATRIX_TRANSPOSE_IN_PLACE_RUNTIME_GROUP_ID)
+        );
+        assert_eq!(
+            allocating.runtime_group_id(),
+            Some(BIT_MATRIX_TRANSPOSE_ALLOCATING_RUNTIME_GROUP_ID)
+        );
+        for group in [in_place, allocating] {
+            for work_items in [DEFAULT_TRANSPOSE_WORK_ITEMS, 4_194_304, 268_435_456] {
+                assert!(validate_probe_work_items(group, work_items).is_ok());
+            }
+            for work_items in [65_025, 65_537, 66_049, 276_889_600] {
+                assert!(validate_probe_work_items(group, work_items).is_err());
+            }
         }
     }
 }

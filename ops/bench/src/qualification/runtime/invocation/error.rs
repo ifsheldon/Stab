@@ -137,6 +137,16 @@ pub(crate) enum InvocationError {
         stdout: String,
         stderr: String,
     },
+    #[error(
+        "{implementation} did not reject the {class} bit-matrix transpose work count before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
+    )]
+    BitMatrixTransposeWorkRejection {
+        implementation: Implementation,
+        class: &'static str,
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
     #[error("qualification invocation returned no measurement")]
     MissingMeasurement,
     #[error("qualification worker measured invalid duration {0}")]

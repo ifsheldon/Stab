@@ -4,6 +4,9 @@ use std::path::Path;
 use super::sparse_xor::{
     SparseXorRejectionClass, checked_sparse_xor_rejection, sparse_xor_rejection_expectation,
 };
+use super::transpose::{
+    TransposeRejectionClass, checked_transpose_rejection, transpose_rejection_expectation,
+};
 use super::*;
 
 fn contract_identity() -> WorkerContractIdentityEvidence {
@@ -40,7 +43,7 @@ fn canonical_worker_contract_preflight_binds_actual_receipts() {
     let probes = expected_contract_preflight_probes().expect("source-owned probes");
     let evidence = WorkerContractPreflightEvidence::from_actual_probes(contract_identity(), probes)
         .expect("valid contract evidence");
-    assert_eq!(evidence.probe_count(), 58);
+    assert_eq!(evidence.probe_count(), 86);
     assert!(evidence.validates_source_contract());
     let encoded = serde_json::to_vec(&evidence).expect("serialize preflight evidence");
     assert!(
@@ -503,6 +506,59 @@ fn invalid_sparse_xor_work_rejections_must_precede_the_start_barrier() {
         ),
         Err(InvocationError::SparseXorWorkRejection {
             class: "item-over-cap",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn invalid_transpose_work_rejections_must_precede_the_start_barrier() {
+    let output = |status, stdout: &str, stderr: &str| ProcessResult {
+        status,
+        stdout: stdout.as_bytes().to_vec(),
+        stderr: stderr.as_bytes().to_vec(),
+        parent_observed_peak_rss_bytes: None,
+        wall_elapsed: Duration::from_millis(1),
+    };
+    for class in TransposeRejectionClass::all() {
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            let (status, stderr) = transpose_rejection_expectation(implementation, class);
+            checked_transpose_rejection(&output(Some(status), "", stderr), implementation, class)
+                .expect("transpose work rejection");
+        }
+    }
+
+    assert!(matches!(
+        checked_transpose_rejection(
+            &output(
+                Some(2),
+                "",
+                "stim qualification adapter: start barrier must contain exactly one newline\n",
+            ),
+            Implementation::Stim,
+            TransposeRejectionClass::InPlaceNonSquare,
+        ),
+        Err(InvocationError::BitMatrixTransposeWorkRejection {
+            class: "in-place-non-square",
+            ..
+        })
+    ));
+    assert!(matches!(
+        checked_transpose_rejection(
+            &output(
+                Some(1),
+                "unexpected output\n",
+                transpose_rejection_expectation(
+                    Implementation::Stab,
+                    TransposeRejectionClass::AllocatingOverCap,
+                )
+                .1,
+            ),
+            Implementation::Stab,
+            TransposeRejectionClass::AllocatingOverCap,
+        ),
+        Err(InvocationError::BitMatrixTransposeWorkRejection {
+            class: "allocating-over-cap",
             ..
         })
     ));

@@ -18,6 +18,8 @@ const SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-
 const SIMD_BITS_NOT_ZERO_LATE_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE";
 const SPARSE_XOR_ROW_GROUP_ID: &str = "PERFQ-M5-SPARSE-XOR";
 const SPARSE_XOR_ITEM_GROUP_ID: &str = "PERFQ-M5-SPARSE-XOR-ITEM";
+const BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID: &str = "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE";
+const BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID: &str = "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING";
 const STIM_ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
 const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_word_popcount_contract.h";
@@ -25,6 +27,8 @@ const SIMD_BITS_XOR_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/simd_bits
 const SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_bits_not_zero_contract.h";
 const SPARSE_XOR_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/sparse_xor_contract.h";
+const BIT_MATRIX_TRANSPOSE_COMPARATOR_SOURCE: &str =
+    "benchmarks/stim_adapter/bit_matrix_transpose_contract.h";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
     "cq-evidence-qualification-e660819ae9a223c6",
@@ -44,6 +48,10 @@ const SIMD_BITS_XOR_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-ba252d42660a41ce",
 ];
 const SPARSE_XOR_CORRECTNESS_CASE: &str = "cq-evidence-qualification-bea77c19e9ae0b24";
+const BIT_MATRIX_TRANSPOSE_CORRECTNESS_CASES: [&str; 2] = [
+    "cq-evidence-qualification-4d0291febfd22b68",
+    "cq-evidence-qualification-66e29faafe5f2856",
+];
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
 struct NotZeroGroupSpec {
@@ -62,9 +70,112 @@ pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(
         SIMD_WORD_POPCOUNT_GROUP_ID => apply_simd_word_popcount(root, group)?,
         SIMD_BITS_XOR_GROUP_ID => apply_simd_bits_xor(root, group)?,
         SPARSE_XOR_ROW_GROUP_ID => apply_sparse_xor(root, group, false)?,
+        BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID => {
+            apply_bit_matrix_transpose(root, group, false)?;
+        }
+        BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID => {
+            apply_bit_matrix_transpose(root, group, true)?;
+        }
         _ => {}
     }
     Ok(())
+}
+
+fn apply_bit_matrix_transpose(
+    root: &RepoRoot,
+    group: &mut QualificationGroup,
+    allocating: bool,
+) -> Result<(), BenchError> {
+    group.phase = Phase::Execute;
+    group.runner_fidelity = RunnerFidelity::AdapterLibrary;
+    group.correctness_cases = BIT_MATRIX_TRANSPOSE_CORRECTNESS_CASES
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = bit_matrix_transpose_workload_family();
+    group.work_unit = "transposed-bits".to_string();
+    group.output_contract = OutputContract {
+        expected_shape: if allocating {
+            "Exactly sixteen little-endian u64 fields bind iteration count, declared work, dimension, allocating marker, four input-digest lanes, four result-digest lanes, and four unchanged-source-digest lanes."
+        } else {
+            "Exactly twelve little-endian u64 fields bind iteration count, declared work, dimension, in-place marker, four input-digest lanes, and four final-state-digest lanes."
+        }
+        .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: if allocating {
+            "Both workers keep one immutable source live, execute and discard two untimed public allocating transposes, time one public allocation and transpose per iteration while destroying the preceding result inside the timed body, retain the final result, and hash both result and unchanged source outside timing."
+        } else {
+            "Both workers execute two untimed public in-place transposes to restore the canonical matrix, time only public in-place calls behind matching compiler fences and optimizer-opaque mutable references, retain the final matrix, and hash it outside timing."
+        }
+        .to_string(),
+        comparator_sources: [STIM_ADAPTER_SOURCE, BIT_MATRIX_TRANSPOSE_COMPARATOR_SOURCE]
+            .into_iter()
+            .map(|path| comparator_source(root, path))
+            .collect::<Result<_, _>>()?,
+    };
+    group.memory_policy = circuit_memory_policy(if allocating {
+        "One immutable source and one retained result remain live after timing. Stab allocation instrumentation proves exactly one result-data allocation of dimension squared divided by eight bytes per public call at every scale and the accepted maximum; setup and peak RSS are report-only until PQ6."
+    } else {
+        "One mutable matrix remains live during timing. Stab allocation instrumentation proves zero calls and zero bytes for public in-place transpose at every scale and the accepted maximum; setup and peak RSS are report-only until PQ6."
+    });
+    group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.owner = "stab-core/bits".to_string();
+    group.reason = if allocating {
+        "Implemented paired pinned-Stim and Rust public allocating square transpose with exact API ownership, CQ2, deterministic non-symmetric input, semantic output, one-allocation, scale, timing, and bounded-worker contracts."
+    } else {
+        "Implemented paired pinned-Stim and Rust public in-place square transpose with exact API ownership, CQ2, deterministic non-symmetric input, semantic output, zero-allocation, scale, timing, and bounded-worker contracts."
+    }
+    .to_string();
+    group.status = QualificationStatus::Implemented;
+    Ok(())
+}
+
+fn bit_matrix_transpose_workload_family() -> WorkloadFamily {
+    WorkloadFamily {
+        fixture: FixtureLocator::Generated {
+            id: "bit-matrix-transpose-affine-splitmix64-v1".to_string(),
+        },
+        source: "src/stim/mem/simd_bit_table.perf.cc".to_string(),
+        deterministic_seed: "0xd1b54a32d192ed03".to_string(),
+        scales: [
+            (
+                "small",
+                256_u64,
+                65_536_u64,
+                8_208_u64,
+                "2a2a5f587d3c9fdb6fea43274c06ad453fcc76bbbcf6bcd9563991076cdf79da",
+            ),
+            (
+                "medium",
+                2_048,
+                4_194_304,
+                524_304,
+                "15e610ea94b541a52446f7ff48ff9ca9560f8dbef5f96232806d0bcbff95f054",
+            ),
+            (
+                "large",
+                16_384,
+                268_435_456,
+                33_554_448,
+                "d68c253c0ca01452ce0624f0fdeb67dd92c85b442034b4b0e574286f3c9f636e",
+            ),
+        ]
+        .into_iter()
+        .map(
+            |(id, dimension, transposed_bits, input_bytes, input_digest)| ScalePoint {
+                id: id.to_string(),
+                parameters: format!(
+                    "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension={dimension}; set_bits_per_row=8; seed=0xd1b54a32d192ed03"
+                ),
+                input_bytes: InputByteCount::Exact { bytes: input_bytes },
+                semantic_work: Some(transposed_bits),
+                input_digest: Some(input_digest.to_string()),
+            },
+        )
+        .collect(),
+    }
 }
 
 pub(super) fn additional_groups(

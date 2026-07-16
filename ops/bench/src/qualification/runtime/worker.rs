@@ -18,6 +18,7 @@ mod bits;
 mod error;
 mod not_zero;
 mod sparse_xor;
+mod transpose;
 
 pub(super) use error::WorkerError;
 
@@ -31,8 +32,9 @@ use bits::{
 };
 use not_zero::{NotZeroPattern, not_zero_fixture, not_zero_output_digest, simd_bits_not_zero};
 use sparse_xor::{SparseXorFixture, SparseXorKind};
+use transpose::{TransposeFixture, TransposeKind};
 
-const WORKER_SOURCES: [(&str, &[u8]); 5] = [
+const WORKER_SOURCES: [(&str, &[u8]); 6] = [
     ("worker.rs", include_bytes!("worker.rs")),
     ("worker/bits.rs", include_bytes!("worker/bits.rs")),
     ("worker/not_zero.rs", include_bytes!("worker/not_zero.rs")),
@@ -40,6 +42,7 @@ const WORKER_SOURCES: [(&str, &[u8]); 5] = [
         "worker/sparse_xor.rs",
         include_bytes!("worker/sparse_xor.rs"),
     ),
+    ("worker/transpose.rs", include_bytes!("worker/transpose.rs")),
     ("worker/error.rs", include_bytes!("worker/error.rs")),
 ];
 const DIAGNOSTIC_BUILD_FINGERPRINT: &str =
@@ -74,6 +77,8 @@ pub(crate) enum WorkerWorkload {
     SimdBitsNotZeroLate,
     SparseXorRow,
     SparseXorItem,
+    BitMatrixTransposeInPlace,
+    BitMatrixTransposeAllocating,
 }
 
 impl WorkerWorkload {
@@ -90,6 +95,8 @@ impl WorkerWorkload {
             Self::SimdBitsNotZeroLate => "simd-bits-not-zero-late",
             Self::SparseXorRow => "sparse-xor-row",
             Self::SparseXorItem => "sparse-xor-item",
+            Self::BitMatrixTransposeInPlace => "bit-matrix-transpose-in-place",
+            Self::BitMatrixTransposeAllocating => "bit-matrix-transpose-allocating",
         }
     }
 
@@ -106,6 +113,8 @@ impl WorkerWorkload {
             }
             Self::SparseXorRow => "row-xor",
             Self::SparseXorItem => "xor-item",
+            Self::BitMatrixTransposeInPlace => TransposeKind::InPlace.measurement(),
+            Self::BitMatrixTransposeAllocating => TransposeKind::Allocating.measurement(),
         }
     }
 
@@ -121,7 +130,9 @@ impl WorkerWorkload {
             | Self::SimdWordPopcount
             | Self::SimdBitsXor
             | Self::SparseXorRow
-            | Self::SparseXorItem => None,
+            | Self::SparseXorItem
+            | Self::BitMatrixTransposeInPlace
+            | Self::BitMatrixTransposeAllocating => None,
         }
     }
 
@@ -129,6 +140,14 @@ impl WorkerWorkload {
         match self {
             Self::SparseXorRow => Some(SparseXorKind::Row),
             Self::SparseXorItem => Some(SparseXorKind::Item),
+            _ => None,
+        }
+    }
+
+    const fn transpose_kind(self) -> Option<TransposeKind> {
+        match self {
+            Self::BitMatrixTransposeInPlace => Some(TransposeKind::InPlace),
+            Self::BitMatrixTransposeAllocating => Some(TransposeKind::Allocating),
             _ => None,
         }
     }
@@ -201,7 +220,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdBitsNotZeroZero
         | WorkerWorkload::SimdBitsNotZeroLate
         | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem => None,
+        | WorkerWorkload::SparseXorItem
+        | WorkerWorkload::BitMatrixTransposeInPlace
+        | WorkerWorkload::BitMatrixTransposeAllocating => None,
         WorkerWorkload::CircuitParse | WorkerWorkload::CircuitCanonicalPrint => {
             Some(circuit_parse_fixture(args.work_items.get())?)
         }
@@ -217,7 +238,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdBitsNotZeroZero
         | WorkerWorkload::SimdBitsNotZeroLate
         | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem => None,
+        | WorkerWorkload::SparseXorItem
+        | WorkerWorkload::BitMatrixTransposeInPlace
+        | WorkerWorkload::BitMatrixTransposeAllocating => None,
     };
     let mut dense_xor_fixture = match args.workload {
         WorkerWorkload::SimdBitsXor => Some(dense_xor_fixture(args.work_items.get())?),
@@ -230,7 +253,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdBitsNotZeroZero
         | WorkerWorkload::SimdBitsNotZeroLate
         | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem => None,
+        | WorkerWorkload::SparseXorItem
+        | WorkerWorkload::BitMatrixTransposeInPlace
+        | WorkerWorkload::BitMatrixTransposeAllocating => None,
     };
     let not_zero_fixture = args
         .workload
@@ -242,6 +267,11 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         .sparse_xor_kind()
         .map(|kind| SparseXorFixture::prepare(kind, args.work_items.get()))
         .transpose()?;
+    let mut transpose_fixture = args
+        .workload
+        .transpose_kind()
+        .map(|kind| TransposeFixture::prepare(kind, args.work_items.get()))
+        .transpose()?;
     let (input_bytes, input_digest_state) = if let Some(fixture) = &popcount_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else if let Some(fixture) = &dense_xor_fixture {
@@ -249,6 +279,8 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     } else if let Some(fixture) = &not_zero_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else if let Some(fixture) = &sparse_xor_fixture {
+        (fixture.input_bytes, fixture.input_digest)
+    } else if let Some(fixture) = &transpose_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else {
         let input = circuit_fixture.as_deref().unwrap_or_default().as_bytes();
@@ -283,7 +315,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdBitsNotZeroZero
         | WorkerWorkload::SimdBitsNotZeroLate
         | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem => None,
+        | WorkerWorkload::SparseXorItem
+        | WorkerWorkload::BitMatrixTransposeInPlace
+        | WorkerWorkload::BitMatrixTransposeAllocating => None,
     };
     let gate_hash_names = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_names()?),
@@ -296,7 +330,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdBitsNotZeroZero
         | WorkerWorkload::SimdBitsNotZeroLate
         | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem => None,
+        | WorkerWorkload::SparseXorItem
+        | WorkerWorkload::BitMatrixTransposeInPlace
+        | WorkerWorkload::BitMatrixTransposeAllocating => None,
     };
     let gate_hash_sweeps = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_sweeps(args.work_items.get())?),
@@ -309,7 +345,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdBitsNotZeroZero
         | WorkerWorkload::SimdBitsNotZeroLate
         | WorkerWorkload::SparseXorRow
-        | WorkerWorkload::SparseXorItem => None,
+        | WorkerWorkload::SparseXorItem
+        | WorkerWorkload::BitMatrixTransposeInPlace
+        | WorkerWorkload::BitMatrixTransposeAllocating => None,
     };
     let gate_hash_table_digest = gate_hash_names
         .as_deref()
@@ -417,6 +455,16 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 Ok(TimedWorkloadOutput::SparseXorComplete)
             })?
         }
+        WorkerWorkload::BitMatrixTransposeInPlace
+        | WorkerWorkload::BitMatrixTransposeAllocating => {
+            let fixture = transpose_fixture
+                .as_mut()
+                .ok_or(WorkerError::MissingTransposeFixture)?;
+            measure_workload(|| {
+                fixture.execute(args.iterations.get())?;
+                Ok(TimedWorkloadOutput::TransposeComplete)
+            })?
+        }
     };
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
@@ -465,6 +513,12 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
             let fixture = sparse_xor_fixture
                 .as_ref()
                 .ok_or(WorkerError::MissingSparseXorFixture)?;
+            semantic_digest(fixture.output_digest(args.iterations.get(), args.work_items.get())?)
+        }
+        TimedWorkloadOutput::TransposeComplete => {
+            let fixture = transpose_fixture
+                .as_ref()
+                .ok_or(WorkerError::MissingTransposeFixture)?;
             semantic_digest(fixture.output_digest(args.iterations.get(), args.work_items.get())?)
         }
     };
@@ -561,6 +615,7 @@ enum TimedWorkloadOutput {
     DenseXorComplete,
     NotZeroChecksum(u64),
     SparseXorComplete,
+    TransposeComplete,
 }
 
 impl WorkloadOutput {
@@ -828,6 +883,9 @@ mod not_zero_tests;
 
 #[cfg(test)]
 mod sparse_xor_tests;
+
+#[cfg(test)]
+mod transpose_tests;
 
 #[cfg(test)]
 mod tests {

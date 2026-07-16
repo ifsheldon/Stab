@@ -39,6 +39,10 @@ const SPARSE_XOR_COMPARATOR_PATHS: [&str; 2] = [
     "benchmarks/stim_adapter/main.cc",
     "benchmarks/stim_adapter/sparse_xor_contract.h",
 ];
+const BIT_MATRIX_TRANSPOSE_COMPARATOR_PATHS: [&str; 2] = [
+    "benchmarks/stim_adapter/main.cc",
+    "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
+];
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -468,6 +472,10 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
             }
             super::invocation::SPARSE_XOR_ROW_GROUP_ID
             | super::invocation::SPARSE_XOR_ITEM_GROUP_ID => SPARSE_XOR_COMPARATOR_PATHS.as_slice(),
+            super::invocation::BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID
+            | super::invocation::BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID => {
+                BIT_MATRIX_TRANSPOSE_COMPARATOR_PATHS.as_slice()
+            }
             _ => &[],
         };
         if measurement_ids.len() != group.measurement_ids.len()
@@ -751,6 +759,16 @@ mod tests {
                 "xor-item",
                 7,
             ),
+            transpose_contract(
+                super::super::invocation::BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID,
+                "bit-matrix-transpose-in-place",
+                "in-place-transpose",
+            ),
+            transpose_contract(
+                super::super::invocation::BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID,
+                "bit-matrix-transpose-allocating",
+                "allocating-transpose",
+            ),
         ]);
         GroupContractFile {
             schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
@@ -813,6 +831,40 @@ mod tests {
                     path: ComparatorSourcePath::try_new((*path).to_string())
                         .expect("comparator path"),
                     sha256: Sha256Digest::try_new("b".repeat(64)).expect("comparator digest"),
+                })
+                .collect(),
+        }
+    }
+
+    fn transpose_contract(
+        group_id: &str,
+        workload_id: &str,
+        measurement_id: &str,
+    ) -> GroupContract {
+        GroupContract {
+            id: ProtocolId::try_new(group_id).expect("group id"),
+            claim_class: ClaimClass::PromotablePerformance,
+            baseline_eligibility: BaselineEligibility::ThresholdEligible,
+            workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
+            measurement_ids: vec![ProtocolId::try_new(measurement_id).expect("measurement id")],
+            scales: vec![ScaleContract {
+                id: ProtocolId::try_new("small").expect("scale id"),
+                work_items: NonZeroU64::new(65_536).expect("positive work"),
+                input_bytes: 8_208,
+                input_digest: InputDigest::try_new("c".repeat(64)).expect("input digest"),
+            }],
+            correctness_case_ids: vec![
+                "cq-evidence-qualification-4d0291febfd22b68".to_string(),
+                "cq-evidence-qualification-66e29faafe5f2856".to_string(),
+            ],
+            owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
+            profiler_note: None,
+            comparator_sources: BIT_MATRIX_TRANSPOSE_COMPARATOR_PATHS
+                .iter()
+                .map(|path| ComparatorSourceContract {
+                    path: ComparatorSourcePath::try_new((*path).to_string())
+                        .expect("comparator path"),
+                    sha256: Sha256Digest::try_new("c".repeat(64)).expect("comparator digest"),
                 })
                 .collect(),
         }

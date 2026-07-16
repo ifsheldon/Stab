@@ -404,7 +404,11 @@ pub(super) fn generate(
     }
     groups.extend(graduation::additional_groups(root, &groups)?);
     groups.push(resource_boundary_group());
-    groups.extend(api::qualification_groups(&correctness));
+    let mut api_groups = api::qualification_groups(&correctness);
+    for group in &mut api_groups {
+        graduation::apply(root, group)?;
+    }
+    groups.extend(api_groups);
     groups.extend(checklist_qualification_groups(&raw_checklist));
     groups.sort_by(|left, right| left.id.cmp(&right.id));
     row_dispositions.sort_by(|left, right| left.id.cmp(&right.id));

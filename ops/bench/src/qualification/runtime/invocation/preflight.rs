@@ -17,6 +17,17 @@ use super::sparse_xor::{
     SPARSE_ROW_MAX_OUTPUT_DIGEST, SPARSE_ROW_MAX_WORK_ITEMS, SPARSE_ROW_SMALL_CASE_ID,
     SPARSE_ROW_SMALL_OUTPUT_DIGEST, SparseXorRejectionClass, sparse_xor_rejection_expectation,
 };
+use super::transpose::{
+    TRANSPOSE_ALLOCATING_EVEN_CASE_ID, TRANSPOSE_ALLOCATING_EVEN_OUTPUT_DIGEST,
+    TRANSPOSE_ALLOCATING_MAX_CASE_ID, TRANSPOSE_ALLOCATING_MAX_OUTPUT_DIGEST,
+    TRANSPOSE_ALLOCATING_ODD_CASE_ID, TRANSPOSE_ALLOCATING_ODD_OUTPUT_DIGEST,
+    TRANSPOSE_IN_PLACE_EVEN_CASE_ID, TRANSPOSE_IN_PLACE_EVEN_OUTPUT_DIGEST,
+    TRANSPOSE_IN_PLACE_MAX_CASE_ID, TRANSPOSE_IN_PLACE_MAX_OUTPUT_DIGEST,
+    TRANSPOSE_IN_PLACE_ODD_CASE_ID, TRANSPOSE_IN_PLACE_ODD_OUTPUT_DIGEST,
+    TRANSPOSE_MAX_INPUT_BYTES, TRANSPOSE_MAX_INPUT_DIGEST, TRANSPOSE_MAX_WORK_ITEMS,
+    TRANSPOSE_SMALL_INPUT_BYTES, TRANSPOSE_SMALL_INPUT_DIGEST, TRANSPOSE_SMALL_WORK_ITEMS,
+    TransposeRejectionClass, transpose_rejection_expectation,
+};
 use super::{
     CIRCUIT_CAP_CASE_ID, CONTRACT_PREFLIGHT_SCHEMA_VERSION, DENSE_XOR_ALIGNMENT_CASE_ID,
     DENSE_XOR_CAP_CASE_ID, DENSE_XOR_EVEN_CASE_ID, DENSE_XOR_MAXIMUM_CASE_ID,
@@ -159,7 +170,7 @@ fn sha256_hex_bytes(bytes: &[u8]) -> Result<String, InvocationError> {
 
 pub(super) fn expected_contract_preflight_probes()
 -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
-    let mut probes = Vec::with_capacity(58);
+    let mut probes = Vec::with_capacity(86);
     let protocol_output_digest = protocol_smoke_output_digest();
     for implementation in [Implementation::Stim, Implementation::Stab] {
         probes.push(expected_accepted_probe(
@@ -210,6 +221,70 @@ pub(super) fn expected_contract_preflight_probes()
                 implementation,
                 1,
                 work_items,
+                input_bytes,
+                input_digest,
+                output_digest,
+            )?);
+        }
+    }
+    for implementation in [Implementation::Stim, Implementation::Stab] {
+        for (case_id, iterations, work_items, input_bytes, input_digest, output_digest) in [
+            (
+                TRANSPOSE_IN_PLACE_ODD_CASE_ID,
+                1,
+                TRANSPOSE_SMALL_WORK_ITEMS,
+                TRANSPOSE_SMALL_INPUT_BYTES,
+                TRANSPOSE_SMALL_INPUT_DIGEST,
+                TRANSPOSE_IN_PLACE_ODD_OUTPUT_DIGEST,
+            ),
+            (
+                TRANSPOSE_IN_PLACE_EVEN_CASE_ID,
+                2,
+                TRANSPOSE_SMALL_WORK_ITEMS,
+                TRANSPOSE_SMALL_INPUT_BYTES,
+                TRANSPOSE_SMALL_INPUT_DIGEST,
+                TRANSPOSE_IN_PLACE_EVEN_OUTPUT_DIGEST,
+            ),
+            (
+                TRANSPOSE_IN_PLACE_MAX_CASE_ID,
+                1,
+                TRANSPOSE_MAX_WORK_ITEMS,
+                TRANSPOSE_MAX_INPUT_BYTES,
+                TRANSPOSE_MAX_INPUT_DIGEST,
+                TRANSPOSE_IN_PLACE_MAX_OUTPUT_DIGEST,
+            ),
+            (
+                TRANSPOSE_ALLOCATING_ODD_CASE_ID,
+                1,
+                TRANSPOSE_SMALL_WORK_ITEMS,
+                TRANSPOSE_SMALL_INPUT_BYTES,
+                TRANSPOSE_SMALL_INPUT_DIGEST,
+                TRANSPOSE_ALLOCATING_ODD_OUTPUT_DIGEST,
+            ),
+            (
+                TRANSPOSE_ALLOCATING_EVEN_CASE_ID,
+                2,
+                TRANSPOSE_SMALL_WORK_ITEMS,
+                TRANSPOSE_SMALL_INPUT_BYTES,
+                TRANSPOSE_SMALL_INPUT_DIGEST,
+                TRANSPOSE_ALLOCATING_EVEN_OUTPUT_DIGEST,
+            ),
+            (
+                TRANSPOSE_ALLOCATING_MAX_CASE_ID,
+                1,
+                TRANSPOSE_MAX_WORK_ITEMS,
+                TRANSPOSE_MAX_INPUT_BYTES,
+                TRANSPOSE_MAX_INPUT_DIGEST,
+                TRANSPOSE_ALLOCATING_MAX_OUTPUT_DIGEST,
+            ),
+        ] {
+            probes.push(expected_accepted_probe(
+                case_id,
+                implementation,
+                iterations,
+                iterations
+                    .checked_mul(work_items)
+                    .ok_or(InvocationError::WorkOverflow)?,
                 input_bytes,
                 input_digest,
                 output_digest,
@@ -367,6 +442,17 @@ pub(super) fn expected_contract_preflight_probes()
     for class in SparseXorRejectionClass::all() {
         for implementation in [Implementation::Stim, Implementation::Stab] {
             let (exit_status, stderr) = sparse_xor_rejection_expectation(implementation, class);
+            probes.push(expected_rejected_probe(
+                class.case_id(),
+                implementation,
+                exit_status,
+                stderr,
+            )?);
+        }
+    }
+    for class in TransposeRejectionClass::all() {
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            let (exit_status, stderr) = transpose_rejection_expectation(implementation, class);
             probes.push(expected_rejected_probe(
                 class.case_id(),
                 implementation,

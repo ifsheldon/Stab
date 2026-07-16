@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "performance_inventory_sha256": "43798bc7a9c81e371e5c3e37ca6d7809ad087ae438b70bee6e8562e9331a6448",
+  "performance_inventory_sha256": "1ff62c5aaebb8d47b1956d135fd5889d376ca2b397226ccdcaa142bcdfa60fb3",
   "groups": [
     {
       "group_id": "pq1-adapter-protocol-smoke",
@@ -112,6 +112,28 @@
       "measurements": [
         {
           "measurement_id": "xor-item",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "in-place-transpose",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "allocating-transpose",
           "max_median_ratio": "1.25",
           "max_confidence_interval_upper": "1.25"
         }

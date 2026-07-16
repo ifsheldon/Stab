@@ -108,6 +108,28 @@ pub(crate) enum WorkerError {
     SparseXorPrimingState(&'static str),
     #[error("sparse XOR workload was invoked without its prepared fixture")]
     MissingSparseXorFixture,
+    #[error("bit-matrix transpose work count {0} is not a perfect square")]
+    TransposeWorkNotSquare(u64),
+    #[error("bit-matrix transpose dimension {actual} is below the minimum {minimum}")]
+    TransposeDimensionMinimum { actual: u64, minimum: u64 },
+    #[error("bit-matrix transpose dimension {actual} is not a multiple of {alignment}")]
+    TransposeDimensionAlignment { actual: u64, alignment: u64 },
+    #[error("bit-matrix transpose dimension {actual} exceeds maximum {maximum}")]
+    TransposeDimensionLimit { actual: u64, maximum: u64 },
+    #[error("bit-matrix transpose dimension {0} cannot be represented on this host")]
+    TransposeDimensionRange(u64),
+    #[error("bit-matrix transpose canonical byte count overflows u64")]
+    TransposeByteCountOverflow,
+    #[error("bit-matrix transpose fixture affine calculation overflows u64")]
+    TransposeAffineOverflow,
+    #[error("{0} warmup did not restore the canonical bit-matrix state")]
+    TransposePrimingState(&'static str),
+    #[error("bit-matrix transpose workload was invoked without its prepared fixture")]
+    MissingTransposeFixture,
+    #[error("allocating bit-matrix transpose produced no retained result")]
+    MissingTransposeResult,
+    #[error("allocating bit-matrix transpose modified its source matrix")]
+    TransposeSourceChanged,
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]

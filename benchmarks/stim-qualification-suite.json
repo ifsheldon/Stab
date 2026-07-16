@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "5d795e831bc20b3f2780ca72c1eaea7c75387388d38f8e37f4539254a41e821b",
-  "semantic_digest": "43798bc7a9c81e371e5c3e37ca6d7809ad087ae438b70bee6e8562e9331a6448",
+  "semantic_digest": "1ff62c5aaebb8d47b1956d135fd5889d376ca2b397226ccdcaa142bcdfa60fb3",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -62335,46 +62335,66 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-qualification-4d0291febfd22b68"
+        "cq-evidence-qualification-4d0291febfd22b68",
+        "cq-evidence-qualification-66e29faafe5f2856"
       ],
-      "correctness_binding": "exact-api-owners",
+      "correctness_binding": "exact-cases",
       "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
           "kind": "generated",
-          "id": "api-small-medium-large-17-PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING"
+          "id": "bit-matrix-transpose-affine-splitmix64-v1"
         },
-        "source": "oracle/qualification-manifest.json",
-        "deterministic_seed": "17",
+        "source": "src/stim/mem/simd_bit_table.perf.cc",
+        "deterministic_seed": "0xd1b54a32d192ed03",
         "scales": [
           {
             "id": "small",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-0296dbd0b172287d",
+            "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=256; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 8208
+            },
+            "semantic_work": 65536,
+            "input_digest": "2a2a5f587d3c9fdb6fea43274c06ad453fcc76bbbcf6bcd9563991076cdf79da"
           },
           {
             "id": "medium",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-0296dbd0b172287d",
+            "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=2048; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 524304
+            },
+            "semantic_work": 4194304,
+            "input_digest": "15e610ea94b541a52446f7ff48ff9ca9560f8dbef5f96232806d0bcbff95f054"
           },
           {
             "id": "large",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-0296dbd0b172287d",
+            "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=16384; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 33554448
+            },
+            "semantic_work": 268435456,
+            "input_digest": "d68c253c0ca01452ce0624f0fdeb67dd92c85b442034b4b0e574286f3c9f636e"
           }
         ]
       },
-      "work_unit": "bits",
+      "work_unit": "transposed-bits",
       "output_contract": {
-        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::BitMatrix with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
-        "digest_state": "planned",
-        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+        "expected_shape": "Exactly sixteen little-endian u64 fields bind iteration count, declared work, dimension, allocating marker, four input-digest lanes, four result-digest lanes, and four unchanged-source-digest lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers keep one immutable source live, execute and discard two untimed public allocating transposes, time one public allocation and transpose per iteration while destroying the preceding result inside the timed body, retain the final result, and hash both result and unchanged source outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+          },
+          {
+            "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
+            "sha256": "fc6543e8acc83130fdeaced066e17f49d6e86132ab7b688fe953d567ff6cada2"
+          }
+        ]
       },
       "timing_policy": {
         "calibration_min_ms": 250,
@@ -62386,18 +62406,18 @@
         "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
       },
       "memory_policy": {
-        "method": "stab-allocations",
+        "method": "process-rss",
         "scale_ids": [
           "small",
           "medium",
           "large"
         ],
-        "expected_growth": "linear in record or bit width"
+        "expected_growth": "One immutable source and one retained result remain live after timing. Stab allocation instrumentation proves exactly one result-data allocation of dimension squared divided by eight bytes per public call at every scale and the accepted maximum; setup and peak RSS are report-only until PQ6."
       },
-      "threshold_policy": "report-only",
-      "reason": "Behavioral API paths owned by stab_core::BitMatrix in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust public allocating square transpose with exact API ownership, CQ2, deterministic non-symmetric input, semantic output, one-allocation, scale, timing, and bounded-worker contracts.",
       "owner": "stab-core/bits",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE",
@@ -62414,46 +62434,66 @@
       "phase": "execute",
       "runner_fidelity": "adapter-library",
       "correctness_cases": [
-        "cq-evidence-qualification-4d0291febfd22b68"
+        "cq-evidence-qualification-4d0291febfd22b68",
+        "cq-evidence-qualification-66e29faafe5f2856"
       ],
-      "correctness_binding": "exact-api-owners",
+      "correctness_binding": "exact-cases",
       "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
           "kind": "generated",
-          "id": "api-small-medium-large-17-PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE"
+          "id": "bit-matrix-transpose-affine-splitmix64-v1"
         },
-        "source": "oracle/qualification-manifest.json",
-        "deterministic_seed": "17",
+        "source": "src/stim/mem/simd_bit_table.perf.cc",
+        "deterministic_seed": "0xd1b54a32d192ed03",
         "scales": [
           {
             "id": "small",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-d3b99ead38282ccc",
+            "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=256; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 8208
+            },
+            "semantic_work": 65536,
+            "input_digest": "2a2a5f587d3c9fdb6fea43274c06ad453fcc76bbbcf6bcd9563991076cdf79da"
           },
           {
             "id": "medium",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-d3b99ead38282ccc",
+            "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=2048; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 524304
+            },
+            "semantic_work": 4194304,
+            "input_digest": "15e610ea94b541a52446f7ff48ff9ca9560f8dbef5f96232806d0bcbff95f054"
           },
           {
             "id": "large",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-d3b99ead38282ccc",
+            "parameters": "generator=bit-matrix-transpose-affine-splitmix64-v1; dimension=16384; set_bits_per_row=8; seed=0xd1b54a32d192ed03",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 33554448
+            },
+            "semantic_work": 268435456,
+            "input_digest": "d68c253c0ca01452ce0624f0fdeb67dd92c85b442034b4b0e574286f3c9f636e"
           }
         ]
       },
-      "work_unit": "bits",
+      "work_unit": "transposed-bits",
       "output_contract": {
-        "expected_shape": "One exact named submeasurement per public_api_items path under stab_core::BitMatrix with equal work count and semantic output digest; unlike API paths must never be aggregated into one ratio.",
-        "digest_state": "planned",
-        "sink_policy": "The Stim adapter and Stab worker fully consume equivalent output outside the timed digest preflight."
+        "expected_shape": "Exactly twelve little-endian u64 fields bind iteration count, declared work, dimension, in-place marker, four input-digest lanes, and four final-state-digest lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers execute two untimed public in-place transposes to restore the canonical matrix, time only public in-place calls behind matching compiler fences and optimizer-opaque mutable references, retain the final matrix, and hash it outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+          },
+          {
+            "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
+            "sha256": "fc6543e8acc83130fdeaced066e17f49d6e86132ab7b688fe953d567ff6cada2"
+          }
+        ]
       },
       "timing_policy": {
         "calibration_min_ms": 250,
@@ -62465,18 +62505,18 @@
         "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
       },
       "memory_policy": {
-        "method": "stab-allocations",
+        "method": "process-rss",
         "scale_ids": [
           "small",
           "medium",
           "large"
         ],
-        "expected_growth": "linear in record or bit width"
+        "expected_growth": "One mutable matrix remains live during timing. Stab allocation instrumentation proves zero calls and zero bytes for public in-place transpose at every scale and the accepted maximum; setup and peak RSS are report-only until PQ6."
       },
-      "threshold_policy": "report-only",
-      "reason": "Behavioral API paths owned by stab_core::BitMatrix in the same phase have no truthful inherited parent workload; PQ2 through PQ5 must implement every exact named submeasurement or explicitly reclassify the path.",
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust public in-place square transpose with exact API ownership, CQ2, deterministic non-symmetric input, semantic output, zero-allocation, scale, timing, and bounded-worker contracts.",
       "owner": "stab-core/bits",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M5-SIMD-BIT-TABLE",
@@ -62601,7 +62641,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -62697,7 +62737,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62793,7 +62833,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62889,7 +62929,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62986,7 +63026,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
           },
           {
             "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -63081,7 +63121,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -63176,7 +63216,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
