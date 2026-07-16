@@ -237,7 +237,7 @@ fn report_rederives_the_common_batch_mode() {
         acceptance_minimum_seconds: 0.25,
         target_minimum_seconds: 0.35,
         maximum_seconds: 2.0,
-        wide_ratio_maximum_seconds: 10.0,
+        wide_ratio_maximum_seconds: 20.0,
         common_batch_mode: CommonBatchMode::Standard,
         stim: calibration(Implementation::Stim),
         stab: calibration(Implementation::Stab),

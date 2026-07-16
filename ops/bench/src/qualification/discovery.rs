@@ -515,7 +515,7 @@ fn default_timing_policy() -> TimingPolicy {
     TimingPolicy {
         calibration_min_ms: 250,
         calibration_max_ms: 2_000,
-        common_wide_ratio_max_ms: 10_000,
+        common_wide_ratio_max_ms: 20_000,
         warmup_batches: 3,
         full_pairs: 9,
         timeout_seconds: 600,

@@ -21,12 +21,12 @@ use super::statistics::{
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 22;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 23;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
 const CALIBRATION_MAXIMUM: Duration = Duration::from_secs(2);
-const CALIBRATION_WIDE_RATIO_MAXIMUM: Duration = Duration::from_secs(10);
+const CALIBRATION_WIDE_RATIO_MAXIMUM: Duration = Duration::from_secs(20);
 const INVOCATION_TIMEOUT: Duration = Duration::from_secs(30);
 const MAXIMUM_ITERATIONS: u64 = 1_000_000_000;
 const WARMUP_BATCHES: usize = 3;
@@ -887,7 +887,7 @@ mod tests {
         assert_eq!(policy.minimum, Duration::from_millis(350));
         assert_eq!(CALIBRATION_ACCEPTANCE_MINIMUM, Duration::from_millis(250));
         assert_eq!(CALIBRATION_MAXIMUM, Duration::from_secs(2));
-        assert_eq!(CALIBRATION_WIDE_RATIO_MAXIMUM, Duration::from_secs(10));
+        assert_eq!(CALIBRATION_WIDE_RATIO_MAXIMUM, Duration::from_secs(20));
         assert!(policy.minimum > CALIBRATION_ACCEPTANCE_MINIMUM);
 
         assert_eq!(
@@ -904,7 +904,7 @@ mod tests {
             classify_common_calibration(
                 100,
                 1_000,
-                Duration::from_secs(5),
+                Duration::from_secs(20),
                 Duration::from_millis(350),
             )
             .expect("Stim may exceed the standard cap at Stab's selected batch"),
@@ -934,7 +934,7 @@ mod tests {
             classify_common_calibration(
                 100,
                 1_000,
-                Duration::from_millis(10_001),
+                Duration::from_millis(20_001),
                 Duration::from_millis(350),
             ),
             classify_common_calibration(

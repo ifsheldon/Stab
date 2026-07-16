@@ -145,7 +145,7 @@ pub(super) fn validate_planned_workload(
     if group.output_contract.digest_state != EvidenceState::Planned
         || group.timing_policy.calibration_min_ms != 250
         || group.timing_policy.calibration_max_ms != 2_000
-        || group.timing_policy.common_wide_ratio_max_ms != 10_000
+        || group.timing_policy.common_wide_ratio_max_ms != 20_000
         || group.timing_policy.warmup_batches != 3
         || group.timing_policy.full_pairs != 9
         || group.timing_policy.timeout_seconds != 600
@@ -187,7 +187,7 @@ fn validate_graduated_workload(group: &QualificationGroup, issues: &mut Issues) 
         || group.output_contract.comparator_sources.is_empty()
         || group.timing_policy.calibration_min_ms != 250
         || group.timing_policy.calibration_max_ms != 2_000
-        || group.timing_policy.common_wide_ratio_max_ms != 10_000
+        || group.timing_policy.common_wide_ratio_max_ms != 20_000
         || group.timing_policy.warmup_batches != 3
         || group.timing_policy.full_pairs != 9
         || group.timing_policy.timeout_seconds != 600

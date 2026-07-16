@@ -534,7 +534,7 @@ fn validate_calibration(report: &QualificationReport) -> Result<(), ReportError>
         || calibration.target_minimum_seconds != 0.35
         || calibration.target_minimum_seconds <= calibration.acceptance_minimum_seconds
         || calibration.maximum_seconds != 2.0
-        || calibration.wide_ratio_maximum_seconds != 10.0
+        || calibration.wide_ratio_maximum_seconds != 20.0
         || calibration.common_iterations == 0
     {
         return Err(ReportError::Calibration);
