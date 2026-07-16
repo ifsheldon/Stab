@@ -90,13 +90,21 @@ fn dense_xor_constructs_and_executes_the_accepted_maximum() {
 #[cfg(feature = "count-allocations")]
 #[test]
 fn dense_xor_timed_mutation_allocates_nothing() {
-    let mut fixture = dense_xor_fixture(262_144).expect("medium fixture");
-    let allocations = allocation_counter::measure(|| {
-        dense_xor(2, &mut fixture).expect("dense XOR workload");
-    });
+    for bit_count in [4_096, 262_144, 16_777_216, DENSE_XOR_MAX_BITS] {
+        let mut fixture = dense_xor_fixture(bit_count).expect("source-owned fixture");
+        let allocations = allocation_counter::measure(|| {
+            dense_xor(2, &mut fixture).expect("dense XOR workload");
+        });
 
-    assert_eq!(allocations.count_total, 0, "{allocations:?}");
-    assert_eq!(allocations.bytes_total, 0, "{allocations:?}");
+        assert_eq!(
+            allocations.count_total, 0,
+            "bit_count={bit_count} {allocations:?}"
+        );
+        assert_eq!(
+            allocations.bytes_total, 0,
+            "bit_count={bit_count} {allocations:?}"
+        );
+    }
 }
 
 #[test]

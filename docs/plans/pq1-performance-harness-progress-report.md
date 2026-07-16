@@ -18,7 +18,7 @@ The sole executable group, `pq1-adapter-protocol-smoke`, is immutable diagnostic
 | --- | --- | --- |
 | Schema-versioned performance inventory and validator | Satisfied | `benchmarks/stim-qualification-suite.json`; `just bench::qualification-check`; checked performance digest above |
 | Symmetric bounded process execution | Satisfied | `ops/bench/src/qualification/runtime/process.rs`; success, exit, signal, timeout, output-limit, process-group cleanup, start-barrier, affinity, and file-limit tests |
-| Pinned-Stim adapter and Stab worker protocol | Satisfied | `benchmarks/stim_adapter/main.cc`; `ops/bench/src/qualification/runtime/adapter.rs`; `stab_build.rs`; `worker.rs`; protocol and build-receipt tests |
+| Pinned-Stim adapter and Stab worker protocol | Satisfied | `benchmarks/stim_adapter/main.cc`; `ops/bench/src/qualification/runtime/adapter.rs`; `stab_build.rs`; `worker.rs`; `worker/bits.rs`; protocol and build-receipt tests |
 | Deterministic calibration and paired statistics | Satisfied | `calibration.rs`; `statistics.rs`; three warmups; 3, 9, and 15 retained pairs; fixed-seed bootstrap interval and paired-ratio MAD tests |
 | Exact measurement and output binding | Satisfied | Runtime-group registry, semantic preflight at the common calibrated batch, parent-derived work counts, exact measurement pairing, and hostile report mutation tests |
 | CQ correctness preflight seam | Satisfied | Canonical CQ request, report, completion, preflight, and per-case execution receipts are independently reconstructed; a real 410-case CQ soak artifact passed the consumer schema probe after resolved oracle and ops selector digests were handled correctly |

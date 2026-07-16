@@ -15,12 +15,18 @@ use super::worker;
 use super::worker::WorkerIdentity;
 use crate::root::RepoRoot;
 
-const RECEIPT_SCHEMA_VERSION: u32 = 1;
+const RECEIPT_SCHEMA_VERSION: u32 = 2;
 const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const BUILD_OUTPUT_LIMIT: usize = 16 << 20;
 const MAX_SOURCE_INPUT_BYTES: u64 = 16 << 20;
 const RUNTIME_PARENT: &str = "/tmp";
-const WORKER_SOURCE_PATH: &str = "ops/bench/src/qualification/runtime/worker.rs";
+const WORKER_SOURCES: [(&str, &str); 2] = [
+    ("worker.rs", "ops/bench/src/qualification/runtime/worker.rs"),
+    (
+        "worker/bits.rs",
+        "ops/bench/src/qualification/runtime/worker/bits.rs",
+    ),
+];
 const FINGERPRINT_PLACEHOLDER: &str = "$FINGERPRINT";
 const RUNTIME_PLACEHOLDER: &str = "$RUNTIME";
 const SOURCE_PLACEHOLDER: &str = "$SOURCE";
@@ -31,7 +37,7 @@ pub(super) struct StabWorkerExecutable {
     executable: SealedExecutable,
     identity: WorkerIdentity,
     receipt: StabBuildReceipt,
-    source_path: PathBuf,
+    source_root: PathBuf,
 }
 
 impl StabWorkerExecutable {
@@ -56,7 +62,6 @@ impl StabWorkerExecutable {
         super::git::materialize_repository_commit(root, repository_commit, &source)?;
         link_cargo_cache(&cargo_home)?;
 
-        let worker_source_path = source.join(WORKER_SOURCE_PATH);
         let worker_source_sha256 = digest_materialized_worker_source(&source)?;
         let cargo_lock_sha256 = digest_file(&source.join("Cargo.lock"))?;
         let workspace_manifest_sha256 = digest_file(&source.join("Cargo.toml"))?;
@@ -136,7 +141,7 @@ impl StabWorkerExecutable {
             executable,
             identity,
             receipt,
-            source_path: worker_source_path,
+            source_root: source,
         };
         worker.verify(toolchain, repository_commit)?;
         Ok(worker)
@@ -164,7 +169,8 @@ impl StabWorkerExecutable {
         repository_commit: &str,
     ) -> Result<(), StabBuildError> {
         self.executable.verify()?;
-        if digest_file(&self.source_path)? != self.receipt.worker_source_sha256
+        if digest_materialized_worker_source(&self.source_root)?
+            != self.receipt.worker_source_sha256
             || self.receipt.binary_sha256 != self.executable.sha256()
             || !self.receipt.validates_report_identity(
                 self.identity.source_digest.as_str(),
@@ -466,7 +472,28 @@ fn digest_file(path: &Path) -> Result<String, StabBuildError> {
 }
 
 fn digest_materialized_worker_source(source: &Path) -> Result<String, StabBuildError> {
-    digest_file(&source.join(WORKER_SOURCE_PATH))
+    let mut digest = Sha256::new();
+    for (logical_path, repository_path) in WORKER_SOURCES {
+        let bytes = crate::source_file::read_regular_file_bounded(
+            &source.join(repository_path),
+            usize::try_from(MAX_SOURCE_INPUT_BYTES)
+                .map_err(|_| StabBuildError::SourceInput("source byte limit".to_string()))?,
+        )
+        .map_err(|error| StabBuildError::SourceInput(error.to_string()))?;
+        digest.update(
+            u64::try_from(logical_path.len())
+                .map_err(|_| StabBuildError::SourceInput("logical path length".to_string()))?
+                .to_le_bytes(),
+        );
+        digest.update(logical_path.as_bytes());
+        digest.update(
+            u64::try_from(bytes.len())
+                .map_err(|_| StabBuildError::SourceInput("source length".to_string()))?
+                .to_le_bytes(),
+        );
+        digest.update(bytes);
+    }
+    Ok(hex_digest(&digest.finalize()))
 }
 
 fn valid_receipt_digest(value: &str) -> bool {
@@ -512,6 +539,8 @@ pub(super) enum StabBuildError {
     },
     #[error("private Stab build receipt has invalid {0}")]
     InvalidDigest(&'static str),
+    #[error("private Stab worker source collection is invalid: {0}")]
+    SourceInput(String),
     #[error("private Stab build environment contains duplicate names")]
     DuplicateEnvironment,
     #[error("private Stab build path is not UTF-8: {0}")]
@@ -549,16 +578,36 @@ mod tests {
     #[test]
     fn worker_receipt_hashes_the_materialized_source() {
         let runtime = tempfile::tempdir().expect("temporary source tree");
-        let worker_path = runtime.path().join(WORKER_SOURCE_PATH);
-        std::fs::create_dir_all(worker_path.parent().expect("worker parent"))
-            .expect("materialized source directories");
-        std::fs::write(&worker_path, b"materialized worker source\n")
-            .expect("materialized worker source");
+        for (_, path) in WORKER_SOURCES {
+            let source_path = runtime.path().join(path);
+            std::fs::create_dir_all(source_path.parent().expect("worker parent"))
+                .expect("materialized source directories");
+            std::fs::write(&source_path, format!("materialized {path}\n"))
+                .expect("materialized worker source");
+        }
 
         let materialized =
             digest_materialized_worker_source(runtime.path()).expect("materialized digest");
         let controller = worker::source_digest().expect("controller digest");
         assert_ne!(materialized, controller.as_str());
+
+        let bits_path = runtime
+            .path()
+            .join(WORKER_SOURCES.get(1).expect("bits source contract").1);
+        std::fs::write(bits_path, b"changed bits source\n").expect("change bits source");
+        let changed = digest_materialized_worker_source(runtime.path()).expect("changed digest");
+        assert_ne!(materialized, changed);
+    }
+
+    #[test]
+    fn controller_and_materialized_worker_source_collections_match() {
+        let root =
+            RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+                .expect("repository root");
+        let materialized =
+            digest_materialized_worker_source(&root.path).expect("materialized digest");
+        let controller = worker::source_digest().expect("controller digest");
+        assert_eq!(materialized, controller.as_str());
     }
 
     #[test]

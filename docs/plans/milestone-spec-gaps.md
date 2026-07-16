@@ -28,16 +28,16 @@ Gap: neither plan requires one machine-readable completion receipt that binds ea
 Proposed amendment: before the next executable PQ2 slice, define a canonical milestone-completion receipt that records each required standalone command as a typed step with the clean revision, canonical arguments, input identities, exit status, and produced artifact digests; validate the receipt during progress-report or rollup publication without making human review mechanically self-certifying.
 Resolution: Pending.
 
+## Resolved Entries
+
 ## 2026-07-16 - PQ2: Allocation-Free Comparator Proof Standard
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of the fifth PQ2 dense-XOR qualification slice.
 Current text: the fifth slice says that the timed mutation must allocate zero bytes and requires an allocation-counter test, while the source-owned performance reports record process RSS for both workers.
 Gap: the plan does not state whether zero-allocation proof must cover Stab only or both implementations, whether it must execute at every scale, or whether pinned Stim source inspection is an acceptable proof for the C++ comparator. The implemented executable check instruments Stab at the medium scale, while Stim's no-allocation body is supported by the pinned comparator source.
 Proposed amendment: state explicitly which implementations and scales require allocator instrumentation, which source-inspection evidence is acceptable for a comparator implemented by in-place operators, and whether the zero-allocation invariant belongs to correctness preflight, report replay, or PQ6 allocation qualification.
-Resolution: Pending.
-
-## Resolved Entries
+Resolution: `docs/plans/comprehensive-stim-performance-qualification-plan.md` and `docs/plans/GOAL.md` now classify zero-allocation evidence explicitly. Stab timed-body claims require allocator instrumentation at every source-owned runtime scale and the accepted maximum, with setup and inspection excluded. Pinned Stim source inspection establishes only the isolated comparator shape and cannot produce a Stim allocation claim; a future cross-implementation claim requires C++ allocator instrumentation. Process RSS stays separate and PQ6-owned. `dense_xor_timed_mutation_allocates_nothing` now checks small, medium, large, and accepted-maximum widths under `count-allocations`.
 
 ## 2026-07-16 - PQ2: Pinned Stim Header Warning Boundary
 
