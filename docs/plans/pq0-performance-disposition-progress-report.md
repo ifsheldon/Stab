@@ -16,7 +16,7 @@ Initial corrected CQ dependency regeneration revision: `79763160d2124d7f3dca3258
 
 The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
-The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, Generation, and Algebra slices changed correctness owner ids, exact classifications, checklist rows, and public API shape, so PQ0 was regenerated without relaxing any performance gate. The current inventory has 544 qualification groups and exactly eight implemented runtime contracts: `PERFQ-M4-CIRCUIT-PARSE`, `PERFQ-M4-CIRCUIT-CANONICAL-PRINT`, `PERFQ-M4-GATE-LOOKUP`, `PERFQ-M5-SIMD-WORD`, `PERFQ-M5-SIMD-BITS`, and three position-specific `not_zero` groups. All retain exact `1.25x` rules. Clean revisions `ba70a52025fdd4122ac97cec263725b2ec56e431`, `c76b7071fc4d7ac358ef3a2fffc053ea675bd05f`, `56dfe7569c6da48ffe76bde18f21ff43095f029b`, and `5d226c94ece70f96d0b771f9c8cde7464ccd261b` supply historical passing AArch64 evidence for the first five groups under preceding performance inventories. Clean revision `817d0fe870fd1b02c8e30f18e534e35df705a1ee` supplies 18 passing full and soak AArch64 measurements plus replayed completion receipts for all three `not_zero` groups under evidence inventory `c2362b6fda35626e5f571399512067ab406f92a22692c162ae70002ef7a651f8`. The legacy canonical-print row is superseded and retains only non-primary diagnostic history. The inherited `m5-simd-word` and heterogeneous `m5-simd-bits` rows remain reworked; the legacy XOR pair remains mapped and active, while the completed early-hit receipt authorized retirement of the duplicate legacy `not_zero` pair.
+The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, Generation, and Algebra slices changed correctness owner ids, exact classifications, checklist rows, and public API shape, so PQ0 was regenerated without relaxing any performance gate. The current inventory has 544 qualification groups and exactly eight implemented runtime contracts: `PERFQ-M4-CIRCUIT-PARSE`, `PERFQ-M4-CIRCUIT-CANONICAL-PRINT`, `PERFQ-M4-GATE-LOOKUP`, `PERFQ-M5-SIMD-WORD`, `PERFQ-M5-SIMD-BITS`, and three position-specific `not_zero` groups. All retain exact `1.25x` rules. Clean revisions `ba70a52025fdd4122ac97cec263725b2ec56e431`, `c76b7071fc4d7ac358ef3a2fffc053ea675bd05f`, `56dfe7569c6da48ffe76bde18f21ff43095f029b`, and `5d226c94ece70f96d0b771f9c8cde7464ccd261b` supply historical passing AArch64 evidence for the first five groups under preceding performance inventories. Clean revision `60b732c77f1828058fbd65ec6c5c4ad582467fd1` supplies 18 passing full and soak AArch64 measurements, six replayed rollups, and three replayed completion receipts for all three `not_zero` groups at the source-current inventory. The legacy canonical-print row is superseded and retains only non-primary diagnostic history. The inherited `m5-simd-word` and heterogeneous `m5-simd-bits` rows remain reworked; the legacy XOR pair remains mapped and active, while the completed early-hit receipt authorized retirement of the duplicate legacy `not_zero` pair.
 
 PQ0 freezes inventory and migration decisions only.
 It does not claim that inherited timing ratios satisfy the comprehensive runner, preflight, scaling, memory, or statistical contract.
@@ -55,11 +55,11 @@ It does not claim that inherited timing ratios satisfy the comprehensive runner,
 | Exact checklist row-and-domain parent groups | 133 |
 | Exact checklist child claims across those parents | 181 |
 | Partial-row child ownership entries | 50 |
-| Typed generated fixture families | 380 |
+| Typed generated fixture families | 388 |
 | Typed repository fixture families with SHA-256 | 35 |
-| Typed inline fixture families | 126 |
-| Scale points with exact input byte counts | 134 |
-| Scale points explicitly not byte-sized | 1,175 |
+| Typed inline fixture families | 121 |
+| Scale points with exact input byte counts | 146 |
+| Scale points explicitly not byte-sized | 1,174 |
 
 The API inventory preserves the CQ0 primary performance ownership counts: 274 bit-kernel, 202 circuit, 1 CLI, 128 DEM, 15 DEM-sampling, 62 detection, 105 error-analysis, 96 flow and detector-utility, 178 gate, 107 generation, 97 result-IO, 49 sampling, 4 search, and 654 stabilizer-algebra items.
 Declaration-only kinds and marker or diagnostic trait implementations do not receive independent runtime claims.
