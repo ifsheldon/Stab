@@ -12,7 +12,7 @@ Latest clean focused correctness evidence revision: `5d226c94ece70f96d0b771f9c8c
 
 Current correctness inventory digest: `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2`.
 
-Current dependent performance inventory digest after the first five PQ2 product-contract graduations, including corrected exact gate hashing, source-bound toggle-plus-popcount, and complete-vector dense XOR: `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`.
+Current dependent performance inventory digest after the first five PQ2 product-contract graduations and exact legacy-threshold replacement mapping: `8b4735f7d651e74d3029014a4bf0c4580d85462295d66c93d8e090d3433c3958`.
 
 The exact report at `target/qualification/pq2-m4-parse-print-full-ba70a52` selected all three shared parser and printer owners and passed all three, but it is now historical because the exact gate-name hash owner changed the correctness inventory. The clean current-digest report at `target/qualification/pq2-m4-gate-hash-full-c76b707` selected and passed `cq-evidence-qualification-bd20a013e903a05f`, which freezes the ordered 82-name table including `NOT_A_GATE` and every per-name Stim hash, and its exact dependent preflight passed before gate timing. The clean current-digest report at `target/qualification/pq2-m5-simd-bits-full-5d226c9` selected and passed `cq-evidence-qualification-b1530dc4e48e942d` and `cq-evidence-qualification-ba252d42660a41ce` before dense-XOR timing. The clean all-domain reports bind preceding correctness digests and remain historical evidence.
 

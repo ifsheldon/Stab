@@ -272,6 +272,8 @@ pub(super) struct ManifestRowDisposition {
     pub(super) threshold_refs: Vec<String>,
     pub(super) threshold_max_relative_ratio: Option<String>,
     pub(super) threshold_measurement_pairs: Vec<MeasurementPair>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) replacement_contracts: Vec<ReplacementContract>,
     pub(super) waiver_refs: Vec<String>,
 }
 
@@ -281,6 +283,15 @@ pub(super) struct MeasurementPair {
     pub(super) stim_name: String,
     pub(super) stab_name: String,
     pub(super) max_relative_ratio: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct ReplacementContract {
+    pub(super) legacy_stim_name: String,
+    pub(super) legacy_stab_name: String,
+    pub(super) runtime_group_id: String,
+    pub(super) runtime_measurement_id: String,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

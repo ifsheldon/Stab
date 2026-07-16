@@ -9,9 +9,9 @@ use super::model::{
     ChecklistItem, ChecklistScope, CorrectnessBinding, EvidenceState, FixtureLocator,
     InputByteCount, ManifestRowDisposition, MeasurementPair, MemoryMethod, MemoryPolicy,
     OutputContract, PerformanceDisposition, PerformanceFeature, Phase, QualificationGroup,
-    QualificationStatus, QualificationSuite, RowClassification, RowDecision, RowOrigin,
-    RunnerFidelity, SCHEMA_VERSION, ScalePoint, ThresholdPolicy, TimingPolicy, UpstreamPerfSource,
-    WaiverDisposition, WaiverReason, WorkloadFamily,
+    QualificationStatus, QualificationSuite, ReplacementContract, RowClassification, RowDecision,
+    RowOrigin, RunnerFidelity, SCHEMA_VERSION, ScalePoint, ThresholdPolicy, TimingPolicy,
+    UpstreamPerfSource, WaiverDisposition, WaiverReason, WorkloadFamily,
 };
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::error::BenchError;
@@ -347,6 +347,7 @@ pub(super) fn generate(
                     max_relative_ratio: measurement.max_relative_ratio.to_string(),
                 })
                 .collect(),
+            replacement_contracts: replacement_contracts(row),
             waiver_refs: waiver_refs(row, &beta_by_id, &regression_by_id),
         });
         let mut group = QualificationGroup {
@@ -480,6 +481,18 @@ pub(super) fn generate(
     };
     suite.semantic_digest = semantic_digest(&suite)?;
     Ok(suite)
+}
+
+fn replacement_contracts(row: &BenchmarkRow) -> Vec<ReplacementContract> {
+    match row.id.as_str() {
+        "m5-simd-bits" => vec![ReplacementContract {
+            legacy_stim_name: "simd_bits_xor_10K".to_string(),
+            legacy_stab_name: "stab_simd_bits_xor_10K".to_string(),
+            runtime_group_id: "PERFQ-M5-SIMD-BITS".to_string(),
+            runtime_measurement_id: "xor-complete-vector".to_string(),
+        }],
+        _ => Vec::new(),
+    }
 }
 
 pub(super) fn semantic_digest(suite: &QualificationSuite) -> Result<String, BenchError> {

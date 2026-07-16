@@ -1,6 +1,6 @@
 # PQ2 Gate Name Hash Qualification Progress Report
 
-> Historical-evidence note, 2026-07-16: this report remains authoritative for gate-name hashing at performance inventory `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`. Correcting and structurally binding `PERFQ-M5-SIMD-WORD` later changed the inventory and shared workers to digest `877df12bf1b3d63da92289e22f117097cedbc20860d165c90b41554aa110263b`; the subsequent dense-XOR graduation changed the source-current digest and worker identities again to `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`. The gate reports below are historical and are not relabeled as simultaneous current-inventory evidence.
+> Historical-evidence note, 2026-07-16: this report remains authoritative for gate-name hashing at performance inventory `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`. Later popcount, dense-XOR, and exact replacement-mapping changes produced source-current performance digest `8b4735f7d651e74d3029014a4bf0c4580d85462295d66c93d8e090d3433c3958`. The gate reports below are historical and are not relabeled as simultaneous current-inventory evidence.
 
 ## Status
 

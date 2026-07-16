@@ -1,6 +1,6 @@
 # PQ1 Paired Performance Harness Progress Report
 
-> Current-evidence note, 2026-07-16: the exact gate-name hash, source-bound corrected popcount, and complete-vector dense-XOR graduations set correctness inventory digest `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2` and performance inventory digest `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`. Parser, canonical-printer, gate-hash, and popcount AArch64 reports remain historical passing evidence under preceding inventories; clean revision `5d226c94ece70f96d0b771f9c8cde7464ccd261b` supplies current passing full and soak AArch64 dense-XOR evidence. The schema-version-13 PQ1 reports remain historical diagnostic infrastructure evidence, not product performance.
+> Current-evidence note, 2026-07-16: correctness inventory digest `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2` and performance inventory digest `8b4735f7d651e74d3029014a4bf0c4580d85462295d66c93d8e090d3433c3958` are source-current. All five product-group AArch64 report families remain historical passing evidence under preceding inventories, including dense XOR at digest `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`. The schema-version-13 PQ1 reports remain historical diagnostic infrastructure evidence, not product performance.
 
 ## Status
 

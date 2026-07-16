@@ -1,5 +1,7 @@
 # PQ2 SIMD-Bits XOR Qualification Progress Report
 
+> Historical-inventory note, 2026-07-16: this report remains valid passing AArch64 evidence at performance inventory `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`. The later source-current inventory `8b4735f7d651e74d3029014a4bf0c4580d85462295d66c93d8e090d3433c3958` adds an exact legacy-threshold replacement mapping without changing the measured implementation or outcome; the evidence below is not relabeled as current-inventory evidence.
+
 ## Status
 
 The fifth PQ2 product group, `PERFQ-M5-SIMD-BITS`, passes the exact `1.25x` timing gate at every full and soak scale on the controlled Linux AArch64 host as of 2026-07-16.

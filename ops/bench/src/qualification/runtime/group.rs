@@ -325,6 +325,30 @@ fn validate_inventory_contracts(
             return Err(GroupError::InventoryContract(contract.id.to_string()));
         }
     }
+    for row in &suite.manifest_rows {
+        for replacement in &row.replacement_contracts {
+            let contract = file
+                .groups
+                .iter()
+                .find(|group| group.id.to_string() == replacement.runtime_group_id)
+                .ok_or_else(|| GroupError::ReplacementContract {
+                    row: row.id.clone(),
+                    group: replacement.runtime_group_id.clone(),
+                    measurement: replacement.runtime_measurement_id.clone(),
+                })?;
+            if !contract
+                .measurement_ids
+                .iter()
+                .any(|measurement| measurement.to_string() == replacement.runtime_measurement_id)
+            {
+                return Err(GroupError::ReplacementContract {
+                    row: row.id.clone(),
+                    group: replacement.runtime_group_id.clone(),
+                    measurement: replacement.runtime_measurement_id.clone(),
+                });
+            }
+        }
+    }
     Ok(())
 }
 
@@ -506,6 +530,14 @@ pub(super) enum GroupError {
     UnknownScale { group: String, scale: String },
     #[error("runtime group {0} does not match the implemented worker shape")]
     UnsupportedRuntimeShape(String),
+    #[error(
+        "manifest row {row} replacement target {group}/{measurement} is not an executable runtime measurement"
+    )]
+    ReplacementContract {
+        row: String,
+        group: String,
+        measurement: String,
+    },
     #[error("runtime group contract does not exactly match the executable group registry")]
     ExecutableRegistration,
     #[error("runtime group contract does not match performance inventory group {0}")]
@@ -858,6 +890,34 @@ mod tests {
             validate_inventory_contracts(&file, &suite),
             Err(GroupError::InventoryContract(group))
                 if group == super::super::invocation::CIRCUIT_PARSE_GROUP_ID
+        ));
+    }
+
+    #[test]
+    fn runtime_contract_rejects_stale_replacement_measurement() {
+        let root =
+            RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+                .expect("repository root");
+        let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
+        let mut suite = super::super::super::discovery::generate(&root, &manifest)
+            .expect("generated performance inventory");
+        let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+        suite
+            .manifest_rows
+            .iter_mut()
+            .find(|row| row.id == "m5-simd-bits")
+            .expect("dense XOR row")
+            .replacement_contracts
+            .first_mut()
+            .expect("dense XOR replacement")
+            .runtime_measurement_id = "stale-measurement".to_string();
+
+        assert!(matches!(
+            validate_inventory_contracts(&file, &suite),
+            Err(GroupError::ReplacementContract { row, group, measurement })
+                if row == "m5-simd-bits"
+                    && group == "PERFQ-M5-SIMD-BITS"
+                    && measurement == "stale-measurement"
         ));
     }
 

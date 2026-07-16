@@ -158,9 +158,57 @@ fn reworked_heterogeneous_row_can_point_to_an_exact_replacement_group() {
         .find(|group| group.id == row.primary_group_id)
         .expect("dense XOR replacement group");
     assert_eq!(group.threshold_policy, ThresholdPolicy::Primary1_25);
+    assert_eq!(
+        row.replacement_contracts
+            .first()
+            .expect("one dense XOR replacement")
+            .runtime_measurement_id,
+        "xor-complete-vector"
+    );
 
     validate(&suite, &manifest, &references, "UNFROZEN")
         .expect("reworked legacy row must not constrain its exact replacement group");
+}
+
+#[test]
+fn reworked_heterogeneous_primary_threshold_requires_an_exact_replacement_mapping() {
+    let (mut suite, manifest, references) = fixture();
+    suite
+        .manifest_rows
+        .iter_mut()
+        .find(|row| row.id == "m5-simd-bits")
+        .expect("dense XOR legacy row")
+        .replacement_contracts
+        .clear();
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("unmapped heterogeneous primary threshold must fail");
+    assert!(
+        error
+            .to_string()
+            .contains("without an exact primary replacement mapping")
+    );
+}
+
+#[test]
+fn replacement_mapping_rejects_stale_sources_and_nonpromotable_targets() {
+    let (mut suite, manifest, references) = fixture();
+    let replacement = suite
+        .manifest_rows
+        .iter_mut()
+        .find(|row| row.id == "m5-simd-bits")
+        .expect("dense XOR legacy row")
+        .replacement_contracts
+        .first_mut()
+        .expect("dense XOR replacement");
+    replacement.legacy_stim_name = "simd_bits_stale".to_string();
+    replacement.runtime_group_id = "PERFQ-M5-SPARSE-XOR".to_string();
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("stale source and planned target must fail");
+    let message = error.to_string();
+    assert!(message.contains("is not an exact legacy threshold pair"));
+    assert!(message.contains("is not an exact implemented primary contract"));
 }
 
 #[test]

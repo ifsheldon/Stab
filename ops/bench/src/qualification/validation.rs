@@ -12,6 +12,7 @@ use crate::manifest::BenchmarkManifest;
 
 mod counts;
 mod planned;
+mod replacements;
 mod source;
 mod values;
 
@@ -938,6 +939,7 @@ fn validate_rows(
                 row.id
             ));
         }
+        replacements::validate(row, primary_feature, &groups, &measurement_pairs, issues);
         let thresholded = references.threshold_rows.contains(&row.id);
         if thresholded != !row.threshold_refs.is_empty() {
             issues.push(format!(
@@ -1090,15 +1092,20 @@ fn validate_rows(
         if row
             .classifications
             .contains(&RowClassification::UnmatchedSubmeasurement)
-            && row.decision == RowDecision::Retained
             && groups
                 .get(row.primary_group_id.as_str())
                 .is_some_and(|group| group.threshold_policy != ThresholdPolicy::ReportOnly)
         {
-            issues.push(format!(
-                "manifest row {} claims a threshold despite unmatched Stim submeasurements",
-                row.id
-            ));
+            let primary_replaced = row
+                .replacement_contracts
+                .iter()
+                .any(|replacement| replacement.runtime_group_id == row.primary_group_id);
+            if row.decision != RowDecision::Reworked || !primary_replaced {
+                issues.push(format!(
+                    "manifest row {} claims a threshold despite unmatched Stim submeasurements without an exact primary replacement mapping",
+                    row.id
+                ));
+            }
         }
         if !row.waiver_refs.is_empty()
             && !row
