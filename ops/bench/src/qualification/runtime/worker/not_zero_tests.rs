@@ -114,7 +114,7 @@ fn not_zero_timed_scans_allocate_nothing() {
         NotZeroPattern::Zero,
         NotZeroPattern::Late,
     ] {
-        for bit_count in [10_000, 640_000, 40_960_000] {
+        for bit_count in [10_000, 640_000, 40_960_000, NOT_ZERO_MAX_BITS] {
             let fixture = not_zero_fixture(bit_count, pattern).expect("source-owned fixture");
             let allocations = allocation_counter::measure(|| {
                 std::hint::black_box(simd_bits_not_zero(2, &fixture));
