@@ -15,13 +15,19 @@ use super::{
     DENSE_XOR_MINIMUM_CASE_ID, DENSE_XOR_ODD_CASE_ID, EVEN_DENSE_XOR_ITERATIONS,
     EVEN_DENSE_XOR_OUTPUT_DIGEST, EVEN_POPCOUNT_ITERATIONS, EVEN_POPCOUNT_OUTPUT_DIGEST,
     GATE_PARTIAL_SWEEP_CASE_ID, InvocationError, MAX_DENSE_XOR_INPUT_DIGEST,
-    MAX_DENSE_XOR_OUTPUT_DIGEST, MAX_POPCOUNT_INPUT_DIGEST, MAX_POPCOUNT_OUTPUT_DIGEST,
-    MAX_SUPPORTED_DENSE_XOR_BITS, MAX_SUPPORTED_POPCOUNT_BITS, ODD_DENSE_XOR_ITERATIONS,
+    MAX_DENSE_XOR_OUTPUT_DIGEST, MAX_NOT_ZERO_LATE_INPUT_DIGEST, MAX_NOT_ZERO_LATE_OUTPUT_DIGEST,
+    MAX_POPCOUNT_INPUT_DIGEST, MAX_POPCOUNT_OUTPUT_DIGEST, MAX_SUPPORTED_DENSE_XOR_BITS,
+    MAX_SUPPORTED_NOT_ZERO_BITS, MAX_SUPPORTED_POPCOUNT_BITS, NOT_ZERO_CAP_CASE_ID,
+    NOT_ZERO_EARLY_CASE_ID, NOT_ZERO_ITERATIONS, NOT_ZERO_LATE_CASE_ID, NOT_ZERO_MAXIMUM_CASE_ID,
+    NOT_ZERO_MINIMUM_CASE_ID, NOT_ZERO_ZERO_CASE_ID, ODD_DENSE_XOR_ITERATIONS,
     ODD_DENSE_XOR_OUTPUT_DIGEST, ODD_POPCOUNT_ITERATIONS, ODD_POPCOUNT_OUTPUT_DIGEST,
     POPCOUNT_ALIGNMENT_CASE_ID, POPCOUNT_CAP_CASE_ID, POPCOUNT_EVEN_CASE_ID,
     POPCOUNT_MAXIMUM_CASE_ID, POPCOUNT_MINIMUM_CASE_ID, POPCOUNT_ODD_CASE_ID,
     PROTOCOL_SMOKE_CASE_ID, SMALL_DENSE_XOR_BITS, SMALL_DENSE_XOR_INPUT_DIGEST,
-    SMALL_POPCOUNT_BITS, SMALL_POPCOUNT_INPUT_DIGEST,
+    SMALL_NOT_ZERO_BITS, SMALL_NOT_ZERO_EARLY_INPUT_DIGEST, SMALL_NOT_ZERO_EARLY_OUTPUT_DIGEST,
+    SMALL_NOT_ZERO_INPUT_BYTES, SMALL_NOT_ZERO_LATE_INPUT_DIGEST,
+    SMALL_NOT_ZERO_LATE_OUTPUT_DIGEST, SMALL_NOT_ZERO_ZERO_INPUT_DIGEST,
+    SMALL_NOT_ZERO_ZERO_OUTPUT_DIGEST, SMALL_POPCOUNT_BITS, SMALL_POPCOUNT_INPUT_DIGEST,
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -145,7 +151,7 @@ fn sha256_hex_bytes(bytes: &[u8]) -> Result<String, InvocationError> {
 
 pub(super) fn expected_contract_preflight_probes()
 -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
-    let mut probes = Vec::with_capacity(30);
+    let mut probes = Vec::with_capacity(42);
     let protocol_output_digest = protocol_smoke_output_digest();
     for implementation in [Implementation::Stim, Implementation::Stab] {
         probes.push(expected_accepted_probe(
@@ -187,6 +193,44 @@ pub(super) fn expected_contract_preflight_probes()
             MAX_SUPPORTED_POPCOUNT_BITS / 8,
             MAX_POPCOUNT_INPUT_DIGEST,
             MAX_POPCOUNT_OUTPUT_DIGEST,
+        )?);
+    }
+    for implementation in [Implementation::Stim, Implementation::Stab] {
+        probes.push(expected_accepted_probe(
+            NOT_ZERO_EARLY_CASE_ID,
+            implementation,
+            NOT_ZERO_ITERATIONS,
+            NOT_ZERO_ITERATIONS * SMALL_NOT_ZERO_BITS,
+            SMALL_NOT_ZERO_INPUT_BYTES,
+            SMALL_NOT_ZERO_EARLY_INPUT_DIGEST,
+            SMALL_NOT_ZERO_EARLY_OUTPUT_DIGEST,
+        )?);
+        probes.push(expected_accepted_probe(
+            NOT_ZERO_ZERO_CASE_ID,
+            implementation,
+            NOT_ZERO_ITERATIONS,
+            NOT_ZERO_ITERATIONS * SMALL_NOT_ZERO_BITS,
+            SMALL_NOT_ZERO_INPUT_BYTES,
+            SMALL_NOT_ZERO_ZERO_INPUT_DIGEST,
+            SMALL_NOT_ZERO_ZERO_OUTPUT_DIGEST,
+        )?);
+        probes.push(expected_accepted_probe(
+            NOT_ZERO_LATE_CASE_ID,
+            implementation,
+            NOT_ZERO_ITERATIONS,
+            NOT_ZERO_ITERATIONS * SMALL_NOT_ZERO_BITS,
+            SMALL_NOT_ZERO_INPUT_BYTES,
+            SMALL_NOT_ZERO_LATE_INPUT_DIGEST,
+            SMALL_NOT_ZERO_LATE_OUTPUT_DIGEST,
+        )?);
+        probes.push(expected_accepted_probe(
+            NOT_ZERO_MAXIMUM_CASE_ID,
+            implementation,
+            1,
+            MAX_SUPPORTED_NOT_ZERO_BITS,
+            MAX_SUPPORTED_NOT_ZERO_BITS / 8,
+            MAX_NOT_ZERO_LATE_INPUT_DIGEST,
+            MAX_NOT_ZERO_LATE_OUTPUT_DIGEST,
         )?);
     }
     for implementation in [Implementation::Stim, Implementation::Stab] {
@@ -250,6 +294,14 @@ pub(super) fn expected_contract_preflight_probes()
         (
             DENSE_XOR_MINIMUM_CASE_ID,
             super::dense_xor_minimum_rejection_expectation as RejectionExpectation,
+        ),
+        (
+            NOT_ZERO_CAP_CASE_ID,
+            super::not_zero_cap_rejection_expectation as RejectionExpectation,
+        ),
+        (
+            NOT_ZERO_MINIMUM_CASE_ID,
+            super::not_zero_minimum_rejection_expectation as RejectionExpectation,
         ),
     ] {
         for implementation in [Implementation::Stim, Implementation::Stab] {

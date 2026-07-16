@@ -22,6 +22,7 @@ use crate::root::RepoRoot;
 
 mod bit_acceptance;
 mod dense_xor;
+mod not_zero;
 mod preflight;
 
 use bit_acceptance::BitAcceptanceContract;
@@ -39,6 +40,18 @@ use dense_xor::{
     checked_dense_xor_alignment_rejection, checked_dense_xor_cap_rejection,
     checked_dense_xor_minimum_rejection,
 };
+use not_zero::{
+    MAX_NOT_ZERO_LATE_INPUT_DIGEST, MAX_NOT_ZERO_LATE_OUTPUT_DIGEST, MAX_SUPPORTED_NOT_ZERO_BITS,
+    NOT_ZERO_CAP_CASE_ID, NOT_ZERO_EARLY_CASE_ID, NOT_ZERO_ITERATIONS, NOT_ZERO_LATE_CASE_ID,
+    NOT_ZERO_MAXIMUM_CASE_ID, NOT_ZERO_MINIMUM_CASE_ID, NOT_ZERO_ZERO_CASE_ID, SMALL_NOT_ZERO_BITS,
+    SMALL_NOT_ZERO_EARLY_INPUT_DIGEST, SMALL_NOT_ZERO_EARLY_OUTPUT_DIGEST,
+    SMALL_NOT_ZERO_INPUT_BYTES, SMALL_NOT_ZERO_LATE_INPUT_DIGEST,
+    SMALL_NOT_ZERO_LATE_OUTPUT_DIGEST, SMALL_NOT_ZERO_ZERO_INPUT_DIGEST,
+    SMALL_NOT_ZERO_ZERO_OUTPUT_DIGEST, not_zero_cap_rejection_expectation,
+    not_zero_minimum_rejection_expectation,
+};
+#[cfg(test)]
+use not_zero::{checked_not_zero_cap_rejection, checked_not_zero_minimum_rejection};
 pub(crate) use preflight::{WorkerContractIdentityEvidence, WorkerContractPreflightEvidence};
 use preflight::{WorkerContractProbeEvidence, accepted_probe, rejected_probe};
 #[cfg(test)]
@@ -66,7 +79,7 @@ const MAX_POPCOUNT_INPUT_DIGEST: &str =
     "cf5061f39d456d884fbdbcebfc53e04c47c29c872830a6a424f55d2e1e3d8ab4";
 const MAX_POPCOUNT_OUTPUT_DIGEST: &str =
     "72b158a2870c2bca123553e5aca970f39107a3c7448bdbdda1512a9bcdfa33aa";
-const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 4;
+const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 5;
 const PROTOCOL_SMOKE_CASE_ID: &str = "protocol-smoke";
 const POPCOUNT_ODD_CASE_ID: &str = "simd-word-popcount-odd";
 const POPCOUNT_EVEN_CASE_ID: &str = "simd-word-popcount-even";
@@ -82,6 +95,10 @@ pub(super) const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANO
 pub(super) const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
 pub(super) const SIMD_WORD_POPCOUNT_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
 pub(super) const SIMD_BITS_XOR_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
+pub(super) const SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY";
+pub(super) const SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID: &str =
+    "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO";
+pub(super) const SIMD_BITS_NOT_ZERO_LATE_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE";
 
 pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
     let identity = (
@@ -111,11 +128,20 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
                 || (group == SIMD_BITS_XOR_GROUP_ID
                     && workload == "simd-bits-xor"
                     && measurement == "xor-complete-vector")
+                || (group == SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID
+                    && workload == "simd-bits-not-zero-early"
+                    && measurement == "not-zero")
+                || (group == SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID
+                    && workload == "simd-bits-not-zero-zero"
+                    && measurement == "not-zero")
+                || (group == SIMD_BITS_NOT_ZERO_LATE_GROUP_ID
+                    && workload == "simd-bits-not-zero-late"
+                    && measurement == "not-zero")
     )
 }
 
 pub(super) const fn registered_group_count() -> usize {
-    6
+    9
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -376,7 +402,7 @@ impl PreparedWorkers {
     fn verify_identity_handshake(
         &self,
     ) -> Result<WorkerContractPreflightEvidence, InvocationError> {
-        let mut probes = Vec::with_capacity(30);
+        let mut probes = Vec::with_capacity(42);
         let protocol_output = SemanticDigest::try_new(protocol_smoke_output_digest())?;
         probes.push(self.invoke_identity_probe(Implementation::Stim, &protocol_output)?);
         probes.push(self.invoke_identity_probe(Implementation::Stab, &protocol_output)?);
@@ -426,6 +452,7 @@ impl PreparedWorkers {
                 },
             )?);
         }
+        probes.extend(self.invoke_not_zero_acceptance_probes()?);
         let dense_xor_input = InputDigest::try_new(SMALL_DENSE_XOR_INPUT_DIGEST)?;
         let dense_xor_odd_output = SemanticDigest::try_new(ODD_DENSE_XOR_OUTPUT_DIGEST)?;
         let dense_xor_even_output = SemanticDigest::try_new(EVEN_DENSE_XOR_OUTPUT_DIGEST)?;
@@ -495,6 +522,12 @@ impl PreparedWorkers {
         }
         for implementation in [Implementation::Stim, Implementation::Stab] {
             probes.push(self.invoke_dense_xor_minimum_rejection(implementation)?);
+        }
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_not_zero_cap_rejection(implementation)?);
+        }
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_not_zero_minimum_rejection(implementation)?);
         }
         WorkerContractPreflightEvidence::from_actual_probes(
             self.contract_identity_evidence()?,
@@ -1109,6 +1142,16 @@ pub(crate) enum InvocationError {
         "{implementation} did not reject the {class} simd-bits-xor width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
     )]
     DenseXorWidthRejection {
+        implementation: Implementation,
+        class: &'static str,
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
+    #[error(
+        "{implementation} did not reject the {class} simd-bits-not-zero width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
+    )]
+    NotZeroWidthRejection {
         implementation: Implementation,
         class: &'static str,
         status: Option<i32>,

@@ -17,6 +17,7 @@ use super::protocol::{
 use crate::config::STIM_COMMIT;
 
 mod bits;
+mod not_zero;
 
 #[cfg(test)]
 use bits::{
@@ -26,10 +27,12 @@ use bits::{
     POPCOUNT_TOGGLE_BIT, dense_xor, dense_xor_fixture, dense_xor_output_digest, popcount_fixture,
     popcount_output_digest, simd_word_popcount,
 };
+use not_zero::{NotZeroPattern, not_zero_fixture, not_zero_output_digest, simd_bits_not_zero};
 
-const WORKER_SOURCES: [(&str, &[u8]); 2] = [
+const WORKER_SOURCES: [(&str, &[u8]); 3] = [
     ("worker.rs", include_bytes!("worker.rs")),
     ("worker/bits.rs", include_bytes!("worker/bits.rs")),
+    ("worker/not_zero.rs", include_bytes!("worker/not_zero.rs")),
 ];
 const DIAGNOSTIC_BUILD_FINGERPRINT: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
@@ -58,6 +61,9 @@ pub(crate) enum WorkerWorkload {
     GateNameHash,
     SimdWordPopcount,
     SimdBitsXor,
+    SimdBitsNotZeroEarly,
+    SimdBitsNotZeroZero,
+    SimdBitsNotZeroLate,
 }
 
 impl WorkerWorkload {
@@ -69,6 +75,9 @@ impl WorkerWorkload {
             Self::GateNameHash => "gate-name-hash",
             Self::SimdWordPopcount => "simd-word-popcount",
             Self::SimdBitsXor => "simd-bits-xor",
+            Self::SimdBitsNotZeroEarly => "simd-bits-not-zero-early",
+            Self::SimdBitsNotZeroZero => "simd-bits-not-zero-zero",
+            Self::SimdBitsNotZeroLate => "simd-bits-not-zero-late",
         }
     }
 
@@ -80,6 +89,23 @@ impl WorkerWorkload {
             Self::GateNameHash => "hash-all-names",
             Self::SimdWordPopcount => "toggle-popcount",
             Self::SimdBitsXor => "xor-complete-vector",
+            Self::SimdBitsNotZeroEarly | Self::SimdBitsNotZeroZero | Self::SimdBitsNotZeroLate => {
+                "not-zero"
+            }
+        }
+    }
+
+    const fn not_zero_pattern(self) -> Option<NotZeroPattern> {
+        match self {
+            Self::SimdBitsNotZeroEarly => Some(NotZeroPattern::Early),
+            Self::SimdBitsNotZeroZero => Some(NotZeroPattern::Zero),
+            Self::SimdBitsNotZeroLate => Some(NotZeroPattern::Late),
+            Self::ProtocolSmoke
+            | Self::CircuitParse
+            | Self::CircuitCanonicalPrint
+            | Self::GateNameHash
+            | Self::SimdWordPopcount
+            | Self::SimdBitsXor => None,
         }
     }
 }
@@ -146,7 +172,10 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         WorkerWorkload::ProtocolSmoke
         | WorkerWorkload::GateNameHash
         | WorkerWorkload::SimdWordPopcount
-        | WorkerWorkload::SimdBitsXor => None,
+        | WorkerWorkload::SimdBitsXor
+        | WorkerWorkload::SimdBitsNotZeroEarly
+        | WorkerWorkload::SimdBitsNotZeroZero
+        | WorkerWorkload::SimdBitsNotZeroLate => None,
         WorkerWorkload::CircuitParse | WorkerWorkload::CircuitCanonicalPrint => {
             Some(circuit_parse_fixture(args.work_items.get())?)
         }
@@ -157,7 +186,10 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::CircuitParse
         | WorkerWorkload::CircuitCanonicalPrint
         | WorkerWorkload::GateNameHash
-        | WorkerWorkload::SimdBitsXor => None,
+        | WorkerWorkload::SimdBitsXor
+        | WorkerWorkload::SimdBitsNotZeroEarly
+        | WorkerWorkload::SimdBitsNotZeroZero
+        | WorkerWorkload::SimdBitsNotZeroLate => None,
     };
     let mut dense_xor_fixture = match args.workload {
         WorkerWorkload::SimdBitsXor => Some(dense_xor_fixture(args.work_items.get())?),
@@ -165,11 +197,21 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::CircuitParse
         | WorkerWorkload::CircuitCanonicalPrint
         | WorkerWorkload::GateNameHash
-        | WorkerWorkload::SimdWordPopcount => None,
+        | WorkerWorkload::SimdWordPopcount
+        | WorkerWorkload::SimdBitsNotZeroEarly
+        | WorkerWorkload::SimdBitsNotZeroZero
+        | WorkerWorkload::SimdBitsNotZeroLate => None,
     };
+    let not_zero_fixture = args
+        .workload
+        .not_zero_pattern()
+        .map(|pattern| not_zero_fixture(args.work_items.get(), pattern))
+        .transpose()?;
     let (input_bytes, input_digest_state) = if let Some(fixture) = &popcount_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else if let Some(fixture) = &dense_xor_fixture {
+        (fixture.input_bytes, fixture.input_digest)
+    } else if let Some(fixture) = &not_zero_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else {
         let input = circuit_fixture.as_deref().unwrap_or_default().as_bytes();
@@ -199,7 +241,10 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::CircuitParse
         | WorkerWorkload::GateNameHash
         | WorkerWorkload::SimdWordPopcount
-        | WorkerWorkload::SimdBitsXor => None,
+        | WorkerWorkload::SimdBitsXor
+        | WorkerWorkload::SimdBitsNotZeroEarly
+        | WorkerWorkload::SimdBitsNotZeroZero
+        | WorkerWorkload::SimdBitsNotZeroLate => None,
     };
     let gate_hash_names = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_names()?),
@@ -207,7 +252,10 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::CircuitParse
         | WorkerWorkload::CircuitCanonicalPrint
         | WorkerWorkload::SimdWordPopcount
-        | WorkerWorkload::SimdBitsXor => None,
+        | WorkerWorkload::SimdBitsXor
+        | WorkerWorkload::SimdBitsNotZeroEarly
+        | WorkerWorkload::SimdBitsNotZeroZero
+        | WorkerWorkload::SimdBitsNotZeroLate => None,
     };
     let gate_hash_sweeps = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_sweeps(args.work_items.get())?),
@@ -215,7 +263,10 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::CircuitParse
         | WorkerWorkload::CircuitCanonicalPrint
         | WorkerWorkload::SimdWordPopcount
-        | WorkerWorkload::SimdBitsXor => None,
+        | WorkerWorkload::SimdBitsXor
+        | WorkerWorkload::SimdBitsNotZeroEarly
+        | WorkerWorkload::SimdBitsNotZeroZero
+        | WorkerWorkload::SimdBitsNotZeroLate => None,
     };
     let gate_hash_table_digest = gate_hash_names
         .as_deref()
@@ -301,6 +352,19 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                     .map(|()| TimedWorkloadOutput::DenseXorComplete)
             })?
         }
+        WorkerWorkload::SimdBitsNotZeroEarly
+        | WorkerWorkload::SimdBitsNotZeroZero
+        | WorkerWorkload::SimdBitsNotZeroLate => {
+            let fixture = not_zero_fixture
+                .as_ref()
+                .ok_or(WorkerError::MissingNotZeroFixture)?;
+            measure_workload(|| {
+                Ok(TimedWorkloadOutput::NotZeroChecksum(simd_bits_not_zero(
+                    args.iterations.get(),
+                    fixture,
+                )))
+            })?
+        }
     };
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
@@ -332,6 +396,17 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 fixture,
                 args.iterations.get(),
                 args.work_items.get(),
+            ))
+        }
+        TimedWorkloadOutput::NotZeroChecksum(checksum) => {
+            let fixture = not_zero_fixture
+                .as_ref()
+                .ok_or(WorkerError::MissingNotZeroFixture)?;
+            semantic_digest(not_zero_output_digest(
+                checksum,
+                args.iterations.get(),
+                args.work_items.get(),
+                fixture,
             ))
         }
     };
@@ -426,6 +501,7 @@ enum TimedWorkloadOutput {
     Complete(WorkloadOutput),
     PopcountChecksum(u64),
     DenseXorComplete,
+    NotZeroChecksum(u64),
 }
 
 impl WorkloadOutput {
@@ -757,6 +833,18 @@ pub(super) enum WorkerError {
     DenseXorFixtureAllocation(std::collections::TryReserveError),
     #[error("simd-bits-xor workload was invoked without its prepared fixture")]
     MissingDenseXorFixture,
+    #[error("simd-bits-not-zero width {actual} bits is below the minimum {minimum}")]
+    NotZeroWidthMinimum { actual: u64, minimum: u64 },
+    #[error("simd-bits-not-zero width {actual} bits exceeds the maximum {maximum}")]
+    NotZeroWidthLimit { actual: u64, maximum: u64 },
+    #[error("simd-bits-not-zero width {0} cannot be represented on this host")]
+    NotZeroWidthRange(u64),
+    #[error("simd-bits-not-zero fixture allocation failed: {0}")]
+    NotZeroFixtureAllocation(std::collections::TryReserveError),
+    #[error("simd-bits-not-zero hit index {index} is outside bit width {bit_count}")]
+    NotZeroHitIndex { index: usize, bit_count: usize },
+    #[error("simd-bits-not-zero workload was invoked without its prepared fixture")]
+    MissingNotZeroFixture,
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]
@@ -789,6 +877,9 @@ pub(super) enum WorkerError {
 
 #[cfg(test)]
 mod dense_xor_tests;
+
+#[cfg(test)]
+mod not_zero_tests;
 
 #[cfg(test)]
 mod tests {

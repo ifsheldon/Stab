@@ -24,6 +24,7 @@
 #include "stim/gates/gates.h"
 #include "stim/mem/simd_bits.h"
 
+#include "simd_bits_not_zero_contract.h"
 #include "simd_bits_xor_contract.h"
 #include "simd_word_popcount_contract.h"
 
@@ -48,6 +49,25 @@ struct Arguments {
     bool start_barrier = false;
     std::optional<uint32_t> expected_cpu;
 };
+
+enum class NotZeroPattern {
+    EARLY,
+    ZERO,
+    LATE,
+};
+
+std::optional<NotZeroPattern> not_zero_pattern(std::string_view workload) {
+    if (workload == "simd-bits-not-zero-early") {
+        return NotZeroPattern::EARLY;
+    }
+    if (workload == "simd-bits-not-zero-zero") {
+        return NotZeroPattern::ZERO;
+    }
+    if (workload == "simd-bits-not-zero-late") {
+        return NotZeroPattern::LATE;
+    }
+    return std::nullopt;
+}
 
 uint64_t parse_u64(std::string_view text, std::string_view name) {
     uint64_t value = 0;
@@ -109,8 +129,10 @@ Arguments parse_arguments(int argc, const char **argv) {
         result.workload == "simd-word-popcount" && result.measurement_id == "toggle-popcount";
     const bool simd_bits_xor =
         result.workload == "simd-bits-xor" && result.measurement_id == "xor-complete-vector";
+    const bool simd_bits_not_zero =
+        not_zero_pattern(result.workload).has_value() && result.measurement_id == "not-zero";
     if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !gate_name_hash &&
-        !simd_word_popcount && !simd_bits_xor) {
+        !simd_word_popcount && !simd_bits_xor && !simd_bits_not_zero) {
         throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
@@ -314,6 +336,8 @@ constexpr size_t POPCOUNT_TOGGLE_BIT = 300;
 constexpr uint64_t DENSE_XOR_ALIGNMENT_BITS = 256;
 constexpr uint64_t DENSE_XOR_MIN_BITS = 256;
 constexpr uint64_t DENSE_XOR_MAX_BITS = 268435456;
+constexpr uint64_t NOT_ZERO_MIN_BITS = 64;
+constexpr uint64_t NOT_ZERO_MAX_BITS = 268435456;
 
 uint64_t splitmix64_word(uint64_t index) {
     uint64_t value = index + 0x9e3779b97f4a7c15ULL;
@@ -495,6 +519,68 @@ std::array<uint64_t, 4> dense_xor_output_digest(
     return byte_digest_words(fields.data(), fields.size());
 }
 
+struct NotZeroFixture {
+    stim::simd_bits<stim::MAX_BITWORD_WIDTH> bits;
+    uint64_t input_bytes;
+    std::array<uint64_t, 4> input_digest;
+    NotZeroPattern pattern;
+};
+
+uint64_t not_zero_hit_marker(NotZeroPattern pattern, uint64_t bit_count) {
+    switch (pattern) {
+        case NotZeroPattern::EARLY:
+            return bit_count * 3 / 50;
+        case NotZeroPattern::ZERO:
+            return std::numeric_limits<uint64_t>::max();
+        case NotZeroPattern::LATE:
+            return bit_count - 1;
+    }
+    throw std::invalid_argument("unknown simd-bits-not-zero pattern");
+}
+
+NotZeroFixture not_zero_fixture(uint64_t bit_count, NotZeroPattern pattern) {
+    if (bit_count < NOT_ZERO_MIN_BITS) {
+        throw std::invalid_argument("simd-bits-not-zero bit width is below the source-owned minimum");
+    }
+    if (bit_count > NOT_ZERO_MAX_BITS) {
+        throw std::invalid_argument("simd-bits-not-zero bit width exceeds the source-owned limit");
+    }
+    if (bit_count > std::numeric_limits<size_t>::max()) {
+        throw std::overflow_error("simd-bits-not-zero bit width exceeds size_t");
+    }
+    const uint64_t word_count = (bit_count + 63) / 64;
+    if (word_count > std::numeric_limits<size_t>::max()) {
+        throw std::overflow_error("simd-bits-not-zero word count exceeds size_t");
+    }
+    stim::simd_bits<stim::MAX_BITWORD_WIDTH> bits(static_cast<size_t>(bit_count));
+    std::fill(bits.u64, bits.u64 + bits.num_u64_padded(), 0);
+    if (pattern != NotZeroPattern::ZERO) {
+        const uint64_t hit_index = not_zero_hit_marker(pattern, bit_count);
+        bits.u64[hit_index / 64] |= uint64_t{1} << (hit_index % 64);
+    }
+    const auto input_digest = byte_digest_words(bits.u64, static_cast<size_t>(word_count));
+    return NotZeroFixture{
+        std::move(bits), word_count * 8, input_digest, pattern};
+}
+
+std::array<uint64_t, 4> not_zero_output_digest(
+    uint64_t checksum,
+    uint64_t iterations,
+    uint64_t work_items,
+    const NotZeroFixture &fixture) {
+    const std::array<uint64_t, 8> fields{
+        checksum,
+        iterations,
+        work_items,
+        not_zero_hit_marker(fixture.pattern, work_items),
+        fixture.input_digest[0],
+        fixture.input_digest[1],
+        fixture.input_digest[2],
+        fixture.input_digest[3],
+    };
+    return byte_digest_words(fields.data(), fields.size());
+}
+
 template <typename CALLBACK>
 double measure_workload(CALLBACK callback) {
     const auto started = std::chrono::steady_clock::now();
@@ -546,15 +632,25 @@ int main(int argc, const char **argv) {
         if (arguments.workload == "simd-bits-xor") {
             dense_xor.emplace(dense_xor_fixture(arguments.work_items));
         }
+        const auto prepared_not_zero_pattern = not_zero_pattern(arguments.workload);
+        std::optional<NotZeroFixture> not_zero;
+        if (prepared_not_zero_pattern.has_value()) {
+            not_zero.emplace(
+                not_zero_fixture(arguments.work_items, prepared_not_zero_pattern.value()));
+        }
         const uint64_t input_bytes = popcount.has_value()
                                          ? popcount->input_bytes
                                      : dense_xor.has_value()
                                          ? dense_xor->input_bytes
+                                     : not_zero.has_value()
+                                         ? not_zero->input_bytes
                                          : static_cast<uint64_t>(circuit_fixture.size());
         const auto input_digest = popcount.has_value()
                                       ? popcount->input_digest
                                   : dense_xor.has_value()
                                       ? dense_xor->input_digest
+                                  : not_zero.has_value()
+                                      ? not_zero->input_digest
                                       : byte_digest(circuit_fixture);
 
         if (arguments.start_barrier) {
@@ -570,6 +666,7 @@ int main(int argc, const char **argv) {
         stim::Circuit parsed;
         std::string canonical;
         uint64_t popcount_checksum = 0;
+        uint64_t not_zero_checksum = 0;
         double elapsed_seconds = 0;
         if (arguments.workload == "protocol-smoke") {
             elapsed_seconds = measure_workload(
@@ -606,6 +703,12 @@ int main(int argc, const char **argv) {
                 stab_qualification::simd_bits_xor_contract(
                     arguments.iterations, prepared_xor.destination, prepared_xor.source);
             });
+        } else if (prepared_not_zero_pattern.has_value()) {
+            const auto &prepared_not_zero = not_zero.value();
+            elapsed_seconds = measure_workload([&]() {
+                not_zero_checksum = stab_qualification::simd_bits_not_zero_contract(
+                    arguments.iterations, prepared_not_zero.bits);
+            });
         } else {
             throw std::invalid_argument("unreachable registered adapter workload");
         }
@@ -624,6 +727,12 @@ int main(int argc, const char **argv) {
         } else if (arguments.workload == "simd-bits-xor") {
             digest_state = dense_xor_output_digest(
                 dense_xor.value(), arguments.iterations, arguments.work_items);
+        } else if (prepared_not_zero_pattern.has_value()) {
+            digest_state = not_zero_output_digest(
+                not_zero_checksum,
+                arguments.iterations,
+                arguments.work_items,
+                not_zero.value());
         }
         if (!(elapsed_seconds > 0)) {
             throw std::runtime_error("adapter measured a non-positive duration");

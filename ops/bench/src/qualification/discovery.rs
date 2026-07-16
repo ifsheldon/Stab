@@ -402,6 +402,7 @@ pub(super) fn generate(
         graduation::apply(root, &mut group)?;
         groups.push(group);
     }
+    groups.extend(graduation::additional_groups(root, &groups)?);
     groups.push(resource_boundary_group());
     groups.extend(api::qualification_groups(&correctness));
     groups.extend(checklist_qualification_groups(&raw_checklist));
@@ -485,12 +486,20 @@ pub(super) fn generate(
 
 fn replacement_contracts(row: &BenchmarkRow) -> Vec<ReplacementContract> {
     match row.id.as_str() {
-        "m5-simd-bits" => vec![ReplacementContract {
-            legacy_stim_name: "simd_bits_xor_10K".to_string(),
-            legacy_stab_name: "stab_simd_bits_xor_10K".to_string(),
-            runtime_group_id: "PERFQ-M5-SIMD-BITS".to_string(),
-            runtime_measurement_id: "xor-complete-vector".to_string(),
-        }],
+        "m5-simd-bits" => vec![
+            ReplacementContract {
+                legacy_stim_name: "simd_bits_xor_10K".to_string(),
+                legacy_stab_name: "stab_simd_bits_xor_10K".to_string(),
+                runtime_group_id: "PERFQ-M5-SIMD-BITS".to_string(),
+                runtime_measurement_id: "xor-complete-vector".to_string(),
+            },
+            ReplacementContract {
+                legacy_stim_name: "simd_bits_not_zero_100K".to_string(),
+                legacy_stab_name: "stab_simd_bits_not_zero_10K".to_string(),
+                runtime_group_id: "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY".to_string(),
+                runtime_measurement_id: "not-zero".to_string(),
+            },
+        ],
         _ => Vec::new(),
     }
 }

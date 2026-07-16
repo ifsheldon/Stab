@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "performance_inventory_sha256": "8b4735f7d651e74d3029014a4bf0c4580d85462295d66c93d8e090d3433c3958",
+  "performance_inventory_sha256": "7fc15258f7fe1e5e4ca075c41e9ab2b869e7d845a11f5f8694386e854cea5435",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -156,11 +156,140 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "4098eadd7aa23e20cf98c155827ff69133a0a116b989659a747bdee71d677f87"
+          "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
           "sha256": "542f96a2a88bb6a074a0b63b99f7be9c3dca29a6bb633986979abd0c4e66e00d"
+        }
+      ]
+    },
+    {
+      "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "simd-bits-not-zero-zero",
+      "measurement_ids": ["not-zero"],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 10000,
+          "input_bytes": 1256,
+          "input_digest": "b6286dfe1dca80e14e17bbc6a371565900665697e8f4f2b22d30a303f804b537"
+        },
+        {
+          "id": "medium",
+          "work_items": 640000,
+          "input_bytes": 80000,
+          "input_digest": "60aace21d864e2176a3f43edcd21a970c401e36a0223c24d09a8d482e075aae0"
+        },
+        {
+          "id": "large",
+          "work_items": 40960000,
+          "input_bytes": 5120000,
+          "input_digest": "080543f5fd6fe5ca816fbfc568988f74eb08c7477f433ccbdecbc16d62790ec8"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-b1530dc4e48e942d",
+        "cq-evidence-qualification-ba252d42660a41ce"
+      ],
+      "owner": "stab-core/bits",
+      "profiler_note": null,
+      "comparator_sources": [
+        {
+          "path": "benchmarks/stim_adapter/main.cc",
+          "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
+        },
+        {
+          "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
+          "sha256": "d1a0d47e842f279d4175c6b12d53af8c1ebc52d28e42dd93241c0de67e0c7d4b"
+        }
+      ]
+    },
+    {
+      "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "simd-bits-not-zero-early",
+      "measurement_ids": ["not-zero"],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 10000,
+          "input_bytes": 1256,
+          "input_digest": "652aebf153201450c8fe9d3707aed8cb0ee9fee8f5332d88e2001c56cfd0838f"
+        },
+        {
+          "id": "medium",
+          "work_items": 640000,
+          "input_bytes": 80000,
+          "input_digest": "f2af8de388713368d12e7bf4188e96c030bf1c3e2906250672e2f2eee9370aa8"
+        },
+        {
+          "id": "large",
+          "work_items": 40960000,
+          "input_bytes": 5120000,
+          "input_digest": "84118644943bed7c2aa82daafc7e8b8f2358d0e38ab07fd140c8aba466fb3ba4"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-b1530dc4e48e942d",
+        "cq-evidence-qualification-ba252d42660a41ce"
+      ],
+      "owner": "stab-core/bits",
+      "profiler_note": null,
+      "comparator_sources": [
+        {
+          "path": "benchmarks/stim_adapter/main.cc",
+          "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
+        },
+        {
+          "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
+          "sha256": "d1a0d47e842f279d4175c6b12d53af8c1ebc52d28e42dd93241c0de67e0c7d4b"
+        }
+      ]
+    },
+    {
+      "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "simd-bits-not-zero-late",
+      "measurement_ids": ["not-zero"],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 10000,
+          "input_bytes": 1256,
+          "input_digest": "76618d8f234d913b3b6f99be0c83fca1e8a6eb3c5cdb6f622c06dccc7aaa2cc0"
+        },
+        {
+          "id": "medium",
+          "work_items": 640000,
+          "input_bytes": 80000,
+          "input_digest": "61aace21da17e2176a3f445b0d21a9b0c41d536a0223c24deda8d482e075aae6"
+        },
+        {
+          "id": "large",
+          "work_items": 40960000,
+          "input_bytes": 5120000,
+          "input_digest": "0b0543f60288e5ca816fc551a8988eb4e96d37477f433ccbe2cbc16d62790f06"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-b1530dc4e48e942d",
+        "cq-evidence-qualification-ba252d42660a41ce"
+      ],
+      "owner": "stab-core/bits",
+      "profiler_note": null,
+      "comparator_sources": [
+        {
+          "path": "benchmarks/stim_adapter/main.cc",
+          "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
+        },
+        {
+          "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
+          "sha256": "d1a0d47e842f279d4175c6b12d53af8c1ebc52d28e42dd93241c0de67e0c7d4b"
         }
       ]
     },
@@ -202,7 +331,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "4098eadd7aa23e20cf98c155827ff69133a0a116b989659a747bdee71d677f87"
+          "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
         },
         {
           "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",

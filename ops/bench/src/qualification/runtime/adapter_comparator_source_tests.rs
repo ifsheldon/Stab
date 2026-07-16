@@ -50,8 +50,8 @@ fn receipt_comparator_sources_are_complete_unique_and_ordered() {
     let mut content_altered = receipt;
     content_altered
         .comparator_sources
-        .get_mut(1)
-        .expect("XOR comparator")
+        .get_mut(2)
+        .expect("not-zero comparator")
         .sha256 = "d".repeat(64);
     assert_invalid(content_altered);
 }

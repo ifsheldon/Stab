@@ -165,6 +165,13 @@ fn reworked_heterogeneous_row_can_point_to_an_exact_replacement_group() {
             .runtime_measurement_id,
         "xor-complete-vector"
     );
+    assert_eq!(row.replacement_contracts.len(), 2);
+    assert!(row.replacement_contracts.iter().any(|replacement| {
+        replacement.legacy_stim_name == "simd_bits_not_zero_100K"
+            && replacement.legacy_stab_name == "stab_simd_bits_not_zero_10K"
+            && replacement.runtime_group_id == "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY"
+            && replacement.runtime_measurement_id == "not-zero"
+    }));
 
     validate(&suite, &manifest, &references, "UNFROZEN")
         .expect("reworked legacy row must not constrain its exact replacement group");
@@ -484,4 +491,24 @@ fn validation_rejects_fake_api_fixture_and_extra_generator_key() {
     let message = error.to_string();
     assert!(message.contains("parameter keys"));
     assert!(message.contains("lacks an exact CQ API fixture group"));
+}
+
+#[test]
+fn graduated_planned_origin_group_requires_its_executable_contract() {
+    let (mut suite, manifest, references) = fixture();
+    let group = suite
+        .qualification_groups
+        .iter_mut()
+        .find(|group| group.id == "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY")
+        .expect("graduated not-zero group");
+    group.output_contract.comparator_sources.clear();
+    group.threshold_policy = ThresholdPolicy::ReportOnly;
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("incomplete graduated contract must fail");
+    assert!(
+        error
+            .to_string()
+            .contains("lacks an exact executable workload contract")
+    );
 }

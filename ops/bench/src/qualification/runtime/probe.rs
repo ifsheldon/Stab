@@ -23,12 +23,16 @@ const CIRCUIT_PARSE_PROBE_ID: &str = "pq2-circuit-parse-adapter-smoke";
 const CIRCUIT_CANONICAL_PRINT_PROBE_ID: &str = "pq2-circuit-canonical-print-adapter-smoke";
 const GATE_NAME_HASH_PROBE_ID: &str = "pq2-gate-name-hash-adapter-smoke";
 const SIMD_BITS_XOR_PROBE_ID: &str = "pq2-simd-bits-xor-adapter-smoke";
+const SIMD_BITS_NOT_ZERO_EARLY_PROBE_ID: &str = "pq2-simd-bits-not-zero-early-adapter-smoke";
+const SIMD_BITS_NOT_ZERO_ALL_ZERO_PROBE_ID: &str = "pq2-simd-bits-not-zero-all-zero-adapter-smoke";
+const SIMD_BITS_NOT_ZERO_LATE_PROBE_ID: &str = "pq2-simd-bits-not-zero-late-adapter-smoke";
 const SIMD_WORD_POPCOUNT_PROBE_ID: &str = "pq2-simd-word-popcount-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
 const DEFAULT_PROBE_WORK_ITEMS: u64 = 4_096;
 const DEFAULT_GATE_HASH_WORK_ITEMS: u64 = 5_248;
 const DEFAULT_POPCOUNT_WORK_ITEMS: u64 = 262_144;
+const DEFAULT_NOT_ZERO_WORK_ITEMS: u64 = 10_000;
 const GATE_HASH_NAME_COUNT: u64 = 82;
 const POPCOUNT_ALIGNMENT_BITS: u64 = 256;
 const POPCOUNT_MIN_BITS: u64 = 512;
@@ -36,12 +40,17 @@ const POPCOUNT_MAX_BITS: u64 = 268_435_456;
 const XOR_ALIGNMENT_BITS: u64 = 256;
 const XOR_MIN_BITS: u64 = 256;
 const XOR_MAX_BITS: u64 = 268_435_456;
+const NOT_ZERO_MIN_BITS: u64 = 64;
+const NOT_ZERO_MAX_BITS: u64 = 268_435_456;
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 const CIRCUIT_PARSE_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
 const GATE_NAME_HASH_RUNTIME_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
 const SIMD_WORD_POPCOUNT_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
 const SIMD_BITS_XOR_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
+const SIMD_BITS_NOT_ZERO_EARLY_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY";
+const SIMD_BITS_NOT_ZERO_ALL_ZERO_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO";
+const SIMD_BITS_NOT_ZERO_LATE_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum ProbeGroup {
@@ -59,6 +68,12 @@ enum ProbeGroup {
     SimdWordPopcountAdapter,
     #[value(name = "pq2-simd-bits-xor-adapter-smoke")]
     SimdBitsXorAdapter,
+    #[value(name = "pq2-simd-bits-not-zero-early-adapter-smoke")]
+    SimdBitsNotZeroEarlyAdapter,
+    #[value(name = "pq2-simd-bits-not-zero-all-zero-adapter-smoke")]
+    SimdBitsNotZeroAllZeroAdapter,
+    #[value(name = "pq2-simd-bits-not-zero-late-adapter-smoke")]
+    SimdBitsNotZeroLateAdapter,
 }
 
 impl ProbeGroup {
@@ -71,6 +86,11 @@ impl ProbeGroup {
             Self::GateNameHashAdapter => Some(GATE_NAME_HASH_RUNTIME_GROUP_ID),
             Self::SimdWordPopcountAdapter => Some(SIMD_WORD_POPCOUNT_RUNTIME_GROUP_ID),
             Self::SimdBitsXorAdapter => Some(SIMD_BITS_XOR_RUNTIME_GROUP_ID),
+            Self::SimdBitsNotZeroEarlyAdapter => Some(SIMD_BITS_NOT_ZERO_EARLY_RUNTIME_GROUP_ID),
+            Self::SimdBitsNotZeroAllZeroAdapter => {
+                Some(SIMD_BITS_NOT_ZERO_ALL_ZERO_RUNTIME_GROUP_ID)
+            }
+            Self::SimdBitsNotZeroLateAdapter => Some(SIMD_BITS_NOT_ZERO_LATE_RUNTIME_GROUP_ID),
         }
     }
 
@@ -82,6 +102,11 @@ impl ProbeGroup {
             GATE_NAME_HASH_RUNTIME_GROUP_ID => Some(Self::GateNameHashAdapter),
             SIMD_WORD_POPCOUNT_RUNTIME_GROUP_ID => Some(Self::SimdWordPopcountAdapter),
             SIMD_BITS_XOR_RUNTIME_GROUP_ID => Some(Self::SimdBitsXorAdapter),
+            SIMD_BITS_NOT_ZERO_EARLY_RUNTIME_GROUP_ID => Some(Self::SimdBitsNotZeroEarlyAdapter),
+            SIMD_BITS_NOT_ZERO_ALL_ZERO_RUNTIME_GROUP_ID => {
+                Some(Self::SimdBitsNotZeroAllZeroAdapter)
+            }
+            SIMD_BITS_NOT_ZERO_LATE_RUNTIME_GROUP_ID => Some(Self::SimdBitsNotZeroLateAdapter),
             _ => None,
         }
     }
@@ -158,7 +183,10 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         | ProbeGroup::CircuitCanonicalPrintAdapter
         | ProbeGroup::GateNameHashAdapter
         | ProbeGroup::SimdWordPopcountAdapter
-        | ProbeGroup::SimdBitsXorAdapter => run_adapter_probe(root, args).map(|_| ()),
+        | ProbeGroup::SimdBitsXorAdapter
+        | ProbeGroup::SimdBitsNotZeroEarlyAdapter
+        | ProbeGroup::SimdBitsNotZeroAllZeroAdapter
+        | ProbeGroup::SimdBitsNotZeroLateAdapter => run_adapter_probe(root, args).map(|_| ()),
     }
 }
 
@@ -253,6 +281,21 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
             SIMD_BITS_XOR_PROBE_ID,
             "simd-bits-xor",
             "xor-complete-vector",
+        ),
+        ProbeGroup::SimdBitsNotZeroEarlyAdapter => (
+            SIMD_BITS_NOT_ZERO_EARLY_PROBE_ID,
+            "simd-bits-not-zero-early",
+            "not-zero",
+        ),
+        ProbeGroup::SimdBitsNotZeroAllZeroAdapter => (
+            SIMD_BITS_NOT_ZERO_ALL_ZERO_PROBE_ID,
+            "simd-bits-not-zero-zero",
+            "not-zero",
+        ),
+        ProbeGroup::SimdBitsNotZeroLateAdapter => (
+            SIMD_BITS_NOT_ZERO_LATE_PROBE_ID,
+            "simd-bits-not-zero-late",
+            "not-zero",
         ),
         ProbeGroup::ProcessContract => {
             return Err(ProbeError::Contract(
@@ -447,6 +490,9 @@ fn probe_work_items(args: &ProbeArgs) -> u64 {
             ProbeGroup::SimdWordPopcountAdapter | ProbeGroup::SimdBitsXorAdapter => {
                 DEFAULT_POPCOUNT_WORK_ITEMS
             }
+            ProbeGroup::SimdBitsNotZeroEarlyAdapter
+            | ProbeGroup::SimdBitsNotZeroAllZeroAdapter
+            | ProbeGroup::SimdBitsNotZeroLateAdapter => DEFAULT_NOT_ZERO_WORK_ITEMS,
             ProbeGroup::ProcessContract
             | ProbeGroup::AdapterProtocol
             | ProbeGroup::CircuitParseAdapter
@@ -489,7 +535,21 @@ fn validate_probe_work_items(group: ProbeGroup, work_items: u64) -> Result<(), P
             "simd-bits-xor probe width {work_items} is not a multiple of {XOR_ALIGNMENT_BITS} bits"
         )));
     }
+    if is_not_zero_probe(group) && !(NOT_ZERO_MIN_BITS..=NOT_ZERO_MAX_BITS).contains(&work_items) {
+        return Err(ProbeError::Contract(format!(
+            "simd-bits-not-zero probe width {work_items} is outside {NOT_ZERO_MIN_BITS}..={NOT_ZERO_MAX_BITS} bits"
+        )));
+    }
     Ok(())
+}
+
+const fn is_not_zero_probe(group: ProbeGroup) -> bool {
+    matches!(
+        group,
+        ProbeGroup::SimdBitsNotZeroEarlyAdapter
+            | ProbeGroup::SimdBitsNotZeroAllZeroAdapter
+            | ProbeGroup::SimdBitsNotZeroLateAdapter
+    )
 }
 
 fn checked_process(output: ProcessResult, name: &'static str) -> Result<ProcessResult, ProbeError> {
@@ -579,6 +639,9 @@ mod tests {
         assert!(ProtocolId::try_new(GATE_NAME_HASH_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(SIMD_WORD_POPCOUNT_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(SIMD_BITS_XOR_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(SIMD_BITS_NOT_ZERO_EARLY_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(SIMD_BITS_NOT_ZERO_ALL_ZERO_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(SIMD_BITS_NOT_ZERO_LATE_PROBE_ID).is_ok());
     }
 
     #[test]
@@ -643,5 +706,19 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn simd_bits_not_zero_probes_accept_logical_widths_and_enforce_bounds() {
+        for group in [
+            ProbeGroup::SimdBitsNotZeroEarlyAdapter,
+            ProbeGroup::SimdBitsNotZeroAllZeroAdapter,
+            ProbeGroup::SimdBitsNotZeroLateAdapter,
+        ] {
+            assert!(validate_probe_work_items(group, DEFAULT_NOT_ZERO_WORK_ITEMS).is_ok());
+            assert!(validate_probe_work_items(group, 65).is_ok());
+            assert!(validate_probe_work_items(group, NOT_ZERO_MIN_BITS - 1).is_err());
+            assert!(validate_probe_work_items(group, NOT_ZERO_MAX_BITS + 1).is_err());
+        }
     }
 }

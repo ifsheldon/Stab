@@ -13,10 +13,15 @@ const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT
 const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
 const SIMD_WORD_POPCOUNT_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
 const SIMD_BITS_XOR_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
+const SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY";
+const SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO";
+const SIMD_BITS_NOT_ZERO_LATE_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE";
 const STIM_ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
 const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_word_popcount_contract.h";
 const SIMD_BITS_XOR_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/simd_bits_xor_contract.h";
+const SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE: &str =
+    "benchmarks/stim_adapter/simd_bits_not_zero_contract.h";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
     "cq-evidence-qualification-e660819ae9a223c6",
@@ -37,6 +42,14 @@ const SIMD_BITS_XOR_CORRECTNESS_CASES: [&str; 2] = [
 ];
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
+struct NotZeroGroupSpec {
+    id: &'static str,
+    manifest_row: &'static str,
+    pattern: &'static str,
+    seed: &'static str,
+    input_digests: [&'static str; 3],
+}
+
 pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(), BenchError> {
     match group.id.as_str() {
         CIRCUIT_PARSE_GROUP_ID => apply_circuit_parse(group),
@@ -47,6 +60,94 @@ pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(
         _ => {}
     }
     Ok(())
+}
+
+pub(super) fn additional_groups(
+    root: &RepoRoot,
+    groups: &[QualificationGroup],
+) -> Result<Vec<QualificationGroup>, BenchError> {
+    let dense_xor = groups
+        .iter()
+        .find(|group| group.id == SIMD_BITS_XOR_GROUP_ID)
+        .ok_or_else(|| {
+            BenchError::Qualification(
+                "source-owned not-zero groups require the dense-XOR bit-kernel owner".to_string(),
+            )
+        })?;
+    [
+        NotZeroGroupSpec {
+            id: SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID,
+            manifest_row: "pq2-simd-bits-not-zero-early",
+            pattern: "early",
+            seed: "single-bit-at-3-of-50-v1",
+            input_digests: [
+                "652aebf153201450c8fe9d3707aed8cb0ee9fee8f5332d88e2001c56cfd0838f",
+                "f2af8de388713368d12e7bf4188e96c030bf1c3e2906250672e2f2eee9370aa8",
+                "84118644943bed7c2aa82daafc7e8b8f2358d0e38ab07fd140c8aba466fb3ba4",
+            ],
+        },
+        NotZeroGroupSpec {
+            id: SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID,
+            manifest_row: "pq2-simd-bits-not-zero-all-zero",
+            pattern: "zero",
+            seed: "all-zero-v1",
+            input_digests: [
+                "b6286dfe1dca80e14e17bbc6a371565900665697e8f4f2b22d30a303f804b537",
+                "60aace21d864e2176a3f43edcd21a970c401e36a0223c24d09a8d482e075aae0",
+                "080543f5fd6fe5ca816fbfc568988f74eb08c7477f433ccbdecbc16d62790ec8",
+            ],
+        },
+        NotZeroGroupSpec {
+            id: SIMD_BITS_NOT_ZERO_LATE_GROUP_ID,
+            manifest_row: "pq2-simd-bits-not-zero-late",
+            pattern: "late",
+            seed: "single-bit-at-logical-end-v1",
+            input_digests: [
+                "76618d8f234d913b3b6f99be0c83fca1e8a6eb3c5cdb6f622c06dccc7aaa2cc0",
+                "61aace21da17e2176a3f445b0d21a9b0c41d536a0223c24deda8d482e075aae6",
+                "0b0543f60288e5ca816fc551a8988eb4e96d37477f433ccbe2cbc16d62790f06",
+            ],
+        },
+    ]
+    .into_iter()
+    .map(|spec| not_zero_group(root, dense_xor, spec))
+    .collect()
+}
+
+fn not_zero_group(
+    root: &RepoRoot,
+    dense_xor: &QualificationGroup,
+    spec: NotZeroGroupSpec,
+) -> Result<QualificationGroup, BenchError> {
+    let mut group = dense_xor.clone();
+    group.id = spec.id.to_string();
+    group.manifest_row = spec.manifest_row.to_string();
+    group.row_origin = super::super::model::RowOrigin::Planned;
+    group.correctness_cases = SIMD_BITS_XOR_CORRECTNESS_CASES
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    group.workload_family =
+        simd_bits_not_zero_workload_family(spec.pattern, spec.seed, spec.input_digests);
+    group.output_contract = OutputContract {
+        expected_shape: "Exact generated logical-word fixture bytes plus a canonical digest over checksum, iteration count, logical bit width, pattern marker, and all four input-fingerprint lanes."
+            .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: "Both workers prepare the same logical u64 words outside timing, invoke only not_zero behind matching compiler fences, accumulate the Boolean result, and digest the semantic output outside timing."
+            .to_string(),
+        comparator_sources: [STIM_ADAPTER_SOURCE, SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE]
+            .into_iter()
+            .map(|path| comparator_source(root, path))
+            .collect::<Result<_, _>>()?,
+    };
+    group.memory_policy = circuit_memory_policy(
+        "One logical bit vector remains live during timing and setup and peak process RSS are report-only observations at every scale. Timed scans allocate nothing; PQ6 owns explicit cross-scale RSS and allocation slack.",
+    );
+    group.reason = format!(
+        "Implemented paired pinned-Stim and Rust not_zero scans for the {} pattern with independent exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts.",
+        spec.pattern,
+    );
+    Ok(group)
 }
 
 fn apply_simd_bits_xor(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(), BenchError> {
@@ -351,6 +452,35 @@ fn simd_bits_xor_workload_family() -> WorkloadFamily {
             parameters: format!(
                 "generator=splitmix64-xor-pair-v1; bits={bits}; alignment_bits=256"
             ),
+            input_bytes: InputByteCount::Exact { bytes: input_bytes },
+            semantic_work: Some(bits),
+            input_digest: Some(input_digest.to_string()),
+        })
+        .collect(),
+    }
+}
+
+fn simd_bits_not_zero_workload_family(
+    pattern: &str,
+    seed: &str,
+    input_digests: [&str; 3],
+) -> WorkloadFamily {
+    WorkloadFamily {
+        fixture: FixtureLocator::Generated {
+            id: format!("simd-bits-not-zero-{pattern}-v1"),
+        },
+        source: "src/stim/mem/simd_bits.perf.cc".to_string(),
+        deterministic_seed: seed.to_string(),
+        scales: [
+            ("small", 10_000_u64, 1_256_u64),
+            ("medium", 640_000, 80_000),
+            ("large", 40_960_000, 5_120_000),
+        ]
+        .into_iter()
+        .zip(input_digests)
+        .map(|((id, bits, input_bytes), input_digest)| ScalePoint {
+            id: id.to_string(),
+            parameters: format!("generator=simd-bits-not-zero-v1; bits={bits}; pattern={pattern}"),
             input_bytes: InputByteCount::Exact { bytes: input_bytes },
             semantic_work: Some(bits),
             input_digest: Some(input_digest.to_string()),

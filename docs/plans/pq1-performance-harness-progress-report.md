@@ -1,6 +1,6 @@
 # PQ1 Paired Performance Harness Progress Report
 
-> Current-evidence note, 2026-07-16: correctness inventory digest `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2` and performance inventory digest `8b4735f7d651e74d3029014a4bf0c4580d85462295d66c93d8e090d3433c3958` are source-current. All five product-group AArch64 report families remain historical passing evidence under preceding inventories, including dense XOR at digest `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`. The schema-version-13 PQ1 reports remain historical diagnostic infrastructure evidence, not product performance.
+> Current-evidence note, 2026-07-16: correctness inventory digest `ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2` and performance inventory digest `7fc15258f7fe1e5e4ca075c41e9ab2b869e7d845a11f5f8694386e854cea5435` are source-current. All five previously qualified product-group AArch64 report families remain historical passing evidence under preceding inventories, including dense XOR at digest `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`; the three new `not_zero` groups have no accepted timing evidence yet. The schema-version-13 PQ1 reports remain historical diagnostic infrastructure evidence, not product performance.
 
 ## Status
 

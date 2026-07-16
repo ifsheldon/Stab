@@ -20,11 +20,15 @@ const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const BUILD_OUTPUT_LIMIT: usize = 16 << 20;
 const MAX_SOURCE_INPUT_BYTES: u64 = 16 << 20;
 const RUNTIME_PARENT: &str = "/tmp";
-const WORKER_SOURCES: [(&str, &str); 2] = [
+const WORKER_SOURCES: [(&str, &str); 3] = [
     ("worker.rs", "ops/bench/src/qualification/runtime/worker.rs"),
     (
         "worker/bits.rs",
         "ops/bench/src/qualification/runtime/worker/bits.rs",
+    ),
+    (
+        "worker/not_zero.rs",
+        "ops/bench/src/qualification/runtime/worker/not_zero.rs",
     ),
 ];
 const FINGERPRINT_PLACEHOLDER: &str = "$FINGERPRINT";
@@ -597,6 +601,15 @@ mod tests {
         std::fs::write(bits_path, b"changed bits source\n").expect("change bits source");
         let changed = digest_materialized_worker_source(runtime.path()).expect("changed digest");
         assert_ne!(materialized, changed);
+
+        let not_zero_path = runtime
+            .path()
+            .join(WORKER_SOURCES.get(2).expect("not-zero source contract").1);
+        std::fs::write(not_zero_path, b"changed not-zero source\n")
+            .expect("change not-zero source");
+        let changed_again =
+            digest_materialized_worker_source(runtime.path()).expect("changed digest");
+        assert_ne!(changed, changed_again);
     }
 
     #[test]

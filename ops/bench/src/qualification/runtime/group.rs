@@ -31,6 +31,10 @@ const SIMD_BITS_XOR_COMPARATOR_PATHS: [&str; 2] = [
     "benchmarks/stim_adapter/main.cc",
     "benchmarks/stim_adapter/simd_bits_xor_contract.h",
 ];
+const SIMD_BITS_NOT_ZERO_COMPARATOR_PATHS: [&str; 2] = [
+    "benchmarks/stim_adapter/main.cc",
+    "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
+];
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -453,6 +457,11 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
         let expected_comparator_paths = match group.id.to_string().as_str() {
             SIMD_WORD_POPCOUNT_GROUP_ID => SIMD_WORD_POPCOUNT_COMPARATOR_PATHS.as_slice(),
             SIMD_BITS_XOR_GROUP_ID => SIMD_BITS_XOR_COMPARATOR_PATHS.as_slice(),
+            super::invocation::SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID
+            | super::invocation::SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID
+            | super::invocation::SIMD_BITS_NOT_ZERO_LATE_GROUP_ID => {
+                SIMD_BITS_NOT_ZERO_COMPARATOR_PATHS.as_slice()
+            }
             _ => &[],
         };
         if measurement_ids.len() != group.measurement_ids.len()
@@ -570,158 +579,192 @@ mod tests {
     use super::*;
 
     fn valid_contract_file() -> GroupContractFile {
+        let mut groups = vec![
+            GroupContract {
+                id: ProtocolId::try_new(super::super::invocation::PQ1_GROUP_ID).expect("group id"),
+                claim_class: ClaimClass::DiagnosticInfrastructure,
+                baseline_eligibility: BaselineEligibility::ReportOnly,
+                workload_id: ProtocolId::try_new("protocol-smoke").expect("workload id"),
+                measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
+                scales: vec![ScaleContract {
+                    id: ProtocolId::try_new("default").expect("scale id"),
+                    work_items: NonZeroU64::new(4096).expect("positive work"),
+                    input_bytes: 0,
+                    input_digest: InputDigest::try_new(
+                        "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1",
+                    )
+                    .expect("empty input digest"),
+                }],
+                correctness_case_ids: Vec::new(),
+                owner: ProtocolId::try_new("ops/bench").expect("owner"),
+                profiler_note: None,
+                comparator_sources: Vec::new(),
+            },
+            GroupContract {
+                id: ProtocolId::try_new(super::super::invocation::CIRCUIT_CANONICAL_PRINT_GROUP_ID)
+                    .expect("group id"),
+                claim_class: ClaimClass::PromotablePerformance,
+                baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                workload_id: ProtocolId::try_new("circuit-canonical-print").expect("workload id"),
+                measurement_ids: vec![ProtocolId::try_new("serialize").expect("measurement id")],
+                scales: vec![ScaleContract {
+                    id: ProtocolId::try_new("small").expect("scale id"),
+                    work_items: NonZeroU64::new(64).expect("positive work"),
+                    input_bytes: 64,
+                    input_digest: InputDigest::try_new("b".repeat(64)).expect("input digest"),
+                }],
+                correctness_case_ids: vec!["cq-evidence-canonical-print".to_string()],
+                owner: ProtocolId::try_new("stab-core/circuit-printer").expect("owner"),
+                profiler_note: None,
+                comparator_sources: Vec::new(),
+            },
+            GroupContract {
+                id: ProtocolId::try_new(super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
+                    .expect("group id"),
+                claim_class: ClaimClass::PromotablePerformance,
+                baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                workload_id: ProtocolId::try_new("circuit-parse").expect("workload id"),
+                measurement_ids: vec![ProtocolId::try_new("parse").expect("measurement id")],
+                scales: vec![ScaleContract {
+                    id: ProtocolId::try_new("small").expect("scale id"),
+                    work_items: NonZeroU64::new(64).expect("positive work"),
+                    input_bytes: 64,
+                    input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
+                }],
+                correctness_case_ids: vec!["cq-evidence-example".to_string()],
+                owner: ProtocolId::try_new("stab-core/circuit-parser").expect("owner"),
+                profiler_note: Some(ProfilerNoteContract {
+                    path: ProfilerNotePath::try_new(
+                        "benchmarks/profiler-notes/qualification/example.md".to_string(),
+                    )
+                    .expect("note path"),
+                    sha256: Sha256Digest::try_new("d".repeat(64)).expect("note digest"),
+                }),
+                comparator_sources: Vec::new(),
+            },
+            GroupContract {
+                id: ProtocolId::try_new(super::super::invocation::GATE_NAME_HASH_GROUP_ID)
+                    .expect("group id"),
+                claim_class: ClaimClass::PromotablePerformance,
+                baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                workload_id: ProtocolId::try_new("gate-name-hash").expect("workload id"),
+                measurement_ids: vec![
+                    ProtocolId::try_new("hash-all-names").expect("measurement id"),
+                ],
+                scales: vec![ScaleContract {
+                    id: ProtocolId::try_new("small").expect("scale id"),
+                    work_items: NonZeroU64::new(82).expect("positive work"),
+                    input_bytes: 0,
+                    input_digest: InputDigest::try_new(
+                        "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1",
+                    )
+                    .expect("empty input digest"),
+                }],
+                correctness_case_ids: vec!["cq-evidence-gate-name-hash".to_string()],
+                owner: ProtocolId::try_new("stab-core/gates").expect("owner"),
+                profiler_note: None,
+                comparator_sources: Vec::new(),
+            },
+            GroupContract {
+                id: ProtocolId::try_new(super::super::invocation::SIMD_BITS_XOR_GROUP_ID)
+                    .expect("group id"),
+                claim_class: ClaimClass::PromotablePerformance,
+                baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                workload_id: ProtocolId::try_new("simd-bits-xor").expect("workload id"),
+                measurement_ids: vec![
+                    ProtocolId::try_new("xor-complete-vector").expect("measurement id"),
+                ],
+                scales: vec![ScaleContract {
+                    id: ProtocolId::try_new("small").expect("scale id"),
+                    work_items: NonZeroU64::new(4_096).expect("positive work"),
+                    input_bytes: 1_024,
+                    input_digest: InputDigest::try_new("d".repeat(64)).expect("input digest"),
+                }],
+                correctness_case_ids: vec!["cq-evidence-simd-bits-xor".to_string()],
+                owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
+                profiler_note: None,
+                comparator_sources: SIMD_BITS_XOR_COMPARATOR_PATHS
+                    .iter()
+                    .map(|path| ComparatorSourceContract {
+                        path: ComparatorSourcePath::try_new((*path).to_string())
+                            .expect("comparator path"),
+                        sha256: Sha256Digest::try_new("e".repeat(64)).expect("comparator digest"),
+                    })
+                    .collect(),
+            },
+            GroupContract {
+                id: ProtocolId::try_new(super::super::invocation::SIMD_WORD_POPCOUNT_GROUP_ID)
+                    .expect("group id"),
+                claim_class: ClaimClass::PromotablePerformance,
+                baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                workload_id: ProtocolId::try_new("simd-word-popcount").expect("workload id"),
+                measurement_ids: vec![
+                    ProtocolId::try_new("toggle-popcount").expect("measurement id"),
+                ],
+                scales: vec![ScaleContract {
+                    id: ProtocolId::try_new("small").expect("scale id"),
+                    work_items: NonZeroU64::new(4_096).expect("positive work"),
+                    input_bytes: 512,
+                    input_digest: InputDigest::try_new("e".repeat(64)).expect("input digest"),
+                }],
+                correctness_case_ids: vec!["cq-evidence-simd-word-popcount".to_string()],
+                owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
+                profiler_note: None,
+                comparator_sources: SIMD_WORD_POPCOUNT_COMPARATOR_PATHS
+                    .iter()
+                    .map(|path| ComparatorSourceContract {
+                        path: ComparatorSourcePath::try_new((*path).to_string())
+                            .expect("comparator path"),
+                        sha256: Sha256Digest::try_new("f".repeat(64)).expect("comparator digest"),
+                    })
+                    .collect(),
+            },
+        ];
+        groups.extend([
+            not_zero_contract(
+                super::super::invocation::SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID,
+                "simd-bits-not-zero-early",
+            ),
+            not_zero_contract(
+                super::super::invocation::SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID,
+                "simd-bits-not-zero-zero",
+            ),
+            not_zero_contract(
+                super::super::invocation::SIMD_BITS_NOT_ZERO_LATE_GROUP_ID,
+                "simd-bits-not-zero-late",
+            ),
+        ]);
         GroupContractFile {
             schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
             performance_inventory_sha256: "a".repeat(64),
-            groups: vec![
-                GroupContract {
-                    id: ProtocolId::try_new(super::super::invocation::PQ1_GROUP_ID)
-                        .expect("group id"),
-                    claim_class: ClaimClass::DiagnosticInfrastructure,
-                    baseline_eligibility: BaselineEligibility::ReportOnly,
-                    workload_id: ProtocolId::try_new("protocol-smoke").expect("workload id"),
-                    measurement_ids: vec![ProtocolId::try_new("main").expect("measurement id")],
-                    scales: vec![ScaleContract {
-                        id: ProtocolId::try_new("default").expect("scale id"),
-                        work_items: NonZeroU64::new(4096).expect("positive work"),
-                        input_bytes: 0,
-                        input_digest: InputDigest::try_new(
-                            "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1",
-                        )
-                        .expect("empty input digest"),
-                    }],
-                    correctness_case_ids: Vec::new(),
-                    owner: ProtocolId::try_new("ops/bench").expect("owner"),
-                    profiler_note: None,
-                    comparator_sources: Vec::new(),
-                },
-                GroupContract {
-                    id: ProtocolId::try_new(
-                        super::super::invocation::CIRCUIT_CANONICAL_PRINT_GROUP_ID,
-                    )
-                    .expect("group id"),
-                    claim_class: ClaimClass::PromotablePerformance,
-                    baseline_eligibility: BaselineEligibility::ThresholdEligible,
-                    workload_id: ProtocolId::try_new("circuit-canonical-print")
-                        .expect("workload id"),
-                    measurement_ids: vec![
-                        ProtocolId::try_new("serialize").expect("measurement id"),
-                    ],
-                    scales: vec![ScaleContract {
-                        id: ProtocolId::try_new("small").expect("scale id"),
-                        work_items: NonZeroU64::new(64).expect("positive work"),
-                        input_bytes: 64,
-                        input_digest: InputDigest::try_new("b".repeat(64)).expect("input digest"),
-                    }],
-                    correctness_case_ids: vec!["cq-evidence-canonical-print".to_string()],
-                    owner: ProtocolId::try_new("stab-core/circuit-printer").expect("owner"),
-                    profiler_note: None,
-                    comparator_sources: Vec::new(),
-                },
-                GroupContract {
-                    id: ProtocolId::try_new(super::super::invocation::CIRCUIT_PARSE_GROUP_ID)
-                        .expect("group id"),
-                    claim_class: ClaimClass::PromotablePerformance,
-                    baseline_eligibility: BaselineEligibility::ThresholdEligible,
-                    workload_id: ProtocolId::try_new("circuit-parse").expect("workload id"),
-                    measurement_ids: vec![ProtocolId::try_new("parse").expect("measurement id")],
-                    scales: vec![ScaleContract {
-                        id: ProtocolId::try_new("small").expect("scale id"),
-                        work_items: NonZeroU64::new(64).expect("positive work"),
-                        input_bytes: 64,
-                        input_digest: InputDigest::try_new("a".repeat(64)).expect("input digest"),
-                    }],
-                    correctness_case_ids: vec!["cq-evidence-example".to_string()],
-                    owner: ProtocolId::try_new("stab-core/circuit-parser").expect("owner"),
-                    profiler_note: Some(ProfilerNoteContract {
-                        path: ProfilerNotePath::try_new(
-                            "benchmarks/profiler-notes/qualification/example.md".to_string(),
-                        )
-                        .expect("note path"),
-                        sha256: Sha256Digest::try_new("d".repeat(64)).expect("note digest"),
-                    }),
-                    comparator_sources: Vec::new(),
-                },
-                GroupContract {
-                    id: ProtocolId::try_new(super::super::invocation::GATE_NAME_HASH_GROUP_ID)
-                        .expect("group id"),
-                    claim_class: ClaimClass::PromotablePerformance,
-                    baseline_eligibility: BaselineEligibility::ThresholdEligible,
-                    workload_id: ProtocolId::try_new("gate-name-hash").expect("workload id"),
-                    measurement_ids: vec![
-                        ProtocolId::try_new("hash-all-names").expect("measurement id"),
-                    ],
-                    scales: vec![ScaleContract {
-                        id: ProtocolId::try_new("small").expect("scale id"),
-                        work_items: NonZeroU64::new(82).expect("positive work"),
-                        input_bytes: 0,
-                        input_digest: InputDigest::try_new(
-                            "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1",
-                        )
-                        .expect("empty input digest"),
-                    }],
-                    correctness_case_ids: vec!["cq-evidence-gate-name-hash".to_string()],
-                    owner: ProtocolId::try_new("stab-core/gates").expect("owner"),
-                    profiler_note: None,
-                    comparator_sources: Vec::new(),
-                },
-                GroupContract {
-                    id: ProtocolId::try_new(super::super::invocation::SIMD_BITS_XOR_GROUP_ID)
-                        .expect("group id"),
-                    claim_class: ClaimClass::PromotablePerformance,
-                    baseline_eligibility: BaselineEligibility::ThresholdEligible,
-                    workload_id: ProtocolId::try_new("simd-bits-xor").expect("workload id"),
-                    measurement_ids: vec![
-                        ProtocolId::try_new("xor-complete-vector").expect("measurement id"),
-                    ],
-                    scales: vec![ScaleContract {
-                        id: ProtocolId::try_new("small").expect("scale id"),
-                        work_items: NonZeroU64::new(4_096).expect("positive work"),
-                        input_bytes: 1_024,
-                        input_digest: InputDigest::try_new("d".repeat(64)).expect("input digest"),
-                    }],
-                    correctness_case_ids: vec!["cq-evidence-simd-bits-xor".to_string()],
-                    owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
-                    profiler_note: None,
-                    comparator_sources: SIMD_BITS_XOR_COMPARATOR_PATHS
-                        .iter()
-                        .map(|path| ComparatorSourceContract {
-                            path: ComparatorSourcePath::try_new((*path).to_string())
-                                .expect("comparator path"),
-                            sha256: Sha256Digest::try_new("e".repeat(64))
-                                .expect("comparator digest"),
-                        })
-                        .collect(),
-                },
-                GroupContract {
-                    id: ProtocolId::try_new(super::super::invocation::SIMD_WORD_POPCOUNT_GROUP_ID)
-                        .expect("group id"),
-                    claim_class: ClaimClass::PromotablePerformance,
-                    baseline_eligibility: BaselineEligibility::ThresholdEligible,
-                    workload_id: ProtocolId::try_new("simd-word-popcount").expect("workload id"),
-                    measurement_ids: vec![
-                        ProtocolId::try_new("toggle-popcount").expect("measurement id"),
-                    ],
-                    scales: vec![ScaleContract {
-                        id: ProtocolId::try_new("small").expect("scale id"),
-                        work_items: NonZeroU64::new(4_096).expect("positive work"),
-                        input_bytes: 512,
-                        input_digest: InputDigest::try_new("e".repeat(64)).expect("input digest"),
-                    }],
-                    correctness_case_ids: vec!["cq-evidence-simd-word-popcount".to_string()],
-                    owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
-                    profiler_note: None,
-                    comparator_sources: SIMD_WORD_POPCOUNT_COMPARATOR_PATHS
-                        .iter()
-                        .map(|path| ComparatorSourceContract {
-                            path: ComparatorSourcePath::try_new((*path).to_string())
-                                .expect("comparator path"),
-                            sha256: Sha256Digest::try_new("f".repeat(64))
-                                .expect("comparator digest"),
-                        })
-                        .collect(),
-                },
-            ],
+            groups,
+        }
+    }
+
+    fn not_zero_contract(group_id: &str, workload_id: &str) -> GroupContract {
+        GroupContract {
+            id: ProtocolId::try_new(group_id).expect("group id"),
+            claim_class: ClaimClass::PromotablePerformance,
+            baseline_eligibility: BaselineEligibility::ThresholdEligible,
+            workload_id: ProtocolId::try_new(workload_id).expect("workload id"),
+            measurement_ids: vec![ProtocolId::try_new("not-zero").expect("measurement id")],
+            scales: vec![ScaleContract {
+                id: ProtocolId::try_new("small").expect("scale id"),
+                work_items: NonZeroU64::new(10_000).expect("positive work"),
+                input_bytes: 1_256,
+                input_digest: InputDigest::try_new("f".repeat(64)).expect("input digest"),
+            }],
+            correctness_case_ids: vec!["cq-evidence-simd-bits-not-zero".to_string()],
+            owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
+            profiler_note: None,
+            comparator_sources: SIMD_BITS_NOT_ZERO_COMPARATOR_PATHS
+                .iter()
+                .map(|path| ComparatorSourceContract {
+                    path: ComparatorSourcePath::try_new((*path).to_string())
+                        .expect("comparator path"),
+                    sha256: Sha256Digest::try_new("a".repeat(64)).expect("comparator digest"),
+                })
+                .collect(),
         }
     }
 

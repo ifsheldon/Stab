@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "performance_inventory_sha256": "8b4735f7d651e74d3029014a4bf0c4580d85462295d66c93d8e090d3433c3958",
+  "performance_inventory_sha256": "7fc15258f7fe1e5e4ca075c41e9ab2b869e7d845a11f5f8694386e854cea5435",
   "groups": [
     {
       "group_id": "pq1-adapter-protocol-smoke",
@@ -46,6 +46,39 @@
       "measurements": [
         {
           "measurement_id": "xor-complete-vector",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "not-zero",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "not-zero",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "not-zero",
           "max_median_ratio": "1.25",
           "max_confidence_interval_upper": "1.25"
         }

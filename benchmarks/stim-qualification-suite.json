@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2",
-  "semantic_digest": "8b4735f7d651e74d3029014a4bf0c4580d85462295d66c93d8e090d3433c3958",
+  "semantic_digest": "7fc15258f7fe1e5e4ca075c41e9ab2b869e7d845a11f5f8694386e854cea5435",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -196,6 +196,9 @@
         "PERFQ-CHECKLIST-d2d203c23e3ef634-BIT-KERNELS",
         "PERFQ-M5-SIMD-BIT-TABLE",
         "PERFQ-M5-SIMD-BITS",
+        "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO",
+        "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY",
+        "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE",
         "PERFQ-M5-SIMD-WORD",
         "PERFQ-M5-SPARSE-XOR",
         "PERFQ-M8-PROBABILITY-UTIL"
@@ -62045,7 +62048,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "4098eadd7aa23e20cf98c155827ff69133a0a116b989659a747bdee71d677f87"
+            "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -62072,6 +62075,291 @@
       },
       "threshold_policy": "primary-1.25",
       "reason": "Implemented paired pinned-Stim and Rust complete-vector XOR work with exact CQ2, deterministic paired input, semantic output, scale, timing, and bounded-worker contracts. The legacy row's not-zero and unmatched logical operations remain separate.",
+      "owner": "stab-core/bits",
+      "status": "implemented"
+    },
+    {
+      "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO",
+      "manifest_row": "pq2-simd-bits-not-zero-all-zero",
+      "row_origin": "planned",
+      "performance_feature": "PERF-BIT-KERNELS",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-b1530dc4e48e942d",
+        "cq-evidence-qualification-ba252d42660a41ce"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "simd-bits-not-zero-zero-v1"
+        },
+        "source": "src/stim/mem/simd_bits.perf.cc",
+        "deterministic_seed": "all-zero-v1",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=simd-bits-not-zero-v1; bits=10000; pattern=zero",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1256
+            },
+            "semantic_work": 10000,
+            "input_digest": "b6286dfe1dca80e14e17bbc6a371565900665697e8f4f2b22d30a303f804b537"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=simd-bits-not-zero-v1; bits=640000; pattern=zero",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 80000
+            },
+            "semantic_work": 640000,
+            "input_digest": "60aace21d864e2176a3f43edcd21a970c401e36a0223c24d09a8d482e075aae0"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=simd-bits-not-zero-v1; bits=40960000; pattern=zero",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 5120000
+            },
+            "semantic_work": 40960000,
+            "input_digest": "080543f5fd6fe5ca816fbfc568988f74eb08c7477f433ccbdecbc16d62790ec8"
+          }
+        ]
+      },
+      "work_unit": "bits",
+      "output_contract": {
+        "expected_shape": "Exact generated logical-word fixture bytes plus a canonical digest over checksum, iteration count, logical bit width, pattern marker, and all four input-fingerprint lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers prepare the same logical u64 words outside timing, invoke only not_zero behind matching compiler fences, accumulate the Boolean result, and digest the semantic output outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
+          },
+          {
+            "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
+            "sha256": "d1a0d47e842f279d4175c6b12d53af8c1ebc52d28e42dd93241c0de67e0c7d4b"
+          }
+        ]
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "process-rss",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "One logical bit vector remains live during timing and setup and peak process RSS are report-only observations at every scale. Timed scans allocate nothing; PQ6 owns explicit cross-scale RSS and allocation slack."
+      },
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust not_zero scans for the zero pattern with independent exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts.",
+      "owner": "stab-core/bits",
+      "status": "implemented"
+    },
+    {
+      "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY",
+      "manifest_row": "pq2-simd-bits-not-zero-early",
+      "row_origin": "planned",
+      "performance_feature": "PERF-BIT-KERNELS",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-b1530dc4e48e942d",
+        "cq-evidence-qualification-ba252d42660a41ce"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "simd-bits-not-zero-early-v1"
+        },
+        "source": "src/stim/mem/simd_bits.perf.cc",
+        "deterministic_seed": "single-bit-at-3-of-50-v1",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=simd-bits-not-zero-v1; bits=10000; pattern=early",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1256
+            },
+            "semantic_work": 10000,
+            "input_digest": "652aebf153201450c8fe9d3707aed8cb0ee9fee8f5332d88e2001c56cfd0838f"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=simd-bits-not-zero-v1; bits=640000; pattern=early",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 80000
+            },
+            "semantic_work": 640000,
+            "input_digest": "f2af8de388713368d12e7bf4188e96c030bf1c3e2906250672e2f2eee9370aa8"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=simd-bits-not-zero-v1; bits=40960000; pattern=early",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 5120000
+            },
+            "semantic_work": 40960000,
+            "input_digest": "84118644943bed7c2aa82daafc7e8b8f2358d0e38ab07fd140c8aba466fb3ba4"
+          }
+        ]
+      },
+      "work_unit": "bits",
+      "output_contract": {
+        "expected_shape": "Exact generated logical-word fixture bytes plus a canonical digest over checksum, iteration count, logical bit width, pattern marker, and all four input-fingerprint lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers prepare the same logical u64 words outside timing, invoke only not_zero behind matching compiler fences, accumulate the Boolean result, and digest the semantic output outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
+          },
+          {
+            "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
+            "sha256": "d1a0d47e842f279d4175c6b12d53af8c1ebc52d28e42dd93241c0de67e0c7d4b"
+          }
+        ]
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "process-rss",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "One logical bit vector remains live during timing and setup and peak process RSS are report-only observations at every scale. Timed scans allocate nothing; PQ6 owns explicit cross-scale RSS and allocation slack."
+      },
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust not_zero scans for the early pattern with independent exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts.",
+      "owner": "stab-core/bits",
+      "status": "implemented"
+    },
+    {
+      "id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE",
+      "manifest_row": "pq2-simd-bits-not-zero-late",
+      "row_origin": "planned",
+      "performance_feature": "PERF-BIT-KERNELS",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-b1530dc4e48e942d",
+        "cq-evidence-qualification-ba252d42660a41ce"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "simd-bits-not-zero-late-v1"
+        },
+        "source": "src/stim/mem/simd_bits.perf.cc",
+        "deterministic_seed": "single-bit-at-logical-end-v1",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=simd-bits-not-zero-v1; bits=10000; pattern=late",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 1256
+            },
+            "semantic_work": 10000,
+            "input_digest": "76618d8f234d913b3b6f99be0c83fca1e8a6eb3c5cdb6f622c06dccc7aaa2cc0"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=simd-bits-not-zero-v1; bits=640000; pattern=late",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 80000
+            },
+            "semantic_work": 640000,
+            "input_digest": "61aace21da17e2176a3f445b0d21a9b0c41d536a0223c24deda8d482e075aae6"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=simd-bits-not-zero-v1; bits=40960000; pattern=late",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 5120000
+            },
+            "semantic_work": 40960000,
+            "input_digest": "0b0543f60288e5ca816fc551a8988eb4e96d37477f433ccbe2cbc16d62790f06"
+          }
+        ]
+      },
+      "work_unit": "bits",
+      "output_contract": {
+        "expected_shape": "Exact generated logical-word fixture bytes plus a canonical digest over checksum, iteration count, logical bit width, pattern marker, and all four input-fingerprint lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers prepare the same logical u64 words outside timing, invoke only not_zero behind matching compiler fences, accumulate the Boolean result, and digest the semantic output outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
+          },
+          {
+            "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
+            "sha256": "d1a0d47e842f279d4175c6b12d53af8c1ebc52d28e42dd93241c0de67e0c7d4b"
+          }
+        ]
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "process-rss",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "One logical bit vector remains live during timing and setup and peak process RSS are report-only observations at every scale. Timed scans allocate nothing; PQ6 owns explicit cross-scale RSS and allocation slack."
+      },
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust not_zero scans for the late pattern with independent exact CQ2, deterministic input, semantic output, scale, timing, and bounded-worker contracts.",
       "owner": "stab-core/bits",
       "status": "implemented"
     },
@@ -62141,7 +62429,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "4098eadd7aa23e20cf98c155827ff69133a0a116b989659a747bdee71d677f87"
+            "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
           },
           {
             "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -70806,6 +71094,12 @@
           "legacy_stab_name": "stab_simd_bits_xor_10K",
           "runtime_group_id": "PERFQ-M5-SIMD-BITS",
           "runtime_measurement_id": "xor-complete-vector"
+        },
+        {
+          "legacy_stim_name": "simd_bits_not_zero_100K",
+          "legacy_stab_name": "stab_simd_bits_not_zero_10K",
+          "runtime_group_id": "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY",
+          "runtime_measurement_id": "not-zero"
         }
       ],
       "waiver_refs": []

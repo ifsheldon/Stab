@@ -3,7 +3,8 @@ use std::collections::BTreeMap;
 use super::Issues;
 use crate::qualification::discovery::SourceReferences;
 use crate::qualification::model::{
-    EvidenceState, FixtureLocator, InputByteCount, QualificationGroup, ScalePoint, ThresholdPolicy,
+    CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount, QualificationGroup,
+    QualificationStatus, RunnerFidelity, ScalePoint, ThresholdPolicy,
 };
 
 pub(super) fn validate_planned_workload(
@@ -11,6 +12,10 @@ pub(super) fn validate_planned_workload(
     references: &SourceReferences,
     issues: &mut Issues,
 ) {
+    if group.status != QualificationStatus::Planned {
+        validate_graduated_workload(group, issues);
+        return;
+    }
     let expected_scale_ids = ["small", "medium", "large"];
     let actual_scale_ids = group
         .workload_family
@@ -150,6 +155,47 @@ pub(super) fn validate_planned_workload(
     {
         issues.push(format!(
             "planned group {} has an incomplete output, timing, memory, or threshold contract",
+            group.id
+        ));
+    }
+}
+
+fn validate_graduated_workload(group: &QualificationGroup, issues: &mut Issues) {
+    let expected_scale_ids = ["small", "medium", "large"];
+    let actual_scale_ids = group
+        .workload_family
+        .scales
+        .iter()
+        .map(|scale| scale.id.as_str())
+        .collect::<Vec<_>>();
+    let valid_parameters = group.workload_family.scales.iter().all(|scale| {
+        parameter_map(&group.id, &scale.parameters, issues).is_some_and(|parameters| {
+            parameters.contains_key("generator")
+                && parameters.values().all(|value| !is_placeholder(value))
+        })
+    });
+    if actual_scale_ids != expected_scale_ids
+        || !valid_parameters
+        || is_placeholder(&group.workload_family.deterministic_seed)
+        || !matches!(&group.workload_family.fixture, FixtureLocator::Generated { id } if !id.is_empty())
+        || group.runner_fidelity != RunnerFidelity::AdapterLibrary
+        || group.correctness_binding != CorrectnessBinding::ExactCases
+        || group.correctness_cases.is_empty()
+        || group.planned_correctness_case_id.is_some()
+        || group.output_contract.digest_state != EvidenceState::Existing
+        || group.output_contract.comparator_sources.is_empty()
+        || group.timing_policy.calibration_min_ms != 250
+        || group.timing_policy.calibration_max_ms != 2_000
+        || group.timing_policy.warmup_batches != 3
+        || group.timing_policy.full_pairs != 9
+        || group.timing_policy.timeout_seconds != 600
+        || group.timing_policy.gate_statistic
+            != "median paired ratio and fixed-seed bootstrap 95% upper bound"
+        || group.memory_policy.scale_ids != expected_scale_ids
+        || group.threshold_policy != ThresholdPolicy::Primary1_25
+    {
+        issues.push(format!(
+            "graduated planned-origin group {} lacks an exact executable workload contract",
             group.id
         ));
     }
