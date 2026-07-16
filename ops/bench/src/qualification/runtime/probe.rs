@@ -4,6 +4,7 @@ use std::num::NonZeroU64;
 use std::time::Duration;
 
 use clap::{Args, ValueEnum};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::adapter::prepare_adapter;
@@ -36,6 +37,11 @@ const XOR_ALIGNMENT_BITS: u64 = 256;
 const XOR_MIN_BITS: u64 = 256;
 const XOR_MAX_BITS: u64 = 268_435_456;
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
+const CIRCUIT_PARSE_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
+const CIRCUIT_CANONICAL_PRINT_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
+const GATE_NAME_HASH_RUNTIME_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
+const SIMD_WORD_POPCOUNT_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
+const SIMD_BITS_XOR_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum ProbeGroup {
@@ -53,6 +59,32 @@ enum ProbeGroup {
     SimdWordPopcountAdapter,
     #[value(name = "pq2-simd-bits-xor-adapter-smoke")]
     SimdBitsXorAdapter,
+}
+
+impl ProbeGroup {
+    fn runtime_group_id(self) -> Option<&'static str> {
+        match self {
+            Self::ProcessContract => None,
+            Self::AdapterProtocol => Some(ADAPTER_PROBE_ID),
+            Self::CircuitParseAdapter => Some(CIRCUIT_PARSE_RUNTIME_GROUP_ID),
+            Self::CircuitCanonicalPrintAdapter => Some(CIRCUIT_CANONICAL_PRINT_RUNTIME_GROUP_ID),
+            Self::GateNameHashAdapter => Some(GATE_NAME_HASH_RUNTIME_GROUP_ID),
+            Self::SimdWordPopcountAdapter => Some(SIMD_WORD_POPCOUNT_RUNTIME_GROUP_ID),
+            Self::SimdBitsXorAdapter => Some(SIMD_BITS_XOR_RUNTIME_GROUP_ID),
+        }
+    }
+
+    fn for_runtime_group(group_id: &str) -> Option<Self> {
+        match group_id {
+            ADAPTER_PROBE_ID => Some(Self::AdapterProtocol),
+            CIRCUIT_PARSE_RUNTIME_GROUP_ID => Some(Self::CircuitParseAdapter),
+            CIRCUIT_CANONICAL_PRINT_RUNTIME_GROUP_ID => Some(Self::CircuitCanonicalPrintAdapter),
+            GATE_NAME_HASH_RUNTIME_GROUP_ID => Some(Self::GateNameHashAdapter),
+            SIMD_WORD_POPCOUNT_RUNTIME_GROUP_ID => Some(Self::SimdWordPopcountAdapter),
+            SIMD_BITS_XOR_RUNTIME_GROUP_ID => Some(Self::SimdBitsXorAdapter),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -98,6 +130,25 @@ pub(crate) struct ProbeArgs {
     evidence_mode: ProbeEvidenceMode,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct AdapterProbeReceipt {
+    pub(super) probe_id: String,
+    pub(super) runtime_group_id: String,
+    pub(super) evidence_mode: String,
+    pub(super) iteration_count: u64,
+    pub(super) work_items: u64,
+    pub(super) work_count: u64,
+    pub(super) input_bytes: u64,
+    pub(super) input_digest: String,
+    pub(super) output_digest: String,
+    pub(super) stim_source_sha256: String,
+    pub(super) stim_build_fingerprint: String,
+    pub(super) stim_binary_sha256: String,
+    pub(super) stab_source_sha256: String,
+    pub(super) stab_build_fingerprint: String,
+}
+
 pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
     validate_probe_work_items(args.group, probe_work_items(&args))?;
     match args.group {
@@ -107,8 +158,26 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         | ProbeGroup::CircuitCanonicalPrintAdapter
         | ProbeGroup::GateNameHashAdapter
         | ProbeGroup::SimdWordPopcountAdapter
-        | ProbeGroup::SimdBitsXorAdapter => run_adapter_probe(root, args),
+        | ProbeGroup::SimdBitsXorAdapter => run_adapter_probe(root, args).map(|_| ()),
     }
+}
+
+pub(super) fn run_source_owned_adapter_probe(
+    root: &RepoRoot,
+    runtime_group_id: &str,
+) -> Result<AdapterProbeReceipt, ProbeError> {
+    let group = ProbeGroup::for_runtime_group(runtime_group_id)
+        .ok_or_else(|| ProbeError::MissingRuntimeGroup(runtime_group_id.to_string()))?;
+    let iterations = NonZeroU64::new(4)
+        .ok_or_else(|| ProbeError::Contract("probe iteration count must be nonzero".to_string()))?;
+    let args = ProbeArgs {
+        group,
+        iterations,
+        work_items: None,
+        evidence_mode: ProbeEvidenceMode::Timing,
+    };
+    validate_probe_work_items(args.group, probe_work_items(&args))?;
+    run_adapter_probe(root, args)
 }
 
 fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
@@ -163,7 +232,7 @@ fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
     Ok(())
 }
 
-fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
+fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeReceipt, ProbeError> {
     let (probe_id, workload, measurement) = match args.group {
         ProbeGroup::AdapterProtocol => (ADAPTER_PROBE_ID, "protocol-smoke", "main"),
         ProbeGroup::CircuitParseAdapter => (CIRCUIT_PARSE_PROBE_ID, "circuit-parse", "parse"),
@@ -320,7 +389,32 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
             display_rss(stab.peak_rss_bytes),
         );
     }
-    Ok(())
+    let stim = stim_rows
+        .first()
+        .ok_or_else(|| ProbeError::Contract("Stim probe returned no row".to_string()))?;
+    let stab = stab_rows
+        .first()
+        .ok_or_else(|| ProbeError::Contract("Stab probe returned no row".to_string()))?;
+    let runtime_group_id = args
+        .group
+        .runtime_group_id()
+        .ok_or_else(|| ProbeError::Contract("adapter probe has no runtime group".to_string()))?;
+    Ok(AdapterProbeReceipt {
+        probe_id: probe_id.to_string(),
+        runtime_group_id: runtime_group_id.to_string(),
+        evidence_mode: args.evidence_mode.as_str().to_string(),
+        iteration_count: args.iterations.get(),
+        work_items: probe_work_items(&args),
+        work_count: stim.work_count,
+        input_bytes: stim.input_bytes,
+        input_digest: stim.input_digest.as_str().to_string(),
+        output_digest: stim.output_digest.as_str().to_string(),
+        stim_source_sha256: stim.source_digest.as_str().to_string(),
+        stim_build_fingerprint: stim.build_fingerprint.as_str().to_string(),
+        stim_binary_sha256: adapter.binary_digest.as_str().to_string(),
+        stab_source_sha256: stab.source_digest.as_str().to_string(),
+        stab_build_fingerprint: stab.build_fingerprint.as_str().to_string(),
+    })
 }
 
 fn worker_arguments(args: &ProbeArgs) -> Vec<OsString> {
@@ -458,6 +552,8 @@ pub(super) enum ProbeError {
     WorkerIdentityChanged,
     #[error("qualification probe semantic work count overflows u64")]
     WorkOverflow,
+    #[error("runtime group {0} has no source-owned adapter probe")]
+    MissingRuntimeGroup(String),
     #[error("qualification probe contract failed: {0}")]
     Contract(String),
 }

@@ -12,6 +12,7 @@ use crate::root::RepoRoot;
 
 const BASELINE_SCHEMA_VERSION: u32 = 2;
 const MAX_BASELINE_BYTES: usize = 4 << 20;
+pub(super) const DEFAULT_BASELINE: &str = "benchmarks/qualification-baseline.json";
 
 #[derive(Clone, Debug, Args)]
 pub(crate) struct RegressionArgs {
@@ -20,8 +21,17 @@ pub(crate) struct RegressionArgs {
     input: PathBuf,
 
     /// Source-owned regression baseline.
-    #[arg(long, default_value = "benchmarks/qualification-baseline.json")]
+    #[arg(long, default_value = DEFAULT_BASELINE)]
     baseline: PathBuf,
+}
+
+impl RegressionArgs {
+    pub(super) fn for_input(input: PathBuf) -> Self {
+        Self {
+            input,
+            baseline: PathBuf::from(DEFAULT_BASELINE),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -162,7 +172,7 @@ pub(super) fn check_baseline(
     root: &RepoRoot,
     expected_inventory_sha256: &str,
 ) -> Result<(), RegressionError> {
-    let path = root.path.join("benchmarks/qualification-baseline.json");
+    let path = root.path.join(DEFAULT_BASELINE);
     let bytes = crate::source_file::read_repo_regular_file_bounded(root, &path, MAX_BASELINE_BYTES)
         .map_err(|error| RegressionError::BaselineRead(error.to_string()))?;
     let baseline: RegressionBaseline =

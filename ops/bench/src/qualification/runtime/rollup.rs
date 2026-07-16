@@ -49,6 +49,12 @@ pub(crate) struct RollupReportArgs {
     input: PathBuf,
 }
 
+impl RollupReportArgs {
+    pub(super) fn for_input(input: PathBuf) -> Self {
+        Self { input }
+    }
+}
+
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum RollupTier {
     Full,
@@ -222,6 +228,35 @@ struct RollupPreflight {
     overall_outcome: GateOutcome,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct RollupSourceEvidence {
+    pub(super) scale_id: String,
+    pub(super) path: PathBuf,
+    pub(super) report_sha256: String,
+    pub(super) preflight_sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct RollupReplayEvidence {
+    pub(super) output: PathBuf,
+    pub(super) report_sha256: String,
+    pub(super) preflight_sha256: String,
+    pub(super) markdown_sha256: String,
+    pub(super) group_id: String,
+    pub(super) tier: QualificationTier,
+    pub(super) stab_commit: String,
+    pub(super) host_policy_sha256: String,
+    pub(super) host_profile_id: String,
+    pub(super) architecture: String,
+    pub(super) cpu_identity: String,
+    pub(super) target_triple: String,
+    pub(super) toolchain_sha256: String,
+    pub(super) workers: WorkerIdentityEvidence,
+    pub(super) correctness_preflight: CorrectnessPreflightEvidence,
+    pub(super) overall_outcome: GateOutcome,
+    pub(super) sources: Vec<RollupSourceEvidence>,
+}
+
 pub(super) fn run(
     root: &RepoRoot,
     expected_performance_inventory_sha256: &str,
@@ -274,11 +309,11 @@ pub(super) fn run(
     let preflight_json = render_json(&preflight)?;
     let markdown = render_markdown(&report, &sha256_hex(&report_json));
 
-    let output = QualificationOutput::begin(root, output_path.as_path())?;
+    let mut output = QualificationOutput::begin(root, output_path.as_path())?;
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;
     output.write("report.md", markdown.as_bytes())?;
-    require_current_sources(&output, &loaded)?;
+    require_current_sources(&mut output, &loaded)?;
     require_current_producer(root, &report.producer_repository)?;
     output.commit()?;
     Ok(output_path.into_path_buf())
@@ -290,6 +325,21 @@ pub(super) fn run_report(
     expected_correctness_inventory_sha256: &str,
     args: RollupReportArgs,
 ) -> Result<PathBuf, RollupError> {
+    Ok(replay(
+        root,
+        expected_performance_inventory_sha256,
+        expected_correctness_inventory_sha256,
+        args,
+    )?
+    .output)
+}
+
+pub(super) fn replay(
+    root: &RepoRoot,
+    expected_performance_inventory_sha256: &str,
+    expected_correctness_inventory_sha256: &str,
+    args: RollupReportArgs,
+) -> Result<RollupReplayEvidence, RollupError> {
     let repository_before = super::git::repository_state(root)?;
     require_clean_repository(&repository_before)?;
     let output_path = DirectQualificationArtifactPath::try_new(&args.input)?;
@@ -364,16 +414,43 @@ pub(super) fn run_report(
     }
     let markdown = render_markdown(&reconstructed, &sha256_hex(&report_json));
 
-    let output = QualificationOutput::begin(root, output_path.as_path())?;
+    let mut output = QualificationOutput::begin(root, output_path.as_path())?;
     output.require_current_artifact("report.json", &existing_report_json)?;
     output.require_current_artifact("preflight.json", &existing_preflight_json)?;
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;
     output.write("report.md", markdown.as_bytes())?;
-    require_current_sources(&output, &loaded)?;
+    require_current_sources(&mut output, &loaded)?;
     require_current_producer(root, &reconstructed.producer_repository)?;
     output.commit()?;
-    Ok(output_path.into_path_buf())
+    Ok(RollupReplayEvidence {
+        output: output_path.into_path_buf(),
+        report_sha256: sha256_hex(&report_json),
+        preflight_sha256: sha256_hex(&preflight_json),
+        markdown_sha256: sha256_hex(markdown.as_bytes()),
+        group_id: reconstructed.group_id,
+        tier: reconstructed.tier,
+        stab_commit: reconstructed.stab_commit,
+        host_policy_sha256: reconstructed.host_policy_sha256,
+        host_profile_id: reconstructed.host_profile_id,
+        architecture: reconstructed.architecture,
+        cpu_identity: reconstructed.cpu_identity,
+        target_triple: reconstructed.target_triple,
+        toolchain_sha256: reconstructed.toolchain_sha256,
+        workers: reconstructed.workers,
+        correctness_preflight: reconstructed.correctness_preflight,
+        overall_outcome: reconstructed.overall_outcome,
+        sources: reconstructed
+            .scales
+            .into_iter()
+            .map(|scale| RollupSourceEvidence {
+                scale_id: scale.scale_id,
+                path: PathBuf::from(scale.source.path),
+                report_sha256: scale.source.report_sha256,
+                preflight_sha256: scale.source.preflight_sha256,
+            })
+            .collect(),
+    })
 }
 
 fn collect_input_paths<'a>(
@@ -543,7 +620,7 @@ fn require_reconstruction(
 }
 
 fn require_current_sources(
-    output: &QualificationOutput,
+    output: &mut QualificationOutput,
     loaded: &[LoadedCandidate],
 ) -> Result<(), RollupError> {
     for evidence in loaded {

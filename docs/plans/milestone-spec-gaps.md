@@ -19,16 +19,18 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Open Entries
 
+No open entries.
+
+## Resolved Entries
+
 ## 2026-07-16 - PQ2: Completion-Command Receipt Boundary
 
-Status: Open
+Status: Resolved
 Revealed by: milestone audit of the fifth PQ2 dense-XOR qualification slice.
 Current text: the fifth slice requires standalone worker reproducibility, an adapter probe, immediate source-report replay and regression checks, rollup replay, milestone audit, and GPT-5.6/max full code review before completion; `GOAL.md` requires a prose progress report that records the commands and outcomes.
 Gap: neither plan requires one machine-readable completion receipt that binds each standalone command, exact revision, input artifact, result, and output digest. The prose report can record execution, but the normal report and rollup schemas cannot independently attest the complete closure sequence.
 Proposed amendment: before the next executable PQ2 slice, define a canonical milestone-completion receipt that records each required standalone command as a typed step with the clean revision, canonical arguments, input identities, exit status, and produced artifact digests; validate the receipt during progress-report or rollup publication without making human review mechanically self-certifying.
-Resolution: Pending.
-
-## Resolved Entries
+Resolution: `just bench::qualification-completion` now executes typed worker-reproducibility, source-owned adapter-probe, report-replay, regression, and rollup-replay handlers from one clean unchanged revision. Completion receipt schema version 1 records canonical standalone argument vectors, exact input and output artifact identities, command-equivalent zero exit status only after successful handler return, and typed results; it rejects non-idempotent repair, mixed exact CPU or worker identities, incomplete gates, failed rollups, and source replacement before atomic publication. Shared artifact publication retains descriptors for every validated source directory and replay target, rechecks their inode identities at the commit boundary together with the parent, staging, target, and replaced directories, makes the new directory durable before treating bounded old-directory cleanup as best effort, and has direct production-path regression coverage for byte-identical directory replacement and cleanup failure. A controllable workflow harness proves exact handler order, first-error termination, and non-idempotent live replay rejection. `just bench::qualification-completion-report` reruns every machine-checkable operation and requires byte-identical receipt and preflight reconstruction. The performance plan and benchmark operations documentation explicitly keep milestone audit and independent code review outside the machine-certified receipt. The requirement applies to closure claims made after schema version 1 was introduced; historical dense-XOR evidence predates this receipt and is not retroactively relabeled.
 
 ## 2026-07-16 - PQ2: Allocation-Free Comparator Proof Standard
 

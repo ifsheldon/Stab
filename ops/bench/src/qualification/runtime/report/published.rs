@@ -25,7 +25,7 @@ pub(in crate::qualification::runtime) fn run(
     let preflight_json = render_preflight(&report, &report_json)?;
     let markdown = render_markdown(&report, &sha256_hex(&report_json))?;
 
-    let output = super::super::artifact::QualificationOutput::begin(root, &args.input)?;
+    let mut output = super::super::artifact::QualificationOutput::begin(root, &args.input)?;
     output.require_current_artifact("report.json", &report_json)?;
     output.write("report.json", &report_json)?;
     output.write("preflight.json", &preflight_json)?;

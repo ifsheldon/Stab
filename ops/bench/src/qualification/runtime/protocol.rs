@@ -138,6 +138,10 @@ impl SemanticDigest {
         }
         Ok(Self(value.into_boxed_str()))
     }
+
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl<'de> Deserialize<'de> for SemanticDigest {

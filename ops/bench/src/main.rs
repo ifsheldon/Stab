@@ -100,6 +100,12 @@ enum Command {
     /// Validate a paired qualification report and regenerate derived artifacts.
     QualificationReport(qualification::ReportArgs),
 
+    /// Execute and bind every machine-checkable milestone closure operation.
+    QualificationCompletion(qualification::CompletionArgs),
+
+    /// Replay a milestone completion receipt from its exact source evidence.
+    QualificationCompletionReport(qualification::CompletionReportArgs),
+
     /// Check promotable qualification evidence against source-owned thresholds.
     QualificationRegression(qualification::RegressionArgs),
 
@@ -271,6 +277,12 @@ fn run(cli: Cli) -> Result<(), BenchError> {
         }
         Command::QualificationReport(args) => {
             qualification::report(&root, &manifest, args)?;
+        }
+        Command::QualificationCompletion(args) => {
+            qualification::completion(&root, &manifest, args)?;
+        }
+        Command::QualificationCompletionReport(args) => {
+            qualification::completion_report(&root, &manifest, args)?;
         }
         Command::QualificationRegression(args) => {
             qualification::regression(&root, &manifest, args)?;

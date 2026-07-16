@@ -43,6 +43,16 @@ qualification-run *args:
 qualification-report *args:
     cargo run -q -p stab-bench --profile release -- qualification-report {{args}}
 
+# Execute every machine-checkable closure operation and publish one completion receipt.
+[working-directory: '..']
+qualification-completion *args:
+    cargo run -q -p stab-bench --profile release -- qualification-completion {{args}}
+
+# Replay a qualification completion receipt from its exact source evidence.
+[working-directory: '..']
+qualification-completion-report *args:
+    cargo run -q -p stab-bench --profile release -- qualification-completion-report {{args}}
+
 # Check promotable qualification evidence against source-owned thresholds.
 [working-directory: '..']
 qualification-regression *args:

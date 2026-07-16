@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{OsStr, OsString};
 use std::io::{Read as _, Write as _};
 use std::mem::MaybeUninit;
@@ -56,10 +56,14 @@ impl DirectQualificationArtifactPath {
 #[derive(Debug)]
 pub(crate) struct QualificationOutput {
     relative: PathBuf,
+    repository: OwnedFd,
+    parent_components: Vec<OsString>,
     parent: OwnedFd,
     staging: OwnedFd,
     staging_name: OsString,
     target_name: OsString,
+    bound_target: Option<OwnedFd>,
+    bound_siblings: BTreeMap<OsString, OwnedFd>,
     staging_active: bool,
     _lock: OwnedFd,
 }
@@ -92,10 +96,17 @@ impl QualificationOutput {
         let (staging_name, staging) = create_staging_directory(&parent)?;
         Ok(Self {
             relative: relative.to_path_buf(),
+            repository,
+            parent_components: parent_components
+                .iter()
+                .map(|component| (*component).to_os_string())
+                .collect(),
             parent,
             staging,
             staging_name,
             target_name,
+            bound_target: None,
+            bound_siblings: BTreeMap::new(),
             staging_active: true,
             _lock: lock,
         })
@@ -131,35 +142,93 @@ impl QualificationOutput {
         file.sync_all().map_err(ArtifactError::Write)
     }
 
-    pub(crate) fn commit(mut self) -> Result<(), ArtifactError> {
+    pub(crate) fn commit(self) -> Result<(), ArtifactError> {
+        self.commit_with_cleanup(remove_known_output)
+    }
+
+    pub(super) fn commit_with_cleanup<F>(mut self, cleanup: F) -> Result<(), ArtifactError>
+    where
+        F: FnOnce(&OwnedFd, &OwnedFd, &OsStr, &BTreeSet<OsString>) -> Result<(), ArtifactError>,
+    {
         rustix::fs::fsync(&self.staging).map_err(ArtifactError::Io)?;
-        match open_directory_at(&self.parent, &self.target_name) {
-            Ok(previous) => {
-                let previous_names = validate_existing_output(&previous)?;
-                rustix::fs::renameat_with(
-                    &self.parent,
-                    &self.staging_name,
-                    &self.parent,
-                    &self.target_name,
-                    rustix::fs::RenameFlags::EXCHANGE,
-                )
-                .map_err(ArtifactError::Io)?;
-                self.staging_active = false;
-                remove_known_output(&self.parent, &previous, &self.staging_name, &previous_names)?;
-            }
-            Err(rustix::io::Errno::NOENT) => {
-                rustix::fs::renameat(
-                    &self.parent,
-                    &self.staging_name,
-                    &self.parent,
-                    &self.target_name,
-                )
-                .map_err(ArtifactError::Io)?;
-                self.staging_active = false;
-            }
-            Err(source) => return Err(ArtifactError::Io(source)),
+        ensure_directory_chain(&self.repository, &self.parent_components, &self.parent)?;
+        if !directory_entry_matches(&self.parent, &self.staging_name, &self.staging)? {
+            return Err(ArtifactError::DirectoryIdentity(
+                "staging directory changed before publication",
+            ));
         }
+        self.require_bound_sibling_identities()?;
+        let previous = if let Some(bound_target) = &self.bound_target {
+            if !directory_entry_matches(&self.parent, &self.target_name, bound_target)? {
+                return Err(ArtifactError::DirectoryIdentity(
+                    "validated qualification directory changed before publication",
+                ));
+            }
+            let previous_names = validate_existing_output(bound_target)?;
+            let previous = rustix::io::dup(bound_target).map_err(ArtifactError::Io)?;
+            Some((previous, previous_names))
+        } else {
+            match open_directory_at(&self.parent, &self.target_name) {
+                Ok(previous) => {
+                    let previous_names = validate_existing_output(&previous)?;
+                    if !directory_entry_matches(&self.parent, &self.target_name, &previous)? {
+                        return Err(ArtifactError::DirectoryIdentity(
+                            "published directory changed before replacement",
+                        ));
+                    }
+                    Some((previous, previous_names))
+                }
+                Err(rustix::io::Errno::NOENT) => None,
+                Err(source) => return Err(ArtifactError::Io(source)),
+            }
+        };
+        if let Some((previous_directory, _)) = &previous {
+            rustix::fs::renameat_with(
+                &self.parent,
+                &self.staging_name,
+                &self.parent,
+                &self.target_name,
+                rustix::fs::RenameFlags::EXCHANGE,
+            )
+            .map_err(ArtifactError::Io)?;
+            self.staging_active = false;
+            if !directory_entry_matches(&self.parent, &self.target_name, &self.staging)?
+                || !directory_entry_matches(&self.parent, &self.staging_name, previous_directory)?
+            {
+                let _ = rustix::fs::fsync(&self.parent);
+                return Err(ArtifactError::DirectoryIdentity(
+                    "qualification directory identities changed during publication",
+                ));
+            }
+        } else {
+            rustix::fs::renameat_with(
+                &self.parent,
+                &self.staging_name,
+                &self.parent,
+                &self.target_name,
+                rustix::fs::RenameFlags::NOREPLACE,
+            )
+            .map_err(ArtifactError::Io)?;
+            self.staging_active = false;
+            if !directory_entry_matches(&self.parent, &self.target_name, &self.staging)? {
+                let _ = rustix::fs::fsync(&self.parent);
+                return Err(ArtifactError::DirectoryIdentity(
+                    "published qualification directory identity changed",
+                ));
+            }
+        }
+        self.require_bound_sibling_identities()?;
         rustix::fs::fsync(&self.parent).map_err(ArtifactError::Io)?;
+        ensure_directory_chain(&self.repository, &self.parent_components, &self.parent)?;
+        self.require_bound_sibling_identities()?;
+        if let Some((previous, previous_names)) = previous {
+            drop(cleanup(
+                &self.parent,
+                &previous,
+                &self.staging_name,
+                &previous_names,
+            ));
+        }
         Ok(())
     }
 
@@ -168,16 +237,35 @@ impl QualificationOutput {
     }
 
     pub(crate) fn require_current_artifact(
-        &self,
+        &mut self,
         name: &'static str,
         expected: &[u8],
     ) -> Result<(), ArtifactError> {
         if !ARTIFACT_NAMES.contains(&name) {
             return Err(ArtifactError::InvalidArtifactName(name));
         }
-        let target =
-            open_directory_at(&self.parent, &self.target_name).map_err(ArtifactError::Io)?;
-        let current = read_artifact_from_directory(&target, name, MAX_ARTIFACT_BYTES)?;
+        if self.bound_target.is_none() {
+            let target =
+                open_directory_at(&self.parent, &self.target_name).map_err(ArtifactError::Io)?;
+            if !directory_entry_matches(&self.parent, &self.target_name, &target)? {
+                return Err(ArtifactError::DirectoryIdentity(
+                    "qualification directory changed while it was being validated",
+                ));
+            }
+            self.bound_target = Some(target);
+        }
+        let target = self
+            .bound_target
+            .as_ref()
+            .ok_or(ArtifactError::DirectoryIdentity(
+                "validated qualification directory identity is missing",
+            ))?;
+        if !directory_entry_matches(&self.parent, &self.target_name, target)? {
+            return Err(ArtifactError::DirectoryIdentity(
+                "validated qualification directory changed",
+            ));
+        }
+        let current = read_artifact_from_directory(target, name, MAX_ARTIFACT_BYTES)?;
         if current == expected {
             Ok(())
         } else {
@@ -186,7 +274,7 @@ impl QualificationOutput {
     }
 
     pub(crate) fn require_sibling_artifact_digest(
-        &self,
+        &mut self,
         source_path: &DirectQualificationArtifactPath,
         name: &'static str,
         expected_sha256: &str,
@@ -197,21 +285,52 @@ impl QualificationOutput {
         }
         DirectQualificationArtifactPath::try_new(&self.relative)?;
         let source_components = validate_output(source_path.as_path())?;
-        let source_name = source_components
+        let source_name = *source_components
             .last()
             .ok_or_else(|| ArtifactError::NonDirectArtifact(source_path.as_path().to_path_buf()))?;
-        if *source_name == self.target_name {
+        if source_name == self.target_name {
             return Err(ArtifactError::NonSiblingArtifact(
                 source_path.as_path().to_path_buf(),
             ));
         }
-        let source = open_directory_at(&self.parent, source_name).map_err(ArtifactError::Io)?;
-        let current = read_artifact_from_directory(&source, name, maximum_bytes)?;
+        if !self.bound_siblings.contains_key(source_name) {
+            let source = open_directory_at(&self.parent, source_name).map_err(ArtifactError::Io)?;
+            if !directory_entry_matches(&self.parent, source_name, &source)? {
+                return Err(ArtifactError::DirectoryIdentity(
+                    "qualification source changed while it was being validated",
+                ));
+            }
+            self.bound_siblings
+                .insert(source_name.to_os_string(), source);
+        }
+        let source =
+            self.bound_siblings
+                .get(source_name)
+                .ok_or(ArtifactError::DirectoryIdentity(
+                    "validated qualification source identity is missing",
+                ))?;
+        if !directory_entry_matches(&self.parent, source_name, source)? {
+            return Err(ArtifactError::DirectoryIdentity(
+                "validated qualification source changed",
+            ));
+        }
+        let current = read_artifact_from_directory(source, name, maximum_bytes)?;
         if super::run::sha256_hex(&current) == expected_sha256 {
             Ok(())
         } else {
             Err(ArtifactError::ConcurrentReplacement(name))
         }
+    }
+
+    fn require_bound_sibling_identities(&self) -> Result<(), ArtifactError> {
+        for (name, directory) in &self.bound_siblings {
+            if !directory_entry_matches(&self.parent, name, directory)? {
+                return Err(ArtifactError::DirectoryIdentity(
+                    "validated qualification source changed before publication",
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -399,6 +518,52 @@ fn open_existing_directories(
     Ok(current)
 }
 
+fn ensure_directory_chain(
+    repository: &OwnedFd,
+    components: &[OsString],
+    expected: &OwnedFd,
+) -> Result<(), ArtifactError> {
+    let components = components
+        .iter()
+        .map(OsString::as_os_str)
+        .collect::<Vec<_>>();
+    let actual = open_existing_directories(repository, &components)?;
+    if same_directory(&actual, expected)? {
+        Ok(())
+    } else {
+        Err(ArtifactError::DirectoryIdentity(
+            "qualification output parent chain changed",
+        ))
+    }
+}
+
+fn directory_entry_matches(
+    parent: &OwnedFd,
+    name: &OsStr,
+    expected: &OwnedFd,
+) -> Result<bool, ArtifactError> {
+    let actual = match open_directory_at(parent, name) {
+        Ok(actual) => actual,
+        Err(rustix::io::Errno::NOENT | rustix::io::Errno::NOTDIR | rustix::io::Errno::LOOP) => {
+            return Ok(false);
+        }
+        Err(source) => return Err(ArtifactError::Io(source)),
+    };
+    same_directory(&actual, expected)
+}
+
+fn same_directory(left: &OwnedFd, right: &OwnedFd) -> Result<bool, ArtifactError> {
+    use std::os::unix::fs::MetadataExt as _;
+
+    let left = std::fs::File::from(rustix::io::dup(left).map_err(ArtifactError::Io)?)
+        .metadata()
+        .map_err(ArtifactError::Write)?;
+    let right = std::fs::File::from(rustix::io::dup(right).map_err(ArtifactError::Io)?)
+        .metadata()
+        .map_err(ArtifactError::Write)?;
+    Ok(left.dev() == right.dev() && left.ino() == right.ino())
+}
+
 fn create_staging_directory(parent: &OwnedFd) -> Result<(OsString, OwnedFd), ArtifactError> {
     for _ in 0..128 {
         let sequence = STAGING_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -480,9 +645,19 @@ fn remove_known_output(
     previous_name: &OsStr,
     names: &BTreeSet<OsString>,
 ) -> Result<(), ArtifactError> {
+    if !directory_entry_matches(parent, previous_name, previous)? {
+        return Err(ArtifactError::DirectoryIdentity(
+            "replaced qualification directory changed before cleanup",
+        ));
+    }
     for name in names {
         rustix::fs::unlinkat(previous, name, rustix::fs::AtFlags::empty())
             .map_err(ArtifactError::Io)?;
+    }
+    if !directory_entry_matches(parent, previous_name, previous)? {
+        return Err(ArtifactError::DirectoryIdentity(
+            "replaced qualification directory changed during cleanup",
+        ));
     }
     rustix::fs::unlinkat(parent, previous_name, rustix::fs::AtFlags::REMOVEDIR)
         .map_err(ArtifactError::Io)
@@ -520,6 +695,8 @@ pub(crate) enum ArtifactError {
     NoStagingName,
     #[error("qualification artifact filesystem operation failed: {0}")]
     Io(rustix::io::Errno),
+    #[error("qualification artifact directory identity check failed: {0}")]
+    DirectoryIdentity(&'static str),
     #[error("qualification artifact write failed: {0}")]
     Write(std::io::Error),
     #[error("qualification artifact is not a bounded regular file: {0}")]
@@ -596,6 +773,71 @@ mod tests {
     }
 
     #[test]
+    fn cleanup_failure_does_not_invalidate_durable_replacement() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let output = Path::new("target/benchmarks/qualification/cleanup-failure");
+
+        let first = QualificationOutput::begin(&root, output).expect("begin first publication");
+        first
+            .write("report.json", b"first\n")
+            .expect("write first report");
+        first.commit().expect("publish first report");
+
+        let second = QualificationOutput::begin(&root, output).expect("begin replacement");
+        second
+            .write("report.json", b"second\n")
+            .expect("write replacement report");
+        second
+            .commit_with_cleanup(|_, _, _, _| {
+                Err(ArtifactError::DirectoryIdentity("injected cleanup failure"))
+            })
+            .expect("cleanup failure must not invalidate durable publication");
+
+        assert_eq!(
+            read_artifact(&root, output, "report.json").expect("read replacement"),
+            b"second\n"
+        );
+    }
+
+    #[test]
+    fn publication_rejects_replaced_parent_chain() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let output = Path::new("target/benchmarks/qualification/parent-replacement");
+        let publication = QualificationOutput::begin(&root, output).expect("begin publication");
+        publication
+            .write("report.json", b"detached\n")
+            .expect("write staged report");
+        let parent = repository.path().join("target/benchmarks/qualification");
+        let moved = parent.with_extension("moved");
+        std::fs::rename(&parent, &moved).expect("move publication parent");
+        std::fs::create_dir(&parent).expect("replace publication parent");
+
+        assert!(publication.commit().is_err());
+        assert!(!parent.join("parent-replacement/report.json").exists());
+    }
+
+    #[test]
+    fn publication_rejects_replaced_staging_directory() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let output = Path::new("target/benchmarks/qualification/staging-replacement");
+        let publication = QualificationOutput::begin(&root, output).expect("begin publication");
+        publication
+            .write("report.json", b"detached\n")
+            .expect("write staged report");
+        let parent = repository.path().join("target/benchmarks/qualification");
+        let staging = parent.join(&publication.staging_name);
+        let moved = staging.with_extension("moved");
+        std::fs::rename(&staging, &moved).expect("move staging directory");
+        std::fs::create_dir(&staging).expect("replace staging directory");
+
+        assert!(publication.commit().is_err());
+        assert!(!parent.join("staging-replacement/report.json").exists());
+    }
+
+    #[test]
     fn unexpected_existing_artifact_blocks_replacement_without_damaging_evidence() {
         let repository = tempfile::tempdir().expect("temporary repository");
         let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
@@ -644,7 +886,7 @@ mod tests {
             .expect("write newer report");
         second.commit().expect("publish newer report");
 
-        let refresh = QualificationOutput::begin(&root, output).expect("begin stale refresh");
+        let mut refresh = QualificationOutput::begin(&root, output).expect("begin stale refresh");
         assert!(matches!(
             refresh.require_current_artifact("report.json", &stale),
             Err(ArtifactError::ConcurrentReplacement("report.json"))
@@ -652,6 +894,33 @@ mod tests {
         drop(refresh);
         assert_eq!(
             read_artifact(&root, output, "report.json").expect("read newer report"),
+            b"second\n"
+        );
+    }
+
+    #[test]
+    fn bound_refresh_replaces_the_validated_target() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let output = Path::new("target/benchmarks/qualification/bound-refresh");
+
+        let first = QualificationOutput::begin(&root, output).expect("begin first publication");
+        first
+            .write("report.json", b"first\n")
+            .expect("write first report");
+        first.commit().expect("publish first report");
+
+        let mut refresh = QualificationOutput::begin(&root, output).expect("begin refresh");
+        refresh
+            .require_current_artifact("report.json", b"first\n")
+            .expect("bind current report");
+        refresh
+            .write("report.json", b"second\n")
+            .expect("write refreshed report");
+        refresh.commit().expect("publish bound refresh");
+
+        assert_eq!(
+            read_artifact(&root, output, "report.json").expect("read refreshed report"),
             b"second\n"
         );
     }
@@ -668,7 +937,7 @@ mod tests {
         source.commit().expect("publish source");
 
         let rollup_path = Path::new("target/benchmarks/qualification/rollup");
-        let rollup = QualificationOutput::begin(&root, rollup_path).expect("begin rollup");
+        let mut rollup = QualificationOutput::begin(&root, rollup_path).expect("begin rollup");
         let source_path =
             DirectQualificationArtifactPath::try_new(source_path).expect("direct source path");
         let current_digest = super::super::run::sha256_hex(b"current\n");
@@ -686,6 +955,83 @@ mod tests {
             )),
             Err(ArtifactError::NonDirectArtifact(_))
         ));
+    }
+
+    #[test]
+    fn publication_rejects_replaced_bound_source_directory() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let source_path = Path::new("target/benchmarks/qualification/source-inode");
+        let source = QualificationOutput::begin(&root, source_path).expect("begin source");
+        source
+            .write("report.json", b"source\n")
+            .expect("write source");
+        source.commit().expect("publish source");
+
+        let output_path = Path::new("target/benchmarks/qualification/derived-inode");
+        let mut output = QualificationOutput::begin(&root, output_path).expect("begin output");
+        let source_path =
+            DirectQualificationArtifactPath::try_new(source_path).expect("direct source path");
+        output
+            .require_sibling_artifact_digest(
+                &source_path,
+                "report.json",
+                &super::super::run::sha256_hex(b"source\n"),
+                64,
+            )
+            .expect("bind source directory");
+        output
+            .write("report.json", b"derived\n")
+            .expect("write derived report");
+
+        let source = repository.path().join(source_path.as_path());
+        let moved = source.with_extension("detached");
+        std::fs::rename(&source, &moved).expect("move bound source");
+        std::fs::create_dir(&source).expect("replace bound source directory");
+        std::fs::write(source.join("report.json"), b"source\n")
+            .expect("write byte-identical replacement source");
+
+        assert!(matches!(
+            output.commit(),
+            Err(ArtifactError::DirectoryIdentity(_))
+        ));
+        assert!(!repository.path().join(output_path).exists());
+    }
+
+    #[test]
+    fn publication_rejects_replaced_bound_target_directory() {
+        let repository = tempfile::tempdir().expect("temporary repository");
+        let root = RepoRoot::resolve(repository.path()).expect("resolve repository");
+        let output_path = Path::new("target/benchmarks/qualification/target-inode");
+        let first = QualificationOutput::begin(&root, output_path).expect("begin first output");
+        first
+            .write("report.json", b"current\n")
+            .expect("write current report");
+        first.commit().expect("publish current report");
+
+        let mut refresh = QualificationOutput::begin(&root, output_path).expect("begin refresh");
+        refresh
+            .require_current_artifact("report.json", b"current\n")
+            .expect("bind current target");
+        refresh
+            .write("report.json", b"refreshed\n")
+            .expect("write refreshed report");
+
+        let target = repository.path().join(output_path);
+        let moved = target.with_extension("detached");
+        std::fs::rename(&target, &moved).expect("move bound target");
+        std::fs::create_dir(&target).expect("replace bound target directory");
+        std::fs::write(target.join("report.json"), b"current\n")
+            .expect("write byte-identical replacement target");
+
+        assert!(matches!(
+            refresh.commit(),
+            Err(ArtifactError::DirectoryIdentity(_))
+        ));
+        assert_eq!(
+            std::fs::read(target.join("report.json")).expect("read replacement target"),
+            b"current\n"
+        );
     }
 
     #[test]

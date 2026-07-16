@@ -18,7 +18,8 @@ mod runtime;
 mod validation;
 
 pub(crate) use runtime::{
-    ProbeArgs, RegressionArgs, ReportArgs, RollupArgs, RollupReportArgs, RunArgs, WorkerArgs,
+    CompletionArgs, CompletionReportArgs, ProbeArgs, RegressionArgs, ReportArgs, RollupArgs,
+    RollupReportArgs, RunArgs, WorkerArgs,
 };
 
 const EXPECTED_FROZEN_DIGEST: &str =
@@ -84,6 +85,48 @@ pub(crate) fn report(
     .map_err(BenchError::Qualification)?;
     println!(
         "[{PREFIX}] validated performance qualification evidence at {}",
+        output.display()
+    );
+    Ok(())
+}
+
+pub(crate) fn completion(
+    root: &RepoRoot,
+    manifest: &BenchmarkManifest,
+    args: CompletionArgs,
+) -> Result<(), BenchError> {
+    check(root, manifest)?;
+    let checked = read(root)?;
+    let output = runtime::run_completion(
+        root,
+        EXPECTED_FROZEN_DIGEST,
+        &checked.correctness_digest,
+        args,
+    )
+    .map_err(BenchError::Qualification)?;
+    println!(
+        "[{PREFIX}] published performance qualification completion receipt at {}",
+        output.display()
+    );
+    Ok(())
+}
+
+pub(crate) fn completion_report(
+    root: &RepoRoot,
+    manifest: &BenchmarkManifest,
+    args: CompletionReportArgs,
+) -> Result<(), BenchError> {
+    check(root, manifest)?;
+    let checked = read(root)?;
+    let output = runtime::run_completion_report(
+        root,
+        EXPECTED_FROZEN_DIGEST,
+        &checked.correctness_digest,
+        args,
+    )
+    .map_err(BenchError::Qualification)?;
+    println!(
+        "[{PREFIX}] replayed performance qualification completion receipt at {}",
         output.display()
     );
     Ok(())

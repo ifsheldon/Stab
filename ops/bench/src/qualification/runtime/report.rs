@@ -48,6 +48,12 @@ pub(crate) struct ReportArgs {
     input: PathBuf,
 }
 
+impl ReportArgs {
+    pub(super) fn for_input(input: PathBuf) -> Self {
+        Self { input }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct PerformancePreflightArtifact {
