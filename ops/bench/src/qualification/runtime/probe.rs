@@ -26,6 +26,8 @@ const SIMD_BITS_XOR_PROBE_ID: &str = "pq2-simd-bits-xor-adapter-smoke";
 const SIMD_BITS_NOT_ZERO_EARLY_PROBE_ID: &str = "pq2-simd-bits-not-zero-early-adapter-smoke";
 const SIMD_BITS_NOT_ZERO_ALL_ZERO_PROBE_ID: &str = "pq2-simd-bits-not-zero-all-zero-adapter-smoke";
 const SIMD_BITS_NOT_ZERO_LATE_PROBE_ID: &str = "pq2-simd-bits-not-zero-late-adapter-smoke";
+const SPARSE_XOR_ROW_PROBE_ID: &str = "pq2-sparse-xor-row-adapter-smoke";
+const SPARSE_XOR_ITEM_PROBE_ID: &str = "pq2-sparse-xor-item-adapter-smoke";
 const SIMD_WORD_POPCOUNT_PROBE_ID: &str = "pq2-simd-word-popcount-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
@@ -42,6 +44,10 @@ const XOR_MIN_BITS: u64 = 256;
 const XOR_MAX_BITS: u64 = 268_435_456;
 const NOT_ZERO_MIN_BITS: u64 = 64;
 const NOT_ZERO_MAX_BITS: u64 = 268_435_456;
+const SPARSE_XOR_ROW_BASE_WORK_ITEMS: u64 = 1_997;
+const SPARSE_XOR_ROW_MAX_WORK_ITEMS: u64 = 8_179_712;
+const SPARSE_XOR_ITEM_BASE_WORK_ITEMS: u64 = 7;
+const SPARSE_XOR_ITEM_MAX_WORK_ITEMS: u64 = 28_672;
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 const CIRCUIT_PARSE_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
@@ -51,6 +57,8 @@ const SIMD_BITS_XOR_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
 const SIMD_BITS_NOT_ZERO_EARLY_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY";
 const SIMD_BITS_NOT_ZERO_ALL_ZERO_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO";
 const SIMD_BITS_NOT_ZERO_LATE_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE";
+const SPARSE_XOR_ROW_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SPARSE-XOR";
+const SPARSE_XOR_ITEM_RUNTIME_GROUP_ID: &str = "PERFQ-M5-SPARSE-XOR-ITEM";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum ProbeGroup {
@@ -74,6 +82,10 @@ enum ProbeGroup {
     SimdBitsNotZeroAllZeroAdapter,
     #[value(name = "pq2-simd-bits-not-zero-late-adapter-smoke")]
     SimdBitsNotZeroLateAdapter,
+    #[value(name = "pq2-sparse-xor-row-adapter-smoke")]
+    SparseXorRowAdapter,
+    #[value(name = "pq2-sparse-xor-item-adapter-smoke")]
+    SparseXorItemAdapter,
 }
 
 impl ProbeGroup {
@@ -91,6 +103,8 @@ impl ProbeGroup {
                 Some(SIMD_BITS_NOT_ZERO_ALL_ZERO_RUNTIME_GROUP_ID)
             }
             Self::SimdBitsNotZeroLateAdapter => Some(SIMD_BITS_NOT_ZERO_LATE_RUNTIME_GROUP_ID),
+            Self::SparseXorRowAdapter => Some(SPARSE_XOR_ROW_RUNTIME_GROUP_ID),
+            Self::SparseXorItemAdapter => Some(SPARSE_XOR_ITEM_RUNTIME_GROUP_ID),
         }
     }
 
@@ -107,6 +121,8 @@ impl ProbeGroup {
                 Some(Self::SimdBitsNotZeroAllZeroAdapter)
             }
             SIMD_BITS_NOT_ZERO_LATE_RUNTIME_GROUP_ID => Some(Self::SimdBitsNotZeroLateAdapter),
+            SPARSE_XOR_ROW_RUNTIME_GROUP_ID => Some(Self::SparseXorRowAdapter),
+            SPARSE_XOR_ITEM_RUNTIME_GROUP_ID => Some(Self::SparseXorItemAdapter),
             _ => None,
         }
     }
@@ -186,7 +202,9 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         | ProbeGroup::SimdBitsXorAdapter
         | ProbeGroup::SimdBitsNotZeroEarlyAdapter
         | ProbeGroup::SimdBitsNotZeroAllZeroAdapter
-        | ProbeGroup::SimdBitsNotZeroLateAdapter => run_adapter_probe(root, args).map(|_| ()),
+        | ProbeGroup::SimdBitsNotZeroLateAdapter
+        | ProbeGroup::SparseXorRowAdapter
+        | ProbeGroup::SparseXorItemAdapter => run_adapter_probe(root, args).map(|_| ()),
     }
 }
 
@@ -297,6 +315,10 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
             "simd-bits-not-zero-late",
             "not-zero",
         ),
+        ProbeGroup::SparseXorRowAdapter => (SPARSE_XOR_ROW_PROBE_ID, "sparse-xor-row", "row-xor"),
+        ProbeGroup::SparseXorItemAdapter => {
+            (SPARSE_XOR_ITEM_PROBE_ID, "sparse-xor-item", "xor-item")
+        }
         ProbeGroup::ProcessContract => {
             return Err(ProbeError::Contract(
                 "process-only probe cannot use the adapter path".to_string(),
@@ -493,6 +515,8 @@ fn probe_work_items(args: &ProbeArgs) -> u64 {
             ProbeGroup::SimdBitsNotZeroEarlyAdapter
             | ProbeGroup::SimdBitsNotZeroAllZeroAdapter
             | ProbeGroup::SimdBitsNotZeroLateAdapter => DEFAULT_NOT_ZERO_WORK_ITEMS,
+            ProbeGroup::SparseXorRowAdapter => SPARSE_XOR_ROW_BASE_WORK_ITEMS,
+            ProbeGroup::SparseXorItemAdapter => SPARSE_XOR_ITEM_BASE_WORK_ITEMS,
             ProbeGroup::ProcessContract
             | ProbeGroup::AdapterProtocol
             | ProbeGroup::CircuitParseAdapter
@@ -538,6 +562,24 @@ fn validate_probe_work_items(group: ProbeGroup, work_items: u64) -> Result<(), P
     if is_not_zero_probe(group) && !(NOT_ZERO_MIN_BITS..=NOT_ZERO_MAX_BITS).contains(&work_items) {
         return Err(ProbeError::Contract(format!(
             "simd-bits-not-zero probe width {work_items} is outside {NOT_ZERO_MIN_BITS}..={NOT_ZERO_MAX_BITS} bits"
+        )));
+    }
+    if group == ProbeGroup::SparseXorRowAdapter
+        && (work_items == 0
+            || work_items > SPARSE_XOR_ROW_MAX_WORK_ITEMS
+            || !work_items.is_multiple_of(SPARSE_XOR_ROW_BASE_WORK_ITEMS))
+    {
+        return Err(ProbeError::Contract(format!(
+            "sparse-XOR row probe work count {work_items} is not a positive complete callback through {SPARSE_XOR_ROW_MAX_WORK_ITEMS} row XORs"
+        )));
+    }
+    if group == ProbeGroup::SparseXorItemAdapter
+        && (work_items == 0
+            || work_items > SPARSE_XOR_ITEM_MAX_WORK_ITEMS
+            || !work_items.is_multiple_of(SPARSE_XOR_ITEM_BASE_WORK_ITEMS))
+    {
+        return Err(ProbeError::Contract(format!(
+            "sparse-XOR item probe work count {work_items} is not a positive complete callback through {SPARSE_XOR_ITEM_MAX_WORK_ITEMS} item toggles"
         )));
     }
     Ok(())
@@ -642,6 +684,8 @@ mod tests {
         assert!(ProtocolId::try_new(SIMD_BITS_NOT_ZERO_EARLY_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(SIMD_BITS_NOT_ZERO_ALL_ZERO_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(SIMD_BITS_NOT_ZERO_LATE_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(SPARSE_XOR_ROW_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(SPARSE_XOR_ITEM_PROBE_ID).is_ok());
     }
 
     #[test]
@@ -719,6 +763,65 @@ mod tests {
             assert!(validate_probe_work_items(group, 65).is_ok());
             assert!(validate_probe_work_items(group, NOT_ZERO_MIN_BITS - 1).is_err());
             assert!(validate_probe_work_items(group, NOT_ZERO_MAX_BITS + 1).is_err());
+        }
+    }
+
+    #[test]
+    fn sparse_xor_probes_are_distinct_and_map_to_their_runtime_groups() {
+        let row = ProbeGroup::from_str(SPARSE_XOR_ROW_PROBE_ID, true).expect("row probe");
+        let item = ProbeGroup::from_str(SPARSE_XOR_ITEM_PROBE_ID, true).expect("item probe");
+        assert_ne!(row, item);
+        assert_eq!(
+            row.runtime_group_id(),
+            Some(SPARSE_XOR_ROW_RUNTIME_GROUP_ID)
+        );
+        assert_eq!(
+            item.runtime_group_id(),
+            Some(SPARSE_XOR_ITEM_RUNTIME_GROUP_ID)
+        );
+        assert_eq!(
+            ProbeGroup::for_runtime_group(SPARSE_XOR_ROW_RUNTIME_GROUP_ID),
+            Some(row)
+        );
+        assert_eq!(
+            ProbeGroup::for_runtime_group(SPARSE_XOR_ITEM_RUNTIME_GROUP_ID),
+            Some(item)
+        );
+    }
+
+    #[test]
+    fn sparse_xor_probes_require_complete_bounded_callbacks() {
+        for work_items in [
+            SPARSE_XOR_ROW_BASE_WORK_ITEMS,
+            SPARSE_XOR_ROW_MAX_WORK_ITEMS,
+        ] {
+            assert!(validate_probe_work_items(ProbeGroup::SparseXorRowAdapter, work_items).is_ok());
+        }
+        for work_items in [
+            0,
+            SPARSE_XOR_ROW_BASE_WORK_ITEMS + 1,
+            SPARSE_XOR_ROW_MAX_WORK_ITEMS + SPARSE_XOR_ROW_BASE_WORK_ITEMS,
+        ] {
+            assert!(
+                validate_probe_work_items(ProbeGroup::SparseXorRowAdapter, work_items).is_err()
+            );
+        }
+        for work_items in [
+            SPARSE_XOR_ITEM_BASE_WORK_ITEMS,
+            SPARSE_XOR_ITEM_MAX_WORK_ITEMS,
+        ] {
+            assert!(
+                validate_probe_work_items(ProbeGroup::SparseXorItemAdapter, work_items).is_ok()
+            );
+        }
+        for work_items in [
+            0,
+            SPARSE_XOR_ITEM_BASE_WORK_ITEMS + 1,
+            SPARSE_XOR_ITEM_MAX_WORK_ITEMS + SPARSE_XOR_ITEM_BASE_WORK_ITEMS,
+        ] {
+            assert!(
+                validate_probe_work_items(ProbeGroup::SparseXorItemAdapter, work_items).is_err()
+            );
         }
     }
 }
