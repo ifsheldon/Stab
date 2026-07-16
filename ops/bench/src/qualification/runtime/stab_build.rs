@@ -20,7 +20,7 @@ const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const BUILD_OUTPUT_LIMIT: usize = 16 << 20;
 const MAX_SOURCE_INPUT_BYTES: u64 = 16 << 20;
 const RUNTIME_PARENT: &str = "/tmp";
-const WORKER_SOURCES: [(&str, &str); 4] = [
+const WORKER_SOURCES: [(&str, &str); 5] = [
     ("worker.rs", "ops/bench/src/qualification/runtime/worker.rs"),
     (
         "worker/bits.rs",
@@ -33,6 +33,10 @@ const WORKER_SOURCES: [(&str, &str); 4] = [
     (
         "worker/sparse_xor.rs",
         "ops/bench/src/qualification/runtime/worker/sparse_xor.rs",
+    ),
+    (
+        "worker/error.rs",
+        "ops/bench/src/qualification/runtime/worker/error.rs",
     ),
 ];
 const FINGERPRINT_PLACEHOLDER: &str = "$FINGERPRINT";

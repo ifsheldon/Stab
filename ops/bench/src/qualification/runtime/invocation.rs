@@ -4,9 +4,6 @@ use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
-
 use super::adapter::{AdapterExecutable, prepare_adapter};
 use super::contract::{
     PROTOCOL_SMOKE_INPUT_DIGEST, PROTOCOL_SMOKE_ITERATIONS, PROTOCOL_SMOKE_WORK_ITEMS,
@@ -19,9 +16,11 @@ use super::protocol::{
 };
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
+use serde::{Deserialize, Serialize};
 
 mod bit_acceptance;
 mod dense_xor;
+mod error;
 mod not_zero;
 mod preflight;
 mod sparse_xor;
@@ -41,6 +40,7 @@ use dense_xor::{
     checked_dense_xor_alignment_rejection, checked_dense_xor_cap_rejection,
     checked_dense_xor_minimum_rejection,
 };
+pub(crate) use error::InvocationError;
 use not_zero::{
     MAX_NOT_ZERO_LATE_INPUT_DIGEST, MAX_NOT_ZERO_LATE_OUTPUT_DIGEST, MAX_SUPPORTED_NOT_ZERO_BITS,
     NOT_ZERO_CAP_CASE_ID, NOT_ZERO_EARLY_CASE_ID, NOT_ZERO_ITERATIONS, NOT_ZERO_LATE_CASE_ID,
@@ -1043,148 +1043,6 @@ fn checked_work_count(
         .get()
         .checked_mul(work_items.get())
         .ok_or(InvocationError::WorkOverflow)
-}
-
-#[derive(Debug, Error)]
-pub(crate) enum InvocationError {
-    #[error(transparent)]
-    Adapter(#[from] super::adapter::AdapterError),
-    #[error(transparent)]
-    StabBuild(#[from] super::stab_build::StabBuildError),
-    #[error(transparent)]
-    Process(#[from] super::process::ProcessError),
-    #[error(transparent)]
-    Protocol(#[from] super::protocol::ProtocolError),
-    #[error(transparent)]
-    Json(#[from] serde_json::Error),
-    #[error(transparent)]
-    Group(#[from] super::group::GroupError),
-    #[error(transparent)]
-    Git(#[from] super::git::GitError),
-    #[error(transparent)]
-    Toolchain(#[from] super::toolchain::ToolchainError),
-    #[error(
-        "private worker reproducibility requires a clean checkout before and after both builds"
-    )]
-    DirtyReproducibilityRepository,
-    #[error("private worker reproducibility checkout changed from {before} to {after}")]
-    ReproducibilityRepositoryChanged { before: String, after: String },
-    #[error(
-        "private Stim or Stab worker builds produced different identities: first={first:?}, second={second:?}"
-    )]
-    NonReproducibleWorkers {
-        first: Box<WorkerIdentityEvidence>,
-        second: Box<WorkerIdentityEvidence>,
-    },
-    #[error("qualification runtime group is not implemented by both workers: {0}")]
-    UnsupportedGroup(String),
-    #[error("qualification runtime group {0} does not match the materialized comparator sources")]
-    ComparatorSourceContract(String),
-    #[error("qualification CPU {0} exceeds the shared worker protocol")]
-    CpuRange(usize),
-    #[error("qualification workers were invoked before selecting a host-policy CPU")]
-    MissingCpu,
-    #[error("qualification workers lack the mandatory canonical contract preflight")]
-    MissingContractPreflight,
-    #[error("the source-owned worker contract preflight digest is stale")]
-    ContractPreflightDefinition,
-    #[error("qualification parent semantic work count overflows u64")]
-    WorkOverflow,
-    #[error(
-        "{implementation} qualification worker failed with status {status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    WorkerFailed {
-        implementation: Implementation,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error("{implementation} qualification worker emitted unexpected stderr: {stderr}")]
-    UnexpectedStderr {
-        implementation: Implementation,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject the first unsupported circuit-parse scale before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    CapRejection {
-        implementation: Implementation,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject a partial gate-name-hash sweep before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    GatePartialSweepRejection {
-        implementation: Implementation,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject the first unsupported simd-word-popcount width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    PopcountCapRejection {
-        implementation: Implementation,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject an unaligned simd-word-popcount width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    PopcountAlignmentRejection {
-        implementation: Implementation,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject a below-minimum simd-word-popcount width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    PopcountMinimumRejection {
-        implementation: Implementation,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject the {class} simd-bits-xor width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    DenseXorWidthRejection {
-        implementation: Implementation,
-        class: &'static str,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject the {class} simd-bits-not-zero width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    NotZeroWidthRejection {
-        implementation: Implementation,
-        class: &'static str,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error(
-        "{implementation} did not reject the {class} sparse-XOR work count before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
-    )]
-    SparseXorWorkRejection {
-        implementation: Implementation,
-        class: &'static str,
-        status: Option<i32>,
-        stdout: String,
-        stderr: String,
-    },
-    #[error("qualification invocation returned no measurement")]
-    MissingMeasurement,
-    #[error("qualification worker measured invalid duration {0}")]
-    InvalidMeasuredDuration(f64),
-    #[error("qualification process recorded invalid wall duration {0}")]
-    InvalidWallDuration(f64),
 }
 
 #[cfg(test)]

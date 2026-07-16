@@ -6,19 +6,20 @@ use std::num::NonZeroU64;
 use std::sync::atomic::{Ordering, compiler_fence};
 use std::time::Instant;
 
-use clap::{Args, ValueEnum};
-use sha2::{Digest as _, Sha256};
-use thiserror::Error;
-
 use super::protocol::{
     EvidenceMode, GitCommit, Implementation, InputDigest, PROTOCOL_SCHEMA_VERSION, ProtocolId,
     SemanticDigest, Sha256Digest, WorkerMeasurement,
 };
 use crate::config::STIM_COMMIT;
+use clap::{Args, ValueEnum};
+use sha2::{Digest as _, Sha256};
 
 mod bits;
+mod error;
 mod not_zero;
 mod sparse_xor;
+
+pub(super) use error::WorkerError;
 
 #[cfg(test)]
 use bits::{
@@ -31,7 +32,7 @@ use bits::{
 use not_zero::{NotZeroPattern, not_zero_fixture, not_zero_output_digest, simd_bits_not_zero};
 use sparse_xor::{SparseXorFixture, SparseXorKind};
 
-const WORKER_SOURCES: [(&str, &[u8]); 4] = [
+const WORKER_SOURCES: [(&str, &[u8]); 5] = [
     ("worker.rs", include_bytes!("worker.rs")),
     ("worker/bits.rs", include_bytes!("worker/bits.rs")),
     ("worker/not_zero.rs", include_bytes!("worker/not_zero.rs")),
@@ -39,6 +40,7 @@ const WORKER_SOURCES: [(&str, &[u8]); 4] = [
         "worker/sparse_xor.rs",
         include_bytes!("worker/sparse_xor.rs"),
     ),
+    ("worker/error.rs", include_bytes!("worker/error.rs")),
 ];
 const DIAGNOSTIC_BUILD_FINGERPRINT: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
@@ -816,144 +818,6 @@ fn ensure_linux() -> Result<(), WorkerError> {
     } else {
         Err(WorkerError::UnsupportedHost)
     }
-}
-
-#[derive(Debug, Error)]
-pub(super) enum WorkerError {
-    #[error("qualification workers require Linux RSS and process contracts")]
-    UnsupportedHost,
-    #[error(transparent)]
-    Protocol(#[from] super::protocol::ProtocolError),
-    #[error(transparent)]
-    Circuit(#[from] stab_core::CircuitError),
-    #[error(transparent)]
-    Bits(#[from] stab_core::BitError),
-    #[error("qualification workload {workload} requires measurement {expected}, got {actual}")]
-    MeasurementMismatch {
-        workload: &'static str,
-        expected: &'static str,
-        actual: String,
-    },
-    #[error("circuit-parse scale has {actual} instructions, maximum {maximum}")]
-    CircuitScaleLimit { actual: u64, maximum: u64 },
-    #[error("circuit-parse scale {0} cannot be represented on this host")]
-    CircuitScaleRange(u64),
-    #[error("circuit-parse fixture capacity overflows usize")]
-    CircuitFixtureOverflow,
-    #[error("qualification input byte count cannot be represented as u64")]
-    InputSizeRange,
-    #[error("circuit-parse workload was invoked without its prepared fixture")]
-    MissingCircuitFixture,
-    #[error("circuit-canonical-print workload was invoked without its prepared circuit")]
-    MissingCanonicalPrintCircuit,
-    #[error("gate-name-hash workload was invoked without its prepared name table")]
-    MissingGateHashNames,
-    #[error("gate-name-hash workload was invoked without its validated sweep count")]
-    MissingGateHashSweeps,
-    #[error("gate-name-hash workload was invoked without its prepared table digest")]
-    MissingGateHashTableDigest,
-    #[error("gate-name-hash registry has {actual} names, expected {expected}")]
-    GateHashNameCount { actual: usize, expected: u64 },
-    #[error("gate-name-hash value {actual} for {name:?} cannot be represented as u16")]
-    GateHashValueRange { name: String, actual: usize },
-    #[error("gate-name-hash work count {actual} is not a complete sweep of {name_count} names")]
-    GateHashPartialSweep { actual: u64, name_count: u64 },
-    #[error("simd-word-popcount width {actual} bits is below the minimum {minimum}")]
-    PopcountWidthMinimum { actual: u64, minimum: u64 },
-    #[error("simd-word-popcount width {actual} bits exceeds the maximum {maximum}")]
-    PopcountWidthLimit { actual: u64, maximum: u64 },
-    #[error("simd-word-popcount width {actual} bits is not a multiple of {alignment}")]
-    PopcountWidthAlignment { actual: u64, alignment: u64 },
-    #[error("simd-word-popcount width {0} cannot be represented on this host")]
-    PopcountWidthRange(u64),
-    #[error("simd-word-popcount word index cannot be represented as u64")]
-    PopcountWordIndexRange,
-    #[error("simd-word-popcount fixture allocation failed: {0}")]
-    PopcountFixtureAllocation(std::collections::TryReserveError),
-    #[error("simd-word-popcount fixture does not contain its toggle bit")]
-    MissingPopcountToggleBit,
-    #[error("simd-word-popcount workload was invoked without its prepared fixture")]
-    MissingPopcountFixture,
-    #[error("simd-word-popcount result cannot be represented as u64")]
-    PopcountResultRange,
-    #[error("simd-bits-xor width {actual} bits is below the minimum {minimum}")]
-    DenseXorWidthMinimum { actual: u64, minimum: u64 },
-    #[error("simd-bits-xor width {actual} bits exceeds the maximum {maximum}")]
-    DenseXorWidthLimit { actual: u64, maximum: u64 },
-    #[error("simd-bits-xor width {actual} bits is not a multiple of {alignment}")]
-    DenseXorWidthAlignment { actual: u64, alignment: u64 },
-    #[error("simd-bits-xor width {0} cannot be represented on this host")]
-    DenseXorWidthRange(u64),
-    #[error("simd-bits-xor word index cannot be represented as u64")]
-    DenseXorWordIndexRange,
-    #[error("simd-bits-xor fixture allocation failed: {0}")]
-    DenseXorFixtureAllocation(std::collections::TryReserveError),
-    #[error("simd-bits-xor workload was invoked without its prepared fixture")]
-    MissingDenseXorFixture,
-    #[error("simd-bits-not-zero width {actual} bits is below the minimum {minimum}")]
-    NotZeroWidthMinimum { actual: u64, minimum: u64 },
-    #[error("simd-bits-not-zero width {actual} bits exceeds the maximum {maximum}")]
-    NotZeroWidthLimit { actual: u64, maximum: u64 },
-    #[error("simd-bits-not-zero width {0} cannot be represented on this host")]
-    NotZeroWidthRange(u64),
-    #[error("simd-bits-not-zero fixture allocation failed: {0}")]
-    NotZeroFixtureAllocation(std::collections::TryReserveError),
-    #[error("simd-bits-not-zero hit index {index} is outside bit width {bit_count}")]
-    NotZeroHitIndex { index: usize, bit_count: usize },
-    #[error("simd-bits-not-zero workload was invoked without its prepared fixture")]
-    MissingNotZeroFixture,
-    #[error("{workload} work count {actual} is not a positive multiple of {base}")]
-    SparseXorWorkShape {
-        workload: &'static str,
-        actual: u64,
-        base: u64,
-    },
-    #[error("{workload} work count {actual} exceeds maximum {maximum}")]
-    SparseXorWorkLimit {
-        workload: &'static str,
-        actual: u64,
-        maximum: u64,
-    },
-    #[error("sparse XOR fixture value {0} cannot be represented on this host")]
-    SparseXorFixtureRange(u64),
-    #[error("sparse XOR fixture allocation failed: {0}")]
-    SparseXorFixtureAllocation(std::collections::TryReserveError),
-    #[error("sparse XOR canonical encoding size overflows usize")]
-    SparseXorEncodingOverflow,
-    #[error("sparse XOR canonical encoding allocation failed: {0}")]
-    SparseXorEncodingAllocation(std::collections::TryReserveError),
-    #[error("{0} capacity priming did not restore the canonical sparse XOR state")]
-    SparseXorPrimingState(&'static str),
-    #[error("sparse XOR workload was invoked without its prepared fixture")]
-    MissingSparseXorFixture,
-    #[error("qualification worker semantic work count overflows u64")]
-    WorkOverflow,
-    #[error("failed to read the qualification start barrier: {0}")]
-    ReadStartBarrier(std::io::Error),
-    #[error("qualification start barrier must contain exactly one newline")]
-    InvalidStartBarrier,
-    #[error("qualification CPU id cannot be represented on this host")]
-    AffinityCpuRange,
-    #[error("failed to read qualification worker CPU affinity: {0}")]
-    ReadAffinity(rustix::io::Errno),
-    #[error("qualification worker affinity is {actual:?}, expected only CPU {expected}")]
-    AffinityMismatch { expected: usize, actual: Vec<usize> },
-    #[error("qualification worker elapsed seconds are invalid: {0}")]
-    InvalidElapsed(f64),
-    #[error("failed to read /proc/self/status: {0}")]
-    ReadStatus(std::io::Error),
-    #[error("/proc/self/status is missing {0}")]
-    MissingStatusField(&'static str),
-    #[error("/proc/self/status has malformed {0}")]
-    MalformedStatusField(&'static str),
-    #[error("qualification worker resident memory overflows u64 bytes")]
-    MemoryOverflow,
-    #[error("qualification worker could not encode a SHA-256 digest")]
-    DigestEncoding,
-    #[error("failed to serialize qualification worker output: {0}")]
-    Serialize(serde_json::Error),
-    #[error("failed to write qualification worker output: {0}")]
-    Write(std::io::Error),
 }
 
 #[cfg(test)]
