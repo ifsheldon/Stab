@@ -492,20 +492,6 @@ fn replacement_contracts(row: &BenchmarkRow) -> Vec<ReplacementContract> {
             runtime_group_id: "PERFQ-M5-SIMD-BITS".to_string(),
             runtime_measurement_id: "xor-complete-vector".to_string(),
         }],
-        "m5-sparse-xor" => vec![
-            ReplacementContract {
-                legacy_stim_name: "SparseXorTable_SmallRowXor_1000".to_string(),
-                legacy_stab_name: "stab_sparse_table_row_xor_1000".to_string(),
-                runtime_group_id: "PERFQ-M5-SPARSE-XOR".to_string(),
-                runtime_measurement_id: "row-xor".to_string(),
-            },
-            ReplacementContract {
-                legacy_stim_name: "SparseXorVec_XorItem".to_string(),
-                legacy_stab_name: "stab_sparse_xor_item_7".to_string(),
-                runtime_group_id: "PERFQ-M5-SPARSE-XOR-ITEM".to_string(),
-                runtime_measurement_id: "xor-item".to_string(),
-            },
-        ],
         _ => Vec::new(),
     }
 }

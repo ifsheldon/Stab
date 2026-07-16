@@ -1092,6 +1092,7 @@ fn validate_rows(
         if row
             .classifications
             .contains(&RowClassification::UnmatchedSubmeasurement)
+            && matches!(row.decision, RowDecision::Retained | RowDecision::Reworked)
             && groups
                 .get(row.primary_group_id.as_str())
                 .is_some_and(|group| group.threshold_policy != ThresholdPolicy::ReportOnly)
@@ -1153,15 +1154,15 @@ fn validate_rows(
         ));
     }
     validate_decision_count(suite, RowDecision::Retained, 12, issues);
-    validate_decision_count(suite, RowDecision::Reworked, 137, issues);
+    validate_decision_count(suite, RowDecision::Reworked, 136, issues);
     validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
-    validate_decision_count(suite, RowDecision::Superseded, 6, issues);
+    validate_decision_count(suite, RowDecision::Superseded, 7, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);
     validate_classification_count(suite, RowClassification::Faithful, 15, issues);
     validate_classification_count(suite, RowClassification::Diagnostic, 134, issues);
     validate_classification_count(suite, RowClassification::Proxy, 10, issues);
     validate_classification_count(suite, RowClassification::Stale, 2, issues);
-    validate_classification_count(suite, RowClassification::Duplicate, 6, issues);
+    validate_classification_count(suite, RowClassification::Duplicate, 7, issues);
     validate_classification_count(suite, RowClassification::MissingScale, 123, issues);
     validate_classification_count(
         suite,
@@ -1187,7 +1188,7 @@ fn validate_rows(
     validate_classification_count(
         suite,
         RowClassification::UnmatchedSubmeasurement,
-        14,
+        15,
         issues,
     );
 }

@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2",
-  "semantic_digest": "2d9cb3e3e2dc36a29c31964480f9b735e2411b26f4ba2b3ac66ed6791b617dc0",
+  "semantic_digest": "8cc3ab3eb88faaf539c3c0eabaf3865ad421d8f67b14549cb4c7acc71faf2406",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -71797,49 +71797,24 @@
       "id": "m5-sparse-xor",
       "primary_group_id": "PERFQ-M5-SPARSE-XOR",
       "supporting_performance_features": [],
-      "decision": "reworked",
+      "decision": "superseded",
       "classifications": [
         "faithful",
+        "duplicate",
         "missing-scale",
         "missing-correctness-preflight",
         "missing-output-digest",
-        "heterogeneous-measurements"
+        "heterogeneous-measurements",
+        "unmatched-submeasurement"
       ],
       "stim_mapping": {
         "kind": "stim-perf",
         "source": "src/stim/mem/sparse_xor_vec.perf.cc",
         "filter": "SparseXor*"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
+      "threshold_refs": [],
       "threshold_max_relative_ratio": null,
-      "threshold_measurement_pairs": [
-        {
-          "stim_name": "SparseXorTable_SmallRowXor_1000",
-          "stab_name": "stab_sparse_table_row_xor_1000",
-          "max_relative_ratio": "1.25"
-        },
-        {
-          "stim_name": "SparseXorVec_XorItem",
-          "stab_name": "stab_sparse_xor_item_7",
-          "max_relative_ratio": "1.25"
-        }
-      ],
-      "replacement_contracts": [
-        {
-          "legacy_stim_name": "SparseXorTable_SmallRowXor_1000",
-          "legacy_stab_name": "stab_sparse_table_row_xor_1000",
-          "runtime_group_id": "PERFQ-M5-SPARSE-XOR",
-          "runtime_measurement_id": "row-xor"
-        },
-        {
-          "legacy_stim_name": "SparseXorVec_XorItem",
-          "legacy_stab_name": "stab_sparse_xor_item_7",
-          "runtime_group_id": "PERFQ-M5-SPARSE-XOR-ITEM",
-          "runtime_measurement_id": "xor-item"
-        }
-      ],
+      "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
     {

@@ -176,6 +176,26 @@ fn reworked_heterogeneous_row_can_point_to_an_exact_replacement_group() {
 }
 
 #[test]
+fn superseded_sparse_xor_row_retires_legacy_timing_pairs() {
+    let (suite, manifest, references) = fixture();
+    let row = suite
+        .manifest_rows
+        .iter()
+        .find(|row| row.id == "m5-sparse-xor")
+        .expect("superseded sparse-XOR row");
+    assert_eq!(row.decision, RowDecision::Superseded);
+    assert!(row.threshold_measurement_pairs.is_empty());
+    assert!(row.replacement_contracts.is_empty());
+    assert!(row.classifications.contains(&RowClassification::Duplicate));
+    assert!(
+        row.classifications
+            .contains(&RowClassification::UnmatchedSubmeasurement)
+    );
+    validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect("superseded provenance does not own the replacement threshold");
+}
+
+#[test]
 fn reworked_heterogeneous_primary_threshold_requires_an_exact_replacement_mapping() {
     let (mut suite, manifest, references) = fixture();
     suite

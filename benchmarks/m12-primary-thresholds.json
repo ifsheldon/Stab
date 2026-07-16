@@ -55,21 +55,6 @@
       ]
     },
     { "id": "m5-simd-word", "max_relative_ratio": 1.25 },
-    {
-      "id": "m5-sparse-xor",
-      "measurement_thresholds": [
-        {
-          "stim_name": "SparseXorTable_SmallRowXor_1000",
-          "stab_name": "stab_sparse_table_row_xor_1000",
-          "max_relative_ratio": 1.25
-        },
-        {
-          "stim_name": "SparseXorVec_XorItem",
-          "stab_name": "stab_sparse_xor_item_7",
-          "max_relative_ratio": 1.25
-        }
-      ]
-    },
     { "id": "m6-clifford-string", "max_relative_ratio": 1.25 },
     { "id": "m6-pauli-iter", "max_relative_ratio": 1.25 },
     { "id": "m6-pauli-string", "max_relative_ratio": 1.25 },
