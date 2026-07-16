@@ -19,12 +19,14 @@ const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
 const SIMD_BITS_XOR_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/simd_bits_xor_contract.h";
 const SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_bits_not_zero_contract.h";
-const COMPARATOR_SOURCES: [&str; 3] = [
+const SPARSE_XOR_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/sparse_xor_contract.h";
+const COMPARATOR_SOURCES: [&str; 4] = [
     SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE,
     SIMD_BITS_XOR_COMPARATOR_SOURCE,
     SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE,
+    SPARSE_XOR_COMPARATOR_SOURCE,
 ];
-const RECEIPT_SCHEMA_VERSION: u32 = 6;
+const RECEIPT_SCHEMA_VERSION: u32 = 7;
 const MAX_SOURCE_BYTES: u64 = 1 << 20;
 const MAX_FLAGS_FILE_BYTES: u64 = 64 << 10;
 const MAX_TOOL_BYTES: u64 = 512 << 20;
@@ -1099,12 +1101,14 @@ mod tests {
         let popcount_source = runtime.path().join("simd_word_popcount_contract.h");
         let xor_source = runtime.path().join("simd_bits_xor_contract.h");
         let not_zero_source = runtime.path().join("simd_bits_not_zero_contract.h");
+        let sparse_xor_source = runtime.path().join("sparse_xor_contract.h");
         let library = runtime.path().join("libstim.a");
         let binary = runtime.path().join("adapter");
         std::fs::write(&source, b"source").expect("write source");
         std::fs::write(&popcount_source, b"source").expect("write popcount source");
         std::fs::write(&xor_source, b"source").expect("write XOR source");
         std::fs::write(&not_zero_source, b"source").expect("write not-zero source");
+        std::fs::write(&sparse_xor_source, b"source").expect("write sparse XOR source");
         std::fs::write(&library, b"library").expect("write library");
         std::fs::write(&binary, b"binary").expect("write binary");
         std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700))
@@ -1129,6 +1133,7 @@ mod tests {
                 popcount_source.clone(),
                 xor_source.clone(),
                 not_zero_source.clone(),
+                sparse_xor_source.clone(),
             ],
             library_path: library,
         };

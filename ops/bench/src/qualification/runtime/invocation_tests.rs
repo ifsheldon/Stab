@@ -1,6 +1,9 @@
 #[cfg(target_os = "linux")]
 use std::path::Path;
 
+use super::sparse_xor::{
+    SparseXorRejectionClass, checked_sparse_xor_rejection, sparse_xor_rejection_expectation,
+};
 use super::*;
 
 fn contract_identity() -> WorkerContractIdentityEvidence {
@@ -37,7 +40,7 @@ fn canonical_worker_contract_preflight_binds_actual_receipts() {
     let probes = expected_contract_preflight_probes().expect("source-owned probes");
     let evidence = WorkerContractPreflightEvidence::from_actual_probes(contract_identity(), probes)
         .expect("valid contract evidence");
-    assert_eq!(evidence.probe_count(), 42);
+    assert_eq!(evidence.probe_count(), 58);
     assert!(evidence.validates_source_contract());
     let encoded = serde_json::to_vec(&evidence).expect("serialize preflight evidence");
     assert!(
@@ -447,6 +450,59 @@ fn invalid_not_zero_width_rejections_must_precede_the_start_barrier() {
         ),
         Err(InvocationError::NotZeroWidthRejection {
             class: "below-minimum",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn invalid_sparse_xor_work_rejections_must_precede_the_start_barrier() {
+    let output = |status, stdout: &str, stderr: &str| ProcessResult {
+        status,
+        stdout: stdout.as_bytes().to_vec(),
+        stderr: stderr.as_bytes().to_vec(),
+        parent_observed_peak_rss_bytes: None,
+        wall_elapsed: Duration::from_millis(1),
+    };
+    for class in SparseXorRejectionClass::all() {
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            let (status, stderr) = sparse_xor_rejection_expectation(implementation, class);
+            checked_sparse_xor_rejection(&output(Some(status), "", stderr), implementation, class)
+                .expect("sparse XOR work rejection");
+        }
+    }
+
+    assert!(matches!(
+        checked_sparse_xor_rejection(
+            &output(
+                Some(2),
+                "",
+                "stim qualification adapter: start barrier must contain exactly one newline\n",
+            ),
+            Implementation::Stim,
+            SparseXorRejectionClass::RowPartial,
+        ),
+        Err(InvocationError::SparseXorWorkRejection {
+            class: "row-partial",
+            ..
+        })
+    ));
+    assert!(matches!(
+        checked_sparse_xor_rejection(
+            &output(
+                Some(1),
+                "unexpected output\n",
+                sparse_xor_rejection_expectation(
+                    Implementation::Stab,
+                    SparseXorRejectionClass::ItemOverCap,
+                )
+                .1,
+            ),
+            Implementation::Stab,
+            SparseXorRejectionClass::ItemOverCap,
+        ),
+        Err(InvocationError::SparseXorWorkRejection {
+            class: "item-over-cap",
             ..
         })
     ));

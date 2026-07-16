@@ -9,6 +9,14 @@ use super::super::process::ProcessResult;
 use super::super::protocol::{
     Implementation, InputDigest, ProtocolId, SemanticDigest, Sha256Digest, WorkerMeasurement,
 };
+use super::sparse_xor::{
+    SPARSE_ITEM_BASE_WORK_ITEMS, SPARSE_ITEM_INPUT_BYTES, SPARSE_ITEM_INPUT_DIGEST,
+    SPARSE_ITEM_MAX_CASE_ID, SPARSE_ITEM_MAX_OUTPUT_DIGEST, SPARSE_ITEM_MAX_WORK_ITEMS,
+    SPARSE_ITEM_SMALL_CASE_ID, SPARSE_ITEM_SMALL_OUTPUT_DIGEST, SPARSE_ROW_BASE_WORK_ITEMS,
+    SPARSE_ROW_INPUT_BYTES, SPARSE_ROW_INPUT_DIGEST, SPARSE_ROW_MAX_CASE_ID,
+    SPARSE_ROW_MAX_OUTPUT_DIGEST, SPARSE_ROW_MAX_WORK_ITEMS, SPARSE_ROW_SMALL_CASE_ID,
+    SPARSE_ROW_SMALL_OUTPUT_DIGEST, SparseXorRejectionClass, sparse_xor_rejection_expectation,
+};
 use super::{
     CIRCUIT_CAP_CASE_ID, CONTRACT_PREFLIGHT_SCHEMA_VERSION, DENSE_XOR_ALIGNMENT_CASE_ID,
     DENSE_XOR_CAP_CASE_ID, DENSE_XOR_EVEN_CASE_ID, DENSE_XOR_MAXIMUM_CASE_ID,
@@ -151,7 +159,7 @@ fn sha256_hex_bytes(bytes: &[u8]) -> Result<String, InvocationError> {
 
 pub(super) fn expected_contract_preflight_probes()
 -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
-    let mut probes = Vec::with_capacity(42);
+    let mut probes = Vec::with_capacity(58);
     let protocol_output_digest = protocol_smoke_output_digest();
     for implementation in [Implementation::Stim, Implementation::Stab] {
         probes.push(expected_accepted_probe(
@@ -165,6 +173,48 @@ pub(super) fn expected_contract_preflight_probes()
             PROTOCOL_SMOKE_INPUT_DIGEST,
             &protocol_output_digest,
         )?);
+    }
+    for implementation in [Implementation::Stim, Implementation::Stab] {
+        for (case_id, work_items, input_bytes, input_digest, output_digest) in [
+            (
+                SPARSE_ROW_SMALL_CASE_ID,
+                SPARSE_ROW_BASE_WORK_ITEMS,
+                SPARSE_ROW_INPUT_BYTES,
+                SPARSE_ROW_INPUT_DIGEST,
+                SPARSE_ROW_SMALL_OUTPUT_DIGEST,
+            ),
+            (
+                SPARSE_ROW_MAX_CASE_ID,
+                SPARSE_ROW_MAX_WORK_ITEMS,
+                SPARSE_ROW_INPUT_BYTES,
+                SPARSE_ROW_INPUT_DIGEST,
+                SPARSE_ROW_MAX_OUTPUT_DIGEST,
+            ),
+            (
+                SPARSE_ITEM_SMALL_CASE_ID,
+                SPARSE_ITEM_BASE_WORK_ITEMS,
+                SPARSE_ITEM_INPUT_BYTES,
+                SPARSE_ITEM_INPUT_DIGEST,
+                SPARSE_ITEM_SMALL_OUTPUT_DIGEST,
+            ),
+            (
+                SPARSE_ITEM_MAX_CASE_ID,
+                SPARSE_ITEM_MAX_WORK_ITEMS,
+                SPARSE_ITEM_INPUT_BYTES,
+                SPARSE_ITEM_INPUT_DIGEST,
+                SPARSE_ITEM_MAX_OUTPUT_DIGEST,
+            ),
+        ] {
+            probes.push(expected_accepted_probe(
+                case_id,
+                implementation,
+                1,
+                work_items,
+                input_bytes,
+                input_digest,
+                output_digest,
+            )?);
+        }
     }
     for implementation in [Implementation::Stim, Implementation::Stab] {
         probes.push(expected_accepted_probe(
@@ -308,6 +358,17 @@ pub(super) fn expected_contract_preflight_probes()
             let (exit_status, stderr) = expectation(implementation);
             probes.push(expected_rejected_probe(
                 case_id,
+                implementation,
+                exit_status,
+                stderr,
+            )?);
+        }
+    }
+    for class in SparseXorRejectionClass::all() {
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            let (exit_status, stderr) = sparse_xor_rejection_expectation(implementation, class);
+            probes.push(expected_rejected_probe(
+                class.case_id(),
                 implementation,
                 exit_status,
                 stderr,

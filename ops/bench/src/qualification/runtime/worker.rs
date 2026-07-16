@@ -18,6 +18,7 @@ use crate::config::STIM_COMMIT;
 
 mod bits;
 mod not_zero;
+mod sparse_xor;
 
 #[cfg(test)]
 use bits::{
@@ -28,11 +29,16 @@ use bits::{
     popcount_output_digest, simd_word_popcount,
 };
 use not_zero::{NotZeroPattern, not_zero_fixture, not_zero_output_digest, simd_bits_not_zero};
+use sparse_xor::{SparseXorFixture, SparseXorKind};
 
-const WORKER_SOURCES: [(&str, &[u8]); 3] = [
+const WORKER_SOURCES: [(&str, &[u8]); 4] = [
     ("worker.rs", include_bytes!("worker.rs")),
     ("worker/bits.rs", include_bytes!("worker/bits.rs")),
     ("worker/not_zero.rs", include_bytes!("worker/not_zero.rs")),
+    (
+        "worker/sparse_xor.rs",
+        include_bytes!("worker/sparse_xor.rs"),
+    ),
 ];
 const DIAGNOSTIC_BUILD_FINGERPRINT: &str =
     "0000000000000000000000000000000000000000000000000000000000000000";
@@ -64,6 +70,8 @@ pub(crate) enum WorkerWorkload {
     SimdBitsNotZeroEarly,
     SimdBitsNotZeroZero,
     SimdBitsNotZeroLate,
+    SparseXorRow,
+    SparseXorItem,
 }
 
 impl WorkerWorkload {
@@ -78,6 +86,8 @@ impl WorkerWorkload {
             Self::SimdBitsNotZeroEarly => "simd-bits-not-zero-early",
             Self::SimdBitsNotZeroZero => "simd-bits-not-zero-zero",
             Self::SimdBitsNotZeroLate => "simd-bits-not-zero-late",
+            Self::SparseXorRow => "sparse-xor-row",
+            Self::SparseXorItem => "sparse-xor-item",
         }
     }
 
@@ -92,6 +102,8 @@ impl WorkerWorkload {
             Self::SimdBitsNotZeroEarly | Self::SimdBitsNotZeroZero | Self::SimdBitsNotZeroLate => {
                 "not-zero"
             }
+            Self::SparseXorRow => "row-xor",
+            Self::SparseXorItem => "xor-item",
         }
     }
 
@@ -105,7 +117,17 @@ impl WorkerWorkload {
             | Self::CircuitCanonicalPrint
             | Self::GateNameHash
             | Self::SimdWordPopcount
-            | Self::SimdBitsXor => None,
+            | Self::SimdBitsXor
+            | Self::SparseXorRow
+            | Self::SparseXorItem => None,
+        }
+    }
+
+    const fn sparse_xor_kind(self) -> Option<SparseXorKind> {
+        match self {
+            Self::SparseXorRow => Some(SparseXorKind::Row),
+            Self::SparseXorItem => Some(SparseXorKind::Item),
+            _ => None,
         }
     }
 }
@@ -175,7 +197,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdBitsXor
         | WorkerWorkload::SimdBitsNotZeroEarly
         | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate => None,
+        | WorkerWorkload::SimdBitsNotZeroLate
+        | WorkerWorkload::SparseXorRow
+        | WorkerWorkload::SparseXorItem => None,
         WorkerWorkload::CircuitParse | WorkerWorkload::CircuitCanonicalPrint => {
             Some(circuit_parse_fixture(args.work_items.get())?)
         }
@@ -189,7 +213,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdBitsXor
         | WorkerWorkload::SimdBitsNotZeroEarly
         | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate => None,
+        | WorkerWorkload::SimdBitsNotZeroLate
+        | WorkerWorkload::SparseXorRow
+        | WorkerWorkload::SparseXorItem => None,
     };
     let mut dense_xor_fixture = match args.workload {
         WorkerWorkload::SimdBitsXor => Some(dense_xor_fixture(args.work_items.get())?),
@@ -200,18 +226,27 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdWordPopcount
         | WorkerWorkload::SimdBitsNotZeroEarly
         | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate => None,
+        | WorkerWorkload::SimdBitsNotZeroLate
+        | WorkerWorkload::SparseXorRow
+        | WorkerWorkload::SparseXorItem => None,
     };
     let not_zero_fixture = args
         .workload
         .not_zero_pattern()
         .map(|pattern| not_zero_fixture(args.work_items.get(), pattern))
         .transpose()?;
+    let mut sparse_xor_fixture = args
+        .workload
+        .sparse_xor_kind()
+        .map(|kind| SparseXorFixture::prepare(kind, args.work_items.get()))
+        .transpose()?;
     let (input_bytes, input_digest_state) = if let Some(fixture) = &popcount_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else if let Some(fixture) = &dense_xor_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else if let Some(fixture) = &not_zero_fixture {
+        (fixture.input_bytes, fixture.input_digest)
+    } else if let Some(fixture) = &sparse_xor_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else {
         let input = circuit_fixture.as_deref().unwrap_or_default().as_bytes();
@@ -244,7 +279,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdBitsXor
         | WorkerWorkload::SimdBitsNotZeroEarly
         | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate => None,
+        | WorkerWorkload::SimdBitsNotZeroLate
+        | WorkerWorkload::SparseXorRow
+        | WorkerWorkload::SparseXorItem => None,
     };
     let gate_hash_names = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_names()?),
@@ -255,7 +292,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdBitsXor
         | WorkerWorkload::SimdBitsNotZeroEarly
         | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate => None,
+        | WorkerWorkload::SimdBitsNotZeroLate
+        | WorkerWorkload::SparseXorRow
+        | WorkerWorkload::SparseXorItem => None,
     };
     let gate_hash_sweeps = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_sweeps(args.work_items.get())?),
@@ -266,7 +305,9 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SimdBitsXor
         | WorkerWorkload::SimdBitsNotZeroEarly
         | WorkerWorkload::SimdBitsNotZeroZero
-        | WorkerWorkload::SimdBitsNotZeroLate => None,
+        | WorkerWorkload::SimdBitsNotZeroLate
+        | WorkerWorkload::SparseXorRow
+        | WorkerWorkload::SparseXorItem => None,
     };
     let gate_hash_table_digest = gate_hash_names
         .as_deref()
@@ -365,6 +406,15 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 )))
             })?
         }
+        WorkerWorkload::SparseXorRow | WorkerWorkload::SparseXorItem => {
+            let fixture = sparse_xor_fixture
+                .as_mut()
+                .ok_or(WorkerError::MissingSparseXorFixture)?;
+            measure_workload(|| {
+                fixture.execute(args.iterations.get());
+                Ok(TimedWorkloadOutput::SparseXorComplete)
+            })?
+        }
     };
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
@@ -408,6 +458,12 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 args.work_items.get(),
                 fixture,
             ))
+        }
+        TimedWorkloadOutput::SparseXorComplete => {
+            let fixture = sparse_xor_fixture
+                .as_ref()
+                .ok_or(WorkerError::MissingSparseXorFixture)?;
+            semantic_digest(fixture.output_digest(args.iterations.get(), args.work_items.get())?)
         }
     };
     let row = WorkerMeasurement {
@@ -502,6 +558,7 @@ enum TimedWorkloadOutput {
     PopcountChecksum(u64),
     DenseXorComplete,
     NotZeroChecksum(u64),
+    SparseXorComplete,
 }
 
 impl WorkloadOutput {
@@ -845,6 +902,30 @@ pub(super) enum WorkerError {
     NotZeroHitIndex { index: usize, bit_count: usize },
     #[error("simd-bits-not-zero workload was invoked without its prepared fixture")]
     MissingNotZeroFixture,
+    #[error("{workload} work count {actual} is not a positive multiple of {base}")]
+    SparseXorWorkShape {
+        workload: &'static str,
+        actual: u64,
+        base: u64,
+    },
+    #[error("{workload} work count {actual} exceeds maximum {maximum}")]
+    SparseXorWorkLimit {
+        workload: &'static str,
+        actual: u64,
+        maximum: u64,
+    },
+    #[error("sparse XOR fixture value {0} cannot be represented on this host")]
+    SparseXorFixtureRange(u64),
+    #[error("sparse XOR fixture allocation failed: {0}")]
+    SparseXorFixtureAllocation(std::collections::TryReserveError),
+    #[error("sparse XOR canonical encoding size overflows usize")]
+    SparseXorEncodingOverflow,
+    #[error("sparse XOR canonical encoding allocation failed: {0}")]
+    SparseXorEncodingAllocation(std::collections::TryReserveError),
+    #[error("{0} capacity priming did not restore the canonical sparse XOR state")]
+    SparseXorPrimingState(&'static str),
+    #[error("sparse XOR workload was invoked without its prepared fixture")]
+    MissingSparseXorFixture,
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]
@@ -880,6 +961,9 @@ mod dense_xor_tests;
 
 #[cfg(test)]
 mod not_zero_tests;
+
+#[cfg(test)]
+mod sparse_xor_tests;
 
 #[cfg(test)]
 mod tests {

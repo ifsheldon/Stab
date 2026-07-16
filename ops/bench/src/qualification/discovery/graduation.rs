@@ -2,7 +2,7 @@ use std::path::Path;
 
 use super::super::model::{
     ComparatorSource, CorrectnessBinding, EvidenceState, FixtureLocator, InputByteCount,
-    MemoryMethod, MemoryPolicy, OutputContract, QualificationGroup, QualificationStatus,
+    MemoryMethod, MemoryPolicy, OutputContract, Phase, QualificationGroup, QualificationStatus,
     RunnerFidelity, ScalePoint, ThresholdPolicy, WorkloadFamily,
 };
 use crate::error::BenchError;
@@ -16,12 +16,15 @@ const SIMD_BITS_XOR_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
 const SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY";
 const SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-ALL-ZERO";
 const SIMD_BITS_NOT_ZERO_LATE_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE";
+const SPARSE_XOR_ROW_GROUP_ID: &str = "PERFQ-M5-SPARSE-XOR";
+const SPARSE_XOR_ITEM_GROUP_ID: &str = "PERFQ-M5-SPARSE-XOR-ITEM";
 const STIM_ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
 const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_word_popcount_contract.h";
 const SIMD_BITS_XOR_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/simd_bits_xor_contract.h";
 const SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_bits_not_zero_contract.h";
+const SPARSE_XOR_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/sparse_xor_contract.h";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
     "cq-evidence-qualification-e660819ae9a223c6",
@@ -40,6 +43,7 @@ const SIMD_BITS_XOR_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-b1530dc4e48e942d",
     "cq-evidence-qualification-ba252d42660a41ce",
 ];
+const SPARSE_XOR_CORRECTNESS_CASE: &str = "cq-evidence-qualification-bea77c19e9ae0b24";
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
 struct NotZeroGroupSpec {
@@ -57,6 +61,7 @@ pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(
         GATE_NAME_HASH_GROUP_ID => apply_gate_name_hash(group),
         SIMD_WORD_POPCOUNT_GROUP_ID => apply_simd_word_popcount(root, group)?,
         SIMD_BITS_XOR_GROUP_ID => apply_simd_bits_xor(root, group)?,
+        SPARSE_XOR_ROW_GROUP_ID => apply_sparse_xor(root, group, false)?,
         _ => {}
     }
     Ok(())
@@ -74,7 +79,15 @@ pub(super) fn additional_groups(
                 "source-owned not-zero groups require the dense-XOR bit-kernel owner".to_string(),
             )
         })?;
-    [
+    let sparse_xor_row = groups
+        .iter()
+        .find(|group| group.id == SPARSE_XOR_ROW_GROUP_ID)
+        .ok_or_else(|| {
+            BenchError::Qualification(
+                "source-owned sparse-XOR item group requires the row-XOR owner".to_string(),
+            )
+        })?;
+    let mut additional = [
         NotZeroGroupSpec {
             id: SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID,
             manifest_row: "pq2-simd-bits-not-zero-early",
@@ -111,7 +124,57 @@ pub(super) fn additional_groups(
     ]
     .into_iter()
     .map(|spec| not_zero_group(root, dense_xor, spec))
-    .collect()
+    .collect::<Result<Vec<_>, _>>()?;
+    let mut sparse_xor_item = sparse_xor_row.clone();
+    sparse_xor_item.id = SPARSE_XOR_ITEM_GROUP_ID.to_string();
+    sparse_xor_item.manifest_row = "pq2-sparse-xor-item".to_string();
+    sparse_xor_item.row_origin = super::super::model::RowOrigin::Planned;
+    apply_sparse_xor(root, &mut sparse_xor_item, true)?;
+    additional.push(sparse_xor_item);
+    Ok(additional)
+}
+
+fn apply_sparse_xor(
+    root: &RepoRoot,
+    group: &mut QualificationGroup,
+    item_workload: bool,
+) -> Result<(), BenchError> {
+    group.phase = Phase::Execute;
+    group.runner_fidelity = RunnerFidelity::AdapterLibrary;
+    group.correctness_cases = vec![SPARSE_XOR_CORRECTNESS_CASE.to_string()];
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = sparse_xor_workload_family(item_workload);
+    group.work_unit = if item_workload {
+        "item-toggles"
+    } else {
+        "row-xors"
+    }
+    .to_string();
+    group.output_contract = OutputContract {
+        expected_shape: "Exact canonical input bytes plus a digest over iteration count, declared work, workload marker, callback work, all four input-fingerprint lanes, and all four final-state-fingerprint lanes."
+            .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: "Both workers prepare the exact pinned-Stim sparse fixture, execute two untimed complete callbacks to restore canonical state while retaining capacity, time only complete callbacks behind matching compiler barriers and optimizer-opaque mutable references, and encode final state outside timing."
+            .to_string(),
+        comparator_sources: [STIM_ADAPTER_SOURCE, SPARSE_XOR_COMPARATOR_SOURCE]
+            .into_iter()
+            .map(|path| comparator_source(root, path))
+            .collect::<Result<_, _>>()?,
+    };
+    group.memory_policy = circuit_memory_policy(
+        "One capacity-primed sparse fixture remains live during timing and setup and peak process RSS are report-only observations at every scale. Stab's timed callbacks allocate nothing at all scales and the accepted maximum; PQ6 owns cross-scale RSS and Stim allocation acceptance.",
+    );
+    group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.owner = "stab-core/bits".to_string();
+    group.reason = if item_workload {
+        "Implemented paired pinned-Stim and Rust seven-item sparse toggles with exact CQ2, complete-callback, canonical-state, allocation, scale, timing, and bounded-worker contracts."
+    } else {
+        "Implemented paired pinned-Stim and Rust 1,000-row sparse symmetric differences with exact CQ2, actual-operation, canonical-state, allocation, scale, timing, and bounded-worker contracts."
+    }
+    .to_string();
+    group.status = QualificationStatus::Implemented;
+    Ok(())
 }
 
 fn not_zero_group(
@@ -486,5 +549,52 @@ fn simd_bits_not_zero_workload_family(
             input_digest: Some(input_digest.to_string()),
         })
         .collect(),
+    }
+}
+
+fn sparse_xor_workload_family(item_workload: bool) -> WorkloadFamily {
+    let (fixture_id, seed, input_bytes, input_digest) = if item_workload {
+        (
+            "stim-v1.16.0-sparse-xor-item-sequence-v1",
+            "items=2,5,9,5,3,6,10",
+            36,
+            "c2c1749b4bf4c7c355c1d0a8109ea53bba790034d116acea3755b533c1fb1059",
+        )
+    } else {
+        (
+            "stim-v1.16.0-sparse-xor-row-table-v1",
+            "rows=1000; offsets=0,1,4,8,15",
+            28_008,
+            "9fdcaf10b6a6437d51afade0e21f39acdd1130ff18255e38c0751261f93df2a2",
+        )
+    };
+    WorkloadFamily {
+        fixture: FixtureLocator::Generated {
+            id: fixture_id.to_string(),
+        },
+        source: "src/stim/mem/sparse_xor_vec.perf.cc".to_string(),
+        deterministic_seed: seed.to_string(),
+        scales: [("small", 1_u64), ("medium", 64), ("large", 4_096)]
+            .into_iter()
+            .map(|(id, sweeps)| {
+                let base_work = if item_workload { 7 } else { 1_997 };
+                let work_items = sweeps * base_work;
+                ScalePoint {
+                    id: id.to_string(),
+                    parameters: if item_workload {
+                        format!(
+                            "generator={fixture_id}; complete_callbacks={sweeps}; toggles_per_callback=7"
+                        )
+                    } else {
+                        format!(
+                            "generator={fixture_id}; complete_callbacks={sweeps}; rows=1000; actual_row_xors_per_callback=1997"
+                        )
+                    },
+                    input_bytes: InputByteCount::Exact { bytes: input_bytes },
+                    semantic_work: Some(work_items),
+                    input_digest: Some(input_digest.to_string()),
+                }
+            })
+            .collect(),
     }
 }

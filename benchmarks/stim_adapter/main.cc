@@ -27,6 +27,7 @@
 #include "simd_bits_not_zero_contract.h"
 #include "simd_bits_xor_contract.h"
 #include "simd_word_popcount_contract.h"
+#include "sparse_xor_contract.h"
 
 #ifndef STAB_STIM_COMMIT
 #error "STAB_STIM_COMMIT must identify the pinned Stim source"
@@ -56,6 +57,11 @@ enum class NotZeroPattern {
     LATE,
 };
 
+enum class SparseXorKind {
+    ROW,
+    ITEM,
+};
+
 std::optional<NotZeroPattern> not_zero_pattern(std::string_view workload) {
     if (workload == "simd-bits-not-zero-early") {
         return NotZeroPattern::EARLY;
@@ -65,6 +71,16 @@ std::optional<NotZeroPattern> not_zero_pattern(std::string_view workload) {
     }
     if (workload == "simd-bits-not-zero-late") {
         return NotZeroPattern::LATE;
+    }
+    return std::nullopt;
+}
+
+std::optional<SparseXorKind> sparse_xor_kind(std::string_view workload) {
+    if (workload == "sparse-xor-row") {
+        return SparseXorKind::ROW;
+    }
+    if (workload == "sparse-xor-item") {
+        return SparseXorKind::ITEM;
     }
     return std::nullopt;
 }
@@ -131,8 +147,13 @@ Arguments parse_arguments(int argc, const char **argv) {
         result.workload == "simd-bits-xor" && result.measurement_id == "xor-complete-vector";
     const bool simd_bits_not_zero =
         not_zero_pattern(result.workload).has_value() && result.measurement_id == "not-zero";
+    const bool sparse_xor =
+        (sparse_xor_kind(result.workload) == SparseXorKind::ROW &&
+         result.measurement_id == "row-xor") ||
+        (sparse_xor_kind(result.workload) == SparseXorKind::ITEM &&
+         result.measurement_id == "xor-item");
     if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !gate_name_hash &&
-        !simd_word_popcount && !simd_bits_xor && !simd_bits_not_zero) {
+        !simd_word_popcount && !simd_bits_xor && !simd_bits_not_zero && !sparse_xor) {
         throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
@@ -398,6 +419,176 @@ std::array<uint64_t, 4> byte_digest_word_pair(
     return state;
 }
 
+constexpr uint64_t SPARSE_ROW_BASE_WORK_ITEMS = 1997;
+constexpr uint64_t SPARSE_ROW_MAX_WORK_ITEMS = SPARSE_ROW_BASE_WORK_ITEMS * 4096;
+constexpr uint64_t SPARSE_ITEM_BASE_WORK_ITEMS = 7;
+constexpr uint64_t SPARSE_ITEM_MAX_WORK_ITEMS = SPARSE_ITEM_BASE_WORK_ITEMS * 4096;
+constexpr uint64_t SPARSE_ROW_MARKER = 1;
+constexpr uint64_t SPARSE_ITEM_MARKER = 2;
+constexpr std::array<uint32_t, SPARSE_ITEM_BASE_WORK_ITEMS> SPARSE_ITEM_SEQUENCE{
+    2, 5, 9, 5, 3, 6, 10};
+
+std::string_view sparse_xor_workload(SparseXorKind kind) {
+    return kind == SparseXorKind::ROW ? "sparse-xor-row" : "sparse-xor-item";
+}
+
+uint64_t sparse_xor_base_work_items(SparseXorKind kind) {
+    return kind == SparseXorKind::ROW ? SPARSE_ROW_BASE_WORK_ITEMS : SPARSE_ITEM_BASE_WORK_ITEMS;
+}
+
+uint64_t sparse_xor_max_work_items(SparseXorKind kind) {
+    return kind == SparseXorKind::ROW ? SPARSE_ROW_MAX_WORK_ITEMS : SPARSE_ITEM_MAX_WORK_ITEMS;
+}
+
+uint64_t sparse_xor_complete_sweeps(SparseXorKind kind, uint64_t work_items) {
+    const uint64_t maximum = sparse_xor_max_work_items(kind);
+    if (work_items > maximum) {
+        throw std::invalid_argument(
+            std::string(sparse_xor_workload(kind)) + " work count " +
+            std::to_string(work_items) + " exceeds maximum " + std::to_string(maximum));
+    }
+    const uint64_t base = sparse_xor_base_work_items(kind);
+    if (work_items < base || work_items % base != 0) {
+        throw std::invalid_argument(
+            std::string(sparse_xor_workload(kind)) + " work count " +
+            std::to_string(work_items) + " is not a positive multiple of " +
+            std::to_string(base));
+    }
+    return work_items / base;
+}
+
+void append_le_u64(std::vector<uint8_t> &output, uint64_t value) {
+    for (uint32_t byte = 0; byte < 8; ++byte) {
+        output.push_back(static_cast<uint8_t>(value >> (byte * 8)));
+    }
+}
+
+void append_le_u32(std::vector<uint8_t> &output, uint32_t value) {
+    for (uint32_t byte = 0; byte < 4; ++byte) {
+        output.push_back(static_cast<uint8_t>(value >> (byte * 8)));
+    }
+}
+
+std::vector<uint8_t> canonical_sparse_items(const uint32_t *items, size_t size) {
+    if (size > (std::numeric_limits<size_t>::max() - 8) / 4) {
+        throw std::overflow_error("sparse XOR item encoding size overflows size_t");
+    }
+    std::vector<uint8_t> output;
+    output.reserve(8 + size * 4);
+    append_le_u64(output, static_cast<uint64_t>(size));
+    for (size_t index = 0; index < size; ++index) {
+        append_le_u32(output, items[index]);
+    }
+    return output;
+}
+
+std::vector<uint8_t> canonical_sparse_table(
+    const std::vector<stim::SparseXorVec<uint32_t>> &table) {
+    size_t item_count = 0;
+    for (const auto &row : table) {
+        if (row.sorted_items.size() > std::numeric_limits<size_t>::max() - item_count) {
+            throw std::overflow_error("sparse XOR table item count overflows size_t");
+        }
+        item_count += row.sorted_items.size();
+    }
+    if (table.size() > (std::numeric_limits<size_t>::max() - 8) / 8) {
+        throw std::overflow_error("sparse XOR table header size overflows size_t");
+    }
+    const size_t header_bytes = 8 + table.size() * 8;
+    if (item_count > (std::numeric_limits<size_t>::max() - header_bytes) / 4) {
+        throw std::overflow_error("sparse XOR table encoding size overflows size_t");
+    }
+    std::vector<uint8_t> output;
+    output.reserve(header_bytes + item_count * 4);
+    append_le_u64(output, static_cast<uint64_t>(table.size()));
+    for (const auto &row : table) {
+        append_le_u64(output, static_cast<uint64_t>(row.sorted_items.size()));
+        for (const auto item : row.sorted_items) {
+            append_le_u32(output, item);
+        }
+    }
+    return output;
+}
+
+std::array<uint64_t, 4> byte_digest_bytes(const std::vector<uint8_t> &bytes) {
+    return byte_digest(std::string_view(
+        reinterpret_cast<const char *>(bytes.data()), bytes.size()));
+}
+
+struct SparseXorFixture {
+    SparseXorKind kind;
+    uint64_t sweeps;
+    uint64_t input_bytes;
+    std::array<uint64_t, 4> input_digest;
+    std::vector<stim::SparseXorVec<uint32_t>> table;
+    stim::SparseXorVec<uint32_t> buffer;
+};
+
+std::vector<uint8_t> canonical_sparse_state(const SparseXorFixture &fixture) {
+    if (fixture.kind == SparseXorKind::ROW) {
+        return canonical_sparse_table(fixture.table);
+    }
+    return canonical_sparse_items(
+        fixture.buffer.sorted_items.data(), fixture.buffer.sorted_items.size());
+}
+
+SparseXorFixture sparse_xor_fixture(SparseXorKind kind, uint64_t work_items) {
+    const uint64_t sweeps = sparse_xor_complete_sweeps(kind, work_items);
+    SparseXorFixture fixture{kind, sweeps, 0, {}, {}, {}};
+    std::vector<uint8_t> canonical_input;
+    std::vector<uint8_t> canonical_initial_state;
+    if (kind == SparseXorKind::ROW) {
+        fixture.table.resize(1000);
+        for (uint32_t row = 0; row < fixture.table.size(); ++row) {
+            fixture.table[row].xor_item(row);
+            fixture.table[row].xor_item(row + 1);
+            fixture.table[row].xor_item(row + 4);
+            fixture.table[row].xor_item(row + 8);
+            fixture.table[row].xor_item(row + 15);
+        }
+        canonical_input = canonical_sparse_table(fixture.table);
+        canonical_initial_state = canonical_input;
+        stab_qualification::sparse_xor_row_callback(fixture.table);
+        stab_qualification::sparse_xor_row_callback(fixture.table);
+    } else {
+        canonical_input = canonical_sparse_items(
+            SPARSE_ITEM_SEQUENCE.data(), SPARSE_ITEM_SEQUENCE.size());
+        canonical_initial_state = canonical_sparse_state(fixture);
+        stab_qualification::sparse_xor_item_callback(fixture.buffer);
+        stab_qualification::sparse_xor_item_callback(fixture.buffer);
+    }
+    if (canonical_sparse_state(fixture) != canonical_initial_state) {
+        throw std::runtime_error(
+            std::string(sparse_xor_workload(kind)) +
+            " capacity priming did not restore the canonical sparse XOR state");
+    }
+    fixture.input_bytes = static_cast<uint64_t>(canonical_input.size());
+    fixture.input_digest = byte_digest_bytes(canonical_input);
+    return fixture;
+}
+
+std::array<uint64_t, 4> sparse_xor_output_digest(
+    const SparseXorFixture &fixture,
+    uint64_t iterations,
+    uint64_t work_items) {
+    const auto final_state_digest = byte_digest_bytes(canonical_sparse_state(fixture));
+    const std::array<uint64_t, 12> fields{
+        iterations,
+        work_items,
+        fixture.kind == SparseXorKind::ROW ? SPARSE_ROW_MARKER : SPARSE_ITEM_MARKER,
+        sparse_xor_base_work_items(fixture.kind),
+        fixture.input_digest[0],
+        fixture.input_digest[1],
+        fixture.input_digest[2],
+        fixture.input_digest[3],
+        final_state_digest[0],
+        final_state_digest[1],
+        final_state_digest[2],
+        final_state_digest[3],
+    };
+    return byte_digest_words(fields.data(), fields.size());
+}
+
 struct PopcountFixture {
     stim::simd_bits<stim::MAX_BITWORD_WIDTH> bits;
     uint64_t input_bytes;
@@ -638,12 +829,20 @@ int main(int argc, const char **argv) {
             not_zero.emplace(
                 not_zero_fixture(arguments.work_items, prepared_not_zero_pattern.value()));
         }
+        const auto prepared_sparse_xor_kind = sparse_xor_kind(arguments.workload);
+        std::optional<SparseXorFixture> sparse_xor;
+        if (prepared_sparse_xor_kind.has_value()) {
+            sparse_xor.emplace(
+                sparse_xor_fixture(prepared_sparse_xor_kind.value(), arguments.work_items));
+        }
         const uint64_t input_bytes = popcount.has_value()
                                          ? popcount->input_bytes
                                      : dense_xor.has_value()
                                          ? dense_xor->input_bytes
                                      : not_zero.has_value()
                                          ? not_zero->input_bytes
+                                     : sparse_xor.has_value()
+                                         ? sparse_xor->input_bytes
                                          : static_cast<uint64_t>(circuit_fixture.size());
         const auto input_digest = popcount.has_value()
                                       ? popcount->input_digest
@@ -651,6 +850,8 @@ int main(int argc, const char **argv) {
                                       ? dense_xor->input_digest
                                   : not_zero.has_value()
                                       ? not_zero->input_digest
+                                  : sparse_xor.has_value()
+                                      ? sparse_xor->input_digest
                                       : byte_digest(circuit_fixture);
 
         if (arguments.start_barrier) {
@@ -709,6 +910,22 @@ int main(int argc, const char **argv) {
                 not_zero_checksum = stab_qualification::simd_bits_not_zero_contract(
                     arguments.iterations, prepared_not_zero.bits);
             });
+        } else if (prepared_sparse_xor_kind == SparseXorKind::ROW) {
+            auto &prepared_sparse_xor = sparse_xor.value();
+            elapsed_seconds = measure_workload([&]() {
+                stab_qualification::sparse_xor_row_contract(
+                    arguments.iterations,
+                    prepared_sparse_xor.sweeps,
+                    prepared_sparse_xor.table);
+            });
+        } else if (prepared_sparse_xor_kind == SparseXorKind::ITEM) {
+            auto &prepared_sparse_xor = sparse_xor.value();
+            elapsed_seconds = measure_workload([&]() {
+                stab_qualification::sparse_xor_item_contract(
+                    arguments.iterations,
+                    prepared_sparse_xor.sweeps,
+                    prepared_sparse_xor.buffer);
+            });
         } else {
             throw std::invalid_argument("unreachable registered adapter workload");
         }
@@ -733,6 +950,9 @@ int main(int argc, const char **argv) {
                 arguments.iterations,
                 arguments.work_items,
                 not_zero.value());
+        } else if (prepared_sparse_xor_kind.has_value()) {
+            digest_state = sparse_xor_output_digest(
+                sparse_xor.value(), arguments.iterations, arguments.work_items);
         }
         if (!(elapsed_seconds > 0)) {
             throw std::runtime_error("adapter measured a non-positive duration");

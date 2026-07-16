@@ -1152,8 +1152,8 @@ fn validate_rows(
             "manifest primary performance ownership is stale: {primary_owners:?}"
         ));
     }
-    validate_decision_count(suite, RowDecision::Retained, 13, issues);
-    validate_decision_count(suite, RowDecision::Reworked, 136, issues);
+    validate_decision_count(suite, RowDecision::Retained, 12, issues);
+    validate_decision_count(suite, RowDecision::Reworked, 137, issues);
     validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
     validate_decision_count(suite, RowDecision::Superseded, 6, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);

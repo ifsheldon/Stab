@@ -198,16 +198,21 @@ fn reworked_heterogeneous_primary_threshold_requires_an_exact_replacement_mappin
 #[test]
 fn replacement_mapping_rejects_stale_sources_and_nonpromotable_targets() {
     let (mut suite, manifest, references) = fixture();
-    let replacement = suite
+    suite
         .manifest_rows
         .iter_mut()
         .find(|row| row.id == "m5-simd-bits")
         .expect("dense XOR legacy row")
         .replacement_contracts
         .first_mut()
-        .expect("dense XOR replacement");
-    replacement.legacy_stim_name = "simd_bits_stale".to_string();
-    replacement.runtime_group_id = "PERFQ-M5-SPARSE-XOR".to_string();
+        .expect("dense XOR replacement")
+        .legacy_stim_name = "simd_bits_stale".to_string();
+    suite
+        .qualification_groups
+        .iter_mut()
+        .find(|group| group.id == "PERFQ-M5-SIMD-BITS")
+        .expect("dense XOR runtime group")
+        .status = QualificationStatus::Planned;
 
     let error = validate(&suite, &manifest, &references, "UNFROZEN")
         .expect_err("stale source and planned target must fail");

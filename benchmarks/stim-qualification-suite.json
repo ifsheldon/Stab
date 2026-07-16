@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2",
-  "semantic_digest": "0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0",
+  "semantic_digest": "2d9cb3e3e2dc36a29c31964480f9b735e2411b26f4ba2b3ac66ed6791b617dc0",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -201,6 +201,7 @@
         "PERFQ-M5-SIMD-BITS-NOT-ZERO-LATE",
         "PERFQ-M5-SIMD-WORD",
         "PERFQ-M5-SPARSE-XOR",
+        "PERFQ-M5-SPARSE-XOR-ITEM",
         "PERFQ-M8-PROBABILITY-UTIL"
       ],
       "reason": "Implemented selected operations have variable-size or public latency work in this qualification domain."
@@ -62446,7 +62447,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
+            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -62542,7 +62543,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
+            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62638,7 +62639,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
+            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62734,7 +62735,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
+            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62831,7 +62832,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "746ad7c6979b7f3476eba8ead6cf9df84fb329b27b118191d51edd95971e49e6"
+            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
           },
           {
             "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -62871,33 +62872,68 @@
       "checklist_child_ids": [],
       "public_api_items": [],
       "disposition": "measured",
-      "phase": "parse",
-      "runner_fidelity": "stim-perf",
-      "correctness_cases": [],
-      "correctness_binding": "unresolved",
-      "planned_correctness_case_id": "CQPLANNED-PERFQ-M5-SPARSE-XOR",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-bea77c19e9ae0b24"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
-          "kind": "inline",
-          "id": "m5-sparse-xor"
+          "kind": "generated",
+          "id": "stim-v1.16.0-sparse-xor-row-table-v1"
         },
         "source": "src/stim/mem/sparse_xor_vec.perf.cc",
-        "deterministic_seed": "source-owned-inline:m5-sparse-xor",
+        "deterministic_seed": "rows=1000; offsets=0,1,4,8,15",
         "scales": [
           {
-            "id": "inherited",
-            "parameters": "sparse table row XOR and item XOR workloads",
+            "id": "small",
+            "parameters": "generator=stim-v1.16.0-sparse-xor-row-table-v1; complete_callbacks=1; rows=1000; actual_row_xors_per_callback=1997",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 28008
+            },
+            "semantic_work": 1997,
+            "input_digest": "9fdcaf10b6a6437d51afade0e21f39acdd1130ff18255e38c0751261f93df2a2"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=stim-v1.16.0-sparse-xor-row-table-v1; complete_callbacks=64; rows=1000; actual_row_xors_per_callback=1997",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 28008
+            },
+            "semantic_work": 127808,
+            "input_digest": "9fdcaf10b6a6437d51afade0e21f39acdd1130ff18255e38c0751261f93df2a2"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=stim-v1.16.0-sparse-xor-row-table-v1; complete_callbacks=4096; rows=1000; actual_row_xors_per_callback=1997",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 28008
+            },
+            "semantic_work": 8179712,
+            "input_digest": "9fdcaf10b6a6437d51afade0e21f39acdd1130ff18255e38c0751261f93df2a2"
           }
         ]
       },
-      "work_unit": "bits",
+      "work_unit": "row-xors",
       "output_contract": {
-        "expected_shape": "sparse-xor output count, width, and semantic digest from the declared correctness preflight",
-        "digest_state": "planned",
-        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+        "expected_shape": "Exact canonical input bytes plus a digest over iteration count, declared work, workload marker, callback work, all four input-fingerprint lanes, and all four final-state-fingerprint lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers prepare the exact pinned-Stim sparse fixture, execute two untimed complete callbacks to restore canonical state while retaining capacity, time only complete callbacks behind matching compiler barriers and optimizer-opaque mutable references, and encode final state outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+          },
+          {
+            "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
+            "sha256": "344b5fe4c5a5e8a61c0bf8c3676e7dddbb83cc1b277edd1444458c26f818f365"
+          }
+        ]
       },
       "timing_policy": {
         "calibration_min_ms": 250,
@@ -62909,16 +62945,113 @@
         "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
       },
       "memory_policy": {
-        "method": "stab-allocations",
+        "method": "process-rss",
         "scale_ids": [
-          "inherited"
+          "small",
+          "medium",
+          "large"
         ],
-        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+        "expected_growth": "One capacity-primed sparse fixture remains live during timing and setup and peak process RSS are report-only observations at every scale. Stab's timed callbacks allocate nothing at all scales and the accepted maximum; PQ6 owns cross-scale RSS and Stim allocation acceptance."
       },
       "threshold_policy": "primary-1.25",
-      "reason": "The inherited operation shape is retained, but PQ1 must add correctness preflight, exact output digest, scales, and paired statistics before qualification.",
+      "reason": "Implemented paired pinned-Stim and Rust 1,000-row sparse symmetric differences with exact CQ2, actual-operation, canonical-state, allocation, scale, timing, and bounded-worker contracts.",
       "owner": "stab-core/bits",
-      "status": "planned"
+      "status": "implemented"
+    },
+    {
+      "id": "PERFQ-M5-SPARSE-XOR-ITEM",
+      "manifest_row": "pq2-sparse-xor-item",
+      "row_origin": "planned",
+      "performance_feature": "PERF-BIT-KERNELS",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-bea77c19e9ae0b24"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "stim-v1.16.0-sparse-xor-item-sequence-v1"
+        },
+        "source": "src/stim/mem/sparse_xor_vec.perf.cc",
+        "deterministic_seed": "items=2,5,9,5,3,6,10",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=stim-v1.16.0-sparse-xor-item-sequence-v1; complete_callbacks=1; toggles_per_callback=7",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 36
+            },
+            "semantic_work": 7,
+            "input_digest": "c2c1749b4bf4c7c355c1d0a8109ea53bba790034d116acea3755b533c1fb1059"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=stim-v1.16.0-sparse-xor-item-sequence-v1; complete_callbacks=64; toggles_per_callback=7",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 36
+            },
+            "semantic_work": 448,
+            "input_digest": "c2c1749b4bf4c7c355c1d0a8109ea53bba790034d116acea3755b533c1fb1059"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=stim-v1.16.0-sparse-xor-item-sequence-v1; complete_callbacks=4096; toggles_per_callback=7",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 36
+            },
+            "semantic_work": 28672,
+            "input_digest": "c2c1749b4bf4c7c355c1d0a8109ea53bba790034d116acea3755b533c1fb1059"
+          }
+        ]
+      },
+      "work_unit": "item-toggles",
+      "output_contract": {
+        "expected_shape": "Exact canonical input bytes plus a digest over iteration count, declared work, workload marker, callback work, all four input-fingerprint lanes, and all four final-state-fingerprint lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers prepare the exact pinned-Stim sparse fixture, execute two untimed complete callbacks to restore canonical state while retaining capacity, time only complete callbacks behind matching compiler barriers and optimizer-opaque mutable references, and encode final state outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "276e1bd8de12064a3234812b4421e47d1e20b9a81c3063f7f9ef53d2e88f5c18"
+          },
+          {
+            "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
+            "sha256": "344b5fe4c5a5e8a61c0bf8c3676e7dddbb83cc1b277edd1444458c26f818f365"
+          }
+        ]
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "process-rss",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "One capacity-primed sparse fixture remains live during timing and setup and peak process RSS are report-only observations at every scale. Stab's timed callbacks allocate nothing at all scales and the accepted maximum; PQ6 owns cross-scale RSS and Stim allocation acceptance."
+      },
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust seven-item sparse toggles with exact CQ2, complete-callback, canonical-state, allocation, scale, timing, and bounded-worker contracts.",
+      "owner": "stab-core/bits",
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M6-CLIFFORD-STRING",
@@ -71664,7 +71797,7 @@
       "id": "m5-sparse-xor",
       "primary_group_id": "PERFQ-M5-SPARSE-XOR",
       "supporting_performance_features": [],
-      "decision": "retained",
+      "decision": "reworked",
       "classifications": [
         "faithful",
         "missing-scale",
@@ -71691,6 +71824,20 @@
           "stim_name": "SparseXorVec_XorItem",
           "stab_name": "stab_sparse_xor_item_7",
           "max_relative_ratio": "1.25"
+        }
+      ],
+      "replacement_contracts": [
+        {
+          "legacy_stim_name": "SparseXorTable_SmallRowXor_1000",
+          "legacy_stab_name": "stab_sparse_table_row_xor_1000",
+          "runtime_group_id": "PERFQ-M5-SPARSE-XOR",
+          "runtime_measurement_id": "row-xor"
+        },
+        {
+          "legacy_stim_name": "SparseXorVec_XorItem",
+          "legacy_stab_name": "stab_sparse_xor_item_7",
+          "runtime_group_id": "PERFQ-M5-SPARSE-XOR-ITEM",
+          "runtime_measurement_id": "xor-item"
         }
       ],
       "waiver_refs": []
