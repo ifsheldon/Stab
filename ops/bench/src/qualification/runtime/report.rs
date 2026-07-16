@@ -534,6 +534,7 @@ fn validate_calibration(report: &QualificationReport) -> Result<(), ReportError>
         || calibration.target_minimum_seconds != 0.35
         || calibration.target_minimum_seconds <= calibration.acceptance_minimum_seconds
         || calibration.maximum_seconds != 2.0
+        || calibration.wide_ratio_maximum_seconds != 10.0
         || calibration.common_iterations == 0
     {
         return Err(ReportError::Calibration);
@@ -559,16 +560,22 @@ fn validate_calibration(report: &QualificationReport) -> Result<(), ReportError>
         return Err(ReportError::Calibration);
     }
     validate_pair_execution(&calibration.common_validation, EvidenceMode::Timing)?;
-    for invocation in [
-        &calibration.common_validation.stim,
-        &calibration.common_validation.stab,
-    ] {
-        let measured = invocation.measured_duration()?.as_secs_f64();
-        if measured < calibration.acceptance_minimum_seconds
-            || measured > calibration.maximum_seconds
-        {
-            return Err(ReportError::Calibration);
-        }
+    validate_common_batch_mode(calibration)?;
+    Ok(())
+}
+
+fn validate_common_batch_mode(
+    calibration: &super::run::CalibrationEvidence,
+) -> Result<(), ReportError> {
+    let common_batch_mode = super::run::classify_common_calibration(
+        calibration.stim.selected_iterations,
+        calibration.stab.selected_iterations,
+        calibration.common_validation.stim.measured_duration()?,
+        calibration.common_validation.stab.measured_duration()?,
+    )
+    .map_err(|_| ReportError::Calibration)?;
+    if common_batch_mode != calibration.common_batch_mode {
+        return Err(ReportError::Calibration);
     }
     Ok(())
 }

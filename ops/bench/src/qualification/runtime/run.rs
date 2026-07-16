@@ -21,11 +21,12 @@ use super::statistics::{
 use crate::config::{STIM_COMMIT, STIM_TAG};
 use crate::root::RepoRoot;
 
-pub(super) const REPORT_SCHEMA_VERSION: u32 = 21;
+pub(super) const REPORT_SCHEMA_VERSION: u32 = 22;
 const DEFAULT_OUTPUT: &str = "target/benchmarks/qualification/latest";
 const CALIBRATION_ACCEPTANCE_MINIMUM: Duration = Duration::from_millis(250);
 const CALIBRATION_TARGET_MINIMUM: Duration = Duration::from_millis(350);
 const CALIBRATION_MAXIMUM: Duration = Duration::from_secs(2);
+const CALIBRATION_WIDE_RATIO_MAXIMUM: Duration = Duration::from_secs(10);
 const INVOCATION_TIMEOUT: Duration = Duration::from_secs(30);
 const MAXIMUM_ITERATIONS: u64 = 1_000_000_000;
 const WARMUP_BATCHES: usize = 3;
@@ -188,10 +189,28 @@ pub(super) struct CalibrationEvidence {
     pub(super) acceptance_minimum_seconds: f64,
     pub(super) target_minimum_seconds: f64,
     pub(super) maximum_seconds: f64,
+    pub(super) wide_ratio_maximum_seconds: f64,
+    pub(super) common_batch_mode: CommonBatchMode,
     pub(super) stim: ImplementationCalibration,
     pub(super) stab: ImplementationCalibration,
     pub(super) common_iterations: u64,
     pub(super) common_validation: PairExecution,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(super) enum CommonBatchMode {
+    Standard,
+    WideRatio,
+}
+
+impl CommonBatchMode {
+    pub(super) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::WideRatio => "wide-ratio",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -305,11 +324,17 @@ pub(super) fn run(
         Some(&expected_output_digest),
     )?;
     pair_execution(&common_validation)?;
-    validate_common_calibration(&common_validation)?;
+    let common_batch_mode = validate_common_calibration(
+        &common_validation,
+        stim_decision.iterations.get(),
+        stab_decision.iterations.get(),
+    )?;
     let calibration = CalibrationEvidence {
         acceptance_minimum_seconds: CALIBRATION_ACCEPTANCE_MINIMUM.as_secs_f64(),
         target_minimum_seconds: CALIBRATION_TARGET_MINIMUM.as_secs_f64(),
         maximum_seconds: CALIBRATION_MAXIMUM.as_secs_f64(),
+        wide_ratio_maximum_seconds: CALIBRATION_WIDE_RATIO_MAXIMUM.as_secs_f64(),
+        common_batch_mode,
         stim: calibration_evidence(Implementation::Stim, stim_decision, stim_probes),
         stab: calibration_evidence(Implementation::Stab, stab_decision, stab_probes),
         common_iterations: common_iterations.get(),
@@ -651,21 +676,58 @@ fn pair_execution(execution: &PairExecution) -> Result<Vec<PairedSample>, RunErr
     )?)
 }
 
-fn validate_common_calibration(execution: &PairExecution) -> Result<(), RunError> {
-    for invocation in [&execution.stim, &execution.stab] {
-        let measured = invocation.measured_duration()?;
-        if !common_calibration_duration_is_accepted(measured) {
+fn validate_common_calibration(
+    execution: &PairExecution,
+    stim_selected_iterations: u64,
+    stab_selected_iterations: u64,
+) -> Result<CommonBatchMode, RunError> {
+    classify_common_calibration(
+        stim_selected_iterations,
+        stab_selected_iterations,
+        execution.stim.measured_duration()?,
+        execution.stab.measured_duration()?,
+    )
+}
+
+pub(super) fn classify_common_calibration(
+    stim_selected_iterations: u64,
+    stab_selected_iterations: u64,
+    stim_measured: Duration,
+    stab_measured: Duration,
+) -> Result<CommonBatchMode, RunError> {
+    for (implementation, measured) in [
+        (Implementation::Stim, stim_measured),
+        (Implementation::Stab, stab_measured),
+    ] {
+        if measured < CALIBRATION_ACCEPTANCE_MINIMUM || measured > CALIBRATION_WIDE_RATIO_MAXIMUM {
             return Err(RunError::CommonCalibrationOutOfBounds {
-                implementation: invocation.implementation,
+                implementation,
                 measured,
             });
         }
     }
-    Ok(())
-}
-
-fn common_calibration_duration_is_accepted(measured: Duration) -> bool {
-    measured >= CALIBRATION_ACCEPTANCE_MINIMUM && measured <= CALIBRATION_MAXIMUM
+    if stim_measured <= CALIBRATION_MAXIMUM && stab_measured <= CALIBRATION_MAXIMUM {
+        return Ok(CommonBatchMode::Standard);
+    }
+    let wide_ratio_is_valid = if stim_selected_iterations < stab_selected_iterations {
+        stim_measured > CALIBRATION_MAXIMUM && stab_measured <= CALIBRATION_MAXIMUM
+    } else if stab_selected_iterations < stim_selected_iterations {
+        stab_measured > CALIBRATION_MAXIMUM && stim_measured <= CALIBRATION_MAXIMUM
+    } else {
+        false
+    };
+    if wide_ratio_is_valid {
+        return Ok(CommonBatchMode::WideRatio);
+    }
+    let (implementation, measured) = if stim_measured > CALIBRATION_MAXIMUM {
+        (Implementation::Stim, stim_measured)
+    } else {
+        (Implementation::Stab, stab_measured)
+    };
+    Err(RunError::CommonCalibrationOutOfBounds {
+        implementation,
+        measured,
+    })
 }
 
 fn memory_evidence(
@@ -820,23 +882,80 @@ mod tests {
     }
 
     #[test]
-    fn calibration_guard_band_preserves_the_acceptance_floor() {
+    fn calibration_guard_band_and_wide_ratio_mode_preserve_source_bounds() {
         let policy = calibration_policy().expect("calibration policy");
         assert_eq!(policy.minimum, Duration::from_millis(350));
         assert_eq!(CALIBRATION_ACCEPTANCE_MINIMUM, Duration::from_millis(250));
+        assert_eq!(CALIBRATION_MAXIMUM, Duration::from_secs(2));
+        assert_eq!(CALIBRATION_WIDE_RATIO_MAXIMUM, Duration::from_secs(10));
         assert!(policy.minimum > CALIBRATION_ACCEPTANCE_MINIMUM);
-        assert!(!common_calibration_duration_is_accepted(
-            Duration::from_micros(249_999)
-        ));
-        assert!(common_calibration_duration_is_accepted(
-            Duration::from_millis(250)
-        ));
-        assert!(common_calibration_duration_is_accepted(
-            Duration::from_secs(2)
-        ));
-        assert!(!common_calibration_duration_is_accepted(
-            Duration::from_micros(2_000_001)
-        ));
+
+        assert_eq!(
+            classify_common_calibration(
+                100,
+                100,
+                Duration::from_millis(250),
+                Duration::from_secs(2),
+            )
+            .expect("standard endpoints are accepted"),
+            CommonBatchMode::Standard
+        );
+        assert_eq!(
+            classify_common_calibration(
+                100,
+                1_000,
+                Duration::from_secs(5),
+                Duration::from_millis(350),
+            )
+            .expect("Stim may exceed the standard cap at Stab's selected batch"),
+            CommonBatchMode::WideRatio
+        );
+        assert_eq!(
+            classify_common_calibration(
+                1_000,
+                100,
+                Duration::from_millis(350),
+                Duration::from_secs(5),
+            )
+            .expect("Stab may exceed the standard cap at Stim's selected batch"),
+            CommonBatchMode::WideRatio
+        );
+    }
+
+    #[test]
+    fn wide_ratio_mode_rejects_floor_cap_and_iteration_owner_violations() {
+        for result in [
+            classify_common_calibration(
+                100,
+                1_000,
+                Duration::from_millis(249),
+                Duration::from_millis(350),
+            ),
+            classify_common_calibration(
+                100,
+                1_000,
+                Duration::from_millis(10_001),
+                Duration::from_millis(350),
+            ),
+            classify_common_calibration(
+                100,
+                1_000,
+                Duration::from_millis(350),
+                Duration::from_millis(2_001),
+            ),
+            classify_common_calibration(
+                1_000,
+                1_000,
+                Duration::from_secs(3),
+                Duration::from_millis(350),
+            ),
+            classify_common_calibration(100, 1_000, Duration::from_secs(3), Duration::from_secs(3)),
+        ] {
+            assert!(matches!(
+                result,
+                Err(RunError::CommonCalibrationOutOfBounds { .. })
+            ));
+        }
     }
 
     #[test]

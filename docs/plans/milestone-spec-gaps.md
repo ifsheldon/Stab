@@ -23,6 +23,15 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-16 - PQ1/PQ2: Wide-Ratio Common Calibration Batches
+
+Status: Resolved
+Revealed by: the first clean calibrated run of `PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY` after both workers were protected against immutable-input scan elision.
+Current text: PQ1 independently calibrates each implementation to a 350-millisecond target within a 250-millisecond to 2-second retained range, then requires one equal-work common iteration count whose measured duration also stays within that same range for both implementations.
+Gap: a genuine speed ratio greater than eight has no common iteration count that can keep both implementations between 250 milliseconds and 2 seconds. The early-hit `not_zero` contract exposed this because Stab short-circuits after the bit-600 hit while pinned Stim OR-reduces the complete 10,000-bit vector. The shared batch made Stim take 4.90 seconds while keeping Stab above the noise floor, so the harness rejected a valid large speedup before it could publish evidence.
+Proposed amendment: retain the 350-millisecond target and 2-second ceiling for each independent calibration. Add a source-owned wide-ratio common-batch mode that preserves identical iterations, fixture identity, work count, output digest, and paired statistics; requires both measured durations to remain at least 250 milliseconds; permits only the implementation whose independent calibration selected fewer iterations to exceed 2 seconds; requires the other implementation to remain at or below 2 seconds at its selected common iteration count; and rejects either side above a hard 10-second common ceiling under the existing 30-second invocation timeout. Record and offline-rederive the mode instead of trusting report-owned classification.
+Resolution: qualification report schema version 22 records the standard or wide-ratio common-batch mode and both the 2-second independent and 10-second wide-ratio ceilings. Runtime and offline report validation derive the mode from the two independently replayed calibration decisions and common-validation receipts, reject floor, cap, equal-iteration, wrong-owner, and both-over-standard violations, and retain identical semantic work for every timed and memory pair. `GOAL.md`, the performance qualification plan, and benchmark operations documentation now state this bounded exception explicitly.
+
 ## 2026-07-16 - PQ2: Completion-Command Receipt Boundary
 
 Status: Resolved

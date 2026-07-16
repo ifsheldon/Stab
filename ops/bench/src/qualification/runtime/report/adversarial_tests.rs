@@ -1,5 +1,8 @@
 use super::super::protocol::{GitCommit, PROTOCOL_SCHEMA_VERSION, Sha256Digest, WorkerMeasurement};
-use super::super::run::{CalibrationProbeEvidence, ImplementationCalibration, MemoryEvidence};
+use super::super::run::{
+    CalibrationEvidence, CalibrationProbeEvidence, CommonBatchMode, ImplementationCalibration,
+    MemoryEvidence,
+};
 use super::super::statistics::StatisticsSummary;
 use super::*;
 
@@ -220,6 +223,58 @@ fn calibration_evidence_must_replay_the_controller_decision() {
             Err(ReportError::Calibration)
         ));
     }
+}
+
+#[test]
+fn report_rederives_the_common_batch_mode() {
+    let common_validation = PairExecution {
+        pair_index: 0,
+        order: PairOrder::StimThenStab,
+        stim: invocation(Implementation::Stim, EvidenceMode::Timing, 350, 0.35),
+        stab: invocation(Implementation::Stab, EvidenceMode::Timing, 350, 0.35),
+    };
+    let mut evidence = CalibrationEvidence {
+        acceptance_minimum_seconds: 0.25,
+        target_minimum_seconds: 0.35,
+        maximum_seconds: 2.0,
+        wide_ratio_maximum_seconds: 10.0,
+        common_batch_mode: CommonBatchMode::Standard,
+        stim: calibration(Implementation::Stim),
+        stab: calibration(Implementation::Stab),
+        common_iterations: 350,
+        common_validation,
+    };
+    validate_common_batch_mode(&evidence).expect("standard mode is reconstructed");
+
+    evidence.common_batch_mode = CommonBatchMode::WideRatio;
+    assert!(matches!(
+        validate_common_batch_mode(&evidence),
+        Err(ReportError::Calibration)
+    ));
+
+    evidence.common_batch_mode = CommonBatchMode::Standard;
+    evidence
+        .common_validation
+        .stim
+        .rows
+        .first_mut()
+        .expect("Stim row")
+        .elapsed_seconds = 3.0;
+    assert!(matches!(
+        validate_common_batch_mode(&evidence),
+        Err(ReportError::Calibration)
+    ));
+
+    evidence.common_batch_mode = CommonBatchMode::WideRatio;
+    evidence.stim.selected_iterations = 100;
+    evidence
+        .common_validation
+        .stim
+        .rows
+        .first_mut()
+        .expect("Stim row")
+        .elapsed_seconds = 5.0;
+    validate_common_batch_mode(&evidence).expect("wide-ratio mode is reconstructed");
 }
 
 #[test]

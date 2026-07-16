@@ -219,6 +219,7 @@ pub(super) enum EvidenceState {
 pub(super) struct TimingPolicy {
     pub(super) calibration_min_ms: u32,
     pub(super) calibration_max_ms: u32,
+    pub(super) common_wide_ratio_max_ms: u32,
     pub(super) warmup_batches: u8,
     pub(super) full_pairs: u8,
     pub(super) timeout_seconds: u32,

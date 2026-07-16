@@ -46,9 +46,10 @@ pub(super) fn render(
     let frequency_governor = code(&format!("{:?}", report.host.frequency_governor_before));
     let rust_toolchain = code(&report.toolchain.rust_toolchain);
     let target_triple = code(&report.toolchain.target_triple);
+    let common_batch_mode = code(report.calibration.common_batch_mode.as_str());
     let report_sha256 = code(report_sha256);
     Ok(format!(
-        "# Performance Qualification Report\n\n- Group: {}\n- Scale: {} (`{}` work items per iteration)\n- Group contract SHA-256: {}\n- Claim class: `{:?}`\n- Baseline eligibility: `{:?}`\n- Owner: {}\n- Profiler note: {}\n- Input bytes: `{}`\n- Input digest: {}\n- Tier: `{:?}`\n- Stim: {} ({})\n- Stab commit: {}\n- Worker contract preflight: {}\n- Worker contract probes: `{}`\n- Local modifications: `{}`\n- Host profile: {}\n- Host verified: `{}`\n- CPU: `{}` on {}\n- Frequency governor: {}\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: {}\n- Target: {}\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median Stab/Stim ratio: `{}`\n- Upper bootstrap bound: `{}`\n- 1.25 outcome: `{}`\n- Stim setup RSS: `{}` bytes\n- Stim peak RSS: `{}` bytes\n- Stim measured RSS delta: `{}` bytes\n- Stim parent-observed peak RSS: `{}`\n- Stab setup RSS: `{}` bytes\n- Stab peak RSS: `{}` bytes\n- Stab measured RSS delta: `{}` bytes\n- Stab parent-observed peak RSS: `{}`\n- Promotable product claim: `{}`\n- Report SHA-256: {}\n",
+        "# Performance Qualification Report\n\n- Group: {}\n- Scale: {} (`{}` work items per iteration)\n- Group contract SHA-256: {}\n- Claim class: `{:?}`\n- Baseline eligibility: `{:?}`\n- Owner: {}\n- Profiler note: {}\n- Input bytes: `{}`\n- Input digest: {}\n- Tier: `{:?}`\n- Stim: {} ({})\n- Stab commit: {}\n- Worker contract preflight: {}\n- Worker contract probes: `{}`\n- Local modifications: `{}`\n- Host profile: {}\n- Host verified: `{}`\n- CPU: `{}` on {}\n- Frequency governor: {}\n- Maximum thermal reading before: `{}` millidegrees Celsius\n- Maximum thermal reading after: `{}` millidegrees Celsius\n- Rust toolchain: {}\n- Target: {}\n- Calibration target: `{:.3}` seconds\n- Calibration acceptance floor: `{:.3}` seconds\n- Independent calibration ceiling: `{:.3}` seconds\n- Wide-ratio common ceiling: `{:.3}` seconds\n- Common batch mode: {}\n- Timing attempts retained: `{}`\n- Authoritative timing attempt: `{}`\n- Warmups in authoritative attempt: `{}`\n- Paired samples in authoritative attempt: `{}`\n- Median Stab/Stim ratio: `{}`\n- Upper bootstrap bound: `{}`\n- 1.25 outcome: `{}`\n- Stim setup RSS: `{}` bytes\n- Stim peak RSS: `{}` bytes\n- Stim measured RSS delta: `{}` bytes\n- Stim parent-observed peak RSS: `{}`\n- Stab setup RSS: `{}` bytes\n- Stab peak RSS: `{}` bytes\n- Stab measured RSS delta: `{}` bytes\n- Stab parent-observed peak RSS: `{}`\n- Promotable product claim: `{}`\n- Report SHA-256: {}\n",
         group_id,
         scale_id,
         report.command.work_items,
@@ -77,6 +78,9 @@ pub(super) fn render(
         target_triple,
         report.calibration.target_minimum_seconds,
         report.calibration.acceptance_minimum_seconds,
+        report.calibration.maximum_seconds,
+        report.calibration.wide_ratio_maximum_seconds,
+        common_batch_mode,
         report.timing_attempts.len(),
         authoritative.attempt_index,
         authoritative.warmups.len(),
