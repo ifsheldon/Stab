@@ -1,6 +1,6 @@
 # PQ2 SIMD-Bits XOR Qualification Progress Report
 
-> Historical-inventory note, 2026-07-16: this report remains valid passing AArch64 evidence at performance inventory `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`. The source-current inventory is now `c2362b6fda35626e5f571399512067ab406f92a22692c162ae70002ef7a651f8` after exact replacement mapping, `not_zero` graduation, the `not_zero` anti-elision contract correction, and the bounded wide-ratio common-batch policy. The measured dense-XOR implementation and outcome below are not relabeled as current-inventory evidence.
+> Historical-inventory note, 2026-07-16: this report remains valid passing AArch64 evidence at performance inventory `fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716`. The source-current inventory is now `0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0` after exact replacement mapping, `not_zero` graduation, the anti-elision contract correction, the bounded wide-ratio common-batch policy, and evidence-authorized retirement of the duplicate legacy `not_zero` threshold pair. The measured dense-XOR implementation and outcome below are not relabeled as current-inventory evidence.
 
 ## Status
 

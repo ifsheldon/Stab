@@ -165,12 +165,10 @@ fn reworked_heterogeneous_row_can_point_to_an_exact_replacement_group() {
             .runtime_measurement_id,
         "xor-complete-vector"
     );
-    assert_eq!(row.replacement_contracts.len(), 2);
-    assert!(row.replacement_contracts.iter().any(|replacement| {
-        replacement.legacy_stim_name == "simd_bits_not_zero_100K"
-            && replacement.legacy_stab_name == "stab_simd_bits_not_zero_10K"
-            && replacement.runtime_group_id == "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY"
-            && replacement.runtime_measurement_id == "not-zero"
+    assert_eq!(row.replacement_contracts.len(), 1);
+    assert!(row.replacement_contracts.iter().all(|replacement| {
+        replacement.legacy_stim_name != "simd_bits_not_zero_100K"
+            && replacement.legacy_stab_name != "stab_simd_bits_not_zero_10K"
     }));
 
     validate(&suite, &manifest, &references, "UNFROZEN")

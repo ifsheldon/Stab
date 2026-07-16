@@ -486,20 +486,12 @@ pub(super) fn generate(
 
 fn replacement_contracts(row: &BenchmarkRow) -> Vec<ReplacementContract> {
     match row.id.as_str() {
-        "m5-simd-bits" => vec![
-            ReplacementContract {
-                legacy_stim_name: "simd_bits_xor_10K".to_string(),
-                legacy_stab_name: "stab_simd_bits_xor_10K".to_string(),
-                runtime_group_id: "PERFQ-M5-SIMD-BITS".to_string(),
-                runtime_measurement_id: "xor-complete-vector".to_string(),
-            },
-            ReplacementContract {
-                legacy_stim_name: "simd_bits_not_zero_100K".to_string(),
-                legacy_stab_name: "stab_simd_bits_not_zero_10K".to_string(),
-                runtime_group_id: "PERFQ-M5-SIMD-BITS-NOT-ZERO-EARLY".to_string(),
-                runtime_measurement_id: "not-zero".to_string(),
-            },
-        ],
+        "m5-simd-bits" => vec![ReplacementContract {
+            legacy_stim_name: "simd_bits_xor_10K".to_string(),
+            legacy_stab_name: "stab_simd_bits_xor_10K".to_string(),
+            runtime_group_id: "PERFQ-M5-SIMD-BITS".to_string(),
+            runtime_measurement_id: "xor-complete-vector".to_string(),
+        }],
         _ => Vec::new(),
     }
 }

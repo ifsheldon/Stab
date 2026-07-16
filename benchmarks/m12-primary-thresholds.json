@@ -51,11 +51,6 @@
           "stim_name": "simd_bits_xor_10K",
           "stab_name": "stab_simd_bits_xor_10K",
           "max_relative_ratio": 1.25
-        },
-        {
-          "stim_name": "simd_bits_not_zero_100K",
-          "stab_name": "stab_simd_bits_not_zero_10K",
-          "max_relative_ratio": 1.25
         }
       ]
     },
