@@ -24,6 +24,7 @@
 #include "stim/gates/gates.h"
 #include "stim/mem/simd_bits.h"
 
+#include "simd_bits_xor_contract.h"
 #include "simd_word_popcount_contract.h"
 
 #ifndef STAB_STIM_COMMIT
@@ -106,8 +107,10 @@ Arguments parse_arguments(int argc, const char **argv) {
         result.workload == "gate-name-hash" && result.measurement_id == "hash-all-names";
     const bool simd_word_popcount =
         result.workload == "simd-word-popcount" && result.measurement_id == "toggle-popcount";
+    const bool simd_bits_xor =
+        result.workload == "simd-bits-xor" && result.measurement_id == "xor-complete-vector";
     if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !gate_name_hash &&
-        !simd_word_popcount) {
+        !simd_word_popcount && !simd_bits_xor) {
         throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
@@ -308,6 +311,9 @@ constexpr uint64_t POPCOUNT_ALIGNMENT_BITS = 256;
 constexpr uint64_t POPCOUNT_MIN_BITS = 512;
 constexpr uint64_t POPCOUNT_MAX_BITS = 268435456;
 constexpr size_t POPCOUNT_TOGGLE_BIT = 300;
+constexpr uint64_t DENSE_XOR_ALIGNMENT_BITS = 256;
+constexpr uint64_t DENSE_XOR_MIN_BITS = 256;
+constexpr uint64_t DENSE_XOR_MAX_BITS = 268435456;
 
 uint64_t splitmix64_word(uint64_t index) {
     uint64_t value = index + 0x9e3779b97f4a7c15ULL;
@@ -326,6 +332,20 @@ void mix_digest_byte(std::array<uint64_t, 4> &state, uint64_t index, uint8_t byt
     }
 }
 
+void mix_digest_words(
+    std::array<uint64_t, 4> &state,
+    uint64_t &byte_index,
+    const uint64_t *words,
+    size_t word_count) {
+    for (size_t word_index = 0; word_index < word_count; ++word_index) {
+        const uint64_t word = words[word_index];
+        for (uint32_t word_byte = 0; word_byte < 8; ++word_byte) {
+            mix_digest_byte(state, byte_index, static_cast<uint8_t>(word >> (word_byte * 8)));
+            ++byte_index;
+        }
+    }
+}
+
 std::array<uint64_t, 4> byte_digest_words(const uint64_t *words, size_t word_count) {
     std::array<uint64_t, 4> state{
         0x6a09e667f3bcc908ULL,
@@ -333,14 +353,24 @@ std::array<uint64_t, 4> byte_digest_words(const uint64_t *words, size_t word_cou
         0x3c6ef372fe94f82bULL,
         0xa54ff53a5f1d36f1ULL,
     };
-    uint64_t index = 0;
-    for (size_t word_index = 0; word_index < word_count; ++word_index) {
-        const uint64_t word = words[word_index];
-        for (uint32_t byte_index = 0; byte_index < 8; ++byte_index) {
-            mix_digest_byte(state, index, static_cast<uint8_t>(word >> (byte_index * 8)));
-            ++index;
-        }
-    }
+    uint64_t byte_index = 0;
+    mix_digest_words(state, byte_index, words, word_count);
+    return state;
+}
+
+std::array<uint64_t, 4> byte_digest_word_pair(
+    const uint64_t *first,
+    const uint64_t *second,
+    size_t word_count) {
+    std::array<uint64_t, 4> state{
+        0x6a09e667f3bcc908ULL,
+        0xbb67ae8584caa73bULL,
+        0x3c6ef372fe94f82bULL,
+        0xa54ff53a5f1d36f1ULL,
+    };
+    uint64_t byte_index = 0;
+    mix_digest_words(state, byte_index, first, word_count);
+    mix_digest_words(state, byte_index, second, word_count);
     return state;
 }
 
@@ -397,6 +427,74 @@ std::array<uint64_t, 4> popcount_output_digest(
     return byte_digest_words(fields.data(), fields.size());
 }
 
+struct DenseXorFixture {
+    stim::simd_bits<stim::MAX_BITWORD_WIDTH> destination;
+    stim::simd_bits<stim::MAX_BITWORD_WIDTH> source;
+    uint64_t input_bytes;
+    std::array<uint64_t, 4> input_digest;
+};
+
+DenseXorFixture dense_xor_fixture(uint64_t bit_count) {
+    if (bit_count < DENSE_XOR_MIN_BITS) {
+        throw std::invalid_argument("simd-bits-xor bit width is below the source-owned minimum");
+    }
+    if (bit_count > DENSE_XOR_MAX_BITS) {
+        throw std::invalid_argument("simd-bits-xor bit width exceeds the source-owned limit");
+    }
+    if (bit_count % DENSE_XOR_ALIGNMENT_BITS != 0) {
+        throw std::invalid_argument("simd-bits-xor bit width is not a multiple of 256");
+    }
+    if (bit_count > std::numeric_limits<size_t>::max()) {
+        throw std::overflow_error("simd-bits-xor bit width exceeds size_t");
+    }
+    const uint64_t word_count = bit_count / 64;
+    if (word_count > std::numeric_limits<size_t>::max()) {
+        throw std::overflow_error("simd-bits-xor word count exceeds size_t");
+    }
+    stim::simd_bits<stim::MAX_BITWORD_WIDTH> destination(static_cast<size_t>(bit_count));
+    stim::simd_bits<stim::MAX_BITWORD_WIDTH> source(static_cast<size_t>(bit_count));
+    if (destination.num_u64_padded() != word_count || source.num_u64_padded() != word_count) {
+        throw std::runtime_error("simd-bits-xor padded width differs from the fixture");
+    }
+    for (uint64_t index = 0; index < word_count; ++index) {
+        if (index > (std::numeric_limits<uint64_t>::max() - 1) / 2) {
+            throw std::overflow_error("simd-bits-xor fixture index overflows u64");
+        }
+        destination.u64[index] = splitmix64_word(index * 2);
+        source.u64[index] = splitmix64_word(index * 2 + 1);
+    }
+    const auto input_digest = byte_digest_word_pair(
+        destination.u64, source.u64, static_cast<size_t>(word_count));
+    return DenseXorFixture{
+        std::move(destination), std::move(source), word_count * 16, input_digest};
+}
+
+std::array<uint64_t, 4> dense_xor_output_digest(
+    const DenseXorFixture &fixture,
+    uint64_t iterations,
+    uint64_t work_items) {
+    const auto destination_digest =
+        byte_digest_words(fixture.destination.u64, fixture.destination.num_u64_padded());
+    const auto source_digest = byte_digest_words(fixture.source.u64, fixture.source.num_u64_padded());
+    const std::array<uint64_t, 14> fields{
+        iterations,
+        work_items,
+        fixture.input_digest[0],
+        fixture.input_digest[1],
+        fixture.input_digest[2],
+        fixture.input_digest[3],
+        destination_digest[0],
+        destination_digest[1],
+        destination_digest[2],
+        destination_digest[3],
+        source_digest[0],
+        source_digest[1],
+        source_digest[2],
+        source_digest[3],
+    };
+    return byte_digest_words(fields.data(), fields.size());
+}
+
 template <typename CALLBACK>
 double measure_workload(CALLBACK callback) {
     const auto started = std::chrono::steady_clock::now();
@@ -444,11 +542,20 @@ int main(int argc, const char **argv) {
         if (arguments.workload == "simd-word-popcount") {
             popcount.emplace(popcount_fixture(arguments.work_items));
         }
+        std::optional<DenseXorFixture> dense_xor;
+        if (arguments.workload == "simd-bits-xor") {
+            dense_xor.emplace(dense_xor_fixture(arguments.work_items));
+        }
         const uint64_t input_bytes = popcount.has_value()
                                          ? popcount->input_bytes
+                                     : dense_xor.has_value()
+                                         ? dense_xor->input_bytes
                                          : static_cast<uint64_t>(circuit_fixture.size());
-        const auto input_digest =
-            popcount.has_value() ? popcount->input_digest : byte_digest(circuit_fixture);
+        const auto input_digest = popcount.has_value()
+                                      ? popcount->input_digest
+                                  : dense_xor.has_value()
+                                      ? dense_xor->input_digest
+                                      : byte_digest(circuit_fixture);
 
         if (arguments.start_barrier) {
             wait_for_start_barrier();
@@ -493,6 +600,12 @@ int main(int argc, const char **argv) {
                 popcount_checksum = stab_qualification::simd_word_popcount_contract(
                     arguments.iterations, prepared_popcount.bits);
             });
+        } else if (arguments.workload == "simd-bits-xor") {
+            auto &prepared_xor = dense_xor.value();
+            elapsed_seconds = measure_workload([&]() {
+                stab_qualification::simd_bits_xor_contract(
+                    arguments.iterations, prepared_xor.destination, prepared_xor.source);
+            });
         } else {
             throw std::invalid_argument("unreachable registered adapter workload");
         }
@@ -508,6 +621,9 @@ int main(int argc, const char **argv) {
                 arguments.work_items,
                 popcount->input_digest,
                 final_bit);
+        } else if (arguments.workload == "simd-bits-xor") {
+            digest_state = dense_xor_output_digest(
+                dense_xor.value(), arguments.iterations, arguments.work_items);
         }
         if (!(elapsed_seconds > 0)) {
             throw std::runtime_error("adapter measured a non-positive duration");

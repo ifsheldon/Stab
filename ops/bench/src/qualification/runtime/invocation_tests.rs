@@ -37,7 +37,7 @@ fn canonical_worker_contract_preflight_binds_actual_receipts() {
     let probes = expected_contract_preflight_probes().expect("source-owned probes");
     let evidence = WorkerContractPreflightEvidence::from_actual_probes(contract_identity(), probes)
         .expect("valid contract evidence");
-    assert_eq!(evidence.probe_count(), 18);
+    assert_eq!(evidence.probe_count(), 30);
     assert!(evidence.validates_source_contract());
     let encoded = serde_json::to_vec(&evidence).expect("serialize preflight evidence");
     assert!(
@@ -336,6 +336,71 @@ fn invalid_popcount_width_rejections_must_precede_the_start_barrier() {
             Implementation::Stim,
         ),
         Err(InvocationError::PopcountMinimumRejection { .. })
+    ));
+}
+
+#[test]
+fn invalid_dense_xor_width_rejections_must_precede_the_start_barrier() {
+    let output = |status, stdout: &str, stderr: &str| ProcessResult {
+        status,
+        stdout: stdout.as_bytes().to_vec(),
+        stderr: stderr.as_bytes().to_vec(),
+        parent_observed_peak_rss_bytes: None,
+        wall_elapsed: Duration::from_millis(1),
+    };
+    for implementation in [Implementation::Stim, Implementation::Stab] {
+        let (status, stderr) = dense_xor_cap_rejection_expectation(implementation);
+        checked_dense_xor_cap_rejection(&output(Some(status), "", stderr), implementation)
+            .expect("dense XOR cap rejection");
+        let (status, stderr) = dense_xor_alignment_rejection_expectation(implementation);
+        checked_dense_xor_alignment_rejection(&output(Some(status), "", stderr), implementation)
+            .expect("dense XOR alignment rejection");
+        let (status, stderr) = dense_xor_minimum_rejection_expectation(implementation);
+        checked_dense_xor_minimum_rejection(&output(Some(status), "", stderr), implementation)
+            .expect("dense XOR minimum rejection");
+    }
+
+    assert!(matches!(
+        checked_dense_xor_cap_rejection(
+            &output(
+                Some(2),
+                "",
+                "stim qualification adapter: start barrier must contain exactly one newline\n",
+            ),
+            Implementation::Stim,
+        ),
+        Err(InvocationError::DenseXorWidthRejection {
+            class: "over-cap",
+            ..
+        })
+    ));
+    assert!(matches!(
+        checked_dense_xor_alignment_rejection(
+            &output(
+                Some(0),
+                "",
+                "stim qualification adapter: simd-bits-xor bit width is not a multiple of 256\n",
+            ),
+            Implementation::Stim,
+        ),
+        Err(InvocationError::DenseXorWidthRejection {
+            class: "unaligned",
+            ..
+        })
+    ));
+    assert!(matches!(
+        checked_dense_xor_minimum_rejection(
+            &output(
+                Some(2),
+                "unexpected output\n",
+                "stim qualification adapter: simd-bits-xor bit width is below the source-owned minimum\n",
+            ),
+            Implementation::Stim,
+        ),
+        Err(InvocationError::DenseXorWidthRejection {
+            class: "below-minimum",
+            ..
+        })
     ));
 }
 

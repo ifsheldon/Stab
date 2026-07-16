@@ -20,8 +20,25 @@ use super::protocol::{
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
+mod bit_acceptance;
+mod dense_xor;
 mod preflight;
 
+use bit_acceptance::BitAcceptanceContract;
+use dense_xor::{
+    DENSE_XOR_ALIGNMENT_CASE_ID, DENSE_XOR_CAP_CASE_ID, DENSE_XOR_EVEN_CASE_ID,
+    DENSE_XOR_MAXIMUM_CASE_ID, DENSE_XOR_MINIMUM_CASE_ID, DENSE_XOR_ODD_CASE_ID,
+    EVEN_DENSE_XOR_ITERATIONS, EVEN_DENSE_XOR_OUTPUT_DIGEST, MAX_DENSE_XOR_INPUT_DIGEST,
+    MAX_DENSE_XOR_OUTPUT_DIGEST, MAX_SUPPORTED_DENSE_XOR_BITS, ODD_DENSE_XOR_ITERATIONS,
+    ODD_DENSE_XOR_OUTPUT_DIGEST, SMALL_DENSE_XOR_BITS, SMALL_DENSE_XOR_INPUT_DIGEST,
+    dense_xor_alignment_rejection_expectation, dense_xor_cap_rejection_expectation,
+    dense_xor_minimum_rejection_expectation,
+};
+#[cfg(test)]
+use dense_xor::{
+    checked_dense_xor_alignment_rejection, checked_dense_xor_cap_rejection,
+    checked_dense_xor_minimum_rejection,
+};
 pub(crate) use preflight::{WorkerContractIdentityEvidence, WorkerContractPreflightEvidence};
 use preflight::{WorkerContractProbeEvidence, accepted_probe, rejected_probe};
 #[cfg(test)]
@@ -49,7 +66,7 @@ const MAX_POPCOUNT_INPUT_DIGEST: &str =
     "cf5061f39d456d884fbdbcebfc53e04c47c29c872830a6a424f55d2e1e3d8ab4";
 const MAX_POPCOUNT_OUTPUT_DIGEST: &str =
     "72b158a2870c2bca123553e5aca970f39107a3c7448bdbdda1512a9bcdfa33aa";
-const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 3;
+const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 4;
 const PROTOCOL_SMOKE_CASE_ID: &str = "protocol-smoke";
 const POPCOUNT_ODD_CASE_ID: &str = "simd-word-popcount-odd";
 const POPCOUNT_EVEN_CASE_ID: &str = "simd-word-popcount-even";
@@ -64,6 +81,7 @@ pub(super) const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 pub(super) const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
 pub(super) const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
 pub(super) const SIMD_WORD_POPCOUNT_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
+pub(super) const SIMD_BITS_XOR_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
 
 pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
     let identity = (
@@ -90,11 +108,14 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
                 || (group == SIMD_WORD_POPCOUNT_GROUP_ID
                     && workload == "simd-word-popcount"
                     && measurement == "toggle-popcount")
+                || (group == SIMD_BITS_XOR_GROUP_ID
+                    && workload == "simd-bits-xor"
+                    && measurement == "xor-complete-vector")
     )
 }
 
 pub(super) const fn registered_group_count() -> usize {
-    5
+    6
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -355,7 +376,7 @@ impl PreparedWorkers {
     fn verify_identity_handshake(
         &self,
     ) -> Result<WorkerContractPreflightEvidence, InvocationError> {
-        let mut probes = Vec::with_capacity(18);
+        let mut probes = Vec::with_capacity(30);
         let protocol_output = SemanticDigest::try_new(protocol_smoke_output_digest())?;
         probes.push(self.invoke_identity_probe(Implementation::Stim, &protocol_output)?);
         probes.push(self.invoke_identity_probe(Implementation::Stab, &protocol_output)?);
@@ -365,29 +386,90 @@ impl PreparedWorkers {
         let maximum_input = InputDigest::try_new(MAX_POPCOUNT_INPUT_DIGEST)?;
         let maximum_output = SemanticDigest::try_new(MAX_POPCOUNT_OUTPUT_DIGEST)?;
         for implementation in [Implementation::Stim, Implementation::Stab] {
-            probes.push(self.invoke_popcount_acceptance(
-                POPCOUNT_ODD_CASE_ID,
+            probes.push(self.invoke_bit_acceptance(
                 implementation,
-                ODD_POPCOUNT_ITERATIONS,
-                SMALL_POPCOUNT_BITS,
-                &small_input,
-                &odd_output,
+                BitAcceptanceContract {
+                    case_id: POPCOUNT_ODD_CASE_ID,
+                    workload: "simd-word-popcount",
+                    measurement: "toggle-popcount",
+                    iterations: ODD_POPCOUNT_ITERATIONS,
+                    work_items: SMALL_POPCOUNT_BITS,
+                    input_bytes: SMALL_POPCOUNT_BITS / 8,
+                    expected_input_digest: &small_input,
+                    expected_output_digest: &odd_output,
+                },
             )?);
-            probes.push(self.invoke_popcount_acceptance(
-                POPCOUNT_EVEN_CASE_ID,
+            probes.push(self.invoke_bit_acceptance(
                 implementation,
-                EVEN_POPCOUNT_ITERATIONS,
-                SMALL_POPCOUNT_BITS,
-                &small_input,
-                &even_output,
+                BitAcceptanceContract {
+                    case_id: POPCOUNT_EVEN_CASE_ID,
+                    workload: "simd-word-popcount",
+                    measurement: "toggle-popcount",
+                    iterations: EVEN_POPCOUNT_ITERATIONS,
+                    work_items: SMALL_POPCOUNT_BITS,
+                    input_bytes: SMALL_POPCOUNT_BITS / 8,
+                    expected_input_digest: &small_input,
+                    expected_output_digest: &even_output,
+                },
             )?);
-            probes.push(self.invoke_popcount_acceptance(
-                POPCOUNT_MAXIMUM_CASE_ID,
+            probes.push(self.invoke_bit_acceptance(
                 implementation,
-                1,
-                MAX_SUPPORTED_POPCOUNT_BITS,
-                &maximum_input,
-                &maximum_output,
+                BitAcceptanceContract {
+                    case_id: POPCOUNT_MAXIMUM_CASE_ID,
+                    workload: "simd-word-popcount",
+                    measurement: "toggle-popcount",
+                    iterations: 1,
+                    work_items: MAX_SUPPORTED_POPCOUNT_BITS,
+                    input_bytes: MAX_SUPPORTED_POPCOUNT_BITS / 8,
+                    expected_input_digest: &maximum_input,
+                    expected_output_digest: &maximum_output,
+                },
+            )?);
+        }
+        let dense_xor_input = InputDigest::try_new(SMALL_DENSE_XOR_INPUT_DIGEST)?;
+        let dense_xor_odd_output = SemanticDigest::try_new(ODD_DENSE_XOR_OUTPUT_DIGEST)?;
+        let dense_xor_even_output = SemanticDigest::try_new(EVEN_DENSE_XOR_OUTPUT_DIGEST)?;
+        let dense_xor_maximum_input = InputDigest::try_new(MAX_DENSE_XOR_INPUT_DIGEST)?;
+        let dense_xor_maximum_output = SemanticDigest::try_new(MAX_DENSE_XOR_OUTPUT_DIGEST)?;
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_bit_acceptance(
+                implementation,
+                BitAcceptanceContract {
+                    case_id: DENSE_XOR_ODD_CASE_ID,
+                    workload: "simd-bits-xor",
+                    measurement: "xor-complete-vector",
+                    iterations: ODD_DENSE_XOR_ITERATIONS,
+                    work_items: SMALL_DENSE_XOR_BITS,
+                    input_bytes: SMALL_DENSE_XOR_BITS / 4,
+                    expected_input_digest: &dense_xor_input,
+                    expected_output_digest: &dense_xor_odd_output,
+                },
+            )?);
+            probes.push(self.invoke_bit_acceptance(
+                implementation,
+                BitAcceptanceContract {
+                    case_id: DENSE_XOR_EVEN_CASE_ID,
+                    workload: "simd-bits-xor",
+                    measurement: "xor-complete-vector",
+                    iterations: EVEN_DENSE_XOR_ITERATIONS,
+                    work_items: SMALL_DENSE_XOR_BITS,
+                    input_bytes: SMALL_DENSE_XOR_BITS / 4,
+                    expected_input_digest: &dense_xor_input,
+                    expected_output_digest: &dense_xor_even_output,
+                },
+            )?);
+            probes.push(self.invoke_bit_acceptance(
+                implementation,
+                BitAcceptanceContract {
+                    case_id: DENSE_XOR_MAXIMUM_CASE_ID,
+                    workload: "simd-bits-xor",
+                    measurement: "xor-complete-vector",
+                    iterations: 1,
+                    work_items: MAX_SUPPORTED_DENSE_XOR_BITS,
+                    input_bytes: MAX_SUPPORTED_DENSE_XOR_BITS / 4,
+                    expected_input_digest: &dense_xor_maximum_input,
+                    expected_output_digest: &dense_xor_maximum_output,
+                },
             )?);
         }
         for implementation in [Implementation::Stim, Implementation::Stab] {
@@ -404,6 +486,15 @@ impl PreparedWorkers {
         }
         for implementation in [Implementation::Stim, Implementation::Stab] {
             probes.push(self.invoke_popcount_minimum_rejection(implementation)?);
+        }
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_dense_xor_cap_rejection(implementation)?);
+        }
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_dense_xor_alignment_rejection(implementation)?);
+        }
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            probes.push(self.invoke_dense_xor_minimum_rejection(implementation)?);
         }
         WorkerContractPreflightEvidence::from_actual_probes(
             self.contract_identity_evidence()?,
@@ -485,83 +576,6 @@ impl PreparedWorkers {
             .next()
             .ok_or(InvocationError::MissingMeasurement)?;
         accepted_probe(PROTOCOL_SMOKE_CASE_ID, &row)
-    }
-
-    fn invoke_popcount_acceptance(
-        &self,
-        case_id: &'static str,
-        implementation: Implementation,
-        iterations: u64,
-        work_items: u64,
-        expected_input_digest: &InputDigest,
-        expected_output_digest: &SemanticDigest,
-    ) -> Result<WorkerContractProbeEvidence, InvocationError> {
-        let mut arguments = vec![
-            OsString::from("--workload"),
-            OsString::from("simd-word-popcount"),
-            OsString::from("--measurement-id"),
-            OsString::from("toggle-popcount"),
-            OsString::from("--iterations"),
-            OsString::from(iterations.to_string()),
-            OsString::from("--work-items"),
-            OsString::from(work_items.to_string()),
-            OsString::from("--evidence-mode"),
-            OsString::from("timing"),
-            OsString::from("--start-barrier"),
-            OsString::from("true"),
-        ];
-        let (program, source_digest, build_fingerprint) = match implementation {
-            Implementation::Stim => (
-                self.adapter.path.clone(),
-                self.adapter.source_digest.clone(),
-                self.adapter.build_fingerprint.clone(),
-            ),
-            Implementation::Stab => {
-                arguments.insert(0, OsString::from("qualification-worker"));
-                (
-                    self.worker.program(),
-                    self.worker.identity().source_digest.clone(),
-                    self.worker.identity().build_fingerprint.clone(),
-                )
-            }
-        };
-        let process = run_bounded_process(&ProcessRequest {
-            program,
-            args: arguments,
-            stdin: vec![b'\n'],
-            working_directory: self.root.clone(),
-            environment: worker_environment(),
-            affinity_cpu: None,
-            limits: ProcessLimits {
-                stdin_bytes: 1,
-                stdout_bytes: PROTOCOL_OUTPUT_LIMIT,
-                stderr_bytes: 64 << 10,
-                regular_file_bytes: None,
-                timeout: IDENTITY_PROBE_TIMEOUT,
-            },
-        })?;
-        let process = checked_process(process, implementation)?;
-        let rows = parse_worker_json_lines(&process.stdout)?;
-        ProtocolExpectation {
-            implementation,
-            evidence_mode: EvidenceMode::Timing,
-            workload_id: ProtocolId::try_new("simd-word-popcount")?,
-            measurement_ids: BTreeSet::from([ProtocolId::try_new("toggle-popcount")?]),
-            iteration_count: iterations,
-            expected_work_count: iterations
-                .checked_mul(work_items)
-                .ok_or(InvocationError::WorkOverflow)?,
-            expected_input_bytes: work_items / 8,
-            expected_input_digest: expected_input_digest.clone(),
-            expected_output_digest: Some(expected_output_digest.clone()),
-            affinity_cpu: None,
-            stim_commit: GitCommit::try_new(STIM_COMMIT)?,
-            source_digest,
-            build_fingerprint,
-        }
-        .validate(&rows)?;
-        let row = rows.first().ok_or(InvocationError::MissingMeasurement)?;
-        accepted_probe(case_id, row)
     }
 
     fn invoke_cap_rejection(
@@ -656,8 +670,12 @@ impl PreparedWorkers {
         &self,
         implementation: Implementation,
     ) -> Result<WorkerContractProbeEvidence, InvocationError> {
-        let output =
-            self.invoke_invalid_popcount_width(implementation, FIRST_UNSUPPORTED_POPCOUNT_BITS)?;
+        let output = self.invoke_invalid_bit_width(
+            implementation,
+            "simd-word-popcount",
+            "toggle-popcount",
+            FIRST_UNSUPPORTED_POPCOUNT_BITS,
+        )?;
         checked_popcount_cap_rejection(&output, implementation)?;
         rejected_probe(POPCOUNT_CAP_CASE_ID, implementation, &output)
     }
@@ -666,8 +684,12 @@ impl PreparedWorkers {
         &self,
         implementation: Implementation,
     ) -> Result<WorkerContractProbeEvidence, InvocationError> {
-        let output =
-            self.invoke_invalid_popcount_width(implementation, FIRST_UNALIGNED_POPCOUNT_BITS)?;
+        let output = self.invoke_invalid_bit_width(
+            implementation,
+            "simd-word-popcount",
+            "toggle-popcount",
+            FIRST_UNALIGNED_POPCOUNT_BITS,
+        )?;
         checked_popcount_alignment_rejection(&output, implementation)?;
         rejected_probe(POPCOUNT_ALIGNMENT_CASE_ID, implementation, &output)
     }
@@ -676,22 +698,28 @@ impl PreparedWorkers {
         &self,
         implementation: Implementation,
     ) -> Result<WorkerContractProbeEvidence, InvocationError> {
-        let output =
-            self.invoke_invalid_popcount_width(implementation, FIRST_BELOW_MINIMUM_POPCOUNT_BITS)?;
+        let output = self.invoke_invalid_bit_width(
+            implementation,
+            "simd-word-popcount",
+            "toggle-popcount",
+            FIRST_BELOW_MINIMUM_POPCOUNT_BITS,
+        )?;
         checked_popcount_minimum_rejection(&output, implementation)?;
         rejected_probe(POPCOUNT_MINIMUM_CASE_ID, implementation, &output)
     }
 
-    fn invoke_invalid_popcount_width(
+    fn invoke_invalid_bit_width(
         &self,
         implementation: Implementation,
+        workload: &'static str,
+        measurement: &'static str,
         work_items: &'static str,
     ) -> Result<ProcessResult, InvocationError> {
         let mut arguments = vec![
             OsString::from("--workload"),
-            OsString::from("simd-word-popcount"),
+            OsString::from(workload),
             OsString::from("--measurement-id"),
-            OsString::from("toggle-popcount"),
+            OsString::from(measurement),
             OsString::from("--iterations"),
             OsString::from("1"),
             OsString::from("--work-items"),
@@ -1073,6 +1101,16 @@ pub(crate) enum InvocationError {
     )]
     PopcountMinimumRejection {
         implementation: Implementation,
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
+    #[error(
+        "{implementation} did not reject the {class} simd-bits-xor width before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
+    )]
+    DenseXorWidthRejection {
+        implementation: Implementation,
+        class: &'static str,
         status: Option<i32>,
         stdout: String,
         stderr: String,

@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "performance_inventory_sha256": "877df12bf1b3d63da92289e22f117097cedbc20860d165c90b41554aa110263b",
+  "performance_inventory_sha256": "fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -120,6 +120,51 @@
       "profiler_note": null
     },
     {
+      "id": "PERFQ-M5-SIMD-BITS",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "simd-bits-xor",
+      "measurement_ids": [
+        "xor-complete-vector"
+      ],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 4096,
+          "input_bytes": 1024,
+          "input_digest": "d7fbfcc618ad7e3fd8a616be64f8b41949214afbbca6b58514d40fa5ea7ac498"
+        },
+        {
+          "id": "medium",
+          "work_items": 262144,
+          "input_bytes": 65536,
+          "input_digest": "7f2b0610db451711e538c7bea04e7cdbead09cc41c088ebfeb3da0788d53ca46"
+        },
+        {
+          "id": "large",
+          "work_items": 16777216,
+          "input_bytes": 4194304,
+          "input_digest": "43fe5c79be45a459124be3bd00a45b65dbc886a6915fe19b3a173d37abc088ee"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-b1530dc4e48e942d",
+        "cq-evidence-qualification-ba252d42660a41ce"
+      ],
+      "owner": "stab-core/bits",
+      "profiler_note": null,
+      "comparator_sources": [
+        {
+          "path": "benchmarks/stim_adapter/main.cc",
+          "sha256": "4098eadd7aa23e20cf98c155827ff69133a0a116b989659a747bdee71d677f87"
+        },
+        {
+          "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
+          "sha256": "542f96a2a88bb6a074a0b63b99f7be9c3dca29a6bb633986979abd0c4e66e00d"
+        }
+      ]
+    },
+    {
       "id": "PERFQ-M5-SIMD-WORD",
       "claim_class": "promotable-performance",
       "baseline_eligibility": "threshold-eligible",
@@ -157,7 +202,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "8f7bed25d8af3116f705574d2de88745e214c6b1845d8c8d6bb86b72241eacc3"
+          "sha256": "4098eadd7aa23e20cf98c155827ff69133a0a116b989659a747bdee71d677f87"
         },
         {
           "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",

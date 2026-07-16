@@ -25,6 +25,9 @@ const POPCOUNT_ALIGNMENT_BITS: u64 = 256;
 const POPCOUNT_MIN_BITS: u64 = 512;
 const POPCOUNT_MAX_BITS: u64 = 268_435_456;
 const POPCOUNT_TOGGLE_BIT: usize = 300;
+const DENSE_XOR_ALIGNMENT_BITS: u64 = 256;
+const DENSE_XOR_MIN_BITS: u64 = 256;
+const DENSE_XOR_MAX_BITS: u64 = 268_435_456;
 const CIRCUIT_INSTRUCTION_CYCLE: [&str; 6] = [
     "H 0\n",
     "S 1\n",
@@ -47,6 +50,7 @@ pub(crate) enum WorkerWorkload {
     CircuitCanonicalPrint,
     GateNameHash,
     SimdWordPopcount,
+    SimdBitsXor,
 }
 
 impl WorkerWorkload {
@@ -57,6 +61,7 @@ impl WorkerWorkload {
             Self::CircuitCanonicalPrint => "circuit-canonical-print",
             Self::GateNameHash => "gate-name-hash",
             Self::SimdWordPopcount => "simd-word-popcount",
+            Self::SimdBitsXor => "simd-bits-xor",
         }
     }
 
@@ -67,6 +72,7 @@ impl WorkerWorkload {
             Self::CircuitCanonicalPrint => "serialize",
             Self::GateNameHash => "hash-all-names",
             Self::SimdWordPopcount => "toggle-popcount",
+            Self::SimdBitsXor => "xor-complete-vector",
         }
     }
 }
@@ -132,7 +138,8 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     let circuit_fixture = match args.workload {
         WorkerWorkload::ProtocolSmoke
         | WorkerWorkload::GateNameHash
-        | WorkerWorkload::SimdWordPopcount => None,
+        | WorkerWorkload::SimdWordPopcount
+        | WorkerWorkload::SimdBitsXor => None,
         WorkerWorkload::CircuitParse | WorkerWorkload::CircuitCanonicalPrint => {
             Some(circuit_parse_fixture(args.work_items.get())?)
         }
@@ -142,9 +149,20 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         WorkerWorkload::ProtocolSmoke
         | WorkerWorkload::CircuitParse
         | WorkerWorkload::CircuitCanonicalPrint
-        | WorkerWorkload::GateNameHash => None,
+        | WorkerWorkload::GateNameHash
+        | WorkerWorkload::SimdBitsXor => None,
+    };
+    let mut dense_xor_fixture = match args.workload {
+        WorkerWorkload::SimdBitsXor => Some(dense_xor_fixture(args.work_items.get())?),
+        WorkerWorkload::ProtocolSmoke
+        | WorkerWorkload::CircuitParse
+        | WorkerWorkload::CircuitCanonicalPrint
+        | WorkerWorkload::GateNameHash
+        | WorkerWorkload::SimdWordPopcount => None,
     };
     let (input_bytes, input_digest_state) = if let Some(fixture) = &popcount_fixture {
+        (fixture.input_bytes, fixture.input_digest)
+    } else if let Some(fixture) = &dense_xor_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else {
         let input = circuit_fixture.as_deref().unwrap_or_default().as_bytes();
@@ -173,21 +191,24 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         WorkerWorkload::ProtocolSmoke
         | WorkerWorkload::CircuitParse
         | WorkerWorkload::GateNameHash
-        | WorkerWorkload::SimdWordPopcount => None,
+        | WorkerWorkload::SimdWordPopcount
+        | WorkerWorkload::SimdBitsXor => None,
     };
     let gate_hash_names = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_names()?),
         WorkerWorkload::ProtocolSmoke
         | WorkerWorkload::CircuitParse
         | WorkerWorkload::CircuitCanonicalPrint
-        | WorkerWorkload::SimdWordPopcount => None,
+        | WorkerWorkload::SimdWordPopcount
+        | WorkerWorkload::SimdBitsXor => None,
     };
     let gate_hash_sweeps = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_sweeps(args.work_items.get())?),
         WorkerWorkload::ProtocolSmoke
         | WorkerWorkload::CircuitParse
         | WorkerWorkload::CircuitCanonicalPrint
-        | WorkerWorkload::SimdWordPopcount => None,
+        | WorkerWorkload::SimdWordPopcount
+        | WorkerWorkload::SimdBitsXor => None,
     };
     let gate_hash_table_digest = gate_hash_names
         .as_deref()
@@ -264,6 +285,15 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                     .map(TimedWorkloadOutput::PopcountChecksum)
             })?
         }
+        WorkerWorkload::SimdBitsXor => {
+            let fixture = dense_xor_fixture
+                .as_mut()
+                .ok_or(WorkerError::MissingDenseXorFixture)?;
+            measure_workload(|| {
+                dense_xor(args.iterations.get(), fixture)
+                    .map(|()| TimedWorkloadOutput::DenseXorComplete)
+            })?
+        }
     };
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
@@ -285,6 +315,16 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 args.work_items.get(),
                 fixture.input_digest,
                 final_bit,
+            ))
+        }
+        TimedWorkloadOutput::DenseXorComplete => {
+            let fixture = dense_xor_fixture
+                .as_ref()
+                .ok_or(WorkerError::MissingDenseXorFixture)?;
+            semantic_digest(dense_xor_output_digest(
+                fixture,
+                args.iterations.get(),
+                args.work_items.get(),
             ))
         }
     };
@@ -363,6 +403,7 @@ enum WorkloadOutput {
 enum TimedWorkloadOutput {
     Complete(WorkloadOutput),
     PopcountChecksum(u64),
+    DenseXorComplete,
 }
 
 impl WorkloadOutput {
@@ -590,12 +631,123 @@ fn popcount_output_digest(
     ])
 }
 
+#[derive(Clone)]
+struct DenseXorFixture {
+    destination: stab_core::BitVec,
+    source: stab_core::BitVec,
+    input_bytes: u64,
+    input_digest: [u64; 4],
+}
+
+fn dense_xor_fixture(bit_count: u64) -> Result<DenseXorFixture, WorkerError> {
+    let word_count = validate_dense_xor_width(bit_count)?;
+    let bit_count_usize =
+        usize::try_from(bit_count).map_err(|_| WorkerError::DenseXorWidthRange(bit_count))?;
+    let mut destination_words = Vec::new();
+    destination_words
+        .try_reserve_exact(word_count)
+        .map_err(WorkerError::DenseXorFixtureAllocation)?;
+    let mut source_words = Vec::new();
+    source_words
+        .try_reserve_exact(word_count)
+        .map_err(WorkerError::DenseXorFixtureAllocation)?;
+    for index in 0..word_count {
+        let index = u64::try_from(index).map_err(|_| WorkerError::DenseXorWordIndexRange)?;
+        let destination_index = index
+            .checked_mul(2)
+            .ok_or(WorkerError::DenseXorWordIndexRange)?;
+        let source_index = destination_index
+            .checked_add(1)
+            .ok_or(WorkerError::DenseXorWordIndexRange)?;
+        destination_words.push(splitmix64_word(destination_index));
+        source_words.push(splitmix64_word(source_index));
+    }
+    let input_bytes = u64::try_from(word_count)
+        .ok()
+        .and_then(|count| count.checked_mul(2 * (u64::BITS as u64 / 8)))
+        .ok_or(WorkerError::InputSizeRange)?;
+    let input_digest = byte_digest_word_pair(&destination_words, &source_words);
+    Ok(DenseXorFixture {
+        destination: stab_core::BitVec::from_words_truncated(bit_count_usize, destination_words),
+        source: stab_core::BitVec::from_words_truncated(bit_count_usize, source_words),
+        input_bytes,
+        input_digest,
+    })
+}
+
+fn validate_dense_xor_width(bit_count: u64) -> Result<usize, WorkerError> {
+    if bit_count < DENSE_XOR_MIN_BITS {
+        return Err(WorkerError::DenseXorWidthMinimum {
+            actual: bit_count,
+            minimum: DENSE_XOR_MIN_BITS,
+        });
+    }
+    if bit_count > DENSE_XOR_MAX_BITS {
+        return Err(WorkerError::DenseXorWidthLimit {
+            actual: bit_count,
+            maximum: DENSE_XOR_MAX_BITS,
+        });
+    }
+    if !bit_count.is_multiple_of(DENSE_XOR_ALIGNMENT_BITS) {
+        return Err(WorkerError::DenseXorWidthAlignment {
+            actual: bit_count,
+            alignment: DENSE_XOR_ALIGNMENT_BITS,
+        });
+    }
+    usize::try_from(bit_count / u64::BITS as u64)
+        .map_err(|_| WorkerError::DenseXorWidthRange(bit_count))
+}
+
+fn dense_xor(iterations: u64, fixture: &mut DenseXorFixture) -> Result<(), WorkerError> {
+    for _ in 0..iterations {
+        compiler_fence(Ordering::SeqCst);
+        fixture
+            .destination
+            .xor_assign(&fixture.source.as_bitslice())?;
+    }
+    Ok(())
+}
+
+fn dense_xor_output_digest(
+    fixture: &DenseXorFixture,
+    iterations: u64,
+    work_items: u64,
+) -> [u64; 4] {
+    let destination_digest = byte_digest_words(fixture.destination.words());
+    let source_digest = byte_digest_words(fixture.source.words());
+    byte_digest_words(&[
+        iterations,
+        work_items,
+        fixture.input_digest[0],
+        fixture.input_digest[1],
+        fixture.input_digest[2],
+        fixture.input_digest[3],
+        destination_digest[0],
+        destination_digest[1],
+        destination_digest[2],
+        destination_digest[3],
+        source_digest[0],
+        source_digest[1],
+        source_digest[2],
+        source_digest[3],
+    ])
+}
+
 fn byte_digest(bytes: &[u8]) -> [u64; 4] {
     byte_digest_iter(bytes.iter().copied())
 }
 
 fn byte_digest_words(words: &[u64]) -> [u64; 4] {
     byte_digest_iter(words.iter().flat_map(|word| word.to_le_bytes()))
+}
+
+fn byte_digest_word_pair(first: &[u64], second: &[u64]) -> [u64; 4] {
+    byte_digest_iter(
+        first
+            .iter()
+            .chain(second)
+            .flat_map(|word| word.to_le_bytes()),
+    )
 }
 
 fn byte_digest_iter(bytes: impl IntoIterator<Item = u8>) -> [u64; 4] {
@@ -773,6 +925,20 @@ pub(super) enum WorkerError {
     MissingPopcountFixture,
     #[error("simd-word-popcount result cannot be represented as u64")]
     PopcountResultRange,
+    #[error("simd-bits-xor width {actual} bits is below the minimum {minimum}")]
+    DenseXorWidthMinimum { actual: u64, minimum: u64 },
+    #[error("simd-bits-xor width {actual} bits exceeds the maximum {maximum}")]
+    DenseXorWidthLimit { actual: u64, maximum: u64 },
+    #[error("simd-bits-xor width {actual} bits is not a multiple of {alignment}")]
+    DenseXorWidthAlignment { actual: u64, alignment: u64 },
+    #[error("simd-bits-xor width {0} cannot be represented on this host")]
+    DenseXorWidthRange(u64),
+    #[error("simd-bits-xor word index cannot be represented as u64")]
+    DenseXorWordIndexRange,
+    #[error("simd-bits-xor fixture allocation failed: {0}")]
+    DenseXorFixtureAllocation(std::collections::TryReserveError),
+    #[error("simd-bits-xor workload was invoked without its prepared fixture")]
+    MissingDenseXorFixture,
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]
@@ -802,6 +968,9 @@ pub(super) enum WorkerError {
     #[error("failed to write qualification worker output: {0}")]
     Write(std::io::Error),
 }
+
+#[cfg(test)]
+mod dense_xor_tests;
 
 #[cfg(test)]
 mod tests {

@@ -1090,6 +1090,7 @@ fn validate_rows(
         if row
             .classifications
             .contains(&RowClassification::UnmatchedSubmeasurement)
+            && row.decision == RowDecision::Retained
             && groups
                 .get(row.primary_group_id.as_str())
                 .is_some_and(|group| group.threshold_policy != ThresholdPolicy::ReportOnly)

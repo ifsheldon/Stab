@@ -26,6 +26,11 @@ const SIMD_WORD_POPCOUNT_COMPARATOR_PATHS: [&str; 2] = [
     "benchmarks/stim_adapter/main.cc",
     "benchmarks/stim_adapter/simd_word_popcount_contract.h",
 ];
+const SIMD_BITS_XOR_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
+const SIMD_BITS_XOR_COMPARATOR_PATHS: [&str; 2] = [
+    "benchmarks/stim_adapter/main.cc",
+    "benchmarks/stim_adapter/simd_bits_xor_contract.h",
+];
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -421,10 +426,10 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
             .iter()
             .map(|source| source.path.as_str())
             .collect::<Vec<_>>();
-        let expected_comparator_paths = if group.id.to_string() == SIMD_WORD_POPCOUNT_GROUP_ID {
-            SIMD_WORD_POPCOUNT_COMPARATOR_PATHS.as_slice()
-        } else {
-            &[]
+        let expected_comparator_paths = match group.id.to_string().as_str() {
+            SIMD_WORD_POPCOUNT_GROUP_ID => SIMD_WORD_POPCOUNT_COMPARATOR_PATHS.as_slice(),
+            SIMD_BITS_XOR_GROUP_ID => SIMD_BITS_XOR_COMPARATOR_PATHS.as_slice(),
+            _ => &[],
         };
         if measurement_ids.len() != group.measurement_ids.len()
             || scale_ids.len() != group.scales.len()
@@ -627,6 +632,34 @@ mod tests {
                     owner: ProtocolId::try_new("stab-core/gates").expect("owner"),
                     profiler_note: None,
                     comparator_sources: Vec::new(),
+                },
+                GroupContract {
+                    id: ProtocolId::try_new(super::super::invocation::SIMD_BITS_XOR_GROUP_ID)
+                        .expect("group id"),
+                    claim_class: ClaimClass::PromotablePerformance,
+                    baseline_eligibility: BaselineEligibility::ThresholdEligible,
+                    workload_id: ProtocolId::try_new("simd-bits-xor").expect("workload id"),
+                    measurement_ids: vec![
+                        ProtocolId::try_new("xor-complete-vector").expect("measurement id"),
+                    ],
+                    scales: vec![ScaleContract {
+                        id: ProtocolId::try_new("small").expect("scale id"),
+                        work_items: NonZeroU64::new(4_096).expect("positive work"),
+                        input_bytes: 1_024,
+                        input_digest: InputDigest::try_new("d".repeat(64)).expect("input digest"),
+                    }],
+                    correctness_case_ids: vec!["cq-evidence-simd-bits-xor".to_string()],
+                    owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
+                    profiler_note: None,
+                    comparator_sources: SIMD_BITS_XOR_COMPARATOR_PATHS
+                        .iter()
+                        .map(|path| ComparatorSourceContract {
+                            path: ComparatorSourcePath::try_new((*path).to_string())
+                                .expect("comparator path"),
+                            sha256: Sha256Digest::try_new("e".repeat(64))
+                                .expect("comparator digest"),
+                        })
+                        .collect(),
                 },
                 GroupContract {
                     id: ProtocolId::try_new(super::super::invocation::SIMD_WORD_POPCOUNT_GROUP_ID)

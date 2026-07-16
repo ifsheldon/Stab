@@ -140,6 +140,49 @@ fn validation_rejects_asymmetric_primary_cli_and_stale_stim_filter() {
 }
 
 #[test]
+fn reworked_heterogeneous_row_can_point_to_an_exact_replacement_group() {
+    let (suite, manifest, references) = fixture();
+    let row = suite
+        .manifest_rows
+        .iter()
+        .find(|row| row.id == "m5-simd-bits")
+        .expect("dense XOR legacy row");
+    assert_eq!(row.decision, RowDecision::Reworked);
+    assert!(
+        row.classifications
+            .contains(&RowClassification::UnmatchedSubmeasurement)
+    );
+    let group = suite
+        .qualification_groups
+        .iter()
+        .find(|group| group.id == row.primary_group_id)
+        .expect("dense XOR replacement group");
+    assert_eq!(group.threshold_policy, ThresholdPolicy::Primary1_25);
+
+    validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect("reworked legacy row must not constrain its exact replacement group");
+}
+
+#[test]
+fn retained_heterogeneous_row_cannot_claim_a_primary_threshold() {
+    let (mut suite, manifest, references) = fixture();
+    let row = suite
+        .manifest_rows
+        .iter_mut()
+        .find(|row| row.id == "m5-simd-bits")
+        .expect("dense XOR legacy row");
+    row.decision = RowDecision::Retained;
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("retained unmatched row must not claim a primary threshold");
+    assert!(
+        error
+            .to_string()
+            .contains("claims a threshold despite unmatched Stim submeasurements")
+    );
+}
+
+#[test]
 fn comma_filter_resolves_every_exact_and_wildcard_symbol() {
     let symbols = vec![
         "tableau_random_10".to_string(),

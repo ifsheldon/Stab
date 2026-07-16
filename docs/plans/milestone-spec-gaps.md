@@ -21,6 +21,15 @@ Resolution: link or note for the plan update that resolved the gap
 
 ## Resolved Entries
 
+## 2026-07-16 - PQ2: Pinned Stim Header Warning Boundary
+
+Status: Resolved
+Revealed by: direct compilation of the exact `PERFQ-M5-SIMD-BITS` adapter comparator under the source-owned warning policy.
+Current text: the fifth PQ2 slice required the literal pinned `destination ^= source` operation and required the standalone adapter to retain strict warning enforcement, but it did not specify how warnings originating inside pinned Stim headers should interact with adapter-owned `-Werror`.
+Gap: GCC emits `-Wdeprecated-copy` while instantiating Stim v1.16.0's `simd_bits::operator^=` from the pinned header. A call-site pragma cannot suppress a diagnostic attached to the template definition, globally downgrading that warning would also weaken adapter-owned code, and replacing the operator would violate the exact comparator contract.
+Proposed amendment: compile the pinned Stim include root as an external system-header path while preserving CMake's resolved `libstim` flags and retaining `-Wextra -Werror` for adapter-owned code; bind the exact compile arguments into the adapter receipt and build fingerprint.
+Resolution: `ops/bench` now emits `-isystem $STIM_SOURCE/src`, retains `-Wextra -Werror`, and tests both properties alongside preservation of CMake-resolved machine flags. The exact isolated comparator still executes `destination ^= source`; direct compilation against pinned `libstim` produces the frozen 4,096-bit input and output digests. Adapter receipt schema version 5 binds the ordered comparator-source collection and compile arguments, contract-preflight schema version 4 records 30 worker receipts, and qualification report schema version 19 rejects the prior embedded receipt shape.
+
 ## 2026-07-16 - PQ1/PQ2: Adapter Machine Flags And Mandatory Contract Preflight
 
 Status: Resolved

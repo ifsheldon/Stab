@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "ccb80eb4b660a375b59460c3b7fa03a810abd6f868735b566735378105db22b2",
-  "semantic_digest": "877df12bf1b3d63da92289e22f117097cedbc20860d165c90b41554aa110263b",
+  "semantic_digest": "fb50789c58786219c807c79e87202396b17563ee7cb584bcda4d3379007ed716",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -61990,32 +61990,68 @@
       "public_api_items": [],
       "disposition": "measured",
       "phase": "execute",
-      "runner_fidelity": "stim-perf",
-      "correctness_cases": [],
-      "correctness_binding": "unresolved",
-      "planned_correctness_case_id": "CQPLANNED-PERFQ-M5-SIMD-BITS",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-b1530dc4e48e942d",
+        "cq-evidence-qualification-ba252d42660a41ce"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
-          "kind": "inline",
-          "id": "m5-simd-bits"
+          "kind": "generated",
+          "id": "splitmix64-xor-pair-v1"
         },
         "source": "src/stim/mem/simd_bits.perf.cc",
-        "deterministic_seed": "source-owned-inline:m5-simd-bits",
+        "deterministic_seed": "splitmix64-xor-pair-v1",
         "scales": [
           {
-            "id": "inherited",
-            "parameters": "bit vector xor and nonzero baseline plus Stab masked range and copy contract rates",
+            "id": "small",
+            "parameters": "generator=splitmix64-xor-pair-v1; bits=4096; alignment_bits=256",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 1024
+            },
+            "semantic_work": 4096,
+            "input_digest": "d7fbfcc618ad7e3fd8a616be64f8b41949214afbbca6b58514d40fa5ea7ac498"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=splitmix64-xor-pair-v1; bits=262144; alignment_bits=256",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 65536
+            },
+            "semantic_work": 262144,
+            "input_digest": "7f2b0610db451711e538c7bea04e7cdbead09cc41c088ebfeb3da0788d53ca46"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=splitmix64-xor-pair-v1; bits=16777216; alignment_bits=256",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 4194304
+            },
+            "semantic_work": 16777216,
+            "input_digest": "43fe5c79be45a459124be3bd00a45b65dbc886a6915fe19b3a173d37abc088ee"
           }
         ]
       },
       "work_unit": "bits",
       "output_contract": {
-        "expected_shape": "bit-vector output count, width, and semantic digest from the declared correctness preflight",
-        "digest_state": "planned",
-        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+        "expected_shape": "Exact paired deterministic fixture bytes plus a canonical digest over iteration count, bit width, all four input-fingerprint lanes, all four final-destination lanes, and all four unchanged-source lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers prepare identical aligned destination and source vectors outside timing, apply only complete-vector XOR behind matching compiler fences, and hash both final vectors outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "4098eadd7aa23e20cf98c155827ff69133a0a116b989659a747bdee71d677f87"
+          },
+          {
+            "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
+            "sha256": "542f96a2a88bb6a074a0b63b99f7be9c3dca29a6bb633986979abd0c4e66e00d"
+          }
+        ]
       },
       "timing_policy": {
         "calibration_min_ms": 250,
@@ -62026,16 +62062,18 @@
         "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
       },
       "memory_policy": {
-        "method": "stab-allocations",
+        "method": "process-rss",
         "scale_ids": [
-          "inherited"
+          "small",
+          "medium",
+          "large"
         ],
-        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+        "expected_growth": "Two aligned bit vectors remain live during timing and setup and peak process RSS are report-only observations at every scale. Timed mutation reuses preallocated storage; PQ6 owns explicit cross-scale RSS and allocation slack."
       },
-      "threshold_policy": "report-only",
-      "reason": "The inherited workload requires a faithful runner, exact phase split, scale family, or output contract before it can produce qualification evidence.",
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust complete-vector XOR work with exact CQ2, deterministic paired input, semantic output, scale, timing, and bounded-worker contracts. The legacy row's not-zero and unmatched logical operations remain separate.",
       "owner": "stab-core/bits",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M5-SIMD-WORD",
@@ -62103,7 +62141,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "8f7bed25d8af3116f705574d2de88745e214c6b1845d8c8d6bb86b72241eacc3"
+            "sha256": "4098eadd7aa23e20cf98c155827ff69133a0a116b989659a747bdee71d677f87"
           },
           {
             "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",

@@ -10,13 +10,18 @@ use super::super::protocol::{
     Implementation, InputDigest, ProtocolId, SemanticDigest, Sha256Digest, WorkerMeasurement,
 };
 use super::{
-    CIRCUIT_CAP_CASE_ID, CONTRACT_PREFLIGHT_SCHEMA_VERSION, EVEN_POPCOUNT_ITERATIONS,
-    EVEN_POPCOUNT_OUTPUT_DIGEST, GATE_PARTIAL_SWEEP_CASE_ID, InvocationError,
-    MAX_POPCOUNT_INPUT_DIGEST, MAX_POPCOUNT_OUTPUT_DIGEST, MAX_SUPPORTED_POPCOUNT_BITS,
-    ODD_POPCOUNT_ITERATIONS, ODD_POPCOUNT_OUTPUT_DIGEST, POPCOUNT_ALIGNMENT_CASE_ID,
-    POPCOUNT_CAP_CASE_ID, POPCOUNT_EVEN_CASE_ID, POPCOUNT_MAXIMUM_CASE_ID,
-    POPCOUNT_MINIMUM_CASE_ID, POPCOUNT_ODD_CASE_ID, PROTOCOL_SMOKE_CASE_ID, SMALL_POPCOUNT_BITS,
-    SMALL_POPCOUNT_INPUT_DIGEST,
+    CIRCUIT_CAP_CASE_ID, CONTRACT_PREFLIGHT_SCHEMA_VERSION, DENSE_XOR_ALIGNMENT_CASE_ID,
+    DENSE_XOR_CAP_CASE_ID, DENSE_XOR_EVEN_CASE_ID, DENSE_XOR_MAXIMUM_CASE_ID,
+    DENSE_XOR_MINIMUM_CASE_ID, DENSE_XOR_ODD_CASE_ID, EVEN_DENSE_XOR_ITERATIONS,
+    EVEN_DENSE_XOR_OUTPUT_DIGEST, EVEN_POPCOUNT_ITERATIONS, EVEN_POPCOUNT_OUTPUT_DIGEST,
+    GATE_PARTIAL_SWEEP_CASE_ID, InvocationError, MAX_DENSE_XOR_INPUT_DIGEST,
+    MAX_DENSE_XOR_OUTPUT_DIGEST, MAX_POPCOUNT_INPUT_DIGEST, MAX_POPCOUNT_OUTPUT_DIGEST,
+    MAX_SUPPORTED_DENSE_XOR_BITS, MAX_SUPPORTED_POPCOUNT_BITS, ODD_DENSE_XOR_ITERATIONS,
+    ODD_DENSE_XOR_OUTPUT_DIGEST, ODD_POPCOUNT_ITERATIONS, ODD_POPCOUNT_OUTPUT_DIGEST,
+    POPCOUNT_ALIGNMENT_CASE_ID, POPCOUNT_CAP_CASE_ID, POPCOUNT_EVEN_CASE_ID,
+    POPCOUNT_MAXIMUM_CASE_ID, POPCOUNT_MINIMUM_CASE_ID, POPCOUNT_ODD_CASE_ID,
+    PROTOCOL_SMOKE_CASE_ID, SMALL_DENSE_XOR_BITS, SMALL_DENSE_XOR_INPUT_DIGEST,
+    SMALL_POPCOUNT_BITS, SMALL_POPCOUNT_INPUT_DIGEST,
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -140,7 +145,7 @@ fn sha256_hex_bytes(bytes: &[u8]) -> Result<String, InvocationError> {
 
 pub(super) fn expected_contract_preflight_probes()
 -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
-    let mut probes = Vec::with_capacity(18);
+    let mut probes = Vec::with_capacity(30);
     let protocol_output_digest = protocol_smoke_output_digest();
     for implementation in [Implementation::Stim, Implementation::Stab] {
         probes.push(expected_accepted_probe(
@@ -184,6 +189,35 @@ pub(super) fn expected_contract_preflight_probes()
             MAX_POPCOUNT_OUTPUT_DIGEST,
         )?);
     }
+    for implementation in [Implementation::Stim, Implementation::Stab] {
+        probes.push(expected_accepted_probe(
+            DENSE_XOR_ODD_CASE_ID,
+            implementation,
+            ODD_DENSE_XOR_ITERATIONS,
+            ODD_DENSE_XOR_ITERATIONS * SMALL_DENSE_XOR_BITS,
+            SMALL_DENSE_XOR_BITS / 4,
+            SMALL_DENSE_XOR_INPUT_DIGEST,
+            ODD_DENSE_XOR_OUTPUT_DIGEST,
+        )?);
+        probes.push(expected_accepted_probe(
+            DENSE_XOR_EVEN_CASE_ID,
+            implementation,
+            EVEN_DENSE_XOR_ITERATIONS,
+            EVEN_DENSE_XOR_ITERATIONS * SMALL_DENSE_XOR_BITS,
+            SMALL_DENSE_XOR_BITS / 4,
+            SMALL_DENSE_XOR_INPUT_DIGEST,
+            EVEN_DENSE_XOR_OUTPUT_DIGEST,
+        )?);
+        probes.push(expected_accepted_probe(
+            DENSE_XOR_MAXIMUM_CASE_ID,
+            implementation,
+            1,
+            MAX_SUPPORTED_DENSE_XOR_BITS,
+            MAX_SUPPORTED_DENSE_XOR_BITS / 4,
+            MAX_DENSE_XOR_INPUT_DIGEST,
+            MAX_DENSE_XOR_OUTPUT_DIGEST,
+        )?);
+    }
     for (case_id, expectation) in [
         (
             CIRCUIT_CAP_CASE_ID,
@@ -204,6 +238,18 @@ pub(super) fn expected_contract_preflight_probes()
         (
             POPCOUNT_MINIMUM_CASE_ID,
             super::popcount_minimum_rejection_expectation as RejectionExpectation,
+        ),
+        (
+            DENSE_XOR_CAP_CASE_ID,
+            super::dense_xor_cap_rejection_expectation as RejectionExpectation,
+        ),
+        (
+            DENSE_XOR_ALIGNMENT_CASE_ID,
+            super::dense_xor_alignment_rejection_expectation as RejectionExpectation,
+        ),
+        (
+            DENSE_XOR_MINIMUM_CASE_ID,
+            super::dense_xor_minimum_rejection_expectation as RejectionExpectation,
         ),
     ] {
         for implementation in [Implementation::Stim, Implementation::Stab] {

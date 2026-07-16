@@ -12,9 +12,11 @@ const CIRCUIT_PARSE_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
 const GATE_NAME_HASH_GROUP_ID: &str = "PERFQ-M4-GATE-LOOKUP";
 const SIMD_WORD_POPCOUNT_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
+const SIMD_BITS_XOR_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
 const STIM_ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
 const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_word_popcount_contract.h";
+const SIMD_BITS_XOR_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/simd_bits_xor_contract.h";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
     "cq-evidence-qualification-e660819ae9a223c6",
@@ -29,6 +31,10 @@ const SIMD_WORD_POPCOUNT_CORRECTNESS_CASES: [&str; 3] = [
     "cq-evidence-qualification-b1530dc4e48e942d",
     "cq-evidence-qualification-ba252d42660a41ce",
 ];
+const SIMD_BITS_XOR_CORRECTNESS_CASES: [&str; 2] = [
+    "cq-evidence-qualification-b1530dc4e48e942d",
+    "cq-evidence-qualification-ba252d42660a41ce",
+];
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
 pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(), BenchError> {
@@ -37,8 +43,40 @@ pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(
         CIRCUIT_CANONICAL_PRINT_GROUP_ID => apply_circuit_canonical_print(group),
         GATE_NAME_HASH_GROUP_ID => apply_gate_name_hash(group),
         SIMD_WORD_POPCOUNT_GROUP_ID => apply_simd_word_popcount(root, group)?,
+        SIMD_BITS_XOR_GROUP_ID => apply_simd_bits_xor(root, group)?,
         _ => {}
     }
+    Ok(())
+}
+
+fn apply_simd_bits_xor(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(), BenchError> {
+    group.runner_fidelity = RunnerFidelity::AdapterLibrary;
+    group.correctness_cases = SIMD_BITS_XOR_CORRECTNESS_CASES
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = simd_bits_xor_workload_family();
+    group.output_contract = OutputContract {
+        expected_shape: "Exact paired deterministic fixture bytes plus a canonical digest over iteration count, bit width, all four input-fingerprint lanes, all four final-destination lanes, and all four unchanged-source lanes."
+            .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: "Both workers prepare identical aligned destination and source vectors outside timing, apply only complete-vector XOR behind matching compiler fences, and hash both final vectors outside timing."
+            .to_string(),
+        comparator_sources: [STIM_ADAPTER_SOURCE, SIMD_BITS_XOR_COMPARATOR_SOURCE]
+            .into_iter()
+            .map(|path| comparator_source(root, path))
+            .collect::<Result<_, _>>()?,
+    };
+    group.memory_policy = circuit_memory_policy(
+        "Two aligned bit vectors remain live during timing and setup and peak process RSS are report-only observations at every scale. Timed mutation reuses preallocated storage; PQ6 owns explicit cross-scale RSS and allocation slack.",
+    );
+    group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.owner = "stab-core/bits".to_string();
+    group.reason = "Implemented paired pinned-Stim and Rust complete-vector XOR work with exact CQ2, deterministic paired input, semantic output, scale, timing, and bounded-worker contracts. The legacy row's not-zero and unmatched logical operations remain separate."
+        .to_string();
+    group.status = QualificationStatus::Implemented;
     Ok(())
 }
 
@@ -271,6 +309,47 @@ fn simd_word_popcount_workload_family() -> WorkloadFamily {
             id: id.to_string(),
             parameters: format!(
                 "generator=splitmix64-word-v1; bits={bits}; alignment_bits=256; toggle_bit=300"
+            ),
+            input_bytes: InputByteCount::Exact { bytes: input_bytes },
+            semantic_work: Some(bits),
+            input_digest: Some(input_digest.to_string()),
+        })
+        .collect(),
+    }
+}
+
+fn simd_bits_xor_workload_family() -> WorkloadFamily {
+    WorkloadFamily {
+        fixture: FixtureLocator::Generated {
+            id: "splitmix64-xor-pair-v1".to_string(),
+        },
+        source: "src/stim/mem/simd_bits.perf.cc".to_string(),
+        deterministic_seed: "splitmix64-xor-pair-v1".to_string(),
+        scales: [
+            (
+                "small",
+                4_096,
+                1_024,
+                "d7fbfcc618ad7e3fd8a616be64f8b41949214afbbca6b58514d40fa5ea7ac498",
+            ),
+            (
+                "medium",
+                262_144,
+                65_536,
+                "7f2b0610db451711e538c7bea04e7cdbead09cc41c088ebfeb3da0788d53ca46",
+            ),
+            (
+                "large",
+                16_777_216,
+                4_194_304,
+                "43fe5c79be45a459124be3bd00a45b65dbc886a6915fe19b3a173d37abc088ee",
+            ),
+        ]
+        .into_iter()
+        .map(|(id, bits, input_bytes, input_digest)| ScalePoint {
+            id: id.to_string(),
+            parameters: format!(
+                "generator=splitmix64-xor-pair-v1; bits={bits}; alignment_bits=256"
             ),
             input_bytes: InputByteCount::Exact { bytes: input_bytes },
             semantic_work: Some(bits),

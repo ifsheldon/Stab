@@ -21,6 +21,7 @@ const ADAPTER_PROBE_ID: &str = "pq1-adapter-protocol-smoke";
 const CIRCUIT_PARSE_PROBE_ID: &str = "pq2-circuit-parse-adapter-smoke";
 const CIRCUIT_CANONICAL_PRINT_PROBE_ID: &str = "pq2-circuit-canonical-print-adapter-smoke";
 const GATE_NAME_HASH_PROBE_ID: &str = "pq2-gate-name-hash-adapter-smoke";
+const SIMD_BITS_XOR_PROBE_ID: &str = "pq2-simd-bits-xor-adapter-smoke";
 const SIMD_WORD_POPCOUNT_PROBE_ID: &str = "pq2-simd-word-popcount-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
@@ -31,6 +32,9 @@ const GATE_HASH_NAME_COUNT: u64 = 82;
 const POPCOUNT_ALIGNMENT_BITS: u64 = 256;
 const POPCOUNT_MIN_BITS: u64 = 512;
 const POPCOUNT_MAX_BITS: u64 = 268_435_456;
+const XOR_ALIGNMENT_BITS: u64 = 256;
+const XOR_MIN_BITS: u64 = 256;
+const XOR_MAX_BITS: u64 = 268_435_456;
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -47,6 +51,8 @@ enum ProbeGroup {
     GateNameHashAdapter,
     #[value(name = "pq2-simd-word-popcount-adapter-smoke")]
     SimdWordPopcountAdapter,
+    #[value(name = "pq2-simd-bits-xor-adapter-smoke")]
+    SimdBitsXorAdapter,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -100,7 +106,8 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         | ProbeGroup::CircuitParseAdapter
         | ProbeGroup::CircuitCanonicalPrintAdapter
         | ProbeGroup::GateNameHashAdapter
-        | ProbeGroup::SimdWordPopcountAdapter => run_adapter_probe(root, args),
+        | ProbeGroup::SimdWordPopcountAdapter
+        | ProbeGroup::SimdBitsXorAdapter => run_adapter_probe(root, args),
     }
 }
 
@@ -172,6 +179,11 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
             SIMD_WORD_POPCOUNT_PROBE_ID,
             "simd-word-popcount",
             "toggle-popcount",
+        ),
+        ProbeGroup::SimdBitsXorAdapter => (
+            SIMD_BITS_XOR_PROBE_ID,
+            "simd-bits-xor",
+            "xor-complete-vector",
         ),
         ProbeGroup::ProcessContract => {
             return Err(ProbeError::Contract(
@@ -338,7 +350,9 @@ fn probe_work_items(args: &ProbeArgs) -> u64 {
     args.work_items.map_or_else(
         || match args.group {
             ProbeGroup::GateNameHashAdapter => DEFAULT_GATE_HASH_WORK_ITEMS,
-            ProbeGroup::SimdWordPopcountAdapter => DEFAULT_POPCOUNT_WORK_ITEMS,
+            ProbeGroup::SimdWordPopcountAdapter | ProbeGroup::SimdBitsXorAdapter => {
+                DEFAULT_POPCOUNT_WORK_ITEMS
+            }
             ProbeGroup::ProcessContract
             | ProbeGroup::AdapterProtocol
             | ProbeGroup::CircuitParseAdapter
@@ -367,6 +381,18 @@ fn validate_probe_work_items(group: ProbeGroup, work_items: u64) -> Result<(), P
     {
         return Err(ProbeError::Contract(format!(
             "simd-word-popcount probe width {work_items} is not a multiple of {POPCOUNT_ALIGNMENT_BITS} bits"
+        )));
+    }
+    if group == ProbeGroup::SimdBitsXorAdapter
+        && !(XOR_MIN_BITS..=XOR_MAX_BITS).contains(&work_items)
+    {
+        return Err(ProbeError::Contract(format!(
+            "simd-bits-xor probe width {work_items} is outside {XOR_MIN_BITS}..={XOR_MAX_BITS} bits"
+        )));
+    }
+    if group == ProbeGroup::SimdBitsXorAdapter && !work_items.is_multiple_of(XOR_ALIGNMENT_BITS) {
+        return Err(ProbeError::Contract(format!(
+            "simd-bits-xor probe width {work_items} is not a multiple of {XOR_ALIGNMENT_BITS} bits"
         )));
     }
     Ok(())
@@ -456,6 +482,7 @@ mod tests {
         assert!(ProtocolId::try_new(CIRCUIT_CANONICAL_PRINT_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(GATE_NAME_HASH_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(SIMD_WORD_POPCOUNT_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(SIMD_BITS_XOR_PROBE_ID).is_ok());
     }
 
     #[test]
@@ -499,6 +526,24 @@ mod tests {
             validate_probe_work_items(
                 ProbeGroup::SimdWordPopcountAdapter,
                 POPCOUNT_MAX_BITS + POPCOUNT_ALIGNMENT_BITS
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn simd_bits_xor_probe_enforces_bounded_aligned_widths() {
+        assert!(ProbeGroup::from_str("pq2-simd-bits-xor-adapter-smoke", true).is_ok());
+        assert!(
+            validate_probe_work_items(ProbeGroup::SimdBitsXorAdapter, DEFAULT_POPCOUNT_WORK_ITEMS)
+                .is_ok()
+        );
+        assert!(validate_probe_work_items(ProbeGroup::SimdBitsXorAdapter, 257).is_err());
+        assert!(validate_probe_work_items(ProbeGroup::SimdBitsXorAdapter, 0).is_err());
+        assert!(
+            validate_probe_work_items(
+                ProbeGroup::SimdBitsXorAdapter,
+                XOR_MAX_BITS + XOR_ALIGNMENT_BITS
             )
             .is_err()
         );

@@ -16,7 +16,12 @@ use crate::root::RepoRoot;
 const ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
 const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_word_popcount_contract.h";
-const RECEIPT_SCHEMA_VERSION: u32 = 4;
+const SIMD_BITS_XOR_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/simd_bits_xor_contract.h";
+const COMPARATOR_SOURCES: [&str; 2] = [
+    SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE,
+    SIMD_BITS_XOR_COMPARATOR_SOURCE,
+];
+const RECEIPT_SCHEMA_VERSION: u32 = 5;
 const MAX_SOURCE_BYTES: u64 = 1 << 20;
 const MAX_FLAGS_FILE_BYTES: u64 = 64 << 10;
 const MAX_TOOL_BYTES: u64 = 512 << 20;
@@ -38,7 +43,7 @@ pub(crate) struct AdapterExecutable {
     _runtime: tempfile::TempDir,
     executable: SealedExecutable,
     source_path: PathBuf,
-    comparator_source_path: PathBuf,
+    comparator_source_paths: Vec<PathBuf>,
     library_path: PathBuf,
 }
 
@@ -46,8 +51,16 @@ impl AdapterExecutable {
     pub(crate) fn verify(&self) -> Result<(), AdapterError> {
         self.executable.verify()?;
         let source = sha256_regular_file(&self.source_path, MAX_SOURCE_BYTES)?;
-        let comparator_source =
-            sha256_regular_file(&self.comparator_source_path, MAX_SOURCE_BYTES)?;
+        let comparator_sources_match = self.comparator_source_paths.len()
+            == self.receipt.comparator_sources.len()
+            && self
+                .comparator_source_paths
+                .iter()
+                .zip(&self.receipt.comparator_sources)
+                .all(|(path, expected)| {
+                    sha256_regular_file(path, MAX_SOURCE_BYTES)
+                        .is_ok_and(|actual| actual == expected.sha256)
+                });
         let library = sha256_regular_file(&self.library_path, MAX_LIBRARY_BYTES)?;
         if self.path != self.executable.program()
             || self.executable.sha256() != self.binary_digest.as_str()
@@ -55,7 +68,7 @@ impl AdapterExecutable {
             || self.receipt.adapter_source_sha256 != self.source_digest.as_str()
             || self.receipt.build_fingerprint != self.build_fingerprint.as_str()
             || source != self.receipt.adapter_source_sha256
-            || comparator_source != self.receipt.comparator_source_sha256
+            || !comparator_sources_match
             || library != self.receipt.stim_library_sha256
             || !self.receipt.validates_report_identity(
                 self.source_digest.as_str(),
@@ -76,7 +89,7 @@ pub(crate) struct AdapterBuildReceipt {
     stim_tag: String,
     stim_commit: String,
     adapter_source_sha256: String,
-    comparator_source_sha256: String,
+    comparator_sources: Vec<AdapterComparatorSource>,
     stim_library_sha256: String,
     cmake: ToolIdentity,
     cc: ToolIdentity,
@@ -102,7 +115,7 @@ impl AdapterBuildReceipt {
             && self.stim_tag == STIM_TAG
             && self.stim_commit == STIM_COMMIT
             && self.adapter_source_sha256 == source_sha256
-            && valid_digest(&self.comparator_source_sha256)
+            && valid_comparator_sources(&self.comparator_sources)
             && self.build_fingerprint == build_fingerprint
             && self.binary_sha256 == binary_sha256
             && valid_digest(&self.stim_library_sha256)
@@ -131,15 +144,28 @@ impl AdapterBuildReceipt {
         &self,
         sources: &[super::group::ComparatorSourceContract],
     ) -> bool {
-        sources.is_empty()
-            || matches!(
-                sources,
-                [adapter, comparator]
-                    if adapter.path.as_str() == ADAPTER_SOURCE
-                        && adapter.sha256.as_str() == self.adapter_source_sha256
-                        && comparator.path.as_str() == SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE
-                        && comparator.sha256.as_str() == self.comparator_source_sha256
-            )
+        let Some((adapter, comparators)) = sources.split_first() else {
+            return true;
+        };
+        if adapter.path.as_str() != ADAPTER_SOURCE
+            || adapter.sha256.as_str() != self.adapter_source_sha256
+        {
+            return false;
+        }
+        let mut previous_index = None;
+        for comparator in comparators {
+            let Some(index) = self.comparator_sources.iter().position(|candidate| {
+                candidate.path == comparator.path.as_str()
+                    && candidate.sha256 == comparator.sha256.as_str()
+            }) else {
+                return false;
+            };
+            if previous_index.is_some_and(|previous| index <= previous) {
+                return false;
+            }
+            previous_index = Some(index);
+        }
+        true
     }
 
     fn recomputed_build_fingerprint(&self) -> Result<String, AdapterError> {
@@ -165,7 +191,7 @@ impl AdapterBuildReceipt {
             "stim_tag": self.stim_tag,
             "stim_commit": self.stim_commit,
             "adapter_source_sha256": self.adapter_source_sha256,
-            "comparator_source_sha256": self.comparator_source_sha256,
+            "comparator_sources": self.comparator_sources,
             "stim_library_sha256": self.stim_library_sha256,
             "cmake": self.cmake,
             "cc": self.cc,
@@ -179,6 +205,23 @@ impl AdapterBuildReceipt {
         }))?;
         sha256_bytes(&material)
     }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct AdapterComparatorSource {
+    path: String,
+    sha256: String,
+}
+
+fn valid_comparator_sources(sources: &[AdapterComparatorSource]) -> bool {
+    sources.len() == COMPARATOR_SOURCES.len()
+        && sources
+            .iter()
+            .zip(COMPARATOR_SOURCES)
+            .all(|(source, expected_path)| {
+                source.path == expected_path && valid_digest(&source.sha256)
+            })
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -262,14 +305,26 @@ pub(crate) fn prepare_adapter(
     let stim_compile_flags = read_stim_compile_flags(&stim_build)?;
     let source_path = stab_source.join(ADAPTER_SOURCE);
     let source_digest = sha256_regular_file(&source_path, MAX_SOURCE_BYTES)?;
-    let comparator_source_path = stab_source.join(SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE);
-    let comparator_source_digest = sha256_regular_file(&comparator_source_path, MAX_SOURCE_BYTES)?;
+    let comparator_source_paths = COMPARATOR_SOURCES
+        .into_iter()
+        .map(|path| stab_source.join(path))
+        .collect::<Vec<_>>();
+    let comparator_sources = COMPARATOR_SOURCES
+        .into_iter()
+        .zip(&comparator_source_paths)
+        .map(|(path, materialized_path)| {
+            Ok(AdapterComparatorSource {
+                path: path.to_string(),
+                sha256: sha256_regular_file(materialized_path, MAX_SOURCE_BYTES)?,
+            })
+        })
+        .collect::<Result<Vec<_>, AdapterError>>()?;
     let mut receipt = AdapterBuildReceipt {
         schema_version: RECEIPT_SCHEMA_VERSION,
         stim_tag: STIM_TAG.to_string(),
         stim_commit: STIM_COMMIT.to_string(),
         adapter_source_sha256: source_digest.clone(),
-        comparator_source_sha256: comparator_source_digest,
+        comparator_sources,
         stim_library_sha256: library_digest,
         cmake,
         cc,
@@ -312,7 +367,7 @@ pub(crate) fn prepare_adapter(
         _runtime: runtime,
         executable,
         source_path,
-        comparator_source_path,
+        comparator_source_paths,
         library_path,
     };
     adapter.verify()?;
@@ -361,7 +416,7 @@ fn normalized_compile_arguments(
     arguments.extend([
         "-Wextra".to_string(),
         "-Werror".to_string(),
-        "-I".to_string(),
+        "-isystem".to_string(),
         "$STIM_SOURCE/src".to_string(),
         format!("-DSTAB_STIM_COMMIT=\"{STIM_COMMIT}\""),
         format!("-DSTAB_ADAPTER_SOURCE_DIGEST=\"{source_digest}\""),
@@ -751,6 +806,10 @@ pub(crate) enum AdapterError {
 }
 
 #[cfg(test)]
+#[path = "adapter_comparator_source_tests.rs"]
+mod comparator_source_tests;
+
+#[cfg(test)]
 mod tests {
     use std::os::unix::fs::PermissionsExt as _;
 
@@ -765,7 +824,7 @@ mod tests {
         }
     }
 
-    fn test_receipt(source: &str, library: &str, binary: &str) -> AdapterBuildReceipt {
+    pub(super) fn test_receipt(source: &str, library: &str, binary: &str) -> AdapterBuildReceipt {
         let cmake = actual_tool("cmake");
         let cc = actual_tool("cc");
         let cxx = actual_tool("c++");
@@ -775,7 +834,13 @@ mod tests {
             stim_tag: STIM_TAG.to_string(),
             stim_commit: STIM_COMMIT.to_string(),
             adapter_source_sha256: source.to_string(),
-            comparator_source_sha256: source.to_string(),
+            comparator_sources: COMPARATOR_SOURCES
+                .into_iter()
+                .map(|path| AdapterComparatorSource {
+                    path: path.to_string(),
+                    sha256: source.to_string(),
+                })
+                .collect(),
             stim_library_sha256: library.to_string(),
             configure_arguments: normalized_configure_arguments(&cc, &cxx, &make),
             library_build_arguments: normalized_library_build_arguments(),
@@ -912,7 +977,11 @@ mod tests {
         );
 
         let mut changed_comparator = receipt.clone();
-        changed_comparator.comparator_source_sha256 = "e".repeat(64);
+        changed_comparator
+            .comparator_sources
+            .first_mut()
+            .expect("popcount comparator")
+            .sha256 = "e".repeat(64);
         assert!(!changed_comparator.validates_report_identity(
             &source,
             &receipt.build_fingerprint,
@@ -931,12 +1000,18 @@ mod tests {
             receipt.build_fingerprint
         );
 
+        let popcount_digest = receipt
+            .comparator_sources
+            .first()
+            .expect("popcount comparator")
+            .sha256
+            .clone();
         let comparator_sources: Vec<super::super::group::ComparatorSourceContract> =
             serde_json::from_value(serde_json::json!([
                 {"path": ADAPTER_SOURCE, "sha256": source},
                 {
                     "path": SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE,
-                    "sha256": receipt.comparator_source_sha256
+                    "sha256": popcount_digest
                 }
             ]))
             .expect("comparator source contracts");
@@ -974,6 +1049,15 @@ mod tests {
                 .count(),
             1
         );
+        let include_flag = arguments
+            .iter()
+            .position(|argument| argument == "-isystem")
+            .expect("external Stim include flag");
+        assert_eq!(
+            arguments.get(include_flag + 1).map(String::as_str),
+            Some("$STIM_SOURCE/src")
+        );
+        assert!(arguments.iter().any(|argument| argument == "-Werror"));
     }
 
     #[test]
@@ -1009,11 +1093,13 @@ mod tests {
     fn executable_verification_rejects_materialized_source_drift() {
         let runtime = tempfile::tempdir().expect("adapter runtime");
         let source = runtime.path().join("main.cc");
-        let comparator_source = runtime.path().join("simd_word_popcount_contract.h");
+        let popcount_source = runtime.path().join("simd_word_popcount_contract.h");
+        let xor_source = runtime.path().join("simd_bits_xor_contract.h");
         let library = runtime.path().join("libstim.a");
         let binary = runtime.path().join("adapter");
         std::fs::write(&source, b"source").expect("write source");
-        std::fs::write(&comparator_source, b"source").expect("write comparator source");
+        std::fs::write(&popcount_source, b"source").expect("write popcount source");
+        std::fs::write(&xor_source, b"source").expect("write XOR source");
         std::fs::write(&library, b"library").expect("write library");
         std::fs::write(&binary, b"binary").expect("write binary");
         std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700))
@@ -1034,7 +1120,7 @@ mod tests {
             _runtime: runtime,
             executable,
             source_path: source.clone(),
-            comparator_source_path: comparator_source.clone(),
+            comparator_source_paths: vec![popcount_source.clone(), xor_source.clone()],
             library_path: library,
         };
         adapter.verify().expect("unchanged adapter verifies");
@@ -1043,7 +1129,7 @@ mod tests {
 
         std::fs::write(&adapter.source_path, b"source").expect("restore source");
         adapter.verify().expect("restored adapter verifies");
-        std::fs::write(comparator_source, b"drifted comparator source")
+        std::fs::write(popcount_source, b"drifted comparator source")
             .expect("drift comparator source");
         assert!(matches!(adapter.verify(), Err(AdapterError::StaleBuild)));
     }
