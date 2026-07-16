@@ -496,9 +496,13 @@ fn cq2_bit_matrix_transpose_contract_matches_scalar_reference() {
             }
         }
         let original = matrix.clone();
+        let expected = original
+            .transpose()
+            .expect("allocating reference transpose");
         matrix
             .transpose_square_in_place()
             .expect("square transpose");
+        assert_eq!(matrix, expected, "in-place transpose size={size}");
         matrix
             .transpose_square_in_place()
             .expect("square double transpose");

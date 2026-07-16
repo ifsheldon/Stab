@@ -170,7 +170,7 @@ fn sha256_hex_bytes(bytes: &[u8]) -> Result<String, InvocationError> {
 
 pub(super) fn expected_contract_preflight_probes()
 -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
-    let mut probes = Vec::with_capacity(86);
+    let mut probes = Vec::with_capacity(90);
     let protocol_output_digest = protocol_smoke_output_digest();
     for implementation in [Implementation::Stim, Implementation::Stab] {
         probes.push(expected_accepted_probe(

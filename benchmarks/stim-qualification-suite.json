@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "5d795e831bc20b3f2780ca72c1eaea7c75387388d38f8e37f4539254a41e821b",
-  "semantic_digest": "3d8da16998e4ea387f025a55e61b1c8c0ce8a3202804633aae4083dc4647d2cb",
+  "semantic_digest": "1d38c155acbaf78234f9b92857cfef8c25ffa059a4a9e9756b272a72272dfd0d",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -62388,7 +62388,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -62487,7 +62487,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -62641,7 +62641,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -62737,7 +62737,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62833,7 +62833,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62929,7 +62929,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -63026,7 +63026,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
           },
           {
             "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -63121,7 +63121,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -63216,7 +63216,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "f8c8365cd0932f4d13fa47794afa048a323ba16df25a81ddd457b9a6d2c071c5"
+            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",

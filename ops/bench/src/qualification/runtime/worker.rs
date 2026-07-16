@@ -210,6 +210,11 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     }
     let measurement_id = ProtocolId::try_new(args.measurement_id)?;
     let workload_id = ProtocolId::try_new(args.workload.id())?;
+    let work_count = args
+        .iterations
+        .get()
+        .checked_mul(args.work_items.get())
+        .ok_or(WorkerError::WorkOverflow)?;
     let identity = current_identity()?;
     let circuit_fixture = match args.workload {
         WorkerWorkload::ProtocolSmoke
@@ -358,11 +363,6 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     }
     verify_affinity(args.expected_cpu)?;
     let setup_rss_bytes = current_rss_bytes()?;
-    let work_count = args
-        .iterations
-        .get()
-        .checked_mul(args.work_items.get())
-        .ok_or(WorkerError::WorkOverflow)?;
 
     let (output, elapsed_seconds) = match args.workload {
         WorkerWorkload::ProtocolSmoke => measure_workload(|| {

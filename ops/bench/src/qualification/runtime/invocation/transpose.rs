@@ -37,6 +37,8 @@ const TRANSPOSE_BELOW_MINIMUM_WORK_ITEMS: &str = "65025";
 const TRANSPOSE_NON_SQUARE_WORK_ITEMS: &str = "65537";
 const TRANSPOSE_UNALIGNED_WORK_ITEMS: &str = "66049";
 const TRANSPOSE_OVER_CAP_WORK_ITEMS: &str = "276889600";
+const TRANSPOSE_VALID_SMALL_WORK_ITEMS: &str = "65536";
+const TRANSPOSE_OVERFLOW_ITERATIONS: &str = "281474976710656";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum TransposeRejectionClass {
@@ -44,23 +46,27 @@ pub(super) enum TransposeRejectionClass {
     InPlaceNonSquare,
     InPlaceUnaligned,
     InPlaceOverCap,
+    InPlaceWorkOverflow,
     AllocatingBelowMinimum,
     AllocatingNonSquare,
     AllocatingUnaligned,
     AllocatingOverCap,
+    AllocatingWorkOverflow,
 }
 
 impl TransposeRejectionClass {
-    pub(super) const fn all() -> [Self; 8] {
+    pub(super) const fn all() -> [Self; 10] {
         [
             Self::InPlaceBelowMinimum,
             Self::InPlaceNonSquare,
             Self::InPlaceUnaligned,
             Self::InPlaceOverCap,
+            Self::InPlaceWorkOverflow,
             Self::AllocatingBelowMinimum,
             Self::AllocatingNonSquare,
             Self::AllocatingUnaligned,
             Self::AllocatingOverCap,
+            Self::AllocatingWorkOverflow,
         ]
     }
 
@@ -70,10 +76,12 @@ impl TransposeRejectionClass {
             Self::InPlaceNonSquare => "bit-matrix-transpose-in-place-non-square",
             Self::InPlaceUnaligned => "bit-matrix-transpose-in-place-unaligned",
             Self::InPlaceOverCap => "bit-matrix-transpose-in-place-over-cap",
+            Self::InPlaceWorkOverflow => "bit-matrix-transpose-in-place-work-overflow",
             Self::AllocatingBelowMinimum => "bit-matrix-transpose-allocating-below-minimum",
             Self::AllocatingNonSquare => "bit-matrix-transpose-allocating-non-square",
             Self::AllocatingUnaligned => "bit-matrix-transpose-allocating-unaligned",
             Self::AllocatingOverCap => "bit-matrix-transpose-allocating-over-cap",
+            Self::AllocatingWorkOverflow => "bit-matrix-transpose-allocating-work-overflow",
         }
     }
 
@@ -82,11 +90,13 @@ impl TransposeRejectionClass {
             Self::InPlaceBelowMinimum
             | Self::InPlaceNonSquare
             | Self::InPlaceUnaligned
-            | Self::InPlaceOverCap => "bit-matrix-transpose-in-place",
+            | Self::InPlaceOverCap
+            | Self::InPlaceWorkOverflow => "bit-matrix-transpose-in-place",
             Self::AllocatingBelowMinimum
             | Self::AllocatingNonSquare
             | Self::AllocatingUnaligned
-            | Self::AllocatingOverCap => "bit-matrix-transpose-allocating",
+            | Self::AllocatingOverCap
+            | Self::AllocatingWorkOverflow => "bit-matrix-transpose-allocating",
         }
     }
 
@@ -95,11 +105,13 @@ impl TransposeRejectionClass {
             Self::InPlaceBelowMinimum
             | Self::InPlaceNonSquare
             | Self::InPlaceUnaligned
-            | Self::InPlaceOverCap => "in-place-transpose",
+            | Self::InPlaceOverCap
+            | Self::InPlaceWorkOverflow => "in-place-transpose",
             Self::AllocatingBelowMinimum
             | Self::AllocatingNonSquare
             | Self::AllocatingUnaligned
-            | Self::AllocatingOverCap => "allocating-transpose",
+            | Self::AllocatingOverCap
+            | Self::AllocatingWorkOverflow => "allocating-transpose",
         }
     }
 
@@ -111,6 +123,18 @@ impl TransposeRejectionClass {
             Self::InPlaceNonSquare | Self::AllocatingNonSquare => TRANSPOSE_NON_SQUARE_WORK_ITEMS,
             Self::InPlaceUnaligned | Self::AllocatingUnaligned => TRANSPOSE_UNALIGNED_WORK_ITEMS,
             Self::InPlaceOverCap | Self::AllocatingOverCap => TRANSPOSE_OVER_CAP_WORK_ITEMS,
+            Self::InPlaceWorkOverflow | Self::AllocatingWorkOverflow => {
+                TRANSPOSE_VALID_SMALL_WORK_ITEMS
+            }
+        }
+    }
+
+    const fn iterations(self) -> &'static str {
+        match self {
+            Self::InPlaceWorkOverflow | Self::AllocatingWorkOverflow => {
+                TRANSPOSE_OVERFLOW_ITERATIONS
+            }
+            _ => "1",
         }
     }
 
@@ -120,31 +144,41 @@ impl TransposeRejectionClass {
             Self::InPlaceNonSquare => "in-place-non-square",
             Self::InPlaceUnaligned => "in-place-unaligned",
             Self::InPlaceOverCap => "in-place-over-cap",
+            Self::InPlaceWorkOverflow => "in-place-work-overflow",
             Self::AllocatingBelowMinimum => "allocating-below-minimum",
             Self::AllocatingNonSquare => "allocating-non-square",
             Self::AllocatingUnaligned => "allocating-unaligned",
             Self::AllocatingOverCap => "allocating-over-cap",
+            Self::AllocatingWorkOverflow => "allocating-work-overflow",
         }
     }
 
-    const fn failure(self) -> TransposeShapeFailure {
+    const fn failure(self) -> TransposeRejectionFailure {
         match self {
             Self::InPlaceBelowMinimum | Self::AllocatingBelowMinimum => {
-                TransposeShapeFailure::BelowMinimum
+                TransposeRejectionFailure::BelowMinimum
             }
-            Self::InPlaceNonSquare | Self::AllocatingNonSquare => TransposeShapeFailure::NonSquare,
-            Self::InPlaceUnaligned | Self::AllocatingUnaligned => TransposeShapeFailure::Unaligned,
-            Self::InPlaceOverCap | Self::AllocatingOverCap => TransposeShapeFailure::OverCap,
+            Self::InPlaceNonSquare | Self::AllocatingNonSquare => {
+                TransposeRejectionFailure::NonSquare
+            }
+            Self::InPlaceUnaligned | Self::AllocatingUnaligned => {
+                TransposeRejectionFailure::Unaligned
+            }
+            Self::InPlaceOverCap | Self::AllocatingOverCap => TransposeRejectionFailure::OverCap,
+            Self::InPlaceWorkOverflow | Self::AllocatingWorkOverflow => {
+                TransposeRejectionFailure::WorkOverflow
+            }
         }
     }
 }
 
 #[derive(Clone, Copy)]
-enum TransposeShapeFailure {
+enum TransposeRejectionFailure {
     BelowMinimum,
     NonSquare,
     Unaligned,
     OverCap,
+    WorkOverflow,
 }
 
 impl PreparedWorkers {
@@ -232,13 +266,14 @@ impl PreparedWorkers {
     pub(super) fn invoke_transpose_rejection_probes(
         &self,
     ) -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
-        let mut probes = Vec::with_capacity(16);
+        let mut probes = Vec::with_capacity(20);
         for class in TransposeRejectionClass::all() {
             for implementation in [Implementation::Stim, Implementation::Stab] {
-                let output = self.invoke_invalid_bit_width(
+                let output = self.invoke_invalid_work(
                     implementation,
                     class.workload(),
                     class.measurement(),
+                    class.iterations(),
                     class.work_items(),
                 )?;
                 checked_transpose_rejection(&output, implementation, class)?;
@@ -275,37 +310,45 @@ pub(super) fn transpose_rejection_expectation(
     class: TransposeRejectionClass,
 ) -> (i32, &'static str) {
     match (implementation, class.failure()) {
-        (Implementation::Stim, TransposeShapeFailure::BelowMinimum) => (
+        (Implementation::Stim, TransposeRejectionFailure::BelowMinimum) => (
             2,
             "stim qualification adapter: bit-matrix transpose dimension 255 is below the minimum 256\n",
         ),
-        (Implementation::Stab, TransposeShapeFailure::BelowMinimum) => (
+        (Implementation::Stab, TransposeRejectionFailure::BelowMinimum) => (
             1,
             "[stab-bench] ERROR: performance qualification validation failed:\nbit-matrix transpose dimension 255 is below the minimum 256\n",
         ),
-        (Implementation::Stim, TransposeShapeFailure::NonSquare) => (
+        (Implementation::Stim, TransposeRejectionFailure::NonSquare) => (
             2,
             "stim qualification adapter: bit-matrix transpose work count 65537 is not a perfect square\n",
         ),
-        (Implementation::Stab, TransposeShapeFailure::NonSquare) => (
+        (Implementation::Stab, TransposeRejectionFailure::NonSquare) => (
             1,
             "[stab-bench] ERROR: performance qualification validation failed:\nbit-matrix transpose work count 65537 is not a perfect square\n",
         ),
-        (Implementation::Stim, TransposeShapeFailure::Unaligned) => (
+        (Implementation::Stim, TransposeRejectionFailure::Unaligned) => (
             2,
             "stim qualification adapter: bit-matrix transpose dimension 257 is not a multiple of 256\n",
         ),
-        (Implementation::Stab, TransposeShapeFailure::Unaligned) => (
+        (Implementation::Stab, TransposeRejectionFailure::Unaligned) => (
             1,
             "[stab-bench] ERROR: performance qualification validation failed:\nbit-matrix transpose dimension 257 is not a multiple of 256\n",
         ),
-        (Implementation::Stim, TransposeShapeFailure::OverCap) => (
+        (Implementation::Stim, TransposeRejectionFailure::OverCap) => (
             2,
             "stim qualification adapter: bit-matrix transpose dimension 16640 exceeds maximum 16384\n",
         ),
-        (Implementation::Stab, TransposeShapeFailure::OverCap) => (
+        (Implementation::Stab, TransposeRejectionFailure::OverCap) => (
             1,
             "[stab-bench] ERROR: performance qualification validation failed:\nbit-matrix transpose dimension 16640 exceeds maximum 16384\n",
+        ),
+        (Implementation::Stim, TransposeRejectionFailure::WorkOverflow) => (
+            2,
+            "stim qualification adapter: adapter semantic work count overflows u64\n",
+        ),
+        (Implementation::Stab, TransposeRejectionFailure::WorkOverflow) => (
+            1,
+            "[stab-bench] ERROR: performance qualification validation failed:\nqualification worker semantic work count overflows u64\n",
         ),
     }
 }

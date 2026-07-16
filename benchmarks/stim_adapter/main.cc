@@ -793,6 +793,10 @@ double measure_workload(CALLBACK callback) {
 int main(int argc, const char **argv) {
     try {
         const Arguments arguments = parse_arguments(argc, argv);
+        if (arguments.iterations > std::numeric_limits<uint64_t>::max() / arguments.work_items) {
+            throw std::overflow_error("adapter semantic work count overflows u64");
+        }
+        const uint64_t work_count = arguments.iterations * arguments.work_items;
 
         // Linking and constructing a pinned Stim type ensures this is an adapter build, not a
         // free-standing synthetic comparator.
@@ -879,9 +883,6 @@ int main(int argc, const char **argv) {
         verify_affinity(arguments.expected_cpu);
 
         const uint64_t setup_rss = status_kib("VmRSS:");
-        if (arguments.iterations > std::numeric_limits<uint64_t>::max() / arguments.work_items) {
-            throw std::overflow_error("adapter semantic work count overflows u64");
-        }
         std::array<uint64_t, 4> digest_state{};
         stim::Circuit parsed;
         std::string canonical;
@@ -994,7 +995,7 @@ int main(int argc, const char **argv) {
                   << "\"measurement_id\":\"" << arguments.measurement_id << "\","
                   << "\"iteration_count\":" << arguments.iterations << ','
                   << "\"elapsed_seconds\":" << elapsed_seconds << ','
-                  << "\"work_count\":" << arguments.iterations * arguments.work_items << ','
+                  << "\"work_count\":" << work_count << ','
                   << "\"input_bytes\":" << input_bytes << ','
                   << "\"input_digest\":\"" << semantic_digest(input_digest) << "\","
                   << "\"output_digest\":\"" << semantic_digest(digest_state) << "\","

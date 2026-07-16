@@ -259,6 +259,7 @@ pub(super) fn run_source_owned_adapter_probe(
 }
 
 fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
+    let expected_work_count = expected_work_count(&args)?;
     let identity = worker::current_identity()?;
     let current_exe = std::env::current_exe().map_err(ProbeError::CurrentExecutable)?;
     let request = ProcessRequest {
@@ -272,7 +273,6 @@ fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
     };
     let output = checked_process(run_bounded_process(&request)?, "Stab worker")?;
     let rows = parse_worker_json_lines(&output.stdout)?;
-    let expected_work_count = expected_work_count(&args)?;
     ProtocolExpectation {
         implementation: Implementation::Stab,
         evidence_mode: args.evidence_mode.into(),
@@ -311,6 +311,7 @@ fn run_process_probe(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError>
 }
 
 fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeReceipt, ProbeError> {
+    let expected_work_count = expected_work_count(&args)?;
     let (probe_id, workload, measurement) = match args.group {
         ProbeGroup::AdapterProtocol => (ADAPTER_PROBE_ID, "protocol-smoke", "main"),
         ProbeGroup::CircuitParseAdapter => (CIRCUIT_PARSE_PROBE_ID, "circuit-parse", "parse"),
@@ -420,7 +421,6 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
     let measurement_id = ProtocolId::try_new(measurement)?;
     let measurement_ids = BTreeSet::from([measurement_id.clone()]);
     let stim_commit = GitCommit::try_new(STIM_COMMIT)?;
-    let expected_work_count = expected_work_count(&args)?;
     let stim_input = stim_rows
         .first()
         .ok_or_else(|| ProbeError::Contract("Stim probe returned no row".to_string()))?;
@@ -920,5 +920,23 @@ mod tests {
                 assert!(validate_probe_work_items(group, work_items).is_err());
             }
         }
+    }
+
+    #[test]
+    fn transpose_probe_rejects_semantic_work_overflow_before_process_setup() {
+        let args = ProbeArgs {
+            group: ProbeGroup::BitMatrixTransposeInPlaceAdapter,
+            iterations: NonZeroU64::new(1_u64 << 48).expect("nonzero overflow iterations"),
+            work_items: NonZeroU64::new(DEFAULT_TRANSPOSE_WORK_ITEMS),
+            evidence_mode: ProbeEvidenceMode::Timing,
+        };
+        assert!(
+            validate_probe_work_items(args.group, probe_work_items(&args)).is_ok(),
+            "overflow regression must use an otherwise valid transpose shape"
+        );
+        assert!(matches!(
+            expected_work_count(&args),
+            Err(ProbeError::WorkOverflow)
+        ));
     }
 }
