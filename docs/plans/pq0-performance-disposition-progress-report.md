@@ -8,7 +8,7 @@ Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4
 
 Current correctness dependency after tightening the exact BitMatrix transpose resource contract: schema-version-3 CQ0 semantic digest `5d795e831bc20b3f2780ca72c1eaea7c75387388d38f8e37f4539254a41e821b`.
 
-Current performance inventory digest after graduating the four public transpose API paths into independent executable allocating and in-place groups: `1ff62c5aaebb8d47b1956d135fd5889d376ca2b397226ccdcaa142bcdfa60fb3`.
+Current performance inventory digest after graduating the four public transpose API paths and superseding the heterogeneous legacy BitMatrix timing row: `3d8da16998e4ea387f025a55e61b1c8c0ce8a3202804633aae4083dc4647d2cb`.
 
 Original PQ0 implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 
@@ -18,10 +18,10 @@ The original PQ0 evidence state was clean at the source-owned revision above.
 CQ1's confirmed exact-selector correction changed the CQ0 digest, so the checked PQ0 inventory and frozen performance digest were regenerated without changing any group, disposition, unresolved count, threshold, waiver, or acceptance conclusion.
 The completed selected CQ2 `.stim`, `.dem`, result-format, gate-contract, bit-kernel, circuit-API, Generation, and Algebra slices changed correctness owner ids, exact classifications, checklist rows, and public API shape, so PQ0 was regenerated without relaxing any performance gate.
 The current inventory has 547 qualification groups and exactly twelve implemented runtime contracts: `PERFQ-M4-CIRCUIT-PARSE`, `PERFQ-M4-CIRCUIT-CANONICAL-PRINT`, `PERFQ-M4-GATE-LOOKUP`, `PERFQ-M5-SIMD-WORD`, `PERFQ-M5-SIMD-BITS`, three position-specific `not_zero` groups, `PERFQ-M5-SPARSE-XOR`, `PERFQ-M5-SPARSE-XOR-ITEM`, `PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING`, and `PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE`.
-The transpose groups own only their two rustdoc aliases apiece, remain independent, and have no accepted performance evidence until the clean eighth-slice evidence sequence completes.
+The transpose groups own only their two rustdoc aliases apiece and remain independent. Clean pre-migration revision `e660c91cff142b611f52a0a28a36e0a3d15670ed` passed both exact correctness prerequisites, worker reproducibility, both probes, all 12 first-attempt full and soak reports, all report replays and regressions, four rollups, and both completion receipt replays under the preceding inventory. Those ratios range from `0.370154x` to `0.695896x`, with worst confidence-interval upper bound `0.696808x`, and authorize the narrow timing migration without becoming source-current post-migration evidence.
 All twelve executable groups retain independent exact `1.25x` rules.
 Clean revisions `ba70a52025fdd4122ac97cec263725b2ec56e431`, `c76b7071fc4d7ac358ef3a2fffc053ea675bd05f`, `56dfe7569c6da48ffe76bde18f21ff43095f029b`, `5d226c94ece70f96d0b771f9c8cde7464ccd261b`, `60b732c77f1828058fbd65ec6c5c4ad582467fd1`, and `7b43b46d1c08f669264d009b8d3872ce86838f0e` supply accepted historical AArch64 evidence under their recorded inventories.
-The legacy canonical-print and heterogeneous sparse-XOR rows are superseded and retain only non-primary provenance or memory history.
+The legacy canonical-print, heterogeneous sparse-XOR, and heterogeneous BitMatrix rows are superseded and retain only non-primary provenance or memory history.
 The inherited `m5-simd-word` and heterogeneous `m5-simd-bits` rows remain reworked; the legacy XOR pair remains mapped and active, while completed evidence authorized retirement of the duplicate `not_zero` and sparse-XOR timing pairs.
 
 PQ0 freezes inventory and migration decisions only.
@@ -84,12 +84,12 @@ Every scale point stores either an exact input-byte count or an explicit not-app
 | Decision | Count | Meaning |
 | --- | ---: | --- |
 | Retained | 12 | The upstream operation shape is faithful, but comprehensive preflight, output, scaling, and statistical evidence is still missing. |
-| Reworked | 136 | The row needs a faithful runner, exact phase split, scale family, output contract, or another material correction; `m4-circuit-parse` now has its exact replacement contract, and `m5-simd-word` remains reworked while its older M12 threshold stays active pending explicit replacement migration. |
+| Reworked | 135 | The row needs a faithful runner, exact phase split, scale family, output contract, or another material correction; `m4-circuit-parse` now has its exact replacement contract, and `m5-simd-word` remains reworked while its older M12 threshold stays active pending explicit replacement migration. |
 | Diagnostic | 4 | The row remains useful for investigation but cannot produce a comprehensive ratio in its current form. |
-| Superseded | 7 | A more specific row owns the behavior and the duplicate identity must be removed during manifest migration. |
+| Superseded | 8 | A more specific row owns the behavior and the duplicate identity must be removed during manifest migration. |
 | Removed | 2 | `m7-perf-harness` and `m12-primary-performance-matrix` are metadata rather than timed workloads. |
 
-The seven superseded identities are `m4-circuit-canonical-print`, `m5-sparse-xor`, `m10-analyze-errors-fold-cli`, `m9-feedback-inline-mpp-batch`, `pf3-m2d-sweep-b8`, `pf7-cli-m2d-sweep-b8`, and `pf7-cli-m2d-feedback-inline`.
+The eight superseded identities are `m4-circuit-canonical-print`, `m5-simd-bit-table`, `m5-sparse-xor`, `m10-analyze-errors-fold-cli`, `m9-feedback-inline-mpp-batch`, `pf3-m2d-sweep-b8`, `pf7-cli-m2d-sweep-b8`, and `pf7-cli-m2d-feedback-inline`.
 The four diagnostic identities are `m7-cli-dispatch`, `m7-convert-stim-canonical`, `m7-convert-01-to-ptb64`, and `pf3-gate-semantic-wide`.
 
 ## Unresolved Work Frozen For Later Milestones
@@ -98,7 +98,7 @@ The four diagnostic identities are `m7-cli-dispatch`, `m7-convert-stim-canonical
 | --- | ---: | --- |
 | Proxy workload | 10 | PQ2 through PQ5 exact workload replacement |
 | Stale metadata row | 2 | PQ1 manifest migration |
-| Duplicate workload | 7 | PQ1 manifest migration |
+| Duplicate workload | 8 | PQ1 manifest migration |
 | Missing scale family | 123 | PQ2 through PQ6 |
 | Missing qualification correctness preflight | 158 | PQ1 plus dependent CQ milestones |
 | Missing semantic output digest | 158 | PQ1 |
@@ -108,7 +108,7 @@ The four diagnostic identities are `m7-cli-dispatch`, `m7-convert-stim-canonical
 | Heterogeneous selector without current exact threshold pairs | 15 | PQ1 row split or exact pair inventory |
 
 All 58 current `stim-cli` rows are explicitly marked asymmetric and cannot enter the comprehensive primary gate until PQ1 runs built Stab and Stim processes symmetrically.
-Five aggregate upstream rows, including SIMD table, tableau simulator, graphlike search, error analyzer, and DEM sampler coverage, remain visible for rework because their current Stab workload is not the same operation or scale as the selected Stim measurements.
+Four aggregate upstream rows covering the tableau simulator, graphlike search, error analyzer, and DEM sampler remain visible for rework because their current Stab workload is not the same operation or scale as the selected Stim measurements. The aggregate SIMD table row remains visible only as superseded provenance after exact allocating and in-place transpose completion authorized its timing migration.
 No inherited or proposed row is granted a `no-faithful-stim-comparator` conclusion in PQ0.
 The four current M12 no-ratio waivers instead name concrete pinned-Stim adapter retirement symbols for Stim canonical conversion, DEM serialization, `01` to `ptb64`, and `ptb64` reading.
 

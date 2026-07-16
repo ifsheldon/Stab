@@ -196,6 +196,56 @@ fn superseded_sparse_xor_row_retires_legacy_timing_pairs() {
 }
 
 #[test]
+fn superseded_bit_matrix_row_retires_only_legacy_timing_provenance() {
+    let (suite, manifest, references) = fixture();
+    let row = suite
+        .manifest_rows
+        .iter()
+        .find(|row| row.id == "m5-simd-bit-table")
+        .expect("superseded BitMatrix row");
+    assert_eq!(row.decision, RowDecision::Superseded);
+    assert!(row.threshold_refs.is_empty());
+    assert!(row.threshold_max_relative_ratio.is_none());
+    assert!(row.threshold_measurement_pairs.is_empty());
+    assert!(row.replacement_contracts.is_empty());
+
+    let source = suite
+        .upstream_perf_sources
+        .iter()
+        .find(|source| source.path == "src/stim/mem/simd_bit_table.perf.cc")
+        .expect("pinned Stim BitMatrix performance source");
+    for symbol in [
+        "simd_bit_table_inplace_square_transpose_diam10K",
+        "simd_bit_table_out_of_place_transpose_diam10K",
+    ] {
+        assert!(source.symbols.iter().any(|candidate| candidate == symbol));
+    }
+    assert!(
+        source
+            .manifest_rows
+            .iter()
+            .any(|candidate| candidate == "m5-simd-bit-table")
+    );
+
+    for group_id in [
+        "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE",
+        "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING",
+    ] {
+        let group = suite
+            .qualification_groups
+            .iter()
+            .find(|group| group.id == group_id)
+            .expect("exact transpose replacement group");
+        assert_eq!(group.status, QualificationStatus::Implemented);
+        assert_eq!(group.threshold_policy, ThresholdPolicy::Primary1_25);
+        assert_eq!(group.workload_family.source, source.path);
+    }
+
+    validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect("superseded provenance does not own a legacy timing threshold");
+}
+
+#[test]
 fn bit_matrix_transpose_paths_have_exact_independent_parents() {
     let (suite, manifest, references) = fixture();
     let in_place = suite
