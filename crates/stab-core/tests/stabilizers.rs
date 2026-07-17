@@ -183,7 +183,8 @@ fn stabilizers_pauli_multiplication_tracks_real_and_imaginary_phases() {
         "-ZZY"
     );
 
-    for width in [1, 63, 64, 65, 10_000, 100_000, 1_000_000] {
+    assert_exhaustive_short_in_place_pauli_products();
+    for width in [1, 63, 64, 65, 255, 256, 257, 10_000, 100_000, 1_000_000] {
         assert_qualified_in_place_pauli_product(width);
     }
 }
@@ -1087,6 +1088,36 @@ fn scalar_commutes(left: &PauliString, right: &PauliString) -> bool {
         anticommutes ^= anti;
     }
     !anticommutes
+}
+
+fn assert_exhaustive_short_in_place_pauli_products() {
+    let bases = [PauliBasis::I, PauliBasis::X, PauliBasis::Y, PauliBasis::Z];
+    for left_sign in [PauliSign::Plus, PauliSign::Minus] {
+        for right_sign in [PauliSign::Plus, PauliSign::Minus] {
+            for left_basis in bases {
+                for right_basis in bases {
+                    let mut actual =
+                        PauliString::from_bases(left_sign, [left_basis]).expect("short left");
+                    let right =
+                        PauliString::from_bases(right_sign, [right_basis]).expect("short right");
+                    let expected_basis = PauliBasis::from_xz(
+                        left_basis.x_bit() ^ right_basis.x_bit(),
+                        left_basis.z_bit() ^ right_basis.z_bit(),
+                    );
+                    let expected_phase = left_basis
+                        .log_i_scalar_byproduct(right_basis)
+                        .wrapping_add(u8::from(right_sign.is_negative()) << 1)
+                        & 3;
+                    let phase = actual
+                        .right_multiply_in_place_returning_log_i_scalar(&right)
+                        .expect("short in-place product");
+                    assert_eq!(phase, expected_phase);
+                    assert_eq!(actual.sign(), left_sign);
+                    assert_eq!(actual.get(0), Some(expected_basis));
+                }
+            }
+        }
+    }
 }
 
 fn assert_qualified_in_place_pauli_product(width: usize) {

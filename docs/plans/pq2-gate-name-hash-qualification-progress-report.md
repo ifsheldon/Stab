@@ -1,6 +1,6 @@
 # PQ2 Gate Name Hash Qualification Progress Report
 
-> Historical-evidence note, 2026-07-17: this report remains authoritative for gate-name hashing at performance inventory `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`. Later product groups and migrations produced source-current performance digest `7eedf59cb65d2bd244accc56973d7831001191cd62511c56b05a5cd7ed612ac6`. The gate reports below are historical and are not relabeled as simultaneous current-inventory evidence.
+> Historical-evidence note, 2026-07-17: this report remains authoritative for gate-name hashing at performance inventory `1cc0be5c8c0a37c98bd4fb56f331dd6964e6f53e56b328b9564be507cbf88a42`. Later product groups, migrations, and exact-CQ strengthening produced source-current performance digest `e79edf2e1eaa49a801606245d4a845d47a1d000ed527c9669d95e091c4480237`. The gate reports below are historical and are not relabeled as simultaneous current-inventory evidence.
 
 ## Status
 

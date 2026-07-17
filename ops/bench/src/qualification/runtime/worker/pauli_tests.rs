@@ -120,8 +120,13 @@ fn pauli_fixture_matches_frozen_input_and_odd_even_output_receipts() {
 fn pauli_timed_public_calls_allocate_nothing_at_every_qualified_width() {
     for width in [10_000, 100_000, 1_000_000, PAULI_MAX_QUBITS] {
         let mut fixture = PauliMultiplyFixture::prepare(width).expect("prepare fixture");
-        let allocations = allocation_counter::measure(|| fixture.execute(1));
-        allocations.value.expect("execute fixture");
+        let mut execution = None;
+        let allocations = allocation_counter::measure(|| {
+            execution = Some(fixture.execute(1));
+        });
+        execution
+            .expect("execution result")
+            .expect("execute fixture");
         assert_eq!(allocations.count_total, 0, "width={width} {allocations:?}");
         assert_eq!(allocations.bytes_total, 0, "width={width} {allocations:?}");
     }

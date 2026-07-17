@@ -6,9 +6,9 @@ Completed: 2026-07-13.
 
 Compatibility target: Stim v1.16.0 at commit `e2fc1eca7fd21684d433aa5f10f4504ea4860d07`.
 
-Current correctness dependency after strengthening the direct non-identity Pauli multiplication owner: schema-version-3 CQ0 semantic digest `3db44922e3310cb3a573fcff3b28d5eea5d28e0d6975e0856965c601ecc23c72`.
+Current correctness dependency after strengthening the direct non-identity Pauli multiplication owner and edge corpus: schema-version-3 CQ0 semantic digest `a739d350eeb3455d4a0b386f8a257d3d4fe01d417d7d11d8a269229d68a6a103`.
 
-Current performance inventory digest after accepted pre-migration Pauli evidence retired the identity-only timing thresholds and mappings: `7eedf59cb65d2bd244accc56973d7831001191cd62511c56b05a5cd7ed612ac6`.
+Current performance inventory digest after accepted pre-migration Pauli evidence retired the identity-only timing thresholds and mappings and the exact correctness owner was strengthened: `e79edf2e1eaa49a801606245d4a845d47a1d000ed527c9669d95e091c4480237`.
 
 Original PQ0 implementation evidence revision: `abf7cd1bae0de045f62e976a290507238153f976`.
 

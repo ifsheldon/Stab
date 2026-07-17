@@ -513,13 +513,20 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(thresholds.schema_version, 2);
-        assert_eq!(thresholds.rows.len(), 78);
+        assert_eq!(thresholds.rows.len(), 77);
         assert!(
             thresholds
                 .rows
                 .iter()
                 .all(|row| row.id != "m5-simd-bit-table"),
             "the completed exact transpose groups supersede the heterogeneous legacy timing row"
+        );
+        assert!(
+            thresholds
+                .rows
+                .iter()
+                .all(|row| row.id != "m6-pauli-string"),
+            "the exact non-identity group supersedes the identity-only legacy timing row"
         );
         assert!(thresholds.rows.iter().all(|row| {
             row.max_relative_ratio == Some(1.25)

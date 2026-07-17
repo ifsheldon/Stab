@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Source-current note, 2026-07-17: this report records CQ1 harness completion and historical evidence. Strengthening the direct non-identity Pauli multiplication owner sets the source-current correctness digest to `3db44922e3310cb3a573fcff3b28d5eea5d28e0d6975e0856965c601ecc23c72`, with 580 implemented, 17 evidence-close, and 1,147 planned parents. The earlier broad CQ2 PR, full, soak, and focused reports remain historical under their recorded digests; focused clean publication of the strengthened Pauli owner and all 271 selected deterministic parents remain pending. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Source-current note, 2026-07-17: this report records CQ1 harness completion and historical evidence. Strengthening the direct non-identity Pauli multiplication owner and its exhaustive basis, sign, and word-boundary corpus sets the source-current correctness digest to `a739d350eeb3455d4a0b386f8a257d3d4fe01d417d7d11d8a269229d68a6a103`, with 580 implemented, 17 evidence-close, and 1,147 planned parents. The earlier broad CQ2 PR, full, soak, and focused reports remain historical under their recorded digests; focused clean publication of the strengthened Pauli owner and all 271 selected deterministic parents remain pending. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 

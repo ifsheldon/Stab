@@ -1,6 +1,6 @@
 # PQ2 SIMD-Bits `not_zero` Qualification Progress Report
 
-> Historical-inventory note, 2026-07-17: this report remains accepted passing Linux AArch64 evidence at performance inventory `0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0`. The source-current inventory is `7eedf59cb65d2bd244accc56973d7831001191cd62511c56b05a5cd7ed612ac6` after later product groups and evidence-authorized migrations. The measured `not_zero` contracts and outcomes below are not relabeled as current-inventory evidence.
+> Historical-inventory note, 2026-07-17: this report remains accepted passing Linux AArch64 evidence at performance inventory `0161ab09015487ee2a1298be8dafe7c744b426b28a4e9fbdbd688e775c1655a0`. The source-current inventory is `e79edf2e1eaa49a801606245d4a845d47a1d000ed527c9669d95e091c4480237` after later product groups, evidence-authorized migrations, and exact-CQ strengthening. The measured `not_zero` contracts and outcomes below are not relabeled as current-inventory evidence.
 
 ## Status
 
