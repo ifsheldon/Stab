@@ -351,7 +351,7 @@ impl PauliStringIterator {
                         return true;
                     }
                     if self.advance_positions_and_reset_bases() {
-                        self.rewrite_active_result();
+                        self.sync_active_result_from(0);
                         return true;
                     }
                     if !self.advance_to_next_weight() {
@@ -363,10 +363,10 @@ impl PauliStringIterator {
     }
 
     pub fn restart(&mut self) {
+        self.clear_active_result();
         self.current_weight = self.min_weight;
         self.positions.clear();
         self.active_bases.clear();
-        self.result.clear_terms();
         self.state = if self.max_weight < self.min_weight {
             PauliStringIteratorState::Done
         } else {
@@ -377,7 +377,6 @@ impl PauliStringIterator {
     fn prepare_current_weight(&mut self) -> bool {
         self.positions.clear();
         self.active_bases.clear();
-        self.result.clear_terms();
         if self.current_weight > 0 {
             let Some(first_basis) = self.allowed.first() else {
                 return false;
@@ -414,35 +413,33 @@ impl PauliStringIterator {
         if weight == 0 {
             return false;
         }
-        for index in (0..weight).rev() {
-            let max_at_index = self.num_qubits - weight + index;
-            let advanced_to = if let Some(position) = self.positions.get_mut(index)
-                && *position < max_at_index
-            {
-                *position += 1;
-                Some(*position)
-            } else {
-                None
-            };
-            if let Some(mut previous) = advanced_to {
-                for position in self.positions.iter_mut().skip(index + 1) {
-                    previous += 1;
-                    *position = previous;
-                }
-                self.reset_all_bases();
-                return true;
-            }
+        let Some((index, position)) = self
+            .positions
+            .iter()
+            .copied()
+            .enumerate()
+            .rev()
+            .find(|(index, position)| *position < self.num_qubits - weight + *index)
+        else {
+            return false;
+        };
+        self.clear_active_result();
+        for (next_position, position) in (position + 1..).zip(self.positions.iter_mut().skip(index))
+        {
+            *position = next_position;
         }
-        false
+        self.reset_all_bases();
+        true
     }
 
     fn advance_to_next_weight(&mut self) -> bool {
-        self.positions.clear();
-        self.active_bases.clear();
         if self.current_weight >= self.max_weight {
             self.state = PauliStringIteratorState::Done;
             false
         } else {
+            self.clear_active_result();
+            self.positions.clear();
+            self.active_bases.clear();
             self.current_weight += 1;
             self.state = PauliStringIteratorState::NeedFirst;
             true
@@ -465,9 +462,8 @@ impl PauliStringIterator {
         }
     }
 
-    fn rewrite_active_result(&mut self) {
-        self.result.clear_terms();
-        self.sync_active_result_from(0);
+    fn clear_active_result(&mut self) {
+        self.result.clear_known_terms(&self.positions);
     }
 
     fn sync_active_result_from(&mut self, start: usize) {

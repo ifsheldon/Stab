@@ -372,14 +372,23 @@ impl PauliString {
         !self.has_terms
     }
 
-    pub(crate) fn clear_terms(&mut self) {
-        self.sign = PauliSign::Plus;
-        self.xs.clear();
-        self.zs.clear();
+    pub(crate) fn set_in_bounds(&mut self, index: usize, basis: PauliBasis) {
+        self.write_basis_in_bounds(index, basis);
+        if basis == PauliBasis::I {
+            self.has_terms = bits_have_terms(&self.xs, &self.zs);
+        } else {
+            self.has_terms = true;
+        }
+    }
+
+    pub(crate) fn clear_known_terms(&mut self, positions: &[usize]) {
+        for position in positions.iter().copied() {
+            self.write_basis_in_bounds(position, PauliBasis::I);
+        }
         self.has_terms = false;
     }
 
-    pub(crate) fn set_in_bounds(&mut self, index: usize, basis: PauliBasis) {
+    fn write_basis_in_bounds(&mut self, index: usize, basis: PauliBasis) {
         debug_assert!(index < self.len());
         let word = index / WORD_BITS;
         let bit = index % WORD_BITS;
@@ -399,11 +408,6 @@ impl PauliString {
             *z_word |= mask;
         } else {
             *z_word &= !mask;
-        }
-        if basis == PauliBasis::I {
-            self.has_terms = bits_have_terms(&self.xs, &self.zs);
-        } else {
-            self.has_terms = true;
         }
     }
 

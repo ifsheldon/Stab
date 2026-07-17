@@ -6517,7 +6517,12 @@
       "negative_axes": [
         "zero-weight",
         "full-weight",
-        "mixed-weight-order"
+        "mixed-weight-order",
+        "runtime-range-scales",
+        "runtime-singleton-scales",
+        "word-boundary-order",
+        "maximum-accepted-width",
+        "first-rejected-width"
       ],
       "primary_selector": {
         "state": "existing",
@@ -6528,15 +6533,15 @@
           "-p",
           "stab-core",
           "--test",
-          "stabilizers",
-          "stabilizers_pauli_string_iter_small_cases_match_stim_order",
+          "cq2_algebra_pauli_iterator",
+          "cq2_algebra_pauli_iterator_runtime_contract_matches_independent_reference",
           "--quiet",
           "--exact"
         ]
       },
       "resource_contract": {
         "kind": "bounded-search",
-        "detail": "The case checks deterministic restartable search state at small exact sizes; constructor limits and first rejection are owned by the source-owned Algebra resource-admission parents."
+        "detail": "The case uses an independent sparse enumerator to check complete borrowed-result order and summary at the two pinned workload shapes, six runtime scales, six word boundaries, restart, the accepted constructor maximum, and the typed first rejection without materializing the complete output family."
       },
       "upstream_word_size_families": [
         {
