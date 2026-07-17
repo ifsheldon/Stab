@@ -12,6 +12,28 @@ const WORD_BITS: usize = u64::BITS as usize;
 const SPARSE_XOR_TINY_STACK_ITEMS: usize = 16;
 const SPARSE_XOR_STACK_ITEMS: usize = 64;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct PauliWordProduct {
+    pub(crate) count_bit_1: u64,
+    pub(crate) count_bit_2: u64,
+    pub(crate) has_terms: bool,
+}
+
+pub(crate) fn pauli_right_multiply_words(
+    left_x: &mut [u64],
+    left_z: &mut [u64],
+    right_x: &[u64],
+    right_z: &[u64],
+) -> PauliWordProduct {
+    let (count_bit_1, count_bit_2, has_terms) =
+        scalar::pauli_right_multiply_words(left_x, left_z, right_x, right_z);
+    PauliWordProduct {
+        count_bit_1,
+        count_bit_2,
+        has_terms,
+    }
+}
+
 pub type BitResult<T> = Result<T, BitError>;
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]

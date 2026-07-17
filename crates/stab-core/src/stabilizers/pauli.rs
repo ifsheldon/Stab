@@ -4,6 +4,7 @@ use std::str::FromStr;
 use rand::{Rng, RngExt as _};
 
 use super::{StabilizerError, StabilizerResource, StabilizerResult};
+use crate::bits::pauli_right_multiply_words;
 use crate::{BitError, BitVec};
 
 const WORD_BITS: usize = 64;
@@ -462,39 +463,33 @@ impl PauliString {
             return Ok(u8::from(rhs.sign.is_negative()) << 1);
         }
 
-        let mut count_bit_1 = 0_u64;
-        let mut count_bit_2 = 0_u64;
         let rhs_word_count = rhs.xs.word_count();
-        let mut has_terms = self
+        let trailing_has_terms = self
             .xs
             .words()
             .iter()
             .zip(self.zs.words())
             .skip(rhs_word_count)
             .any(|(x_word, z_word)| (x_word | z_word) != 0);
-        for (((left_x, left_z), right_x), right_z) in self
-            .xs
-            .words_mut()
-            .iter_mut()
-            .zip(self.zs.words_mut().iter_mut())
-            .zip(rhs.xs.words())
-            .zip(rhs.zs.words())
-        {
-            let old_left_x = *left_x;
-            let old_left_z = *left_z;
-            *left_x ^= right_x;
-            *left_z ^= right_z;
+        let left_len = self.len();
+        let right_len = rhs.len();
+        let left_x = self.xs.words_mut().get_mut(..rhs_word_count).ok_or(
+            StabilizerError::LengthMismatch {
+                left: left_len,
+                right: right_len,
+            },
+        )?;
+        let left_z = self.zs.words_mut().get_mut(..rhs_word_count).ok_or(
+            StabilizerError::LengthMismatch {
+                left: left_len,
+                right: right_len,
+            },
+        )?;
+        let product = pauli_right_multiply_words(left_x, left_z, rhs.xs.words(), rhs.zs.words());
+        self.has_terms = trailing_has_terms || product.has_terms;
 
-            let old_x_new_z = old_left_x & right_z;
-            let anti_commutes = (right_x & old_left_z) ^ old_x_new_z;
-            count_bit_2 ^= (count_bit_1 ^ *left_x ^ *left_z ^ old_x_new_z) & anti_commutes;
-            count_bit_1 ^= anti_commutes;
-            has_terms |= (*left_x | *left_z) != 0;
-        }
-        self.has_terms = has_terms;
-
-        let mut log_i = popcount_mod_4(count_bit_1);
-        log_i ^= popcount_mod_4(count_bit_2) << 1;
+        let mut log_i = popcount_mod_4(product.count_bit_1);
+        log_i ^= popcount_mod_4(product.count_bit_2) << 1;
         log_i ^= u8::from(rhs.sign.is_negative()) << 1;
         Ok(log_i & 3)
     }

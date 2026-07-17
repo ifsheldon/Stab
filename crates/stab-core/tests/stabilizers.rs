@@ -11,7 +11,7 @@ use rand::SeedableRng as _;
 use rand::rngs::SmallRng;
 use stab_core::{
     CliffordString, CommutingPauliStringIterator, FlexPauliString, Gate, PauliBasis, PauliPhase,
-    PauliString, PauliStringIterator, SingleQubitClifford, Tableau, TableauIterator,
+    PauliSign, PauliString, PauliStringIterator, SingleQubitClifford, Tableau, TableauIterator,
     unitary_to_tableau,
 };
 
@@ -182,6 +182,10 @@ fn stabilizers_pauli_multiplication_tracks_real_and_imaginary_phases() {
             .to_string(),
         "-ZZY"
     );
+
+    for width in [1, 63, 64, 65, 10_000, 100_000, 1_000_000] {
+        assert_qualified_in_place_pauli_product(width);
+    }
 }
 
 #[test]
@@ -1083,4 +1087,77 @@ fn scalar_commutes(left: &PauliString, right: &PauliString) -> bool {
         anticommutes ^= anti;
     }
     !anticommutes
+}
+
+fn assert_qualified_in_place_pauli_product(width: usize) {
+    let left_bases = qualified_pauli_bases(0x243f_6a88_85a3_08d3, 0x9e37_79b9_7f4a_7c15, width);
+    let right_bases = qualified_pauli_bases(0x1319_8a2e_0370_7344, 0xbf58_476d_1ce4_e5b9, width);
+    let expected_bases = left_bases
+        .iter()
+        .copied()
+        .zip(right_bases.iter().copied())
+        .map(|(left, right)| {
+            PauliBasis::from_xz(left.x_bit() ^ right.x_bit(), left.z_bit() ^ right.z_bit())
+        })
+        .collect::<Vec<_>>();
+    let expected_first_phase = left_bases
+        .iter()
+        .copied()
+        .zip(right_bases.iter().copied())
+        .fold(2_u8, |phase, (left, right)| {
+            phase.wrapping_add(left.log_i_scalar_byproduct(right))
+        })
+        & 3;
+    let expected_second_phase = expected_bases
+        .iter()
+        .copied()
+        .zip(right_bases.iter().copied())
+        .fold(2_u8, |phase, (left, right)| {
+            phase.wrapping_add(left.log_i_scalar_byproduct(right))
+        })
+        & 3;
+
+    let original = PauliString::from_bases(PauliSign::Plus, left_bases).expect("left fixture");
+    let expected =
+        PauliString::from_bases(PauliSign::Plus, expected_bases).expect("expected product");
+    let right = PauliString::from_bases(PauliSign::Minus, right_bases).expect("right fixture");
+    let right_before = right.clone();
+    let mut actual = original.clone();
+
+    let first_phase = actual
+        .right_multiply_in_place_returning_log_i_scalar(&right)
+        .expect("first in-place product");
+    assert_eq!(
+        first_phase, expected_first_phase,
+        "first phase at width {width}"
+    );
+    assert_eq!(actual, expected, "first product at width {width}");
+    assert_eq!(actual.sign(), PauliSign::Plus, "left sign at width {width}");
+    assert_eq!(right, right_before, "right operand at width {width}");
+
+    let second_phase = actual
+        .right_multiply_in_place_returning_log_i_scalar(&right)
+        .expect("second in-place product");
+    assert_eq!(
+        second_phase, expected_second_phase,
+        "second phase at width {width}"
+    );
+    assert_eq!(actual, original, "two products at width {width}");
+    assert_eq!(right, right_before, "right operand at width {width}");
+}
+
+fn qualified_pauli_bases(seed: u64, stride: u64, width: usize) -> Vec<PauliBasis> {
+    (0..width)
+        .map(|index| {
+            let value = splitmix64(seed.wrapping_add((index as u64).wrapping_mul(stride)));
+            PauliBasis::from_xz(value & 1 != 0, value & 2 != 0)
+        })
+        .collect()
+}
+
+fn splitmix64(mut value: u64) -> u64 {
+    value = value.wrapping_add(0x9e37_79b9_7f4a_7c15);
+    value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    value ^ (value >> 31)
 }
