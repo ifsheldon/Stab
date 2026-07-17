@@ -20,6 +20,84 @@ const SINGLETON_SPECS: [IteratorSpec; 3] = [
     IteratorSpec::xyz_singleton(1_000_000),
 ];
 const WORD_BOUNDARIES: [usize; 6] = [63, 64, 65, 255, 256, 257];
+const RANGE_SEQUENCE_DIGESTS: [[u64; 4]; 3] = [
+    [
+        12_446_789_277_131_027_186,
+        13_051_800_182_227_271_736,
+        8_913_968_126_161_186_152,
+        615_325_163_075_576_630,
+    ],
+    [
+        8_534_633_740_512_535_725,
+        4_085_474_010_443_026_331,
+        18_206_560_189_976_024_663,
+        5_389_641_570_020_862_266,
+    ],
+    [
+        4_583_398_351_909_552_890,
+        10_692_845_233_139_100_947,
+        16_030_953_713_442_756_085,
+        15_103_561_035_003_883_458,
+    ],
+];
+const SINGLETON_SEQUENCE_DIGESTS: [[u64; 4]; 3] = [
+    [
+        10_062_400_317_628_243_932,
+        8_094_961_272_711_778_612,
+        3_304_519_595_989_212_289,
+        16_690_026_315_542_598_811,
+    ],
+    [
+        4_677_313_449_531_378_386,
+        3_680_951_585_136_897_876,
+        14_549_473_997_558_646_074,
+        16_804_399_793_348_274_468,
+    ],
+    [
+        13_916_549_690_708_414_893,
+        12_377_616_979_003_074_289,
+        3_252_611_672_401_433_999,
+        16_537_992_152_957_202_582,
+    ],
+];
+const WORD_BOUNDARY_SEQUENCE_DIGESTS: [[u64; 4]; 6] = [
+    [
+        3_090_780_283_937_011_957,
+        18_080_691_007_433_190_073,
+        12_352_157_874_546_323_577,
+        18_307_326_670_971_381_005,
+    ],
+    [
+        7_056_300_548_564_720_962,
+        8_403_608_438_459_964_027,
+        17_287_770_800_484_319_015,
+        13_775_059_398_034_614_954,
+    ],
+    [
+        10_463_140_286_969_830_809,
+        15_415_621_748_824_166_523,
+        7_485_816_268_919_135_903,
+        96_674_164_544_979_753,
+    ],
+    [
+        7_797_370_015_588_931_115,
+        8_369_731_014_461_536_336,
+        4_511_031_657_567_620_864,
+        7_905_674_535_924_389_521,
+    ],
+    [
+        18_225_252_125_383_721_054,
+        2_001_592_867_943_306_302,
+        12_483_468_837_754_404_859,
+        15_310_441_896_764_087_119,
+    ],
+    [
+        4_822_836_063_366_409_570,
+        6_190_669_524_495_593_407,
+        18_194_907_299_641_788_014,
+        5_590_972_172_499_269_586,
+    ],
+];
 
 #[test]
 fn cq2_algebra_pauli_iterator_runtime_contract_matches_independent_reference() -> TestResult<()> {
@@ -36,24 +114,39 @@ fn cq2_algebra_pauli_iterator_runtime_contract_matches_independent_reference() -
     }
 
     let expected_range_counts = [232, 21_604, 972_972];
-    for (spec, expected_count) in RANGE_SPECS.into_iter().zip(expected_range_counts) {
+    for ((spec, expected_count), expected_digest) in RANGE_SPECS
+        .into_iter()
+        .zip(expected_range_counts)
+        .zip(RANGE_SEQUENCE_DIGESTS)
+    {
         let actual = summarize_actual(spec)?;
         let reference = summarize_reference(spec)?;
         assert_eq!(actual, reference, "{spec:?}");
         assert_eq!(actual.output_count, expected_count, "{spec:?}");
+        assert_frozen_range_summary(&actual, spec, expected_digest)?;
     }
 
     let expected_singleton_counts = [3_000, 96_000, 3_000_000];
-    for (spec, expected_count) in SINGLETON_SPECS.into_iter().zip(expected_singleton_counts) {
+    for ((spec, expected_count), expected_digest) in SINGLETON_SPECS
+        .into_iter()
+        .zip(expected_singleton_counts)
+        .zip(SINGLETON_SEQUENCE_DIGESTS)
+    {
         let actual = summarize_actual(spec)?;
         let reference = summarize_reference(spec)?;
         assert_eq!(actual, reference, "{spec:?}");
         assert_eq!(actual.output_count, expected_count, "{spec:?}");
+        assert_frozen_singleton_summary(&actual, spec, expected_digest)?;
     }
 
-    for width in WORD_BOUNDARIES {
+    for (width, expected_digest) in WORD_BOUNDARIES
+        .into_iter()
+        .zip(WORD_BOUNDARY_SEQUENCE_DIGESTS)
+    {
         let spec = IteratorSpec::xyz_singleton(width);
-        assert_eq!(summarize_actual(spec)?, summarize_reference(spec)?);
+        let actual = summarize_actual(spec)?;
+        assert_eq!(actual, summarize_reference(spec)?);
+        assert_frozen_singleton_summary(&actual, spec, expected_digest)?;
     }
 
     let restart_spec = IteratorSpec::xyz_singleton(32_000);
@@ -315,6 +408,53 @@ fn summarize_reference(spec: IteratorSpec) -> TestResult<SequenceSummary> {
         )
     })?;
     Ok(summary)
+}
+
+fn assert_frozen_range_summary(
+    summary: &SequenceSummary,
+    spec: IteratorSpec,
+    expected_digest: [u64; 4],
+) -> TestResult<()> {
+    assert_eq!(summary.digest, expected_digest, "{spec:?}");
+    assert_eq!(
+        summary.total_result_width,
+        summary
+            .output_count
+            .checked_mul(u64::try_from(spec.num_qubits)?)
+            .ok_or(QualificationTestError::ArithmeticOverflow)?,
+        "{spec:?}"
+    );
+    assert_eq!(
+        summary.first,
+        [(0, PauliBasis::X), (1, PauliBasis::X)],
+        "{spec:?}"
+    );
+    assert_eq!(
+        summary.last,
+        (spec.num_qubits - 5..spec.num_qubits)
+            .map(|position| (position, PauliBasis::Z))
+            .collect::<Vec<_>>(),
+        "{spec:?}"
+    );
+    Ok(())
+}
+
+fn assert_frozen_singleton_summary(
+    summary: &SequenceSummary,
+    spec: IteratorSpec,
+    expected_digest: [u64; 4],
+) -> TestResult<()> {
+    let width = u64::try_from(spec.num_qubits)?;
+    assert_eq!(summary.output_count, width * 3, "{spec:?}");
+    assert_eq!(summary.total_result_width, width * width * 3, "{spec:?}");
+    assert_eq!(summary.digest, expected_digest, "{spec:?}");
+    assert_eq!(summary.first, [(0, PauliBasis::X)], "{spec:?}");
+    assert_eq!(
+        summary.last,
+        [(spec.num_qubits - 1, PauliBasis::Z)],
+        "{spec:?}"
+    );
+    Ok(())
 }
 
 fn visit_reference(
