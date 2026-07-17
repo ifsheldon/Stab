@@ -1,6 +1,6 @@
 # PQ2 Completion Receipt Infrastructure Progress Report
 
-> Current-use note, 2026-07-16: the three `not_zero` groups and both sparse-XOR groups have since published and byte-for-byte replayed schema-version-1 completion receipts. This report remains the infrastructure acceptance record; the product evidence lives in their respective PQ2 progress reports.
+> Current-use note, 2026-07-16: the three `not_zero` groups, both sparse-XOR groups, and both BitMatrix transpose groups have since published and byte-for-byte replayed schema-version-1 completion receipts. This report remains the infrastructure acceptance record; the product evidence lives in their respective PQ2 progress reports.
 
 Date: 2026-07-16
 
@@ -47,7 +47,7 @@ No implementation defect or remaining specification loophole blocks this infrast
 | Prospective acceptance policy | Satisfied | `GOAL.md`, the performance plan, the dense-XOR report, and the specification-gap resolution |
 | Human audit and review kept separate | Satisfied | Receipt Markdown and operational documentation |
 
-The real completion and replay commands were not run against the five historical product groups because the receipt contract is prospective and requires source-current full and soak evidence from one clean committed revision. Later `not_zero` and sparse-XOR slices exercised both commands before claiming closure, without retroactively relabeling the first five groups as receipt-backed.
+The real completion and replay commands were not run against the five historical product groups because the receipt contract is prospective and requires source-current full and soak evidence from one clean committed revision. Later `not_zero`, sparse-XOR, and BitMatrix transpose slices exercised both commands before claiming closure, without retroactively relabeling the first five groups as receipt-backed.
 
 ## Independent Full Code Review
 
