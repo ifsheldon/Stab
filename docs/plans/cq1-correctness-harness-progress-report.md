@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Source-current note, 2026-07-16: this report records CQ1 harness completion and historical evidence. The tightened BitMatrix transpose resource contract sets the source-current correctness digest to `5d795e831bc20b3f2780ca72c1eaea7c75387388d38f8e37f4539254a41e821b`, with 580 implemented, 17 evidence-close, and 1,147 planned parents. Clean revision `f912cc3af1f13cc9fab798d69937c155d37d83a0` passed the two exact transpose prerequisites at this digest and published a controller-bound preflight before dependent timing. The earlier broad CQ2 PR, full, soak, and focused reports remain historical under their recorded digests, and all 271 selected deterministic parents still must run before citing all-domain harness execution as source-current. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Source-current note, 2026-07-17: this report records CQ1 harness completion and historical evidence. Strengthening the direct non-identity Pauli multiplication owner sets the source-current correctness digest to `3db44922e3310cb3a573fcff3b28d5eea5d28e0d6975e0856965c601ecc23c72`, with 580 implemented, 17 evidence-close, and 1,147 planned parents. The earlier broad CQ2 PR, full, soak, and focused reports remain historical under their recorded digests; focused clean publication of the strengthened Pauli owner and all 271 selected deterministic parents remain pending. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 

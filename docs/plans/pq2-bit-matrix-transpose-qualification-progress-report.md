@@ -1,5 +1,7 @@
 # PQ2 BitMatrix Transpose Qualification Progress Report
 
+> Historical-inventory note, 2026-07-17: this report remains accepted passing Linux AArch64 evidence at performance inventory `1d38c155acbaf78234f9b92857cfef8c25ffa059a4a9e9756b272a72272dfd0d` and correctness inventory `5d795e831bc20b3f2780ca72c1eaea7c75387388d38f8e37f4539254a41e821b`. The source-current Pauli inventories are different, so the transpose outcomes below are not relabeled as simultaneous current-inventory evidence.
+
 ## Status
 
 The eighth PQ2 executable slice passes its independent `1.25x` timing gates for public square in-place BitMatrix transpose and public allocating BitMatrix transpose at every full and soak scale on the controlled Linux AArch64 host as of 2026-07-16.
