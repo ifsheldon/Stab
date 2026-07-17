@@ -352,6 +352,12 @@ fn validate_inventory_contracts(
                 .measurement_ids
                 .iter()
                 .any(|measurement| measurement.to_string() == replacement.runtime_measurement_id)
+                || replacement.runtime_scale_id.as_ref().is_some_and(|scale| {
+                    !contract
+                        .scales
+                        .iter()
+                        .any(|candidate| candidate.id.to_string() == *scale)
+                })
             {
                 return Err(GroupError::ReplacementContract {
                     row: row.id.clone(),
@@ -1063,6 +1069,34 @@ mod tests {
                 if row == "m5-simd-bits"
                     && group == "PERFQ-M5-SIMD-BITS"
                     && measurement == "stale-measurement"
+        ));
+    }
+
+    #[test]
+    fn runtime_contract_rejects_stale_replacement_scale() {
+        let root =
+            RepoRoot::resolve(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))
+                .expect("repository root");
+        let manifest = crate::manifest::BenchmarkManifest::read(&root).expect("manifest");
+        let mut suite = super::super::super::discovery::generate(&root, &manifest)
+            .expect("generated performance inventory");
+        let (file, _) = load(&root, &suite.semantic_digest).expect("runtime contract");
+        suite
+            .manifest_rows
+            .iter_mut()
+            .find(|row| row.id == "m5-simd-bits")
+            .expect("dense XOR row")
+            .replacement_contracts
+            .first_mut()
+            .expect("dense XOR replacement")
+            .runtime_scale_id = Some("stale-scale".to_string());
+
+        assert!(matches!(
+            validate_inventory_contracts(&file, &suite),
+            Err(GroupError::ReplacementContract { row, group, measurement })
+                if row == "m5-simd-bits"
+                    && group == "PERFQ-M5-SIMD-BITS"
+                    && measurement == "xor-complete-vector"
         ));
     }
 

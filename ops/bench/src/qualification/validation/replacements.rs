@@ -37,6 +37,9 @@ pub(super) fn validate(
             &replacement.runtime_measurement_id,
             issues,
         );
+        if let Some(scale) = &replacement.runtime_scale_id {
+            validate_identifier("legacy replacement runtime scale", scale, issues);
+        }
         let source = (
             replacement.legacy_stim_name.as_str(),
             replacement.legacy_stab_name.as_str(),
@@ -44,6 +47,7 @@ pub(super) fn validate(
         let target = (
             replacement.runtime_group_id.as_str(),
             replacement.runtime_measurement_id.as_str(),
+            replacement.runtime_scale_id.as_deref(),
         );
         if !replacement_sources.insert(source) {
             issues.push(format!(
@@ -53,8 +57,11 @@ pub(super) fn validate(
         }
         if !replacement_targets.insert(target) {
             issues.push(format!(
-                "manifest row {} repeats replacement target {:?}/{:?}",
-                row.id, replacement.runtime_group_id, replacement.runtime_measurement_id
+                "manifest row {} repeats replacement target {:?}/{:?}/{:?}",
+                row.id,
+                replacement.runtime_group_id,
+                replacement.runtime_measurement_id,
+                replacement.runtime_scale_id
             ));
         }
         if !measurement_pairs.iter().any(|(stim, stab, ratio)| {
@@ -76,7 +83,23 @@ pub(super) fn validate(
                     && !group.correctness_cases.is_empty()
                     && group.output_contract.digest_state == EvidenceState::Existing
                     && group.threshold_policy == ThresholdPolicy::Primary1_25
-                    && group.status != QualificationStatus::Planned => {}
+                    && group.status != QualificationStatus::Planned => {
+                if let Some(scale) = &replacement.runtime_scale_id
+                    && !group
+                        .workload_family
+                        .scales
+                        .iter()
+                        .any(|candidate| candidate.id == *scale)
+                {
+                    issues.push(format!(
+                        "manifest row {} replacement target {}/{}/{} references an unknown runtime scale",
+                        row.id,
+                        replacement.runtime_group_id,
+                        replacement.runtime_measurement_id,
+                        scale
+                    ));
+                }
+            }
             Some(_) => issues.push(format!(
                 "manifest row {} replacement target {} is not an exact implemented primary contract in the same performance feature",
                 row.id, replacement.runtime_group_id

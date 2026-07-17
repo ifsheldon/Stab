@@ -165,6 +165,13 @@ fn reworked_heterogeneous_row_can_point_to_an_exact_replacement_group() {
             .runtime_measurement_id,
         "xor-complete-vector"
     );
+    assert!(
+        row.replacement_contracts
+            .first()
+            .expect("one dense XOR replacement")
+            .runtime_scale_id
+            .is_none()
+    );
     assert_eq!(row.replacement_contracts.len(), 1);
     assert!(row.replacement_contracts.iter().all(|replacement| {
         replacement.legacy_stim_name != "simd_bits_not_zero_100K"
@@ -173,6 +180,52 @@ fn reworked_heterogeneous_row_can_point_to_an_exact_replacement_group() {
 
     validate(&suite, &manifest, &references, "UNFROZEN")
         .expect("reworked legacy row must not constrain its exact replacement group");
+}
+
+#[test]
+fn replacement_scale_must_name_a_target_group_scale() {
+    let (mut suite, manifest, references) = fixture();
+    suite
+        .manifest_rows
+        .iter_mut()
+        .find(|row| row.id == "m5-simd-bits")
+        .expect("dense XOR legacy row")
+        .replacement_contracts
+        .first_mut()
+        .expect("dense XOR replacement")
+        .runtime_scale_id = Some("missing-scale".to_string());
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("an unknown replacement scale must fail");
+    assert!(
+        error
+            .to_string()
+            .contains("references an unknown runtime scale")
+    );
+}
+
+#[test]
+fn replacement_target_uniqueness_includes_an_optional_scale() {
+    let (mut suite, manifest, references) = fixture();
+    let row = suite
+        .manifest_rows
+        .iter_mut()
+        .find(|row| row.id == "m5-simd-bits")
+        .expect("dense XOR legacy row");
+    let replacement = row
+        .replacement_contracts
+        .first_mut()
+        .expect("dense XOR replacement");
+    replacement.runtime_scale_id = Some("small".to_string());
+    let mut second = replacement.clone();
+    second.runtime_scale_id = Some("medium".to_string());
+    row.replacement_contracts.push(second);
+
+    let error = validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect_err("the duplicated legacy source remains invalid");
+    let message = error.to_string();
+    assert!(message.contains("repeats replacement source"));
+    assert!(!message.contains("repeats replacement target"));
 }
 
 #[test]

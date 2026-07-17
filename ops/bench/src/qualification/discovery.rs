@@ -495,6 +495,7 @@ fn replacement_contracts(row: &BenchmarkRow) -> Vec<ReplacementContract> {
             legacy_stab_name: "stab_simd_bits_xor_10K".to_string(),
             runtime_group_id: "PERFQ-M5-SIMD-BITS".to_string(),
             runtime_measurement_id: "xor-complete-vector".to_string(),
+            runtime_scale_id: None,
         }],
         _ => Vec::new(),
     }
