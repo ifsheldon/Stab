@@ -2,7 +2,7 @@
 
 ## Status
 
-Active execution goal as of 2026-07-16.
+Active execution goal as of 2026-07-17.
 
 The previous non-deferred blocker rollup is complete and recorded in `docs/plans/pfm8-rollup-evidence-report.md`.
 This goal replaces that completed execution contract; it does not reopen the finite PFM-B ledger.
@@ -63,7 +63,11 @@ Do not treat PQ0's 12 retained rows as qualified evidence: the current inventory
 The sixth, seventh, and eighth executable slices are closed on controlled Linux AArch64 and must not be reopened merely to produce a newer aggregate digest.
 The eighth slice remains two independent contracts from API ownership through completion: public allocating transpose and public square in-place transpose. Do not aggregate their timing or allocation outcomes, substitute `transpose_into`, weaken the exact fixture or output obligations, or retire the retained M12 memory baseline before PQ6 supplies equal or stronger evidence.
 Clean revision `f912cc3af1f13cc9fab798d69937c155d37d83a0` is the accepted reviewed transpose evidence revision. Its two-case correctness preflight, reproducible workers, both probes, 12 first-attempt reports and regressions, four rollups, two completion receipts, exact ratios, artifact hashes, and review-fix history are recorded in `docs/plans/pq2-bit-matrix-transpose-qualification-progress-report.md`.
-The next PQ2 implementation slice must be selected as another finite exact runtime group from `docs/plans/comprehensive-stim-performance-qualification-plan.md`; do not infer completion of all bit kernels, deterministic PQ2, or the comprehensive suite from the transpose closure.
+The active ninth PQ2 slice is `PERFQ-M6-PAULI-STRING` in `docs/plans/comprehensive-stim-performance-qualification-plan.md`. It qualifies only equal-width public `PauliString::right_multiply_in_place_returning_log_i_scalar` against pinned Stim with deterministic non-identity operands at 10,000, 100,000, and 1,000,000 qubits.
+Do not use the inherited identity-only `m6-pauli-string` ratio as evidence: Stab's public identity-right fast path makes that legacy comparison O(1) on the Stab side. Keep its `1.25x` threshold active until the faithful group has a clean pre-migration completion receipt, then retire only that timing threshold through the scale-aware migration and regenerate the complete evidence chain from one clean post-migration revision.
+The ninth slice must preserve the direct public lifecycle, returned phase, odd/even state, right-operand immutability, zero timed Stab allocations, the 1,048,576-qubit accepted maximum, first rejection, pre-setup semantic-work overflow rejection, exact output digests, and independent thresholds at every scale. Portable SIMD belongs only behind the tested private bit-kernel boundary and may be added only after faithful diagnostic evidence.
+Refactor the near-limit benchmark adapter, invocation, validation, and worker owners before an affected source reaches 1,200 lines. Publish `docs/plans/pq2-pauli-string-multiplication-qualification-progress-report.md` only after post-migration correctness, worker reproducibility, probe, full and soak reports, replay, regression, rollup, completion, milestone-audit, and GPT-5.6/max review closure all pass.
+Do not infer completion of stabilizer Algebra, deterministic PQ2, or the comprehensive suite from this one group.
 Keep the complete source-current 271-parent CQ2 run, native Linux x86-64 execution, and PQ6 memory-growth qualification visible as separate later obligations.
 
 Execute the milestones in this dependency order:
