@@ -376,6 +376,7 @@ fn summarize_singleton_existing(
 ) -> TestResult<SequenceSummary> {
     let allowed_bases = spec.allowed_bases();
     let mut summary = SequenceSummary::new();
+    let mut observed_terms = Vec::with_capacity(1);
     for position in 0..spec.num_qubits {
         for (basis_index, basis) in allowed_bases.iter().copied().enumerate() {
             assert!(
@@ -389,13 +390,39 @@ fn summarize_singleton_existing(
             if basis_index == 0 && position > 0 {
                 assert_eq!(result.get(position - 1), Some(PauliBasis::I));
             }
-            summary.record_terms(spec.num_qubits, 1, std::iter::once((position, basis)))?;
+            if singleton_full_state_checkpoint(spec.num_qubits, position) {
+                observed_terms.clear();
+                observed_terms.extend(result.active_terms());
+                assert_eq!(result.weight(), 1, "{spec:?} at {position}:{basis_index}");
+                assert_eq!(
+                    observed_terms,
+                    [(position, basis)],
+                    "{spec:?} at {position}:{basis_index}"
+                );
+                summary.record_terms(
+                    spec.num_qubits,
+                    observed_terms.len(),
+                    observed_terms.iter().copied(),
+                )?;
+            } else {
+                summary.record_terms(spec.num_qubits, 1, std::iter::once((position, basis)))?;
+            }
         }
     }
     assert!(!iterator.iter_next(), "{spec:?} produced an extra value");
     let final_terms = iterator.result().active_terms().collect::<Vec<_>>();
     assert_eq!(final_terms, summary.last);
     Ok(summary)
+}
+
+fn singleton_full_state_checkpoint(num_qubits: usize, position: usize) -> bool {
+    if num_qubits <= 1_000 {
+        return true;
+    }
+    position < 3
+        || position.saturating_add(3) >= num_qubits
+        || WORD_BOUNDARIES.contains(&position)
+        || [num_qubits / 4, num_qubits / 2, num_qubits / 4 * 3].contains(&position)
 }
 
 fn summarize_reference(spec: IteratorSpec) -> TestResult<SequenceSummary> {
