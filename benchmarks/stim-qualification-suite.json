@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "a739d350eeb3455d4a0b386f8a257d3d4fe01d417d7d11d8a269229d68a6a103",
-  "semantic_digest": "e79edf2e1eaa49a801606245d4a845d47a1d000ed527c9669d95e091c4480237",
+  "correctness_digest": "4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87",
+  "semantic_digest": "ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -284,6 +284,7 @@
         "PERFQ-CHECKLIST-ec64113cdae0cd99-STABILIZER-ALGEBRA",
         "PERFQ-M6-CLIFFORD-STRING",
         "PERFQ-M6-PAULI-ITER",
+        "PERFQ-M6-PAULI-ITER-SINGLETON",
         "PERFQ-M6-PAULI-STRING",
         "PERFQ-M6-STABILIZERS-TO-TABLEAU",
         "PERFQ-M6-TABLEAU",
@@ -17607,7 +17608,7 @@
       "correctness_case_id": "cq-evidence-qualification-5331280b58fd49c7",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-3d2db408cc3160d5"
+        "PERFQ-M6-PAULI-ITER"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -17620,7 +17621,7 @@
       "correctness_case_id": "cq-evidence-qualification-5331280b58fd49c7",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-3d2db408cc3160d5"
+        "PERFQ-M6-PAULI-ITER"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -17646,7 +17647,7 @@
       "correctness_case_id": "cq-evidence-qualification-5331280b58fd49c7",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-3d2db408cc3160d5"
+        "PERFQ-M6-PAULI-ITER"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -27991,7 +27992,7 @@
       "correctness_case_id": "cq-evidence-qualification-5331280b58fd49c7",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-cbbff45d08223758"
+        "PERFQ-M6-PAULI-ITER"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -28004,7 +28005,7 @@
       "correctness_case_id": "cq-evidence-qualification-5331280b58fd49c7",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-cbbff45d08223758"
+        "PERFQ-M6-PAULI-ITER"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -28030,7 +28031,7 @@
       "correctness_case_id": "cq-evidence-qualification-5331280b58fd49c7",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-cbbff45d08223758"
+        "PERFQ-M6-PAULI-ITER"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -34100,10 +34101,7 @@
         "stab_core::PauliStringIterator as Clone for@c2002687be3f",
         "stab_core::PauliStringIterator as Iterator for@c2002687be3f",
         "stab_core::PauliStringIterator as PartialEq for@c2002687be3f",
-        "stab_core::PauliStringIterator::iter_next",
-        "stab_core::PauliStringIterator::new",
-        "stab_core::PauliStringIterator::restart",
-        "stab_core::PauliStringIterator::result"
+        "stab_core::PauliStringIterator::restart"
       ],
       "disposition": "measured",
       "phase": "execute",
@@ -34123,21 +34121,21 @@
         "scales": [
           {
             "id": "small",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-0e08f575fb8bd920",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-497c0e5750a53a74",
             "input_bytes": {
               "kind": "not-applicable"
             }
           },
           {
             "id": "medium",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-0e08f575fb8bd920",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-497c0e5750a53a74",
             "input_bytes": {
               "kind": "not-applicable"
             }
           },
           {
             "id": "large",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-0e08f575fb8bd920",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-497c0e5750a53a74",
             "input_bytes": {
               "kind": "not-applicable"
             }
@@ -45876,10 +45874,7 @@
         "stab_core::stabilizers::PauliStringIterator as Clone for@c2002687be3f",
         "stab_core::stabilizers::PauliStringIterator as Iterator for@c2002687be3f",
         "stab_core::stabilizers::PauliStringIterator as PartialEq for@c2002687be3f",
-        "stab_core::stabilizers::PauliStringIterator::iter_next",
-        "stab_core::stabilizers::PauliStringIterator::new",
-        "stab_core::stabilizers::PauliStringIterator::restart",
-        "stab_core::stabilizers::PauliStringIterator::result"
+        "stab_core::stabilizers::PauliStringIterator::restart"
       ],
       "disposition": "measured",
       "phase": "execute",
@@ -45899,21 +45894,21 @@
         "scales": [
           {
             "id": "small",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-0b35035a6f88b7fa",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=1; seed=17; fixture_group=cq-api-item-0e6d0d4353a19257",
             "input_bytes": {
               "kind": "not-applicable"
             }
           },
           {
             "id": "medium",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-0b35035a6f88b7fa",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=64; seed=17; fixture_group=cq-api-item-0e6d0d4353a19257",
             "input_bytes": {
               "kind": "not-applicable"
             }
           },
           {
             "id": "large",
-            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-0b35035a6f88b7fa",
+            "parameters": "generator=api-owner-phase-v1; semantic_items=4096; seed=17; fixture_group=cq-api-item-0e6d0d4353a19257",
             "input_bytes": {
               "kind": "not-applicable"
             }
@@ -62386,7 +62381,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -62485,7 +62480,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -62639,7 +62634,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -62735,7 +62730,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62831,7 +62826,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62927,7 +62922,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -63024,7 +63019,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
           },
           {
             "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -63119,7 +63114,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -63214,7 +63209,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -63310,35 +63305,79 @@
       "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "checklist_anchors": [],
       "checklist_child_ids": [],
-      "public_api_items": [],
+      "public_api_items": [
+        "stab_core::PauliStringIterator::iter_next",
+        "stab_core::PauliStringIterator::new",
+        "stab_core::PauliStringIterator::result",
+        "stab_core::stabilizers::PauliStringIterator::iter_next",
+        "stab_core::stabilizers::PauliStringIterator::new",
+        "stab_core::stabilizers::PauliStringIterator::result"
+      ],
       "disposition": "measured",
       "phase": "execute",
-      "runner_fidelity": "stim-perf",
-      "correctness_cases": [],
-      "correctness_binding": "unresolved",
-      "planned_correctness_case_id": "CQPLANNED-PERFQ-M6-PAULI-ITER",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-0a4be178ce1c903b",
+        "cq-evidence-qualification-489e6445120743c2",
+        "cq-evidence-qualification-5331280b58fd49c7"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
-          "kind": "inline",
-          "id": "m6-pauli-iter"
+          "kind": "generated",
+          "id": "pauli-iterator-xz-weight-range-v1"
         },
         "source": "src/stim/stabilizers/pauli_string_iter.perf.cc",
-        "deterministic_seed": "source-owned-inline:m6-pauli-iter",
+        "deterministic_seed": "source-owned-enumeration;marker=6",
         "scales": [
           {
-            "id": "inherited",
-            "parameters": "Pauli string iterator workloads",
+            "id": "small",
+            "parameters": "generator=pauli-iterator-xz-weight-range-v1; qubits=5; min_weight=2; max_weight=5; axes=XZ; outputs=232; marker=6",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 232,
+            "input_digest": "315732711c88257f9f4b2be3dfc3dd01785be01b86bdb7338e663945a90070d5"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=pauli-iterator-xz-weight-range-v1; qubits=11; min_weight=2; max_weight=5; axes=XZ; outputs=21604; marker=6",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 21604,
+            "input_digest": "d5c711573168f39a388aa386b1fb66b4b9d063f2a070610cd4543442548f4102"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=pauli-iterator-xz-weight-range-v1; qubits=22; min_weight=2; max_weight=5; axes=XZ; outputs=972972; marker=6",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 972972,
+            "input_digest": "85017fcee6d99c399676aac24ff1945f03363f316352eb10d707b51c66f506bc"
           }
         ]
       },
-      "work_unit": "qubits",
+      "work_unit": "Pauli strings",
       "output_contract": {
-        "expected_shape": "pauli-iterator output count, width, and semantic digest from the declared correctness preflight",
-        "digest_state": "planned",
-        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+        "expected_shape": "Exactly eighteen little-endian u64 fields bind iteration count, checked semantic work, width, workload marker, minimum and maximum weight, allowed-axis mask, outputs per traversal, observed output count, observed total result-width checksum, four canonical-input digest lanes, and four last-yielded-result digest lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers validate one complete traversal outside timing, then each timed callback constructs one public iterator, repeatedly advances its borrowed result, consumes every result width and output count, and destroys the iterator. The observed counters are optimizer-opaque and the last yielded validation result is hashed outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+          },
+          {
+            "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
+            "sha256": "2afbc4c3cad051e3ed35885335af53731b56130e460c269eb24b402d84b7cee3"
+          }
+        ]
       },
       "timing_policy": {
         "calibration_min_ms": 250,
@@ -63350,16 +63389,115 @@
         "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
       },
       "memory_policy": {
-        "method": "stab-allocations",
+        "method": "process-rss",
         "scale_ids": [
-          "inherited"
+          "small",
+          "medium",
+          "large"
         ],
-        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+        "expected_growth": "Each Stab callback performs exactly five allocation calls requesting 120 bytes at all three range scales, including the accepted maximum. Stim allocation counts remain unclaimed; setup and peak RSS remain report-only until PQ6."
       },
-      "threshold_policy": "report-only",
-      "reason": "The inherited operation shape is retained, but PQ1 must add correctness preflight, exact output digest, scales, and paired statistics before qualification.",
-      "owner": "stab-core",
-      "status": "planned"
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust construction plus complete borrowed X/Z weight-range traversal with exact API ownership, CQ2, semantic output, allocation, scale, timing, and bounded-worker contracts.",
+      "owner": "stab-core/stabilizers",
+      "status": "implemented"
+    },
+    {
+      "id": "PERFQ-M6-PAULI-ITER-SINGLETON",
+      "manifest_row": "pq2-pauli-string-iter-singleton",
+      "row_origin": "planned",
+      "performance_feature": "PERF-STABILIZER-ALGEBRA",
+      "checklist_anchors": [],
+      "checklist_child_ids": [],
+      "public_api_items": [],
+      "disposition": "measured",
+      "phase": "execute",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-0a4be178ce1c903b",
+        "cq-evidence-qualification-489e6445120743c2",
+        "cq-evidence-qualification-5331280b58fd49c7"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
+      "workload_family": {
+        "fixture": {
+          "kind": "generated",
+          "id": "pauli-iterator-xyz-singleton-v1"
+        },
+        "source": "src/stim/stabilizers/pauli_string_iter.perf.cc",
+        "deterministic_seed": "source-owned-enumeration;marker=7",
+        "scales": [
+          {
+            "id": "small",
+            "parameters": "generator=pauli-iterator-xyz-singleton-v1; qubits=1000; min_weight=1; max_weight=1; axes=XYZ; outputs=3000; marker=7",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 3000,
+            "input_digest": "d8d6b42d21392b7ab593f2b09cb9673e261381aa2d93c8f15b8c4ac52a97235b"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=pauli-iterator-xyz-singleton-v1; qubits=32000; min_weight=1; max_weight=1; axes=XYZ; outputs=96000; marker=7",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 96000,
+            "input_digest": "802dc4fd7b6e4d21c2eef73174aa24ee6cb81bc00be978d223a4e4c2242d89f9"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=pauli-iterator-xyz-singleton-v1; qubits=1000000; min_weight=1; max_weight=1; axes=XYZ; outputs=3000000; marker=7",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 64
+            },
+            "semantic_work": 3000000,
+            "input_digest": "394634d1a0abfaace26d4f3c07b81fe797d60c474314e625fd7f02f64d25fd0d"
+          }
+        ]
+      },
+      "work_unit": "Pauli strings",
+      "output_contract": {
+        "expected_shape": "Exactly eighteen little-endian u64 fields bind iteration count, checked semantic work, width, workload marker, minimum and maximum weight, allowed-axis mask, outputs per traversal, observed output count, observed total result-width checksum, four canonical-input digest lanes, and four last-yielded-result digest lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers validate one complete traversal outside timing, then each timed callback constructs one public iterator, repeatedly advances its borrowed result, consumes every result width and output count, and destroys the iterator. The observed counters are optimizer-opaque and the last yielded validation result is hashed outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+          },
+          {
+            "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
+            "sha256": "2afbc4c3cad051e3ed35885335af53731b56130e460c269eb24b402d84b7cee3"
+          }
+        ]
+      },
+      "timing_policy": {
+        "calibration_min_ms": 250,
+        "calibration_max_ms": 2000,
+        "common_wide_ratio_max_ms": 20000,
+        "warmup_batches": 3,
+        "full_pairs": 9,
+        "timeout_seconds": 600,
+        "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
+      },
+      "memory_policy": {
+        "method": "process-rss",
+        "scale_ids": [
+          "small",
+          "medium",
+          "large"
+        ],
+        "expected_growth": "Each Stab callback performs exactly four allocation calls. Requested bytes equal two packed result planes plus 40 bytes of traversal state: 296 bytes at small, 8,040 at medium, 250,040 at large, and 262,184 at the accepted maximum. Stim allocation counts remain unclaimed; setup and peak RSS remain report-only until PQ6."
+      },
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust construction plus complete borrowed X/Y/Z singleton traversal with exact CQ2, semantic output, allocation, scale, timing, and bounded-worker contracts.",
+      "owner": "stab-core/stabilizers",
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M6-PAULI-STRING",
@@ -63429,7 +63567,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+            "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
           },
           {
             "path": "benchmarks/stim_adapter/pauli_string_multiply_contract.h",
@@ -72076,14 +72214,13 @@
       "id": "m6-pauli-iter",
       "primary_group_id": "PERFQ-M6-PAULI-ITER",
       "supporting_performance_features": [],
-      "decision": "retained",
+      "decision": "reworked",
       "classifications": [
         "faithful",
         "missing-scale",
         "missing-correctness-preflight",
         "missing-output-digest",
-        "heterogeneous-measurements",
-        "unmatched-submeasurement"
+        "heterogeneous-measurements"
       ],
       "stim_mapping": {
         "kind": "stim-perf",
@@ -72094,7 +72231,34 @@
         "benchmarks/m12-primary-thresholds.json"
       ],
       "threshold_max_relative_ratio": "1.25",
-      "threshold_measurement_pairs": [],
+      "threshold_measurement_pairs": [
+        {
+          "stim_name": "pauli_iter_xz_2_to_5_of_5",
+          "stab_name": "stab_pauli_iter_xz_2_to_5_of_5",
+          "max_relative_ratio": "1.25"
+        },
+        {
+          "stim_name": "pauli_iter_xyz_1_of_1000",
+          "stab_name": "stab_pauli_iter_xyz_1_of_1000",
+          "max_relative_ratio": "1.25"
+        }
+      ],
+      "replacement_contracts": [
+        {
+          "legacy_stim_name": "pauli_iter_xz_2_to_5_of_5",
+          "legacy_stab_name": "stab_pauli_iter_xz_2_to_5_of_5",
+          "runtime_group_id": "PERFQ-M6-PAULI-ITER",
+          "runtime_measurement_id": "construct-and-iterate-borrowed",
+          "runtime_scale_id": "small"
+        },
+        {
+          "legacy_stim_name": "pauli_iter_xyz_1_of_1000",
+          "legacy_stab_name": "stab_pauli_iter_xyz_1_of_1000",
+          "runtime_group_id": "PERFQ-M6-PAULI-ITER-SINGLETON",
+          "runtime_measurement_id": "construct-and-iterate-borrowed",
+          "runtime_scale_id": "small"
+        }
+      ],
       "waiver_refs": []
     },
     {

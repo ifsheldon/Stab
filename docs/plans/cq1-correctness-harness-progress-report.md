@@ -1,6 +1,6 @@
 # CQ1 Correctness Harness Progress Report
 
-> Source-current note, 2026-07-17: this report records CQ1 harness completion and historical evidence. Strengthening the direct non-identity Pauli multiplication owner and its exhaustive basis, sign, and word-boundary corpus sets the source-current correctness digest to `a739d350eeb3455d4a0b386f8a257d3d4fe01d417d7d11d8a269229d68a6a103`, with 580 implemented, 17 evidence-close, and 1,147 planned parents. Clean revision `cd1e33e10f45995ccaca498547ff5aa88bfe51bb` published and replayed the exact strengthened two-case Pauli prerequisite. The earlier broad CQ2 PR, full, soak, and focused reports remain historical under their recorded digests, and all 271 selected deterministic parents still require one complete source-current run. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
+> Source-current note, 2026-07-17: this report records CQ1 harness completion and historical evidence. Strengthening the dedicated Pauli iterator owner sets the source-current correctness digest to `4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87`, with 580 implemented, 17 evidence-close, and 1,147 planned parents. Core revision `8503f458eac09fe94dba54cf8d6e16e88e195df4` provides the exact iterator corpus, while its source-current focused publication and the complete 271-parent CQ2 run remain pending. Earlier broad and focused reports remain historical under their recorded digests. See `docs/plans/cq2-deterministic-qualification-progress-report.md`.
 
 ## Status
 

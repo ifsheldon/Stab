@@ -55,7 +55,22 @@
     },
     { "id": "m5-simd-word", "max_relative_ratio": 1.25 },
     { "id": "m6-clifford-string", "max_relative_ratio": 1.25 },
-    { "id": "m6-pauli-iter", "max_relative_ratio": 1.25 },
+    {
+      "id": "m6-pauli-iter",
+      "max_relative_ratio": 1.25,
+      "measurement_thresholds": [
+        {
+          "stim_name": "pauli_iter_xz_2_to_5_of_5",
+          "stab_name": "stab_pauli_iter_xz_2_to_5_of_5",
+          "max_relative_ratio": 1.25
+        },
+        {
+          "stim_name": "pauli_iter_xyz_1_of_1000",
+          "stab_name": "stab_pauli_iter_xyz_1_of_1000",
+          "max_relative_ratio": 1.25
+        }
+      ]
+    },
     { "id": "m6-stabilizers-to-tableau", "max_relative_ratio": 1.25 },
     { "id": "m6-tableau", "max_relative_ratio": 1.25 },
     { "id": "m6-tableau-iter", "max_relative_ratio": 1.25 },

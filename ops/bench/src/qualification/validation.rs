@@ -23,7 +23,7 @@ use values::{
     validate_fixture_locator, validate_identifier, validate_relative_path, validate_text,
 };
 
-const CORRECTNESS_DIGEST: &str = "a739d350eeb3455d4a0b386f8a257d3d4fe01d417d7d11d8a269229d68a6a103";
+const CORRECTNESS_DIGEST: &str = "4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87";
 const EXPECTED_CHECKLIST_ROWS: usize = 127;
 const EXPECTED_PUBLIC_API_ITEMS: usize = 1_972;
 const EXPECTED_MANIFEST_ROWS: usize = 161;
@@ -1149,8 +1149,8 @@ fn validate_rows(
             "manifest primary performance ownership is stale: {primary_owners:?}"
         ));
     }
-    validate_decision_count(suite, RowDecision::Retained, 11, issues);
-    validate_decision_count(suite, RowDecision::Reworked, 135, issues);
+    validate_decision_count(suite, RowDecision::Retained, 10, issues);
+    validate_decision_count(suite, RowDecision::Reworked, 136, issues);
     validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
     validate_decision_count(suite, RowDecision::Superseded, 9, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);
@@ -1184,7 +1184,7 @@ fn validate_rows(
     validate_classification_count(
         suite,
         RowClassification::UnmatchedSubmeasurement,
-        15,
+        14,
         issues,
     );
 }

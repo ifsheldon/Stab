@@ -1,6 +1,6 @@
 {
   "schema_version": 4,
-  "performance_inventory_sha256": "e79edf2e1eaa49a801606245d4a845d47a1d000ed527c9669d95e091c4480237",
+  "performance_inventory_sha256": "ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb",
   "groups": [
     {
       "id": "pq1-adapter-protocol-smoke",
@@ -156,7 +156,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -199,7 +199,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -242,7 +242,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -285,7 +285,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
         },
         {
           "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -331,7 +331,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
         },
         {
           "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -375,7 +375,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
         },
         {
           "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -419,7 +419,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
         },
         {
           "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -462,7 +462,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
         },
         {
           "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -505,7 +505,7 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
         },
         {
           "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -548,11 +548,99 @@
       "comparator_sources": [
         {
           "path": "benchmarks/stim_adapter/main.cc",
-          "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
         },
         {
           "path": "benchmarks/stim_adapter/pauli_string_multiply_contract.h",
           "sha256": "1ee59f9387a40afc25426b35145f3c800ee2a08a89bf8f09037b529b1efeefbb"
+        }
+      ]
+    },
+    {
+      "id": "PERFQ-M6-PAULI-ITER",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "pauli-string-iter-range",
+      "measurement_ids": ["construct-and-iterate-borrowed"],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 232,
+          "input_bytes": 64,
+          "input_digest": "315732711c88257f9f4b2be3dfc3dd01785be01b86bdb7338e663945a90070d5"
+        },
+        {
+          "id": "medium",
+          "work_items": 21604,
+          "input_bytes": 64,
+          "input_digest": "d5c711573168f39a388aa386b1fb66b4b9d063f2a070610cd4543442548f4102"
+        },
+        {
+          "id": "large",
+          "work_items": 972972,
+          "input_bytes": 64,
+          "input_digest": "85017fcee6d99c399676aac24ff1945f03363f316352eb10d707b51c66f506bc"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-0a4be178ce1c903b",
+        "cq-evidence-qualification-489e6445120743c2",
+        "cq-evidence-qualification-5331280b58fd49c7"
+      ],
+      "owner": "stab-core/stabilizers",
+      "profiler_note": null,
+      "comparator_sources": [
+        {
+          "path": "benchmarks/stim_adapter/main.cc",
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+        },
+        {
+          "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
+          "sha256": "2afbc4c3cad051e3ed35885335af53731b56130e460c269eb24b402d84b7cee3"
+        }
+      ]
+    },
+    {
+      "id": "PERFQ-M6-PAULI-ITER-SINGLETON",
+      "claim_class": "promotable-performance",
+      "baseline_eligibility": "threshold-eligible",
+      "workload_id": "pauli-string-iter-singleton",
+      "measurement_ids": ["construct-and-iterate-borrowed"],
+      "scales": [
+        {
+          "id": "small",
+          "work_items": 3000,
+          "input_bytes": 64,
+          "input_digest": "d8d6b42d21392b7ab593f2b09cb9673e261381aa2d93c8f15b8c4ac52a97235b"
+        },
+        {
+          "id": "medium",
+          "work_items": 96000,
+          "input_bytes": 64,
+          "input_digest": "802dc4fd7b6e4d21c2eef73174aa24ee6cb81bc00be978d223a4e4c2242d89f9"
+        },
+        {
+          "id": "large",
+          "work_items": 3000000,
+          "input_bytes": 64,
+          "input_digest": "394634d1a0abfaace26d4f3c07b81fe797d60c474314e625fd7f02f64d25fd0d"
+        }
+      ],
+      "correctness_case_ids": [
+        "cq-evidence-qualification-0a4be178ce1c903b",
+        "cq-evidence-qualification-489e6445120743c2",
+        "cq-evidence-qualification-5331280b58fd49c7"
+      ],
+      "owner": "stab-core/stabilizers",
+      "profiler_note": null,
+      "comparator_sources": [
+        {
+          "path": "benchmarks/stim_adapter/main.cc",
+          "sha256": "5c8bc8f0b3f76fd688104e9110087a09d1f3c0027b24272d1d30d033e9e6990a"
+        },
+        {
+          "path": "benchmarks/stim_adapter/pauli_string_iter_contract.h",
+          "sha256": "2afbc4c3cad051e3ed35885335af53731b56130e460c269eb24b402d84b7cee3"
         }
       ]
     }

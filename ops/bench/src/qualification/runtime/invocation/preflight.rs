@@ -15,6 +15,19 @@ use super::pauli::{
     PAULI_ODD_OUTPUT_DIGEST, PAULI_SMALL_INPUT_BYTES, PAULI_SMALL_INPUT_DIGEST,
     PAULI_SMALL_WORK_ITEMS, PauliRejectionClass, pauli_rejection_expectation,
 };
+use super::pauli_iter::{
+    PAULI_ITER_INPUT_BYTES, PAULI_ITER_RANGE_EVEN_CASE_ID, PAULI_ITER_RANGE_EVEN_OUTPUT_DIGEST,
+    PAULI_ITER_RANGE_MAX_CASE_ID, PAULI_ITER_RANGE_MAX_INPUT_DIGEST,
+    PAULI_ITER_RANGE_MAX_OUTPUT_DIGEST, PAULI_ITER_RANGE_MAX_WORK_ITEMS,
+    PAULI_ITER_RANGE_ODD_CASE_ID, PAULI_ITER_RANGE_ODD_OUTPUT_DIGEST,
+    PAULI_ITER_RANGE_SMALL_INPUT_DIGEST, PAULI_ITER_RANGE_SMALL_WORK_ITEMS,
+    PAULI_ITER_SINGLETON_EVEN_CASE_ID, PAULI_ITER_SINGLETON_EVEN_OUTPUT_DIGEST,
+    PAULI_ITER_SINGLETON_MAX_CASE_ID, PAULI_ITER_SINGLETON_MAX_INPUT_DIGEST,
+    PAULI_ITER_SINGLETON_MAX_OUTPUT_DIGEST, PAULI_ITER_SINGLETON_MAX_WORK_ITEMS,
+    PAULI_ITER_SINGLETON_ODD_CASE_ID, PAULI_ITER_SINGLETON_ODD_OUTPUT_DIGEST,
+    PAULI_ITER_SINGLETON_SMALL_INPUT_DIGEST, PAULI_ITER_SINGLETON_SMALL_WORK_ITEMS,
+    PauliIterContractKind, PauliIterRejectionClass, pauli_iter_rejection_expectation,
+};
 use super::sparse_xor::{
     SPARSE_ITEM_BASE_WORK_ITEMS, SPARSE_ITEM_INPUT_BYTES, SPARSE_ITEM_INPUT_DIGEST,
     SPARSE_ITEM_MAX_CASE_ID, SPARSE_ITEM_MAX_OUTPUT_DIGEST, SPARSE_ITEM_MAX_WORK_ITEMS,
@@ -176,7 +189,7 @@ fn sha256_hex_bytes(bytes: &[u8]) -> Result<String, InvocationError> {
 
 pub(super) fn expected_contract_preflight_probes()
 -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
-    let mut probes = Vec::with_capacity(104);
+    let mut probes = Vec::with_capacity(140);
     let protocol_output_digest = protocol_smoke_output_digest();
     for implementation in [Implementation::Stim, Implementation::Stab] {
         probes.push(expected_accepted_probe(
@@ -292,6 +305,64 @@ pub(super) fn expected_contract_preflight_probes()
                     .checked_mul(work_items)
                     .ok_or(InvocationError::WorkOverflow)?,
                 input_bytes,
+                input_digest,
+                output_digest,
+            )?);
+        }
+    }
+    for implementation in [Implementation::Stim, Implementation::Stab] {
+        for (case_id, iterations, work_items, input_digest, output_digest) in [
+            (
+                PAULI_ITER_RANGE_ODD_CASE_ID,
+                1,
+                PAULI_ITER_RANGE_SMALL_WORK_ITEMS,
+                PAULI_ITER_RANGE_SMALL_INPUT_DIGEST,
+                PAULI_ITER_RANGE_ODD_OUTPUT_DIGEST,
+            ),
+            (
+                PAULI_ITER_RANGE_EVEN_CASE_ID,
+                2,
+                PAULI_ITER_RANGE_SMALL_WORK_ITEMS,
+                PAULI_ITER_RANGE_SMALL_INPUT_DIGEST,
+                PAULI_ITER_RANGE_EVEN_OUTPUT_DIGEST,
+            ),
+            (
+                PAULI_ITER_RANGE_MAX_CASE_ID,
+                1,
+                PAULI_ITER_RANGE_MAX_WORK_ITEMS,
+                PAULI_ITER_RANGE_MAX_INPUT_DIGEST,
+                PAULI_ITER_RANGE_MAX_OUTPUT_DIGEST,
+            ),
+            (
+                PAULI_ITER_SINGLETON_ODD_CASE_ID,
+                1,
+                PAULI_ITER_SINGLETON_SMALL_WORK_ITEMS,
+                PAULI_ITER_SINGLETON_SMALL_INPUT_DIGEST,
+                PAULI_ITER_SINGLETON_ODD_OUTPUT_DIGEST,
+            ),
+            (
+                PAULI_ITER_SINGLETON_EVEN_CASE_ID,
+                2,
+                PAULI_ITER_SINGLETON_SMALL_WORK_ITEMS,
+                PAULI_ITER_SINGLETON_SMALL_INPUT_DIGEST,
+                PAULI_ITER_SINGLETON_EVEN_OUTPUT_DIGEST,
+            ),
+            (
+                PAULI_ITER_SINGLETON_MAX_CASE_ID,
+                1,
+                PAULI_ITER_SINGLETON_MAX_WORK_ITEMS,
+                PAULI_ITER_SINGLETON_MAX_INPUT_DIGEST,
+                PAULI_ITER_SINGLETON_MAX_OUTPUT_DIGEST,
+            ),
+        ] {
+            probes.push(expected_accepted_probe(
+                case_id,
+                implementation,
+                iterations,
+                iterations
+                    .checked_mul(work_items)
+                    .ok_or(InvocationError::WorkOverflow)?,
+                PAULI_ITER_INPUT_BYTES,
                 input_digest,
                 output_digest,
             )?);
@@ -516,6 +587,20 @@ pub(super) fn expected_contract_preflight_probes()
                 exit_status,
                 stderr,
             )?);
+        }
+    }
+    for kind in PauliIterContractKind::all() {
+        for class in PauliIterRejectionClass::all() {
+            for implementation in [Implementation::Stim, Implementation::Stab] {
+                let (exit_status, stderr) =
+                    pauli_iter_rejection_expectation(implementation, kind, class);
+                probes.push(expected_rejected_probe(
+                    class.case_id(kind),
+                    implementation,
+                    exit_status,
+                    stderr,
+                )?);
+            }
         }
     }
     Ok(probes)

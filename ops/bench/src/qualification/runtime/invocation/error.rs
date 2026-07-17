@@ -157,6 +157,17 @@ pub(crate) enum InvocationError {
         stdout: String,
         stderr: String,
     },
+    #[error(
+        "{implementation} did not reject the {class} {workload} invocation before the start barrier; status={status:?}; stdout={stdout:?}; stderr={stderr:?}"
+    )]
+    PauliIterWorkRejection {
+        implementation: Implementation,
+        workload: &'static str,
+        class: &'static str,
+        status: Option<i32>,
+        stdout: String,
+        stderr: String,
+    },
     #[error("qualification invocation returned no measurement")]
     MissingMeasurement,
     #[error("qualification worker measured invalid duration {0}")]

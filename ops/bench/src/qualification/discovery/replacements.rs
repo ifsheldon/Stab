@@ -10,6 +10,22 @@ pub(super) fn contracts(row: &BenchmarkRow) -> Vec<ReplacementContract> {
             "xor-complete-vector",
             None,
         )],
+        "m6-pauli-iter" => vec![
+            replacement(
+                "pauli_iter_xz_2_to_5_of_5",
+                "stab_pauli_iter_xz_2_to_5_of_5",
+                "PERFQ-M6-PAULI-ITER",
+                "construct-and-iterate-borrowed",
+                Some("small"),
+            ),
+            replacement(
+                "pauli_iter_xyz_1_of_1000",
+                "stab_pauli_iter_xyz_1_of_1000",
+                "PERFQ-M6-PAULI-ITER-SINGLETON",
+                "construct-and-iterate-borrowed",
+                Some("small"),
+            ),
+        ],
         _ => Vec::new(),
     }
 }

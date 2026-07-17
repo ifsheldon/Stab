@@ -44,7 +44,7 @@ fn canonical_worker_contract_preflight_binds_actual_receipts() {
     let probes = expected_contract_preflight_probes().expect("source-owned probes");
     let evidence = WorkerContractPreflightEvidence::from_actual_probes(contract_identity(), probes)
         .expect("valid contract evidence");
-    assert_eq!(evidence.probe_count(), 104);
+    assert_eq!(evidence.probe_count(), 140);
     assert!(evidence.validates_source_contract());
     let encoded = serde_json::to_vec(&evidence).expect("serialize preflight evidence");
     assert!(

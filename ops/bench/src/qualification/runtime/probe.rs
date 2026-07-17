@@ -18,6 +18,8 @@ use super::worker;
 use crate::config::STIM_COMMIT;
 use crate::root::RepoRoot;
 
+mod pauli_iter;
+
 const ADAPTER_PROBE_ID: &str = "pq1-adapter-protocol-smoke";
 const CIRCUIT_PARSE_PROBE_ID: &str = "pq2-circuit-parse-adapter-smoke";
 const CIRCUIT_CANONICAL_PRINT_PROBE_ID: &str = "pq2-circuit-canonical-print-adapter-smoke";
@@ -33,6 +35,8 @@ const BIT_MATRIX_TRANSPOSE_IN_PLACE_PROBE_ID: &str =
 const BIT_MATRIX_TRANSPOSE_ALLOCATING_PROBE_ID: &str =
     "pq2-bit-matrix-transpose-allocating-adapter-smoke";
 const PAULI_STRING_MULTIPLY_PROBE_ID: &str = "pq2-pauli-string-multiply-adapter-smoke";
+const PAULI_STRING_ITER_RANGE_PROBE_ID: &str = "pq2-pauli-iter-range-adapter-smoke";
+const PAULI_STRING_ITER_SINGLETON_PROBE_ID: &str = "pq2-pauli-iter-singleton-adapter-smoke";
 const SIMD_WORD_POPCOUNT_PROBE_ID: &str = "pq2-simd-word-popcount-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
@@ -42,6 +46,8 @@ const DEFAULT_POPCOUNT_WORK_ITEMS: u64 = 262_144;
 const DEFAULT_NOT_ZERO_WORK_ITEMS: u64 = 10_000;
 const DEFAULT_TRANSPOSE_WORK_ITEMS: u64 = 65_536;
 const DEFAULT_PAULI_WORK_ITEMS: u64 = 10_000;
+const DEFAULT_PAULI_ITER_RANGE_WORK_ITEMS: u64 = 232;
+const DEFAULT_PAULI_ITER_SINGLETON_WORK_ITEMS: u64 = 3_000;
 const GATE_HASH_NAME_COUNT: u64 = 82;
 const POPCOUNT_ALIGNMENT_BITS: u64 = 256;
 const POPCOUNT_MIN_BITS: u64 = 512;
@@ -60,6 +66,8 @@ const TRANSPOSE_MAX_DIMENSION: u64 = 16_384;
 const TRANSPOSE_DIMENSION_ALIGNMENT: u64 = 256;
 const PAULI_MIN_QUBITS: u64 = 1;
 const PAULI_MAX_QUBITS: u64 = 1_048_576;
+const PAULI_ITER_RANGE_OUTPUT_CAP: u64 = 1_000_000;
+const PAULI_ITER_SINGLETON_OUTPUT_CAP: u64 = PAULI_MAX_QUBITS * 3;
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 const CIRCUIT_PARSE_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
@@ -76,6 +84,8 @@ const BIT_MATRIX_TRANSPOSE_IN_PLACE_RUNTIME_GROUP_ID: &str =
 const BIT_MATRIX_TRANSPOSE_ALLOCATING_RUNTIME_GROUP_ID: &str =
     "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING";
 const PAULI_STRING_MULTIPLY_RUNTIME_GROUP_ID: &str = "PERFQ-M6-PAULI-STRING";
+const PAULI_STRING_ITER_RANGE_RUNTIME_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER";
+const PAULI_STRING_ITER_SINGLETON_RUNTIME_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER-SINGLETON";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum ProbeGroup {
@@ -109,6 +119,10 @@ enum ProbeGroup {
     BitMatrixTransposeAllocatingAdapter,
     #[value(name = "pq2-pauli-string-multiply-adapter-smoke")]
     PauliStringMultiplyAdapter,
+    #[value(name = "pq2-pauli-iter-range-adapter-smoke")]
+    PauliStringIterRangeAdapter,
+    #[value(name = "pq2-pauli-iter-singleton-adapter-smoke")]
+    PauliStringIterSingletonAdapter,
 }
 
 impl ProbeGroup {
@@ -135,6 +149,10 @@ impl ProbeGroup {
                 Some(BIT_MATRIX_TRANSPOSE_ALLOCATING_RUNTIME_GROUP_ID)
             }
             Self::PauliStringMultiplyAdapter => Some(PAULI_STRING_MULTIPLY_RUNTIME_GROUP_ID),
+            Self::PauliStringIterRangeAdapter => Some(PAULI_STRING_ITER_RANGE_RUNTIME_GROUP_ID),
+            Self::PauliStringIterSingletonAdapter => {
+                Some(PAULI_STRING_ITER_SINGLETON_RUNTIME_GROUP_ID)
+            }
         }
     }
 
@@ -160,6 +178,10 @@ impl ProbeGroup {
                 Some(Self::BitMatrixTransposeAllocatingAdapter)
             }
             PAULI_STRING_MULTIPLY_RUNTIME_GROUP_ID => Some(Self::PauliStringMultiplyAdapter),
+            PAULI_STRING_ITER_RANGE_RUNTIME_GROUP_ID => Some(Self::PauliStringIterRangeAdapter),
+            PAULI_STRING_ITER_SINGLETON_RUNTIME_GROUP_ID => {
+                Some(Self::PauliStringIterSingletonAdapter)
+            }
             _ => None,
         }
     }
@@ -244,7 +266,9 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         | ProbeGroup::SparseXorItemAdapter
         | ProbeGroup::BitMatrixTransposeInPlaceAdapter
         | ProbeGroup::BitMatrixTransposeAllocatingAdapter
-        | ProbeGroup::PauliStringMultiplyAdapter => run_adapter_probe(root, args).map(|_| ()),
+        | ProbeGroup::PauliStringMultiplyAdapter
+        | ProbeGroup::PauliStringIterRangeAdapter
+        | ProbeGroup::PauliStringIterSingletonAdapter => run_adapter_probe(root, args).map(|_| ()),
     }
 }
 
@@ -375,6 +399,16 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
             "pauli-string-right-multiply",
             "right-multiply-in-place",
         ),
+        ProbeGroup::PauliStringIterRangeAdapter => (
+            PAULI_STRING_ITER_RANGE_PROBE_ID,
+            "pauli-string-iter-range",
+            "construct-and-iterate-borrowed",
+        ),
+        ProbeGroup::PauliStringIterSingletonAdapter => (
+            PAULI_STRING_ITER_SINGLETON_PROBE_ID,
+            "pauli-string-iter-singleton",
+            "construct-and-iterate-borrowed",
+        ),
         ProbeGroup::ProcessContract => {
             return Err(ProbeError::Contract(
                 "process-only probe cannot use the adapter path".to_string(),
@@ -409,7 +443,7 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
     let mut worker_arguments = vec![OsString::from("qualification-worker")];
     worker_arguments.extend(common_arguments);
     let worker_request = ProcessRequest {
-        program: current_exe,
+        program: current_exe.clone(),
         args: worker_arguments,
         stdin: Vec::new(),
         working_directory: root.path.clone(),
@@ -467,10 +501,11 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
         expected_output_digest: None,
         affinity_cpu: None,
         stim_commit,
-        source_digest: worker_identity.source_digest,
-        build_fingerprint: worker_identity.build_fingerprint,
+        source_digest: worker_identity.source_digest.clone(),
+        build_fingerprint: worker_identity.build_fingerprint.clone(),
     }
     .validate(&stab_rows)?;
+    pauli_iter::validate_boundaries(root, args.group, &adapter, &current_exe, &worker_identity)?;
 
     if args.evidence_mode == ProbeEvidenceMode::Timing {
         let pairs = pair_measurements(0, PairOrder::StimThenStab, &stim_rows, &stab_rows)?;
@@ -575,6 +610,8 @@ fn probe_work_items(args: &ProbeArgs) -> u64 {
             ProbeGroup::BitMatrixTransposeInPlaceAdapter
             | ProbeGroup::BitMatrixTransposeAllocatingAdapter => DEFAULT_TRANSPOSE_WORK_ITEMS,
             ProbeGroup::PauliStringMultiplyAdapter => DEFAULT_PAULI_WORK_ITEMS,
+            ProbeGroup::PauliStringIterRangeAdapter => DEFAULT_PAULI_ITER_RANGE_WORK_ITEMS,
+            ProbeGroup::PauliStringIterSingletonAdapter => DEFAULT_PAULI_ITER_SINGLETON_WORK_ITEMS,
             ProbeGroup::ProcessContract
             | ProbeGroup::AdapterProtocol
             | ProbeGroup::CircuitParseAdapter
@@ -665,7 +702,46 @@ fn validate_probe_work_items(group: ProbeGroup, work_items: u64) -> Result<(), P
             "Pauli multiplication probe width {work_items} is outside {PAULI_MIN_QUBITS}..={PAULI_MAX_QUBITS} qubits"
         )));
     }
+    if group == ProbeGroup::PauliStringIterRangeAdapter
+        && !valid_pauli_iter_range_work_items(work_items)
+    {
+        return Err(ProbeError::Contract(format!(
+            "Pauli iterator range probe work count {work_items} is not a complete source-owned traversal through {PAULI_ITER_RANGE_OUTPUT_CAP} outputs"
+        )));
+    }
+    if group == ProbeGroup::PauliStringIterSingletonAdapter
+        && (work_items == 0
+            || work_items > PAULI_ITER_SINGLETON_OUTPUT_CAP
+            || !work_items.is_multiple_of(3))
+    {
+        return Err(ProbeError::Contract(format!(
+            "Pauli iterator singleton probe work count {work_items} is not a positive complete callback through {PAULI_ITER_SINGLETON_OUTPUT_CAP} outputs"
+        )));
+    }
     Ok(())
+}
+
+fn valid_pauli_iter_range_work_items(work_items: u64) -> bool {
+    (2..=22).any(|width| pauli_iter_range_output_count(width) == Some(work_items))
+}
+
+fn pauli_iter_range_output_count(width: u64) -> Option<u64> {
+    let mut outputs = 0_u64;
+    for weight in 2..=5_u64.min(width) {
+        let basis_products = 1_u64.checked_shl(u32::try_from(weight).ok()?)?;
+        outputs =
+            outputs.checked_add(checked_choose(width, weight)?.checked_mul(basis_products)?)?;
+    }
+    Some(outputs)
+}
+
+fn checked_choose(n: u64, k: u64) -> Option<u64> {
+    let k = k.min(n.checked_sub(k)?);
+    let mut result = 1_u64;
+    for step in 1..=k {
+        result = result.checked_mul(n - k + step)?.checked_div(step)?;
+    }
+    Some(result)
 }
 
 const fn is_transpose_probe(group: ProbeGroup) -> bool {
@@ -739,6 +815,8 @@ pub(super) enum ProbeError {
     Protocol(#[from] super::protocol::ProtocolError),
     #[error(transparent)]
     Statistics(#[from] super::statistics::StatisticsError),
+    #[error(transparent)]
+    Invocation(#[from] super::invocation::InvocationError),
     #[error("failed to resolve the current Stab qualification worker: {0}")]
     CurrentExecutable(std::io::Error),
     #[error("Stab qualification worker identity changed during the probe")]
@@ -779,6 +857,9 @@ mod tests {
         assert!(ProtocolId::try_new(SPARSE_XOR_ITEM_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(BIT_MATRIX_TRANSPOSE_IN_PLACE_PROBE_ID).is_ok());
         assert!(ProtocolId::try_new(BIT_MATRIX_TRANSPOSE_ALLOCATING_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(PAULI_STRING_MULTIPLY_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(PAULI_STRING_ITER_RANGE_PROBE_ID).is_ok());
+        assert!(ProtocolId::try_new(PAULI_STRING_ITER_SINGLETON_PROBE_ID).is_ok());
     }
 
     #[test]
@@ -997,5 +1078,89 @@ mod tests {
             expected_work_count(&args),
             Err(ProbeError::WorkOverflow)
         ));
+    }
+
+    #[test]
+    fn pauli_iterator_probes_are_distinct_and_map_to_their_runtime_groups() {
+        let range = ProbeGroup::from_str(PAULI_STRING_ITER_RANGE_PROBE_ID, true)
+            .expect("Pauli iterator range probe");
+        let singleton = ProbeGroup::from_str(PAULI_STRING_ITER_SINGLETON_PROBE_ID, true)
+            .expect("Pauli iterator singleton probe");
+        assert_ne!(range, singleton);
+        assert_eq!(
+            range.runtime_group_id(),
+            Some(PAULI_STRING_ITER_RANGE_RUNTIME_GROUP_ID)
+        );
+        assert_eq!(
+            singleton.runtime_group_id(),
+            Some(PAULI_STRING_ITER_SINGLETON_RUNTIME_GROUP_ID)
+        );
+        assert_eq!(
+            ProbeGroup::for_runtime_group(PAULI_STRING_ITER_RANGE_RUNTIME_GROUP_ID),
+            Some(range)
+        );
+        assert_eq!(
+            ProbeGroup::for_runtime_group(PAULI_STRING_ITER_SINGLETON_RUNTIME_GROUP_ID),
+            Some(singleton)
+        );
+    }
+
+    #[test]
+    fn pauli_iterator_probes_require_complete_bounded_traversals() {
+        for work_items in [DEFAULT_PAULI_ITER_RANGE_WORK_ITEMS, 21_604, 972_972] {
+            assert!(
+                validate_probe_work_items(ProbeGroup::PauliStringIterRangeAdapter, work_items)
+                    .is_ok()
+            );
+        }
+        for work_items in [0, 233, PAULI_ITER_RANGE_OUTPUT_CAP, 1_233_628] {
+            assert!(
+                validate_probe_work_items(ProbeGroup::PauliStringIterRangeAdapter, work_items)
+                    .is_err()
+            );
+        }
+        for work_items in [
+            DEFAULT_PAULI_ITER_SINGLETON_WORK_ITEMS,
+            96_000,
+            3_000_000,
+            PAULI_ITER_SINGLETON_OUTPUT_CAP,
+        ] {
+            assert!(
+                validate_probe_work_items(ProbeGroup::PauliStringIterSingletonAdapter, work_items)
+                    .is_ok()
+            );
+        }
+        for work_items in [0, 3_001, PAULI_ITER_SINGLETON_OUTPUT_CAP + 3] {
+            assert!(
+                validate_probe_work_items(ProbeGroup::PauliStringIterSingletonAdapter, work_items)
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn pauli_iterator_probes_reject_semantic_work_overflow_before_process_setup() {
+        for (group, work_items) in [
+            (
+                ProbeGroup::PauliStringIterRangeAdapter,
+                DEFAULT_PAULI_ITER_RANGE_WORK_ITEMS,
+            ),
+            (
+                ProbeGroup::PauliStringIterSingletonAdapter,
+                DEFAULT_PAULI_ITER_SINGLETON_WORK_ITEMS,
+            ),
+        ] {
+            let args = ProbeArgs {
+                group,
+                iterations: NonZeroU64::new(u64::MAX).expect("nonzero overflow iterations"),
+                work_items: NonZeroU64::new(work_items),
+                evidence_mode: ProbeEvidenceMode::Timing,
+            };
+            assert!(validate_probe_work_items(group, work_items).is_ok());
+            assert!(matches!(
+                expected_work_count(&args),
+                Err(ProbeError::WorkOverflow)
+            ));
+        }
     }
 }

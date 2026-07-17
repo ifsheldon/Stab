@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "performance_inventory_sha256": "e79edf2e1eaa49a801606245d4a845d47a1d000ed527c9669d95e091c4480237",
+  "performance_inventory_sha256": "ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb",
   "groups": [
     {
       "group_id": "pq1-adapter-protocol-smoke",
@@ -145,6 +145,28 @@
       "measurements": [
         {
           "measurement_id": "right-multiply-in-place",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M6-PAULI-ITER",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "construct-and-iterate-borrowed",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M6-PAULI-ITER-SINGLETON",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "construct-and-iterate-borrowed",
           "max_median_ratio": "1.25",
           "max_confidence_interval_upper": "1.25"
         }

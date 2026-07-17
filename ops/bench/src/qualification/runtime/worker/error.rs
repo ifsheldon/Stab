@@ -146,6 +146,52 @@ pub(crate) enum WorkerError {
     PauliRightChanged,
     #[error("Pauli multiplication workload was invoked without its prepared fixture")]
     MissingPauliFixture,
+    #[error("{workload} work count {actual} is not a complete source-owned iterator traversal")]
+    PauliIterWorkShape { workload: &'static str, actual: u64 },
+    #[error("{workload} output count {actual} exceeds maximum {maximum}")]
+    PauliIterOutputLimit {
+        workload: &'static str,
+        actual: u64,
+        maximum: u64,
+    },
+    #[error("{workload} width {actual} exceeds maximum {maximum}")]
+    PauliIterWidthLimit {
+        workload: &'static str,
+        actual: u64,
+        maximum: u64,
+    },
+    #[error("Pauli iterator value {0} cannot be represented on this host")]
+    PauliIterWidthRange(u64),
+    #[error("Pauli iterator result width cannot be represented as u64")]
+    PauliIterResultWidthRange,
+    #[error("Pauli iterator combinatorial output count overflows u64")]
+    PauliIterCountOverflow,
+    #[error("Pauli iterator output-count times result-width checksum overflows u64")]
+    PauliIterWidthChecksumOverflow,
+    #[error("Pauli iterator validation produced no final yielded result")]
+    PauliIterMissingFinalResult,
+    #[error(
+        "{workload} validation produced outputs {actual_outputs} and width checksum {actual_width_checksum}, expected {expected_outputs} and {expected_width_checksum}"
+    )]
+    PauliIterValidation {
+        workload: &'static str,
+        expected_outputs: u64,
+        actual_outputs: u64,
+        expected_width_checksum: u64,
+        actual_width_checksum: u64,
+    },
+    #[error(
+        "{workload} timing produced outputs {actual_outputs} and width checksum {actual_width_checksum}, expected {expected_outputs} and {expected_width_checksum}"
+    )]
+    PauliIterObserved {
+        workload: &'static str,
+        expected_outputs: u64,
+        actual_outputs: u64,
+        expected_width_checksum: u64,
+        actual_width_checksum: u64,
+    },
+    #[error("Pauli iterator workload was invoked without its prepared fixture")]
+    MissingPauliIterFixture,
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]

@@ -1,5 +1,7 @@
 # PQ2 Pauli-String Multiplication Qualification Progress Report
 
+> Historical-inventory note, 2026-07-17: this report remains accepted Linux AArch64 evidence under its frozen correctness and performance inventories. Adding the split Pauli iterator contracts produced source-current correctness digest `4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87` and pre-migration performance digest `ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb`; the results below are not relabeled as simultaneous current-inventory evidence.
+
 ## Status
 
 The ninth PQ2 executable slice passes its independent `1.25x` timing gates for public equal-width in-place Pauli-string right multiplication at every full and soak scale on the controlled Linux AArch64 host as of 2026-07-17.
@@ -23,8 +25,8 @@ It does not qualify allocating or unequal-width multiplication, the identity fas
 - Host profile: verified `linux-aarch64-controlled`, pinned to logical CPU 0 with CPU identity `CPU implementer=0x41, CPU architecture=8, CPU variant=0x0, CPU part=0xd87, CPU revision=1`.
 - Rust toolchain: `nightly-2026-06-20`, release profile, target `aarch64-unknown-linux-gnu`.
 
-The source-current correctness inventory contains 2,886 upstream records, 1,972 default-feature public Rust API items, and 1,744 evidence parents: 580 implemented, 17 evidence-close, and 1,147 planned.
-The source-current performance inventory contains 547 groups and 161 inherited rows classified as 11 retained, 135 reworked, four diagnostic, nine superseded, and two removed, with 21 exact threshold pairs.
+At this slice's accepted revision, the correctness inventory contained 2,886 upstream records, 1,972 default-feature public Rust API items, and 1,744 evidence parents: 580 implemented, 17 evidence-close, and 1,147 planned.
+At this slice's accepted revision, the performance inventory contained 547 groups and 161 inherited rows classified as 11 retained, 135 reworked, four diagnostic, nine superseded, and two removed, with 21 exact threshold pairs.
 This slice does not reinterpret any of the remaining missing comparator, scale, correctness, output, CLI, or heterogeneous-selection dispositions as passes.
 
 ## Correctness Preflight

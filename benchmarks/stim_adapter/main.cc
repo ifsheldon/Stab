@@ -25,6 +25,7 @@
 #include "stim/mem/simd_bits.h"
 
 #include "bit_matrix_transpose_contract.h"
+#include "pauli_string_iter_contract.h"
 #include "pauli_string_multiply_contract.h"
 #include "simd_bits_not_zero_contract.h"
 #include "simd_bits_xor_contract.h"
@@ -163,9 +164,12 @@ Arguments parse_arguments(int argc, const char **argv) {
     const bool pauli_string_multiply =
         stab_qualification::is_pauli_string_multiply_workload(result.workload) &&
         result.measurement_id == "right-multiply-in-place";
+    const bool pauli_string_iter =
+        stab_qualification::pauli_iter_kind(result.workload).has_value() &&
+        result.measurement_id == "construct-and-iterate-borrowed";
     if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !gate_name_hash &&
         !simd_word_popcount && !simd_bits_xor && !simd_bits_not_zero && !sparse_xor &&
-        !bit_matrix_transpose && !pauli_string_multiply) {
+        !bit_matrix_transpose && !pauli_string_multiply && !pauli_string_iter) {
         throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
@@ -863,6 +867,13 @@ int main(int argc, const char **argv) {
             pauli_multiply.emplace(
                 stab_qualification::pauli_multiply_fixture(arguments.work_items));
         }
+        const auto prepared_pauli_iter_kind =
+            stab_qualification::pauli_iter_kind(arguments.workload);
+        std::optional<stab_qualification::PauliIterFixture> pauli_iter;
+        if (prepared_pauli_iter_kind.has_value()) {
+            pauli_iter.emplace(stab_qualification::pauli_iter_fixture(
+                prepared_pauli_iter_kind.value(), arguments.work_items, work_count));
+        }
         const uint64_t input_bytes = popcount.has_value()
                                          ? popcount->input_bytes
                                      : dense_xor.has_value()
@@ -875,6 +886,8 @@ int main(int argc, const char **argv) {
                                          ? transpose->input_bytes
                                      : pauli_multiply.has_value()
                                          ? pauli_multiply->input_bytes
+                                     : pauli_iter.has_value()
+                                         ? pauli_iter->input_bytes
                                          : static_cast<uint64_t>(circuit_fixture.size());
         const auto input_digest = popcount.has_value()
                                       ? popcount->input_digest
@@ -888,6 +901,8 @@ int main(int argc, const char **argv) {
                                       ? transpose->input_digest
                                   : pauli_multiply.has_value()
                                       ? pauli_multiply->input_digest
+                                  : pauli_iter.has_value()
+                                      ? pauli_iter->input_digest
                                       : byte_digest(circuit_fixture);
 
         if (arguments.start_barrier) {
@@ -971,6 +986,12 @@ int main(int argc, const char **argv) {
                 stab_qualification::pauli_multiply_contract(
                     arguments.iterations, prepared_pauli);
             });
+        } else if (pauli_iter.has_value()) {
+            auto &prepared_pauli_iter = pauli_iter.value();
+            elapsed_seconds = measure_workload([&]() {
+                stab_qualification::pauli_iter_contract(
+                    arguments.iterations, prepared_pauli_iter);
+            });
         } else {
             throw std::invalid_argument("unreachable registered adapter workload");
         }
@@ -1004,6 +1025,9 @@ int main(int argc, const char **argv) {
         } else if (pauli_multiply.has_value()) {
             digest_state = stab_qualification::pauli_multiply_output_digest(
                 pauli_multiply.value(), arguments.iterations, work_count);
+        } else if (pauli_iter.has_value()) {
+            digest_state = stab_qualification::pauli_iter_output_digest(
+                pauli_iter.value(), arguments.iterations, work_count);
         }
         if (!(elapsed_seconds > 0)) {
             throw std::runtime_error("adapter measured a non-positive duration");

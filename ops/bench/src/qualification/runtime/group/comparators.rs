@@ -20,6 +20,8 @@ pub(super) const PAULI_STRING_MULTIPLY: [&str; 2] = [
     MAIN,
     "benchmarks/stim_adapter/pauli_string_multiply_contract.h",
 ];
+pub(super) const PAULI_STRING_ITER: [&str; 2] =
+    [MAIN, "benchmarks/stim_adapter/pauli_string_iter_contract.h"];
 
 pub(super) fn expected_paths(group_id: &str) -> &'static [&'static str] {
     match group_id {
@@ -32,6 +34,8 @@ pub(super) fn expected_paths(group_id: &str) -> &'static [&'static str] {
         invocation::BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID
         | invocation::BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID => &BIT_MATRIX_TRANSPOSE,
         invocation::PAULI_STRING_MULTIPLY_GROUP_ID => &PAULI_STRING_MULTIPLY,
+        invocation::PAULI_STRING_ITER_RANGE_GROUP_ID
+        | invocation::PAULI_STRING_ITER_SINGLETON_GROUP_ID => &PAULI_STRING_ITER,
         _ => &[],
     }
 }

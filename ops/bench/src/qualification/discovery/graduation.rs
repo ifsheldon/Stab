@@ -21,6 +21,8 @@ const SPARSE_XOR_ITEM_GROUP_ID: &str = "PERFQ-M5-SPARSE-XOR-ITEM";
 const BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID: &str = "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE";
 const BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID: &str = "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING";
 const PAULI_STRING_MULTIPLY_GROUP_ID: &str = "PERFQ-M6-PAULI-STRING";
+const PAULI_STRING_ITER_RANGE_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER";
+const PAULI_STRING_ITER_SINGLETON_GROUP_ID: &str = "PERFQ-M6-PAULI-ITER-SINGLETON";
 const STIM_ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
 const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_word_popcount_contract.h";
@@ -32,6 +34,8 @@ const BIT_MATRIX_TRANSPOSE_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/bit_matrix_transpose_contract.h";
 const PAULI_STRING_MULTIPLY_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/pauli_string_multiply_contract.h";
+const PAULI_STRING_ITER_COMPARATOR_SOURCE: &str =
+    "benchmarks/stim_adapter/pauli_string_iter_contract.h";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
     "cq-evidence-qualification-e660819ae9a223c6",
@@ -59,6 +63,11 @@ const PAULI_STRING_MULTIPLY_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-3bab0f51237445f6",
     "cq-evidence-qualification-489e6445120743c2",
 ];
+const PAULI_STRING_ITER_CORRECTNESS_CASES: [&str; 3] = [
+    "cq-evidence-qualification-0a4be178ce1c903b",
+    "cq-evidence-qualification-489e6445120743c2",
+    "cq-evidence-qualification-5331280b58fd49c7",
+];
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
 struct NotZeroGroupSpec {
@@ -84,9 +93,133 @@ pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(
             apply_bit_matrix_transpose(root, group, true)?;
         }
         PAULI_STRING_MULTIPLY_GROUP_ID => apply_pauli_string_multiply(root, group)?,
+        PAULI_STRING_ITER_RANGE_GROUP_ID => apply_pauli_string_iter(root, group, false)?,
+        PAULI_STRING_ITER_SINGLETON_GROUP_ID => apply_pauli_string_iter(root, group, true)?,
         _ => {}
     }
     Ok(())
+}
+
+fn apply_pauli_string_iter(
+    root: &RepoRoot,
+    group: &mut QualificationGroup,
+    singleton: bool,
+) -> Result<(), BenchError> {
+    group.phase = Phase::Execute;
+    group.runner_fidelity = RunnerFidelity::AdapterLibrary;
+    group.correctness_cases = PAULI_STRING_ITER_CORRECTNESS_CASES
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = pauli_string_iter_workload_family(singleton);
+    group.work_unit = "Pauli strings".to_string();
+    group.output_contract = OutputContract {
+        expected_shape: "Exactly eighteen little-endian u64 fields bind iteration count, checked semantic work, width, workload marker, minimum and maximum weight, allowed-axis mask, outputs per traversal, observed output count, observed total result-width checksum, four canonical-input digest lanes, and four last-yielded-result digest lanes."
+            .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: "Both workers validate one complete traversal outside timing, then each timed callback constructs one public iterator, repeatedly advances its borrowed result, consumes every result width and output count, and destroys the iterator. The observed counters are optimizer-opaque and the last yielded validation result is hashed outside timing."
+            .to_string(),
+        comparator_sources: [STIM_ADAPTER_SOURCE, PAULI_STRING_ITER_COMPARATOR_SOURCE]
+            .into_iter()
+            .map(|path| comparator_source(root, path))
+            .collect::<Result<_, _>>()?,
+    };
+    group.memory_policy = circuit_memory_policy(if singleton {
+        "Each Stab callback performs exactly four allocation calls. Requested bytes equal two packed result planes plus 40 bytes of traversal state: 296 bytes at small, 8,040 at medium, 250,040 at large, and 262,184 at the accepted maximum. Stim allocation counts remain unclaimed; setup and peak RSS remain report-only until PQ6."
+    } else {
+        "Each Stab callback performs exactly five allocation calls requesting 120 bytes at all three range scales, including the accepted maximum. Stim allocation counts remain unclaimed; setup and peak RSS remain report-only until PQ6."
+    });
+    group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.owner = "stab-core/stabilizers".to_string();
+    group.reason = if singleton {
+        "Implemented paired pinned-Stim and Rust construction plus complete borrowed X/Y/Z singleton traversal with exact CQ2, semantic output, allocation, scale, timing, and bounded-worker contracts."
+    } else {
+        "Implemented paired pinned-Stim and Rust construction plus complete borrowed X/Z weight-range traversal with exact API ownership, CQ2, semantic output, allocation, scale, timing, and bounded-worker contracts."
+    }
+    .to_string();
+    group.status = QualificationStatus::Implemented;
+    Ok(())
+}
+
+fn pauli_string_iter_workload_family(singleton: bool) -> WorkloadFamily {
+    let (fixture, marker, scales) = if singleton {
+        (
+            "pauli-iterator-xyz-singleton-v1",
+            7,
+            [
+                (
+                    "small",
+                    1_000_u64,
+                    3_000_u64,
+                    "d8d6b42d21392b7ab593f2b09cb9673e261381aa2d93c8f15b8c4ac52a97235b",
+                ),
+                (
+                    "medium",
+                    32_000,
+                    96_000,
+                    "802dc4fd7b6e4d21c2eef73174aa24ee6cb81bc00be978d223a4e4c2242d89f9",
+                ),
+                (
+                    "large",
+                    1_000_000,
+                    3_000_000,
+                    "394634d1a0abfaace26d4f3c07b81fe797d60c474314e625fd7f02f64d25fd0d",
+                ),
+            ],
+        )
+    } else {
+        (
+            "pauli-iterator-xz-weight-range-v1",
+            6,
+            [
+                (
+                    "small",
+                    5_u64,
+                    232_u64,
+                    "315732711c88257f9f4b2be3dfc3dd01785be01b86bdb7338e663945a90070d5",
+                ),
+                (
+                    "medium",
+                    11,
+                    21_604,
+                    "d5c711573168f39a388aa386b1fb66b4b9d063f2a070610cd4543442548f4102",
+                ),
+                (
+                    "large",
+                    22,
+                    972_972,
+                    "85017fcee6d99c399676aac24ff1945f03363f316352eb10d707b51c66f506bc",
+                ),
+            ],
+        )
+    };
+    WorkloadFamily {
+        fixture: FixtureLocator::Generated {
+            id: fixture.to_string(),
+        },
+        source: "src/stim/stabilizers/pauli_string_iter.perf.cc".to_string(),
+        deterministic_seed: format!("source-owned-enumeration;marker={marker}"),
+        scales: scales
+            .into_iter()
+            .map(|(id, width, outputs, input_digest)| ScalePoint {
+                id: id.to_string(),
+                parameters: if singleton {
+                    format!(
+                        "generator={fixture}; qubits={width}; min_weight=1; max_weight=1; axes=XYZ; outputs={outputs}; marker={marker}"
+                    )
+                } else {
+                    format!(
+                        "generator={fixture}; qubits={width}; min_weight=2; max_weight=5; axes=XZ; outputs={outputs}; marker={marker}"
+                    )
+                },
+                input_bytes: InputByteCount::Exact { bytes: 64 },
+                semantic_work: Some(outputs),
+                input_digest: Some(input_digest.to_string()),
+            })
+            .collect(),
+    }
 }
 
 fn apply_pauli_string_multiply(
@@ -283,6 +416,15 @@ pub(super) fn additional_groups(
                 "source-owned sparse-XOR item group requires the row-XOR owner".to_string(),
             )
         })?;
+    let pauli_iter_range = groups
+        .iter()
+        .find(|group| group.id == PAULI_STRING_ITER_RANGE_GROUP_ID)
+        .ok_or_else(|| {
+            BenchError::Qualification(
+                "source-owned Pauli singleton iterator group requires the range iterator owner"
+                    .to_string(),
+            )
+        })?;
     let mut additional = [
         NotZeroGroupSpec {
             id: SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID,
@@ -327,6 +469,13 @@ pub(super) fn additional_groups(
     sparse_xor_item.row_origin = super::super::model::RowOrigin::Planned;
     apply_sparse_xor(root, &mut sparse_xor_item, true)?;
     additional.push(sparse_xor_item);
+    let mut pauli_iter_singleton = pauli_iter_range.clone();
+    pauli_iter_singleton.id = PAULI_STRING_ITER_SINGLETON_GROUP_ID.to_string();
+    pauli_iter_singleton.manifest_row = "pq2-pauli-string-iter-singleton".to_string();
+    pauli_iter_singleton.row_origin = super::super::model::RowOrigin::Planned;
+    pauli_iter_singleton.public_api_items.clear();
+    apply_pauli_string_iter(root, &mut pauli_iter_singleton, true)?;
+    additional.push(pauli_iter_singleton);
     Ok(additional)
 }
 
