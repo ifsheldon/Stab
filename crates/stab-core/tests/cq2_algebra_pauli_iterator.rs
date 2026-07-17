@@ -181,6 +181,8 @@ enum QualificationTestError {
     IntegerRange(#[from] std::num::TryFromIntError),
     #[error("Pauli iterator qualification arithmetic overflowed")]
     ArithmeticOverflow,
+    #[error("Pauli iterator expected-plane position {position} is outside {words} words")]
+    ExpectedPlanePosition { position: usize, words: usize },
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -376,37 +378,38 @@ fn summarize_singleton_existing(
 ) -> TestResult<SequenceSummary> {
     let allowed_bases = spec.allowed_bases();
     let mut summary = SequenceSummary::new();
-    let mut observed_terms = Vec::with_capacity(1);
+    let mut expected_x = vec![0_u64; spec.num_qubits.div_ceil(64)];
+    let mut expected_z = vec![0_u64; spec.num_qubits.div_ceil(64)];
     for position in 0..spec.num_qubits {
         for (basis_index, basis) in allowed_bases.iter().copied().enumerate() {
             assert!(
                 iterator.iter_next(),
                 "{spec:?} stopped at {position}:{basis_index}"
             );
+            if basis_index == 0 && position > 0 {
+                set_expected_basis(
+                    &mut expected_x,
+                    &mut expected_z,
+                    position - 1,
+                    PauliBasis::I,
+                )?;
+            }
+            set_expected_basis(&mut expected_x, &mut expected_z, position, basis)?;
             let result = iterator.result();
             assert_eq!(result.len(), spec.num_qubits);
             assert_eq!(result.sign(), PauliSign::Plus);
             assert_eq!(result.get(position), Some(basis));
-            if basis_index == 0 && position > 0 {
-                assert_eq!(result.get(position - 1), Some(PauliBasis::I));
-            }
-            if singleton_full_state_checkpoint(spec.num_qubits, position) {
-                observed_terms.clear();
-                observed_terms.extend(result.active_terms());
-                assert_eq!(result.weight(), 1, "{spec:?} at {position}:{basis_index}");
-                assert_eq!(
-                    observed_terms,
-                    [(position, basis)],
-                    "{spec:?} at {position}:{basis_index}"
-                );
-                summary.record_terms(
-                    spec.num_qubits,
-                    observed_terms.len(),
-                    observed_terms.iter().copied(),
-                )?;
-            } else {
-                summary.record_terms(spec.num_qubits, 1, std::iter::once((position, basis)))?;
-            }
+            assert_eq!(
+                result.x_bits(),
+                expected_x.as_slice(),
+                "{spec:?} X plane at {position}:{basis_index}"
+            );
+            assert_eq!(
+                result.z_bits(),
+                expected_z.as_slice(),
+                "{spec:?} Z plane at {position}:{basis_index}"
+            );
+            summary.record_terms(spec.num_qubits, 1, std::iter::once((position, basis)))?;
         }
     }
     assert!(!iterator.iter_next(), "{spec:?} produced an extra value");
@@ -415,14 +418,41 @@ fn summarize_singleton_existing(
     Ok(summary)
 }
 
-fn singleton_full_state_checkpoint(num_qubits: usize, position: usize) -> bool {
-    if num_qubits <= 1_000 {
-        return true;
+fn set_expected_basis(
+    expected_x: &mut [u64],
+    expected_z: &mut [u64],
+    position: usize,
+    basis: PauliBasis,
+) -> TestResult<()> {
+    let word = position / 64;
+    let mask = 1_u64 << (position % 64);
+    let word_count = expected_x.len();
+    let expected_x_word =
+        expected_x
+            .get_mut(word)
+            .ok_or(QualificationTestError::ExpectedPlanePosition {
+                position,
+                words: word_count,
+            })?;
+    let expected_z_word =
+        expected_z
+            .get_mut(word)
+            .ok_or(QualificationTestError::ExpectedPlanePosition {
+                position,
+                words: word_count,
+            })?;
+    *expected_x_word &= !mask;
+    *expected_z_word &= !mask;
+    match basis {
+        PauliBasis::I => {}
+        PauliBasis::X => *expected_x_word |= mask,
+        PauliBasis::Y => {
+            *expected_x_word |= mask;
+            *expected_z_word |= mask;
+        }
+        PauliBasis::Z => *expected_z_word |= mask,
     }
-    position < 3
-        || position.saturating_add(3) >= num_qubits
-        || WORD_BOUNDARIES.contains(&position)
-        || [num_qubits / 4, num_qubits / 2, num_qubits / 4 * 3].contains(&position)
+    Ok(())
 }
 
 fn summarize_reference(spec: IteratorSpec) -> TestResult<SequenceSummary> {
