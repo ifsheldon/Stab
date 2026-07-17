@@ -513,7 +513,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert_eq!(thresholds.schema_version, 2);
-        assert_eq!(thresholds.rows.len(), 77);
+        assert_eq!(thresholds.rows.len(), 76);
         assert!(
             thresholds
                 .rows
@@ -527,6 +527,10 @@ mod tests {
                 .iter()
                 .all(|row| row.id != "m6-pauli-string"),
             "the exact non-identity group supersedes the identity-only legacy timing row"
+        );
+        assert!(
+            thresholds.rows.iter().all(|row| row.id != "m6-pauli-iter"),
+            "the exact range and singleton groups supersede the bundled iterator timing row"
         );
         assert!(thresholds.rows.iter().all(|row| {
             row.max_relative_ratio == Some(1.25)

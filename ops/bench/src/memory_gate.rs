@@ -447,6 +447,10 @@ mod tests {
             "Pauli timing migration must preserve the legacy memory baseline until PQ6"
         );
         assert!(
+            baseline.rows.iter().any(|row| row.id == "m6-pauli-iter"),
+            "Pauli iterator timing migration must preserve the legacy memory baseline until PQ6"
+        );
+        assert!(
             baseline
                 .rows
                 .iter()

@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "4c940e983df10a7c95cc512939f4a0cce79f1865e141739af9378db581ea5f87",
-  "semantic_digest": "ad3b6640e04855ac76d4851f856bb405e7c80c55dbcd67b204d67ea41d40c1eb",
+  "semantic_digest": "48eacf03a2ecdca917c05aade52b7e17c9ead1be8b75b203e1d43c2f3b3b7dbf",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -72214,51 +72214,24 @@
       "id": "m6-pauli-iter",
       "primary_group_id": "PERFQ-M6-PAULI-ITER",
       "supporting_performance_features": [],
-      "decision": "reworked",
+      "decision": "superseded",
       "classifications": [
         "faithful",
+        "duplicate",
         "missing-scale",
         "missing-correctness-preflight",
         "missing-output-digest",
-        "heterogeneous-measurements"
+        "heterogeneous-measurements",
+        "unmatched-submeasurement"
       ],
       "stim_mapping": {
         "kind": "stim-perf",
         "source": "src/stim/stabilizers/pauli_string_iter.perf.cc",
         "filter": "pauli_iter_*"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
-      "threshold_max_relative_ratio": "1.25",
-      "threshold_measurement_pairs": [
-        {
-          "stim_name": "pauli_iter_xz_2_to_5_of_5",
-          "stab_name": "stab_pauli_iter_xz_2_to_5_of_5",
-          "max_relative_ratio": "1.25"
-        },
-        {
-          "stim_name": "pauli_iter_xyz_1_of_1000",
-          "stab_name": "stab_pauli_iter_xyz_1_of_1000",
-          "max_relative_ratio": "1.25"
-        }
-      ],
-      "replacement_contracts": [
-        {
-          "legacy_stim_name": "pauli_iter_xz_2_to_5_of_5",
-          "legacy_stab_name": "stab_pauli_iter_xz_2_to_5_of_5",
-          "runtime_group_id": "PERFQ-M6-PAULI-ITER",
-          "runtime_measurement_id": "construct-and-iterate-borrowed",
-          "runtime_scale_id": "small"
-        },
-        {
-          "legacy_stim_name": "pauli_iter_xyz_1_of_1000",
-          "legacy_stab_name": "stab_pauli_iter_xyz_1_of_1000",
-          "runtime_group_id": "PERFQ-M6-PAULI-ITER-SINGLETON",
-          "runtime_measurement_id": "construct-and-iterate-borrowed",
-          "runtime_scale_id": "small"
-        }
-      ],
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
+      "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
     {

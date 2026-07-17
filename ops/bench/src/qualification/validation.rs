@@ -1150,15 +1150,15 @@ fn validate_rows(
         ));
     }
     validate_decision_count(suite, RowDecision::Retained, 10, issues);
-    validate_decision_count(suite, RowDecision::Reworked, 136, issues);
+    validate_decision_count(suite, RowDecision::Reworked, 135, issues);
     validate_decision_count(suite, RowDecision::Diagnostic, 4, issues);
-    validate_decision_count(suite, RowDecision::Superseded, 9, issues);
+    validate_decision_count(suite, RowDecision::Superseded, 10, issues);
     validate_decision_count(suite, RowDecision::Removed, 2, issues);
     validate_classification_count(suite, RowClassification::Faithful, 15, issues);
     validate_classification_count(suite, RowClassification::Diagnostic, 134, issues);
     validate_classification_count(suite, RowClassification::Proxy, 10, issues);
     validate_classification_count(suite, RowClassification::Stale, 2, issues);
-    validate_classification_count(suite, RowClassification::Duplicate, 9, issues);
+    validate_classification_count(suite, RowClassification::Duplicate, 10, issues);
     validate_classification_count(suite, RowClassification::MissingScale, 123, issues);
     validate_classification_count(
         suite,
@@ -1184,7 +1184,7 @@ fn validate_rows(
     validate_classification_count(
         suite,
         RowClassification::UnmatchedSubmeasurement,
-        14,
+        15,
         issues,
     );
 }
