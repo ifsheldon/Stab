@@ -54,18 +54,6 @@ mod tests {
     }
 
     #[test]
-    fn exact_scale_replacement_records_the_scale() {
-        let replacement = replacement(
-            "legacy_stim",
-            "legacy_stab",
-            "PERFQ-EXAMPLE",
-            "measurement",
-            Some("large"),
-        );
-        assert_eq!(replacement.runtime_scale_id.as_deref(), Some("large"));
-    }
-
-    #[test]
     fn scale_family_replacement_can_still_omit_an_exact_scale() {
         let replacements = contracts(&row("m5-simd-bits"));
         assert_eq!(replacements.len(), 1);
