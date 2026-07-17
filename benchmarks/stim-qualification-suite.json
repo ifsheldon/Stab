@@ -3,7 +3,7 @@
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
   "correctness_digest": "3db44922e3310cb3a573fcff3b28d5eea5d28e0d6975e0856965c601ecc23c72",
-  "semantic_digest": "84d5ab682acda2a847972a74c5d58443fde8d2c820e62e46b634562e7c918e46",
+  "semantic_digest": "7eedf59cb65d2bd244accc56973d7831001191cd62511c56b05a5cd7ed612ac6",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -72101,63 +72101,24 @@
       "id": "m6-pauli-string",
       "primary_group_id": "PERFQ-M6-PAULI-STRING",
       "supporting_performance_features": [],
-      "decision": "reworked",
+      "decision": "superseded",
       "classifications": [
         "faithful",
+        "duplicate",
         "missing-scale",
         "missing-correctness-preflight",
         "missing-output-digest",
-        "heterogeneous-measurements"
+        "heterogeneous-measurements",
+        "unmatched-submeasurement"
       ],
       "stim_mapping": {
         "kind": "stim-perf",
         "source": "src/stim/stabilizers/pauli_string.perf.cc",
         "filter": "PauliString_*"
       },
-      "threshold_refs": [
-        "benchmarks/m12-primary-thresholds.json"
-      ],
-      "threshold_max_relative_ratio": "1.25",
-      "threshold_measurement_pairs": [
-        {
-          "stim_name": "PauliString_multiplication_10K",
-          "stab_name": "stab_pauli_string_multiplication_10K",
-          "max_relative_ratio": "1.25"
-        },
-        {
-          "stim_name": "PauliString_multiplication_100K",
-          "stab_name": "stab_pauli_string_multiplication_100K",
-          "max_relative_ratio": "1.25"
-        },
-        {
-          "stim_name": "PauliString_multiplication_1M",
-          "stab_name": "stab_pauli_string_multiplication_1M",
-          "max_relative_ratio": "1.25"
-        }
-      ],
-      "replacement_contracts": [
-        {
-          "legacy_stim_name": "PauliString_multiplication_10K",
-          "legacy_stab_name": "stab_pauli_string_multiplication_10K",
-          "runtime_group_id": "PERFQ-M6-PAULI-STRING",
-          "runtime_measurement_id": "right-multiply-in-place",
-          "runtime_scale_id": "small"
-        },
-        {
-          "legacy_stim_name": "PauliString_multiplication_100K",
-          "legacy_stab_name": "stab_pauli_string_multiplication_100K",
-          "runtime_group_id": "PERFQ-M6-PAULI-STRING",
-          "runtime_measurement_id": "right-multiply-in-place",
-          "runtime_scale_id": "medium"
-        },
-        {
-          "legacy_stim_name": "PauliString_multiplication_1M",
-          "legacy_stab_name": "stab_pauli_string_multiplication_1M",
-          "runtime_group_id": "PERFQ-M6-PAULI-STRING",
-          "runtime_measurement_id": "right-multiply-in-place",
-          "runtime_scale_id": "large"
-        }
-      ],
+      "threshold_refs": [],
+      "threshold_max_relative_ratio": null,
+      "threshold_measurement_pairs": [],
       "waiver_refs": []
     },
     {

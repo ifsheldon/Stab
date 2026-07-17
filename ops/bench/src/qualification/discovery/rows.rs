@@ -158,18 +158,14 @@ pub(super) fn classify_phase(row: &BenchmarkRow) -> Phase {
 }
 
 pub(super) fn row_decision(row: &BenchmarkRow) -> RowDecision {
-    const REWORKED: [&str; 4] = [
-        "m4-circuit-parse",
-        "m5-simd-bits",
-        "m5-simd-word",
-        "m6-pauli-string",
-    ];
+    const REWORKED: [&str; 3] = ["m4-circuit-parse", "m5-simd-bits", "m5-simd-word"];
     const REMOVED: [&str; 2] = ["m7-perf-harness", "m12-primary-performance-matrix"];
-    const SUPERSEDED: [&str; 8] = [
+    const SUPERSEDED: [&str; 9] = [
         "m10-analyze-errors-fold-cli",
         "m4-circuit-canonical-print",
         "m5-simd-bit-table",
         "m5-sparse-xor",
+        "m6-pauli-string",
         "m9-feedback-inline-mpp-batch",
         "pf3-m2d-sweep-b8",
         "pf7-cli-m2d-sweep-b8",

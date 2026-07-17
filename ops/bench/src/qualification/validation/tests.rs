@@ -249,6 +249,33 @@ fn superseded_sparse_xor_row_retires_legacy_timing_pairs() {
 }
 
 #[test]
+fn superseded_pauli_row_retires_identity_only_timing_pairs() {
+    let (suite, manifest, references) = fixture();
+    let row = suite
+        .manifest_rows
+        .iter()
+        .find(|row| row.id == "m6-pauli-string")
+        .expect("superseded Pauli row");
+    assert_eq!(row.decision, RowDecision::Superseded);
+    assert!(row.threshold_refs.is_empty());
+    assert!(row.threshold_max_relative_ratio.is_none());
+    assert!(row.threshold_measurement_pairs.is_empty());
+    assert!(row.replacement_contracts.is_empty());
+    assert!(row.classifications.contains(&RowClassification::Duplicate));
+
+    let group = suite
+        .qualification_groups
+        .iter()
+        .find(|group| group.id == "PERFQ-M6-PAULI-STRING")
+        .expect("exact non-identity Pauli group");
+    assert_eq!(group.status, QualificationStatus::Implemented);
+    assert_eq!(group.threshold_policy, ThresholdPolicy::Primary1_25);
+
+    validate(&suite, &manifest, &references, "UNFROZEN")
+        .expect("superseded identity-only provenance owns no timing threshold");
+}
+
+#[test]
 fn superseded_bit_matrix_row_retires_only_legacy_timing_provenance() {
     let (suite, manifest, references) = fixture();
     let row = suite

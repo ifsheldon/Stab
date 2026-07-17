@@ -10,34 +10,6 @@ pub(super) fn contracts(row: &BenchmarkRow) -> Vec<ReplacementContract> {
             "xor-complete-vector",
             None,
         )],
-        "m6-pauli-string" => [
-            (
-                "PauliString_multiplication_10K",
-                "stab_pauli_string_multiplication_10K",
-                "small",
-            ),
-            (
-                "PauliString_multiplication_100K",
-                "stab_pauli_string_multiplication_100K",
-                "medium",
-            ),
-            (
-                "PauliString_multiplication_1M",
-                "stab_pauli_string_multiplication_1M",
-                "large",
-            ),
-        ]
-        .into_iter()
-        .map(|(stim, stab, scale)| {
-            replacement(
-                stim,
-                stab,
-                "PERFQ-M6-PAULI-STRING",
-                "right-multiply-in-place",
-                Some(scale),
-            )
-        })
-        .collect(),
         _ => Vec::new(),
     }
 }
@@ -82,20 +54,15 @@ mod tests {
     }
 
     #[test]
-    fn pauli_replacements_bind_each_legacy_pair_to_one_exact_scale() {
-        let replacements = contracts(&row("m6-pauli-string"));
-        assert_eq!(replacements.len(), 3);
-        assert_eq!(
-            replacements
-                .iter()
-                .map(|replacement| replacement.runtime_scale_id.as_deref())
-                .collect::<Vec<_>>(),
-            [Some("small"), Some("medium"), Some("large")]
+    fn exact_scale_replacement_records_the_scale() {
+        let replacement = replacement(
+            "legacy_stim",
+            "legacy_stab",
+            "PERFQ-EXAMPLE",
+            "measurement",
+            Some("large"),
         );
-        assert!(replacements.iter().all(|replacement| {
-            replacement.runtime_group_id == "PERFQ-M6-PAULI-STRING"
-                && replacement.runtime_measurement_id == "right-multiply-in-place"
-        }));
+        assert_eq!(replacement.runtime_scale_id.as_deref(), Some("large"));
     }
 
     #[test]
