@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "performance_inventory_sha256": "1d38c155acbaf78234f9b92857cfef8c25ffa059a4a9e9756b272a72272dfd0d",
+  "performance_inventory_sha256": "84d5ab682acda2a847972a74c5d58443fde8d2c820e62e46b634562e7c918e46",
   "groups": [
     {
       "group_id": "pq1-adapter-protocol-smoke",
@@ -134,6 +134,17 @@
       "measurements": [
         {
           "measurement_id": "allocating-transpose",
+          "max_median_ratio": "1.25",
+          "max_confidence_interval_upper": "1.25"
+        }
+      ]
+    },
+    {
+      "group_id": "PERFQ-M6-PAULI-STRING",
+      "baseline_eligibility": "threshold-eligible",
+      "measurements": [
+        {
+          "measurement_id": "right-multiply-in-place",
           "max_median_ratio": "1.25",
           "max_confidence_interval_upper": "1.25"
         }

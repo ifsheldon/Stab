@@ -130,6 +130,22 @@ pub(crate) enum WorkerError {
     MissingTransposeResult,
     #[error("allocating bit-matrix transpose modified its source matrix")]
     TransposeSourceChanged,
+    #[error(transparent)]
+    Stabilizer(#[from] stab_core::StabilizerError),
+    #[error("Pauli multiplication width {actual} is below the minimum {minimum}")]
+    PauliWidthMinimum { actual: u64, minimum: u64 },
+    #[error("Pauli multiplication width {actual} exceeds maximum {maximum}")]
+    PauliWidthLimit { actual: u64, maximum: u64 },
+    #[error("Pauli multiplication width {0} cannot be represented on this host")]
+    PauliWidthRange(u64),
+    #[error("Pauli multiplication canonical byte count overflows u64")]
+    PauliByteCountOverflow,
+    #[error("Pauli multiplication warmup did not restore the canonical left operand")]
+    PauliPrimingState,
+    #[error("Pauli multiplication modified its right operand")]
+    PauliRightChanged,
+    #[error("Pauli multiplication workload was invoked without its prepared fixture")]
+    MissingPauliFixture,
     #[error("qualification worker semantic work count overflows u64")]
     WorkOverflow,
     #[error("failed to read the qualification start barrier: {0}")]

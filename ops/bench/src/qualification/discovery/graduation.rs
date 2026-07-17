@@ -20,6 +20,7 @@ const SPARSE_XOR_ROW_GROUP_ID: &str = "PERFQ-M5-SPARSE-XOR";
 const SPARSE_XOR_ITEM_GROUP_ID: &str = "PERFQ-M5-SPARSE-XOR-ITEM";
 const BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID: &str = "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE";
 const BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID: &str = "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING";
+const PAULI_STRING_MULTIPLY_GROUP_ID: &str = "PERFQ-M6-PAULI-STRING";
 const STIM_ADAPTER_SOURCE: &str = "benchmarks/stim_adapter/main.cc";
 const SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/simd_word_popcount_contract.h";
@@ -29,6 +30,8 @@ const SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE: &str =
 const SPARSE_XOR_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/sparse_xor_contract.h";
 const BIT_MATRIX_TRANSPOSE_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/bit_matrix_transpose_contract.h";
+const PAULI_STRING_MULTIPLY_COMPARATOR_SOURCE: &str =
+    "benchmarks/stim_adapter/pauli_string_multiply_contract.h";
 const CIRCUIT_PARSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-633fa529edf5f549",
     "cq-evidence-qualification-e660819ae9a223c6",
@@ -51,6 +54,10 @@ const SPARSE_XOR_CORRECTNESS_CASE: &str = "cq-evidence-qualification-bea77c19e9a
 const BIT_MATRIX_TRANSPOSE_CORRECTNESS_CASES: [&str; 2] = [
     "cq-evidence-qualification-4d0291febfd22b68",
     "cq-evidence-qualification-66e29faafe5f2856",
+];
+const PAULI_STRING_MULTIPLY_CORRECTNESS_CASES: [&str; 2] = [
+    "cq-evidence-qualification-3bab0f51237445f6",
+    "cq-evidence-qualification-489e6445120743c2",
 ];
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 
@@ -76,9 +83,87 @@ pub(super) fn apply(root: &RepoRoot, group: &mut QualificationGroup) -> Result<(
         BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID => {
             apply_bit_matrix_transpose(root, group, true)?;
         }
+        PAULI_STRING_MULTIPLY_GROUP_ID => apply_pauli_string_multiply(root, group)?,
         _ => {}
     }
     Ok(())
+}
+
+fn apply_pauli_string_multiply(
+    root: &RepoRoot,
+    group: &mut QualificationGroup,
+) -> Result<(), BenchError> {
+    group.phase = Phase::Execute;
+    group.runner_fidelity = RunnerFidelity::AdapterLibrary;
+    group.correctness_cases = PAULI_STRING_MULTIPLY_CORRECTNESS_CASES
+        .into_iter()
+        .map(str::to_string)
+        .collect();
+    group.correctness_binding = CorrectnessBinding::ExactCases;
+    group.planned_correctness_case_id = None;
+    group.workload_family = pauli_string_multiply_workload_family();
+    group.work_unit = "qubits".to_string();
+    group.output_contract = OutputContract {
+        expected_shape: "Exactly seventeen little-endian u64 fields bind iteration count, checked semantic work, width, workload marker, consumed phase checksum, four input-digest lanes, four final-left-digest lanes, and four unchanged-right-digest lanes."
+            .to_string(),
+        digest_state: EvidenceState::Existing,
+        sink_policy: "Both workers build the same equal-width non-identity operands outside timing, execute two untimed public multiplications to restore the left operand, time only direct public in-place calls behind matching compiler fences and optimizer-opaque references, consume every returned phase, retain the final left operand, and hash both operands outside timing."
+            .to_string(),
+        comparator_sources: [STIM_ADAPTER_SOURCE, PAULI_STRING_MULTIPLY_COMPARATOR_SOURCE]
+            .into_iter()
+            .map(|path| comparator_source(root, path))
+            .collect::<Result<_, _>>()?,
+    };
+    group.memory_policy = circuit_memory_policy(
+        "Two equal-width Pauli strings remain live during timing. Stab allocation instrumentation proves zero calls and zero bytes for each direct public in-place multiplication at every scale and the accepted maximum; setup and peak RSS remain report-only until PQ6.",
+    );
+    group.threshold_policy = ThresholdPolicy::Primary1_25;
+    group.owner = "stab-core/stabilizers".to_string();
+    group.reason = "Implemented paired pinned-Stim and Rust direct in-place Pauli multiplication with exact API ownership, CQ2, deterministic non-identity operands, phase and state digests, zero-allocation, scale, timing, and bounded-worker contracts."
+        .to_string();
+    group.status = QualificationStatus::Implemented;
+    Ok(())
+}
+
+fn pauli_string_multiply_workload_family() -> WorkloadFamily {
+    WorkloadFamily {
+        fixture: FixtureLocator::Generated {
+            id: "pauli-right-multiply-splitmix64-v1".to_string(),
+        },
+        source: "src/stim/stabilizers/pauli_string.perf.cc".to_string(),
+        deterministic_seed: "left=0x243f6a8885a308d3;right=0x13198a2e03707344".to_string(),
+        scales: [
+            (
+                "small",
+                10_000_u64,
+                5_056_u64,
+                "401b897ceb9c02fec1c57b15f76cdc45045fd551354c3dc5ae499e791aef22f4",
+            ),
+            (
+                "medium",
+                100_000,
+                50_048,
+                "51b8460e6069c3590ce2e25ee912a0ef92dfe1000a28aa4a1aa3b644ba0d402f",
+            ),
+            (
+                "large",
+                1_000_000,
+                500_032,
+                "5babb5f0de800c6ed6c644d103b7a0d01ab22fa7696a363e9120c7cac8157fd9",
+            ),
+        ]
+        .into_iter()
+        .map(|(id, qubits, input_bytes, input_digest)| ScalePoint {
+            id: id.to_string(),
+            parameters: format!(
+                "generator=pauli-right-multiply-splitmix64-v1; qubits={qubits}; marker=5; left_sign=plus; right_sign=minus"
+            ),
+            input_bytes: InputByteCount::Exact { bytes: input_bytes },
+            semantic_work: Some(qubits),
+            input_digest: Some(input_digest.to_string()),
+        })
+        .collect(),
+    }
 }
 
 fn apply_bit_matrix_transpose(

@@ -1,6 +1,7 @@
 #[cfg(target_os = "linux")]
 use std::path::Path;
 
+use super::pauli::{PauliRejectionClass, checked_pauli_rejection, pauli_rejection_expectation};
 use super::sparse_xor::{
     SparseXorRejectionClass, checked_sparse_xor_rejection, sparse_xor_rejection_expectation,
 };
@@ -43,7 +44,7 @@ fn canonical_worker_contract_preflight_binds_actual_receipts() {
     let probes = expected_contract_preflight_probes().expect("source-owned probes");
     let evidence = WorkerContractPreflightEvidence::from_actual_probes(contract_identity(), probes)
         .expect("valid contract evidence");
-    assert_eq!(evidence.probe_count(), 90);
+    assert_eq!(evidence.probe_count(), 104);
     assert!(evidence.validates_source_contract());
     let encoded = serde_json::to_vec(&evidence).expect("serialize preflight evidence");
     assert!(
@@ -559,6 +560,55 @@ fn invalid_transpose_work_rejections_must_precede_the_start_barrier() {
         ),
         Err(InvocationError::BitMatrixTransposeWorkRejection {
             class: "allocating-over-cap",
+            ..
+        })
+    ));
+}
+
+#[test]
+fn invalid_pauli_work_rejections_must_precede_the_start_barrier() {
+    let output = |status, stdout: &str, stderr: &str| ProcessResult {
+        status,
+        stdout: stdout.as_bytes().to_vec(),
+        stderr: stderr.as_bytes().to_vec(),
+        parent_observed_peak_rss_bytes: None,
+        wall_elapsed: Duration::from_millis(1),
+    };
+    for class in PauliRejectionClass::all() {
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            let (status, stderr) = pauli_rejection_expectation(implementation, class);
+            checked_pauli_rejection(&output(Some(status), "", stderr), implementation, class)
+                .expect("Pauli work rejection");
+        }
+    }
+
+    assert!(matches!(
+        checked_pauli_rejection(
+            &output(
+                Some(2),
+                "",
+                "stim qualification adapter: start barrier must contain exactly one newline\n",
+            ),
+            Implementation::Stim,
+            PauliRejectionClass::WorkOverflow,
+        ),
+        Err(InvocationError::PauliWorkRejection {
+            class: "work-overflow",
+            ..
+        })
+    ));
+    assert!(matches!(
+        checked_pauli_rejection(
+            &output(
+                Some(1),
+                "unexpected output\n",
+                pauli_rejection_expectation(Implementation::Stab, PauliRejectionClass::OverCap,).1,
+            ),
+            Implementation::Stab,
+            PauliRejectionClass::OverCap,
+        ),
+        Err(InvocationError::PauliWorkRejection {
+            class: "over-cap",
             ..
         })
     ));

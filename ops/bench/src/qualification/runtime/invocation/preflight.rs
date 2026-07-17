@@ -9,6 +9,12 @@ use super::super::process::ProcessResult;
 use super::super::protocol::{
     Implementation, InputDigest, ProtocolId, SemanticDigest, Sha256Digest, WorkerMeasurement,
 };
+use super::pauli::{
+    PAULI_EVEN_CASE_ID, PAULI_EVEN_OUTPUT_DIGEST, PAULI_MAX_CASE_ID, PAULI_MAX_INPUT_BYTES,
+    PAULI_MAX_INPUT_DIGEST, PAULI_MAX_OUTPUT_DIGEST, PAULI_MAX_WORK_ITEMS, PAULI_ODD_CASE_ID,
+    PAULI_ODD_OUTPUT_DIGEST, PAULI_SMALL_INPUT_BYTES, PAULI_SMALL_INPUT_DIGEST,
+    PAULI_SMALL_WORK_ITEMS, PauliRejectionClass, pauli_rejection_expectation,
+};
 use super::sparse_xor::{
     SPARSE_ITEM_BASE_WORK_ITEMS, SPARSE_ITEM_INPUT_BYTES, SPARSE_ITEM_INPUT_DIGEST,
     SPARSE_ITEM_MAX_CASE_ID, SPARSE_ITEM_MAX_OUTPUT_DIGEST, SPARSE_ITEM_MAX_WORK_ITEMS,
@@ -170,7 +176,7 @@ fn sha256_hex_bytes(bytes: &[u8]) -> Result<String, InvocationError> {
 
 pub(super) fn expected_contract_preflight_probes()
 -> Result<Vec<WorkerContractProbeEvidence>, InvocationError> {
-    let mut probes = Vec::with_capacity(90);
+    let mut probes = Vec::with_capacity(104);
     let protocol_output_digest = protocol_smoke_output_digest();
     for implementation in [Implementation::Stim, Implementation::Stab] {
         probes.push(expected_accepted_probe(
@@ -276,6 +282,46 @@ pub(super) fn expected_contract_preflight_probes()
                 TRANSPOSE_MAX_INPUT_BYTES,
                 TRANSPOSE_MAX_INPUT_DIGEST,
                 TRANSPOSE_ALLOCATING_MAX_OUTPUT_DIGEST,
+            ),
+        ] {
+            probes.push(expected_accepted_probe(
+                case_id,
+                implementation,
+                iterations,
+                iterations
+                    .checked_mul(work_items)
+                    .ok_or(InvocationError::WorkOverflow)?,
+                input_bytes,
+                input_digest,
+                output_digest,
+            )?);
+        }
+    }
+    for implementation in [Implementation::Stim, Implementation::Stab] {
+        for (case_id, iterations, work_items, input_bytes, input_digest, output_digest) in [
+            (
+                PAULI_ODD_CASE_ID,
+                1,
+                PAULI_SMALL_WORK_ITEMS,
+                PAULI_SMALL_INPUT_BYTES,
+                PAULI_SMALL_INPUT_DIGEST,
+                PAULI_ODD_OUTPUT_DIGEST,
+            ),
+            (
+                PAULI_EVEN_CASE_ID,
+                2,
+                PAULI_SMALL_WORK_ITEMS,
+                PAULI_SMALL_INPUT_BYTES,
+                PAULI_SMALL_INPUT_DIGEST,
+                PAULI_EVEN_OUTPUT_DIGEST,
+            ),
+            (
+                PAULI_MAX_CASE_ID,
+                1,
+                PAULI_MAX_WORK_ITEMS,
+                PAULI_MAX_INPUT_BYTES,
+                PAULI_MAX_INPUT_DIGEST,
+                PAULI_MAX_OUTPUT_DIGEST,
             ),
         ] {
             probes.push(expected_accepted_probe(
@@ -453,6 +499,17 @@ pub(super) fn expected_contract_preflight_probes()
     for class in TransposeRejectionClass::all() {
         for implementation in [Implementation::Stim, Implementation::Stab] {
             let (exit_status, stderr) = transpose_rejection_expectation(implementation, class);
+            probes.push(expected_rejected_probe(
+                class.case_id(),
+                implementation,
+                exit_status,
+                stderr,
+            )?);
+        }
+    }
+    for class in PauliRejectionClass::all() {
+        for implementation in [Implementation::Stim, Implementation::Stab] {
+            let (exit_status, stderr) = pauli_rejection_expectation(implementation, class);
             probes.push(expected_rejected_probe(
                 class.case_id(),
                 implementation,

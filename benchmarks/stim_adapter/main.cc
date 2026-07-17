@@ -25,6 +25,7 @@
 #include "stim/mem/simd_bits.h"
 
 #include "bit_matrix_transpose_contract.h"
+#include "pauli_string_multiply_contract.h"
 #include "simd_bits_not_zero_contract.h"
 #include "simd_bits_xor_contract.h"
 #include "simd_word_popcount_contract.h"
@@ -159,9 +160,12 @@ Arguments parse_arguments(int argc, const char **argv) {
          result.measurement_id == "in-place-transpose") ||
         (transpose_kind == stab_qualification::BitMatrixTransposeKind::ALLOCATING &&
          result.measurement_id == "allocating-transpose");
+    const bool pauli_string_multiply =
+        stab_qualification::is_pauli_string_multiply_workload(result.workload) &&
+        result.measurement_id == "right-multiply-in-place";
     if (!protocol_smoke && !circuit_parse && !circuit_canonical_print && !gate_name_hash &&
         !simd_word_popcount && !simd_bits_xor && !simd_bits_not_zero && !sparse_xor &&
-        !bit_matrix_transpose) {
+        !bit_matrix_transpose && !pauli_string_multiply) {
         throw std::invalid_argument("adapter workload and measurement are not a registered pair");
     }
     if (result.iterations == 0 || result.work_items == 0) {
@@ -854,6 +858,11 @@ int main(int argc, const char **argv) {
             transpose.emplace(stab_qualification::bit_matrix_transpose_fixture(
                 prepared_transpose_kind.value(), arguments.work_items));
         }
+        std::optional<stab_qualification::PauliMultiplyFixture> pauli_multiply;
+        if (stab_qualification::is_pauli_string_multiply_workload(arguments.workload)) {
+            pauli_multiply.emplace(
+                stab_qualification::pauli_multiply_fixture(arguments.work_items));
+        }
         const uint64_t input_bytes = popcount.has_value()
                                          ? popcount->input_bytes
                                      : dense_xor.has_value()
@@ -864,6 +873,8 @@ int main(int argc, const char **argv) {
                                          ? sparse_xor->input_bytes
                                      : transpose.has_value()
                                          ? transpose->input_bytes
+                                     : pauli_multiply.has_value()
+                                         ? pauli_multiply->input_bytes
                                          : static_cast<uint64_t>(circuit_fixture.size());
         const auto input_digest = popcount.has_value()
                                       ? popcount->input_digest
@@ -875,6 +886,8 @@ int main(int argc, const char **argv) {
                                       ? sparse_xor->input_digest
                                   : transpose.has_value()
                                       ? transpose->input_digest
+                                  : pauli_multiply.has_value()
+                                      ? pauli_multiply->input_digest
                                       : byte_digest(circuit_fixture);
 
         if (arguments.start_barrier) {
@@ -952,6 +965,12 @@ int main(int argc, const char **argv) {
                 stab_qualification::bit_matrix_transpose_contract(
                     arguments.iterations, prepared_transpose);
             });
+        } else if (pauli_multiply.has_value()) {
+            auto &prepared_pauli = pauli_multiply.value();
+            elapsed_seconds = measure_workload([&]() {
+                stab_qualification::pauli_multiply_contract(
+                    arguments.iterations, prepared_pauli);
+            });
         } else {
             throw std::invalid_argument("unreachable registered adapter workload");
         }
@@ -982,6 +1001,9 @@ int main(int argc, const char **argv) {
         } else if (prepared_transpose_kind.has_value()) {
             digest_state = stab_qualification::bit_matrix_transpose_output_digest(
                 transpose.value(), arguments.iterations, arguments.work_items);
+        } else if (pauli_multiply.has_value()) {
+            digest_state = stab_qualification::pauli_multiply_output_digest(
+                pauli_multiply.value(), arguments.iterations, work_count);
         }
         if (!(elapsed_seconds > 0)) {
             throw std::runtime_error("adapter measured a non-positive duration");

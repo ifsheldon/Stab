@@ -32,6 +32,7 @@ const BIT_MATRIX_TRANSPOSE_IN_PLACE_PROBE_ID: &str =
     "pq2-bit-matrix-transpose-in-place-adapter-smoke";
 const BIT_MATRIX_TRANSPOSE_ALLOCATING_PROBE_ID: &str =
     "pq2-bit-matrix-transpose-allocating-adapter-smoke";
+const PAULI_STRING_MULTIPLY_PROBE_ID: &str = "pq2-pauli-string-multiply-adapter-smoke";
 const SIMD_WORD_POPCOUNT_PROBE_ID: &str = "pq2-simd-word-popcount-adapter-smoke";
 const PROCESS_PROBE_ID: &str = "pq1-process-contract-smoke";
 const PROTOCOL_OUTPUT_LIMIT: usize = 1 << 20;
@@ -40,6 +41,7 @@ const DEFAULT_GATE_HASH_WORK_ITEMS: u64 = 5_248;
 const DEFAULT_POPCOUNT_WORK_ITEMS: u64 = 262_144;
 const DEFAULT_NOT_ZERO_WORK_ITEMS: u64 = 10_000;
 const DEFAULT_TRANSPOSE_WORK_ITEMS: u64 = 65_536;
+const DEFAULT_PAULI_WORK_ITEMS: u64 = 10_000;
 const GATE_HASH_NAME_COUNT: u64 = 82;
 const POPCOUNT_ALIGNMENT_BITS: u64 = 256;
 const POPCOUNT_MIN_BITS: u64 = 512;
@@ -56,6 +58,8 @@ const SPARSE_XOR_ITEM_MAX_WORK_ITEMS: u64 = 28_672;
 const TRANSPOSE_MIN_DIMENSION: u64 = 256;
 const TRANSPOSE_MAX_DIMENSION: u64 = 16_384;
 const TRANSPOSE_DIMENSION_ALIGNMENT: u64 = 256;
+const PAULI_MIN_QUBITS: u64 = 1;
+const PAULI_MAX_QUBITS: u64 = 1_048_576;
 const EMPTY_INPUT_DIGEST: &str = "6a09e667f3bcc908bb67ae8584caa73b3c6ef372fe94f82ba54ff53a5f1d36f1";
 const CIRCUIT_PARSE_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-PARSE";
 const CIRCUIT_CANONICAL_PRINT_RUNTIME_GROUP_ID: &str = "PERFQ-M4-CIRCUIT-CANONICAL-PRINT";
@@ -71,6 +75,7 @@ const BIT_MATRIX_TRANSPOSE_IN_PLACE_RUNTIME_GROUP_ID: &str =
     "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE";
 const BIT_MATRIX_TRANSPOSE_ALLOCATING_RUNTIME_GROUP_ID: &str =
     "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING";
+const PAULI_STRING_MULTIPLY_RUNTIME_GROUP_ID: &str = "PERFQ-M6-PAULI-STRING";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum ProbeGroup {
@@ -102,6 +107,8 @@ enum ProbeGroup {
     BitMatrixTransposeInPlaceAdapter,
     #[value(name = "pq2-bit-matrix-transpose-allocating-adapter-smoke")]
     BitMatrixTransposeAllocatingAdapter,
+    #[value(name = "pq2-pauli-string-multiply-adapter-smoke")]
+    PauliStringMultiplyAdapter,
 }
 
 impl ProbeGroup {
@@ -127,6 +134,7 @@ impl ProbeGroup {
             Self::BitMatrixTransposeAllocatingAdapter => {
                 Some(BIT_MATRIX_TRANSPOSE_ALLOCATING_RUNTIME_GROUP_ID)
             }
+            Self::PauliStringMultiplyAdapter => Some(PAULI_STRING_MULTIPLY_RUNTIME_GROUP_ID),
         }
     }
 
@@ -151,6 +159,7 @@ impl ProbeGroup {
             BIT_MATRIX_TRANSPOSE_ALLOCATING_RUNTIME_GROUP_ID => {
                 Some(Self::BitMatrixTransposeAllocatingAdapter)
             }
+            PAULI_STRING_MULTIPLY_RUNTIME_GROUP_ID => Some(Self::PauliStringMultiplyAdapter),
             _ => None,
         }
     }
@@ -234,9 +243,8 @@ pub(super) fn run(root: &RepoRoot, args: ProbeArgs) -> Result<(), ProbeError> {
         | ProbeGroup::SparseXorRowAdapter
         | ProbeGroup::SparseXorItemAdapter
         | ProbeGroup::BitMatrixTransposeInPlaceAdapter
-        | ProbeGroup::BitMatrixTransposeAllocatingAdapter => {
-            run_adapter_probe(root, args).map(|_| ())
-        }
+        | ProbeGroup::BitMatrixTransposeAllocatingAdapter
+        | ProbeGroup::PauliStringMultiplyAdapter => run_adapter_probe(root, args).map(|_| ()),
     }
 }
 
@@ -361,6 +369,11 @@ fn run_adapter_probe(root: &RepoRoot, args: ProbeArgs) -> Result<AdapterProbeRec
             BIT_MATRIX_TRANSPOSE_ALLOCATING_PROBE_ID,
             "bit-matrix-transpose-allocating",
             "allocating-transpose",
+        ),
+        ProbeGroup::PauliStringMultiplyAdapter => (
+            PAULI_STRING_MULTIPLY_PROBE_ID,
+            "pauli-string-right-multiply",
+            "right-multiply-in-place",
         ),
         ProbeGroup::ProcessContract => {
             return Err(ProbeError::Contract(
@@ -561,6 +574,7 @@ fn probe_work_items(args: &ProbeArgs) -> u64 {
             ProbeGroup::SparseXorItemAdapter => SPARSE_XOR_ITEM_BASE_WORK_ITEMS,
             ProbeGroup::BitMatrixTransposeInPlaceAdapter
             | ProbeGroup::BitMatrixTransposeAllocatingAdapter => DEFAULT_TRANSPOSE_WORK_ITEMS,
+            ProbeGroup::PauliStringMultiplyAdapter => DEFAULT_PAULI_WORK_ITEMS,
             ProbeGroup::ProcessContract
             | ProbeGroup::AdapterProtocol
             | ProbeGroup::CircuitParseAdapter
@@ -643,6 +657,13 @@ fn validate_probe_work_items(group: ProbeGroup, work_items: u64) -> Result<(), P
                 "bit-matrix transpose probe dimension {dimension} is not a multiple of {TRANSPOSE_DIMENSION_ALIGNMENT}"
             )));
         }
+    }
+    if group == ProbeGroup::PauliStringMultiplyAdapter
+        && !(PAULI_MIN_QUBITS..=PAULI_MAX_QUBITS).contains(&work_items)
+    {
+        return Err(ProbeError::Contract(format!(
+            "Pauli multiplication probe width {work_items} is outside {PAULI_MIN_QUBITS}..={PAULI_MAX_QUBITS} qubits"
+        )));
     }
     Ok(())
 }
@@ -933,6 +954,44 @@ mod tests {
         assert!(
             validate_probe_work_items(args.group, probe_work_items(&args)).is_ok(),
             "overflow regression must use an otherwise valid transpose shape"
+        );
+        assert!(matches!(
+            expected_work_count(&args),
+            Err(ProbeError::WorkOverflow)
+        ));
+    }
+
+    #[test]
+    fn pauli_probe_maps_to_its_runtime_group_and_enforces_public_bounds() {
+        let group = ProbeGroup::from_str(PAULI_STRING_MULTIPLY_PROBE_ID, true)
+            .expect("Pauli multiplication probe");
+        assert_eq!(
+            group.runtime_group_id(),
+            Some(PAULI_STRING_MULTIPLY_RUNTIME_GROUP_ID)
+        );
+        assert_eq!(
+            ProbeGroup::for_runtime_group(PAULI_STRING_MULTIPLY_RUNTIME_GROUP_ID),
+            Some(group)
+        );
+        for work_items in [PAULI_MIN_QUBITS, DEFAULT_PAULI_WORK_ITEMS, PAULI_MAX_QUBITS] {
+            assert!(validate_probe_work_items(group, work_items).is_ok());
+        }
+        for work_items in [0, PAULI_MAX_QUBITS + 1] {
+            assert!(validate_probe_work_items(group, work_items).is_err());
+        }
+    }
+
+    #[test]
+    fn pauli_probe_rejects_semantic_work_overflow_before_process_setup() {
+        let args = ProbeArgs {
+            group: ProbeGroup::PauliStringMultiplyAdapter,
+            iterations: NonZeroU64::new(1_u64 << 44).expect("nonzero overflow iterations"),
+            work_items: NonZeroU64::new(PAULI_MAX_QUBITS),
+            evidence_mode: ProbeEvidenceMode::Timing,
+        };
+        assert!(
+            validate_probe_work_items(args.group, probe_work_items(&args)).is_ok(),
+            "overflow regression must use an otherwise valid Pauli width"
         );
         assert!(matches!(
             expected_work_count(&args),

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "stim_version": "v1.16.0",
   "stim_commit": "e2fc1eca7fd21684d433aa5f10f4504ea4860d07",
-  "correctness_digest": "5d795e831bc20b3f2780ca72c1eaea7c75387388d38f8e37f4539254a41e821b",
-  "semantic_digest": "1d38c155acbaf78234f9b92857cfef8c25ffa059a4a9e9756b272a72272dfd0d",
+  "correctness_digest": "3db44922e3310cb3a573fcff3b28d5eea5d28e0d6975e0856965c601ecc23c72",
+  "semantic_digest": "84d5ab682acda2a847972a74c5d58443fde8d2c820e62e46b634562e7c918e46",
   "performance_features": [
     {
       "id": "PERF-CIRCUIT-MODEL",
@@ -17433,7 +17433,7 @@
       "correctness_case_id": "cq-evidence-qualification-3bab0f51237445f6",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-63efe14ce80c59fe"
+        "PERFQ-M6-PAULI-STRING"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -27817,7 +27817,7 @@
       "correctness_case_id": "cq-evidence-qualification-3bab0f51237445f6",
       "disposition": "covered-by-parent",
       "parent_group_ids": [
-        "PERFQ-API-5f2d52968aea1402"
+        "PERFQ-M6-PAULI-STRING"
       ],
       "reason": "Behavioral operation is assigned to its exact planned measured parent; PQ2 through PQ5 must implement or explicitly reclassify that workload."
     },
@@ -38330,7 +38330,6 @@
         "stab_core::stabilizers::PauliString::phase",
         "stab_core::stabilizers::PauliString::random",
         "stab_core::stabilizers::PauliString::randomize",
-        "stab_core::stabilizers::PauliString::right_multiply_in_place_returning_log_i_scalar",
         "stab_core::stabilizers::PauliString::set",
         "stab_core::stabilizers::PauliString::sign",
         "stab_core::stabilizers::PauliString::weight",
@@ -38695,7 +38694,6 @@
         "stab_core::PauliString::phase",
         "stab_core::PauliString::random",
         "stab_core::PauliString::randomize",
-        "stab_core::PauliString::right_multiply_in_place_returning_log_i_scalar",
         "stab_core::PauliString::set",
         "stab_core::PauliString::sign",
         "stab_core::PauliString::weight",
@@ -62388,7 +62386,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
+            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -62487,7 +62485,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
+            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
           },
           {
             "path": "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
@@ -62641,7 +62639,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
+            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_xor_contract.h",
@@ -62737,7 +62735,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
+            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62833,7 +62831,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
+            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -62929,7 +62927,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
+            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
           },
           {
             "path": "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
@@ -63026,7 +63024,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
+            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
           },
           {
             "path": "benchmarks/stim_adapter/simd_word_popcount_contract.h",
@@ -63121,7 +63119,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
+            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -63216,7 +63214,7 @@
         "comparator_sources": [
           {
             "path": "benchmarks/stim_adapter/main.cc",
-            "sha256": "be0dc2df9b03021f693682fea805d5d17aee056d73fa0331073ab11b5a9347c3"
+            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
           },
           {
             "path": "benchmarks/stim_adapter/sparse_xor_contract.h",
@@ -63370,35 +63368,74 @@
       "performance_feature": "PERF-STABILIZER-ALGEBRA",
       "checklist_anchors": [],
       "checklist_child_ids": [],
-      "public_api_items": [],
+      "public_api_items": [
+        "stab_core::PauliString::right_multiply_in_place_returning_log_i_scalar",
+        "stab_core::stabilizers::PauliString::right_multiply_in_place_returning_log_i_scalar"
+      ],
       "disposition": "measured",
       "phase": "execute",
-      "runner_fidelity": "stim-perf",
-      "correctness_cases": [],
-      "correctness_binding": "unresolved",
-      "planned_correctness_case_id": "CQPLANNED-PERFQ-M6-PAULI-STRING",
+      "runner_fidelity": "adapter-library",
+      "correctness_cases": [
+        "cq-evidence-qualification-3bab0f51237445f6",
+        "cq-evidence-qualification-489e6445120743c2"
+      ],
+      "correctness_binding": "exact-cases",
+      "planned_correctness_case_id": null,
       "workload_family": {
         "fixture": {
-          "kind": "inline",
-          "id": "m6-pauli-string"
+          "kind": "generated",
+          "id": "pauli-right-multiply-splitmix64-v1"
         },
         "source": "src/stim/stabilizers/pauli_string.perf.cc",
-        "deterministic_seed": "source-owned-inline:m6-pauli-string",
+        "deterministic_seed": "left=0x243f6a8885a308d3;right=0x13198a2e03707344",
         "scales": [
           {
-            "id": "inherited",
-            "parameters": "Pauli string multiplication workloads",
+            "id": "small",
+            "parameters": "generator=pauli-right-multiply-splitmix64-v1; qubits=10000; marker=5; left_sign=plus; right_sign=minus",
             "input_bytes": {
-              "kind": "not-applicable"
-            }
+              "kind": "exact",
+              "bytes": 5056
+            },
+            "semantic_work": 10000,
+            "input_digest": "401b897ceb9c02fec1c57b15f76cdc45045fd551354c3dc5ae499e791aef22f4"
+          },
+          {
+            "id": "medium",
+            "parameters": "generator=pauli-right-multiply-splitmix64-v1; qubits=100000; marker=5; left_sign=plus; right_sign=minus",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 50048
+            },
+            "semantic_work": 100000,
+            "input_digest": "51b8460e6069c3590ce2e25ee912a0ef92dfe1000a28aa4a1aa3b644ba0d402f"
+          },
+          {
+            "id": "large",
+            "parameters": "generator=pauli-right-multiply-splitmix64-v1; qubits=1000000; marker=5; left_sign=plus; right_sign=minus",
+            "input_bytes": {
+              "kind": "exact",
+              "bytes": 500032
+            },
+            "semantic_work": 1000000,
+            "input_digest": "5babb5f0de800c6ed6c644d103b7a0d01ab22fa7696a363e9120c7cac8157fd9"
           }
         ]
       },
       "work_unit": "qubits",
       "output_contract": {
-        "expected_shape": "pauli-string output count, width, and semantic digest from the declared correctness preflight",
-        "digest_state": "planned",
-        "sink_policy": "Both workers black-box equal semantic work and an untimed output digest."
+        "expected_shape": "Exactly seventeen little-endian u64 fields bind iteration count, checked semantic work, width, workload marker, consumed phase checksum, four input-digest lanes, four final-left-digest lanes, and four unchanged-right-digest lanes.",
+        "digest_state": "existing",
+        "sink_policy": "Both workers build the same equal-width non-identity operands outside timing, execute two untimed public multiplications to restore the left operand, time only direct public in-place calls behind matching compiler fences and optimizer-opaque references, consume every returned phase, retain the final left operand, and hash both operands outside timing.",
+        "comparator_sources": [
+          {
+            "path": "benchmarks/stim_adapter/main.cc",
+            "sha256": "976a412ff242de4c5efc4b442c06e512088196664ab30d423bde52191d165230"
+          },
+          {
+            "path": "benchmarks/stim_adapter/pauli_string_multiply_contract.h",
+            "sha256": "1ee59f9387a40afc25426b35145f3c800ee2a08a89bf8f09037b529b1efeefbb"
+          }
+        ]
       },
       "timing_policy": {
         "calibration_min_ms": 250,
@@ -63410,16 +63447,18 @@
         "gate_statistic": "median paired ratio and fixed-seed bootstrap 95% upper bound"
       },
       "memory_policy": {
-        "method": "stab-allocations",
+        "method": "process-rss",
         "scale_ids": [
-          "inherited"
+          "small",
+          "medium",
+          "large"
         ],
-        "expected_growth": "unclassified until PQ2 through PQ5 provide three-scale evidence"
+        "expected_growth": "Two equal-width Pauli strings remain live during timing. Stab allocation instrumentation proves zero calls and zero bytes for each direct public in-place multiplication at every scale and the accepted maximum; setup and peak RSS remain report-only until PQ6."
       },
-      "threshold_policy": "report-only",
-      "reason": "The inherited operation shape is retained, but PQ1 must add correctness preflight, exact output digest, scales, and paired statistics before qualification.",
-      "owner": "stab-core",
-      "status": "planned"
+      "threshold_policy": "primary-1.25",
+      "reason": "Implemented paired pinned-Stim and Rust direct in-place Pauli multiplication with exact API ownership, CQ2, deterministic non-identity operands, phase and state digests, zero-allocation, scale, timing, and bounded-worker contracts.",
+      "owner": "stab-core/stabilizers",
+      "status": "implemented"
     },
     {
       "id": "PERFQ-M6-STABILIZERS-TO-TABLEAU",
@@ -72062,14 +72101,13 @@
       "id": "m6-pauli-string",
       "primary_group_id": "PERFQ-M6-PAULI-STRING",
       "supporting_performance_features": [],
-      "decision": "retained",
+      "decision": "reworked",
       "classifications": [
         "faithful",
         "missing-scale",
         "missing-correctness-preflight",
         "missing-output-digest",
-        "heterogeneous-measurements",
-        "unmatched-submeasurement"
+        "heterogeneous-measurements"
       ],
       "stim_mapping": {
         "kind": "stim-perf",
@@ -72080,7 +72118,46 @@
         "benchmarks/m12-primary-thresholds.json"
       ],
       "threshold_max_relative_ratio": "1.25",
-      "threshold_measurement_pairs": [],
+      "threshold_measurement_pairs": [
+        {
+          "stim_name": "PauliString_multiplication_10K",
+          "stab_name": "stab_pauli_string_multiplication_10K",
+          "max_relative_ratio": "1.25"
+        },
+        {
+          "stim_name": "PauliString_multiplication_100K",
+          "stab_name": "stab_pauli_string_multiplication_100K",
+          "max_relative_ratio": "1.25"
+        },
+        {
+          "stim_name": "PauliString_multiplication_1M",
+          "stab_name": "stab_pauli_string_multiplication_1M",
+          "max_relative_ratio": "1.25"
+        }
+      ],
+      "replacement_contracts": [
+        {
+          "legacy_stim_name": "PauliString_multiplication_10K",
+          "legacy_stab_name": "stab_pauli_string_multiplication_10K",
+          "runtime_group_id": "PERFQ-M6-PAULI-STRING",
+          "runtime_measurement_id": "right-multiply-in-place",
+          "runtime_scale_id": "small"
+        },
+        {
+          "legacy_stim_name": "PauliString_multiplication_100K",
+          "legacy_stab_name": "stab_pauli_string_multiplication_100K",
+          "runtime_group_id": "PERFQ-M6-PAULI-STRING",
+          "runtime_measurement_id": "right-multiply-in-place",
+          "runtime_scale_id": "medium"
+        },
+        {
+          "legacy_stim_name": "PauliString_multiplication_1M",
+          "legacy_stab_name": "stab_pauli_string_multiplication_1M",
+          "runtime_group_id": "PERFQ-M6-PAULI-STRING",
+          "runtime_measurement_id": "right-multiply-in-place",
+          "runtime_scale_id": "large"
+        }
+      ],
       "waiver_refs": []
     },
     {

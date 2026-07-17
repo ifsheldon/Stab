@@ -22,14 +22,17 @@ const SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE: &str =
 const SPARSE_XOR_COMPARATOR_SOURCE: &str = "benchmarks/stim_adapter/sparse_xor_contract.h";
 const BIT_MATRIX_TRANSPOSE_COMPARATOR_SOURCE: &str =
     "benchmarks/stim_adapter/bit_matrix_transpose_contract.h";
-const COMPARATOR_SOURCES: [&str; 5] = [
+const PAULI_STRING_MULTIPLY_COMPARATOR_SOURCE: &str =
+    "benchmarks/stim_adapter/pauli_string_multiply_contract.h";
+const COMPARATOR_SOURCES: [&str; 6] = [
     SIMD_WORD_POPCOUNT_COMPARATOR_SOURCE,
     SIMD_BITS_XOR_COMPARATOR_SOURCE,
     SIMD_BITS_NOT_ZERO_COMPARATOR_SOURCE,
     SPARSE_XOR_COMPARATOR_SOURCE,
     BIT_MATRIX_TRANSPOSE_COMPARATOR_SOURCE,
+    PAULI_STRING_MULTIPLY_COMPARATOR_SOURCE,
 ];
-const RECEIPT_SCHEMA_VERSION: u32 = 8;
+const RECEIPT_SCHEMA_VERSION: u32 = 9;
 const MAX_SOURCE_BYTES: u64 = 1 << 20;
 const MAX_FLAGS_FILE_BYTES: u64 = 64 << 10;
 const MAX_TOOL_BYTES: u64 = 512 << 20;
@@ -1106,6 +1109,7 @@ mod tests {
         let not_zero_source = runtime.path().join("simd_bits_not_zero_contract.h");
         let sparse_xor_source = runtime.path().join("sparse_xor_contract.h");
         let transpose_source = runtime.path().join("bit_matrix_transpose_contract.h");
+        let pauli_source = runtime.path().join("pauli_string_multiply_contract.h");
         let library = runtime.path().join("libstim.a");
         let binary = runtime.path().join("adapter");
         std::fs::write(&source, b"source").expect("write source");
@@ -1114,6 +1118,7 @@ mod tests {
         std::fs::write(&not_zero_source, b"source").expect("write not-zero source");
         std::fs::write(&sparse_xor_source, b"source").expect("write sparse XOR source");
         std::fs::write(&transpose_source, b"source").expect("write transpose source");
+        std::fs::write(&pauli_source, b"source").expect("write Pauli source");
         std::fs::write(&library, b"library").expect("write library");
         std::fs::write(&binary, b"binary").expect("write binary");
         std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700))
@@ -1140,6 +1145,7 @@ mod tests {
                 not_zero_source.clone(),
                 sparse_xor_source.clone(),
                 transpose_source.clone(),
+                pauli_source.clone(),
             ],
             library_path: library,
         };

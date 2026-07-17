@@ -8,6 +8,8 @@ use super::protocol::{InputDigest, ProtocolId, Sha256Digest};
 use super::run::ClaimClass;
 use crate::root::RepoRoot;
 
+mod comparators;
+
 const GROUP_CONTRACT_PATH: &str = "benchmarks/qualification-runtime-groups.json";
 const GROUP_CONTRACT_SCHEMA_VERSION: u32 = 4;
 const MAX_GROUP_CONTRACT_BYTES: usize = 1 << 20;
@@ -21,28 +23,6 @@ const MAX_PROFILER_NOTE_BYTES: usize = 64 << 10;
 const MAX_COMPARATOR_SOURCE_BYTES: usize = 1 << 20;
 const PROFILER_NOTE_PREFIX: &str = "benchmarks/profiler-notes/qualification/";
 const COMPARATOR_SOURCE_PREFIX: &str = "benchmarks/stim_adapter/";
-const SIMD_WORD_POPCOUNT_GROUP_ID: &str = "PERFQ-M5-SIMD-WORD";
-const SIMD_WORD_POPCOUNT_COMPARATOR_PATHS: [&str; 2] = [
-    "benchmarks/stim_adapter/main.cc",
-    "benchmarks/stim_adapter/simd_word_popcount_contract.h",
-];
-const SIMD_BITS_XOR_GROUP_ID: &str = "PERFQ-M5-SIMD-BITS";
-const SIMD_BITS_XOR_COMPARATOR_PATHS: [&str; 2] = [
-    "benchmarks/stim_adapter/main.cc",
-    "benchmarks/stim_adapter/simd_bits_xor_contract.h",
-];
-const SIMD_BITS_NOT_ZERO_COMPARATOR_PATHS: [&str; 2] = [
-    "benchmarks/stim_adapter/main.cc",
-    "benchmarks/stim_adapter/simd_bits_not_zero_contract.h",
-];
-const SPARSE_XOR_COMPARATOR_PATHS: [&str; 2] = [
-    "benchmarks/stim_adapter/main.cc",
-    "benchmarks/stim_adapter/sparse_xor_contract.h",
-];
-const BIT_MATRIX_TRANSPOSE_COMPARATOR_PATHS: [&str; 2] = [
-    "benchmarks/stim_adapter/main.cc",
-    "benchmarks/stim_adapter/bit_matrix_transpose_contract.h",
-];
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -468,22 +448,7 @@ fn validate(file: &GroupContractFile, expected_inventory_sha256: &str) -> Result
             .iter()
             .map(|source| source.path.as_str())
             .collect::<Vec<_>>();
-        let expected_comparator_paths = match group.id.to_string().as_str() {
-            SIMD_WORD_POPCOUNT_GROUP_ID => SIMD_WORD_POPCOUNT_COMPARATOR_PATHS.as_slice(),
-            SIMD_BITS_XOR_GROUP_ID => SIMD_BITS_XOR_COMPARATOR_PATHS.as_slice(),
-            super::invocation::SIMD_BITS_NOT_ZERO_EARLY_GROUP_ID
-            | super::invocation::SIMD_BITS_NOT_ZERO_ALL_ZERO_GROUP_ID
-            | super::invocation::SIMD_BITS_NOT_ZERO_LATE_GROUP_ID => {
-                SIMD_BITS_NOT_ZERO_COMPARATOR_PATHS.as_slice()
-            }
-            super::invocation::SPARSE_XOR_ROW_GROUP_ID
-            | super::invocation::SPARSE_XOR_ITEM_GROUP_ID => SPARSE_XOR_COMPARATOR_PATHS.as_slice(),
-            super::invocation::BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID
-            | super::invocation::BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID => {
-                BIT_MATRIX_TRANSPOSE_COMPARATOR_PATHS.as_slice()
-            }
-            _ => &[],
-        };
+        let expected_comparator_paths = comparators::expected_paths(group.id.to_string().as_str());
         if measurement_ids.len() != group.measurement_ids.len()
             || scale_ids.len() != group.scales.len()
             || !group
@@ -703,7 +668,7 @@ mod tests {
                 correctness_case_ids: vec!["cq-evidence-simd-bits-xor".to_string()],
                 owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
                 profiler_note: None,
-                comparator_sources: SIMD_BITS_XOR_COMPARATOR_PATHS
+                comparator_sources: comparators::SIMD_BITS_XOR
                     .iter()
                     .map(|path| ComparatorSourceContract {
                         path: ComparatorSourcePath::try_new((*path).to_string())
@@ -730,7 +695,7 @@ mod tests {
                 correctness_case_ids: vec!["cq-evidence-simd-word-popcount".to_string()],
                 owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
                 profiler_note: None,
-                comparator_sources: SIMD_WORD_POPCOUNT_COMPARATOR_PATHS
+                comparator_sources: comparators::SIMD_WORD_POPCOUNT
                     .iter()
                     .map(|path| ComparatorSourceContract {
                         path: ComparatorSourcePath::try_new((*path).to_string())
@@ -775,6 +740,7 @@ mod tests {
                 "bit-matrix-transpose-allocating",
                 "allocating-transpose",
             ),
+            pauli_contract(),
         ]);
         GroupContractFile {
             schema_version: GROUP_CONTRACT_SCHEMA_VERSION,
@@ -799,7 +765,7 @@ mod tests {
             correctness_case_ids: vec!["cq-evidence-simd-bits-not-zero".to_string()],
             owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
             profiler_note: None,
-            comparator_sources: SIMD_BITS_NOT_ZERO_COMPARATOR_PATHS
+            comparator_sources: comparators::SIMD_BITS_NOT_ZERO
                 .iter()
                 .map(|path| ComparatorSourceContract {
                     path: ComparatorSourcePath::try_new((*path).to_string())
@@ -831,7 +797,7 @@ mod tests {
             correctness_case_ids: vec!["cq-evidence-sparse-xor".to_string()],
             owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
             profiler_note: None,
-            comparator_sources: SPARSE_XOR_COMPARATOR_PATHS
+            comparator_sources: comparators::SPARSE_XOR
                 .iter()
                 .map(|path| ComparatorSourceContract {
                     path: ComparatorSourcePath::try_new((*path).to_string())
@@ -865,12 +831,48 @@ mod tests {
             ],
             owner: ProtocolId::try_new("stab-core/bits").expect("owner"),
             profiler_note: None,
-            comparator_sources: BIT_MATRIX_TRANSPOSE_COMPARATOR_PATHS
+            comparator_sources: comparators::BIT_MATRIX_TRANSPOSE
                 .iter()
                 .map(|path| ComparatorSourceContract {
                     path: ComparatorSourcePath::try_new((*path).to_string())
                         .expect("comparator path"),
                     sha256: Sha256Digest::try_new("c".repeat(64)).expect("comparator digest"),
+                })
+                .collect(),
+        }
+    }
+
+    fn pauli_contract() -> GroupContract {
+        GroupContract {
+            id: ProtocolId::try_new(super::super::invocation::PAULI_STRING_MULTIPLY_GROUP_ID)
+                .expect("group id"),
+            claim_class: ClaimClass::PromotablePerformance,
+            baseline_eligibility: BaselineEligibility::ThresholdEligible,
+            workload_id: ProtocolId::try_new("pauli-string-right-multiply").expect("workload id"),
+            measurement_ids: vec![
+                ProtocolId::try_new("right-multiply-in-place").expect("measurement id"),
+            ],
+            scales: [("small", 10_000), ("medium", 100_000), ("large", 1_000_000)]
+                .into_iter()
+                .map(|(id, work_items)| ScaleContract {
+                    id: ProtocolId::try_new(id).expect("scale id"),
+                    work_items: NonZeroU64::new(work_items).expect("positive work"),
+                    input_bytes: 8,
+                    input_digest: InputDigest::try_new("d".repeat(64)).expect("input digest"),
+                })
+                .collect(),
+            correctness_case_ids: vec![
+                "cq-evidence-qualification-3bab0f51237445f6".to_string(),
+                "cq-evidence-qualification-489e6445120743c2".to_string(),
+            ],
+            owner: ProtocolId::try_new("stab-core/stabilizers").expect("owner"),
+            profiler_note: None,
+            comparator_sources: comparators::PAULI_STRING_MULTIPLY
+                .iter()
+                .map(|path| ComparatorSourceContract {
+                    path: ComparatorSourcePath::try_new((*path).to_string())
+                        .expect("comparator path"),
+                    sha256: Sha256Digest::try_new("d".repeat(64)).expect("comparator digest"),
                 })
                 .collect(),
         }

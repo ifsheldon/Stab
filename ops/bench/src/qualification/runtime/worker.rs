@@ -17,6 +17,7 @@ use sha2::{Digest as _, Sha256};
 mod bits;
 mod error;
 mod not_zero;
+mod pauli;
 mod sparse_xor;
 mod transpose;
 
@@ -31,13 +32,15 @@ use bits::{
     popcount_output_digest, simd_word_popcount,
 };
 use not_zero::{NotZeroPattern, not_zero_fixture, not_zero_output_digest, simd_bits_not_zero};
+use pauli::PauliMultiplyFixture;
 use sparse_xor::{SparseXorFixture, SparseXorKind};
 use transpose::{TransposeFixture, TransposeKind};
 
-const WORKER_SOURCES: [(&str, &[u8]); 6] = [
+const WORKER_SOURCES: [(&str, &[u8]); 7] = [
     ("worker.rs", include_bytes!("worker.rs")),
     ("worker/bits.rs", include_bytes!("worker/bits.rs")),
     ("worker/not_zero.rs", include_bytes!("worker/not_zero.rs")),
+    ("worker/pauli.rs", include_bytes!("worker/pauli.rs")),
     (
         "worker/sparse_xor.rs",
         include_bytes!("worker/sparse_xor.rs"),
@@ -79,6 +82,7 @@ pub(crate) enum WorkerWorkload {
     SparseXorItem,
     BitMatrixTransposeInPlace,
     BitMatrixTransposeAllocating,
+    PauliStringRightMultiply,
 }
 
 impl WorkerWorkload {
@@ -97,6 +101,7 @@ impl WorkerWorkload {
             Self::SparseXorItem => "sparse-xor-item",
             Self::BitMatrixTransposeInPlace => "bit-matrix-transpose-in-place",
             Self::BitMatrixTransposeAllocating => "bit-matrix-transpose-allocating",
+            Self::PauliStringRightMultiply => "pauli-string-right-multiply",
         }
     }
 
@@ -115,6 +120,7 @@ impl WorkerWorkload {
             Self::SparseXorItem => "xor-item",
             Self::BitMatrixTransposeInPlace => TransposeKind::InPlace.measurement(),
             Self::BitMatrixTransposeAllocating => TransposeKind::Allocating.measurement(),
+            Self::PauliStringRightMultiply => "right-multiply-in-place",
         }
     }
 
@@ -132,7 +138,8 @@ impl WorkerWorkload {
             | Self::SparseXorRow
             | Self::SparseXorItem
             | Self::BitMatrixTransposeInPlace
-            | Self::BitMatrixTransposeAllocating => None,
+            | Self::BitMatrixTransposeAllocating
+            | Self::PauliStringRightMultiply => None,
         }
     }
 
@@ -227,7 +234,8 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SparseXorRow
         | WorkerWorkload::SparseXorItem
         | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating => None,
+        | WorkerWorkload::BitMatrixTransposeAllocating
+        | WorkerWorkload::PauliStringRightMultiply => None,
         WorkerWorkload::CircuitParse | WorkerWorkload::CircuitCanonicalPrint => {
             Some(circuit_parse_fixture(args.work_items.get())?)
         }
@@ -245,7 +253,8 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SparseXorRow
         | WorkerWorkload::SparseXorItem
         | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating => None,
+        | WorkerWorkload::BitMatrixTransposeAllocating
+        | WorkerWorkload::PauliStringRightMultiply => None,
     };
     let mut dense_xor_fixture = match args.workload {
         WorkerWorkload::SimdBitsXor => Some(dense_xor_fixture(args.work_items.get())?),
@@ -260,7 +269,8 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SparseXorRow
         | WorkerWorkload::SparseXorItem
         | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating => None,
+        | WorkerWorkload::BitMatrixTransposeAllocating
+        | WorkerWorkload::PauliStringRightMultiply => None,
     };
     let not_zero_fixture = args
         .workload
@@ -277,6 +287,12 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         .transpose_kind()
         .map(|kind| TransposeFixture::prepare(kind, args.work_items.get()))
         .transpose()?;
+    let mut pauli_fixture = match args.workload {
+        WorkerWorkload::PauliStringRightMultiply => {
+            Some(PauliMultiplyFixture::prepare(args.work_items.get())?)
+        }
+        _ => None,
+    };
     let (input_bytes, input_digest_state) = if let Some(fixture) = &popcount_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else if let Some(fixture) = &dense_xor_fixture {
@@ -286,6 +302,8 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
     } else if let Some(fixture) = &sparse_xor_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else if let Some(fixture) = &transpose_fixture {
+        (fixture.input_bytes, fixture.input_digest)
+    } else if let Some(fixture) = &pauli_fixture {
         (fixture.input_bytes, fixture.input_digest)
     } else {
         let input = circuit_fixture.as_deref().unwrap_or_default().as_bytes();
@@ -322,7 +340,8 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SparseXorRow
         | WorkerWorkload::SparseXorItem
         | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating => None,
+        | WorkerWorkload::BitMatrixTransposeAllocating
+        | WorkerWorkload::PauliStringRightMultiply => None,
     };
     let gate_hash_names = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_names()?),
@@ -337,7 +356,8 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SparseXorRow
         | WorkerWorkload::SparseXorItem
         | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating => None,
+        | WorkerWorkload::BitMatrixTransposeAllocating
+        | WorkerWorkload::PauliStringRightMultiply => None,
     };
     let gate_hash_sweeps = match args.workload {
         WorkerWorkload::GateNameHash => Some(gate_hash_sweeps(args.work_items.get())?),
@@ -352,7 +372,8 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
         | WorkerWorkload::SparseXorRow
         | WorkerWorkload::SparseXorItem
         | WorkerWorkload::BitMatrixTransposeInPlace
-        | WorkerWorkload::BitMatrixTransposeAllocating => None,
+        | WorkerWorkload::BitMatrixTransposeAllocating
+        | WorkerWorkload::PauliStringRightMultiply => None,
     };
     let gate_hash_table_digest = gate_hash_names
         .as_deref()
@@ -465,6 +486,15 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 Ok(TimedWorkloadOutput::TransposeComplete)
             })?
         }
+        WorkerWorkload::PauliStringRightMultiply => {
+            let fixture = pauli_fixture
+                .as_mut()
+                .ok_or(WorkerError::MissingPauliFixture)?;
+            measure_workload(|| {
+                fixture.execute(args.iterations.get())?;
+                Ok(TimedWorkloadOutput::PauliMultiplyComplete)
+            })?
+        }
     };
     if elapsed_seconds <= 0.0 || !elapsed_seconds.is_finite() {
         return Err(WorkerError::InvalidElapsed(elapsed_seconds));
@@ -520,6 +550,12 @@ pub(super) fn run(args: WorkerArgs) -> Result<(), WorkerError> {
                 .as_ref()
                 .ok_or(WorkerError::MissingTransposeFixture)?;
             semantic_digest(fixture.output_digest(args.iterations.get(), args.work_items.get())?)
+        }
+        TimedWorkloadOutput::PauliMultiplyComplete => {
+            let fixture = pauli_fixture
+                .as_ref()
+                .ok_or(WorkerError::MissingPauliFixture)?;
+            semantic_digest(fixture.output_digest(args.iterations.get(), work_count)?)
         }
     };
     let row = WorkerMeasurement {
@@ -616,6 +652,7 @@ enum TimedWorkloadOutput {
     NotZeroChecksum(u64),
     SparseXorComplete,
     TransposeComplete,
+    PauliMultiplyComplete,
 }
 
 impl WorkloadOutput {
@@ -880,6 +917,9 @@ mod dense_xor_tests;
 
 #[cfg(test)]
 mod not_zero_tests;
+
+#[cfg(test)]
+mod pauli_tests;
 
 #[cfg(test)]
 mod sparse_xor_tests;

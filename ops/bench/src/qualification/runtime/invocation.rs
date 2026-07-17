@@ -22,6 +22,7 @@ mod bit_acceptance;
 mod dense_xor;
 mod error;
 mod not_zero;
+mod pauli;
 mod preflight;
 mod sparse_xor;
 mod transpose;
@@ -81,7 +82,7 @@ const MAX_POPCOUNT_INPUT_DIGEST: &str =
     "cf5061f39d456d884fbdbcebfc53e04c47c29c872830a6a424f55d2e1e3d8ab4";
 const MAX_POPCOUNT_OUTPUT_DIGEST: &str =
     "72b158a2870c2bca123553e5aca970f39107a3c7448bdbdda1512a9bcdfa33aa";
-const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 8;
+const CONTRACT_PREFLIGHT_SCHEMA_VERSION: u32 = 9;
 const PROTOCOL_SMOKE_CASE_ID: &str = "protocol-smoke";
 const POPCOUNT_ODD_CASE_ID: &str = "simd-word-popcount-odd";
 const POPCOUNT_EVEN_CASE_ID: &str = "simd-word-popcount-even";
@@ -107,6 +108,7 @@ pub(super) const BIT_MATRIX_TRANSPOSE_IN_PLACE_GROUP_ID: &str =
     "PERFQ-M5-BIT-MATRIX-TRANSPOSE-IN-PLACE";
 pub(super) const BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID: &str =
     "PERFQ-M5-BIT-MATRIX-TRANSPOSE-ALLOCATING";
+pub(super) const PAULI_STRING_MULTIPLY_GROUP_ID: &str = "PERFQ-M6-PAULI-STRING";
 
 pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
     let identity = (
@@ -157,11 +159,14 @@ pub(super) fn supports_group(contract: &super::group::GroupContract) -> bool {
                 || (group == BIT_MATRIX_TRANSPOSE_ALLOCATING_GROUP_ID
                     && workload == "bit-matrix-transpose-allocating"
                     && measurement == "allocating-transpose")
+                || (group == PAULI_STRING_MULTIPLY_GROUP_ID
+                    && workload == "pauli-string-right-multiply"
+                    && measurement == "right-multiply-in-place")
     )
 }
 
 pub(super) const fn registered_group_count() -> usize {
-    13
+    14
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -422,12 +427,13 @@ impl PreparedWorkers {
     fn verify_identity_handshake(
         &self,
     ) -> Result<WorkerContractPreflightEvidence, InvocationError> {
-        let mut probes = Vec::with_capacity(90);
+        let mut probes = Vec::with_capacity(104);
         let protocol_output = SemanticDigest::try_new(protocol_smoke_output_digest())?;
         probes.push(self.invoke_identity_probe(Implementation::Stim, &protocol_output)?);
         probes.push(self.invoke_identity_probe(Implementation::Stab, &protocol_output)?);
         probes.extend(self.invoke_sparse_xor_acceptance_probes()?);
         probes.extend(self.invoke_transpose_acceptance_probes()?);
+        probes.extend(self.invoke_pauli_acceptance_probes()?);
         let small_input = InputDigest::try_new(SMALL_POPCOUNT_INPUT_DIGEST)?;
         let odd_output = SemanticDigest::try_new(ODD_POPCOUNT_OUTPUT_DIGEST)?;
         let even_output = SemanticDigest::try_new(EVEN_POPCOUNT_OUTPUT_DIGEST)?;
@@ -553,6 +559,7 @@ impl PreparedWorkers {
         }
         probes.extend(self.invoke_sparse_xor_rejection_probes()?);
         probes.extend(self.invoke_transpose_rejection_probes()?);
+        probes.extend(self.invoke_pauli_rejection_probes()?);
         WorkerContractPreflightEvidence::from_actual_probes(
             self.contract_identity_evidence()?,
             probes,
