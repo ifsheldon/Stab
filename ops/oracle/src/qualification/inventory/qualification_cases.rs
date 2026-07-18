@@ -15,9 +15,12 @@ use crate::qualification::model::{
     UpstreamCase, UpstreamDisposition,
 };
 
+mod owner_expansion;
+
+use owner_expansion::{MAX_OWNERS_PER_CASE, OwnerEntryKind, expand_upstream_owners};
+
 const LEDGER_SCHEMA_VERSION: u32 = 2;
 const MAX_LEDGER_CASES: usize = 4_096;
-const MAX_OWNERS_PER_CASE: usize = 2_048;
 const MAX_LEDGER_TEXT_BYTES: usize = 2_048;
 
 #[derive(Debug, Deserialize)]
@@ -317,7 +320,7 @@ pub(super) fn apply(
     }
 
     for mapping in ledger.existing_parent_mappings {
-        validate_existing_parent_mapping_shape(&mapping)?;
+        let upstream_owners = validate_existing_parent_mapping_shape(&mapping)?;
         if !source_ids.insert(mapping.id.clone()) {
             return invalid(format!(
                 "qualification mapping source id {:?} is duplicated",
@@ -326,6 +329,7 @@ pub(super) fn apply(
         }
         apply_existing_parent_mapping(
             &mapping,
+            &upstream_owners,
             upstream_cases,
             public_api_items,
             evidence_cases,
@@ -386,20 +390,20 @@ fn validate_case_shape(
         ))
     })?;
     let upstream_owners = expand_upstream_owners(
+        OwnerEntryKind::Case,
         &spec.id,
         &spec.upstream_owners,
         &spec.upstream_word_size_families,
+        spec.public_api_owners
+            .len()
+            .checked_add(spec.oracle_fixture_owners.len())
+            .ok_or_else(|| {
+                InventoryError::InvalidQualificationCases(format!(
+                    "qualification case {:?} owner count overflowed",
+                    spec.id
+                ))
+            })?,
     )?;
-    let owner_count = upstream_owners
-        .len()
-        .saturating_add(spec.public_api_owners.len())
-        .saturating_add(spec.oracle_fixture_owners.len());
-    if owner_count > MAX_OWNERS_PER_CASE {
-        return invalid(format!(
-            "qualification case {:?} has {} owners; limit is {}",
-            spec.id, owner_count, MAX_OWNERS_PER_CASE
-        ));
-    }
     validate_text("resource contract", &spec.resource_contract.detail)?;
     for axis in &spec.negative_axes {
         validate_text("negative axis", axis)?;
@@ -464,7 +468,7 @@ fn validate_case_shape(
 
 fn validate_existing_parent_mapping_shape(
     mapping: &ExistingParentMappingSpec,
-) -> Result<(), InventoryError> {
+) -> Result<Vec<UpstreamOwnerSpec>, InventoryError> {
     CaseId::try_new(mapping.id.clone()).map_err(|reason| {
         InventoryError::InvalidQualificationCases(format!(
             "qualification mapping source id {:?} is invalid: {reason}",
@@ -484,25 +488,43 @@ fn validate_existing_parent_mapping_shape(
         ));
     }
     let upstream_owners = expand_upstream_owners(
+        OwnerEntryKind::Mapping,
         &mapping.id,
         &mapping.upstream_owners,
         &mapping.upstream_word_size_families,
+        mapping
+            .public_api_owners
+            .len()
+            .checked_add(mapping.oracle_fixture_owners.len())
+            .ok_or_else(|| {
+                InventoryError::InvalidQualificationCases(format!(
+                    "qualification mapping {:?} owner count overflowed",
+                    mapping.id
+                ))
+            })?,
     )?;
     let owner_count = upstream_owners
         .len()
-        .saturating_add(mapping.public_api_owners.len())
-        .saturating_add(mapping.oracle_fixture_owners.len());
-    if owner_count == 0 || owner_count > MAX_OWNERS_PER_CASE {
+        .checked_add(mapping.public_api_owners.len())
+        .and_then(|count| count.checked_add(mapping.oracle_fixture_owners.len()))
+        .ok_or_else(|| {
+            InventoryError::InvalidQualificationCases(format!(
+                "qualification mapping {:?} owner count overflowed",
+                mapping.id
+            ))
+        })?;
+    if owner_count == 0 {
         return invalid(format!(
             "qualification mapping {:?} has {} owners; expected 1..={}",
             mapping.id, owner_count, MAX_OWNERS_PER_CASE
         ));
     }
-    Ok(())
+    Ok(upstream_owners)
 }
 
 fn apply_existing_parent_mapping(
     mapping: &ExistingParentMappingSpec,
+    upstream_owners: &[UpstreamOwnerSpec],
     upstream_cases: &mut [UpstreamCase],
     public_api_items: &mut [PublicApiItem],
     evidence_cases: &mut [EvidenceCase],
@@ -546,12 +568,7 @@ fn apply_existing_parent_mapping(
     let parent_id = parent.id.clone();
     let parent_comparator = parent.comparator;
 
-    let upstream_owners = expand_upstream_owners(
-        &mapping.id,
-        &mapping.upstream_owners,
-        &mapping.upstream_word_size_families,
-    )?;
-    for owner in &upstream_owners {
+    for owner in upstream_owners {
         validate_text("upstream symbol", &owner.symbol)?;
         if let Some(subcase) = &owner.subcase {
             validate_text("upstream subcase", subcase)?;
@@ -703,49 +720,6 @@ fn apply_existing_parent_mapping(
     parent.supporting_selectors.sort();
     parent.supporting_selectors.dedup();
     Ok(())
-}
-
-fn expand_upstream_owners(
-    mapping_id: &str,
-    owners: &[UpstreamOwnerSpec],
-    families: &[UpstreamWordSizeFamilySpec],
-) -> Result<Vec<UpstreamOwnerSpec>, InventoryError> {
-    let family_owner_count = families
-        .iter()
-        .map(|family| family.word_sizes.len())
-        .sum::<usize>();
-    let mut expanded = Vec::with_capacity(owners.len().saturating_add(family_owner_count));
-    for owner in owners {
-        expanded.push(UpstreamOwnerSpec {
-            path: owner.path.clone(),
-            symbol: owner.symbol.clone(),
-            subcase: owner.subcase.clone(),
-        });
-    }
-    for family in families {
-        validate_text("upstream word-size symbol base", &family.symbol_base)?;
-        if family.word_sizes.is_empty() {
-            return invalid(format!(
-                "qualification case {:?} has an empty upstream word-size family for {}:{}",
-                mapping_id, family.path, family.symbol_base
-            ));
-        }
-        let mut seen_sizes = BTreeSet::new();
-        for word_size in &family.word_sizes {
-            if !matches!(word_size, 64 | 128 | 256) || !seen_sizes.insert(*word_size) {
-                return invalid(format!(
-                    "qualification case {:?} has invalid or duplicate Stim word size {} for {}:{}",
-                    mapping_id, word_size, family.path, family.symbol_base
-                ));
-            }
-            expanded.push(UpstreamOwnerSpec {
-                path: family.path.clone(),
-                symbol: format!("{}_{}", family.symbol_base, word_size),
-                subcase: Some(format!("W={word_size}")),
-            });
-        }
-    }
-    Ok(expanded)
 }
 
 fn claim_planned_evidence(
@@ -1115,35 +1089,6 @@ mod tests {
         });
         empty.parent.provenance = EvidenceProvenance::QualificationPlan;
         assert!(validate_existing_parent_mapping_shape(&empty).is_err());
-    }
-
-    #[test]
-    fn upstream_word_size_families_expand_to_exact_parameterized_owners() {
-        let path =
-            RelativeSourcePath::try_new("src/stim/simulators/frame_simulator.test.cc".into())
-                .expect("path");
-        let families = vec![UpstreamWordSizeFamilySpec {
-            path: path.clone(),
-            symbol_base: "FrameSimulator.noisy_measurement_x".to_string(),
-            word_sizes: vec![64, 128, 256],
-        }];
-        let expanded =
-            expand_upstream_owners("cq2-word-size-family", &[], &families).expect("expand");
-        assert_eq!(expanded.len(), 3);
-        let first = expanded.first().expect("first expanded owner");
-        let third = expanded.last().expect("last expanded owner");
-        assert_eq!(first.path, path);
-        assert_eq!(first.symbol, "FrameSimulator.noisy_measurement_x_64");
-        assert_eq!(first.subcase.as_deref(), Some("W=64"));
-        assert_eq!(third.symbol, "FrameSimulator.noisy_measurement_x_256");
-        assert_eq!(third.subcase.as_deref(), Some("W=256"));
-
-        let duplicate = vec![UpstreamWordSizeFamilySpec {
-            path: first.path.clone(),
-            symbol_base: "FrameSimulator.noisy_measurement_x".to_string(),
-            word_sizes: vec![64, 64],
-        }];
-        assert!(expand_upstream_owners("cq2-word-size-family", &[], &duplicate).is_err());
     }
 
     #[test]
