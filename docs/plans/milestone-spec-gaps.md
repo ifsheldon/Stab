@@ -23,14 +23,41 @@ No open entries.
 
 ## Resolved Entries
 
+## 2026-07-18 - CQ2: Expanded Owner Admission Before Allocation
+
+Status: Resolved
+Revealed by: full code review of the first qualification owner-cap hardening change.
+Current text: the controller counted expanded word-size owners against the 2,048-owner cap and reused the expanded set during assignment.
+Gap: the first fix constructed the expanded vector before enforcing the aggregate cap, so a hostile or accidentally oversized source ledger could still force materialization of the data that admission was intended to reject.
+Proposed amendment: validate family shape and use checked arithmetic to compute the complete explicit, family-expanded, public-API, and oracle-fixture owner count before allocating an expansion; allocate at most the admitted upstream count and reuse it during assignment.
+Resolution: owner expansion now lives in a bounded module that validates every family and enforces the aggregate limit before `Vec::with_capacity`, while direct 2,049-owner aggregate and oversized-family regressions prove both admission paths fail before expansion.
+
+## 2026-07-18 - PQ2: Clifford Identity Execution Witness
+
+Status: Resolved
+Revealed by: milestone audit of the planned eleventh executable performance slice.
+Current text: the plan required the identity callback to call public in-place multiplication and black-box the unchanged left operand after the call.
+Gap: because both operands and the result are identity and Stab has an identity-right early return, a release optimizer could erase or specialize the call while preserving every planned output field, leaving a timing result dominated by harness overhead.
+Proposed amendment: require symmetric per-iteration compiler fences and optimizer-opaque mutable-left and immutable-right references in both workers, retain a post-loop state witness, and freeze the call shape in worker source tests.
+Resolution: items 7 through 9 of the eleventh executable slice require the exact fence, opaque-reference, public-call, fence, per-success callback count, result-derived rolling witness, and final-state-witness sequence for both identity and non-identity workers. Callback count and witness reset to zero after setup and immediately before each invocation barrier, so calibration and warmup cannot contribute. The plan freezes literal identity witnesses `0x9e3779b97f4a7c16` after one call and `0x8d6ea9a2cecd4fdd` after two calls; the sixteen-field output and checked vector file freeze all remaining values and forbid a post-call-only barrier, request-derived substitute, or cross-invocation state.
+
+## 2026-07-18 - PQ2: Clifford Canonical Vectors And Rejection Matrix
+
+Status: Resolved
+Revealed by: milestone audit of the planned eleventh executable performance slice.
+Current text: the plan referred to a canonical 24-gate order, gate-sequence digests, malformed input, and overflow classes without freezing the order, byte encoding, digest framing, exact rejected vectors, or receipt cardinality.
+Gap: different valid Clifford permutations or encodings could produce self-consistent but incomparable fixtures, and workers could omit zero-width, unknown-marker, wrong-measurement, malformed-cycle, reserved-field, or semantic-work-overflow branches while still claiming the broad matrix.
+Proposed amendment: name the exact pinned Stim order and code assignment, define digest framing and scale tails, require an independently cross-checked checked-in vector file before worker implementation, and enumerate every accepted and rejected vector with an exact receipt total.
+Resolution: items 4 and 6 through 10 pin the 24 names and one-byte codes, exact marker and schema constants, SHA-256 framing, scale tails, checked vector file, all 31 complete per-worker requests with exact accepted iteration counts, every descriptor-field rejection trigger, and the precise Stab-then-Stim 62-receipt nesting order. Each rejection is a checked single-field mutation of one named accepted baseline, and the vector file binds all complete request bytes, accepted outputs or rejection classes, and unconsumed-barrier outcomes so an earlier guard cannot impersonate branch coverage. The former output-field-overflow requirement is removed because no independently overflowing output field exists after the semantic-work and width bounds.
+
 ## 2026-07-18 - CQ1/CQ2: Correctness Artifact Relocation Contract
 
 Status: Resolved
-Revealed by: milestone audit of the source-current 271-parent CQ2 report replay and exact preflight.
+Revealed by: milestone audit of the 271-parent CQ2 report replay and exact preflight.
 Current text: the correctness plan required repository-anchored publication and said preflight validates output bindings, but it did not distinguish semantic child-output identity from the report directory's filesystem name.
 Gap: documentation could imply that request, report, completion, or preflight bytes bind one canonical `target/qualification/` directory even though a byte-identical artifact can be relocated to another allowed directory and replayed with unchanged digests.
 Proposed amendment: define correctness artifact identity as content-addressed and path-independent within the allowed qualification root, keep atomic repository-anchored publication as a write-safety contract, and use `output binding` only for semantic child output and retained artifact content rather than directory provenance.
-Resolution: the correctness plan now states that byte-identical report trees are intentionally relocatable beneath `target/qualification/`, that repository-anchored publication protects the destination without making it provenance, and that preflight acceptance binds semantic output and result identity. The source-current CQ2 progress report no longer claims output-directory binding.
+Resolution: the correctness plan states that byte-identical report trees are intentionally relocatable beneath `target/qualification/`, that repository-anchored publication protects the destination without making it provenance, and that preflight acceptance binds semantic output and result identity. Execution-receipt schema version 4 and report and preflight schema version 7 store retained failure-artifact paths relative to the report root, validate them beneath `cases/<case-id>/`, and include a report-tree relocation regression with retained failure content. The CQ2 progress report no longer claims output-directory binding.
 
 ## 2026-07-18 - PQ2: Pauli Iterator Accepted-Maximum State Coverage
 

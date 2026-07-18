@@ -47,25 +47,25 @@ It does not claim that inherited timing ratios satisfy the comprehensive runner,
 | Default-feature public Rust API items | 1,972 |
 | Public API items covered by a measured parent | 1,021 |
 | Public API items classified as not independently performance relevant | 951 |
-| Qualification groups | 547 |
-| Measured or planned measured groups | 545 |
+| Qualification groups | 548 |
+| Measured or planned measured groups | 546 |
 | Non-performance metadata groups | 2 |
 | Inherited benchmark rows | 161 |
 | Upstream perf files | 23 |
 | Upstream `BENCHMARK(...)` symbols | 74 |
 | Current primary waiver rows | 4 |
 | Groups bound to exact CQ0 API owners | 246 |
-| Groups with stable planned CQ preflight ids | 289 |
-| Groups with implemented exact CQ case bindings | 12 |
+| Groups with stable planned CQ preflight ids | 287 |
+| Groups with implemented exact CQ case bindings | 15 |
 | Exact inherited threshold measurement pairs | 21 |
 | Exact checklist row-and-domain parent groups | 133 |
 | Exact checklist child claims across those parents | 181 |
 | Partial-row child ownership entries | 50 |
-| Typed generated fixture families | 388 |
+| Typed generated fixture families | 395 |
 | Typed repository fixture families with SHA-256 | 35 |
-| Typed inline fixture families | 121 |
-| Scale points with exact input byte counts | 146 |
-| Scale points explicitly not byte-sized | 1,174 |
+| Typed inline fixture families | 118 |
+| Scale points with exact input byte counts | 167 |
+| Scale points explicitly not byte-sized | 1,171 |
 
 The API inventory preserves the CQ0 primary performance ownership counts: 274 bit-kernel, 202 circuit, 1 CLI, 128 DEM, 15 DEM-sampling, 62 detection, 105 error-analysis, 96 flow and detector-utility, 178 gate, 107 generation, 97 result-IO, 49 sampling, 4 search, and 654 stabilizer-algebra items.
 Declaration-only kinds and marker or diagnostic trait implementations do not receive independent runtime claims.
@@ -83,13 +83,13 @@ Every scale point stores either an exact input-byte count or an explicit not-app
 
 | Decision | Count | Meaning |
 | --- | ---: | --- |
-| Retained | 12 | The upstream operation shape is faithful, but comprehensive preflight, output, scaling, and statistical evidence is still missing. |
+| Retained | 10 | The upstream operation shape is faithful, but comprehensive preflight, output, scaling, and statistical evidence is still missing. |
 | Reworked | 135 | The row needs a faithful runner, exact phase split, scale family, output contract, or another material correction; `m4-circuit-parse` now has its exact replacement contract, and `m5-simd-word` remains reworked while its older M12 threshold stays active pending explicit replacement migration. |
 | Diagnostic | 4 | The row remains useful for investigation but cannot produce a comprehensive ratio in its current form. |
-| Superseded | 8 | A more specific row owns the behavior and the duplicate identity must be removed during manifest migration. |
+| Superseded | 10 | A more specific row owns the behavior and the duplicate identity must be removed during manifest migration. |
 | Removed | 2 | `m7-perf-harness` and `m12-primary-performance-matrix` are metadata rather than timed workloads. |
 
-The eight superseded identities are `m4-circuit-canonical-print`, `m5-simd-bit-table`, `m5-sparse-xor`, `m10-analyze-errors-fold-cli`, `m9-feedback-inline-mpp-batch`, `pf3-m2d-sweep-b8`, `pf7-cli-m2d-sweep-b8`, and `pf7-cli-m2d-feedback-inline`.
+The ten superseded identities are `m4-circuit-canonical-print`, `m5-simd-bit-table`, `m5-sparse-xor`, `m6-pauli-iter`, `m6-pauli-string`, `m10-analyze-errors-fold-cli`, `m9-feedback-inline-mpp-batch`, `pf3-m2d-sweep-b8`, `pf7-cli-m2d-sweep-b8`, and `pf7-cli-m2d-feedback-inline`.
 The four diagnostic identities are `m7-cli-dispatch`, `m7-convert-stim-canonical`, `m7-convert-01-to-ptb64`, and `pf3-gate-semantic-wide`.
 
 ## Unresolved Work Frozen For Later Milestones
@@ -98,7 +98,7 @@ The four diagnostic identities are `m7-cli-dispatch`, `m7-convert-stim-canonical
 | --- | ---: | --- |
 | Proxy workload | 10 | PQ2 through PQ5 exact workload replacement |
 | Stale metadata row | 2 | PQ1 manifest migration |
-| Duplicate workload | 8 | PQ1 manifest migration |
+| Duplicate workload | 10 | PQ1 manifest migration |
 | Missing scale family | 123 | PQ2 through PQ6 |
 | Missing qualification correctness preflight | 158 | PQ1 plus dependent CQ milestones |
 | Missing semantic output digest | 158 | PQ1 |

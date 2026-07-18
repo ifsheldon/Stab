@@ -113,4 +113,4 @@ The real CQ soak compatibility probe was temporary and target-dependent, so it w
 ## Next Milestone
 
 CQ2 implementation ownership is complete for all 271 deterministic parents, and PQ2 is active.
-Ten exact-case PQ2 product contracts are executable; the remaining work must continue adding equivalent-work deterministic model, format, gate, kernel, and algebra groups instead of promoting the PQ1 synthetic ratio.
+Fifteen exact-case PQ2 product contracts are executable; the remaining work must continue adding equivalent-work deterministic model, format, gate, kernel, and algebra groups instead of promoting the PQ1 synthetic ratio.

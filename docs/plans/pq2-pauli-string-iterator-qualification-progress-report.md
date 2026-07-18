@@ -46,7 +46,7 @@ The clean correctness report at `target/qualification/pq2-pauli-iter-full-afaf0b
 | Preflight | `a06417d24a8f446f4974e4cd7de8b179ae2218e42560d776633ab304000fe5f1` |
 
 Every performance report independently reconstructed the canonical correctness request, report, completion, execution receipts, and exact three-case preflight before timing.
-The complete 271-parent CQ2 family remains a separate source-current checkpoint and is not claimed by this focused prerequisite run.
+The complete 271-parent CQ2 family remains a separate checkpoint and is not claimed by this focused prerequisite run. Its latest complete execution at `6351fe0a529462efd9f18a88bd59c08cfec9f81b` is historical after qualification-controller hardening, and a clean source-current refresh is pending.
 
 ## Correctness Oracle
 
