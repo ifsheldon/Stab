@@ -5,7 +5,8 @@ use rand::{Rng, RngExt as _};
 use super::{
     PauliBasis, PauliPhase, PauliSign, PauliString, StabilizerError, StabilizerResult, Tableau,
 };
-use crate::Gate;
+use crate::bits::{CliffordPlanes, CliffordPlanesMut, clifford_right_multiply_words};
+use crate::{BitError, BitVec, Gate};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct SignedPauli {
@@ -354,8 +355,13 @@ impl Display for SingleQubitClifford {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CliffordString {
-    gates: Vec<SingleQubitClifford>,
-    non_identity_count: usize,
+    z_signs: BitVec,
+    x_signs: BitVec,
+    inv_x2x: BitVec,
+    x2z: BitVec,
+    z2x: BitVec,
+    inv_z2z: BitVec,
+    has_non_identity: bool,
 }
 
 impl CliffordString {
@@ -368,8 +374,13 @@ impl CliffordString {
     pub(crate) fn identity_unchecked(num_qubits: usize) -> Self {
         debug_assert!(num_qubits <= super::StabilizerResource::CliffordQubits.limit());
         Self {
-            gates: vec![SingleQubitClifford::I; num_qubits],
-            non_identity_count: 0,
+            z_signs: BitVec::zeros(num_qubits),
+            x_signs: BitVec::zeros(num_qubits),
+            inv_x2x: BitVec::zeros(num_qubits),
+            x2z: BitVec::zeros(num_qubits),
+            z2x: BitVec::zeros(num_qubits),
+            inv_z2z: BitVec::zeros(num_qubits),
+            has_non_identity: false,
         }
     }
 
@@ -389,21 +400,28 @@ impl CliffordString {
             }
             collected.push(gate);
         }
-        Ok(Self::from_gates_unchecked(collected))
+        Ok(Self::from_gates_within_limit(collected))
     }
 
-    pub(crate) fn from_gates_unchecked(
-        gates: impl IntoIterator<Item = SingleQubitClifford>,
-    ) -> Self {
-        let gates = gates.into_iter().collect::<Vec<_>>();
+    fn from_gates_within_limit(gates: Vec<SingleQubitClifford>) -> Self {
         debug_assert!(gates.len() <= super::StabilizerResource::CliffordQubits.limit());
-        let non_identity_count = gates
-            .iter()
-            .filter(|gate| **gate != SingleQubitClifford::I)
-            .count();
+        let table_indices = gates
+            .into_iter()
+            .map(SingleQubitClifford::table_index)
+            .collect::<Vec<_>>();
+        Self::from_table_indices(&table_indices)
+    }
+
+    fn from_table_indices(table_indices: &[u8]) -> Self {
+        let plane = |bit| BitVec::from_bits(table_indices.iter().map(move |code| code & bit != 0));
         Self {
-            gates,
-            non_identity_count,
+            z_signs: plane(1 << 0),
+            x_signs: plane(1 << 1),
+            inv_x2x: plane(1 << 2),
+            x2z: plane(1 << 3),
+            z2x: plane(1 << 4),
+            inv_z2z: plane(1 << 5),
+            has_non_identity: table_indices.iter().any(|code| *code != 0),
         }
     }
 
@@ -421,25 +439,37 @@ impl CliffordString {
     }
 
     pub fn len(&self) -> usize {
-        self.gates.len()
+        self.z_signs.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.gates.is_empty()
+        self.z_signs.is_empty()
     }
 
     pub fn gate_at(&self, index: usize) -> Option<SingleQubitClifford> {
-        self.gates.get(index).copied()
+        if index >= self.len() {
+            return None;
+        }
+        let table_index = u8::from(self.z_signs.get(index)?)
+            | (u8::from(self.x_signs.get(index)?) << 1)
+            | (u8::from(self.inv_x2x.get(index)?) << 2)
+            | (u8::from(self.x2z.get(index)?) << 3)
+            | (u8::from(self.z2x.get(index)?) << 4)
+            | (u8::from(self.inv_z2z.get(index)?) << 5);
+        SingleQubitClifford::from_table_index(table_index)
     }
 
     pub fn set_gate_at(&mut self, index: usize, gate: SingleQubitClifford) -> StabilizerResult<()> {
         let len = self.len();
-        let target = self
-            .gates
-            .get_mut(index)
+        let old_gate = self
+            .gate_at(index)
             .ok_or(StabilizerError::CliffordIndexOutOfRange { index, len })?;
-        update_non_identity_count(&mut self.non_identity_count, *target, gate);
-        *target = gate;
+        self.write_gate_bits(index, gate)?;
+        if gate != SingleQubitClifford::I {
+            self.has_non_identity = true;
+        } else if old_gate != SingleQubitClifford::I {
+            self.has_non_identity = self.planes_have_terms();
+        }
         Ok(())
     }
 
@@ -448,14 +478,10 @@ impl CliffordString {
     where
         R: Rng + ?Sized,
     {
-        self.non_identity_count = 0;
-        for gate in &mut self.gates {
-            let next = SingleQubitClifford::random(rng);
-            if next != SingleQubitClifford::I {
-                self.non_identity_count += 1;
-            }
-            *gate = next;
-        }
+        let gates = (0..self.len())
+            .map(|_| SingleQubitClifford::random(rng))
+            .collect::<Vec<_>>();
+        *self = Self::from_gates_within_limit(gates);
     }
 
     pub fn concat(&self, rhs: &Self) -> StabilizerResult<Self> {
@@ -467,13 +493,10 @@ impl CliffordString {
                 right: rhs.len(),
             })?;
         super::StabilizerResource::CliffordQubits.ensure(new_len)?;
-        let mut gates = Vec::with_capacity(new_len);
-        gates.extend_from_slice(&self.gates);
-        gates.extend_from_slice(&rhs.gates);
-        Ok(Self {
-            gates,
-            non_identity_count: self.non_identity_count + rhs.non_identity_count,
-        })
+        let mut table_indices = self.table_indices()?;
+        table_indices.reserve(rhs.len());
+        table_indices.extend(rhs.table_indices()?);
+        Ok(Self::from_table_indices(&table_indices))
     }
 
     /// Repeats this string after checking multiplication overflow and the resulting size.
@@ -490,14 +513,14 @@ impl CliffordString {
                     repetitions,
                 })?;
         super::StabilizerResource::CliffordQubits.ensure(new_len)?;
-        let mut gates = Vec::with_capacity(new_len);
-        for _ in 0..repetitions {
-            gates.extend_from_slice(&self.gates);
-        }
-        Ok(Self {
-            gates,
-            non_identity_count: self.non_identity_count * repetitions,
-        })
+        let source = self.table_indices()?;
+        let table_indices = source
+            .iter()
+            .copied()
+            .cycle()
+            .take(new_len)
+            .collect::<Vec<_>>();
+        Ok(Self::from_table_indices(&table_indices))
     }
 
     pub fn multiply(&self, rhs: &Self) -> StabilizerResult<Self> {
@@ -510,51 +533,118 @@ impl CliffordString {
     ///
     /// If `rhs` is longer than this string, this string is extended with identity rotations before
     /// multiplication.
+    #[inline]
     pub fn right_multiply_in_place(&mut self, rhs: &Self) -> StabilizerResult<()> {
         self.ensure_len(rhs.len())?;
-        if rhs.non_identity_count == 0 {
+        if !rhs.has_non_identity {
             return Ok(());
         }
-        for (left, right) in self.gates.iter_mut().zip(&rhs.gates) {
-            if *right != SingleQubitClifford::I {
-                let product = left.multiply(*right)?;
-                update_non_identity_count(&mut self.non_identity_count, *left, product);
-                *left = product;
-            }
-        }
+        let word_count = rhs.z_signs.word_count();
+        let tail_has_non_identity = self.tail_has_non_identity(word_count)?;
+        let left = CliffordPlanesMut {
+            z_signs: prefix_mut(self.z_signs.words_mut(), word_count)?,
+            x_signs: prefix_mut(self.x_signs.words_mut(), word_count)?,
+            inv_x2x: prefix_mut(self.inv_x2x.words_mut(), word_count)?,
+            x2z: prefix_mut(self.x2z.words_mut(), word_count)?,
+            z2x: prefix_mut(self.z2x.words_mut(), word_count)?,
+            inv_z2z: prefix_mut(self.inv_z2z.words_mut(), word_count)?,
+        };
+        let right = CliffordPlanes {
+            z_signs: rhs.z_signs.words(),
+            x_signs: rhs.x_signs.words(),
+            inv_x2x: rhs.inv_x2x.words(),
+            x2z: rhs.x2z.words(),
+            z2x: rhs.z2x.words(),
+            inv_z2z: rhs.inv_z2z.words(),
+        };
+        self.has_non_identity = clifford_right_multiply_words(left, right) || tail_has_non_identity;
         Ok(())
     }
 
     fn ensure_len(&mut self, len: usize) -> StabilizerResult<()> {
         if len > self.len() {
             super::StabilizerResource::CliffordQubits.ensure(len)?;
-            self.gates.resize(len, SingleQubitClifford::I);
+            self.z_signs.resize_zeros(len);
+            self.x_signs.resize_zeros(len);
+            self.inv_x2x.resize_zeros(len);
+            self.x2z.resize_zeros(len);
+            self.z2x.resize_zeros(len);
+            self.inv_z2z.resize_zeros(len);
         }
         Ok(())
     }
+
+    fn write_gate_bits(&mut self, index: usize, gate: SingleQubitClifford) -> StabilizerResult<()> {
+        let table_index = gate.table_index();
+        self.z_signs.set(index, table_index & (1 << 0) != 0)?;
+        self.x_signs.set(index, table_index & (1 << 1) != 0)?;
+        self.inv_x2x.set(index, table_index & (1 << 2) != 0)?;
+        self.x2z.set(index, table_index & (1 << 3) != 0)?;
+        self.z2x.set(index, table_index & (1 << 4) != 0)?;
+        self.inv_z2z.set(index, table_index & (1 << 5) != 0)?;
+        Ok(())
+    }
+
+    fn table_indices(&self) -> StabilizerResult<Vec<u8>> {
+        (0..self.len())
+            .map(|index| {
+                self.gate_at(index)
+                    .map(SingleQubitClifford::table_index)
+                    .ok_or(StabilizerError::InvalidSingleQubitCliffordProduct)
+            })
+            .collect()
+    }
+
+    fn planes_have_terms(&self) -> bool {
+        self.z_signs.not_zero()
+            || self.x_signs.not_zero()
+            || self.inv_x2x.not_zero()
+            || self.x2z.not_zero()
+            || self.z2x.not_zero()
+            || self.inv_z2z.not_zero()
+    }
+
+    fn tail_has_non_identity(&self, word_start: usize) -> StabilizerResult<bool> {
+        for plane in [
+            &self.z_signs,
+            &self.x_signs,
+            &self.inv_x2x,
+            &self.x2z,
+            &self.z2x,
+            &self.inv_z2z,
+        ] {
+            let tail = plane
+                .words()
+                .get(word_start..)
+                .ok_or(BitError::LengthMismatch {
+                    left: word_start * u64::BITS as usize,
+                    right: plane.len(),
+                })?;
+            if tail.iter().any(|word| *word != 0) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
 }
 
-fn update_non_identity_count(
-    non_identity_count: &mut usize,
-    old_gate: SingleQubitClifford,
-    new_gate: SingleQubitClifford,
-) {
-    match (
-        old_gate == SingleQubitClifford::I,
-        new_gate == SingleQubitClifford::I,
-    ) {
-        (true, false) => *non_identity_count += 1,
-        (false, true) => *non_identity_count -= 1,
-        _ => {}
-    }
+fn prefix_mut(words: &mut [u64], len: usize) -> StabilizerResult<&mut [u64]> {
+    let word_len = words.len();
+    words.get_mut(..len).ok_or_else(|| {
+        StabilizerError::Bit(BitError::LengthMismatch {
+            left: word_len * u64::BITS as usize,
+            right: len * u64::BITS as usize,
+        })
+    })
 }
 
 impl Display for CliffordString {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for (index, gate) in self.gates.iter().enumerate() {
+        for index in 0..self.len() {
             if index > 0 {
                 f.write_str(" ")?;
             }
+            let gate = self.gate_at(index).ok_or(std::fmt::Error)?;
             write!(f, "{gate}")?;
         }
         Ok(())
@@ -584,17 +674,19 @@ mod tests {
 
     #[test]
     fn right_multiply_in_place_matches_per_gate_products() {
-        let mut left = CliffordString::from_gates_unchecked([
+        let mut left = CliffordString::from_gates([
             SingleQubitClifford::H,
             SingleQubitClifford::S,
             SingleQubitClifford::I,
-        ]);
-        let right = CliffordString::from_gates_unchecked([
+        ])
+        .unwrap();
+        let right = CliffordString::from_gates([
             SingleQubitClifford::S,
             SingleQubitClifford::H,
             SingleQubitClifford::SqrtX,
-        ]);
-        let expected = CliffordString::from_gates_unchecked([
+        ])
+        .unwrap();
+        let expected = CliffordString::from_gates([
             SingleQubitClifford::H
                 .multiply(SingleQubitClifford::S)
                 .unwrap(),
@@ -604,7 +696,8 @@ mod tests {
             SingleQubitClifford::I
                 .multiply(SingleQubitClifford::SqrtX)
                 .unwrap(),
-        ]);
+        ])
+        .unwrap();
 
         left.right_multiply_in_place(&right).unwrap();
 
@@ -613,9 +706,9 @@ mod tests {
 
     #[test]
     fn right_multiply_in_place_extends_shorter_left_side() {
-        let mut left = CliffordString::from_gates_unchecked([SingleQubitClifford::H]);
+        let mut left = CliffordString::from_gates([SingleQubitClifford::H]).unwrap();
         let right =
-            CliffordString::from_gates_unchecked([SingleQubitClifford::I, SingleQubitClifford::S]);
+            CliffordString::from_gates([SingleQubitClifford::I, SingleQubitClifford::S]).unwrap();
 
         left.right_multiply_in_place(&right).unwrap();
 
@@ -625,7 +718,7 @@ mod tests {
 
     #[test]
     fn right_multiply_in_place_extends_for_longer_identity_rhs() {
-        let mut left = CliffordString::from_gates_unchecked([SingleQubitClifford::H]);
+        let mut left = CliffordString::from_gates([SingleQubitClifford::H]).unwrap();
         let right = CliffordString::identity_unchecked(3);
 
         left.right_multiply_in_place(&right).unwrap();
@@ -634,5 +727,52 @@ mod tests {
         assert_eq!(left.gate_at(0), Some(SingleQubitClifford::H));
         assert_eq!(left.gate_at(1), Some(SingleQubitClifford::I));
         assert_eq!(left.gate_at(2), Some(SingleQubitClifford::I));
+    }
+
+    #[test]
+    fn right_multiply_in_place_preserves_left_tail_across_word_boundaries() {
+        for (left_len, right_len, tail_index) in [(63, 17, 62), (65, 63, 64), (129, 65, 128)] {
+            let mut left = CliffordString::identity_unchecked(left_len);
+            left.set_gate_at(0, SingleQubitClifford::H).unwrap();
+            left.set_gate_at(tail_index, SingleQubitClifford::S)
+                .unwrap();
+            let mut right = CliffordString::identity_unchecked(right_len);
+            right.set_gate_at(0, SingleQubitClifford::SqrtX).unwrap();
+
+            let expected_head = SingleQubitClifford::H
+                .multiply(SingleQubitClifford::SqrtX)
+                .unwrap();
+            left.right_multiply_in_place(&right).unwrap();
+
+            assert_eq!(left.gate_at(0), Some(expected_head), "left_len={left_len}");
+            assert_eq!(
+                left.gate_at(tail_index),
+                Some(SingleQubitClifford::S),
+                "left_len={left_len}"
+            );
+            assert!(left.has_non_identity, "left_len={left_len}");
+        }
+    }
+
+    #[test]
+    fn clearing_last_gate_restores_identity_metadata() {
+        let mut right = CliffordString::identity_unchecked(257);
+        right.set_gate_at(256, SingleQubitClifford::SqrtY).unwrap();
+        assert!(right.has_non_identity);
+
+        right.set_gate_at(256, SingleQubitClifford::I).unwrap();
+        assert!(!right.has_non_identity);
+
+        let mut left = CliffordString::from_gates((0..257).map(|index| {
+            if index % 2 == 0 {
+                SingleQubitClifford::H
+            } else {
+                SingleQubitClifford::S
+            }
+        }))
+        .unwrap();
+        let expected = left.clone();
+        left.right_multiply_in_place(&right).unwrap();
+        assert_eq!(left, expected);
     }
 }

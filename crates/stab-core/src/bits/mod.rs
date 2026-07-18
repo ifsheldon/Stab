@@ -1,6 +1,9 @@
+mod clifford;
 mod scalar;
 mod simd;
 mod transpose;
+
+pub(crate) use clifford::{CliffordPlanes, CliffordPlanesMut, clifford_right_multiply_words};
 
 use std::fmt::{Display, Formatter};
 use std::ops::Range;
@@ -215,6 +218,20 @@ impl BitVec {
         Self { words, bit_len }
     }
 
+    pub(crate) fn from_bits(bits: impl IntoIterator<Item = bool>) -> Self {
+        let bits = bits.into_iter().collect::<Vec<_>>();
+        let bit_len = BitLen::new(bits.len());
+        let words = bits
+            .chunks(WORD_BITS)
+            .map(|chunk| {
+                chunk.iter().enumerate().fold(0_u64, |word, (index, bit)| {
+                    word | (u64::from(*bit) << index)
+                })
+            })
+            .collect();
+        Self { words, bit_len }
+    }
+
     pub fn len(&self) -> usize {
         self.bit_len.get()
     }
@@ -233,6 +250,13 @@ impl BitVec {
 
     pub(crate) fn words_mut(&mut self) -> &mut [u64] {
         &mut self.words
+    }
+
+    pub(crate) fn resize_zeros(&mut self, bit_len: impl Into<BitLen>) {
+        let bit_len = bit_len.into();
+        self.words.resize(bit_len.word_count(), 0);
+        self.bit_len = bit_len;
+        self.mask_unused_tail_bits();
     }
 
     pub fn as_bitslice(&self) -> BitSlice<'_> {
